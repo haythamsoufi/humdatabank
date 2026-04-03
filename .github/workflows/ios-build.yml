@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -160,7 +160,7 @@ jobs:
           cd ../../..
 
       - name: Archive iOS build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-build-ci
           path: |
@@ -194,7 +194,7 @@ jobs:
       #     fi
       #
       # - name: Upload IPA
-      #   uses: actions/upload-artifact@v4
+      #   uses: actions/upload-artifact@v7
       #   with:
       #     name: ios-ipa
       #     path: MobileApp/build/ios/ipa/*.ipa

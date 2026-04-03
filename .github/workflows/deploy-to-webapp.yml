@@ -277,7 +277,7 @@ jobs:
           fi
 
       - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ steps.config.outputs.app_name }}
           images: 'ifrcimage.azurecr.io/databank_backend:${{ inputs.version }}'

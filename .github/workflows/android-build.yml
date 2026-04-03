@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -158,7 +158,7 @@ jobs:
         continue-on-error: true  # Don't fail if bundle build fails
 
       - name: Archive Android build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-build-ci
           path: |
@@ -187,7 +187,7 @@ jobs:
       #     flutter build apk --release --dart-define=PRODUCTION=true
       #
       # - name: Upload signed APK
-      #   uses: actions/upload-artifact@v4
+      #   uses: actions/upload-artifact@v7
       #   with:
       #     name: android-apk-signed
       #     path: ${{ steps.flutter_path.outputs.path }}/build/app/outputs/flutter-apk/*.apk

@@ -1,0 +1,48 @@
+<div id="chatAiPolicyModalOverlay" class="chat-ai-policy-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="chatAiPolicyModalTitle" aria-hidden="true" hidden>
+    <div class="chat-ai-policy-modal">
+        <div class="chat-ai-policy-modal-header" id="chatAiPolicyModalTitle">
+            {{ _('AI Use Policy') }}
+        </div>
+        <div class="chat-ai-policy-modal-body">
+            <div class="chat-ai-policy-notice-highlight" role="alert">
+                <p class="chat-ai-policy-notice-highlight-main">{{ _("Don't share sensitive information.") }}</p>
+                <p class="chat-ai-policy-notice-highlight-sub">{{ _('We use system traces and telemetry to improve the assistant. Your messages may be processed by external AI providers.') }}</p>
+            </div>
+            <section class="chat-ai-policy-section">
+                <h3 class="chat-ai-policy-h3">{{ _('Purpose') }}</h3>
+                <p>{{ _('The AI assistant helps you explore data and documents on the') }} {{ ORG_NAME }} {{ _('platform. It can answer questions about indicators, countries, assignments, and search through uploaded documents. This policy explains acceptable use and important limits.') }}</p>
+            </section>
+            <section class="chat-ai-policy-section">
+                <h3 class="chat-ai-policy-h3">{{ _('Acceptable Use') }}</h3>
+                <ul>
+                    <li>{{ _('Ask questions about platform data, indicators, and documents.') }}</li>
+                    <li>{{ _('Use the assistant to compare values, find information, and interpret evidence from reports and plans.') }}</li>
+                    <li>{{ _('Do NOT share passwords, credentials, or other secrets.') }}</li>
+                    <li>{{ _('Do NOT paste personal data, financial information, or highly confidential operational details.') }}</li>
+                </ul>
+            </section>
+            <section class="chat-ai-policy-section">
+                <h3 class="chat-ai-policy-h3">{{ _('Data Handling') }}</h3>
+                <p>{{ _('Your messages and conversation history may be processed by external AI providers (e.g. OpenAI, Gemini, Azure) to generate responses. We use system traces and telemetry to improve the assistant.') }}</p>
+                <p>{{ _('Technical safeguards include:') }}</p>
+                <ul>
+                    <li>{{ _('Data Loss Prevention (DLP) scans that detect and may block or warn about sensitive patterns before sending.') }}</li>
+                    <li>{{ _('PII scrubbing to reduce exposure of personal data.') }}</li>
+                    <li>{{ _('Audit logging for security events (without storing your message content).') }}</li>
+                </ul>
+                <p>{{ _('These safeguards are best-effort and do not guarantee full removal of sensitive data. Treat the AI assistant as untrusted for sensitive information.') }}</p>
+            </section>
+            <section class="chat-ai-policy-section">
+                <h3 class="chat-ai-policy-h3">{{ _('Accuracy and Verification') }}</h3>
+                <p>{{ _('AI can make mistakes. The assistant may hallucinate or misinterpret data. Always verify important information against the source data or documents before using it for decisions or reporting.') }}</p>
+            </section>
+            <section class="chat-ai-policy-section">
+                <h3 class="chat-ai-policy-h3">{{ _('Your Responsibilities') }}</h3>
+                <p>{{ _('You are responsible for the content you send and how you use the assistant\'s responses. If you suspect a security incident or accidental exposure of sensitive data, contact your administrator or the platform support team.') }}</p>
+            </section>
+        </div>
+        <div class="chat-ai-policy-modal-actions">
+            <button type="button" id="chatAiPolicyModalAckBtn" class="chat-ai-policy-modal-ack-btn">{{ _('I understand') }}</button>
+        </div>
+    </div>
+</div>

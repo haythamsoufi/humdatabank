@@ -1,0 +1,480 @@
+<!-- Backoffice/app/templates/plugins/interactive_map/settings.html -->
+
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}Interactive Map Plugin Settings{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {{ page_header(
+        title="Interactive Map Plugin Settings",
+        icon='fas fa-map-marked-alt',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Plugins', 'url': url_for('admin.plugin_management')},
+            {'name': 'Interactive Map Settings'}
+        ]
+    ) }}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <!-- Plugin Information -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                Plugin Information
+            </h3>
+
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Name:</span>
+                    <span class="font-medium">Interactive Map Plugin</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Version:</span>
+                    <span class="font-medium">1.0.0</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Author:</span>
+                    <span class="font-medium">IFRC Development Team</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">License:</span>
+                    <span class="font-medium">MIT</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Status:</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Active
+                    </span>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm text-gray-600">
+                    This plugin provides interactive map field types for forms, allowing users to select locations
+                    and add markers on maps.
+                </p>
+            </div>
+        </div>
+
+        <!-- Plugin Actions -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                <i class="fas fa-cogs text-gray-600 mr-2"></i>
+                Plugin Actions
+            </h3>
+
+            <div class="space-y-3">
+                <button type="button"
+                        id="im-reload-plugin-btn"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Reload Plugin
+                </button>
+
+                <button type="button"
+                        id="im-check-updates-btn"
+                        class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-600">
+                    <i class="fas fa-download mr-2"></i>
+                    Check for Updates
+                </button>
+
+                <button type="button"
+                        id="im-uninstall-plugin-btn"
+                        class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600">
+                    <i class="fas fa-trash mr-2"></i>
+                    Uninstall Plugin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Settings -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            <i class="fas fa-sliders-h text-green-600 mr-2"></i>
+            Configuration Settings
+        </h3>
+
+        <form id="plugin-settings-form" class="space-y-6">
+            {#
+              Password-type inputs (API keys) can trigger browser "password form" heuristics.
+              Adding an (optionally hidden) username field reduces console warnings in Chromium/Edge
+              without affecting backend behavior (field is ignored server-side).
+            #}
+            <div style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+                <label for="im-settings-username">Username</label>
+                <input type="text" id="im-settings-username" name="username" autocomplete="username" tabindex="-1">
+            </div>
+            <!-- Map Provider Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="default_map_provider" class="block text-sm font-medium text-gray-700 mb-2">
+                        Default Map Provider
+                    </label>
+                    <select id="default_map_provider"
+                            name="default_map_provider"
+                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                        <option value="mapbox">Mapbox</option>
+                        <option value="openstreetmap">OpenStreetMap</option>
+                        <option value="google_maps">Google Maps</option>
+                        <option value="custom_tiles">Custom Tiles</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Select the default map provider for new map fields
+                    </p>
+                </div>
+
+                <div>
+                    <label for="default_zoom_level" class="block text-sm font-medium text-gray-700 mb-2">
+                        Default Zoom Level
+                    </label>
+                    <input type="number"
+                           id="default_zoom_level"
+                           name="default_zoom_level"
+                           min="1"
+                           max="18"
+                           value="10"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Set the default zoom level for new map fields (1-18)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Marker Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="max_markers_per_field" class="block text-sm font-medium text-gray-700 mb-2">
+                        Maximum Markers per Field
+                    </label>
+                    <input type="number"
+                           id="max_markers_per_field"
+                           name="max_markers_per_field"
+                           min="1"
+                           max="100"
+                           value="10"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Maximum number of markers allowed per map field
+                    </p>
+                </div>
+
+                <div>
+                    <label for="allow_marker_editing" class="block text-sm font-medium text-gray-700 mb-2">
+                        Allow Marker Editing
+                    </label>
+                    <div class="flex items-center">
+                        <input type="checkbox"
+                               id="allow_marker_editing"
+                               name="allow_marker_editing"
+                               checked
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="allow_marker_editing" class="ml-2 block text-sm text-gray-900">
+                            Allow users to edit marker positions
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="mapbox_api_key" class="block text-sm font-medium text-gray-700 mb-2">
+                        Mapbox API Key
+                    </label>
+                    <input type="password"
+                           id="mapbox_api_key"
+                           name="mapbox_api_key"
+                           placeholder="Enter Mapbox access token"
+                           autocomplete="new-password"
+                           autocapitalize="off"
+                           autocorrect="off"
+                           spellcheck="false"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Mapbox access token for map tiles (required for Mapbox provider)
+                    </p>
+                </div>
+
+                <div>
+                    <label for="geocoding_api_key" class="block text-sm font-medium text-gray-700 mb-2">
+                        Geocoding API Key
+                    </label>
+                    <input type="password"
+                           id="geocoding_api_key"
+                           name="geocoding_api_key"
+                           placeholder="Enter API key for geocoding service"
+                           autocomplete="new-password"
+                           autocapitalize="off"
+                           autocorrect="off"
+                           spellcheck="false"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        API key for address geocoding (optional)
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="geocoding_service" class="block text-sm font-medium text-gray-700 mb-2">
+                        Geocoding Service
+                    </label>
+                    <select id="geocoding_service"
+                            name="geocoding_service"
+                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                        <option value="nominatim">OpenStreetMap Nominatim (Free)</option>
+                        <option value="google">Google Geocoding API</option>
+                        <option value="custom">Custom Service</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600">
+                    <i class="fas fa-save mr-2"></i>
+                    Save Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Usage Statistics -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            <i class="fas fa-chart-bar text-purple-600 mr-2"></i>
+            Usage Statistics
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600" id="total_map_fields">0</div>
+                <div class="text-sm text-gray-600">Total Map Fields</div>
+            </div>
+
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+                <div class="text-2xl font-bold text-green-600" id="active_forms">0</div>
+                <div class="text-sm text-gray-600">Forms Using Maps</div>
+            </div>
+
+            <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                <div class="text-2xl font-bold text-yellow-600" id="total_markers">0</div>
+                <div class="text-sm text-gray-600">Total Markers</div>
+            </div>
+
+            <div class="text-center p-4 bg-purple-50 rounded-lg">
+                <div class="text-2xl font-bold text-purple-600" id="api_calls">0</div>
+                <div class="text-sm text-gray-600">API Calls Today</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+// Plugin management functions
+function reloadPlugin() {
+    const msg = 'Are you sure you want to reload the Interactive Map plugin? This will restart the plugin service.';
+    const doReload = () => fetch('/admin/api/plugins/reload', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (window.showAlert) window.showAlert('Plugin reloaded successfully!', 'success');
+                else console.log('Plugin reloaded');
+                location.reload();
+            } else {
+                if (window.showAlert) window.showAlert('Failed to reload plugin: ' + data.error, 'error');
+                else console.error('Failed:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (window.showAlert) window.showAlert('Error reloading plugin', 'error');
+        });
+    if (window.showConfirmation) {
+        window.showConfirmation(msg, doReload, null, 'Reload', 'Cancel', 'Reload Plugin?');
+    } else {
+        doReload();
+    }
+}
+
+function checkForUpdates() {
+    const msg = 'Checking for updates...\n\nThis feature would typically check for plugin updates from a repository.';
+    if (window.showAlert) window.showAlert(msg, 'info');
+    else console.log(msg);
+}
+
+function uninstallPlugin() {
+    const msg1 = 'Are you sure you want to uninstall the Interactive Map plugin? This action cannot be undone and will remove all map fields from forms.';
+    const msg2 = 'WARNING: This will permanently remove the plugin and all associated data. Are you absolutely sure?';
+    const doUninstall = () => fetch('/admin/api/plugins/Interactive Map Plugin/uninstall', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (window.showAlert) window.showAlert('Plugin uninstalled successfully!', 'success');
+                    else console.log('Plugin uninstalled');
+                    window.location.href = '/admin/dashboard';
+                } else {
+                    if (window.showAlert) window.showAlert('Failed to uninstall plugin: ' + data.error, 'error');
+                    else console.error('Failed:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if (window.showAlert) window.showAlert('Error uninstalling plugin', 'error');
+            });
+    const step2 = () => {
+        if (window.showDangerConfirmation) {
+            window.showDangerConfirmation(msg2, doUninstall, null, 'Uninstall', 'Cancel', 'Confirm Uninstall');
+        } else {
+            doUninstall();
+        }
+    };
+    if (window.showDangerConfirmation) {
+        window.showDangerConfirmation(msg1, step2, null, 'Uninstall', 'Cancel', 'Uninstall Plugin?');
+    } else {
+        step2();
+    }
+}
+
+// Form submission
+document.getElementById('plugin-settings-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const settings = Object.fromEntries(formData.entries());
+
+    // Debug: Log what we're sending
+    console.log('Saving settings:', settings);
+    console.log('Mapbox API key present:', 'mapbox_api_key' in settings);
+    console.log('Mapbox API key value length:', settings.mapbox_api_key ? settings.mapbox_api_key.length : 0);
+
+    // Save settings to backend API
+    fetch('/admin/plugins/interactive_map/api/settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify(settings)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Settings saved successfully - no alert needed
+            console.log('Settings saved successfully');
+        } else {
+            console.error('Failed to save settings:', data.error || 'Unknown error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving settings:', error);
+    });
+});
+
+// Load usage statistics
+function loadUsageStats() {
+    fetch('/admin/plugins/interactive_map/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.stats) {
+                document.getElementById('total_map_fields').textContent = data.stats.total_map_fields;
+                document.getElementById('active_forms').textContent = data.stats.active_forms;
+                document.getElementById('total_markers').textContent = data.stats.total_markers;
+                document.getElementById('api_calls').textContent = data.stats.api_calls;
+            } else {
+                console.error('Failed to load usage statistics');
+                // Fallback to zeros
+                document.getElementById('total_map_fields').textContent = '0';
+                document.getElementById('active_forms').textContent = '0';
+                document.getElementById('total_markers').textContent = '0';
+                document.getElementById('api_calls').textContent = '0';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading usage statistics:', error);
+            // Fallback to zeros
+            document.getElementById('total_map_fields').textContent = '0';
+            document.getElementById('active_forms').textContent = '0';
+            document.getElementById('total_markers').textContent = '0';
+            document.getElementById('api_calls').textContent = '0';
+        });
+}
+
+// Load current settings
+function loadCurrentSettings() {
+    fetch('/admin/plugins/interactive_map/api/settings')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.settings) {
+                const settings = data.settings.global_settings || {};
+                const apiKeys = data.settings.api_keys || {};
+
+                // Populate form fields with current settings
+                if (settings.default_map_provider) {
+                    document.getElementById('default_map_provider').value = settings.default_map_provider;
+                }
+                if (settings.default_zoom_level) {
+                    document.getElementById('default_zoom_level').value = settings.default_zoom_level;
+                }
+                if (settings.max_markers_per_field) {
+                    document.getElementById('max_markers_per_field').value = settings.max_markers_per_field;
+                }
+                if (settings.allow_marker_editing !== undefined) {
+                    document.getElementById('allow_marker_editing').checked = settings.allow_marker_editing;
+                }
+                if (settings.geocoding_service) {
+                    document.getElementById('geocoding_service').value = settings.geocoding_service;
+                }
+                if (settings.geocoding_api_key) {
+                    document.getElementById('geocoding_api_key').value = settings.geocoding_api_key;
+                }
+                // Load Mapbox API key
+                if (apiKeys.mapbox) {
+                    document.getElementById('mapbox_api_key').value = apiKeys.mapbox;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading current settings:', error);
+        });
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsageStats();
+    loadCurrentSettings();
+
+    // Setup event listeners for action buttons
+    const reloadBtn = document.getElementById('im-reload-plugin-btn');
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', reloadPlugin);
+    }
+
+    const checkUpdatesBtn = document.getElementById('im-check-updates-btn');
+    if (checkUpdatesBtn) {
+        checkUpdatesBtn.addEventListener('click', checkForUpdates);
+    }
+
+    const uninstallBtn = document.getElementById('im-uninstall-plugin-btn');
+    if (uninstallBtn) {
+        uninstallBtn.addEventListener('click', uninstallPlugin);
+    }
+});
+</script>
+{% endblock %}

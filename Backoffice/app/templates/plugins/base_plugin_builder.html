@@ -1,0 +1,31 @@
+{# Base template for plugin field configuration in form builder #}
+{# This template provides the common structure that all plugins can extend #}
+
+<div id="item-plugin-fields" class="hidden">
+    {# Common plugin fields - Label and Description #}
+    <div class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+            <label for="item-plugin-label" class="block text-gray-700 text-sm font-semibold">Field Label</label>
+            <button type="button" id="plugin-translations-btn" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium" title="Add translations">
+                <i class="fas fa-language w-4 h-4 mr-1"></i>
+                Translations
+            </button>
+        </div>
+        <textarea name="label" id="item-plugin-label" data-field-type="label" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Field Label" required autocomplete="off"></textarea>
+    </div>
+
+    <div class="mb-4">
+        <label for="item-plugin-description" class="block text-gray-700 text-sm font-semibold mb-2">Description (Optional)</label>
+        <textarea name="description" id="item-plugin-description" data-field-type="description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Description (Optional)" autocomplete="off"></textarea>
+    </div>
+
+    {# Plugin-specific configuration will be dynamically loaded here #}
+    <div id="plugin-configuration-container" class="mb-4">
+        <!-- Plugin configuration fields will be loaded here -->
+    </div>
+
+    {# Hidden inputs for translations and config #}
+    <input type="hidden" name="label_translations" id="item-plugin-label-translations" value="{}">
+    <input type="hidden" name="description_translations" id="item-plugin-description-translations" value="{}">
+    <input type="hidden" name="plugin_config" id="item-plugin-config" value="{}">
+</div>

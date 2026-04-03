@@ -1,0 +1,337 @@
+/**
+ * AG Grid Common Styles
+ * Centralized styles for AG Grid components used across templates
+ * These styles can be included in templates to ensure consistent appearance
+ */
+
+/* Column Visibility Button Styling - Centralized */
+/* Support for any placeholder with "column-visibility-button-placeholder" in ID */
+[id*="column-visibility-button-placeholder"],
+#column-visibility-button-placeholder,
+#pending-column-visibility-button-placeholder,
+#processed-column-visibility-button-placeholder {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    margin: 0 !important;
+}
+
+[id*="column-visibility-button-placeholder"] .ag-column-visibility-button-container,
+#column-visibility-button-placeholder .ag-column-visibility-button-container,
+#pending-column-visibility-button-placeholder .ag-column-visibility-button-container,
+#processed-column-visibility-button-placeholder .ag-column-visibility-button-container,
+.ag-column-visibility-button-container {
+    display: inline-block !important;
+    margin: 0 !important;
+    width: auto !important;
+    text-align: left !important;
+    flex-shrink: 0 !important;
+}
+
+#column-visibility-button-placeholder .ag-column-visibility-button,
+#pending-column-visibility-button-placeholder .ag-column-visibility-button,
+#processed-column-visibility-button-placeholder .ag-column-visibility-button,
+.ag-column-visibility-button-container .ag-column-visibility-button,
+button.ag-column-visibility-button {
+    padding: 8px 16px !important;
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    color: #374151 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+    /* IMPORTANT: inherit app font so Arabic uses Tajawal (and other locales use the global font) */
+    font-family: inherit !important;
+}
+
+#column-visibility-button-placeholder .ag-column-visibility-button:hover,
+#pending-column-visibility-button-placeholder .ag-column-visibility-button:hover,
+#processed-column-visibility-button-placeholder .ag-column-visibility-button:hover,
+.ag-column-visibility-button-container .ag-column-visibility-button:hover,
+button.ag-column-visibility-button:hover {
+    background: #f9fafb !important;
+    border-color: #9ca3af !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+}
+
+#column-visibility-button-placeholder .ag-column-visibility-button:active,
+#pending-column-visibility-button-placeholder .ag-column-visibility-button:active,
+#processed-column-visibility-button-placeholder .ag-column-visibility-button:active,
+.ag-column-visibility-button-container .ag-column-visibility-button:active,
+button.ag-column-visibility-button:active {
+    transform: translateY(1px) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+#column-visibility-button-placeholder .ag-column-visibility-button i,
+#pending-column-visibility-button-placeholder .ag-column-visibility-button i,
+#processed-column-visibility-button-placeholder .ag-column-visibility-button i,
+.ag-column-visibility-button-container .ag-column-visibility-button i,
+button.ag-column-visibility-button i {
+    font-size: 14px !important;
+    color: #6b7280 !important;
+}
+
+/* Grid Container Styling */
+.ag-grid-container {
+    overflow-x: auto;
+    position: relative;
+}
+
+/* Loading Spinner Animation */
+@keyframes ag-grid-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Default cell alignment and padding for all AG Grid themes */
+/* All cells align text to middle vertically by default */
+
+/* Cell wrapper - centers content vertically */
+/* Use high specificity to override ag-grid defaults */
+.ag-theme-alpine .ag-cell-wrapper,
+.ag-theme-balham .ag-cell-wrapper,
+.ag-theme-quartz .ag-cell-wrapper,
+.ag-theme-material .ag-cell-wrapper,
+.ag-cell-wrapper {
+    align-items: center !important;
+    display: flex !important;
+}
+
+/* Cell itself - centers content vertically with padding */
+/* Use high specificity to override ag-grid defaults and inline styles */
+.ag-theme-alpine .ag-cell,
+.ag-theme-balham .ag-cell,
+.ag-theme-quartz .ag-cell,
+.ag-theme-material .ag-cell,
+.ag-cell {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding-top: 16px !important;
+    padding-bottom: 16px !important;
+    min-height: 42px !important;
+    box-sizing: border-box !important;
+}
+
+/* Handle autoHeight cells - ensure content is centered and padding is applied */
+/* AG Grid measures scrollHeight which includes padding, so this should work */
+/* Use high specificity to override ag-grid defaults for autoHeight cells */
+.ag-theme-alpine .ag-cell.ag-cell-auto-height,
+.ag-theme-balham .ag-cell.ag-cell-auto-height,
+.ag-theme-quartz .ag-cell.ag-cell-auto-height,
+.ag-theme-material .ag-cell.ag-cell-auto-height,
+.ag-cell.ag-cell-auto-height {
+    align-items: center !important;
+    padding-top: 16px !important;
+    padding-bottom: 16px !important;
+    box-sizing: border-box !important;
+}
+
+/* Extra padding for cells with wrapped text (white-space: normal) */
+/* These cells often have multiple lines and need more breathing room */
+.ag-theme-alpine .ag-cell[style*="white-space: normal"],
+.ag-theme-alpine .ag-cell[style*="white-space:normal"],
+.ag-theme-balham .ag-cell[style*="white-space: normal"],
+.ag-theme-balham .ag-cell[style*="white-space:normal"],
+.ag-theme-quartz .ag-cell[style*="white-space: normal"],
+.ag-theme-quartz .ag-cell[style*="white-space:normal"],
+.ag-theme-material .ag-cell[style*="white-space: normal"],
+.ag-theme-material .ag-cell[style*="white-space:normal"],
+.ag-cell[style*="white-space: normal"],
+.ag-cell[style*="white-space:normal"] {
+    padding-top: 18px !important;
+    padding-bottom: 18px !important;
+}
+
+/* Ensure row has proper vertical alignment */
+.ag-row {
+    align-items: stretch !important;
+}
+
+/* For cells with autoHeight, the content should still be centered */
+/* Use high specificity to override ag-grid defaults */
+.ag-theme-alpine .ag-cell.ag-cell-auto-height .ag-cell-wrapper,
+.ag-theme-balham .ag-cell.ag-cell-auto-height .ag-cell-wrapper,
+.ag-theme-quartz .ag-cell.ag-cell-auto-height .ag-cell-wrapper,
+.ag-theme-material .ag-cell.ag-cell-auto-height .ag-cell-wrapper,
+.ag-cell.ag-cell-auto-height .ag-cell-wrapper {
+    align-items: center !important;
+}
+
+/* Override any inline styles that might be set by ag-grid */
+/* Target cells with inline style attributes to ensure center alignment */
+.ag-theme-alpine .ag-cell[style*="align-items"],
+.ag-theme-balham .ag-cell[style*="align-items"],
+.ag-theme-quartz .ag-cell[style*="align-items"],
+.ag-theme-material .ag-cell[style*="align-items"],
+.ag-cell[style*="align-items"] {
+    align-items: center !important;
+}
+
+/* Ensure cell value/content is also centered */
+.ag-theme-alpine .ag-cell-value,
+.ag-theme-balham .ag-cell-value,
+.ag-theme-quartz .ag-cell-value,
+.ag-theme-material .ag-cell-value,
+.ag-cell-value {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+
+/* Enable text selection in AG Grid cells */
+.ag-theme-alpine .ag-cell,
+.ag-theme-balham .ag-cell,
+.ag-theme-quartz .ag-cell,
+.ag-theme-material .ag-cell {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+/* -------------------------------------------------------------
+   RTL pagination (Arabic) fixes
+   -------------------------------------------------------------
+   The app enables RTL by setting `html[dir="rtl"]` at runtime.
+   AG Grid also uses `.ag-rtl` when `enableRtl: true` is passed.
+
+   1) Position: in RTL we want the pagination panel on the left.
+   2) Bidi: prevent numbers in the "start–end–total" summary from
+      visually reordering in RTL.
+*/
+html[dir="rtl"] .ag-paging-panel,
+.ag-rtl .ag-paging-panel {
+    justify-content: flex-start !important; /* left corner */
+}
+
+html[dir="rtl"] .ag-paging-row-summary-panel-number,
+html[dir="rtl"] .ag-paging-page-summary-panel .ag-paging-number,
+html[dir="rtl"] .ag-paging-number,
+.ag-rtl .ag-paging-row-summary-panel-number,
+.ag-rtl .ag-paging-page-summary-panel .ag-paging-number,
+.ag-rtl .ag-paging-number {
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+}
+
+/* Additional padding for cells with word-wrap enabled (multi-line text) */
+.ag-theme-alpine .ag-cell[style*="word-wrap"],
+.ag-theme-alpine .ag-cell[style*="word-wrap"],
+.ag-theme-balham .ag-cell[style*="word-wrap"],
+.ag-theme-balham .ag-cell[style*="word-wrap"],
+.ag-theme-quartz .ag-cell[style*="word-wrap"],
+.ag-theme-quartz .ag-cell[style*="word-wrap"],
+.ag-theme-material .ag-cell[style*="word-wrap"],
+.ag-theme-material .ag-cell[style*="word-wrap"],
+.ag-cell[style*="word-wrap"] {
+    padding-top: 18px !important;
+    padding-bottom: 18px !important;
+}
+
+/* Ensure row borders have proper spacing from cell content */
+.ag-theme-alpine .ag-row,
+.ag-theme-balham .ag-row,
+.ag-theme-quartz .ag-row,
+.ag-theme-material .ag-row,
+.ag-row {
+    border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Templates can override alignment by using more specific selectors */
+/* Example: .my-template .ag-cell { align-items: flex-start !important; } */
+
+/* ===================================================================
+   EMPTY STATE STYLING
+   Ensures "No Rows To Show" message displays nicely centered
+   =================================================================== */
+
+/* Center the overlay container */
+.ag-overlay {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.ag-overlay-panel {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 150px !important;
+}
+
+/* Style the "No Rows To Show" message */
+.ag-overlay-no-rows-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 32px 16px !important;
+    text-align: center !important;
+}
+
+.ag-overlay-no-rows-center {
+    color: #6b7280 !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+/* Loading overlay styling */
+.ag-overlay-loading-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 32px 16px !important;
+}
+
+.ag-overlay-loading-center {
+    color: #6b7280 !important;
+    font-size: 14px !important;
+}
+
+/* ===================================================================
+   FILTER INPUT ICON SPACING  (Alpine theme)
+   AG Grid v31+ renders a search icon (::before) inside .ag-input-wrapper
+   for filter inputs. The Quartz theme ships matching padding; Alpine does
+   not, so the placeholder text overlaps the icon.  Fix: add left-padding
+   on the <input> itself (26px matches Quartz) for all filter contexts.
+   =================================================================== */
+
+.ag-theme-alpine .ag-filter-filter input.ag-text-field-input,
+.ag-theme-alpine .ag-filter-filter input.ag-number-field-input,
+.ag-theme-alpine .ag-filter-filter input.ag-input-field-input,
+.ag-theme-alpine .ag-mini-filter input.ag-text-field-input,
+.ag-theme-alpine .ag-mini-filter input.ag-number-field-input,
+.ag-theme-alpine .ag-floating-filter-input input.ag-text-field-input,
+.ag-theme-alpine .ag-floating-filter-input input.ag-number-field-input {
+    padding-left: 26px !important;
+}
+
+html[dir="rtl"] .ag-theme-alpine .ag-filter-filter input.ag-text-field-input,
+html[dir="rtl"] .ag-theme-alpine .ag-filter-filter input.ag-number-field-input,
+html[dir="rtl"] .ag-theme-alpine .ag-filter-filter input.ag-input-field-input,
+html[dir="rtl"] .ag-theme-alpine .ag-mini-filter input.ag-text-field-input,
+html[dir="rtl"] .ag-theme-alpine .ag-mini-filter input.ag-number-field-input,
+html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-text-field-input,
+html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-number-field-input,
+.ag-theme-alpine.ag-rtl .ag-filter-filter input.ag-text-field-input,
+.ag-theme-alpine.ag-rtl .ag-filter-filter input.ag-number-field-input,
+.ag-theme-alpine.ag-rtl .ag-filter-filter input.ag-input-field-input,
+.ag-theme-alpine.ag-rtl .ag-mini-filter input.ag-text-field-input,
+.ag-theme-alpine.ag-rtl .ag-mini-filter input.ag-number-field-input,
+.ag-theme-alpine.ag-rtl .ag-floating-filter-input input.ag-text-field-input,
+.ag-theme-alpine.ag-rtl .ag-floating-filter-input input.ag-number-field-input {
+    padding-left: unset !important;
+    padding-right: 26px !important;
+}
+

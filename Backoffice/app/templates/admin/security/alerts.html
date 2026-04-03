@@ -1,0 +1,49 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Security Alerts') }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {{ page_header(
+        title=_('Security Alerts'),
+        icon='fas fa-bell',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Security'), 'url': url_for('security.security_dashboard')},
+            {'name': _('Alerts')}
+        ]
+    ) }}
+
+    <div class="bg-white border border-gray-200 shadow-sm overflow-hidden">
+        {% if alerts %}
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left">{{ _('Time') }}</th>
+                    <th class="px-4 py-3 text-left">{{ _('Type') }}</th>
+                    <th class="px-4 py-3 text-left">{{ _('Severity') }}</th>
+                    <th class="px-4 py-3 text-left">{{ _('Description') }}</th>
+                    <th class="px-4 py-3 text-left">{{ _('Action') }}</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for event in alerts %}
+                <tr>
+                    <td class="px-4 py-3">{{ event.timestamp|datetime_local('datetimeShort') }}</td>
+                    <td class="px-4 py-3">{{ event.event_type.replace('_', ' ')|title }}</td>
+                    <td class="px-4 py-3">{{ event.severity|title }}</td>
+                    <td class="px-4 py-3">{{ event.description }}</td>
+                    <td class="px-4 py-3">
+                        <a href="{{ url_for('security.security_event_detail', event_id=event.id) }}" class="text-blue-600 hover:text-blue-800">{{ _('View') }}</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-6 text-sm text-gray-500">{{ _('No active alerts right now.') }}</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{# Early <head> include: when CLIENT_CONSOLE_LOGGING is false, quiet native console methods.
+   Also defines window.__clientLog / __clientWarn / … so inline scripts can avoid leaking logs when the flag is off. #}
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var enabled = {{ config.CLIENT_CONSOLE_LOGGING | tojson }};
+    window.CLIENT_CONSOLE_LOGGING = !!enabled;
+    var c = window.console;
+    if (!c) return;
+
+    var saved = {};
+    var names = ['log', 'debug', 'info', 'warn', 'trace', 'dir', 'dirxml', 'table',
+        'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'timeLog', 'count', 'profile', 'profileEnd'];
+    for (var j = 0; j < names.length; j++) {
+        var n = names[j];
+        if (typeof c[n] === 'function') saved[n] = c[n].bind(c);
+    }
+    // Internal: saved native methods for __client* wrappers only. Do not call from templates/inline JS
+    // (e.g. __consoleSaved.log bypasses CLIENT_CONSOLE_LOGGING). Use window.__clientLog / __clientWarn / …
+    window.__consoleSaved = saved;
+
+    function makeClient(name) {
+        return function () {
+            if (!window.CLIENT_CONSOLE_LOGGING) return;
+            var fn = saved[name];
+            if (fn) return fn.apply(null, arguments);
+        };
+    }
+    window.__clientLog = makeClient('log');
+    window.__clientDebug = makeClient('debug');
+    window.__clientInfo = makeClient('info');
+    window.__clientWarn = makeClient('warn');
+    window.__clientTrace = makeClient('trace');
+    window.__clientDir = makeClient('dir');
+    window.__clientTable = makeClient('table');
+    window.__clientGroup = makeClient('group');
+    window.__clientGroupCollapsed = makeClient('groupCollapsed');
+    window.__clientGroupEnd = makeClient('groupEnd');
+
+    if (enabled) return;
+
+    var noop = function () {};
+    for (var i = 0; i < names.length; i++) {
+        var m = names[i];
+        try {
+            if (typeof c[m] === 'function') c[m] = noop;
+        } catch (e) { /* ignore */ }
+    }
+})();
+</script>

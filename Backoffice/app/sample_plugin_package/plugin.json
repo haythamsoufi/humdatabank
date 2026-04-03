@@ -1,0 +1,8 @@
+{
+  "name": "sample-package",
+  "display_name": "Sample Plugin",
+  "version": "1.0.0",
+  "description": "Starter plugin package for the NGO Databank plugin system.",
+  "author": "NGO Databank",
+  "license": "MIT"
+}

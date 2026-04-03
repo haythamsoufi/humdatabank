@@ -1,0 +1,243 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('AI System Dashboard') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('AI System Dashboard'),
+    icon='fas fa-robot',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'AI System'}
+    ]
+) }}
+
+{% if error %}
+<div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <i class="fas fa-exclamation-circle text-red-400"></i>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm text-red-700">{{ error }}</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- System Status - Compact -->
+<div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="flex flex-wrap items-center gap-6">
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-600">{{ _('AI Agent') }}:</span>
+            {% if stats.agent_enabled %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <i class="fas fa-check-circle mr-1"></i> {{ _('Enabled') }}
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                <i class="fas fa-times-circle mr-1"></i> {{ _('Disabled') }}
+            </span>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-600">{{ _('OpenAI API') }}:</span>
+            {% if stats.openai_configured %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <i class="fas fa-check-circle mr-1"></i> {{ _('Configured') }}
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                <i class="fas fa-exclamation-circle mr-1"></i> {{ _('Not Set') }}
+            </span>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-600">{{ _('LLM Judge') }}:</span>
+            {% if stats.llm_quality_judge_enabled %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <i class="fas fa-check-circle mr-1"></i> {{ _('Enabled') }}
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                <i class="fas fa-exclamation-triangle mr-1"></i> {{ _('Disabled') }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="mb-8">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">{{ _('Overview') }}</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+                <div class="p-1.5 bg-blue-50 rounded-lg">
+                    <i class="fas fa-file-alt text-lg text-blue-600"></i>
+                </div>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 mb-1">{{ stats.documents.total or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600 mb-0.5">{{ _('Documents') }}</div>
+            <div class="text-xs text-gray-500">{{ stats.documents.completed or 0 }} {{ _('indexed') }}</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+                <div class="p-1.5 bg-green-50 rounded-lg">
+                    <i class="fas fa-database text-lg text-green-600"></i>
+                </div>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 mb-1">{{ stats.embeddings or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600 mb-0.5">{{ _('Embeddings') }}</div>
+            <div class="text-xs text-gray-500">{{ _('Vector chunks') }}</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+                <div class="p-1.5 bg-purple-50 rounded-lg">
+                    <i class="fas fa-brain text-lg text-purple-600"></i>
+                </div>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 mb-1">{{ stats.traces.last_30_days or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600 mb-0.5">{{ _('Agent Queries') }}</div>
+            <div class="text-xs text-gray-500">{{ _('Last 30 days') }}</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+                <div class="p-1.5 bg-indigo-50 rounded-lg">
+                    <i class="fas fa-check-double text-lg text-indigo-600"></i>
+                </div>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 mb-1">{{ stats.traces.completed or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600 mb-0.5">{{ _('Successful') }}</div>
+            <div class="text-xs text-gray-500">{{ stats.traces.errors or 0 }} {{ _('errors') }}</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+                <div class="p-1.5 bg-amber-50 rounded-lg">
+                    <i class="fas fa-clipboard-check text-lg text-amber-600"></i>
+                </div>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 mb-1">{{ stats.reviews.pending or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600 mb-0.5">{{ _('Pending Reviews') }}</div>
+            <div class="text-xs text-gray-500">{{ stats.reviews.total or 0 }} {{ _('total queue items') }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- LLM Quality & Reviews -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">
+            <i class="fas fa-balance-scale text-gray-500 mr-2"></i>{{ _('LLM Quality and Reviews') }}
+        </h3>
+        <div class="flex items-center gap-2">
+            <a href="{{ url_for('ai_management.reasoning_traces') }}" class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-purple-100 text-purple-800 hover:bg-purple-200">
+                <i class="fas fa-project-diagram mr-2"></i>{{ _('Reasoning Traces') }}
+            </a>
+            <a href="{{ url_for('ai_management.ai_review_queue') }}" class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200">
+                <i class="fas fa-clipboard-check mr-2"></i>{{ _('Review Queue') }}
+            </a>
+        </div>
+    </div>
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="rounded-lg border border-gray-200 p-4">
+            <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">{{ _('Judged traces') }}</div>
+            <div class="text-2xl font-semibold text-gray-900">{{ stats.traces.judged or 0 }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ _('Traces with LLM quality score') }}</div>
+        </div>
+        <div class="rounded-lg border border-gray-200 p-4">
+            <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">{{ _('Flagged for review') }}</div>
+            <div class="text-2xl font-semibold text-gray-900">{{ stats.traces.flagged_for_review or 0 }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ _('Low-quality traces needing review') }}</div>
+        </div>
+        <div class="rounded-lg border border-gray-200 p-4">
+            <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">{{ _('In review') }}</div>
+            <div class="text-2xl font-semibold text-gray-900">{{ stats.reviews.in_review or 0 }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ stats.reviews.completed or 0 }} {{ _('completed') }}</div>
+        </div>
+        <div class="rounded-lg border border-gray-200 p-4">
+            <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">{{ _('Queue backlog') }}</div>
+            <div class="text-2xl font-semibold text-gray-900">{{ (stats.reviews.pending or 0) + (stats.reviews.in_review or 0) }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ _('Pending + in-review items') }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity & Tools -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Top Tools -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-tools text-gray-500 mr-2"></i>{{ _('Top Tools Used') }}
+            </h3>
+        </div>
+        <div class="p-6">
+            {% if stats.top_tools %}
+            <div class="space-y-4">
+                {% for tool in stats.top_tools %}
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                    <code class="text-sm text-gray-700 font-mono bg-gray-50 px-2 py-1 rounded">{{ tool.name }}</code>
+                    <span class="text-lg font-semibold text-gray-900">{{ tool.count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm text-center py-4">{{ _('No tool usage data yet.') }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-clock text-gray-500 mr-2"></i>{{ _('Recent Queries') }}
+            </h3>
+            {% if recent_traces %}
+            <a href="{{ url_for('ai_management.reasoning_traces') }}" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                {{ _('View all') }} <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+            {% endif %}
+        </div>
+        <div class="p-6">
+            {% if recent_traces %}
+            <div class="space-y-4">
+                {% for trace in recent_traces %}
+                <a href="{{ url_for('ai_management.trace_detail', trace_id=trace.id) }}" class="block group">
+                    <div class="border-l-4 border-purple-300 pl-4 py-2 hover:border-purple-500 transition-colors">
+                        <p class="text-sm text-gray-900 group-hover:text-purple-600 mb-2">
+                            {{ trace.query[:100] }}{% if trace.query|length > 100 %}...{% endif %}
+                        </p>
+                        <div class="flex items-center gap-3 text-xs text-gray-500">
+                            <span>{{ trace.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded {% if trace.status == 'completed' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ trace.status }}
+                            </span>
+                            {% if trace.llm_quality_verdict %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                                {{ trace.llm_quality_verdict|replace('_', ' ')|title }}
+                            </span>
+                            {% endif %}
+                            {% if trace.llm_needs_review %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-700">
+                                <i class="fas fa-flag mr-1"></i>{{ _('Needs review') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm text-center py-4">{{ _('No agent queries yet.') }}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

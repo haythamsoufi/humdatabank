@@ -1,0 +1,960 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% block title %}{{ _('Audit Trail - Admin Panel') }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+<!-- CSRF Token -->
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<style nonce="{{ csp_style_nonce() }}">
+    /* Custom styles for audit trail */
+    .details-pre {
+        white-space: pre-wrap;
+        white-space: -moz-pre-wrap;
+        white-space: -pre-wrap;
+        white-space: -o-pre-wrap;
+        word-wrap: break-word;
+    }
+
+    /* Live search input styling */
+    .live-search-input {
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        padding: 8px 12px;
+        font-size: 14px;
+        color: #374151;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .live-search-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    /* Column settings modal */
+    .modal-overlay {
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    /* Custom multiselect dropdown styling */
+    .multiselect-dropdown {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .multiselect-dropdown::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .multiselect-dropdown::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+
+    .multiselect-dropdown::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .multiselect-dropdown::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    .multiselect-checkbox {
+        transition: all 0.15s ease-in-out;
+    }
+
+    .multiselect-checkbox:hover {
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title=_('Audit Trail'),
+        icon='fas fa-history',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Analytics'), 'url': url_for('analytics.analytics_dashboard')},
+            {'name': _('Audit Trail')}
+        ]
+    ) }}
+
+    <!-- Filters Section -->
+    <div class="bg-gray-50 p-4 sm:p-6 shadow mb-8">
+        <div class="mb-4 flex items-center justify-between">
+            <h5 class="text-xl font-semibold text-gray-700 flex items-center">
+                <i class="fas fa-filter mr-2"></i> {{ _('Filters') }}
+            </h5>
+            <button
+                id="toggleFiltersBtn"
+                type="button"
+                class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-md transition-colors"
+                aria-expanded="false"
+                aria-controls="filtersPane"
+                title="{{ _('Expand or collapse filters') }}"
+            >
+                <span id="toggleFiltersLabel">{{ _('Show Filters') }}</span>
+                <i id="toggleFiltersIcon" class="fas fa-chevron-down transition-transform"></i>
+            </button>
+        </div>
+        <div id="filtersPane" class="hidden">
+        <form method="GET" class="space-y-4">
+            <!-- First Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('User Email') }}</label>
+                    <div id="user-multiselect-container"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Country') }}</label>
+                    <div id="country-multiselect-container"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Risk Level') }}</label>
+                    <div id="risk-level-multiselect-container"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Activity Type') }}</label>
+                    <div id="activity-type-multiselect-container"></div>
+                </div>
+            </div>
+
+            <!-- Second Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div>
+                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                    <input type="text" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="description" name="description"
+                           value="{{ filters.description or '' }}" placeholder="{{ _('Search description (e.g., template name)') }}">
+                </div>
+                <div class="flex items-center pt-7">
+                    <input class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" type="checkbox" id="requires_review"
+                           name="requires_review" value="1" {% if filters.requires_review %}checked{% endif %}>
+                    <label class="text-sm font-medium text-gray-700" for="requires_review">
+                        {{ _('Requires Review') }}
+                    </label>
+                </div>
+                <div>
+                    <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">{{ _('From Date') }}</label>
+                    <input type="date" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="date_from" name="date_from"
+                           value="{{ filters.date_from or '' }}">
+                </div>
+                <div>
+                    <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">{{ _('To Date') }}</label>
+                    <input type="date" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="date_to" name="date_to"
+                           value="{{ filters.date_to or '' }}">
+                </div>
+            </div>
+
+            <!-- Third Row - Action Buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="flex items-end">
+                    <button type="submit" class="btn btn-primary w-full">
+                        <i class="fas fa-filter mr-2"></i> {{ _('Filter') }}
+                    </button>
+                </div>
+                <div class="flex items-end">
+                    <a href="{{ url_for('analytics.audit_trail') }}" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        {{ _('Clear Filters') }}
+                    </a>
+                </div>
+            </div>
+        </form>
+        </div>
+    </div>
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Results Section -->
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+        {% if entries.items %}
+            {{ ag_grid_container('auditTrailGrid', loading_text=_('Loading audit entries...'), grid_height='600px', include_card=false) }}
+        {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-search fa-3x text-gray-400 mb-3"></i>
+                <p class="text-gray-500 text-lg">{{ _('No audit entries found matching your criteria.') }}</p>
+            </div>
+        {% endif %}
+    </div>
+
+<script src="{{ static_url('js/components/multiselect-dropdown.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+    const EMPTY_VALUE_PLACEHOLDER = '-';
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function isNilOrEmpty(value) {
+        return value === null || value === undefined || String(value).trim() === '';
+    }
+
+    function humanizeToken(value) {
+        if (isNilOrEmpty(value)) return EMPTY_VALUE_PLACEHOLDER;
+        return String(value)
+            .replace(/[_\-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function renderTextCell(value, options = {}) {
+        const {
+            mono = false,
+            mutedWhenEmpty = true,
+            extraClasses = ''
+        } = options;
+        if (isNilOrEmpty(value)) {
+            const emptyClass = mutedWhenEmpty ? 'text-gray-500' : 'text-gray-900';
+            return '<span class="text-sm ' + emptyClass + '">' + EMPTY_VALUE_PLACEHOLDER + '</span>';
+        }
+        const classes = ['text-sm', 'text-gray-900'];
+        if (mono) classes.push('font-mono');
+        if (extraClasses) classes.push(extraClasses);
+        return '<span class="' + classes.join(' ') + '">' + escapeHtml(String(value)) + '</span>';
+    }
+
+    function renderDetailsValue(details) {
+        if (details === null || details === undefined) {
+            return '<span class="text-sm text-gray-500">' + EMPTY_VALUE_PLACEHOLDER + '</span>';
+        }
+        if (typeof details === 'object') {
+            try {
+                return '<pre class="text-xs text-gray-700 details-pre">' + escapeHtml(JSON.stringify(details, null, 2)) + '</pre>';
+            } catch (e) {
+                return renderTextCell(String(details));
+            }
+        }
+        if (typeof details === 'boolean') {
+            return renderTextCell(details ? 'true' : 'false');
+        }
+        return renderTextCell(String(details));
+    }
+
+    // Function to toggle details display
+    function toggleDetails(elementId) {
+        const element = document.getElementById(elementId);
+        if (element.classList.contains('hidden')) {
+            element.classList.remove('hidden');
+        } else {
+            element.classList.add('hidden');
+        }
+    }
+
+
+    // Initialize multiselect dropdowns when DOM is loaded
+    let userMultiselect, activityTypeMultiselect, riskLevelMultiselect, countryMultiselect;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait for the MultiselectDropdown class to be available
+        if (typeof MultiselectDropdown !== 'undefined') {
+            initializeMultiselectDropdowns();
+        } else {
+            // Retry after a short delay if the class isn't loaded yet
+            setTimeout(function() {
+                if (typeof MultiselectDropdown !== 'undefined') {
+                    initializeMultiselectDropdowns();
+                } else {
+                    console.error('MultiselectDropdown class not found. Please ensure the script is loaded.');
+                }
+            }, 100);
+        }
+    });
+
+    function initializeMultiselectDropdowns() {
+        // Initialize User multiselect
+        const userData = [
+            {% for user in users %}
+            {
+                value: '{{ user.email }}',
+                label: '{{ user.name or user.email }}',
+                {% if user.name %}sublabel: '{{ user.email }}'{% endif %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        const selectedUsers = [
+            {% if filters.user %}
+                {% for user_email in filters.user %}
+                '{{ user_email }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            {% endif %}
+        ];
+
+        userMultiselect = new MultiselectDropdown({
+            containerId: 'user-multiselect-container',
+            name: 'user',
+            placeholder: '{{ _("Select users...") }}',
+            searchPlaceholder: '{{ _("Search users...") }}',
+            data: userData,
+            selectedValues: selectedUsers
+        });
+
+        // Initialize Country multiselect
+        const countryData = [
+            {% for country in countries %}
+            {
+                value: '{{ country.id }}',
+                label: '{{ country.name }}'
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        const selectedCountries = [
+            {% if filters.country %}
+                {% for country_id in filters.country %}
+                '{{ country_id }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            {% else %}
+                // If no filter is set, select all countries by default
+                {% for country in countries %}
+                '{{ country.id }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            {% endif %}
+        ];
+
+        countryMultiselect = new MultiselectDropdown({
+            containerId: 'country-multiselect-container',
+            name: 'country',
+            placeholder: '{{ _("Select countries...") }}',
+            searchPlaceholder: '{{ _("Search countries...") }}',
+            data: countryData,
+            selectedValues: selectedCountries
+        });
+
+        // Initialize Activity Type multiselect
+        const activityTypeData = [
+            {% for activity_type_val in activity_types %}
+            {
+                value: '{{ activity_type_val }}',
+                label: '{{ activity_type_val.replace("_", " ")|title }}'
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+            {% if action_types %}
+                {% for action_type_val in action_types %}
+                ,{
+                    value: '{{ action_type_val }}',
+                    label: '{{ action_type_val.replace("_", " ")|title }}'
+                }
+                {% endfor %}
+            {% endif %}
+        ];
+        const uniqueActivityTypeData = [];
+        const seenActivityTypes = new Set();
+        activityTypeData.forEach(function(item) {
+            if (!item || !item.value || seenActivityTypes.has(item.value)) return;
+            seenActivityTypes.add(item.value);
+            uniqueActivityTypeData.push(item);
+        });
+
+        // Determine selected activity types
+        let selectedActivityTypes = [];
+        {% if filters.activity_type %}
+            selectedActivityTypes = [
+                {% for activity_type_val in filters.activity_type %}
+                '{{ activity_type_val }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+        {% else %}
+            // If no filter is set, select all except page_view by default
+            selectedActivityTypes = uniqueActivityTypeData
+                .filter(item => item.value !== 'page_view')
+                .map(item => item.value);
+        {% endif %}
+
+        activityTypeMultiselect = new MultiselectDropdown({
+            containerId: 'activity-type-multiselect-container',
+            name: 'activity_type',
+            placeholder: '{{ _("Select activity types...") }}',
+            searchPlaceholder: '{{ _("Search activity types...") }}',
+            data: uniqueActivityTypeData,
+            selectedValues: selectedActivityTypes,
+            searchable: false // Activity types don't need search since there are few of them
+        });
+
+        // Initialize Risk Level multiselect
+        const riskLevelData = [
+            { value: 'low', label: '{{ _("Low") }}' },
+            { value: 'medium', label: '{{ _("Medium") }}' },
+            { value: 'high', label: '{{ _("High") }}' },
+            { value: 'critical', label: '{{ _("Critical") }}' }
+        ];
+
+        const selectedRiskLevels = [
+            {% if filters.risk_level %}
+                {% for risk_level_val in filters.risk_level %}
+                '{{ risk_level_val }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            {% else %}
+                // If no filter is set, select all risk levels by default
+                'low', 'medium', 'high', 'critical'
+            {% endif %}
+        ];
+
+        riskLevelMultiselect = new MultiselectDropdown({
+            containerId: 'risk-level-multiselect-container',
+            name: 'risk_level',
+            placeholder: '{{ _("Select risk levels...") }}',
+            searchPlaceholder: '{{ _("Search risk levels...") }}',
+            data: riskLevelData,
+            selectedValues: selectedRiskLevels,
+            searchable: false // Risk levels don't need search since there are few of them
+        });
+    }
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+$(document).ready(function() {
+    // Filters pane toggle (collapsed by default)
+    const filtersPane = document.getElementById('filtersPane');
+    const toggleFiltersBtn = document.getElementById('toggleFiltersBtn');
+    const toggleFiltersLabel = document.getElementById('toggleFiltersLabel');
+    const toggleFiltersIcon = document.getElementById('toggleFiltersIcon');
+
+    function setFiltersCollapsed(collapsed) {
+        if (!filtersPane || !toggleFiltersBtn) return;
+        filtersPane.classList.toggle('hidden', collapsed);
+        toggleFiltersBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        if (toggleFiltersLabel) {
+            toggleFiltersLabel.textContent = collapsed
+                ? '{{ _("Show Filters") }}'
+                : '{{ _("Hide Filters") }}';
+        }
+        if (toggleFiltersIcon) {
+            toggleFiltersIcon.classList.toggle('rotate-180', !collapsed);
+        }
+    }
+
+    if (toggleFiltersBtn) {
+        setFiltersCollapsed(true);
+        toggleFiltersBtn.addEventListener('click', function() {
+            const isCollapsed = filtersPane ? filtersPane.classList.contains('hidden') : true;
+            setFiltersCollapsed(!isCollapsed);
+        });
+    }
+
+    // Handle form submission
+    $('form').on('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+
+        // Get selected values from multiselect components
+        const activityTypes = activityTypeMultiselect ? activityTypeMultiselect.getSelectedValues() : [];
+        const users = userMultiselect ? userMultiselect.getSelectedValues() : [];
+        const riskLevels = riskLevelMultiselect ? riskLevelMultiselect.getSelectedValues() : [];
+        const countries = countryMultiselect ? countryMultiselect.getSelectedValues() : [];
+
+        // Remove any existing values from formData
+        formData.delete('activity_type');
+        formData.delete('user');
+        formData.delete('risk_level');
+        formData.delete('country');
+
+        // Add multiselect values
+        activityTypes.forEach(function(type) {
+            formData.append('activity_type', type);
+        });
+
+        users.forEach(function(user) {
+            formData.append('user', user);
+        });
+
+        riskLevels.forEach(function(level) {
+            formData.append('risk_level', level);
+        });
+
+        countries.forEach(function(country) {
+            formData.append('country', country);
+        });
+
+        const queryParams = new URLSearchParams(formData).toString();
+        window.location.href = '{{ url_for("analytics.audit_trail") }}?' + queryParams;
+    });
+});
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ super() }}
+<!-- AG Grid JS -->
+{% from "components/ag_grid_includes.html" import ag_grid_js %}
+{{ ag_grid_js() }}
+
+<script nonce="{{ csp_nonce() }}">
+    // Function to toggle details display
+    function toggleDetails(elementId) {
+        const element = document.getElementById(elementId);
+        if (element.classList.contains('hidden')) {
+            element.classList.remove('hidden');
+        } else {
+            element.classList.add('hidden');
+        }
+    }
+
+    // Helper function to render activity badge
+    function renderActivityBadge(activityType) {
+        const activityMap = {
+            // ── Session ────────────────────────────────────────────────────
+            'page_view':   { icon: 'fa-eye',          bg: 'bg-blue-100',   text: 'text-blue-800',   label: '{{ _("Page View") }}' },
+            // Generic POST / non-submit HTTP actions (APIs, AJAX, dashboard widgets)
+            'request':     { icon: 'fa-bolt',         bg: 'bg-slate-100',  text: 'text-slate-800',  label: '{{ _("Action") }}' },
+            'login':       { icon: 'fa-sign-in-alt',  bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("Logged In") }}' },
+            'logout':      { icon: 'fa-sign-out-alt', bg: 'bg-orange-100', text: 'text-orange-800', label: '{{ _("Logged Out") }}' },
+            'profile_update': { icon: 'fa-user-edit', bg: 'bg-teal-100',   text: 'text-teal-800',   label: '{{ _("Profile Updated") }}' },
+
+            // ── Form / Entry actions (new canonical types) ─────────────────
+            'form_saved':      { icon: 'fa-save',        bg: 'bg-blue-100',   text: 'text-blue-800',   label: '{{ _("Form Saved") }}' },
+            'form_submitted':  { icon: 'fa-paper-plane', bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("Form Submitted") }}' },
+            'form_approved':   { icon: 'fa-check-double',bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("Form Approved") }}' },
+            'form_reopened':   { icon: 'fa-lock-open',   bg: 'bg-amber-100',  text: 'text-amber-800',  label: '{{ _("Form Reopened") }}' },
+            'form_validated':  { icon: 'fa-check-circle',bg: 'bg-teal-100',   text: 'text-teal-800',   label: '{{ _("Form Validated") }}' },
+
+            // ── Legacy form types (old DB rows) ───────────────────────────
+            'form_submit': { icon: 'fa-paper-plane', bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("Form Submitted") }}' },
+            'form_save':   { icon: 'fa-save',        bg: 'bg-blue-100',   text: 'text-blue-800',   label: '{{ _("Form Saved") }}' },
+
+            // ── Data actions ───────────────────────────────────────────────
+            'data_modified': { icon: 'fa-pen',      bg: 'bg-yellow-100', text: 'text-yellow-800', label: '{{ _("Data Modified") }}' },
+            'data_deleted':  { icon: 'fa-trash',    bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Data Deleted") }}' },
+            'data_update':   { icon: 'fa-pen',      bg: 'bg-yellow-100', text: 'text-yellow-800', label: '{{ _("Data Modified") }}' },
+            'data_delete':   { icon: 'fa-trash',    bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Data Deleted") }}' },
+            'data_export':   { icon: 'fa-download', bg: 'bg-orange-100', text: 'text-orange-800', label: '{{ _("Data Exported") }}' },
+
+            // ── File ───────────────────────────────────────────────────────
+            'file_uploaded': { icon: 'fa-upload', bg: 'bg-purple-100', text: 'text-purple-800', label: '{{ _("File Uploaded") }}' },
+            'file_upload':   { icon: 'fa-upload', bg: 'bg-purple-100', text: 'text-purple-800', label: '{{ _("File Uploaded") }}' },
+
+            // ── Generic admin verbs ────────────────────────────────────────
+            'create': { icon: 'fa-plus',  bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("Created") }}' },
+            'update': { icon: 'fa-pen',   bg: 'bg-yellow-100', text: 'text-yellow-800', label: '{{ _("Updated") }}' },
+            'delete': { icon: 'fa-trash', bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Deleted") }}' },
+
+            // ── Account ───────────────────────────────────────────────────
+            'account_created': { icon: 'fa-user-plus', bg: 'bg-green-100', text: 'text-green-800', label: '{{ _("Account Created") }}' },
+
+            // ── User management ───────────────────────────────────────────
+            'user_create': { icon: 'fa-user-plus',  bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("User Added") }}' },
+            'user_update': { icon: 'fa-user-edit',  bg: 'bg-yellow-100', text: 'text-yellow-800', label: '{{ _("User Modified") }}' },
+            'user_delete': { icon: 'fa-user-times', bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("User Deleted") }}' },
+            'access_request_approve': { icon: 'fa-user-check', bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("Access Approved") }}' },
+            'access_request_reject':  { icon: 'fa-user-slash', bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Access Rejected") }}' },
+            'kickout_device':  { icon: 'fa-sign-out-alt', bg: 'bg-orange-100', text: 'text-orange-800', label: '{{ _("Device Kicked") }}' },
+            'remove_device':   { icon: 'fa-times',        bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Device Removed") }}' },
+
+            // ── Template actions ───────────────────────────────────────────
+            'template_create':         { icon: 'fa-plus-square', bg: 'bg-indigo-100', text: 'text-indigo-800', label: '{{ _("Template Created") }}' },
+            'template_update':         { icon: 'fa-pen',         bg: 'bg-indigo-100', text: 'text-indigo-800', label: '{{ _("Template Modified") }}' },
+            'template_delete':         { icon: 'fa-trash',       bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Template Deleted") }}' },
+            'template_duplicate':      { icon: 'fa-copy',        bg: 'bg-indigo-100', text: 'text-indigo-800', label: '{{ _("Template Duplicated") }}' },
+            'template_export':         { icon: 'fa-download',    bg: 'bg-indigo-100', text: 'text-indigo-800', label: '{{ _("Template Exported") }}' },
+            'template_import':         { icon: 'fa-upload',      bg: 'bg-indigo-100', text: 'text-indigo-800', label: '{{ _("Template Imported") }}' },
+            'template_import_excel':   { icon: 'fa-file-excel',  bg: 'bg-green-100',  text: 'text-green-800',  label: '{{ _("Excel Imported") }}' },
+            'template_variables_update': { icon: 'fa-code',      bg: 'bg-indigo-100', text: 'text-indigo-800', label: '{{ _("Variables Updated") }}' },
+            'template_sharing_update': { icon: 'fa-share-alt',   bg: 'bg-pink-100',   text: 'text-pink-800',   label: '{{ _("Sharing Updated") }}' },
+
+            // ── Version actions ────────────────────────────────────────────
+            'template_version_deploy':  { icon: 'fa-rocket',       bg: 'bg-purple-100', text: 'text-purple-800', label: '{{ _("Version Deployed") }}' },
+            'template_version_create':  { icon: 'fa-plus-circle',  bg: 'bg-blue-100',   text: 'text-blue-800',   label: '{{ _("Version Created") }}' },
+            'template_version_delete':  { icon: 'fa-trash',        bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Version Deleted") }}' },
+            'template_version_discard': { icon: 'fa-times-circle', bg: 'bg-orange-100', text: 'text-orange-800', label: '{{ _("Version Discarded") }}' },
+            'template_version_comment': { icon: 'fa-comment-alt',  bg: 'bg-gray-100',   text: 'text-gray-600',   label: '{{ _("Version Note Added") }}' },
+
+            // ── Section actions ────────────────────────────────────────────
+            'form_section_create':    { icon: 'fa-plus',      bg: 'bg-blue-50',  text: 'text-blue-700',  label: '{{ _("Section Added") }}' },
+            'form_section_update':    { icon: 'fa-pen',       bg: 'bg-blue-50',  text: 'text-blue-700',  label: '{{ _("Section Modified") }}' },
+            'form_section_delete':    { icon: 'fa-minus-circle', bg: 'bg-red-50', text: 'text-red-700',  label: '{{ _("Section Deleted") }}' },
+            'form_section_duplicate': { icon: 'fa-copy',      bg: 'bg-blue-50',  text: 'text-blue-700',  label: '{{ _("Section Duplicated") }}' },
+            'form_section_configure': { icon: 'fa-sliders-h', bg: 'bg-blue-50',  text: 'text-blue-700',  label: '{{ _("Section Configured") }}' },
+            'form_section_unarchive': { icon: 'fa-box-open',  bg: 'bg-green-50', text: 'text-green-700', label: '{{ _("Section Restored") }}' },
+
+            // ── Item actions ───────────────────────────────────────────────
+            'form_item_create':    { icon: 'fa-plus-circle', bg: 'bg-gray-100', text: 'text-gray-800', label: '{{ _("Item Added") }}' },
+            'form_item_update':    { icon: 'fa-pen',         bg: 'bg-gray-100', text: 'text-gray-800', label: '{{ _("Item Modified") }}' },
+            'form_item_delete':    { icon: 'fa-times',       bg: 'bg-red-50',   text: 'text-red-700',  label: '{{ _("Item Deleted") }}' },
+            'form_item_duplicate': { icon: 'fa-copy',        bg: 'bg-gray-100', text: 'text-gray-800', label: '{{ _("Item Duplicated") }}' },
+            'form_item_unarchive': { icon: 'fa-box-open',    bg: 'bg-green-50', text: 'text-green-700',label: '{{ _("Item Restored") }}' },
+
+            // ── Session / security ─────────────────────────────────────────
+            'cleanup_sessions':      { icon: 'fa-broom',    bg: 'bg-gray-100',   text: 'text-gray-800',   label: '{{ _("Sessions Cleaned") }}' },
+            'end_user_session':      { icon: 'fa-stop',     bg: 'bg-orange-100', text: 'text-orange-800', label: '{{ _("Session Ended") }}' },
+            'resolve_security_event':{ icon: 'fa-shield-alt',bg: 'bg-green-100', text: 'text-green-800',  label: '{{ _("Security Event Resolved") }}' },
+
+            // ── API keys ───────────────────────────────────────────────────
+            'api_key_create': { icon: 'fa-key',       bg: 'bg-teal-100',  text: 'text-teal-800',  label: '{{ _("API Key Created") }}' },
+            'api_key_revoke': { icon: 'fa-key',       bg: 'bg-red-100',   text: 'text-red-800',   label: '{{ _("API Key Revoked") }}' },
+
+            // ── RBAC ───────────────────────────────────────────────────────
+            'rbac_role_create':  { icon: 'fa-user-shield', bg: 'bg-violet-100', text: 'text-violet-800', label: '{{ _("Role Created") }}' },
+            'rbac_role_update':  { icon: 'fa-user-shield', bg: 'bg-violet-100', text: 'text-violet-800', label: '{{ _("Role Modified") }}' },
+            'rbac_role_delete':  { icon: 'fa-user-shield', bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Role Deleted") }}' },
+            'rbac_grant_create': { icon: 'fa-lock-open',   bg: 'bg-violet-100', text: 'text-violet-800', label: '{{ _("Permission Granted") }}' },
+            'rbac_grant_delete': { icon: 'fa-lock',        bg: 'bg-red-100',    text: 'text-red-800',    label: '{{ _("Permission Removed") }}' },
+        };
+
+        const activity = activityMap[activityType] || {
+            icon: 'fa-cog',
+            bg: 'bg-gray-100',
+            text: 'text-gray-800',
+            label: humanizeToken(activityType)
+        };
+        return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full ' + activity.bg + ' ' + activity.text + '"><i class="fas ' + activity.icon + ' mr-1"></i> ' + activity.label + '</span>';
+    }
+
+    // Helper function to render risk level badge
+    function renderRiskBadge(riskLevel) {
+        if (isNilOrEmpty(riskLevel)) {
+            return '<span class="text-sm text-gray-500">' + EMPTY_VALUE_PLACEHOLDER + '</span>';
+        }
+        const riskMap = {
+            'critical': { bg: 'bg-red-200', text: 'text-red-900', icon: '<i class="fas fa-exclamation-triangle mr-1"></i>' },
+            'high': { bg: 'bg-red-100', text: 'text-red-800', icon: '' },
+            'medium': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: '' },
+            'low': { bg: 'bg-green-100', text: 'text-green-800', icon: '' }
+        };
+        const risk = riskMap[riskLevel] || { bg: 'bg-gray-100', text: 'text-gray-800', icon: '' };
+        const label = humanizeToken(riskLevel);
+        return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + risk.bg + ' ' + risk.text + '">' + risk.icon + label + '</span>';
+    }
+
+    function getHttpStatusCategory(statusCode) {
+        if (statusCode === null || statusCode === undefined || statusCode === '') return 'normal';
+        const numericStatus = Number(statusCode);
+        if (!Number.isFinite(numericStatus)) return 'normal';
+        if (numericStatus >= 500) return 'server_error';
+        if (numericStatus >= 400) return 'error';
+        if (numericStatus >= 300) return 'redirect';
+        if (numericStatus >= 200) return 'success';
+        if (numericStatus >= 100) return 'informational';
+        return 'other';
+    }
+
+    // Helper function to render status badge
+    function renderStatusBadge(entry) {
+        const successBadge = '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> {{ _("Success") }}</span>';
+
+        if (entry.type === 'admin_action' && entry.requires_review) {
+            return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800"><i class="fas fa-exclamation-circle mr-1"></i> {{ _("Needs Review") }}</span>';
+        } else if (entry.type === 'activity' && entry.response_status_code !== null && entry.response_status_code !== undefined) {
+            const statusCode = Number(entry.response_status_code);
+            const statusCategory = getHttpStatusCategory(statusCode);
+            if (statusCategory === 'server_error' || statusCategory === 'error') {
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800" title="HTTP ' + statusCode + '"><i class="fas fa-times-circle mr-1"></i>{{ _("Error") }}</span>';
+            }
+            if (statusCategory === 'success') {
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800" title="HTTP ' + statusCode + '"><i class="fas fa-check-circle mr-1"></i>{{ _("Success") }}</span>';
+            }
+            if (statusCategory === 'redirect') {
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800" title="HTTP ' + statusCode + '"><i class="fas fa-random mr-1"></i>{{ _("Redirect") }}</span>';
+            }
+            if (statusCategory === 'informational') {
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-700" title="HTTP ' + statusCode + '"><i class="fas fa-info-circle mr-1"></i>{{ _("Info") }}</span>';
+            }
+            return successBadge;
+        }
+
+        // Non-reviewed admin actions and activity rows without status code
+        // are treated as successful outcomes for visual consistency.
+        return successBadge;
+    }
+
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // Transform audit trail data for ag-grid
+    const auditTrailData = [
+        {% for entry in entries.items %}
+        {
+            id: {{ entry.get('id')|tojson|safe }},
+            timestamp: {{ entry.get('timestamp')|datetime_iso|tojson|safe }},
+            user_id: {{ (entry.get('user').id if entry.get('user') else None)|tojson|safe }},
+            user_name: {{ ((entry.get('user').name or entry.get('user').email) if entry.get('user') else '')|tojson|safe }},
+            user_email: {{ (entry.get('user').email if entry.get('user') else '')|tojson|safe }},
+            user_title: {{ ((entry.get('user').title if entry.get('user') else '') or '')|tojson|safe }},
+            user_active: {{ (entry.get('user').active if entry.get('user') else True)|tojson|safe }},
+            user_profile_color: {{ ((entry.get('user').profile_color if entry.get('user') and entry.get('user').profile_color else '') or '')|tojson|safe }},
+            entity_type: {{ (entry.get('entity_type', '') or '')|tojson|safe }},
+            entity_name: {{ (entry.get('entity_name', '') or '')|tojson|safe }},
+            activity_type: {{ (entry.get('consolidated_activity_type', '') or '')|tojson|safe }},
+            description: {{ ((entry.get('consistent_description') or entry.get('description', '')) or '')|tojson|safe }},
+            details: {% if entry.get('details') is not none %}{{ entry.get('details')|tojson|safe }}{% else %}null{% endif %},
+            endpoint: {{ (entry.get('endpoint', '') or '')|tojson|safe }},
+            http_method: {{ (entry.get('http_method', '') or '')|tojson|safe }},
+            risk_level: {{ (entry.get('risk_level', '') or '')|tojson|safe }},
+            ip_address: {{ (entry.get('ip_address', '') or '')|tojson|safe }},
+            type: {{ (entry.get('type', '') or '')|tojson|safe }},
+            requires_review: {{ entry.get('requires_review', False)|tojson|safe }},
+            response_status_code: {% if entry.get('response_status_code') is not none %}{{ entry.get('response_status_code')|tojson|safe }}{% else %}null{% endif %}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        {
+            field: 'timestamp',
+            headerName: '{{ _("Timestamp") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                // Use DateTimeUtils for proper timezone conversion
+                if (typeof DateTimeUtils !== 'undefined') {
+                    return DateTimeUtils.agGridDualLineRenderer(params, { showTimezone: true });
+                }
+                // Fallback
+                return '<div class="text-sm text-gray-900">' + (params.data.timestamp || '') + '</div>';
+            },
+            cellStyle: { 'white-space': 'normal', 'line-height': '1.4' }
+        },
+        {
+            field: 'user_name',
+            headerName: '{{ _("User") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'user_id',
+                    nameField: 'user_name',
+                    emailField: 'user_email',
+                    titleField: 'user_title',
+                    activeField: 'user_active',
+                    profileColorField: 'user_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: true
+                });
+            },
+            cellStyle: { 'white-space': 'normal', 'line-height': '1.4' }
+        },
+        {
+            field: 'entity_name',
+            headerName: '{{ _("Entity") }}',
+            width: 160,
+            minWidth: 120,
+            maxWidth: 260,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (isNilOrEmpty(params.value)) return '<span class="text-sm text-gray-500">' + EMPTY_VALUE_PLACEHOLDER + '</span>';
+                const typeLabels = {
+                    'country':        '{{ _("Country") }}',
+                    'ns_branch':      '{{ _("NS Branch") }}',
+                    'ns_subbranch':   '{{ _("NS Sub-branch") }}',
+                    'ns_localunit':   '{{ _("Local Unit") }}',
+                    'division':       '{{ _("Division") }}',
+                    'department':     '{{ _("Department") }}',
+                };
+                const entityType = params.data.entity_type || '';
+                const typeLabel = typeLabels[entityType] || humanizeToken(entityType);
+                const badge = typeLabel && entityType !== 'country'
+                    ? ' <span class="ml-1 px-1 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">' + escapeHtml(typeLabel) + '</span>'
+                    : '';
+                return '<span class="text-sm text-gray-900">' + escapeHtml(params.value) + '</span>' + badge;
+            },
+            cellStyle: { 'white-space': 'normal', 'line-height': '1.4' }
+        },
+        {
+            field: 'activity_type',
+            headerName: '{{ _("Activity") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return renderActivityBadge(params.value);
+            },
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'description',
+            headerName: '{{ _("Description") }}',
+            width: 320,
+            minWidth: 250,
+            maxWidth: 520,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const valueText = isNilOrEmpty(params.value) ? EMPTY_VALUE_PLACEHOLDER : String(params.value);
+                let html = '<div class="text-sm text-gray-900" style="word-wrap: break-word; overflow-wrap: break-word; white-space: normal;" title="' + escapeHtml(valueText) + '">' + escapeHtml(valueText) + '</div>';
+                if (params.data.details !== null && params.data.details !== undefined) {
+                    const detailsId = 'details-' + params.data.id;
+                    html += '<button class="text-xs text-blue-500 hover:text-blue-700 mt-1 toggle-details-btn" type="button" data-details-id="' + detailsId + '">{{ _("View Details") }}</button>';
+                    html += '<div class="hidden mt-2 p-3 bg-gray-100 rounded-md border border-gray-200" id="' + detailsId + '">';
+                    html += renderDetailsValue(params.data.details);
+                    html += '</div>';
+                }
+                return html;
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'overflow-wrap': 'break-word', 'line-height': '1.4' },
+            autoHeight: true,
+            wrapText: true
+        },
+        {
+            field: 'risk_level',
+            headerName: '{{ _("Risk Level") }}',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return renderRiskBadge(params.value);
+            }
+        },
+        {
+            field: 'ip_address',
+            headerName: '{{ _("IP Address") }}',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return renderTextCell(params.value, { mono: true });
+            }
+        },
+        {
+            field: 'status',
+            headerName: '{{ _("Status") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'customSetFilter',
+            sortable: true,
+            valueGetter: function(params) {
+                // Return a value for filtering/sorting
+                if (params.data.type === 'admin_action' && params.data.requires_review) {
+                    return 'needs_review';
+                } else if (params.data.type === 'activity' && params.data.response_status_code !== null && params.data.response_status_code !== undefined) {
+                    return getHttpStatusCategory(params.data.response_status_code);
+                }
+                return 'success';
+            },
+            cellRenderer: function(params) {
+                return renderStatusBadge(params.data);
+            },
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+
+        // ── Optional technical detail columns (hidden by default) ──────────
+        {
+            field: 'http_method',
+            headerName: '{{ _("Method") }}',
+            width: 100,
+            minWidth: 80,
+            maxWidth: 120,
+            filter: 'customSetFilter',
+            sortable: true,
+            hide: true,
+            cellRenderer: function(params) {
+                if (isNilOrEmpty(params.value)) return '<span class="text-sm text-gray-500">' + EMPTY_VALUE_PLACEHOLDER + '</span>';
+                const colors = {
+                    'GET':    'bg-blue-100 text-blue-800',
+                    'POST':   'bg-green-100 text-green-800',
+                    'PUT':    'bg-yellow-100 text-yellow-800',
+                    'PATCH':  'bg-amber-100 text-amber-800',
+                    'DELETE': 'bg-red-100 text-red-800',
+                };
+                const cls = colors[params.value] || 'bg-gray-100 text-gray-800';
+                return '<span class="px-2 py-0.5 text-xs font-mono font-semibold rounded ' + cls + '">' + escapeHtml(params.value) + '</span>';
+            },
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'endpoint',
+            headerName: '{{ _("Endpoint") }}',
+            width: 260,
+            minWidth: 180,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            hide: true,
+            cellRenderer: function(params) {
+                return renderTextCell(params.value, { mono: true, extraClasses: 'break-all text-xs text-gray-700' });
+            },
+            cellStyle: { 'white-space': 'normal', 'line-height': '1.4' },
+            wrapText: true,
+            autoHeight: true
+        }
+    ];
+
+    const auditTrailGridEl = document.getElementById('auditTrailGrid');
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        if (!auditTrailGridEl) return;
+
+        var result = AgGridHelper.create('auditTrailGrid', 'audit-trail', columnDefs, auditTrailData, {
+            gridOptions: {
+                getRowStyle: function(params) {
+                    var riskLevel = params.data.risk_level;
+                    if (riskLevel === 'high' || riskLevel === 'critical') {
+                        return { 'background-color': '#fef2f2' };
+                    } else if (riskLevel === 'medium') {
+                        return { 'background-color': '#fefce8' };
+                    }
+                    return null;
+                }
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+    }
+
+    if (auditTrailGridEl) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeGrid);
+        } else {
+            initializeGrid();
+        }
+    }
+
+    // Multiselect dropdown initialization (kept for filters)
+
+    // Event delegation for toggle details buttons (AG Grid renders cells dynamically,
+    // so we must use delegation on the grid container instead of direct binding)
+    if (auditTrailGridEl) {
+        auditTrailGridEl.addEventListener('click', function(e) {
+            const btn = e.target.closest('.toggle-details-btn');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const detailsId = btn.getAttribute('data-details-id');
+                const detailsEl = document.getElementById(detailsId);
+                if (detailsEl) {
+                    const isHidden = detailsEl.classList.contains('hidden');
+                    detailsEl.classList.toggle('hidden');
+                    btn.textContent = isHidden ? '{{ _("Hide Details") }}' : '{{ _("View Details") }}';
+                    // Tell AG Grid to recalculate row heights after expanding/collapsing
+                    if (gridApi) {
+                        gridApi.resetRowHeights();
+                    }
+                }
+            }
+        });
+    }
+
+</script>
+{% endblock %}

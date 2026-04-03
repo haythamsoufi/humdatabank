@@ -1,0 +1,253 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}Session Logs - Admin Panel{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style nonce="{{ csp_style_nonce() }}">
+    /* Custom styles specific to this page, if any, can go here.
+       Aim to use Tailwind utilities primarily. */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+
+    {% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title='Session Logs',
+        icon='fas fa-history',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Analytics', 'url': url_for('analytics.analytics_dashboard')},
+            {'name': 'Session Logs'}
+        ]
+    ) }}
+
+    <div class="bg-gray-50 p-4 sm:p-6 rounded-lg shadow mb-8">
+        <h5 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+            <i class="fas fa-filter mr-2"></i> Filters
+        </h5>
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+            <div>
+                <label for="user" class="block text-sm font-medium text-gray-700 mb-1">User Email</label>
+                <input type="text" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="user" name="user"
+                       value="{{ filters.user or '' }}" placeholder="Search by email">
+            </div>
+            <div>
+                <label for="min_duration" class="block text-sm font-medium text-gray-700 mb-1">Min Duration (min)</label>
+                <input type="number" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="min_duration" name="min_duration"
+                       value="{{ filters.min_duration or '' }}" placeholder="e.g., 10">
+            </div>
+            <div class="flex items-center pt-7"> {# pt-7 to align with other inputs that have labels #}
+                <input class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" type="checkbox" id="active_only"
+                       name="active_only" value="1" {% if filters.active_only %}checked{% endif %}>
+                <label class="text-sm font-medium text-gray-700" for="active_only">
+                    Active Sessions Only
+                </label>
+            </div>
+            <div class="col-span-1 sm:col-span-2 lg:col-span-3 flex flex-col sm:flex-row gap-3 sm:items-end justify-start pt-2">
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                    <i class="fas fa-filter mr-2"></i> Filter
+                </button>
+                <a href="{{ url_for('analytics.session_logs') }}" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Clear Filters
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <h5 class="text-xl font-semibold text-gray-800 mb-2 sm:mb-0">
+                <i class="fas fa-users-cog mr-2"></i> User Sessions <span class="text-sm text-gray-500 font-normal">({{ sessions.total }} total)</span>
+            </h5>
+            {% if sessions.pages > 0 %}
+            <div class="text-sm text-gray-600">
+                Page {{ sessions.page }} of {{ sessions.pages }}
+            </div>
+            {% endif %}
+        </div>
+        <div class="p-0">
+            {% if sessions.items %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session Start</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Page Views</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activities</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for session in sessions.items %}
+                        <tr class="{% if session.is_active %}bg-green-50 hover:bg-green-100{% else %}hover:bg-gray-50{% endif %}">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if session.user %}
+                                <div class="text-sm font-medium text-gray-900 flex items-center">
+                                    {% if session.device_type == 'mobile' %}
+                                    <i class="fas fa-mobile-alt mr-2 text-gray-500"></i>
+                                    {% else %}
+                                    <i class="fas fa-laptop mr-2 text-gray-500"></i>
+                                    {% endif %}
+                                    {{ session.user.name or session.user.email }}
+                                </div>
+                                <div class="text-xs text-gray-500">{{ session.user.email }}</div>
+                                {% else %}
+                                <span class="text-sm text-gray-500">Unknown User</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {{ session.session_start|datetime_local('datetime', 'text-sm text-gray-900') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if session.duration_minutes is not none %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    {{ session.duration_minutes }} min
+                                </span>
+                                {% else %}
+                                <span class="text-sm text-gray-500">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    {{ session.page_views or 0 }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                    {{ session.activity_count or 0 }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if session.is_active %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    <i class="fas fa-circle text-green-500 mr-1 animate-pulse"></i> Active
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    Ended
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if session.last_activity %}
+                                {{ session.last_activity|datetime_local('datetime', 'text-sm text-gray-900') }}
+                                {% else %}
+                                <span class="text-sm text-gray-500">No activity</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if session.is_active %}
+                                <form method="POST" action="{{ url_for('analytics.end_session', session_id=session.session_id) }}" class="inline" data-confirm="Are you sure you want to force logout this user? This will immediately terminate their session and log them out." data-confirm-danger="true">
+                                    <button type="submit"
+                                        class="btn btn-danger btn-sm force-logout-btn"
+                                        title="Force logout user - they will be logged out immediately">
+                                        <i class="fas fa-sign-out-alt mr-1"></i>
+                                        Force Logout
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="text-xs text-gray-500">Session ended</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-file-alt fa-3x text-gray-400 mb-3"></i>
+                <p class="text-gray-500 text-lg">No sessions found matching your criteria.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if sessions.pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-200">
+            <nav class="flex items-center justify-between">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    {% if sessions.has_prev %}
+                    <a href="{{ url_for('analytics.session_logs', page=sessions.prev_num, **request.args) }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Previous
+                    </a>
+                    {% else %}
+                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-400 bg-white cursor-not-allowed">
+                        Previous
+                    </span>
+                    {% endif %}
+                    {% if sessions.has_next %}
+                    <a href="{{ url_for('analytics.session_logs', page=sessions.next_num, **request.args) }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Next
+                    </a>
+                    {% else %}
+                    <span class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-400 bg-white cursor-not-allowed">
+                        Next
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-center">
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            {% if sessions.has_prev %}
+                            <a href="{{ url_for('analytics.session_logs', page=sessions.prev_num, **request.args) }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Previous</span>
+                                <i class="fas fa-chevron-left h-5 w-5"></i>
+                            </a>
+                            {% else %}
+                            <span class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                                <span class="sr-only">Previous</span>
+                                <i class="fas fa-chevron-left h-5 w-5"></i>
+                            </span>
+                            {% endif %}
+
+                            {% for page_num in sessions.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                                {% if page_num %}
+                                    {% if page_num != sessions.page %}
+                                    <a href="{{ url_for('analytics.session_logs', page=page_num, **request.args) }}" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                        {{ page_num }}
+                                    </a>
+                                    {% else %}
+                                    <span aria-current="page" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                        {{ page_num }}
+                                    </span>
+                                    {% endif %}
+                                {% elif loop.index != 1 and loop.index != sessions.pages + 2 %}
+                                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                        &hellip;
+                                    </span>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if sessions.has_next %}
+                            <a href="{{ url_for('analytics.session_logs', page=sessions.next_num, **request.args) }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Next</span>
+                                <i class="fas fa-chevron-right h-5 w-5"></i>
+                            </a>
+                            {% else %}
+                            <span class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                                <span class="sr-only">Next</span>
+                                <i class="fas fa-chevron-right h-5 w-5"></i>
+                            </span>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# Force logout forms use global confirm handler (components.js) via data-confirm and data-confirm-danger on form #}
+{% endblock %}

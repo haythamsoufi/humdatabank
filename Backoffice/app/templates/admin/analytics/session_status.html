@@ -1,0 +1,187 @@
+{% extends "core/layout.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1>{{ title }}</h1>
+
+            <!-- Session Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Sessions</h5>
+                            <h2 class="text-primary">{{ total_sessions }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Active Sessions</h5>
+                            <h2 class="text-success">{{ active_sessions }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Stale Sessions</h5>
+                            <h2 class="text-warning">{{ stale_sessions|length }}</h2>
+                            <small class="text-muted">Inactive > 2h or Active > 8h</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Actions</h5>
+                            <form method="POST" action="{{ url_for('analytics.cleanup_sessions') }}" style="display: inline;" data-confirm="Clean up {{ stale_sessions|length }} stale sessions?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-warning btn-sm cleanup-sessions-btn">
+                                    Clean Up Now
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Sessions by User -->
+            {% if active_sessions_by_user %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Active Sessions by User</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>User Email</th>
+                                    <th>Active Sessions</th>
+                                    <th>Last Activity</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user_session in active_sessions_by_user %}
+                                <tr>
+                                    <td>{{ user_session.email }}</td>
+                                    <td>
+                                        <span class="badge badge-{% if user_session.session_count > 1 %}warning{% else %}success{% endif %}">
+                                            {{ user_session.session_count }}
+                                        </span>
+                                        {% if user_session.session_count > 1 %}
+                                        <small class="text-muted">(Multiple sessions)</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ user_session.last_activity|datetime_local('datetime') }}
+                                        <br>
+                                        <small class="text-muted">
+                                            {% set hours_ago = ((moment().utc() - user_session.last_activity).total_seconds() / 3600) | round(1) %}
+                                            ({{ hours_ago }} hours ago)
+                                        </small>
+                                    </td>
+                                    <td>
+                                        {% set hours_ago = ((moment().utc() - user_session.last_activity).total_seconds() / 3600) %}
+                                        {% if hours_ago > 2 %}
+                                        <span class="badge badge-warning">Stale</span>
+                                        {% else %}
+                                        <span class="badge badge-success">Active</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Stale Sessions Detail -->
+            {% if stale_sessions %}
+            <div class="card">
+                <div class="card-header">
+                    <h5>Stale Sessions ({{ stale_sessions|length }})</h5>
+                    <small class="text-muted">These sessions will be cleaned up automatically or can be cleaned manually</small>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Session Start</th>
+                                    <th>Last Activity</th>
+                                    <th>Inactive Duration</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for session in stale_sessions %}
+                                <tr>
+                                    <td>{{ session.user.email if session.user else 'Unknown' }}</td>
+                                    <td>{{ session.session_start|datetime_local('datetime') }}</td>
+                                    <td>{{ session.last_activity|datetime_local('datetime') }}</td>
+                                    <td>
+                                        {% set hours_inactive = ((moment().utc() - session.last_activity).total_seconds() / 3600) | round(1) %}
+                                        {{ hours_inactive }} hours
+                                    </td>
+                                    <td>
+                                        {% set hours_since_start = ((moment().utc() - session.session_start).total_seconds() / 3600) %}
+                                        {% set hours_since_activity = ((moment().utc() - session.last_activity).total_seconds() / 3600) %}
+                                        {% if hours_since_activity > 2 and hours_since_start > 8 %}
+                                        <span class="badge badge-danger">Inactive + Long Duration</span>
+                                        {% elif hours_since_activity > 2 %}
+                                        <span class="badge badge-warning">Inactive > 2h</span>
+                                        {% elif hours_since_start > 8 %}
+                                        <span class="badge badge-info">Duration > 8h</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <h5>No Stale Sessions Found!</h5>
+                <p>All active sessions are within the normal timeout limits.</p>
+            </div>
+            {% endif %}
+
+            <!-- Information -->
+            <div class="mt-4">
+                <div class="alert alert-info">
+                    <h6>Session Timeout Configuration:</h6>
+                    <ul class="mb-0">
+                        <li><strong>Inactivity Timeout:</strong> 2 hours (sessions with no activity for 2+ hours are considered stale)</li>
+                        <li><strong>Maximum Duration:</strong> 8 hours (sessions older than 8 hours are considered stale)</li>
+                        <li><strong>Automatic Cleanup:</strong> Runs randomly on 1% of requests and at application startup</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add moment.js for time calculations -->
+<script nonce="{{ csp_nonce() }}">
+    // Simple time calculation function since we might not have moment.js
+    function moment() {
+        return {
+            utc: function() {
+                return new Date();
+            }
+        };
+    }
+
+    // Cleanup sessions form uses global confirm handler (components.js) via data-confirm on form
+</script>
+{% endblock %}

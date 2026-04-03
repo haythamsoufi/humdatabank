@@ -1,0 +1,10 @@
+name: NGO Databank
+paths:
+  - Backoffice
+  - Website
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/.next/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - Backoffice/app/static/libs

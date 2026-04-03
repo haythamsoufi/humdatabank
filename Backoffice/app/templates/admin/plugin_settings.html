@@ -1,0 +1,438 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {{ page_header(
+        title="Plugin Settings",
+        icon='fas fa-cog',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Plugin Management', 'url': url_for('admin.plugin_management')},
+            {'name': plugin_name}
+        ],
+        actions=[
+            {
+                'type': 'button',
+                'text': 'Back to Plugins',
+                'icon': 'fas fa-arrow-left',
+                'classes': 'professional-action-btn',
+                'attributes': {'data-action': 'back-to-plugins', 'data-url': url_for('admin.plugin_management'), 'title': 'Return to plugin management'}
+            }
+        ]
+    ) }}
+
+    {% if error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            <strong class="font-bold">Error:</strong>
+            <span class="block sm:inline">{{ error }}</span>
+        </div>
+    {% endif %}
+
+    {% if plugin_info %}
+        <!-- Plugin Information -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-700">
+                    <i class="fas fa-info-circle w-5 h-5 mr-2 inline"></i>
+                    Plugin Information
+                </h3>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Plugin Name</label>
+                        <p class="text-gray-900 font-medium">{{ plugin_info.name }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Version</label>
+                        <p class="text-gray-900">{{ plugin_info.version }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Author</label>
+                        <p class="text-gray-900">{{ plugin_info.author }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">License</label>
+                        <p class="text-gray-900">{{ plugin_info.license }}</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <p class="text-gray-900">{{ plugin_info.description }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plugin Configuration -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-700">
+                    <i class="fas fa-cogs w-5 h-5 mr-2 inline"></i>
+                    Configuration
+                </h3>
+            </div>
+            <div class="p-6">
+                {% if plugin_info.config %}
+                    <div class="space-y-4">
+                        {% for key, value in plugin_info.config.items() %}
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">{{ key }}</label>
+                                    <p class="text-sm text-gray-500">{{ value }}</p>
+                                </div>
+                                <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                    Edit
+                                </button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-center py-4">No configuration options available for this plugin.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Plugin-specific global settings are rendered by each plugin's own settings page. -->
+
+        <!-- Field Types -->
+        {% if plugin_info.field_types %}
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-700">
+                        <i class="fas fa-list w-5 h-5 mr-2 inline"></i>
+                        Field Types
+                    </h3>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-3">
+                        {% for field_type in plugin_info.field_types %}
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div>
+                                    <span class="font-medium text-gray-900">{{ field_type.display_name }}</span>
+                                    <span class="text-sm text-gray-500 ml-2">({{ field_type.type }})</span>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                        Configure
+                                    </button>
+                                    <button class="text-green-600 hover:text-green-800 text-sm font-medium">
+                                        Test
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Plugin Actions -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-700">
+                    <i class="fas fa-tools w-5 h-5 mr-2 inline"></i>
+                    Actions
+                </h3>
+            </div>
+            <div class="p-6">
+                <div class="flex flex-wrap gap-4">
+                    <!-- Activation Status and Controls -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-700">Status:</span>
+                        {% if plugin_info.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <i class="fas fa-check-circle w-3 h-3 mr-1"></i>
+                                Active
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                <i class="fas fa-pause-circle w-3 h-3 mr-1"></i>
+                                Inactive
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Activate/Deactivate Button -->
+                    {% if plugin_info.is_active %}
+                        <button data-action="deactivate" data-plugin-name="{{ plugin_info.name }}"
+                                class="btn btn-warning">
+                            <i class="fas fa-pause w-4 h-4 mr-2 inline"></i>
+                            Deactivate
+                        </button>
+                    {% else %}
+                        <button data-action="activate" data-plugin-name="{{ plugin_info.name }}"
+                                class="btn btn-success">
+                            <i class="fas fa-play w-4 h-4 mr-2 inline"></i>
+                            Activate
+                        </button>
+                    {% endif %}
+
+                    <button data-action="reload" data-plugin-name="{{ plugin_info.name }}"
+                            class="btn btn-warning">
+                        <i class="fas fa-sync-alt w-4 h-4 mr-2 inline"></i>
+                        Reload Plugin
+                    </button>
+                    <button data-action="export" data-plugin-name="{{ plugin_info.name }}"
+                            class="btn btn-primary">
+                        <i class="fas fa-download w-4 h-4 mr-2 inline"></i>
+                        Export Config
+                    </button>
+                    <button data-action="uninstall" data-plugin-name="{{ plugin_info.name }}"
+                            class="btn btn-danger">
+                        <i class="fas fa-trash w-4 h-4 mr-2 inline"></i>
+                        Uninstall Plugin
+                    </button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Loading Spinner -->
+<div id="loading-spinner" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <p class="text-white text-center mt-4">Loading...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+    // Setup event listeners on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        setupEventListeners();
+    });
+
+    function setupEventListeners() {
+        // Back to plugins button
+        document.querySelectorAll('[data-action="back-to-plugins"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                if (url) {
+                    window.location.href = url;
+                }
+            });
+        });
+
+        // Plugin action buttons
+        document.querySelectorAll('[data-action][data-plugin-name]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const action = this.getAttribute('data-action');
+                const pluginName = this.getAttribute('data-plugin-name');
+
+                switch(action) {
+                    case 'activate':
+                        activatePlugin(pluginName);
+                        break;
+                    case 'deactivate':
+                        deactivatePlugin(pluginName);
+                        break;
+                    case 'reload':
+                        reloadPlugin(pluginName);
+                        break;
+                    case 'export':
+                        exportPluginConfig(pluginName);
+                        break;
+                    case 'uninstall':
+                        uninstallPlugin(pluginName);
+                        break;
+                }
+            });
+        });
+    }
+
+    async function _reloadPlugin(pluginName) {
+        try {
+            showLoading(true);
+            const response = await fetch(`/admin/api/plugins/${pluginName}/reload`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    showSuccess(`Plugin "${pluginName}" reloaded successfully`);
+                    // Reload the page to show updated information
+                    window.location.reload();
+                }
+            }
+        } catch (error) {
+            console.error('Error reloading plugin:', error);
+            showError('Failed to reload plugin');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function reloadPlugin(pluginName) {
+        const msg = `Are you sure you want to reload the plugin "${pluginName}"?`;
+        if (window.showConfirmation) {
+            window.showConfirmation(msg, () => { void _reloadPlugin(pluginName); }, null, 'Reload', 'Cancel', 'Reload Plugin?');
+        } else {
+            void _reloadPlugin(pluginName);
+        }
+    }
+
+    async function _activatePlugin(pluginName) {
+        try {
+            showLoading(true);
+            const response = await fetch(`/admin/api/plugins/${pluginName}/activate`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    showSuccess(`Plugin "${pluginName}" activated successfully`);
+                    // Reload the page to show updated status
+                    window.location.reload();
+                }
+            }
+        } catch (error) {
+            console.error('Error activating plugin:', error);
+            showError('Failed to activate plugin');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function activatePlugin(pluginName) {
+        const msg = `Are you sure you want to activate the plugin "${pluginName}"?`;
+        if (window.showConfirmation) {
+            window.showConfirmation(msg, () => { void _activatePlugin(pluginName); }, null, 'Activate', 'Cancel', 'Activate Plugin?');
+        } else {
+            void _activatePlugin(pluginName);
+        }
+    }
+
+    async function _deactivatePlugin(pluginName) {
+        try {
+            showLoading(true);
+            const response = await fetch(`/admin/api/plugins/${pluginName}/deactivate`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    showSuccess(`Plugin "${pluginName}" deactivated successfully`);
+                    // Reload the page to show updated status
+                    window.location.reload();
+                }
+            }
+        } catch (error) {
+            console.error('Error deactivating plugin:', error);
+            showError('Failed to deactivate plugin');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function deactivatePlugin(pluginName) {
+        const msg = `Are you sure you want to deactivate the plugin "${pluginName}"? This will disable its functionality.`;
+        if (window.showConfirmation) {
+            window.showConfirmation(msg, () => { void _deactivatePlugin(pluginName); }, null, 'Deactivate', 'Cancel', 'Deactivate Plugin?');
+        } else {
+            void _deactivatePlugin(pluginName);
+        }
+    }
+
+    async function exportPluginConfig(pluginName) {
+        try {
+            showLoading(true);
+            const response = await fetch(`/admin/api/plugins/${pluginName}`, {
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    // Create and download JSON file
+                    const blob = new Blob([JSON.stringify(data.plugin, null, 2)], { type: 'application/json' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${pluginName}_config.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    showSuccess('Plugin configuration exported successfully');
+                }
+            }
+        } catch (error) {
+            console.error('Error exporting plugin config:', error);
+            showError('Failed to export plugin configuration');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async function uninstallPlugin(pluginName) {
+        if (!currentPluginForUninstall) {
+            currentPluginForUninstall = pluginName;
+        }
+
+        try {
+            showLoading(true);
+            closeCleanupModal();
+
+            const response = await fetch(`/admin/api/plugins/${currentPluginForUninstall}/uninstall`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    showSuccess(`Plugin "${currentPluginForUninstall}" uninstalled successfully`);
+                    await loadPlugins();
+                }
+            }
+        } catch (error) {
+            console.error('Error uninstalling plugin:', error);
+            showError('Failed to uninstall plugin');
+        } finally {
+            showLoading(false);
+            currentPluginForUninstall = null;
+        }
+    }
+
+    // Plugin-specific settings are provided by each plugin's own settings page.
+
+    function showLoading(show) {
+        document.getElementById('loading-spinner').classList.toggle('hidden', !show);
+    }
+
+    function showSuccess(message) {
+        if (window.showAlert) {
+            window.showAlert(message, 'success');
+        } else {
+            window.__clientLog && window.__clientLog('Success:', message);
+        }
+    }
+
+    function showError(message) {
+        if (window.showAlert) {
+            window.showAlert('Error: ' + message, 'error');
+        } else {
+            console.error('Error:', message);
+        }
+    }
+</script>
+{% endblock %}

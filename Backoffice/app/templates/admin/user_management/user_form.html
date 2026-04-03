@@ -1,0 +1,3099 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ user.email if user else "Add New User" }}{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% set azure_sso_enabled = azure_sso_enabled | default(false) %}
+
+{# Permission gates for deactivate / delete actions (only meaningful when editing) #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set target_is_admin = (computed_role_type|default('admin')) == 'admin' %}
+{% set can_toggle_user_active = current_is_system_manager or has_permission('admin.users.deactivate') %}
+{% set can_archive_target = user and can_toggle_user_active and (current_is_system_manager or (not target_is_admin)) and (current_user.is_authenticated and user.id != current_user.id) %}
+{% set can_delete_target = user and current_is_system_manager and (current_user.is_authenticated and user.id != current_user.id) %}
+{% set can_view_user_analytics = current_is_system_manager or has_permission('admin.analytics.view') %}
+
+{# Header actions rendered by page_header component #}
+{% set save_label = form.submit.label.text if form.submit and form.submit.label else _('Save') %}
+{% set header_actions = namespace(items=[]) %}
+{% if can_archive_target %}
+    {% if user and user.active %}
+        {% set __ = header_actions.items.append({
+            'type': 'button',
+            'text': _('Deactivate'),
+            'icon': 'fas fa-user-slash',
+            'classes': 'professional-action-btn professional-action-btn-orange',
+            'attributes': {'id': 'archiveUserBtn'}
+        }) %}
+    {% else %}
+        {% set __ = header_actions.items.append({
+            'type': 'button',
+            'text': _('Reactivate'),
+            'icon': 'fas fa-user-check',
+            'classes': 'professional-action-btn professional-action-btn-green',
+            'attributes': {'id': 'archiveUserBtn'}
+        }) %}
+    {% endif %}
+{% endif %}
+{% if can_delete_target %}
+    {% set __ = header_actions.items.append({
+        'type': 'button',
+        'text': _('Delete'),
+        'icon': 'fas fa-trash',
+        'classes': 'professional-action-btn professional-action-btn-red',
+        'attributes': {'id': 'deleteUserBtn'}
+    }) %}
+{% endif %}
+{% set __ = header_actions.items.append({
+    'type': 'submit',
+    'text': save_label,
+    'classes': 'professional-action-btn professional-action-btn-blue',
+    'attributes': {'form': 'userForm'}
+}) %}
+
+{{ page_header(
+    title=user.email if user else "Add New User",
+    icon='fas fa-' + ('user-edit' if user else 'user-plus'),
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'User Management', 'url': url_for('user_management.manage_users')},
+        {'name': user.email if user else "Add New User"}
+    ],
+    actions=header_actions.items,
+    pin_actions_on_scroll=True
+) }}
+
+{% set resolved_entity_types = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
+{% set has_countries = 'countries' in resolved_entity_types %}
+{% set has_ns_structure = 'ns_structure' in resolved_entity_types %}
+{% set has_secretariat = 'secretariat' in resolved_entity_types %}
+{% set entity_tabs = namespace(order=[]) %}
+{% if has_countries %}{% set __ = entity_tabs.order.append('countries') %}{% endif %}
+{% if has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
+{% if has_secretariat %}{% set __ = entity_tabs.order.append('secretariat') %}{% endif %}
+{% set default_entity_tab = entity_tabs.order[0] if entity_tabs.order else None %}
+
+{# The form for editing or adding a user #}
+<form id="userForm" method="POST" action="{{ url_for('user_management.edit_user', user_id=user.id) if user else url_for('user_management.new_user') }}">
+    {{ form.csrf_token }}
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-24">
+        {# Ensure `read_only` is always a real boolean (not Jinja Undefined) #}
+        {% set read_only = (((user is defined and user) and user_has_role(user, 'system_manager') and (not current_user.is_authenticated or not current_user_has_role('system_manager'))) or false) %}
+        {% if user and not user.active %}
+        <div class="mb-4 p-3 rounded border border-red-300 bg-red-50 text-red-800 text-sm flex items-start">
+            <i class="fas fa-user-slash mr-2 mt-0.5"></i>
+            <div>
+                <strong>{{ _('This user is currently inactive.') }}</strong>
+                <div>{{ _('Inactive users cannot log in. Use the Reactivate button below to restore access.') }}</div>
+            </div>
+        </div>
+        {% endif %}
+        {% if read_only %}
+        <div class="mb-4 p-3 rounded border border-yellow-300 bg-yellow-50 text-yellow-800 text-sm">
+            <i class="fas fa-lock mr-2"></i>
+            This user is a System Manager. Only a System Manager can modify their details.
+        </div>
+        {% endif %}
+
+        {# Main Tab Navigation #}
+        {% call scroll_tab_bar(inner_tag='ul', inner_id='main-tabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-6', aria_label=_('User form sections')) %}
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
+                            id="user-details-tab"
+                            data-tabs-target="#user-details-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="user-details-panel"
+                            aria-selected="true">
+                        <i class="fas fa-user mr-2"></i>User Details
+                    </button>
+                </li>
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
+                            id="entity-permissions-tab"
+                            data-tabs-target="#entity-permissions-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="entity-permissions-panel"
+                            aria-selected="false">
+                        <i class="fas fa-sitemap mr-2"></i>Entity Permissions
+                    </button>
+                </li>
+                {% if user %}
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
+                            id="notification-preferences-tab"
+                            data-tabs-target="#notification-preferences-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="notification-preferences-panel"
+                            aria-selected="false">
+                        <i class="fas fa-bell mr-2"></i>Notification Preferences
+                    </button>
+                </li>
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
+                            id="registered-devices-tab"
+                            data-tabs-target="#registered-devices-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="registered-devices-panel"
+                            aria-selected="false">
+                        <i class="fas fa-mobile-alt mr-2"></i>Registered Devices
+                    </button>
+                </li>
+                {% if can_view_user_analytics %}
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
+                            id="analytics-tab"
+                            data-tabs-target="#analytics-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="analytics-panel"
+                            aria-selected="false">
+                        <i class="fas fa-chart-line mr-2"></i>{{ _('Analytics') }}
+                    </button>
+                </li>
+                {% endif %}
+                {% endif %}
+        {% endcall %}
+
+        {# Main Tab Panels #}
+        <div id="main-tabs-content">
+            {# User Details Tab #}
+            <div id="user-details-panel" role="tabpanel" aria-labelledby="user-details-tab">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="mb-4">
+                        {{ form.email.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {# Email is managed externally via SSO and should never be editable in this system. #}
+                        {{ form.email(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100 cursor-not-allowed", placeholder="Email" if user else "Email Address", readonly=True, disabled=True, autocomplete="username") }}
+                        {# Disabled inputs are not submitted; keep a hidden value for server-side processing/validation. #}
+                        {{ form.email(type="hidden") }}
+                        <p class="mt-1 text-xs text-gray-500">Email is managed by SSO and cannot be edited here.</p>
+                        {% for error in form.email.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {% if read_only %}
+                            {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Full Name", readonly=True, disabled=True) }}
+                        {% else %}
+                            {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Full Name") }}
+                        {% endif %}
+                        {% for error in form.name.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        {{ form.title.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {% if read_only %}
+                            {{ form.title(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Job Title" if user else "Job Title (Optional)", readonly=True, disabled=True) }}
+                        {% else %}
+                            {{ form.title(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Job Title" if user else "Job Title (Optional)") }}
+                        {% endif %}
+                        {% for error in form.title.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+
+                    {# Roles (multi-role per user) #}
+                    {% set is_system_manager = current_user_has_role('system_manager') %}
+                    {% set editing_self = (user is defined and user and current_user.is_authenticated and (user.id == current_user.id)) %}
+                    {% set roles_read_only = roles_read_only if roles_read_only is defined else ((not is_system_manager) and editing_self) %}
+                    {% set can_assign_rbac_roles = (is_system_manager or has_permission('admin.users.roles.assign')) and (not roles_read_only) %}
+                    {% set roles_disabled = read_only or roles_read_only %}
+
+                    {% if roles_read_only %}
+                        <div class="lg:col-span-3 mb-4">
+                            <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                                {{ _('You cannot modify your own roles. Please ask a System Manager.') }}
+                            </p>
+                        </div>
+                    {% endif %}
+
+                    {% if (can_assign_rbac_roles or roles_read_only) and form.rbac_roles is defined and form.rbac_roles.choices %}
+                    <div class="lg:col-span-3 mb-4">
+                        {# If roles are shown read-only (disabled inputs), keep values submitted so the form can validate. #}
+                        {% if roles_disabled %}
+                            {% for rid in (form.rbac_roles.data or []) %}
+                                <input type="hidden" name="rbac_roles" value="{{ rid }}">
+                            {% endfor %}
+                        {% endif %}
+
+                        {# Group roles for readability (based on role name) #}
+                        {% set rbac_groups = namespace(system=[], core_roles=[], admin=[], assignment=[], other=[]) %}
+                        {% for subfield in form.rbac_roles %}
+                            {% set role_name = (subfield.label.text or '') %}
+                            {% if role_name == 'System Manager' %}
+                                {% set __ = rbac_groups.system.append(subfield) %}
+                            {% elif role_name.startswith('Admin') %}
+                                {% set raw_label = role_name %}
+                                {% set display_label = raw_label %}
+                                {% if raw_label.startswith('Admin: ') %}
+                                    {% set display_label = raw_label[7:] %}
+                                {% endif %}
+                                {% set feature = display_label %}
+                                {% if ' (' in display_label and display_label.endswith(')') %}
+                                    {% set feature = display_label.rsplit(' (', 1)[0] %}
+                                {% endif %}
+                                {% if feature in ['Full', 'Core'] %}
+                                    {% set __ = rbac_groups.core_roles.append(subfield) %}
+                                {% else %}
+                                    {% set __ = rbac_groups.admin.append(subfield) %}
+                                {% endif %}
+                            {% elif role_name.startswith('Assignment') %}
+                                {% set __ = rbac_groups.assignment.append(subfield) %}
+                            {% else %}
+                                {% set __ = rbac_groups.other.append(subfield) %}
+                            {% endif %}
+                        {% endfor %}
+
+                        <div class="space-y-4">
+
+                            {# Role Type Selector #}
+                            <div id="role-type-and-assignments" class="{% if roles_disabled %}opacity-70{% endif %}">
+                                <label for="role_type_select" class="block text-sm font-semibold text-gray-700 mb-2">{{ _('Role Type') }}</label>
+                                {# New users default to Focal Point; existing users use the backend-computed value #}
+                                {% set default_role_type = computed_role_type if (computed_role_type is defined and computed_role_type) else ('focal_point' if not (user is defined and user) else 'admin') %}
+                                <select
+                                    id="role_type_select"
+                                    name="role_type"
+                                    class="role-type-selector shadow-sm appearance-none border rounded w-full max-w-xs py-2 px-3 leading-tight sm:text-sm {% if roles_disabled %}bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200{% else %}text-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white{% endif %}"
+                                    {% if roles_disabled %}disabled{% endif %}
+                                >
+                                    <option value="admin" {% if default_role_type == 'admin' %}selected{% endif %}>{{ _('Admin') }}</option>
+                                    <option value="focal_point" {% if default_role_type == 'focal_point' %}selected{% endif %}>{{ _('Focal Point') }}</option>
+                                </select>
+                            </div>
+
+                            {# Assignment Roles — independent of admin sections, always visible #}
+                            {% if rbac_groups.assignment|length %}
+                            <div id="roles-assignment-group" class="p-3 border border-gray-200 rounded-md bg-gray-50">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-sm font-semibold text-gray-800">
+                                        <i class="fas fa-tasks mr-2 text-green-600"></i>{{ _('Assignment Roles') }}
+                                    </div>
+                                    <div class="text-xs text-gray-600">{{ rbac_groups.assignment|length }} role(s)</div>
+                                </div>
+                                <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                    {% for subfield in rbac_groups.assignment %}
+                                        {% set raw_label = (subfield.label.text or '') %}
+                                        {% set display_label = raw_label %}
+                                        {# Strip "Assignment " prefix inside the group #}
+                                        {% if raw_label.startswith('Assignment ') %}
+                                            {% set display_label = raw_label[11:] %}
+                                        {% endif %}
+                                        {% set is_approver = 'approver' in raw_label.lower() %}
+                                        <label class="flex items-center min-w-0 assignment-role-item {% if is_approver %}assignment-approver-role{% endif %} {% if roles_disabled %}cursor-not-allowed{% endif %}" {% if is_approver %}data-role-type="approver"{% endif %}>
+                                            {% if roles_disabled %}
+                                                {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                            {% else %}
+                                                {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                            {% endif %}
+                                            <span class="ml-2 text-sm {% if roles_disabled %}text-gray-500{% else %}text-gray-700{% endif %}">{{ display_label }}</span>
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {# Admin sections - hidden when Focal Point is selected #}
+                            <div id="admin-sections" class="admin-sections-container">
+
+                            {# Admin Roles: Presets + Categorized Admin Roles #}
+                            {% if (rbac_groups.system|length or rbac_groups.core_roles|length) or rbac_groups.admin|length %}
+                            <div id="roles-core-group" class="p-3 border border-gray-200 rounded-md bg-gray-50">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-sm font-semibold text-gray-800">
+                                        <i class="fas fa-shield-alt mr-2 text-blue-600"></i>Admin Roles
+                                    </div>
+                                    <div class="text-xs text-gray-600">{{ (rbac_groups.system|length + rbac_groups.core_roles|length + rbac_groups.admin|length) }} role(s)</div>
+                                </div>
+
+                                {# Presets: System Manager, Full, Core #}
+                                {% if rbac_groups.system|length or rbac_groups.core_roles|length %}
+                                <div class="mb-4">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Presets') }}</span>
+                                        <div class="flex flex-wrap gap-2">
+                                        {# System Manager first #}
+                                        {% for subfield in rbac_groups.system %}
+                                            <label class="flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
+                                                {% if roles_disabled %}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                {% else %}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                {% endif %}
+                                                <span class="ml-2 text-sm font-medium text-red-600">{{ subfield.label.text }}</span>
+                                            </label>
+                                        {% endfor %}
+                                        {# Then Full and Core (Full first, then Core) #}
+                                        {% set full_roles = [] %}
+                                        {% set core_roles_list = [] %}
+                                        {% for subfield in rbac_groups.core_roles %}
+                                            {% set raw_label = (subfield.label.text or '') %}
+                                            {% set display_label = raw_label %}
+                                            {% if raw_label.startswith('Admin: ') %}
+                                                {% set display_label = raw_label[7:] %}
+                                            {% endif %}
+                                            {% set feature = display_label %}
+                                            {% if ' (' in display_label and display_label.endswith(')') %}
+                                                {% set feature = display_label.rsplit(' (', 1)[0] %}
+                                            {% endif %}
+                                            {% if feature == 'Full' %}
+                                                {% set __ = full_roles.append(subfield) %}
+                                            {% else %}
+                                                {% set __ = core_roles_list.append(subfield) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {# Render Full first #}
+                                        {% for subfield in full_roles %}
+                                            {% set raw_label = (subfield.label.text or '') %}
+                                            {% set display_label = raw_label %}
+                                            {% if raw_label.startswith('Admin: ') %}
+                                                {% set display_label = raw_label[7:] %}
+                                            {% endif %}
+                                            <label class="flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
+                                                {% if roles_disabled %}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                {% else %}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                {% endif %}
+                                                <span class="ml-2 text-sm text-gray-800 font-medium">{{ display_label }}</span>
+                                            </label>
+                                        {% endfor %}
+                                        {# Then Core #}
+                                        {% for subfield in core_roles_list %}
+                                            {% set raw_label = (subfield.label.text or '') %}
+                                            {% set display_label = raw_label %}
+                                            {% if raw_label.startswith('Admin: ') %}
+                                                {% set display_label = raw_label[7:] %}
+                                            {% endif %}
+                                            <label class="flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
+                                                {% if roles_disabled %}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                {% else %}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                {% endif %}
+                                                <span class="ml-2 text-sm text-gray-800 font-medium">{{ display_label }}</span>
+                                            </label>
+                                        {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="border-t border-gray-300 my-4"></div>
+                                {% endif %}
+
+                                {# Categorized Admin Roles #}
+                                {% if rbac_groups.admin|length %}
+                                {# Group admin roles by sidebar-like categories, then by feature (View/Manage/...) #}
+                                {% set admin_features = [] %}
+                                {% for subfield in rbac_groups.admin %}
+                                    {% set raw_label = (subfield.label.text or '') %}
+                                    {% set display_label = raw_label %}
+                                    {# Avoid repeating "Admin: ..." inside the Admin group #}
+                                    {% if raw_label.startswith('Admin: ') %}
+                                        {% set display_label = raw_label[7:] %}
+                                    {% endif %}
+                                    {% set feature = display_label %}
+                                    {% if ' (' in display_label and display_label.endswith(')') %}
+                                        {% set feature = display_label.rsplit(' (', 1)[0] %}
+                                    {% endif %}
+                                    {# Only include Plugins if current user is a system manager #}
+                                    {% if feature and feature not in admin_features %}
+                                        {% if feature == 'Plugins' %}
+                                            {% if current_user_has_role('system_manager') %}
+                                                {% set __ = admin_features.append(feature) %}
+                                            {% endif %}
+                                        {% else %}
+                                            {% set __ = admin_features.append(feature) %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+
+                                {# Categorize features to match the left sidebar section grouping/order #}
+                                {% set admin_cats = namespace(
+                                    general=[],
+                                    user_management=[],
+                                    form_data=[],
+                                    website=[],
+                                    reference=[],
+                                    analytics=[],
+                                    other=[]
+                                ) %}
+                                {% for feature in admin_features %}
+                                    {% if feature in ['Settings', 'Documents', 'Docs'] %}
+                                        {% set __ = admin_cats.general.append(feature) %}
+                                    {% elif feature in ['Plugins'] %}
+                                        {# Plugins should appear under General (system managers only) #}
+                                        {% if current_user_has_role('system_manager') %}
+                                            {% set __ = admin_cats.general.append(feature) %}
+                                        {% endif %}
+                                    {% elif feature in ['Users'] %}
+                                        {% set __ = admin_cats.user_management.append(feature) %}
+                                    {% elif feature in ['Templates', 'Assignments', 'Data Explorer'] %}
+                                        {% set __ = admin_cats.form_data.append(feature) %}
+                                    {% elif feature in ['Content'] %}
+                                        {% set __ = admin_cats.website.append(feature) %}
+                                    {% elif feature in ['Countries & Organization', 'Indicator Bank'] %}
+                                        {% set __ = admin_cats.reference.append(feature) %}
+                                    {% elif feature in ['Analytics', 'Audit Trail', 'API', 'Security', 'AI', 'Governance'] %}
+                                        {% set __ = admin_cats.analytics.append(feature) %}
+                                    {% else %}
+                                        {% set __ = admin_cats.other.append(feature) %}
+                                    {% endif %}
+                                {% endfor %}
+
+                                {# Helper: render a category block using a preferred feature order (sidebar-ish) #}
+                                {% set ordered_general = ['Docs', 'Settings', 'Documents', 'Plugins'] %}
+                                {% set ordered_user_mgmt = ['Users'] %}
+                                {% set ordered_form_data = ['Templates', 'Assignments', 'Data Explorer'] %}
+                                {% set ordered_website = ['Content'] %}
+                                {% set ordered_reference = ['Countries & Organization', 'Indicator Bank'] %}
+                                {% set ordered_analytics = ['Analytics', 'Audit Trail', 'Governance', 'AI', 'API', 'Security'] %}
+                                {% set ordered_other = admin_cats.other %}
+
+                                {# Macro to render a group #}
+                                {% macro render_group(category_name, category_items, ordered_list, rbac_groups, read_only) %}
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">{{ _(category_name) }}</div>
+                                        <div class="space-y-2">
+                                            {% for feature in ordered_list if feature in category_items %}
+                                                <div class="js-role-feature-card p-2 border border-gray-200 rounded bg-white">
+                                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                                        <div class="text-sm font-medium text-gray-800">{{ feature }}</div>
+                                                        <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                                            {% for subfield in rbac_groups.admin %}
+                                                                {% set raw_label = (subfield.label.text or '') %}
+                                                                {% set display_label = raw_label[7:] if raw_label.startswith('Admin: ') else raw_label %}
+                                                                {% set row_feature = display_label %}
+                                                                {% set action_label = '' %}
+                                                                {% if ' (' in display_label and display_label.endswith(')') %}
+                                                                    {% set row_feature = display_label.rsplit(' (', 1)[0] %}
+                                                                    {% set action_label = display_label.rsplit(' (', 1)[1][:-1] %}
+                                                                {% endif %}
+                                                                {% if row_feature == feature %}
+                                                                    {# Only show Plugins if current user is a system manager #}
+                                                                    {% if feature != 'Plugins' or current_user_has_role('system_manager') %}
+                                                                        <label class="inline-flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
+                                                                            {% if roles_disabled %}
+                                                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                                            {% else %}
+                                                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                                            {% endif %}
+                                                                            <span class="ml-2 text-sm {% if roles_disabled %}text-gray-500{% else %}text-gray-700{% endif %}">{{ action_label if action_label else display_label }}</span>
+                                                                        </label>
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endmacro %}
+
+                                {# Calculate item counts for each category #}
+                                {% set general_count = admin_cats.general|length %}
+                                {% set user_mgmt_count = admin_cats.user_management|length %}
+                                {% set form_data_count = admin_cats.form_data|length %}
+                                {% set website_count = admin_cats.website|length %}
+                                {% set reference_count = admin_cats.reference|length %}
+                                {% set analytics_count = admin_cats.analytics|length %}
+                                {% set other_count = admin_cats.other|length %}
+
+                                {# Show groups in columns; pair small groups (<=2 items) with larger ones when possible #}
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    {# General section #}
+                                    {% if admin_cats.general|length %}
+                                        {% if admin_cats.user_management|length and user_mgmt_count <= 2 %}
+                                            {# Pair General with User Management #}
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {{ render_group('General', admin_cats.general, ordered_general, rbac_groups, roles_disabled) }}
+                                                {{ render_group('User Management', admin_cats.user_management, ordered_user_mgmt, rbac_groups, roles_disabled) }}
+                                            </div>
+                                        {% else %}
+                                            {{ render_group('General', admin_cats.general, ordered_general, rbac_groups, roles_disabled) }}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {# User Management - only render if not already paired with General #}
+                                    {% if admin_cats.user_management|length %}
+                                        {% set general_paired_with_system = admin_cats.system|length and admin_cats.general|length and general_count <= 2 %}
+                                        {% set user_mgmt_paired_with_general = admin_cats.general|length and user_mgmt_count <= 2 and not general_paired_with_system %}
+                                        {% if not user_mgmt_paired_with_general %}
+                                            {{ render_group('User Management', admin_cats.user_management, ordered_user_mgmt, rbac_groups, roles_disabled) }}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {# Pair Form & Data Management with Website Management if Website is small (<=2 items) #}
+                                    {% if admin_cats.form_data|length %}
+                                        {% if admin_cats.website|length and website_count <= 2 %}
+                                            {# Pair them side by side in one column slot #}
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {{ render_group('Form & Data Management', admin_cats.form_data, ordered_form_data, rbac_groups, roles_disabled) }}
+                                                {{ render_group('Website Management', admin_cats.website, ordered_website, rbac_groups, roles_disabled) }}
+                                            </div>
+                                        {% else %}
+                                            {{ render_group('Form & Data Management', admin_cats.form_data, ordered_form_data, rbac_groups, roles_disabled) }}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {# Website Management - only render if not already paired with Form & Data Management #}
+                                    {% if admin_cats.website|length and not (admin_cats.form_data|length and website_count <= 2) %}
+                                        {{ render_group('Website Management', admin_cats.website, ordered_website, rbac_groups, roles_disabled) }}
+                                    {% endif %}
+
+                                    {# Pair Reference Data with Analytics if Reference Data is small (<=2 items) #}
+                                    {% if admin_cats.reference|length %}
+                                        {% if admin_cats.analytics|length and reference_count <= 2 %}
+                                            {# Pair them side by side in one column slot #}
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {{ render_group('Reference Data', admin_cats.reference, ordered_reference, rbac_groups, roles_disabled) }}
+                                                {{ render_group('Analytics & Monitoring', admin_cats.analytics, ordered_analytics, rbac_groups, roles_disabled) }}
+                                            </div>
+                                        {% else %}
+                                            {{ render_group('Reference Data', admin_cats.reference, ordered_reference, rbac_groups, roles_disabled) }}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {# Analytics & Monitoring - only render if not already paired with Reference Data #}
+                                    {% if admin_cats.analytics|length and not (admin_cats.reference|length and reference_count <= 2) %}
+                                        {# Try pairing with Other if Analytics is small and Other exists #}
+                                        {% if admin_cats.other|length and analytics_count <= 2 %}
+                                            {# Pair Analytics with Other in one column slot #}
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {{ render_group('Analytics & Monitoring', admin_cats.analytics, ordered_analytics, rbac_groups, roles_disabled) }}
+                                                {{ render_group('Other', admin_cats.other, ordered_other, rbac_groups, roles_disabled) }}
+                                            </div>
+                                        {% else %}
+                                            {{ render_group('Analytics & Monitoring', admin_cats.analytics, ordered_analytics, rbac_groups, roles_disabled) }}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {# Other - only render if not already paired with Analytics #}
+                                    {% if admin_cats.other|length %}
+                                        {% set other_paired = admin_cats.analytics|length and analytics_count <= 2 and not (admin_cats.reference|length and reference_count <= 2) %}
+                                        {% if not other_paired %}
+                                            {{ render_group('Other', admin_cats.other, ordered_other, rbac_groups, roles_disabled) }}
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                            {% if rbac_groups.other|length %}
+                            <div id="roles-other-group" class="p-3 border border-gray-200 rounded-md bg-gray-50">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-sm font-semibold text-gray-800">
+                                        <i class="fas fa-layer-group mr-2 text-gray-600"></i>Other
+                                    </div>
+                                    <div class="text-xs text-gray-600">{{ rbac_groups.other|length }} role(s)</div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {% for subfield in rbac_groups.other %}
+                                        <label class="flex items-center">
+                                            {% if roles_disabled %}
+                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                            {% else %}
+                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                            {% endif %}
+                                            {{ subfield.label(class="ml-2 text-sm text-gray-700") }}
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            </div>
+                            {# End admin sections container #}
+                        </div>
+                        {% for error in form.rbac_roles.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <script nonce="{{ csp_nonce() }}">
+                    (function () {
+                      const READ_ONLY = {{ (read_only or roles_read_only)|tojson|safe }};
+                      if (READ_ONLY) return;
+
+                      const form = document.querySelector('form');
+                      if (!form) return;
+
+                      const roleInputs = Array.from(form.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'));
+                      if (!roleInputs.length) return;
+
+                      // Track what the user explicitly wants (vs auto-checked due to implication)
+                      for (const input of roleInputs) {
+                        input.dataset.userWanted = input.checked ? '1' : '0';
+                        input.dataset.userTouched = '0';
+                        input.addEventListener('change', function () {
+                          if (this.disabled) return;
+
+                          this.dataset.userWanted = this.checked ? '1' : '0';
+                          this.dataset.userTouched = '1';
+
+                          // If the user is adjusting a Core child checkbox, allow the Core umbrella to sync again.
+                          if (coreEssentialsInputRef && isEssentialsChild(this)) {
+                            delete coreEssentialsInputRef.dataset.manualOverride;
+                          }
+
+                          // If the user is adjusting an Admin role checkbox (not Full itself), allow Full umbrella to sync again.
+                          if (fullAdminInputRef && adminGroup && adminGroup.contains(this) && this !== fullAdminInputRef) {
+                            delete fullAdminInputRef.dataset.manualOverride;
+                          }
+
+                          // Umbrella checkboxes have their own handlers that call recomputeLocks()
+                          if (this === fullAdminInputRef || this === coreEssentialsInputRef) return;
+
+                          recomputeLocks();
+                        });
+                      }
+
+                      const coreGroup = document.getElementById('roles-core-group'); // Admin Roles: Presets + Categorized Admin Roles
+                      const adminGroup = coreGroup; // Admin roles are now merged into roles-core-group
+                      const assignmentGroup = document.getElementById('roles-assignment-group');
+
+                      // Role Type Selector Handler
+                      const roleTypeSelect = document.getElementById('role_type_select');
+                      const adminSectionsContainer = document.getElementById('admin-sections');
+
+                      function handleRoleTypeChange() {
+                        const selectedType = roleTypeSelect?.value || 'admin';
+                        const isFocalPoint = selectedType === 'focal_point';
+
+                        // Show/hide admin sections
+                        if (adminSectionsContainer) {
+                          adminSectionsContainer.style.display = isFocalPoint ? 'none' : 'block';
+                        }
+
+                        // If switching to Focal Point, clear ALL admin roles (including Full/Core/System Manager presets).
+                        // This keeps the submitted form aligned with what the UI is showing.
+                        if (isFocalPoint && adminGroup) {
+                          const adminInputs = Array.from(
+                            adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
+                          );
+                          for (const input of adminInputs) {
+                            if (input.disabled) continue;
+                            input.checked = false;
+                            input.dataset.userWanted = '0';
+                            input.dataset.userTouched = '1';
+                            delete input.dataset.manualOverride;
+                            try { markAutoChecked(input, false); } catch (e) {}
+                          }
+                        }
+
+                        // Show/hide Approver roles in Assignments section
+                        if (assignmentGroup) {
+                          const approverRoles = assignmentGroup.querySelectorAll('.assignment-approver-role');
+                          approverRoles.forEach(function(role) {
+                            role.style.display = isFocalPoint ? 'none' : 'flex';
+                            // Uncheck Approver roles when switching to Focal Point
+                            if (isFocalPoint) {
+                              const checkbox = role.querySelector('input[type="checkbox"]');
+                              if (checkbox) {
+                                checkbox.checked = false;
+                                checkbox.dataset.userWanted = '0';
+                              }
+                            }
+                          });
+                        }
+
+                        // When "Focal Point" is selected, pre-tick the minimal required roles.
+                        // - Assignment: Editor & Submitter
+                        // - Assignment: Viewer (also implied by Editor & Submitter, but we tick it explicitly)
+                        if (isFocalPoint) {
+                          function ensureChecked(input) {
+                            if (!input || input.disabled) return;
+                            input.checked = true;
+                            input.dataset.userWanted = '1';
+                            // Ensure it isn't treated as "auto-checked" (so it won't be cleared by recomputeLocks)
+                            if (typeof markAutoChecked === 'function') markAutoChecked(input, false);
+                          }
+
+                          // Assignment roles live in the Assignments group.
+                          if (assignmentGroup) {
+                            const aInputs = Array.from(
+                              assignmentGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
+                            );
+                            let viewer = null;
+                            let editorSubmitter = null;
+                            for (const input of aInputs) {
+                              const txt = (getLabelSpanText(input) || '').toLowerCase();
+                              if (txt === 'viewer') viewer = input;
+                              if (txt === 'editor & submitter' || txt === 'editor and submitter') editorSubmitter = input;
+                            }
+                            ensureChecked(editorSubmitter);
+                            ensureChecked(viewer);
+                          }
+                        }
+
+                        // Recompute implied roles / locks after role-type changes.
+                        try { recomputeLocks(); } catch (e) {}
+                      }
+
+                      // Add event listener to role type dropdown
+                      if (roleTypeSelect) {
+                        roleTypeSelect.addEventListener('change', handleRoleTypeChange);
+                        // Initialize on page load
+                        handleRoleTypeChange();
+                      }
+
+                      function normalize(s) {
+                        return String(s || '').trim().toLowerCase();
+                      }
+
+                      function findAdminRoleInput(featureName, actionName) {
+                        if (!adminGroup) return null;
+                        const f = normalize(featureName);
+                        const a = normalize(actionName);
+                        for (const card of adminGroup.querySelectorAll('.js-role-feature-card')) {
+                          const featureTitle = normalize(card.querySelector('.text-sm.font-medium')?.textContent);
+                          if (!featureTitle || featureTitle !== f) continue;
+                          for (const input of card.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')) {
+                            const action = normalize(getLabelSpanText(input));
+                            if (action === a) return input;
+                          }
+                        }
+                        return null;
+                      }
+
+                      // Find System Manager, Full, and Core in Admin Roles section
+                      let fullAdminInputRef = null;
+                      let coreEssentialsInputRef = null;
+                      let systemManagerInputRef = null;
+                      // Check in coreGroup (Admin Roles section where System Manager, Full, and Core are)
+                      if (coreGroup) {
+                        const coreInputs = Array.from(coreGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'));
+                        for (const input of coreInputs) {
+                          const label = getLabelSpanText(input);
+                          const normalizedLabel = normalize(label);
+                          if (normalizedLabel.includes('system manager')) {
+                            systemManagerInputRef = input;
+                          } else if (normalizedLabel.includes('full') || normalizedLabel.includes('all admin roles')) {
+                            fullAdminInputRef = input;
+                          } else if (normalizedLabel.includes('core') || normalizedLabel.includes('essentials')) {
+                            coreEssentialsInputRef = input;
+                          }
+                        }
+                      }
+                      // Fallback: try finding in admin group if not found in core group
+                      if (!fullAdminInputRef) {
+                        fullAdminInputRef = findAdminRoleInput('full', 'all admin roles');
+                      }
+                      if (!coreEssentialsInputRef) {
+                        coreEssentialsInputRef = findAdminRoleInput('core', 'essentials only');
+                      }
+
+                      // Matches admin_core permissions in rbac_seed_service.py exactly (view-only).
+                      const essentialsSpecs = [
+                        { feature: 'Docs', action: 'View' },
+                        { feature: 'Users', action: 'View' },
+                        { feature: 'Templates', action: 'View' },
+                        { feature: 'Assignments', action: 'View' },
+                        { feature: 'Countries & Organization', action: 'View' },
+                        { feature: 'Indicator Bank', action: 'View' },
+                      ];
+
+                      function getEssentialsChildren() {
+                        const inputs = [];
+                        for (const spec of essentialsSpecs) {
+                          const inp = findAdminRoleInput(spec.feature, spec.action);
+                          if (inp) inputs.push(inp);
+                        }
+                        return inputs;
+                      }
+
+                      // Cache Core child inputs for quick checks.
+                      const essentialsChildrenSet = new Set(getEssentialsChildren());
+                      function isEssentialsChild(input) {
+                        return essentialsChildrenSet.has(input);
+                      }
+
+                      function getLabelSpanText(input) {
+                        const label = input.closest('label');
+                        if (!label) return '';
+                        const span = label.querySelector('span');
+                        return (span ? span.textContent : label.textContent).trim();
+                      }
+
+                      function getFeatureTitleForInput(input) {
+                        const card = input.closest('.js-role-feature-card');
+                        if (!card) return '';
+                        return (card.querySelector('.text-sm.font-medium')?.textContent || '').trim();
+                      }
+
+                      // Full (All admin roles) should NOT include Settings or Plugins.
+                      function isExcludedFromFull(input) {
+                        const featureTitle = getFeatureTitleForInput(input);
+                        return featureTitle === 'Settings' || featureTitle === 'Plugins';
+                      }
+
+                      function getFullEligibleAdminInputs() {
+                        if (!adminGroup) return [];
+                        return Array.from(adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'))
+                          .filter((i) => !systemManagerInputRef || i !== systemManagerInputRef)
+                          // Never treat the Full checkbox itself as a child role (otherwise it can get locked).
+                          .filter((i) => !fullAdminInputRef || i !== fullAdminInputRef)
+                          .filter((i) => !isExcludedFromFull(i));
+                      }
+
+                      function setLocked(input, locked) {
+                        const label = input.closest('label');
+                        if (locked) {
+                          input.disabled = true;
+                          input.dataset.locked = '1';
+                          if (label) {
+                            label.classList.add('opacity-60', 'cursor-not-allowed');
+                          }
+                        } else {
+                          if (input.dataset.locked === '1') {
+                            input.disabled = false;
+                          }
+                          input.dataset.locked = '0';
+                          if (label) {
+                            label.classList.remove('opacity-60', 'cursor-not-allowed');
+                          }
+                        }
+                      }
+
+                      function markAutoChecked(input, autoChecked) {
+                        input.dataset.autoChecked = autoChecked ? '1' : '0';
+                      }
+
+                      function isAutoChecked(input) {
+                        return input.dataset.autoChecked === '1';
+                      }
+
+                      function userWants(input) {
+                        return input.dataset.userWanted === '1';
+                      }
+
+                      // Special behavior: Full (All admin roles) is a select-all umbrella for Admin roles.
+                      // - Checking it selects all Admin roles.
+                      // - Unchecking it clears all Admin roles.
+                      if (fullAdminInputRef) {
+                        fullAdminInputRef.addEventListener('change', function () {
+                          if (this.disabled) return;
+                          if (!adminGroup) return;
+
+                          // Clear indeterminate state when manually toggled
+                          this.indeterminate = false;
+
+                          const adminInputs = getFullEligibleAdminInputs();
+
+                          if (this.checked) {
+                            delete this.dataset.manualOverride;
+                            this.dataset.userWanted = '1';
+                            this.dataset.userTouched = '1';
+                            for (const input of adminInputs) {
+                              if (input === this) continue;
+                              if (!input.checked) {
+                                input.checked = true;
+                                // This is a bulk user action via the preset, not an implied/locked state.
+                                markAutoChecked(input, false);
+                              }
+                              // Treat selections made by the preset as explicit user intent so they don't get auto-cleared.
+                              input.dataset.userWanted = '1';
+                              input.dataset.userTouched = '1';
+                            }
+                          } else {
+                            // Prevent snap-back: if admin roles remain checked due to other implications,
+                            // keep Full unchecked until the user explicitly changes an admin role box.
+                            this.dataset.manualOverride = 'cleared';
+                            this.dataset.userWanted = '0';
+                            for (const input of adminInputs) {
+                              input.checked = false;
+                              input.dataset.userWanted = '0';
+                              input.dataset.userTouched = '0';
+                              markAutoChecked(input, false);
+                            }
+                          }
+
+                          recomputeLocks();
+                        });
+                      }
+
+                      // Special behavior: Core (Essentials only) is an umbrella for its child boxes.
+                      // - Checking it checks all child boxes.
+                      // - Unchecking it clears all child boxes.
+                      if (coreEssentialsInputRef) {
+                        coreEssentialsInputRef.addEventListener('change', function () {
+                          if (this.disabled) return;
+                          const children = getEssentialsChildren();
+
+                          // Clear indeterminate state when manually toggled
+                          this.indeterminate = false;
+
+                          if (this.checked) {
+                            delete this.dataset.manualOverride;
+                            this.dataset.userWanted = '1';
+                            this.dataset.userTouched = '1';
+                            for (const child of children) {
+                              if (!child.checked) {
+                                child.checked = true;
+                                markAutoChecked(child, true);
+                                // Mark as user-wanted since Core umbrella was explicitly checked
+                                child.dataset.userWanted = '1';
+                              }
+                            }
+                          } else {
+                            // Prevent snap-back: if children remain checked due to other implications,
+                            // keep Core unchecked until the user explicitly changes a child box.
+                            this.dataset.manualOverride = 'cleared';
+                            this.dataset.userWanted = '0';
+                            for (const child of children) {
+                              child.checked = false;
+                              child.dataset.userWanted = '0';
+                              child.dataset.userTouched = '0';
+                              markAutoChecked(child, false);
+                            }
+                          }
+                          recomputeLocks();
+                        });
+                      }
+
+                      function recomputeLocks() {
+                        // Clear previous locks (only those we applied)
+                        for (const input of roleInputs) {
+                          setLocked(input, false);
+                        }
+
+                        const implied = new Set(); // inputs that must be checked
+                        const lockSet = new Set(); // inputs that must be read-only
+
+                        // 1) System Manager implies everything (read-only)
+                        const systemManagerInput = systemManagerInputRef;
+                        const systemManagerChecked = Boolean(systemManagerInput && systemManagerInput.checked);
+                        if (systemManagerChecked) {
+                          // Clear manual overrides when System Manager is active since it overrides everything
+                          if (fullAdminInputRef) {
+                            delete fullAdminInputRef.dataset.manualOverride;
+                          }
+                          if (coreEssentialsInputRef) {
+                            delete coreEssentialsInputRef.dataset.manualOverride;
+                          }
+                          for (const input of roleInputs) {
+                            if (input === systemManagerInput) continue;
+                            implied.add(input);
+                            lockSet.add(input);
+                          }
+                        }
+
+                        // 2) Admin: Full (All admin roles) is a bulk preset only.
+                        // It should NOT lock roles or keep re-imposing selections after the click.
+                        const fullAdminInput = fullAdminInputRef;
+                        const fullChecked = Boolean(fullAdminInput && fullAdminInput.checked);
+                        const fullManuallyCleared = Boolean(fullAdminInput && fullAdminInput.dataset.manualOverride === 'cleared');
+
+                        // 2a) Handle Full checkbox state: checked, unchecked, or indeterminate
+                        if (!systemManagerChecked && fullAdminInput && adminGroup) {
+                          // Only consider admin roles that Full is allowed to include (excludes Settings + Plugins).
+                          const adminInputsEligible = getFullEligibleAdminInputs();
+                          const checkedCount = adminInputsEligible.filter((i) => i.checked).length;
+                          const totalCount = adminInputsEligible.length;
+                          const allAdminRolesChecked = totalCount > 0 && checkedCount === totalCount;
+
+                          // Only show "-" (indeterminate) for Full when the selection includes any NON-essential admin role.
+                          // If the user has only Core (Essentials only) and/or its essential children, Full should stay plain unchecked.
+                          const essentialsSet = new Set([
+                            ...(coreEssentialsInputRef ? [coreEssentialsInputRef] : []),
+                            ...getEssentialsChildren(),
+                          ]);
+                          const checkedNonEssentialCount = adminInputsEligible
+                            .filter((i) => i.checked && !essentialsSet.has(i)).length;
+                          const someNonEssentialChecked = checkedNonEssentialCount > 0 && checkedCount < totalCount;
+
+                          // Set indeterminate state when some (but not all) admin roles are checked
+                          if (someNonEssentialChecked) {
+                            fullAdminInput.indeterminate = true;
+                            fullAdminInput.checked = false;
+                          } else {
+                            fullAdminInput.indeterminate = false;
+                            // Only auto-check Full when all admin roles are checked and not manually cleared
+                            if (allAdminRolesChecked && !fullChecked && !fullManuallyCleared) {
+                              implied.add(fullAdminInput);
+                            }
+                          }
+                        } else if (fullAdminInput) {
+                          // Clear indeterminate state when System Manager is active
+                          fullAdminInput.indeterminate = false;
+                        }
+
+                        // 2c) Core (Essentials only) implies its children (not read-only).
+                        const coreEssentialsInput = coreEssentialsInputRef;
+                        const coreChecked = Boolean(coreEssentialsInput && coreEssentialsInput.checked);
+                        const essentialsChildren = getEssentialsChildren();
+                        const checkedEssentialsCount = essentialsChildren.filter((i) => i.checked).length;
+                        const totalEssentialsCount = essentialsChildren.length;
+                        const allEssentialsChildrenChecked = totalEssentialsCount > 0 && checkedEssentialsCount === totalEssentialsCount;
+                        const someEssentialsChildrenChecked = checkedEssentialsCount > 0 && checkedEssentialsCount < totalEssentialsCount;
+                        const coreManuallyCleared = Boolean(coreEssentialsInput && coreEssentialsInput.dataset.manualOverride === 'cleared');
+
+                        // Handle Core checkbox state: checked, unchecked, or indeterminate
+                        if (!systemManagerChecked && !fullChecked && coreEssentialsInput) {
+                          // Set indeterminate state when some (but not all) essentials children are checked
+                          if (someEssentialsChildrenChecked) {
+                            coreEssentialsInput.indeterminate = true;
+                            coreEssentialsInput.checked = false;
+                          } else {
+                            coreEssentialsInput.indeterminate = false;
+                            // If Core is checked, add all its children to the implied set.
+                            if (coreChecked && !coreManuallyCleared) {
+                              for (const child of essentialsChildren) {
+                                implied.add(child);
+                              }
+                            }
+                            // If all child boxes are checked, check Core (Essentials only).
+                            if (allEssentialsChildrenChecked && !coreChecked && !coreManuallyCleared) {
+                              implied.add(coreEssentialsInput);
+                            }
+                            // If Core is checked but any child is unchecked, uncheck Core.
+                            if (coreChecked && !allEssentialsChildrenChecked) {
+                              coreEssentialsInput.checked = false;
+                              coreEssentialsInput.indeterminate = false;
+                              coreEssentialsInput.dataset.userWanted = '0';
+                              markAutoChecked(coreEssentialsInput, false);
+                            }
+                          }
+                        } else if (coreEssentialsInput) {
+                          // Clear indeterminate state when System Manager or Full is active
+                          coreEssentialsInput.indeterminate = false;
+                        }
+
+                        // Note: we do NOT force Core children to stay checked when Core is checked.
+                        // Core is an umbrella toggle + derived indicator:
+                        // - clicking Core checks children
+                        // - unchecking any child clears Core
+                        // - Core does not lock children
+
+                        // 3) "Manage" implies "View" within each Admin feature row
+                        if (adminGroup) {
+                          for (const card of adminGroup.querySelectorAll('.js-role-feature-card')) {
+                            const featureTitle = (card.querySelector('.text-sm.font-medium')?.textContent || '').trim();
+                            if (!featureTitle) continue;
+
+                            const inputs = Array.from(card.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'));
+                            if (!inputs.length) continue;
+
+                            const byAction = new Map(); // actionLabel(lower) -> input
+                            for (const input of inputs) {
+                              const action = getLabelSpanText(input).toLowerCase();
+                              if (action) byAction.set(action, input);
+                            }
+
+                            const manage = byAction.get('manage');
+                            const view = byAction.get('view');
+                            if (manage && view && manage.checked) {
+                              implied.add(view);
+                              lockSet.add(view);
+                            }
+                          }
+                        }
+
+                        // 4) Assignment roles: Approver / Editor & Submitter imply Viewer
+                        if (assignmentGroup) {
+                          const aInputs = Array.from(assignmentGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'));
+                          let viewer = null;
+                          let editorSubmitter = null;
+                          let approver = null;
+                          for (const input of aInputs) {
+                            const txt = getLabelSpanText(input).toLowerCase();
+                            if (txt === 'viewer') viewer = input;
+                            if (txt === 'editor & submitter' || txt === 'editor and submitter') editorSubmitter = input;
+                            if (txt === 'approver') approver = input;
+                          }
+                          if (viewer && ((editorSubmitter && editorSubmitter.checked) || (approver && approver.checked))) {
+                            implied.add(viewer);
+                            lockSet.add(viewer);
+                          }
+                        }
+
+                        // Apply implied checks
+                        for (const input of implied) {
+                          if (!input.checked) {
+                            input.checked = true;
+                            markAutoChecked(input, true);
+                          }
+                        }
+
+                        // Uncheck auto-checked roles that are no longer implied and not explicitly wanted
+                        for (const input of roleInputs) {
+                          const stillImplied = implied.has(input);
+                          if (!stillImplied && isAutoChecked(input) && !userWants(input)) {
+                            input.checked = false;
+                            markAutoChecked(input, false);
+                          }
+                          if (!stillImplied && !input.checked) {
+                            // once off, clear auto marker
+                            markAutoChecked(input, false);
+                          }
+                        }
+
+                        // Apply locks (read-only)
+                        for (const input of lockSet) {
+                          setLocked(input, true);
+                        }
+                      }
+
+                      // Visual highlighting: Core vs Full.
+                      function applyRoleHighlights() {
+                        const CORE_CARD_CLASSES = ['border-blue-200', 'bg-blue-50'];
+                        const FULL_CARD_CLASSES = ['border-purple-200', 'bg-purple-50'];
+                        const CORE_PILL_CLASSES = ['px-2', 'py-0.5', 'rounded', 'border', 'border-blue-200', 'bg-blue-50', 'text-blue-900'];
+                        const FULL_PILL_CLASSES = ['px-2', 'py-0.5', 'rounded', 'border', 'border-purple-200', 'bg-purple-50', 'text-purple-900'];
+
+                        function addCardClasses(input, classes) {
+                          if (!input) return;
+                          const card = input.closest('.js-role-feature-card');
+                          if (!card) return;
+                          for (const c of classes) card.classList.add(c);
+                        }
+
+                        function addPillClasses(input, classes) {
+                          if (!input) return;
+                          const label = input.closest('label');
+                          if (!label) return;
+                          const span = label.querySelector('span');
+                          if (!span) return;
+                          for (const c of classes) span.classList.add(c);
+                        }
+
+                        // Core / Full umbrella boxes
+                        addCardClasses(coreEssentialsInputRef, CORE_CARD_CLASSES);
+                        addPillClasses(coreEssentialsInputRef, CORE_PILL_CLASSES);
+                        addCardClasses(fullAdminInputRef, FULL_CARD_CLASSES);
+                        addPillClasses(fullAdminInputRef, FULL_PILL_CLASSES);
+
+                        // Core "child" boxes get blue styling
+                        const essentialsChildren = getEssentialsChildren();
+                        const essentialsChildrenSet = new Set(essentialsChildren);
+                        for (const child of essentialsChildren) {
+                          addPillClasses(child, CORE_PILL_CLASSES);
+                        }
+
+                        // All other admin roles (not Core children, not Full) get purple styling like Full
+                        if (adminGroup) {
+                          const allAdminInputs = Array.from(adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'))
+                            .filter((i) => !systemManagerInputRef || i !== systemManagerInputRef);
+                          const processedCards = new Set();
+
+                          for (const input of allAdminInputs) {
+                            // Skip Full umbrella and Core children
+                            if (input === fullAdminInputRef || input === coreEssentialsInputRef || essentialsChildrenSet.has(input)) {
+                              continue;
+                            }
+
+                            // Apply purple styling to the pill
+                            addPillClasses(input, FULL_PILL_CLASSES);
+
+                            // Apply purple styling to the card (only once per card)
+                            const card = input.closest('.js-role-feature-card');
+                            if (card && !processedCards.has(card)) {
+                              processedCards.add(card);
+                              // Only apply purple card classes if this card doesn't already have Core card classes
+                              if (!card.classList.contains('border-blue-200')) {
+                                for (const c of FULL_CARD_CLASSES) {
+                                  card.classList.add(c);
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+
+                      // Ensure disabled/locked checked roles are submitted (disabled inputs don't submit)
+                      form.addEventListener('submit', function () {
+                        window.__clientLog && window.__clientLog('[role-downgrade] submit handler fired');
+                        window.__clientLog && window.__clientLog('[role-downgrade] roleTypeSelect exists:', !!roleTypeSelect);
+                        window.__clientLog && window.__clientLog('[role-downgrade] roleTypeSelect.value:', roleTypeSelect?.value);
+                        window.__clientLog && window.__clientLog('[role-downgrade] adminGroup exists:', !!adminGroup);
+                        window.__clientLog && window.__clientLog('[role-downgrade] assignmentGroup exists:', !!assignmentGroup);
+
+                        if (roleTypeSelect && roleTypeSelect.value === 'admin') {
+                          const adminCheckboxes = adminGroup
+                            ? Array.from(adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'))
+                            : [];
+                          const checkedAdminBoxes = adminCheckboxes.filter(function (inp) { return inp.checked; });
+                          const hasAdminRole = checkedAdminBoxes.length > 0;
+                          window.__clientLog && window.__clientLog('[role-downgrade] admin checkboxes total:', adminCheckboxes.length, 'checked:', checkedAdminBoxes.length);
+                          checkedAdminBoxes.forEach(function (inp) {
+                            window.__clientLog && window.__clientLog('[role-downgrade]   checked admin:', inp.value, getLabelSpanText(inp));
+                          });
+
+                          let hasApprover = false;
+                          if (assignmentGroup) {
+                            const aInputs = Array.from(
+                              assignmentGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
+                            );
+                            window.__clientLog && window.__clientLog('[role-downgrade] assignment checkboxes total:', aInputs.length);
+                            for (const inp of aInputs) {
+                              const txt = String(getLabelSpanText(inp) || '').trim().toLowerCase();
+                              window.__clientLog && window.__clientLog('[role-downgrade]   assignment role:', txt, 'checked:', inp.checked, 'value:', inp.value);
+                              if (txt === 'approver' && inp.checked) { hasApprover = true; }
+                            }
+                          }
+
+                          window.__clientLog && window.__clientLog('[role-downgrade] hasAdminRole:', hasAdminRole, 'hasApprover:', hasApprover);
+
+                          if (!hasAdminRole && !hasApprover) {
+                            window.__clientLog && window.__clientLog('[role-downgrade] => DOWNGRADING role_type to focal_point');
+                            roleTypeSelect.value = 'focal_point';
+                          } else {
+                            window.__clientLog && window.__clientLog('[role-downgrade] => keeping role_type as admin');
+                          }
+                        } else {
+                          window.__clientLog && window.__clientLog('[role-downgrade] skipped (not admin or no select)');
+                        }
+
+                        // Clean previous hidden mirrors
+                        for (const el of Array.from(form.querySelectorAll('input[type="hidden"][data-implied-rbac="1"]'))) {
+                          el.remove();
+                        }
+                        for (const input of roleInputs) {
+                          if (input.disabled && input.checked) {
+                            const hidden = document.createElement('input');
+                            hidden.type = 'hidden';
+                            hidden.name = input.name;
+                            hidden.value = input.value;
+                            hidden.dataset.impliedRbac = '1';
+                            form.appendChild(hidden);
+                          }
+                        }
+                      });
+
+                      applyRoleHighlights();
+                      recomputeLocks();
+                    })();
+                    </script>
+                    {% endif %}
+
+                    {% if not azure_sso_enabled %}
+                        <div class="lg:col-span-3 mb-4">
+                            {{ form.password.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                            {% if read_only %}
+                                {{ form.password(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Leave blank to keep current password" if user else "Password", disabled=True, autocomplete="new-password") }}
+                            {% else %}
+                                {{ form.password(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Leave blank to keep current password" if user else "Password", autocomplete="new-password") }}
+                            {% endif %}
+                            {% if user %}
+                                <p class="mt-1 text-xs text-gray-500">Leave blank to keep current password.</p>
+                            {% endif %}
+                            {% for error in form.password.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Entity Permissions Tab #}
+            {% if entity_tabs.order %}
+            <div id="entity-permissions-panel" class="hidden space-y-6" role="tabpanel" aria-labelledby="entity-permissions-tab">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                    <p class="text-sm text-gray-600">
+                        {{ _('Assign this user to specific organizational entities. Users will have access to data at the level they are assigned.') }}
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                    {# Entity Sub-Tab Navigation #}
+                    <div class="border-b border-gray-200 bg-gray-50 px-2 sm:px-3">
+                        {% call scroll_tab_bar(border_bottom=False, inner_tag='ul', inner_id='entity-tabs', inner_class='list-none text-sm font-medium text-center', aria_label=_('Entity assignment type')) %}
+                            {% if has_countries %}
+                            {% set is_countries_active = default_entity_tab == 'countries' %}
+                            <li class="me-2" role="presentation">
+                                <button class="inline-block px-3 py-3 border-b-2 rounded-t-lg {% if is_countries_active %}text-blue-600 border-blue-600{% else %}border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300{% endif %}"
+                                        id="countries-tab"
+                                        data-tabs-target="#countries-panel"
+                                        type="button"
+                                        role="tab"
+                                        aria-controls="countries-panel"
+                                        aria-selected="{{ 'true' if is_countries_active else 'false' }}">
+                                    <i class="fas fa-flag mr-2"></i>{{ _('Countries') }}
+                                </button>
+                            </li>
+                            {% endif %}
+                            {% if has_ns_structure %}
+                            {% set is_ns_active = default_entity_tab == 'ns_structure' %}
+                            <li class="me-2" role="presentation">
+                                <button class="inline-block px-3 py-3 border-b-2 rounded-t-lg {% if is_ns_active %}text-blue-600 border-blue-600{% else %}border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300{% endif %}"
+                                        id="ns-structure-tab"
+                                        data-tabs-target="#ns-structure-panel"
+                                        type="button"
+                                        role="tab"
+                                        aria-controls="ns-structure-panel"
+                                        aria-selected="{{ 'true' if is_ns_active else 'false' }}">
+                                    <i class="fas fa-sitemap mr-2"></i>{{ _('NS Structure') }}
+                                </button>
+                            </li>
+                            {% endif %}
+                            {% if has_secretariat %}
+                            {% set is_secretariat_active = default_entity_tab == 'secretariat' %}
+                            <li class="me-2" role="presentation">
+                                <button class="inline-block px-3 py-3 border-b-2 rounded-t-lg {% if is_secretariat_active %}text-blue-600 border-blue-600{% else %}border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300{% endif %}"
+                                        id="secretariat-tab"
+                                        data-tabs-target="#secretariat-panel"
+                                        type="button"
+                                        role="tab"
+                                        aria-controls="secretariat-panel"
+                                        aria-selected="{{ 'true' if is_secretariat_active else 'false' }}">
+                                    <i class="fas fa-building mr-2"></i>{{ _('Secretariat') }}
+                                </button>
+                            </li>
+                            {% endif %}
+                        {% endcall %}
+                    </div>
+
+                    {# Tab Panels #}
+                    <div id="entity-tabs-content" class="p-4 sm:p-5 bg-gray-50">
+                {# Countries Tab #}
+                {% if has_countries %}
+                <div class="{% if default_entity_tab != 'countries' %}hidden{% endif %}" id="countries-panel" role="tabpanel" aria-labelledby="countries-tab">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ form.countries.label.text }}</label>
+                    <div class="p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                        {# Global Select All Checkbox #}
+                        <div class="flex items-center mb-4 pb-4 border-b border-gray-200">
+                            <input type="checkbox" id="select-all-countries" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" {% if read_only %}disabled{% endif %}>
+                            <label for="select-all-countries" class="ml-2 block text-sm font-semibold text-gray-800">{{ _('Select all countries') }}</label>
+                        </div>
+
+                        {# Iterate through regions and their countries #}
+                        {% for region, countries in countries_by_region.items() %}
+                            <div class="mb-4 last:mb-0">
+                                <div class="flex items-center mb-2">
+                                    {# Region Checkbox (Select/Deselect All in Region) #}
+                                    <input type="checkbox" id="select-all-{{ region | replace(' ', '-') }}" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 region-select-all" data-region="{{ region | replace(' ', '-') }}" {% if read_only %}disabled{% endif %}>
+                                    <label for="select-all-{{ region | replace(' ', '-') }}" class="ml-2 block text-sm font-semibold text-gray-800">{{ region }}</label>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pl-6 region-countries" data-region="{{ region | replace(' ', '-') }}">
+                                    {# Iterate through countries in the current region #}
+                                    {% for country in countries %}
+                                        <div class="flex items-center">
+                                            {# Manually render the checkbox for the country #}
+                                            <input type="checkbox" name="{{ form.countries.name }}" id="country-{{ country.id }}" value="{{ country.id }}" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 country-checkbox" {% if user and country in user.countries %}checked{% endif %} {% if read_only %}disabled{% endif %}>
+                                            <label for="country-{{ country.id }}" class="ml-2 block text-sm text-gray-900">{{ country.name }}</label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% for error in form.countries.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                {# NS Structure Tab - Hierarchical view of Branches > Sub-branches > Local Units #}
+                {% endif %}
+                {% if has_ns_structure %}
+                <div class="{% if default_entity_tab != 'ns_structure' %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
+                    <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-gray-700 text-sm font-semibold mb-2" for="ns-structure-search">{{ _('Search NS structure') }}</label>
+                            <input type="text"
+                                   id="ns-structure-search"
+                                   class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                   placeholder="{{ _('Search branches, sub-branches, or local units…') }}">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-semibold mb-2" for="ns-country-select">{{ _('Country') }}</label>
+                            <select id="ns-country-select"
+                                    class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                <option value="">{{ _('Select a country') }}</option>
+                                {% for region, countries in countries_by_region.items() %}
+                                    <optgroup label="{{ region }}">
+                                    {% for country in countries %}
+                                        <option value="{{ country.id }}">{{ country.name }}</option>
+                                    {% endfor %}
+                                    </optgroup>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div id="ns-structure-hierarchy-container" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm max-h-96 overflow-y-auto">
+                        <!-- Hierarchical NS structure will be loaded here by JavaScript -->
+                        <div class="text-center py-6 px-4">
+                            <i class="fas fa-info-circle text-gray-300 text-2xl mb-2"></i>
+                            <p class="text-sm text-gray-600">{{ _('Select a country to view NS structure.') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {# Secretariat Tab - with sub-tabs: Divisions & Departments, Regions #}
+                {% endif %}
+                {% if has_secretariat %}
+                <div class="{% if default_entity_tab != 'secretariat' %}hidden{% endif %}" id="secretariat-panel" role="tabpanel" aria-labelledby="secretariat-tab">
+                    <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                        {# Sub-tab navigation #}
+                        <div class="border-b border-gray-200 bg-gray-50 px-2 sm:px-3">
+                            {% call scroll_tab_bar(border_bottom=False, inner_tag='ul', inner_id='secretariat-subtabs', inner_class='list-none text-sm font-medium text-center', aria_label=_('Secretariat assignment')) %}
+                                <li class="me-2" role="presentation">
+                                    <button class="inline-block px-3 py-2.5 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
+                                            id="secretariat-divisions-tab"
+                                            data-tabs-target="#secretariat-divisions-panel"
+                                            type="button"
+                                            role="tab"
+                                            aria-controls="secretariat-divisions-panel"
+                                            aria-selected="true">
+                                        <i class="fas fa-building mr-2"></i>{{ _('Divisions & Departments') }}
+                                    </button>
+                                </li>
+                                <li class="me-2" role="presentation">
+                                    <button class="inline-block px-3 py-2.5 border-b-2 border-transparent rounded-t-lg text-gray-600 hover:text-gray-800 hover:border-gray-300"
+                                            id="secretariat-regions-tab"
+                                            data-tabs-target="#secretariat-regions-panel"
+                                            type="button"
+                                            role="tab"
+                                            aria-controls="secretariat-regions-panel"
+                                            aria-selected="false">
+                                        <i class="fas fa-globe-europe mr-2"></i>{{ _('Regions') }}
+                                    </button>
+                                </li>
+                            {% endcall %}
+                        </div>
+
+                        {# Sub-tab panels #}
+                        <div id="secretariat-subtabs-content" class="p-4 sm:p-5 bg-gray-50">
+                            {# Divisions & Departments panel #}
+                            <div id="secretariat-divisions-panel" role="tabpanel" aria-labelledby="secretariat-divisions-tab">
+                                <div class="mb-4">
+                                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="secretariat-divisions-search">{{ _('Search secretariat') }}</label>
+                                    <input type="text"
+                                           id="secretariat-divisions-search"
+                                           class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="{{ _('Search divisions or departments…') }}">
+                                </div>
+                                <div id="secretariat-divisions-container" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm max-h-96 overflow-y-auto">
+                                    <!-- Hierarchical Secretariat structure will be loaded here by JavaScript -->
+                                    <div class="text-center py-6 px-4">
+                                        <i class="fas fa-spinner fa-spin text-blue-600 text-xl mb-2"></i>
+                                        <p class="text-sm text-gray-600">{{ _('Loading secretariat structure…') }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {# Regions panel #}
+                            <div class="hidden" id="secretariat-regions-panel" role="tabpanel" aria-labelledby="secretariat-regions-tab">
+                                <div class="mb-4">
+                                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="secretariat-regions-search">{{ _('Search regions') }}</label>
+                                    <input type="text"
+                                           id="secretariat-regions-search"
+                                           class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="{{ _('Search regional or cluster offices…') }}">
+                                </div>
+                                <div id="secretariat-regions-container" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm max-h-96 overflow-y-auto">
+                                    <!-- Hierarchical Regions structure will be loaded here by JavaScript -->
+                                    <div class="text-center py-6 px-4">
+                                        <i class="fas fa-info-circle text-gray-300 text-2xl mb-2"></i>
+                                        <p class="text-sm text-gray-600">{{ _('No structure defined yet.') }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Notification Preferences Tab #}
+            {% if user %}
+            <div id="notification-preferences-panel" class="hidden space-y-6" role="tabpanel" aria-labelledby="notification-preferences-tab">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                    <p class="text-sm text-gray-600 mb-4">
+                        {{ _('Configure notification preferences for this user. These settings control how and when the user receives notifications.') }}
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <span class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Sound') }}</span>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" name="sound_enabled"
+                                       class="form-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                       {% if preferences.sound_enabled %}checked{% endif %}>
+                                <span class="text-sm text-gray-800">{{ _('Enable sound for new notifications') }}</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-2 ml-8">{{ _('Plays a sound when new in-app notifications arrive.') }}</p>
+                        </div>
+                        <div>
+                            <label for="notification_frequency" class="block text-gray-700 text-sm font-semibold mb-2">
+                                {{ _('Email frequency') }}
+                            </label>
+                            <select name="notification_frequency" id="notification_frequency"
+                                    class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                <option value="instant" {% if preferences.notification_frequency == 'instant' %}selected{% endif %}>
+                                    {{ _('Instant') }}
+                                </option>
+                                <option value="daily" {% if preferences.notification_frequency == 'daily' %}selected{% endif %}>
+                                    {{ _('Daily digest') }}
+                                </option>
+                                <option value="weekly" {% if preferences.notification_frequency == 'weekly' %}selected{% endif %}>
+                                    {{ _('Weekly digest') }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="digest-schedule-group-admin" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-6 border-t border-gray-200" style="display: none;">
+                        <div id="digest-day-group-admin" class="pref-group" style="display: none;">
+                            <label for="digest_day" class="block text-gray-700 text-sm font-semibold mb-2">
+                                {{ _('Day of week') }}
+                            </label>
+                            <select name="digest_day" id="digest_day"
+                                    class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                <option value="monday" {% if preferences.digest_day == 'monday' %}selected{% endif %}>{{ _('Monday') }}</option>
+                                <option value="tuesday" {% if preferences.digest_day == 'tuesday' %}selected{% endif %}>{{ _('Tuesday') }}</option>
+                                <option value="wednesday" {% if preferences.digest_day == 'wednesday' %}selected{% endif %}>{{ _('Wednesday') }}</option>
+                                <option value="thursday" {% if preferences.digest_day == 'thursday' %}selected{% endif %}>{{ _('Thursday') }}</option>
+                                <option value="friday" {% if preferences.digest_day == 'friday' %}selected{% endif %}>{{ _('Friday') }}</option>
+                                <option value="saturday" {% if preferences.digest_day == 'saturday' %}selected{% endif %}>{{ _('Saturday') }}</option>
+                                <option value="sunday" {% if preferences.digest_day == 'sunday' %}selected{% endif %}>{{ _('Sunday') }}</option>
+                            </select>
+                        </div>
+                        <div class="pref-group">
+                            <label for="digest_time" class="block text-gray-700 text-sm font-semibold mb-2">
+                                {{ _('Time (local)') }}
+                            </label>
+                            <input type="time" name="digest_time" id="digest_time"
+                                   class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                   value="{% if preferences.digest_time %}{{ preferences.digest_time }}{% else %}09:00{% endif %}">
+                            <p class="text-xs text-gray-500 mt-2">{{ _('When to send the digest email.') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
+                    <p class="text-sm font-semibold text-gray-800 mb-1">
+                        <i class="fas fa-sliders-h mr-2 text-blue-600"></i>{{ _('Notification types') }}
+                    </p>
+                    <p class="text-xs text-gray-500 mb-4">{{ _('Choose email and push delivery per notification type.') }}</p>
+
+                    <div class="overflow-x-auto rounded-lg border border-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        {{ _('Type') }}
+                                    </th>
+                                    <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        {{ _('Email') }}
+                                    </th>
+                                    <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        {{ _('Push') }}
+                                    </th>
+                                </tr>
+                                <tr class="bg-gray-50 border-t border-gray-200">
+                                    <td class="px-4 py-2"></td>
+                                    <td class="px-4 py-2 text-center">
+                                        <label class="inline-flex items-center space-x-2 cursor-pointer group">
+                                            <input type="checkbox" id="select-all-email-admin"
+                                                   class="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded border-gray-300">
+                                            <span class="text-xs text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select all') }}</span>
+                                        </label>
+                                    </td>
+                                    <td class="px-4 py-2 text-center">
+                                        <label class="inline-flex items-center space-x-2 cursor-pointer group">
+                                            <input type="checkbox" id="select-all-push-admin"
+                                                   class="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded border-gray-300">
+                                            <span class="text-xs text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select all') }}</span>
+                                        </label>
+                                    </td>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for notif_type in notification_types_info.for_user %}
+                                <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <span class="text-sm text-gray-900">{{ notif_type.replace('_', ' ').title() }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-center">
+                                        {% set email_enabled = not preferences.notification_types_enabled or notif_type in preferences.notification_types_enabled %}
+                                        <input type="checkbox"
+                                               name="notification_type_email"
+                                               value="{{ notif_type }}"
+                                               class="notification-type-email-admin form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer border-gray-300"
+                                               {% if email_enabled %}checked{% endif %}>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-center">
+                                        {% set push_enabled = not preferences.push_notification_types_enabled or notif_type in preferences.push_notification_types_enabled %}
+                                        <input type="checkbox"
+                                               name="notification_type_push"
+                                               value="{{ notif_type }}"
+                                               class="notification-type-push-admin form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer border-gray-300"
+                                               {% if push_enabled %}checked{% endif %}>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Registered Devices Tab #}
+            {% if user %}
+            <div id="registered-devices-panel" class="hidden" role="tabpanel" aria-labelledby="registered-devices-tab">
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600">
+                        View all mobile devices registered for push notifications for this user.
+                    </p>
+                </div>
+
+                {% if registered_devices %}
+                <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Platform
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Device Info
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    App Version
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Network
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Registered
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Last Active
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for device in registered_devices %}
+                            <tr class="hover:bg-gray-50 transition-colors duration-150 {% if device.logged_out_at %}opacity-60{% endif %}">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        {% if device.platform == 'ios' %}
+                                            <i class="fab fa-apple text-gray-600 mr-2"></i>
+                                            <span class="text-sm font-medium text-gray-900">iOS</span>
+                                        {% elif device.platform == 'android' %}
+                                            <i class="fab fa-android text-green-600 mr-2"></i>
+                                            <span class="text-sm font-medium text-gray-900">Android</span>
+                                        {% else %}
+                                            <i class="fas fa-mobile-alt text-gray-400 mr-2"></i>
+                                            <span class="text-sm font-medium text-gray-900">{{ device.platform|title }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if device.os_version %}
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        {{ device.os_version }}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4">
+                                    {% if device.device_name %}
+                                    <div class="text-sm font-medium text-gray-900">
+                                        <i class="fas fa-mobile-alt text-gray-400 mr-1"></i>{{ device.device_name }}
+                                    </div>
+                                    {% endif %}
+                                    {% if device.device_model %}
+                                    <div class="text-sm text-gray-700 mt-1">
+                                        {{ device.device_model }}
+                                    </div>
+                                    {% endif %}
+                                    <div class="text-xs text-gray-500 mt-1 font-mono">
+                                        Token: {{ device.device_token[:15] }}...{{ device.device_token[-8:] }}
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        ID: {{ device.id }}
+                                    </div>
+                                    {% if device.timezone %}
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        <i class="fas fa-clock text-gray-400 mr-1"></i>{{ device.timezone }}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="text-sm text-gray-900">
+                                        {{ device.app_version or 'N/A' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if device.ip_address %}
+                                    <div class="text-sm text-gray-900 font-mono">
+                                        <i class="fas fa-network-wired text-gray-400 mr-1"></i>{{ device.ip_address }}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-sm text-gray-400">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 device-created-date" data-datetime="{{ device.created_at|datetime_iso }}">
+                                        {{ device.created_at.strftime('%Y-%m-%d') if device.created_at else 'N/A' }}
+                                    </div>
+                                    <div class="text-xs text-gray-500 device-created-time" data-datetime="{{ device.created_at|datetime_iso }}">
+                                        {{ device.created_at.strftime('%H:%M:%S') if device.created_at else '' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 device-last-active-date" data-datetime="{{ device.last_active_at|datetime_iso }}">
+                                        {{ device.last_active_at.strftime('%Y-%m-%d') if device.last_active_at else 'N/A' }}
+                                    </div>
+                                    <div class="text-xs text-gray-500 device-last-active-time" data-datetime="{{ device.last_active_at|datetime_iso }}">
+                                        {{ device.last_active_at.strftime('%H:%M:%S') if device.last_active_at else '' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if device.logged_out_at %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <i class="fas fa-sign-out-alt mr-1"></i>
+                                            Logged Out
+                                        </span>
+                                        <div class="text-xs text-gray-500 mt-1 device-logged-out-date" data-datetime="{{ device.logged_out_at|datetime_iso }}">
+                                            {{ device.logged_out_at.strftime('%Y-%m-%d %H:%M') if device.logged_out_at else '' }}
+                                        </div>
+                                    {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-check-circle mr-1"></i>
+                                            Active
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center space-x-2">
+                                        {% if not device.logged_out_at %}
+                                        <button type="button"
+                                                class="kickout-device-btn inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                data-device-id="{{ device.id }}"
+                                                data-user-id="{{ user.id if user else '' }}"
+                                                title="End this device's session (keeps device registered)">
+                                            <i class="fas fa-sign-out-alt mr-1.5"></i>
+                                            Kick Out
+                                        </button>
+                                        {% endif %}
+                                        <button type="button"
+                                                class="remove-device-btn inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                data-device-id="{{ device.id }}"
+                                                data-user-id="{{ user.id if user else '' }}"
+                                                title="Remove this device from registry">
+                                            <i class="fas fa-trash mr-1.5"></i>
+                                            Remove
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                    <i class="fas fa-mobile-alt text-gray-400 text-4xl mb-4"></i>
+                    <p class="text-gray-600 font-medium">No devices registered</p>
+                    <p class="text-sm text-gray-500 mt-2">This user has not registered any mobile devices for push notifications yet.</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {# Analytics Tab (lazy-loaded) #}
+            {% if user and can_view_user_analytics %}
+            <div id="analytics-panel" class="hidden" role="tabpanel" aria-labelledby="analytics-tab"
+                 data-analytics-url="{{ url_for('analytics.user_analytics', user_id=user.id, partial=1) }}">
+                <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center py-14 px-4" id="analytics-loading">
+                    <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mb-3"></i>
+                    <span class="text-sm text-gray-600">{{ _('Loading analytics...') }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+</form>
+
+{% if can_archive_target %}
+{# Archive form lives outside the main form — nested forms are invalid HTML #}
+<form id="archiveUserForm" action="{{ url_for('user_management.archive_user', user_id=user.id) }}" method="POST" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endif %}
+
+{% if can_delete_target %}
+{# Hidden form for user deletion (submitted after modal confirmation) #}
+<form id="deleteUserForm" action="{{ url_for('user_management.delete_user', user_id=user.id) }}" method="POST" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
+{# Delete confirmation modal #}
+<div id="deleteUserModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4" aria-labelledby="delete-modal-title" role="dialog" aria-modal="true">
+  <div class="absolute inset-0 modal-backdrop transition-opacity" id="deleteUserModalBackdrop" aria-hidden="true"></div>
+  <div class="relative bg-white w-full max-w-2xl rounded-lg shadow-xl transform transition-all p-6 text-left">
+    <div class="flex items-start">
+      <div class="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mr-4">
+        <i class="fas fa-exclamation-triangle text-red-600"></i>
+      </div>
+      <div class="flex-1">
+        <h3 class="text-lg leading-6 font-medium text-gray-900" id="delete-modal-title">{{ _('Delete User') }}</h3>
+        <p class="mt-1 text-sm text-gray-600">{{ user.email }}</p>
+        <div class="mt-4">
+          <p class="text-sm text-gray-700">{{ _('The following related data will be deleted. This action cannot be undone:') }}</p>
+          <div id="delete-preview-container" class="mt-3 text-sm text-gray-800"></div>
+          <div id="unassign-preview-container" class="mt-4 text-xs text-gray-600"></div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3">
+      <button id="cancelDeleteUser" type="button" class="btn btn-secondary w-full sm:w-auto">{{ _('Cancel') }}</button>
+      <button id="confirmDeleteUser" type="button" class="btn btn-danger w-full sm:w-auto">{{ _('Delete') }}</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# Critical action handlers loaded outside extra_js so they still bind even if another JS block fails #}
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    if (window.__userFormActionHandlersBound) return;
+    window.__userFormActionHandlersBound = true;
+
+    const archiveBtn = document.getElementById('archiveUserBtn');
+    const archiveForm = document.getElementById('archiveUserForm');
+    const deleteBtn = document.getElementById('deleteUserBtn');
+    const deleteForm = document.getElementById('deleteUserForm');
+    const deleteModal = document.getElementById('deleteUserModal');
+    const cancelBtn = document.getElementById('cancelDeleteUser');
+    const confirmBtn = document.getElementById('confirmDeleteUser');
+    const backdrop = document.getElementById('deleteUserModalBackdrop');
+    const previewContainer = document.getElementById('delete-preview-container');
+    const unassignContainer = document.getElementById('unassign-preview-container');
+    const userForm = document.getElementById('userForm');
+    const userDeletionPreviewUrl = {% if user %}{{ url_for('user_management.user_deletion_preview', user_id=user.id)|tojson }}{% else %}null{% endif %};
+
+    window.__clientLog && window.__clientLog('[user_form] actions bootstrap', {
+        hasArchiveBtn: !!archiveBtn,
+        hasArchiveForm: !!archiveForm,
+        hasDeleteBtn: !!deleteBtn,
+        hasDeleteForm: !!deleteForm,
+        hasDeleteModal: !!deleteModal
+    });
+
+    // Allow admin to leave Name blank by defaulting it to Email on submit.
+    if (userForm) {
+        userForm.addEventListener('submit', function() {
+            const nameInput = userForm.querySelector('input[name="name"]');
+            const emailInput = userForm.querySelector('input[type="hidden"][name="email"]') || userForm.querySelector('input[name="email"]');
+            if (!nameInput || nameInput.disabled) return;
+
+            const currentName = (nameInput.value || '').trim();
+            const emailValue = (emailInput && emailInput.value ? emailInput.value : '').trim();
+            if (!currentName && emailValue) {
+                nameInput.value = emailValue;
+            }
+        });
+    }
+
+    if (archiveBtn && archiveForm) {
+        archiveBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.__clientLog && window.__clientLog('[user_form] archive button clicked');
+            const isActive = {{ (user.active if user else false)|tojson|safe }};
+            const msg = isActive
+                ? {{ _('Are you sure you want to deactivate this user? They will not be able to log in.')|tojson|safe }}
+                : {{ _('Are you sure you want to reactivate this user?')|tojson|safe }};
+
+            if (isActive && window.showDangerConfirmation) {
+                window.showDangerConfirmation(
+                    msg,
+                    function() { window.__clientLog && window.__clientLog('[user_form] archive confirmed via danger modal'); archiveForm.submit(); },
+                    null,
+                    {{ _('Deactivate')|tojson|safe }},
+                    {{ _('Cancel')|tojson|safe }},
+                    {{ _('Deactivate User?')|tojson|safe }}
+                );
+            } else if (window.showConfirmation) {
+                window.showConfirmation(msg, function() {
+                    window.__clientLog && window.__clientLog('[user_form] archive confirmed via confirmation modal');
+                    archiveForm.submit();
+                });
+            } else {
+                const accepted = confirm(msg);
+                window.__clientLog && window.__clientLog('[user_form] archive native confirm result', accepted);
+                if (accepted) archiveForm.submit();
+            }
+        });
+    }
+
+    if (deleteBtn && deleteForm && deleteModal && confirmBtn) {
+        function closeModal() { deleteModal.classList.add('hidden'); }
+
+        function loadPreview() {
+            if (!previewContainer) return;
+            if (!userDeletionPreviewUrl) {
+                previewContainer.innerHTML = '<div class="text-red-600">{{ _("Could not load preview") }}</div>';
+                confirmBtn.disabled = false;
+                return;
+            }
+            previewContainer.innerHTML = '<div>{{ _("Loading...") }}</div>';
+            if (unassignContainer) unassignContainer.innerHTML = '';
+            confirmBtn.disabled = true;
+
+            const doFetch = (window.getFetch && window.getFetch()) || fetch;
+            doFetch(userDeletionPreviewUrl)
+                .then(function(r) {
+                    window.__clientLog && window.__clientLog('[user_form] delete preview status', r.status);
+                    if (!r.ok) throw new Error('Preview request failed with status ' + r.status);
+                    return r.json();
+                })
+                .then(function(resp) {
+                    window.__clientLog && window.__clientLog('[user_form] delete preview payload', resp);
+                    if (!resp.success) {
+                        previewContainer.innerHTML = '<div class="text-red-600">' + escapeHtml(resp.error || "{{ _('Could not load preview') }}") + '</div>';
+                        confirmBtn.disabled = false;
+                        return;
+                    }
+
+                    var del = (resp.preview && resp.preview.will_delete) || {};
+                    var unassign = (resp.preview && resp.preview.will_unassign) || {};
+                    var listHtml = '<ul class="list-disc pl-5 space-y-1">';
+                    var hasItems = false;
+                    for (var k in del) {
+                        if (del[k] && del[k] > 0) {
+                            hasItems = true;
+                            listHtml += '<li>' + escapeHtml(String(k).replaceAll('_', ' ')) + ': ' + escapeHtml(String(del[k])) + '</li>';
+                        }
+                    }
+                    if (!hasItems) listHtml += '<li>{{ _("No related deletions detected.") }}</li>';
+                    listHtml += '</ul>';
+                    previewContainer.innerHTML = listHtml;
+
+                    if (unassignContainer) {
+                        var unHtml = '';
+                        var hasUnassign = false;
+                        for (var u in unassign) {
+                            if (unassign[u] && unassign[u] > 0) {
+                                hasUnassign = true;
+                                unHtml += '<li>' + escapeHtml(String(u).replaceAll('_', ' ')) + ': ' + escapeHtml(String(unassign[u])) + ' {{ _("will be unassigned") }}</li>';
+                            }
+                        }
+                        unassignContainer.innerHTML = hasUnassign
+                            ? '<div class="font-medium mb-1">{{ _("The following will be unassigned (kept for history):") }}</div><ul class="list-disc pl-5 space-y-1">' + unHtml + '</ul>'
+                            : '';
+                    }
+                    confirmBtn.disabled = false;
+                })
+                .catch(function(err) {
+                    console.error('[user_form] delete preview failed', err);
+                    previewContainer.innerHTML = '<div class="text-red-600">{{ _("Failed to load preview.") }}</div>';
+                    confirmBtn.disabled = false;
+                });
+        }
+
+        deleteBtn.addEventListener('click', function() {
+            window.__clientLog && window.__clientLog('[user_form] delete button clicked');
+            deleteModal.classList.remove('hidden');
+            loadPreview();
+        });
+
+        if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+        if (backdrop) backdrop.addEventListener('click', closeModal);
+        confirmBtn.addEventListener('click', function() {
+            window.__clientLog && window.__clientLog('[user_form] delete confirm clicked, submitting form');
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Deleting...") }}';
+            closeModal();
+            deleteForm.submit();
+        });
+    }
+})();
+</script>
+
+{# Add JavaScript to handle the "Select All" by Region and Global "Select All" functionality #}
+{% block extra_js %}
+{{ super() }}
+<style>
+/* Responsive multi-column layout for NS Structure and Secretariat trees */
+#ns-structure-hierarchy-container > ul,
+#secretariat-hierarchy-container > ul,
+#secretariat-divisions-container > ul,
+#secretariat-regions-container > ul {
+  column-gap: 1.5rem;
+  column-count: 1;
+}
+
+@media (min-width: 640px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-divisions-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 768px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-divisions-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1024px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-divisions-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 4;
+  }
+}
+
+@media (min-width: 1280px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-divisions-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 5; /* max 5 columns */
+  }
+}
+
+/* Prevent items from breaking across columns */
+#ns-structure-hierarchy-container li,
+#secretariat-hierarchy-container li,
+#secretariat-divisions-container li,
+#secretariat-regions-container li {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/*
+  Fixed columns grid: freeze column assignment after first render so expanding
+  nodes only push content down within their column and never reshuffle columns.
+*/
+.fc-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--fc-col-count, 1), minmax(0, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Ensure items avoid breaking within a column during expansion */
+.fc-grid .fc-col li {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+</style>
+
+{# Include DateTimeUtils for timezone conversion #}
+{% from "components/datetime_utils_js.html" import datetime_utils_js %}
+{{ datetime_utils_js() }}
+
+<script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get all "Select All" checkboxes for regions
+        const regionSelectAllCheckboxes = document.querySelectorAll('.region-select-all');
+        // Get all individual country checkboxes
+        const countryCheckboxes = document.querySelectorAll('.country-checkbox');
+        // Get the global "Select All" checkbox
+        const globalSelectAllCheckbox = document.getElementById('select-all-countries');
+
+        // Function to update the state of a region "Select All" checkbox
+        function updateRegionSelectAll(region) {
+            const regionSelectAllCheckbox = document.querySelector(`.region-select-all[data-region="${region}"]`);
+            const countriesInRegion = document.querySelectorAll(`.region-countries[data-region="${region}"] .country-checkbox`);
+            // Check if all countries in the region are checked, but only if there are countries in the region
+            const allChecked = countriesInRegion.length > 0 && Array.from(countriesInRegion).every(cb => cb.checked);
+            if (regionSelectAllCheckbox) {
+                regionSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+         // Function to update the state of the global "Select All" checkbox
+        function updateGlobalSelectAll() {
+            const allCountryCheckboxes = document.querySelectorAll('.country-checkbox');
+             // Check if all countries are checked, but only if there are countries
+            const allChecked = allCountryCheckboxes.length > 0 && Array.from(allCountryCheckboxes).every(cb => cb.checked);
+            if (globalSelectAllCheckbox) {
+                globalSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+        // Add event listener to the global "Select All" checkbox
+        if (globalSelectAllCheckbox) {
+            globalSelectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                // Set the checked state of all country checkboxes
+                countryCheckboxes.forEach(countryCheckbox => {
+                    countryCheckbox.checked = isChecked;
+                });
+                // Update the state of all region "Select All" checkboxes
+                regionSelectAllCheckboxes.forEach(regionCheckbox => {
+                    regionCheckbox.checked = isChecked;
+                });
+            });
+        }
+
+        // Add event listener to each region "Select All" checkbox
+        regionSelectAllCheckboxes.forEach(regionCheckbox => {
+            regionCheckbox.addEventListener('change', function() {
+                const region = this.dataset.region;
+                const isChecked = this.checked;
+                // Get all country checkboxes within this region
+                const countriesInRegion = document.querySelectorAll(`.region-countries[data-region="${region}"] .country-checkbox`);
+                // Set the checked state of country checkboxes based on the region checkbox
+                countriesInRegion.forEach(countryCheckbox => {
+                    countryCheckbox.checked = isChecked;
+                });
+                 // After updating countries in the region, update the global select all checkbox
+                updateGlobalSelectAll();
+            });
+        });
+
+        // Add event listener to individual country checkboxes
+        countryCheckboxes.forEach(countryCheckbox => {
+            countryCheckbox.addEventListener('change', function() {
+                // Find the parent region container
+                const regionContainer = this.closest('.region-countries');
+                if (regionContainer) {
+                    const region = regionContainer.dataset.region;
+                    // Update the state of the region "Select All" checkbox
+                    updateRegionSelectAll(region);
+                }
+                // Update the state of the global "Select All" checkbox
+                updateGlobalSelectAll();
+            });
+        });
+
+        {% if user %}
+        // --- Initial state setup for edit mode ---
+        // For edit mode, we need to set up the initial state based on existing user assignments
+        const userAssignedCountryIds = new Set([
+            {%- for country in user.countries -%}
+                {{ country.id }}
+                {%- if not loop.last -%},{%- endif -%}
+            {%- endfor -%}
+        ]);
+
+        countryCheckboxes.forEach(countryCheckbox => {
+            const countryId = parseInt(countryCheckbox.value);
+            // Country checkboxes are already pre-checked via template logic, but ensure consistency
+            countryCheckbox.checked = userAssignedCountryIds.has(countryId);
+        });
+        {% endif %}
+
+        // Update the state of the global and region "Select All" checkboxes based on initial state
+        updateGlobalSelectAll();
+        regionSelectAllCheckboxes.forEach(regionCheckbox => {
+             const region = regionCheckbox.dataset.region;
+             updateRegionSelectAll(region);
+        });
+
+        // Main tab switching + URL query sync (?tab=…&entity_tab=…&secretariat_tab=…)
+        const USER_FORM_TAB = {
+            PARAM_TO_MAIN: {
+                details: 'user-details-panel',
+                user_details: 'user-details-panel',
+                entity: 'entity-permissions-panel',
+                entity_permissions: 'entity-permissions-panel',
+                notifications: 'notification-preferences-panel',
+                notification_preferences: 'notification-preferences-panel',
+                devices: 'registered-devices-panel',
+                registered_devices: 'registered-devices-panel',
+                analytics: 'analytics-panel'
+            },
+            MAIN_TO_PARAM: {
+                'user-details-panel': 'details',
+                'entity-permissions-panel': 'entity',
+                'notification-preferences-panel': 'notifications',
+                'registered-devices-panel': 'devices',
+                'analytics-panel': 'analytics'
+            },
+            PARAM_TO_ENTITY: {
+                countries: 'countries-panel',
+                ns: 'ns-structure-panel',
+                ns_structure: 'ns-structure-panel',
+                secretariat: 'secretariat-panel'
+            },
+            ENTITY_TO_PARAM: {
+                'countries-panel': 'countries',
+                'ns-structure-panel': 'ns_structure',
+                'secretariat-panel': 'secretariat'
+            },
+            PARAM_TO_SEC: {
+                divisions: 'secretariat-divisions-panel',
+                departments: 'secretariat-divisions-panel',
+                regions: 'secretariat-regions-panel'
+            },
+            SEC_TO_PARAM: {
+                'secretariat-divisions-panel': 'divisions',
+                'secretariat-regions-panel': 'regions'
+            }
+        };
+
+        const KNOWN_MAIN_PANEL_IDS = [
+            'user-details-panel',
+            'entity-permissions-panel',
+            'notification-preferences-panel',
+            'registered-devices-panel',
+            'analytics-panel'
+        ];
+
+        function getActiveMainPanelId() {
+            for (let i = 0; i < KNOWN_MAIN_PANEL_IDS.length; i++) {
+                const id = KNOWN_MAIN_PANEL_IDS[i];
+                const el = document.getElementById(id);
+                if (el && !el.classList.contains('hidden')) return id;
+            }
+            return 'user-details-panel';
+        }
+
+        function getActiveEntityPanelId() {
+            const panels = document.querySelectorAll('#entity-tabs-content > div[role="tabpanel"]');
+            for (let i = 0; i < panels.length; i++) {
+                const p = panels[i];
+                if (p && !p.classList.contains('hidden')) return p.id;
+            }
+            return null;
+        }
+
+        function getActiveSecretariatPanelId() {
+            const panels = document.querySelectorAll('#secretariat-subtabs-content > div[role="tabpanel"]');
+            for (let i = 0; i < panels.length; i++) {
+                const p = panels[i];
+                if (p && !p.classList.contains('hidden')) return p.id;
+            }
+            return 'secretariat-divisions-panel';
+        }
+
+        function syncUserFormTabUrl() {
+            const mainId = getActiveMainPanelId();
+            const mainKey = USER_FORM_TAB.MAIN_TO_PARAM[mainId] || 'details';
+            const params = new URLSearchParams();
+            params.set('tab', mainKey);
+
+            if (mainId === 'entity-permissions-panel') {
+                const eid = getActiveEntityPanelId();
+                if (eid && USER_FORM_TAB.ENTITY_TO_PARAM[eid]) {
+                    params.set('entity_tab', USER_FORM_TAB.ENTITY_TO_PARAM[eid]);
+                    if (eid === 'secretariat-panel') {
+                        const sid = getActiveSecretariatPanelId();
+                        if (sid && USER_FORM_TAB.SEC_TO_PARAM[sid]) {
+                            params.set('secretariat_tab', USER_FORM_TAB.SEC_TO_PARAM[sid]);
+                        }
+                    }
+                }
+            }
+
+            const qs = params.toString();
+            const next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+            const cur = window.location.pathname + window.location.search + window.location.hash;
+            if (next !== cur) {
+                history.replaceState(null, '', next);
+            }
+        }
+
+        function parseMainTabIdFromUrl() {
+            const p = new URLSearchParams(window.location.search);
+            const raw = p.get('tab');
+            if (raw === null || raw === '') return null;
+            const key = String(raw).toLowerCase().replace(/-/g, '_');
+            const id = USER_FORM_TAB.PARAM_TO_MAIN[key];
+            if (!id || !document.getElementById(id)) return null;
+            return id;
+        }
+
+        function parseEntityTabIdFromUrl() {
+            const p = new URLSearchParams(window.location.search);
+            const raw = p.get('entity_tab');
+            if (raw === null || raw === '') return null;
+            const key = String(raw).toLowerCase().replace(/-/g, '_');
+            const id = USER_FORM_TAB.PARAM_TO_ENTITY[key];
+            if (!id || !document.getElementById(id)) return null;
+            return id;
+        }
+
+        function parseSecretariatTabIdFromUrl() {
+            const p = new URLSearchParams(window.location.search);
+            const raw = p.get('secretariat_tab');
+            if (raw === null || raw === '') return null;
+            const key = String(raw).toLowerCase().replace(/-/g, '_');
+            const id = USER_FORM_TAB.PARAM_TO_SEC[key];
+            if (!id || !document.getElementById(id)) return null;
+            return id;
+        }
+
+        function resolveInitialMainTabId() {
+            const fromUrl = parseMainTabIdFromUrl();
+            if (fromUrl) return fromUrl;
+            try {
+                const ls = localStorage.getItem('selectedMainTab');
+                if (ls && document.getElementById(ls)) return ls;
+            } catch (e) { /* ignore */ }
+            return 'user-details-panel';
+        }
+
+        // Main tab switching functionality
+        const mainTabButtons = document.querySelectorAll('#main-tabs button[role="tab"]');
+        const mainTabPanels = document.querySelectorAll('#main-tabs-content > div[role="tabpanel"]');
+
+        function activateMainTab(tabId, options) {
+            options = options || {};
+            // Re-query panels each time to ensure we get all of them (including conditionally rendered ones)
+            const allTabPanels = document.querySelectorAll('#main-tabs-content > div[role="tabpanel"]');
+
+            // Also get all panels by known IDs as a fallback
+            const knownPanelIds = ['user-details-panel', 'entity-permissions-panel', 'notification-preferences-panel', 'registered-devices-panel', 'analytics-panel'];
+            const allPanelsById = knownPanelIds.map(id => document.getElementById(id)).filter(p => p !== null);
+
+            // Update tab buttons
+            mainTabButtons.forEach(btn => {
+                const targetPanelId = btn.getAttribute('data-tabs-target');
+                if (targetPanelId === '#' + tabId) {
+                    btn.classList.add('text-blue-600', 'border-blue-600');
+                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'true');
+                } else {
+                    btn.classList.remove('text-blue-600', 'border-blue-600');
+                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'false');
+                }
+            });
+
+            // Combine both lists to ensure we have all panels
+            const allPanelsSet = new Set([...Array.from(allTabPanels), ...allPanelsById]);
+            const allPanelsCombined = Array.from(allPanelsSet);
+
+            // Update tab panels - use the combined list
+            allPanelsCombined.forEach(panel => {
+                if (panel.id === tabId) {
+                    panel.classList.remove('hidden');
+                } else {
+                    panel.classList.add('hidden');
+                }
+            });
+
+            // Final verification - ensure target panel is visible
+            const targetPanel = document.getElementById(tabId);
+            if (targetPanel) {
+                // Double-check visibility
+                const hasHidden = targetPanel.classList.contains('hidden');
+                const computedDisplay = window.getComputedStyle(targetPanel).display;
+
+                if (hasHidden || computedDisplay === 'none') {
+                    targetPanel.classList.remove('hidden');
+                    if (computedDisplay === 'none') {
+                        targetPanel.style.display = 'block';
+                    }
+                }
+            }
+
+            // Store selected tab in localStorage
+            try {
+                localStorage.setItem('selectedMainTab', tabId);
+            } catch (e) {
+                // Ignore localStorage errors
+            }
+
+            if (!options.skipUrl) {
+                syncUserFormTabUrl();
+            }
+        }
+
+        // Add click handlers to main tabs
+        mainTabButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetPanelId = this.getAttribute('data-tabs-target');
+                if (targetPanelId) {
+                    const tabId = targetPanelId.substring(1); // Remove the #
+                    activateMainTab(tabId);
+                }
+            });
+        });
+
+        // Initial main tab: URL query > localStorage > User Details
+        activateMainTab(resolveInitialMainTabId(), { skipUrl: true });
+
+        // Lazy-load Analytics tab content on first activation
+        (function() {
+            var analyticsTab = document.getElementById('analytics-tab');
+            var analyticsPanel = document.getElementById('analytics-panel');
+            if (!analyticsTab || !analyticsPanel) return;
+
+            var analyticsUrl = analyticsPanel.dataset.analyticsUrl;
+            var loaded = false;
+
+            function fetchAnalytics(days) {
+                var url = analyticsUrl;
+                if (days) {
+                    url = url.replace(/([?&])days=\d+/, '$1days=' + days);
+                    if (url === analyticsUrl) {
+                        url += (url.indexOf('?') !== -1 ? '&' : '?') + 'days=' + days;
+                    }
+                }
+                analyticsPanel.innerHTML = '<div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center py-14 px-4"><i class="fas fa-spinner fa-spin text-blue-600 text-2xl mb-3"></i><span class="text-sm text-gray-600">{{ _("Loading analytics...") }}</span></div>';
+                var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+                fetchFn(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function(r) { return r.text(); })
+                    .then(function(html) { analyticsPanel.innerHTML = html; })
+                    .catch(function() {
+                        analyticsPanel.innerHTML = '<div class="rounded-lg border border-red-200 bg-red-50 text-center py-10 px-4"><i class="fas fa-exclamation-circle text-red-500 text-2xl mb-2"></i><p class="text-sm text-red-800">{{ _("Failed to load analytics.") }}</p></div>';
+                    });
+            }
+
+            analyticsTab.addEventListener('click', function() {
+                if (loaded) return;
+                loaded = true;
+                fetchAnalytics();
+            });
+
+            analyticsPanel.addEventListener('click', function(ev) {
+                var btn = ev.target.closest('[data-analytics-days]');
+                if (!btn || !analyticsPanel.contains(btn)) return;
+                var days = parseInt(btn.getAttribute('data-analytics-days'), 10);
+                if (!isFinite(days) || days <= 0) return;
+                ev.preventDefault();
+                fetchAnalytics(days);
+            });
+
+            window.ensureUserFormAnalyticsLoaded = function() {
+                if (loaded) return;
+                loaded = true;
+                fetchAnalytics();
+            };
+        })();
+
+        // Initialize entity sub-tab switching functionality (within Entity Permissions tab)
+        const entityTabButtons = document.querySelectorAll('#entity-tabs button[role="tab"]');
+        const entityTabPanels = document.querySelectorAll('#entity-tabs-content > div[role="tabpanel"]');
+
+        function activateEntityTab(tabId, options) {
+            options = options || {};
+            // Update tab buttons
+            entityTabButtons.forEach(btn => {
+                const targetPanelId = btn.getAttribute('data-tabs-target');
+                if (targetPanelId === '#' + tabId) {
+                    btn.classList.add('text-blue-600', 'border-blue-600');
+                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'true');
+                } else {
+                    btn.classList.remove('text-blue-600', 'border-blue-600');
+                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'false');
+                }
+            });
+
+            // Update tab panels
+            entityTabPanels.forEach(panel => {
+                if (panel.id === tabId) {
+                    panel.classList.remove('hidden');
+                } else {
+                    panel.classList.add('hidden');
+                }
+            });
+
+            // Store selected tab in localStorage
+            try {
+                localStorage.setItem('selectedEntityTab', tabId);
+            } catch (e) { /* ignore */ }
+
+            if (!options.skipUrl) {
+                syncUserFormTabUrl();
+            }
+        }
+
+        // Add click handlers to entity tabs
+        entityTabButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetPanelId = this.getAttribute('data-tabs-target').substring(1);
+                activateEntityTab(targetPanelId);
+            });
+        });
+
+        function getDefaultEntityTab() {
+            const firstTabButton = document.querySelector('#entity-tabs button[role="tab"]');
+            if (firstTabButton) {
+                const target = firstTabButton.getAttribute('data-tabs-target');
+                if (target) {
+                    return target.substring(1);
+                }
+            }
+            return null;
+        }
+
+        // Entity sub-tab: URL entity_tab > localStorage > first tab
+        (function initEntitySubTab() {
+            if (!document.getElementById('entity-tabs-content')) return;
+            let tabId = parseEntityTabIdFromUrl();
+            if (!tabId) {
+                try {
+                    const ls = localStorage.getItem('selectedEntityTab');
+                    if (ls && document.getElementById(ls)) tabId = ls;
+                } catch (e) { /* ignore */ }
+            }
+            if (!tabId) tabId = getDefaultEntityTab();
+            if (tabId) activateEntityTab(tabId, { skipUrl: true });
+        })();
+
+        // ---------------------------------------------------------------------
+        // Freeze hierarchy columns (NS Structure and Secretariat tabs)
+        // Distribute top-level items into fixed columns once, based on initial
+        // viewport width, and never reshuffle columns on expansion.
+        // ---------------------------------------------------------------------
+        function computeInitialColumnCount() {
+            const w = window.innerWidth || document.documentElement.clientWidth || 0;
+            if (w >= 1280) return 5; // xl
+            if (w >= 1024) return 4; // lg
+            if (w >= 768) return 3;  // md
+            if (w >= 640) return 2;  // sm
+            return 1;
+        }
+
+        function freezeHierarchyColumns(container) {
+            if (!container) return;
+            // Avoid re-freezing if grid already exists
+            if (container.querySelector(':scope > .fc-grid')) return;
+
+            const topLevelUl = container.querySelector(':scope > ul');
+            if (!topLevelUl) return;
+            const items = Array.from(topLevelUl.children).filter(node => node && node.nodeName === 'LI');
+            if (items.length === 0) return;
+
+            const colCount = computeInitialColumnCount();
+            const grid = document.createElement('div');
+            grid.className = 'fc-grid';
+            grid.style.setProperty('--fc-col-count', String(colCount));
+
+            const columns = [];
+            for (let i = 0; i < colCount; i++) {
+                const colUl = document.createElement('ul');
+                colUl.className = 'fc-col';
+                columns.push(colUl);
+                grid.appendChild(colUl);
+            }
+
+            items.forEach((li, index) => {
+                const targetCol = columns[index % colCount];
+                targetCol.appendChild(li);
+            });
+
+            // Remove original UL and attach the frozen grid
+            topLevelUl.remove();
+            container.appendChild(grid);
+        }
+
+        function initFixedColumnsObserver(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            // Try immediately if content already present
+            freezeHierarchyColumns(container);
+
+            // Observe for first-time hierarchy load/reload
+            const observer = new MutationObserver(() => {
+                // If a direct UL appears and we haven't frozen yet, freeze now
+                const hasGrid = !!container.querySelector(':scope > .fc-grid');
+                const hasTopUl = !!container.querySelector(':scope > ul');
+                if (!hasGrid && hasTopUl) {
+                    freezeHierarchyColumns(container);
+                }
+            });
+            observer.observe(container, { childList: true });
+        }
+
+        // Attach to all hierarchical containers
+        initFixedColumnsObserver('ns-structure-hierarchy-container');
+        initFixedColumnsObserver('secretariat-divisions-container');
+        initFixedColumnsObserver('secretariat-regions-container');
+
+        // Initialize Hierarchical Entity Selectors
+        let nsStructureSelector = null;
+        let secretariatDivisionsSelector = null;
+        let secretariatRegionsSelector = null;
+
+        // Initialize NS Structure hierarchical selector
+        if (document.getElementById('ns-structure-hierarchy-container')) {
+            nsStructureSelector = new HierarchicalEntitySelector({
+                containerId: 'ns-structure-hierarchy-container',
+                apiBaseUrl: '', // Empty since blueprint already has /admin prefix
+                targetUserId: {% if user %}{{ user.id }}{% else %}null{% endif %},
+                entityTypes: ['ns_branch', 'ns_subbranch', 'ns_localunit'],
+                onChange: function(data) {
+                    // Just update hidden form fields - no need to reload from server
+                    // Changes will be saved when form is submitted
+                }
+            });
+
+            // Country select wiring for NS Structure
+            const nsCountrySelect = document.getElementById('ns-country-select');
+            const nsContainer = document.getElementById('ns-structure-hierarchy-container');
+            function loadNsForCountry(countryId) {
+                if (!countryId) {
+                    nsContainer.innerHTML = `
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle text-gray-400"></i>
+                            <p class="text-sm text-gray-500 mt-2">Select a country to view NS structure.</p>
+                        </div>`;
+                    return;
+                }
+                nsContainer.innerHTML = `
+                    <div class=\"text-center py-4\">\n                        <i class=\"fas fa-spinner fa-spin text-gray-400\"></i>\n                        <p class=\"text-sm text-gray-500 mt-2\">Loading NS structure...</p>\n                    </div>`;
+                nsStructureSelector.loadHierarchy(`/admin/structure/ns-hierarchy?country_id=${countryId}`);
+            }
+            if (nsCountrySelect) {
+                nsCountrySelect.addEventListener('change', function() {
+                    loadNsForCountry(this.value);
+                });
+                // If editing a user and they have countries, preselect the first
+                const defaultCountryId = {% if user and user.countries.first() %}{{ user.countries.first().id }}{% else %}null{% endif %};
+                if (defaultCountryId) {
+                    nsCountrySelect.value = String(defaultCountryId);
+                    loadNsForCountry(defaultCountryId);
+                }
+            }
+
+            // Add search functionality
+            const nsSearchInput = document.getElementById('ns-structure-search');
+            if (nsSearchInput) {
+                let searchTimeout;
+                nsSearchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        nsStructureSelector.filterHierarchy(e.target.value);
+                    }, 300);
+                });
+            }
+        }
+        {% if user %}
+        // Initialize Secretariat Divisions & Departments selector
+        if (document.getElementById('secretariat-divisions-container')) {
+            secretariatDivisionsSelector = new HierarchicalEntitySelector({
+                containerId: 'secretariat-divisions-container',
+                apiBaseUrl: '',
+                targetUserId: {{ user.id }},
+                entityTypes: ['division', 'department'],
+                onChange: function(data) {}
+            });
+
+            secretariatDivisionsSelector.loadHierarchy('/admin/structure/secretariat-hierarchy');
+
+            const secretariatDivisionsSearchInput = document.getElementById('secretariat-divisions-search');
+            if (secretariatDivisionsSearchInput) {
+                let searchTimeout;
+                secretariatDivisionsSearchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        secretariatDivisionsSelector.filterHierarchy(e.target.value);
+                    }, 300);
+                });
+            }
+        }
+
+        // Initialize Secretariat Regions selector
+        if (document.getElementById('secretariat-regions-container')) {
+            secretariatRegionsSelector = new HierarchicalEntitySelector({
+                containerId: 'secretariat-regions-container',
+                apiBaseUrl: '',
+                targetUserId: {{ user.id }},
+                entityTypes: ['regional_office', 'cluster_office'],
+                onChange: function(data) {}
+            });
+
+            secretariatRegionsSelector.loadHierarchy('/admin/structure/secretariat-regions-hierarchy');
+
+            const secretariatRegionsSearchInput = document.getElementById('secretariat-regions-search');
+            if (secretariatRegionsSearchInput) {
+                let searchTimeout;
+                secretariatRegionsSearchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        secretariatRegionsSelector.filterHierarchy(e.target.value);
+                    }, 300);
+                });
+            }
+        }
+
+        // Store selectors globally for debugging
+        window.nsStructureSelector = nsStructureSelector;
+        window.secretariatDivisionsSelector = secretariatDivisionsSelector;
+        window.secretariatRegionsSelector = secretariatRegionsSelector;
+        {% endif %}
+
+        // Secretariat sub-tabs behavior
+        const secretariatSubtabButtons = document.querySelectorAll('#secretariat-subtabs button[role="tab"]');
+        const secretariatSubtabPanels = document.querySelectorAll('#secretariat-subtabs-content > div[role="tabpanel"]');
+        function activateSecretariatSubtab(panelId, options) {
+            options = options || {};
+            secretariatSubtabButtons.forEach(btn => {
+                const target = btn.getAttribute('data-tabs-target');
+                if (target === '#' + panelId) {
+                    btn.classList.add('text-blue-600', 'border-blue-600');
+                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'true');
+                } else {
+                    btn.classList.remove('text-blue-600', 'border-blue-600');
+                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'false');
+                }
+            });
+            secretariatSubtabPanels.forEach(panel => {
+                if (panel.id === panelId) {
+                    panel.classList.remove('hidden');
+                } else {
+                    panel.classList.add('hidden');
+                }
+            });
+            try {
+                localStorage.setItem('selectedSecretariatSubtab', panelId);
+            } catch (e) { /* ignore */ }
+
+            if (!options.skipUrl) {
+                syncUserFormTabUrl();
+            }
+        }
+        secretariatSubtabButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetPanelId = this.getAttribute('data-tabs-target').substring(1);
+                activateSecretariatSubtab(targetPanelId);
+            });
+        });
+        (function initSecretariatSubTab() {
+            if (!document.getElementById('secretariat-subtabs')) return;
+            let sid = parseSecretariatTabIdFromUrl();
+            if (!sid) {
+                try {
+                    const ls = localStorage.getItem('selectedSecretariatSubtab');
+                    if (ls && document.getElementById(ls)) sid = ls;
+                } catch (e) { /* ignore */ }
+            }
+            if (!sid) sid = 'secretariat-divisions-panel';
+            if (document.getElementById(sid)) {
+                activateSecretariatSubtab(sid, { skipUrl: true });
+            } else {
+                activateSecretariatSubtab('secretariat-divisions-panel', { skipUrl: true });
+            }
+        })();
+
+        // Normalize / persist tab state in the address bar (bookmarkable / refresh-safe)
+        syncUserFormTabUrl();
+
+        if (typeof window.ensureUserFormAnalyticsLoaded === 'function') {
+            var ap = document.getElementById('analytics-panel');
+            if (ap && !ap.classList.contains('hidden')) {
+                window.ensureUserFormAnalyticsLoaded();
+            }
+        }
+
+        // Notification preferences select all functionality
+        const selectAllEmailAdmin = document.getElementById('select-all-email-admin');
+        const selectAllPushAdmin = document.getElementById('select-all-push-admin');
+        const emailCheckboxesAdmin = document.querySelectorAll('.notification-type-email-admin');
+        const pushCheckboxesAdmin = document.querySelectorAll('.notification-type-push-admin');
+
+        if (selectAllEmailAdmin) {
+            selectAllEmailAdmin.addEventListener('change', function() {
+                emailCheckboxesAdmin.forEach(cb => cb.checked = this.checked);
+            });
+
+            // Update select all state when individual checkboxes change
+            emailCheckboxesAdmin.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const allChecked = Array.from(emailCheckboxesAdmin).every(c => c.checked);
+                    selectAllEmailAdmin.checked = allChecked;
+                });
+            });
+
+            // Set initial state
+            const allEmailChecked = emailCheckboxesAdmin.length > 0 && Array.from(emailCheckboxesAdmin).every(c => c.checked);
+            selectAllEmailAdmin.checked = allEmailChecked;
+        }
+
+        if (selectAllPushAdmin) {
+            selectAllPushAdmin.addEventListener('change', function() {
+                pushCheckboxesAdmin.forEach(cb => cb.checked = this.checked);
+            });
+
+            // Update select all state when individual checkboxes change
+            pushCheckboxesAdmin.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const allChecked = Array.from(pushCheckboxesAdmin).every(c => c.checked);
+                    selectAllPushAdmin.checked = allChecked;
+                });
+            });
+
+            // Set initial state
+            const allPushChecked = pushCheckboxesAdmin.length > 0 && Array.from(pushCheckboxesAdmin).every(c => c.checked);
+            selectAllPushAdmin.checked = allPushChecked;
+        }
+
+        // Digest schedule toggle for admin form
+        const notificationFrequencyAdmin = document.getElementById('notification_frequency');
+        const digestScheduleGroupAdmin = document.getElementById('digest-schedule-group-admin');
+        const digestDayGroupAdmin = document.getElementById('digest-day-group-admin');
+
+        function toggleDigestScheduleAdmin(frequency) {
+            if (frequency === 'daily' || frequency === 'weekly') {
+                if (digestScheduleGroupAdmin) digestScheduleGroupAdmin.style.display = 'grid';
+                if (digestDayGroupAdmin) {
+                    digestDayGroupAdmin.style.display = frequency === 'weekly' ? 'block' : 'none';
+                }
+            } else {
+                if (digestScheduleGroupAdmin) digestScheduleGroupAdmin.style.display = 'none';
+            }
+        }
+
+        if (notificationFrequencyAdmin) {
+            // Set initial state
+            toggleDigestScheduleAdmin(notificationFrequencyAdmin.value);
+
+            // Handle changes
+            notificationFrequencyAdmin.addEventListener('change', function() {
+                toggleDigestScheduleAdmin(this.value);
+            });
+        }
+
+        // Convert all device timestamps to viewer's local timezone using DateTimeUtils
+        // DateTimeUtils is loaded from datetime-utils.js and handles timezone conversion automatically
+        document.querySelectorAll('.device-created-date').forEach(element => {
+            DateTimeUtils.convertElement(element, 'dateISO');
+        });
+
+        document.querySelectorAll('.device-created-time').forEach(element => {
+            DateTimeUtils.convertElement(element, 'timeFull');
+        });
+
+        document.querySelectorAll('.device-last-active-date').forEach(element => {
+            DateTimeUtils.convertElement(element, 'dateISO');
+        });
+
+        document.querySelectorAll('.device-last-active-time').forEach(element => {
+            DateTimeUtils.convertElement(element, 'timeFull');
+        });
+
+        document.querySelectorAll('.device-logged-out-date').forEach(element => {
+            DateTimeUtils.convertElement(element, 'datetime');
+        });
+
+        // Device kickout functionality
+        document.querySelectorAll('.kickout-device-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+                const deviceId = this.getAttribute('data-device-id');
+                const userId = this.getAttribute('data-user-id');
+
+                if (!deviceId || !userId) {
+                    if (window.showAlert) window.showAlert('Error: Missing device or user information.', 'error');
+                    else window.__clientWarn && window.__clientWarn('Missing device or user information');
+                    return;
+                }
+
+                const kickMsg = 'Are you sure you want to end this device\'s session? The user will be logged out on this device, but the device will remain registered.';
+                const kickBtn = this;
+                async function doKickout() {
+                // Disable button and show loading state
+                const originalContent = kickBtn.innerHTML;
+                kickBtn.disabled = true;
+                kickBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Kicking Out...';
+
+                try {
+                    // Make AJAX request to kick out device
+                    const response = await fetch(`/admin/users/${userId}/devices/${deviceId}/kickout`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                        },
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        // Find the row containing this button
+                        const row = kickBtn.closest('tr');
+
+                        // Update status cell
+                        const statusCell = row.querySelector('td:nth-last-child(2)');
+                        if (statusCell) {
+                            const now = new Date();
+                            const formattedDate = DateTimeUtils.format(now, 'datetime');
+
+                            statusCell.innerHTML = `
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <i class="fas fa-sign-out-alt mr-1"></i>
+                                    Logged Out
+                                </span>
+                                <div class="text-xs text-gray-500 mt-1">${formattedDate}</div>
+                            `;
+                        }
+
+                        // Update actions cell - remove kickout button, keep remove button
+                        const actionsCell = row.querySelector('td:last-child');
+                        if (actionsCell) {
+                            const removeBtn = actionsCell.querySelector('.remove-device-btn');
+                            if (removeBtn) {
+                                actionsCell.innerHTML = `
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button"
+                                                class="remove-device-btn inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                data-device-id="${deviceId}"
+                                                data-user-id="${userId}"
+                                                title="Remove this device from registry">
+                                            <i class="fas fa-trash mr-1.5"></i>
+                                            Remove
+                                        </button>
+                                    </div>
+                                `;
+                                // Re-attach event listener to the new remove button
+                                attachRemoveDeviceListener(actionsCell.querySelector('.remove-device-btn'));
+                            }
+                        }
+
+                        // Add opacity to row to indicate logged out state
+                        row.classList.add('opacity-60');
+
+                        // Show success message
+                        const successMsg = document.createElement('div');
+                        successMsg.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50';
+                        successMsg.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Device session ended successfully.';
+                        document.body.appendChild(successMsg);
+
+                        setTimeout(() => {
+                            successMsg.remove();
+                        }, 3000);
+                    } else {
+                        throw new Error(data.error || 'Failed to kick out device');
+                    }
+                } catch (error) {
+                    console.error('Error kicking out device:', error);
+
+                    // Re-enable button
+                    kickBtn.disabled = false;
+                    kickBtn.innerHTML = originalContent;
+
+                    // Show error message
+                    var m = 'Error: ' + (error.message || 'Failed to end device session. Please try again.');
+                    if (window.showAlert) window.showAlert(m, 'error');
+                    else console.error(m);
+                }
+                }
+                if (window.showConfirmation) {
+                    window.showConfirmation(kickMsg, doKickout, null, 'End Session', 'Cancel', 'End Device Session?');
+                } else {
+                    doKickout();
+                }
+            });
+        });
+
+        // Helper function to attach remove device listener
+        function attachRemoveDeviceListener(button) {
+            if (!button) return;
+
+            button.addEventListener('click', async function() {
+                const deviceId = this.getAttribute('data-device-id');
+                const userId = this.getAttribute('data-user-id');
+
+                if (!deviceId || !userId) {
+                    if (window.showAlert) window.showAlert('Error: Missing device or user information.', 'error');
+                    else window.__clientWarn && window.__clientWarn('Missing device or user information');
+                    return;
+                }
+
+                const removeMsg = 'Are you sure you want to remove this device from the registry? This will permanently delete the device record and the user will need to register again to receive push notifications on this device.';
+                const removeBtn = this;
+                async function doRemove() {
+                // Disable button and show loading state
+                const originalContent = removeBtn.innerHTML;
+                removeBtn.disabled = true;
+                removeBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Removing...';
+
+                try {
+                    // Make AJAX request to remove device
+                    const response = await fetch(`/admin/users/${userId}/devices/${deviceId}/remove`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                        },
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        // Find the row containing this button
+                        const row = removeBtn.closest('tr');
+
+                        // Remove the entire row with animation
+                        row.style.transition = 'opacity 0.3s ease-out';
+                        row.style.opacity = '0';
+
+                        setTimeout(() => {
+                            row.remove();
+
+                            // Check if table is now empty
+                            const tbody = document.querySelector('#registered-devices-panel tbody');
+                            if (tbody && tbody.children.length === 0) {
+                                // Reload page to show empty state
+                                location.reload();
+                            }
+                        }, 300);
+
+                        // Show success message
+                        const successMsg = document.createElement('div');
+                        successMsg.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50';
+                        successMsg.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Device removed successfully.';
+                        document.body.appendChild(successMsg);
+
+                        setTimeout(() => {
+                            successMsg.remove();
+                        }, 3000);
+                    } else {
+                        throw new Error(data.error || 'Failed to remove device');
+                    }
+                } catch (error) {
+                    console.error('Error removing device:', error);
+
+                    // Re-enable button
+                    removeBtn.disabled = false;
+                    removeBtn.innerHTML = originalContent;
+
+                    // Show error message
+                    var m = 'Error: ' + (error.message || 'Failed to remove device. Please try again.');
+                    if (window.showAlert) window.showAlert(m, 'error');
+                    else console.error(m);
+                }
+                }
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(removeMsg, doRemove, null, 'Remove', 'Cancel', 'Remove Device?');
+                } else if (window.showConfirmation) {
+                    window.showConfirmation(removeMsg, doRemove, null, 'Remove', 'Cancel', 'Remove Device?');
+                } else {
+                    doRemove();
+                }
+            });
+        }
+
+        // Device remove functionality
+        document.querySelectorAll('.remove-device-btn').forEach(button => {
+            attachRemoveDeviceListener(button);
+        });
+    });
+</script>
+<script src="{{ static_url('js/hierarchical_entity_selector.js') }}"></script>
+{% endblock %}
+
+{% endblock %}

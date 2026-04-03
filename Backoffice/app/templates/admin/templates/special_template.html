@@ -1,0 +1,1521 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block extra_css %}
+
+    <style>
+        /* Custom loading spinner animation */
+        .loading-spinner {
+            animation: spin 1s linear infinite !important;
+            display: inline-block !important;
+            transform-origin: center !important;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg) !important;
+            }
+            100% {
+                transform: rotate(360deg) !important;
+            }
+        }
+
+        /* Ensure the animation works on all elements */
+        div.loading-spinner,
+        .loading-spinner {
+            animation: spin 1s linear infinite !important;
+            transform-origin: center !important;
+        }
+
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="sharp-ui">
+{% set header_actions = namespace(items=[]) %}
+{% set __ = header_actions.items.append({
+    'type': 'button',
+    'text': _('FDRS Data Sync'),
+    'icon': 'fas fa-sync-alt',
+    'classes': 'professional-action-btn professional-action-btn-purple',
+    'attributes': {'id': 'fdrs-sync-open-btn', 'title': _('Sync FDRS data from data-api')}
+}) %}
+{{ page_header(
+    title=_(title),
+    icon='fas fa-magic',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Templates'), 'url': url_for('form_builder.manage_templates')},
+        {'name': _('Special View')}
+    ],
+    actions=header_actions.items
+) }}
+
+<div class="max-w-7xl mx-auto py-6">
+  <p class="text-gray-600 mb-6">Configure imputation methods for template items and run imputation.</p>
+
+  <!-- FDRS Sync Settings Modal -->
+  {% from "macros/modal_shell.html" import modal_shell %}
+  {% call modal_shell('fdrs-sync-modal', _('FDRS Data Sync Settings'), max_width='max-w-md', close_id='fdrs-sync-modal-close') %}
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600">{{ _('Sync FDRS data from your configured FDRS / data API endpoint into form data for this template.') }}</p>
+        <div>
+          <label for="fdrs-sync-years" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Years (comma-separated)') }}</label>
+          <input type="text"
+                 id="fdrs-sync-years"
+                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                 placeholder="e.g. 2019,2020,2021 (empty = default 2010-2024)">
+        </div>
+        <div>
+          <label for="fdrs-sync-batch-size" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Batch size') }}</label>
+          <input type="number"
+                 id="fdrs-sync-batch-size"
+                 min="100"
+                 placeholder="1000"
+                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+          <p class="mt-1 text-xs text-gray-500">
+            {{ _('How many rows to process before committing to the database. Smaller batches are safer but slower; larger batches are faster but use more memory. Leave empty to use the default (1000).') }}
+          </p>
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox"
+                 id="fdrs-sync-dry-run"
+                 class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <label for="fdrs-sync-dry-run" class="ml-2 block text-sm text-gray-700">{{ _('Dry run (preview only, no DB write)') }}</label>
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox"
+                 id="fdrs-sync-test"
+                 class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <label for="fdrs-sync-test" class="ml-2 block text-sm text-gray-700">{{ _('Test mode (year 2024 only, max 1000 records)') }}</label>
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox"
+                 id="fdrs-sync-imputed-cache"
+                 class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                 checked>
+          <label for="fdrs-sync-imputed-cache" class="ml-2 block text-sm text-gray-700">{{ _('Use cached imputed values (recommended; uncheck to fetch fresh from API — can take a long time)') }}</label>
+        </div>
+      </div>
+
+      <!-- Live progress -->
+      <div id="fdrs-sync-progress" class="pb-4 hidden">
+        <div class="text-sm text-gray-700 mb-2">
+          <span class="font-medium">{{ _('Status') }}:</span>
+          <span id="fdrs-sync-progress-stage">-</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2">
+          <div id="fdrs-sync-progress-bar" class="bg-purple-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div class="flex justify-between text-xs text-gray-500 mt-2">
+          <span id="fdrs-sync-progress-text">0%</span>
+          <span id="fdrs-sync-progress-count"></span>
+        </div>
+      </div>
+      <div id="fdrs-sync-result" class="py-3 border-t border-gray-200 hidden">
+        <p id="fdrs-sync-result-text" class="text-sm"></p>
+      </div>
+      <div class="pt-4 border-t border-gray-200 flex justify-end gap-2">
+        <button type="button"
+                id="fdrs-sync-modal-cancel"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          {{ _('Cancel') }}
+        </button>
+        <button type="button"
+                id="fdrs-sync-run-btn"
+                class="btn btn-purple">
+          <i class="fas fa-sync-alt mr-2"></i>
+          <span id="fdrs-sync-run-btn-text">{{ _('Run Sync') }}</span>
+        </button>
+      </div>
+  {% endcall %}
+
+  <!-- Template Items Configuration Table -->
+  <div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <button type="button"
+              id="toggle-imputation-methods"
+              class="flex items-center justify-between w-full text-left focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
+        <div>
+          <h2 class="text-lg font-medium text-gray-800">Template Items - Imputation Methods</h2>
+          <p class="text-sm text-gray-600">Click on the method to change how data is imputed for each item.</p>
+        </div>
+        <svg id="toggle-icon" class="h-5 w-5 text-gray-400 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </button>
+    </div>
+    <div id="imputation-methods-content" class="hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          {% for section_data in sections_with_items %}
+            <!-- Section Header Row -->
+            <tr class="bg-gray-100 border-t-2 border-gray-300">
+              <td colspan="5" class="px-6 py-4">
+                <div class="flex items-center">
+                  <div class="flex items-center">
+                    <svg class="h-4 w-4 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    <h3 class="text-sm font-semibold text-gray-800">{{ section_data.section.name }}</h3>
+                  </div>
+                  <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {{ section_data.section_items|length }} item{{ 's' if section_data.section_items|length != 1 else '' }}
+                  </span>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Items in this section -->
+            {% for item in section_data.section_items %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <div class="flex items-center">
+                  <div class="w-4 h-px bg-gray-300 mr-2"></div>
+                  {{ item.display_order }}
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-900">
+                <div class="font-medium">{{ item.label }}</div>
+                {% if item.description %}
+                <div class="text-gray-500 text-xs">{{ item.description }}</div>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {% if item.type %}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    {% if item.type == 'Number' %}bg-green-100 text-green-800
+                    {% elif item.type == 'Percentage' %}bg-purple-100 text-purple-800
+                    {% elif item.type == 'Text' %}bg-gray-100 text-gray-800
+                    {% elif item.type == 'YesNo' %}bg-yellow-100 text-yellow-800
+                    {% elif item.type == 'Choice' %}bg-indigo-100 text-indigo-800
+                    {% elif item.type == 'Currency' %}bg-orange-100 text-orange-800
+                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                    {{ item.type }}
+                  </span>
+                {% else %}
+                  <span class="text-gray-400 italic">Unknown</span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {% if item.unit %}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {{ item.unit }}
+                  </span>
+                {% else %}
+                  <span class="text-gray-400 italic">No unit</span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <div class="relative">
+                  <button type="button"
+                          class="imputation-method-btn inline-flex items-center px-3 py-1 border rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500
+                          {% if item.config.get('imputation_method') == 'no_imputation' %}
+                            border-gray-200 text-gray-500 bg-gray-50 hover:bg-gray-100
+                          {% else %}
+                            border-gray-300 text-gray-700 bg-white hover:bg-gray-50
+                          {% endif %}"
+                          data-item-id="{{ item.id }}"
+                          data-current-method="{{ item.config.get('imputation_method', 'last_year') }}">
+                    <span class="method-text">
+                      {% if item.config.get('imputation_method') == 'three_year_avg' %}
+                        Three Year Average
+                      {% elif item.config.get('imputation_method') == 'no_imputation' %}
+                        No Imputation
+                      {% else %}
+                        Last Year's Value
+                      {% endif %}
+                    </span>
+                    <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+                  <div class="imputation-method-dropdown absolute z-50 mt-1 w-48 bg-white shadow-lg rounded-md border border-gray-200 hidden" style="position: fixed;">
+                    <div class="py-1">
+                      <button type="button" class="method-option block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-method="last_year">
+                        Last Year's Value
+                      </button>
+                      <button type="button" class="method-option block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-method="three_year_avg">
+                        Three Year Average
+                      </button>
+                      <button type="button" class="method-option block w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-100" data-method="no_imputation">
+                        <span class="text-gray-400">No Imputation</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+        </table>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div class="flex justify-end">
+          <button type="button"
+                  id="save-all-methods-btn"
+                  class="btn btn-success"
+                  disabled>
+            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Save All Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Preview Data Section -->
+  <div class="bg-white shadow rounded-lg mt-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-medium text-gray-800">Data Preview</h2>
+          <p class="text-sm text-gray-600">Preview current data and imputed values per country and item.</p>
+        </div>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2">
+            <select id="imputation-mode" class="text-sm border border-gray-300 rounded-md px-3 py-2 pr-8 focus:border-blue-500 focus:ring-blue-500 bg-white">
+              <option value="missing_only">Impute only missing data</option>
+              <option value="all">Impute all data</option>
+            </select>
+          </div>
+          <div class="flex space-x-2">
+          <button type="button"
+                  id="preview-imputation-btn"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+            </svg>
+            Preview Imputation
+          </button>
+          <button type="button"
+                  id="run-imputation-btn"
+                  class="btn btn-primary">
+            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            Run Imputation
+          </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="p-6">
+      <!-- Filter Controls -->
+      <div class="mb-6">
+        <h3 class="text-sm font-medium text-gray-700 mb-4">Filter Options</h3>
+
+        <!-- Filters in 4 columns -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div>
+            <label for="preview-year" class="block text-sm font-medium text-gray-700 mb-1">Target Year</label>
+            <input type="text" id="preview-year" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="2025">
+          </div>
+          <div>
+            <label for="preview-country-filter" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+            <select id="preview-country-filter" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+              <option value="">All Countries</option>
+            </select>
+          </div>
+          <div>
+            <label for="preview-item-filter" class="block text-sm font-medium text-gray-700 mb-1">Item</label>
+            <select id="preview-item-filter" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+              <option value="">All Items</option>
+            </select>
+          </div>
+          <div>
+            <label for="preview-type-filter" class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
+            <select id="preview-type-filter" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+              <option value="">All Types</option>
+              <option value="Number">Number</option>
+              <option value="Percentage">Percentage</option>
+              <option value="Text">Text</option>
+              <option value="YesNo">Yes/No</option>
+              <option value="Choice">Choice</option>
+              <option value="Currency">Currency</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Action buttons row -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button type="button"
+                    id="load-preview-btn"
+                    class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Load Data
+            </button>
+            <button type="button"
+                    id="clear-filters-btn"
+                    class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+              Clear Filters
+            </button>
+          </div>
+          <button type="button"
+                  id="export-excel-btn"
+                  class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Export to Excel
+          </button>
+        </div>
+      </div>
+
+      <div id="preview-loading" class="hidden text-center py-8">
+        <div class="max-w-md mx-auto">
+          <div class="mb-4">
+            <div class="loading-spinner" style="width: 2rem; height: 2rem; border: 4px solid #e5e7eb; border-top: 4px solid #2563eb; border-radius: 50%; margin: 0 auto; animation: spin 1s linear infinite; transform-origin: center;"></div>
+          </div>
+          <p id="preview-loading-text" class="text-sm text-gray-600 mb-3">Loading preview data...</p>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div id="preview-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <p id="preview-progress-text" class="text-xs text-gray-500 mt-2">0%</p>
+        </div>
+      </div>
+
+      <div id="preview-table-container" class="hidden">
+        <div class="mb-3">
+          <div id="preview-results-count" class="text-sm text-gray-600"></div>
+        </div>
+        <div class="overflow-x-auto">
+          <div id="previewDataGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+        </div>
+      </div>
+
+      <div id="preview-empty" class="text-center py-8 text-gray-500">
+        <svg class="h-12 w-12 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <p class="mt-2">Enter a target year and click "Load Data" to preview imputation results.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+// Flash message function (uses centralized FlashMessages.addSafe from core layout)
+function showSaveMessage(message, type = 'success') {
+    if (window.FlashMessages && window.FlashMessages.addSafe) {
+        window.FlashMessages.addSafe(message, type);
+    }
+}
+
+function dismissAlert(alert) {
+    alert.classList.add('fade-out');
+    setTimeout(() => alert.remove(), 300);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const saveAllBtn = document.getElementById('save-all-methods-btn');
+    const pendingChanges = new Map(); // Track pending changes
+
+    // Handle collapsible section
+    const toggleBtn = document.getElementById('toggle-imputation-methods');
+    const content = document.getElementById('imputation-methods-content');
+    const toggleIcon = document.getElementById('toggle-icon');
+
+    toggleBtn.addEventListener('click', function() {
+        const isHidden = content.classList.contains('hidden');
+
+        if (isHidden) {
+            content.classList.remove('hidden');
+            toggleIcon.classList.add('rotate-180');
+        } else {
+            content.classList.add('hidden');
+            toggleIcon.classList.remove('rotate-180');
+        }
+    });
+
+    // Handle imputation method dropdowns
+    const methodButtons = document.querySelectorAll('.imputation-method-btn');
+
+    methodButtons.forEach(button => {
+        const dropdown = button.nextElementSibling;
+        const itemId = button.dataset.itemId;
+        // Track saved method to avoid stale comparisons after a save
+        if (!button.dataset.savedMethod) {
+            button.dataset.savedMethod = button.dataset.currentMethod;
+        }
+
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // Close other dropdowns
+            document.querySelectorAll('.imputation-method-dropdown').forEach(dd => {
+                if (dd !== dropdown) dd.classList.add('hidden');
+            });
+
+            if (dropdown.classList.contains('hidden')) {
+                // Position dropdown relative to button
+                const buttonRect = button.getBoundingClientRect();
+                const dropdownHeight = 120; // Approximate height of dropdown
+                const viewportHeight = window.innerHeight;
+
+                let top = buttonRect.bottom + 4;
+                let left = buttonRect.left;
+
+                // Check if dropdown would go off bottom of screen
+                if (top + dropdownHeight > viewportHeight) {
+                    top = buttonRect.top - dropdownHeight - 4;
+                }
+
+                // Check if dropdown would go off right side of screen
+                const dropdownWidth = 192; // w-48 = 12rem = 192px
+                if (left + dropdownWidth > window.innerWidth) {
+                    left = window.innerWidth - dropdownWidth - 10;
+                }
+
+                dropdown.style.left = left + 'px';
+                dropdown.style.top = top + 'px';
+                dropdown.classList.remove('hidden');
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Handle method selection
+        dropdown.querySelectorAll('.method-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const method = this.dataset.method;
+                const methodText = this.textContent.trim();
+
+                // Update button text
+                button.querySelector('.method-text').textContent = methodText;
+                button.dataset.currentMethod = method;
+
+                // Close dropdown
+                dropdown.classList.add('hidden');
+
+                // Track changes
+                if (method !== button.dataset.savedMethod) {
+                    pendingChanges.set(itemId, method);
+                    button.classList.add('border-yellow-400', 'bg-yellow-50');
+                } else {
+                    pendingChanges.delete(itemId);
+                    button.classList.remove('border-yellow-400', 'bg-yellow-50');
+                }
+
+                // Enable/disable save all button
+                updateSaveAllButton();
+            });
+        });
+    });
+
+    // Handle save all button
+    saveAllBtn.addEventListener('click', function() {
+        if (pendingChanges.size === 0) return;
+
+        // Disable button during save
+        saveAllBtn.disabled = true;
+        saveAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        saveAllBtn.innerHTML = '<svg class="loading-spinner h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Saving...';
+
+        // Save all changes in a single request
+        const updates = Array.from(pendingChanges.entries()).map(([itemId, method]) => ({
+            item_id: itemId,
+            method: method
+        }));
+
+        fetch('{{ url_for("template_special.update_imputation_methods_batch") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                updates: updates
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // All successful
+                pendingChanges.clear();
+                methodButtons.forEach(button => {
+                    button.classList.remove('border-yellow-400', 'bg-yellow-50');
+                    button.classList.add('border-green-300', 'bg-green-50');
+                    // Persist saved method to current selection
+                    if (button.dataset.currentMethod) {
+                        button.dataset.savedMethod = button.dataset.currentMethod;
+                    }
+                });
+                setTimeout(() => {
+                    methodButtons.forEach(button => {
+                        button.classList.remove('border-green-300', 'bg-green-50');
+                    });
+                }, 2000);
+                updateSaveAllButton();
+
+                // Show success message
+                showSaveMessage('Imputation methods saved successfully!', 'success');
+            } else {
+                showSaveMessage(`Failed to save changes: ${data.error || 'Unknown error'}`, 'error');
+            }
+        })
+        .catch(error => {
+            showSaveMessage('Failed to save changes. Please try again.', 'error');
+        })
+        .finally(() => {
+            saveAllBtn.disabled = false;
+            saveAllBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            saveAllBtn.innerHTML = '<svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Save All Changes';
+        });
+    });
+
+    function updateSaveAllButton() {
+        if (pendingChanges.size > 0) {
+            saveAllBtn.disabled = false;
+            saveAllBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            saveAllBtn.textContent = `Save All Changes (${pendingChanges.size})`;
+        } else {
+            saveAllBtn.disabled = true;
+            saveAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            saveAllBtn.textContent = 'Save All Changes';
+        }
+    }
+
+
+    // Handle preview functionality
+    const loadPreviewBtn = document.getElementById('load-preview-btn');
+    const previewImputationBtn = document.getElementById('preview-imputation-btn');
+    const runImputationBtn = document.getElementById('run-imputation-btn');
+    const exportExcelBtn = document.getElementById('export-excel-btn');
+    const previewYearInput = document.getElementById('preview-year');
+    const previewCountryFilter = document.getElementById('preview-country-filter');
+    const previewItemFilter = document.getElementById('preview-item-filter');
+    const previewTypeFilter = document.getElementById('preview-type-filter');
+    const imputationMode = document.getElementById('imputation-mode');
+    const previewLoading = document.getElementById('preview-loading');
+    const previewTableContainer = document.getElementById('preview-table-container');
+    // previewTableBody removed - using AG Grid now
+    const previewEmpty = document.getElementById('preview-empty');
+    const previewResultsCount = document.getElementById('preview-results-count');
+    const clearFiltersBtn = document.getElementById('clear-filters-btn');
+    const previewLoadingText = document.getElementById('preview-loading-text');
+    const previewProgressBar = document.getElementById('preview-progress-bar');
+    const previewProgressText = document.getElementById('preview-progress-text');
+
+    let currentPreviewData = [];
+    let allPreviewData = []; // Store unfiltered data
+
+    // Helper function to format numbers with thousands separators
+    function formatNumber(value) {
+        if (value === null || value === undefined || value === '') {
+            return null;
+        }
+
+        // Convert to number if it's a string
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+
+        // Check if it's a valid number
+        if (isNaN(num)) {
+            return value; // Return original value if not a number
+        }
+
+        // Format with thousands separators
+        return num.toLocaleString();
+    }
+
+    // Initialize page
+
+    // Load filter options when year changes
+    previewYearInput.addEventListener('blur', function() {
+        const year = previewYearInput.value.trim();
+        if (year) {
+            loadFilterOptions(year);
+        }
+    });
+
+    // Also load on Enter key
+    previewYearInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const year = previewYearInput.value.trim();
+            if (year) {
+                loadFilterOptions(year);
+            }
+        }
+    });
+
+    // Load max year and filters on page load
+    loadMaxYearAndFilters();
+
+    function loadMaxYearAndFilters() {
+        fetch(`{{ url_for('template_special.get_max_year', template_id=template.id) }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const maxYear = data.max_year;
+                previewYearInput.value = maxYear;
+                // Load filters for the max year
+                loadFilterOptions(maxYear);
+            } else {
+                // Fallback to current year
+                const currentYear = new Date().getFullYear().toString();
+                previewYearInput.value = currentYear;
+                loadFilterOptions(currentYear);
+            }
+        })
+        .catch(error => {
+            // Fallback to current year
+            const currentYear = new Date().getFullYear().toString();
+            previewYearInput.value = currentYear;
+            loadFilterOptions(currentYear);
+        });
+    }
+
+    loadPreviewBtn.addEventListener('click', function() {
+        const year = previewYearInput.value.trim();
+        if (!year) {
+            showSaveMessage('Please enter a target year', 'warning');
+            return;
+        }
+        loadPreviewData(year);
+    });
+
+    previewImputationBtn.addEventListener('click', function() {
+        const year = previewYearInput.value.trim();
+        if (!year) {
+            showSaveMessage('Please enter a target year', 'warning');
+            return;
+        }
+        previewImputation(year);
+    });
+
+    runImputationBtn.addEventListener('click', function() {
+        const year = previewYearInput.value.trim();
+        if (!year) {
+            showSaveMessage('Please enter a target year', 'warning');
+            return;
+        }
+
+        const countryFilter = previewCountryFilter.value;
+        const itemFilter = previewItemFilter.value;
+        const typeFilter = previewTypeFilter.value;
+
+        let confirmMessage = `Are you sure you want to run imputation for ${year}?`;
+        const activeFilters = [];
+        if (countryFilter) activeFilters.push(`country "${countryFilter}"`);
+        if (itemFilter) activeFilters.push(`item "${itemFilter}"`);
+        if (typeFilter) activeFilters.push(`type "${typeFilter}"`);
+
+        if (activeFilters.length > 0) {
+            confirmMessage = `Are you sure you want to run imputation for ${year} for ${activeFilters.join(', ')}?`;
+        }
+
+        showConfirmation(
+            confirmMessage,
+            () => {
+                runImputation(year, countryFilter, itemFilter, typeFilter);
+            }
+        );
+    });
+
+    exportExcelBtn.addEventListener('click', function() {
+        if (allPreviewData.length === 0) {
+            showSaveMessage('No data to export. Please load preview data first.', 'warning');
+            return;
+        }
+
+        fetch('{{ url_for("template_special.export_preview_excel", template_id=template.id) }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                year: previewYearInput.value.trim(),
+                preview_data: allPreviewData
+            })
+        })
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `preview_data_${previewYearInput.value.trim()}.xlsx`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        })
+        .catch(() => {
+            showSaveMessage('Export failed', 'error');
+        });
+    });
+
+    function loadFilterOptions(year) {
+        fetch(`{{ url_for('template_special.get_filter_options', template_id=template.id) }}?year=${encodeURIComponent(year)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                populateFilterDropdowns(data.countries, data.items);
+            } else {
+                console.error('Failed to load filter options:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load filter options:', error);
+        });
+    }
+
+    function populateFilterDropdowns(countries, items) {
+        // Clear existing options (keep "All" option)
+        previewCountryFilter.innerHTML = '<option value="">All Countries</option>';
+        previewItemFilter.innerHTML = '<option value="">All Items</option>';
+
+        // Populate country options
+        countries.forEach(country => {
+            const option = document.createElement('option');
+            option.value = country.name;
+            option.textContent = country.name;
+            previewCountryFilter.appendChild(option);
+        });
+
+        // Populate item options
+        items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.label;
+            option.textContent = item.label;
+            previewItemFilter.appendChild(option);
+        });
+    }
+
+    function loadPreviewData(year) {
+        showPreviewLoading('Loading preview data...', 'Initializing...');
+        loadPreviewDataChunked(year, 0, []);
+    }
+
+    function loadPreviewDataChunked(year, offset, accumulatedData) {
+        const chunkSize = 2000; // Reduced chunk size for better memory management
+
+        fetch(`{{ url_for('template_special.preview_data_chunked', template_id=template.id) }}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                year: year,
+                chunk_size: chunkSize,
+                offset: offset,
+                country_filter: previewCountryFilter.value || null,
+                item_filter: previewItemFilter.value || null,
+                type_filter: previewTypeFilter.value || null,
+                imputation_mode: imputationMode.value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update progress with real data
+                const progress = data.progress;
+                setProgress(progress.percentage, `Processing ${progress.completed} of ${progress.total} items...`);
+
+                // Accumulate data
+                const newData = accumulatedData.concat(data.data);
+
+                if (progress.is_complete) {
+                    // All data loaded
+                    setProgress(100, 'Complete!');
+                    setTimeout(() => {
+                        allPreviewData = newData;
+                        displayPreviewData(newData);
+                    }, 100);
+                } else {
+                    // Continue with next chunk immediately
+                    loadPreviewDataChunked(year, progress.next_offset, newData);
+                }
+            } else {
+                showSaveMessage(`Failed to load preview data: ${data.error || 'Unknown error'}`, 'error');
+                showPreviewEmpty();
+            }
+        })
+        .catch(error => {
+            showSaveMessage('Failed to load preview data', 'error');
+            showPreviewEmpty();
+        });
+    }
+
+    function previewImputation(year) {
+        showPreviewLoading('Calculating imputation...', 'Initializing calculations...');
+        window.__clientLog && window.__clientLog('Starting imputation preview for year:', year);
+        previewImputationChunked(year, 0, []);
+    }
+
+    function previewImputationChunked(year, offset, accumulatedData) {
+        const chunkSize = 2000; // Reduced chunk size for better memory management
+
+        fetch(`{{ url_for('template_special.preview_imputation_chunked', template_id=template.id) }}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                year: year,
+                chunk_size: chunkSize,
+                offset: offset,
+                country_filter: previewCountryFilter.value || null,
+                item_filter: previewItemFilter.value || null,
+                type_filter: previewTypeFilter.value || null,
+                imputation_mode: imputationMode.value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update progress with real data
+                const progress = data.progress;
+                setProgress(progress.percentage, `Calculating ${progress.completed} of ${progress.total} imputations...`);
+
+                // Accumulate data
+                const newData = accumulatedData.concat(data.data);
+
+                if (progress.is_complete) {
+                    // All calculations complete
+                    setProgress(100, 'Imputation calculated!');
+                    window.__clientLog && window.__clientLog('Imputation complete. Total rows:', newData.length);
+                    window.__clientLog && window.__clientLog('Rows with imputed values:', newData.filter(row => row.imputed_value !== null).length);
+                    setTimeout(() => {
+                        allPreviewData = newData;
+                        displayPreviewData(newData);
+                    }, 100);
+                } else {
+                    // Continue with next chunk immediately
+                    previewImputationChunked(year, progress.next_offset, newData);
+                }
+            } else {
+                showSaveMessage(`Failed to preview imputation: ${data.error || 'Unknown error'}`, 'error');
+                showPreviewEmpty();
+            }
+        })
+        .catch(error => {
+            showSaveMessage('Failed to preview imputation', 'error');
+            showPreviewEmpty();
+        });
+    }
+
+    function runImputation(year, countryFilter = null, itemFilter = null, typeFilter = null) {
+        showPreviewLoading('Running imputation...', 'Processing data...');
+
+        fetch(`{{ url_for('template_special.run_imputation_filtered', template_id=template.id) }}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                year: year,
+                country_filter: countryFilter,
+                item_filter: itemFilter,
+                type_filter: typeFilter,
+                imputation_mode: imputationMode.value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                setProgress(100, 'Imputation completed!');
+                setTimeout(() => {
+                    showPreviewEmpty();
+                    const successMessage = `Imputation completed successfully! Countries processed: ${data.countries_processed}, Items imputed: ${data.items_imputed}, Rows created: ${data.rows_created}, Rows updated: ${data.rows_updated}`;
+                    showSaveMessage(successMessage, 'success');
+                    // Optionally reload the preview data to show the results
+                    if (allPreviewData.length > 0) {
+                        loadPreviewData(year);
+                    }
+                }, 1000);
+            } else {
+                showSaveMessage(`Imputation failed: ${data.error || 'Unknown error'}`, 'error');
+                showPreviewEmpty();
+            }
+        })
+        .catch(error => {
+            showSaveMessage('Failed to run imputation. Please try again.', 'error');
+            showPreviewEmpty();
+        });
+    }
+
+    function showPreviewLoading(title = 'Loading...', subtitle = 'Please wait...') {
+        previewLoadingText.textContent = title;
+        setProgress(0, subtitle);
+        previewLoading.classList.remove('hidden');
+        previewTableContainer.classList.add('hidden');
+        previewEmpty.classList.add('hidden');
+
+        // Grid will be updated via API
+
+        // Disable preview actions during load
+        loadPreviewBtn.disabled = true;
+        previewImputationBtn.disabled = true;
+        runImputationBtn.disabled = true;
+        exportExcelBtn.disabled = true;
+        loadPreviewBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        previewImputationBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        runImputationBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        exportExcelBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    function showPreviewEmpty() {
+        previewLoading.classList.add('hidden');
+        previewTableContainer.classList.add('hidden');
+        previewEmpty.classList.remove('hidden');
+
+        // Grid will be updated via API
+
+        // Re-enable preview actions
+        loadPreviewBtn.disabled = false;
+        previewImputationBtn.disabled = false;
+        runImputationBtn.disabled = false;
+        exportExcelBtn.disabled = true; // Keep disabled until data is loaded
+        loadPreviewBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        previewImputationBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        runImputationBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        exportExcelBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    function setProgress(percentage, text = '') {
+        previewProgressBar.style.width = percentage + '%';
+        previewProgressText.textContent = text || `${Math.round(percentage)}%`;
+    }
+
+    // Real progress tracking - no simulation needed!
+
+    // Add event listeners for filters - reload data when filters change
+    previewCountryFilter.addEventListener('change', function() {
+        const year = previewYearInput.value.trim();
+        if (year && allPreviewData.length > 0) {
+            // Reload data with new filters
+            const currentAction = previewLoadingText.textContent.includes('Calculating') ? 'imputation' : 'data';
+            if (currentAction === 'imputation') {
+                previewImputation(year);
+            } else {
+                loadPreviewData(year);
+            }
+        }
+    });
+
+    previewItemFilter.addEventListener('change', function() {
+        const year = previewYearInput.value.trim();
+        if (year && allPreviewData.length > 0) {
+            // Reload data with new filters
+            const currentAction = previewLoadingText.textContent.includes('Calculating') ? 'imputation' : 'data';
+            if (currentAction === 'imputation') {
+                previewImputation(year);
+            } else {
+                loadPreviewData(year);
+            }
+        }
+    });
+
+    previewTypeFilter.addEventListener('change', function() {
+        const year = previewYearInput.value.trim();
+        if (year && allPreviewData.length > 0) {
+            // Reload data with new filters
+            const currentAction = previewLoadingText.textContent.includes('Calculating') ? 'imputation' : 'data';
+            if (currentAction === 'imputation') {
+                previewImputation(year);
+            } else {
+                loadPreviewData(year);
+            }
+        }
+    });
+
+    // Clear filters functionality
+    clearFiltersBtn.addEventListener('click', function() {
+        previewCountryFilter.value = '';
+        previewItemFilter.value = '';
+        previewTypeFilter.value = '';
+        const year = previewYearInput.value.trim();
+        if (year && allPreviewData.length > 0) {
+            // Reload data without filters
+            loadPreviewData(year);
+        }
+    });
+
+    function displayPreviewData(data) {
+        previewLoading.classList.add('hidden');
+        previewEmpty.classList.add('hidden');
+
+        if (!data || data.length === 0) {
+            showPreviewEmpty();
+            return;
+        }
+
+        // Update results counter
+        const filteredRows = data.length;
+        const countryFilter = previewCountryFilter.value;
+        const itemFilter = previewItemFilter.value;
+        const typeFilter = previewTypeFilter.value;
+
+        let filterText = '';
+        const activeFilters = [];
+        if (countryFilter) activeFilters.push(`country "${countryFilter}"`);
+        if (itemFilter) activeFilters.push(`item "${itemFilter}"`);
+        if (typeFilter) activeFilters.push(`type "${typeFilter}"`);
+
+        if (activeFilters.length > 0) {
+            filterText = ` (filtered by ${activeFilters.join(', ')})`;
+        }
+
+        previewResultsCount.textContent = `Showing ${filteredRows} results${filterText}`;
+
+        // Clear existing rows
+        // Transform data for AG Grid
+        const gridData = data.map(row => ({
+            country: row.country || '',
+            item_label: row.item_label + (row.item_unit ? ` (${row.item_unit})` : ''),
+            current_value: row.current_value !== null && row.current_value !== undefined ? formatNumber(row.current_value) : 'No data',
+            imputed_value: row.imputed_value !== null && row.imputed_value !== undefined ? formatNumber(row.imputed_value) : '-',
+            method: row.method || '-',
+            source: row.source_periods ? row.source_periods.join(', ') : '-'
+        }));
+
+        // Update AG Grid with new data
+        if (window.previewGridApi) {
+            window.previewGridApi.setGridOption('rowData', gridData);
+        } else {
+            // Initialize grid if not already done
+            initializePreviewGrid();
+            setTimeout(() => {
+                if (window.previewGridApi) {
+                    window.previewGridApi.setGridOption('rowData', gridData);
+                }
+            }, 100);
+        }
+
+        // Old table rendering code removed - using AG Grid now
+        /*
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${row.country}</td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                    <div class="font-medium">${row.item_label}</div>
+                    ${row.item_unit ? `<div class="text-xs text-gray-500">${row.item_unit}</div>` : ''}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${row.current_value !== null ? formatNumber(row.current_value) : '<span class="text-gray-400 italic">No data</span>'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${row.imputed_value !== null ?
+                        `<span class="text-blue-600 font-medium">${formatNumber(row.imputed_value)}</span>` :
+                        '<span class="text-gray-400 italic">-</span>'
+                    }
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${row.method || '-'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${row.source_periods ? row.source_periods.join(', ') : '-'}
+                </td>
+            `;
+
+        });
+        */
+
+        previewTableContainer.classList.remove('hidden');
+
+        // Re-enable preview actions
+        loadPreviewBtn.disabled = false;
+        previewImputationBtn.disabled = false;
+        runImputationBtn.disabled = false;
+        exportExcelBtn.disabled = false; // Enable export when data is available
+        loadPreviewBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        previewImputationBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        runImputationBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        exportExcelBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    // Preview grid initialization is handled in the extra_js block
+
+    // FDRS Data Sync modal
+    const fdrsSyncOpenBtn = document.getElementById('fdrs-sync-open-btn');
+    const fdrsSyncModal = document.getElementById('fdrs-sync-modal');
+    const fdrsSyncModalClose = document.getElementById('fdrs-sync-modal-close');
+    const fdrsSyncModalCancel = document.getElementById('fdrs-sync-modal-cancel');
+    const fdrsSyncRunBtn = document.getElementById('fdrs-sync-run-btn');
+    const fdrsSyncRunBtnText = document.getElementById('fdrs-sync-run-btn-text');
+    const fdrsSyncResult = document.getElementById('fdrs-sync-result');
+    const fdrsSyncResultText = document.getElementById('fdrs-sync-result-text');
+    const fdrsSyncProgress = document.getElementById('fdrs-sync-progress');
+    const fdrsSyncProgressStage = document.getElementById('fdrs-sync-progress-stage');
+    const fdrsSyncProgressBar = document.getElementById('fdrs-sync-progress-bar');
+    const fdrsSyncProgressText = document.getElementById('fdrs-sync-progress-text');
+    const fdrsSyncProgressCount = document.getElementById('fdrs-sync-progress-count');
+
+    const fdrsSyncStatusUrlTemplate = '{{ url_for("template_special.fdrs_sync_status", template_id=template.id, job_id="__JOB_ID__") }}';
+    let fdrsSyncActiveJobId = null;
+    let fdrsSyncPollTimer = null;
+
+    function isSafeHref(url) {
+        if (!url || typeof url !== 'string') return false;
+        const u = url.trim();
+        return u.startsWith('/') || u.startsWith('https://') || u.startsWith('http://');
+    }
+
+    function stopFdrsSyncPolling() {
+        if (fdrsSyncPollTimer) {
+            clearTimeout(fdrsSyncPollTimer);
+            fdrsSyncPollTimer = null;
+        }
+        fdrsSyncActiveJobId = null;
+    }
+
+    function resetFdrsSyncUI() {
+        fdrsSyncResult.classList.add('hidden');
+        fdrsSyncResultText.textContent = '';
+        if (fdrsSyncProgress) fdrsSyncProgress.classList.add('hidden');
+        if (fdrsSyncProgressStage) fdrsSyncProgressStage.textContent = '-';
+        if (fdrsSyncProgressBar) fdrsSyncProgressBar.style.width = '0%';
+        if (fdrsSyncProgressText) fdrsSyncProgressText.textContent = '0%';
+        if (fdrsSyncProgressCount) fdrsSyncProgressCount.textContent = '';
+        stopFdrsSyncPolling();
+    }
+
+    function setFdrsSyncProgress(percent, stage, message, current, total) {
+        const pct = Math.max(0, Math.min(100, Number(percent || 0)));
+        if (fdrsSyncProgressBar) fdrsSyncProgressBar.style.width = pct + '%';
+        if (fdrsSyncProgressText) fdrsSyncProgressText.textContent = `${Math.round(pct)}%`;
+        if (fdrsSyncProgressStage) {
+            const stageText = (message && message.trim()) ? message.trim() : (stage || '-');
+            fdrsSyncProgressStage.textContent = stageText;
+        }
+        if (fdrsSyncProgressCount) {
+            if (total !== null && total !== undefined && total !== '' && Number(total) > 0) {
+                fdrsSyncProgressCount.textContent = `${current || 0} / ${total}`;
+            } else {
+                fdrsSyncProgressCount.textContent = '';
+            }
+        }
+    }
+
+    function pollFdrsSyncStatus() {
+        if (!fdrsSyncActiveJobId) return;
+        const url = fdrsSyncStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(fdrsSyncActiveJobId));
+
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                if (!data || !data.success || !data.job) {
+                    throw new Error((data && data.error) || 'Failed to read sync status');
+                }
+                const job = data.job;
+
+                setFdrsSyncProgress(job.percent, job.stage, job.message, job.current, job.total);
+
+                if (job.status === 'completed') {
+                    stopFdrsSyncPolling();
+                    fdrsSyncResult.classList.remove('hidden');
+                    const stats = job.stats || {};
+                    let msg = `Loaded: ${stats.loaded || 0}, Skipped: ${stats.skipped || 0}, Inserted: ${stats.inserted || 0}, Updated: ${stats.updated || 0}, Errors: ${stats.errors || 0}`;
+                    if (job.download_ready && job.download_url) {
+                        msg += `\n\n{{ _("Preview Excel ready:") }} `;
+                        const safeUrl = isSafeHref(job.download_url) ? escapeHtmlAttr(job.download_url) : '#';
+                        fdrsSyncResultText.innerHTML = `${msg.replace(/\n/g, '<br>')}<a class="text-purple-700 underline" href="${safeUrl}">{{ _("Download") }}</a>`;
+                    } else {
+                        fdrsSyncResultText.textContent = msg;
+                    }
+                    fdrsSyncResultText.className = 'text-sm text-green-700';
+
+                    // Re-enable button
+                    fdrsSyncRunBtn.disabled = false;
+                    fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
+                    const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
+                    if (spinIcon) spinIcon.remove();
+                    if (!fdrsSyncRunBtn.querySelector('i.fa-sync-alt')) {
+                        fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+                    }
+                    return;
+                }
+                if (job.status === 'failed') {
+                    stopFdrsSyncPolling();
+                    fdrsSyncResult.classList.remove('hidden');
+                    fdrsSyncResultText.textContent = job.error || '{{ _("Sync failed") }}';
+                    fdrsSyncResultText.className = 'text-sm text-red-700';
+
+                    // Re-enable button
+                    fdrsSyncRunBtn.disabled = false;
+                    fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
+                    const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
+                    if (spinIcon) spinIcon.remove();
+                    if (!fdrsSyncRunBtn.querySelector('i.fa-sync-alt')) {
+                        fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+                    }
+                    return;
+                }
+
+                // Continue polling
+                fdrsSyncPollTimer = setTimeout(pollFdrsSyncStatus, 1000);
+            })
+            .catch(err => {
+                // Stop polling on hard failures (network / server)
+                stopFdrsSyncPolling();
+                fdrsSyncResult.classList.remove('hidden');
+                fdrsSyncResultText.textContent = err.message || '{{ _("Request failed") }}';
+                fdrsSyncResultText.className = 'text-sm text-red-700';
+
+                // Re-enable button
+                fdrsSyncRunBtn.disabled = false;
+                fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
+                const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
+                if (spinIcon) spinIcon.remove();
+                if (!fdrsSyncRunBtn.querySelector('i.fa-sync-alt')) {
+                    fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+                }
+            });
+    }
+
+    function openFdrsSyncModal() {
+        resetFdrsSyncUI();
+        fdrsSyncModal.classList.remove('hidden');
+        fdrsSyncModal.classList.add('flex');
+    }
+
+    function closeFdrsSyncModal() {
+        stopFdrsSyncPolling();
+        fdrsSyncModal.classList.add('hidden');
+        fdrsSyncModal.classList.remove('flex');
+    }
+
+    if (fdrsSyncOpenBtn) {
+        fdrsSyncOpenBtn.addEventListener('click', openFdrsSyncModal);
+    }
+    if (fdrsSyncModalClose) {
+        fdrsSyncModalClose.addEventListener('click', closeFdrsSyncModal);
+    }
+    if (fdrsSyncModalCancel) {
+        fdrsSyncModalCancel.addEventListener('click', closeFdrsSyncModal);
+    }
+    fdrsSyncModal.addEventListener('click', function(e) {
+        if (e.target === fdrsSyncModal) {
+            closeFdrsSyncModal();
+        }
+    });
+
+    if (fdrsSyncRunBtn) {
+        fdrsSyncRunBtn.addEventListener('click', function() {
+            const years = (document.getElementById('fdrs-sync-years') && document.getElementById('fdrs-sync-years').value) || '';
+            const batchSizeRaw = (document.getElementById('fdrs-sync-batch-size') && document.getElementById('fdrs-sync-batch-size').value) || '';
+            const batchSizeRawTrim = (batchSizeRaw || '').trim();
+            const batchSize = batchSizeRawTrim ? parseInt(batchSizeRawTrim, 10) : null;
+            const dryRun = document.getElementById('fdrs-sync-dry-run') && document.getElementById('fdrs-sync-dry-run').checked;
+            const test = document.getElementById('fdrs-sync-test') && document.getElementById('fdrs-sync-test').checked;
+
+            if (batchSizeRawTrim) {
+                if (isNaN(batchSize) || batchSize < 100) {
+                    fdrsSyncResult.classList.remove('hidden');
+                    fdrsSyncResultText.textContent = '{{ _("Invalid batch size. Please enter a number >= 100 (or leave empty).") }}';
+                    fdrsSyncResultText.className = 'text-sm text-red-700';
+                    return;
+                }
+            }
+
+            resetFdrsSyncUI();
+            if (fdrsSyncProgress) fdrsSyncProgress.classList.remove('hidden');
+            setFdrsSyncProgress(0, 'starting', '{{ _("Starting...") }}', 0, null);
+            fdrsSyncRunBtn.disabled = true;
+            fdrsSyncRunBtnText.textContent = '{{ _("Running...") }}';
+            fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
+            const iconEl = fdrsSyncRunBtn.querySelector('i.fa-sync-alt');
+            if (iconEl) iconEl.remove();
+
+            const imputedUseCache = !!(document.getElementById('fdrs-sync-imputed-cache') && document.getElementById('fdrs-sync-imputed-cache').checked);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const payload = {
+                fdrs_years: years,
+                dry_run: dryRun,
+                test: test,
+                async: true,
+                imputed_use_cache: imputedUseCache
+            };
+            if (batchSize !== null) {
+                payload.batch_size = batchSize;
+            }
+            fetch('{{ url_for("template_special.run_fdrs_sync", template_id=template.id) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken || ''
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+            .then(function(result) {
+                var ok = result.ok;
+                var data = result.data || {};
+                if (!ok || !data.success || !data.job_id) {
+                    throw new Error(data.error || '{{ _("Sync failed") }}');
+                }
+                fdrsSyncActiveJobId = data.job_id;
+                pollFdrsSyncStatus();
+            })
+            .catch(function(err) {
+                fdrsSyncResult.classList.remove('hidden');
+                fdrsSyncResultText.textContent = err.message || '{{ _("Request failed") }}';
+                fdrsSyncResultText.className = 'text-sm text-red-700';
+                fdrsSyncRunBtn.disabled = false;
+                fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
+                const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
+                if (spinIcon) spinIcon.remove();
+                fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+            });
+        });
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.imputation-method-dropdown').forEach(dropdown => {
+            dropdown.classList.add('hidden');
+        });
+    });
+
+});
+</script>
+
+{% block extra_js %}
+    <!-- Confirmation dialogs provided by core layout (confirm-dialogs.js) -->
+
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    (function () {
+    // Store singleton instances on window to avoid redeclaration
+    // if this template block is included more than once.
+    window.previewGridHelper = window.previewGridHelper || null;
+    window.previewGridApi = window.previewGridApi || null;
+
+    // Column definitions for preview data grid
+    const previewColumnDefs = [
+        {
+            field: 'country',
+            headerName: 'Country',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 250,
+            filter: 'customSetFilter',
+            sortable: true
+        },
+        {
+            field: 'item_label',
+            headerName: 'Item',
+            width: 300,
+            minWidth: 200,
+            maxWidth: 500,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'current_value',
+            headerName: 'Current Value',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 200,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (params.value && params.value !== 'No data') {
+                    return params.value;
+                }
+                return '<span class="text-gray-400 italic">No data</span>';
+            }
+        },
+        {
+            field: 'imputed_value',
+            headerName: 'Imputed Value',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 200,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (params.value && params.value !== '-') {
+                    return '<span class="text-blue-600 font-medium">' + params.value + '</span>';
+                }
+                return '<span class="text-gray-400 italic">-</span>';
+            }
+        },
+        {
+            field: 'method',
+            headerName: 'Method',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'customSetFilter',
+            sortable: true
+        },
+        {
+            field: 'source',
+            headerName: 'Source',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        }
+    ];
+
+    // Initialize preview grid
+    function initializePreviewGrid() {
+        if (window.previewGridHelper) {
+            return; // Already initialized
+        }
+
+        window.previewGridHelper = new AgGridHelper({
+            containerId: 'previewDataGrid',
+            templateId: 'preview-data',
+            columnDefs: previewColumnDefs,
+            rowData: [],
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        window.previewGridApi = window.previewGridHelper.initialize();
+    }
+
+    // Initialize grid when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializePreviewGrid);
+    } else {
+        initializePreviewGrid();
+    }
+    })();
+    </script>
+{% endblock %}
+</div>
+{% endblock %}

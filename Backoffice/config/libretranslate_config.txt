@@ -1,0 +1,22 @@
+# LibreTranslate Configuration
+# Copy these environment variables to your .env file or set them in your environment
+
+# Local LibreTranslate instance (recommended)
+LIBRE_TRANSLATE_URL=http://localhost:5000
+
+# Alternative: Public LibreTranslate instances
+# LIBRE_TRANSLATE_URL=https://translate.argosopentech.com
+# LIBRE_TRANSLATE_URL=https://translate.fortytwo-it.com
+
+# Optional: API key for LibreTranslate (not required for most instances)
+# LIBRE_TRANSLATE_API_KEY=your_api_key_here
+
+# Google Translate API (alternative translation service)
+# GOOGLE_TRANSLATE_API_KEY=your_google_api_key_here
+
+# To set these environment variables in PowerShell:
+# $env:LIBRE_TRANSLATE_URL="http://localhost:5000"
+
+# To set these environment variables permanently in Windows:
+# 1. Open System Properties > Environment Variables
+# 2. Add LIBRE_TRANSLATE_URL with value http://localhost:5000

@@ -1,0 +1,378 @@
+{% extends "core/layout.html" %}
+
+{# Permission gates for UI (routes remain authoritative) #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_create_indicators = current_is_system_manager or has_permission('admin.indicator_bank.create') %}
+{% set can_archive_indicators = current_is_system_manager or has_permission('admin.indicator_bank.archive') %}
+
+{% block head %}
+    {{ super() }}
+    <style nonce="{{ csp_style_nonce() }}">
+        .sector-input-group {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            background-color: #f9fafb;
+        }
+
+        .sector-level {
+            margin-bottom: 12px;
+        }
+
+        .sector-level:last-child {
+            margin-bottom: 0;
+        }
+
+        .level-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 20px;
+            margin-right: 8px;
+        }
+
+        .level-primary { background-color: #10b981; }
+        .level-secondary { background-color: #f59e0b; }
+        .level-tertiary { background-color: #ef4444; }
+
+        .form-section {
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=title,
+    icon='fas fa-plus-circle',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+        {'name': _('Add Indicator')}
+    ]
+) }}
+
+<div class="max-w-4xl mx-auto">
+
+        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6" role="alert">
+            <p class="font-bold">Add New Indicator</p>
+            <p>{{ _('Create a new standard indicator for the') }} {{ ORG_NAME }}. {{ _('This indicator will be available for use in form templates.') }}</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('system_admin.add_indicator_bank') }}">
+            {{ form.hidden_tag() }}
+
+            {# Basic Information Section #}
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-info-circle mr-2"></i>Basic Information
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {{ form.name(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                        {% for error in form.name.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <div>
+                        {{ form.type.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {{ form.type(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                        {% for error in form.type.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    {{ form.unit.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                    {{ form.unit(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                    {% for error in form.unit.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-6">
+                    {{ form.fdrs_kpi_code.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                    {{ form.fdrs_kpi_code(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                    {% for error in form.fdrs_kpi_code.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-6">
+                    {{ form.definition.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                    {{ form.definition(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                    {% for error in form.definition.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# Multilingual Names Section #}
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-language mr-2"></i>Multilingual Names (Optional)
+                </h2>
+
+                <div class="mb-4">
+                    <button type="button" id="auto-translate-indicator-btn" class="btn btn-success" title="Uses AI to automatically translate the indicator name to all languages">
+                        <i class="fas fa-magic w-4 h-4 mr-1"></i>
+                        Auto Translate
+                    </button>
+                </div>
+
+                {% if TRANSLATABLE_LANGUAGES and TRANSLATABLE_LANGUAGES|length > 0 %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {% for code in TRANSLATABLE_LANGUAGES %}
+                    {% set f = form['name_' ~ code] %}
+                    <div class="{% if code in ['ar','fa','he','ur'] %}md:col-span-2{% endif %}">
+                        {{ f.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {{ f(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", dir=("rtl" if code in ['ar','fa','he','ur'] else None)) }}
+                        {% for error in f.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">{{ _('No additional languages are enabled.') }}</p>
+                {% endif %}
+            </div>
+
+            {# Classification Section #}
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-tags mr-2"></i>Classification
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="sector-input-group">
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-layer-group mr-2"></i>Sector
+                        </h3>
+
+                        <div class="sector-level">
+                            <span class="level-indicator level-primary">P</span>
+                            {{ form.sector_primary.label(class="inline text-gray-700 text-sm font-medium") }}
+                            {{ form.sector_primary(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm") }}
+                        </div>
+
+                        <div class="sector-level">
+                            <span class="level-indicator level-secondary">S</span>
+                            {{ form.sector_secondary.label(class="inline text-gray-700 text-sm font-medium") }}
+                            {{ form.sector_secondary(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm") }}
+                        </div>
+
+                        <div class="sector-level">
+                            <span class="level-indicator level-tertiary">T</span>
+                            {{ form.sector_tertiary.label(class="inline text-gray-700 text-sm font-medium") }}
+                            {{ form.sector_tertiary(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm") }}
+                        </div>
+                    </div>
+
+                    <div class="sector-input-group">
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-sitemap mr-2"></i>Sub-Sector
+                        </h3>
+
+                        <div class="sector-level">
+                            <span class="level-indicator level-primary">P</span>
+                            {{ form.sub_sector_primary.label(class="inline text-gray-700 text-sm font-medium") }}
+                            {{ form.sub_sector_primary(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm") }}
+                        </div>
+
+                        <div class="sector-level">
+                            <span class="level-indicator level-secondary">S</span>
+                            {{ form.sub_sector_secondary.label(class="inline text-gray-700 text-sm font-medium") }}
+                            {{ form.sub_sector_secondary(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm") }}
+                        </div>
+
+                        <div class="sector-level">
+                            <span class="level-indicator level-tertiary">T</span>
+                            {{ form.sub_sector_tertiary.label(class="inline text-gray-700 text-sm font-medium") }}
+                            {{ form.sub_sector_tertiary(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm") }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    {{ form.related_programs.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                    {{ form.related_programs(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                    {% for error in form.related_programs.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# Status & Management Section #}
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-cog mr-2"></i>Status & Management
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {% if can_archive_indicators %}
+                        <div class="flex items-center">
+                            {{ form.archived(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.archived.label(class="ml-2 block text-gray-700 text-sm font-medium") }}
+                        </div>
+                    {% else %}
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-lock mr-2 text-gray-400"></i>
+                            <span class="font-medium">{{ _('Archived') }}</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="flex items-center">
+                        {{ form.emergency(class="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500") }}
+                        {{ form.emergency.label(class="ml-2 block text-gray-700 text-sm font-medium") }}
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    {{ form.comments.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                    {{ form.comments(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                    {% for error in form.comments.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# Submit Button #}
+            <div class="flex items-center justify-between">
+                <a href="{{ url_for('system_admin.manage_indicator_bank') }}" class="btn btn-dark">
+                    <i class="fas fa-arrow-left mr-2"></i>Cancel
+                </a>
+                {{ form.submit(class="btn btn-success") }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function() {
+    const translatableLanguages = {{ TRANSLATABLE_LANGUAGES|default([])|tojson|safe }};
+    const targetLanguages = (translatableLanguages || []).filter(c => c && c !== 'en');
+
+    // Simple toast (avoid native alert)
+    const toastEl = document.createElement('div');
+    toastEl.id = 'styled-toast';
+    toastEl.className = 'fixed top-4 right-4 z-[10000] hidden max-w-sm';
+    toastEl.innerHTML = '<div id="styled-toast-inner" class="rounded-lg shadow-lg border px-4 py-3 text-sm"></div>';
+    document.body.appendChild(toastEl);
+    const toastInner = toastEl.querySelector('#styled-toast-inner');
+    let toastTimer = null;
+    function showToast(message, type = 'info', timeoutMs = 4500) {
+        if (toastTimer) {
+            clearTimeout(toastTimer);
+            toastTimer = null;
+        }
+        const stylesByType = {
+            success: 'bg-green-50 border-green-200 text-green-800',
+            error: 'bg-red-50 border-red-200 text-red-800',
+            warning: 'bg-amber-50 border-amber-200 text-amber-900',
+            info: 'bg-blue-50 border-blue-200 text-blue-800'
+        };
+        toastInner.className = `rounded-lg shadow-lg border px-4 py-3 text-sm ${stylesByType[type] || stylesByType.info}`;
+        toastInner.textContent = String(message || '');
+        toastEl.classList.remove('hidden');
+        toastTimer = setTimeout(() => toastEl.classList.add('hidden'), timeoutMs);
+    }
+
+    // Auto-translate functionality for indicator names
+    const autoTranslateIndicatorBtn = document.getElementById('auto-translate-indicator-btn');
+
+    if (autoTranslateIndicatorBtn) {
+        autoTranslateIndicatorBtn.addEventListener('click', function() {
+            const indicatorName = document.getElementById('name').value;
+
+            if (!indicatorName) {
+                showToast({{ _('Please enter an indicator name to translate')|tojson|safe }}, 'warning');
+                return;
+            }
+
+            // Show loading state
+            const originalText = autoTranslateIndicatorBtn.innerHTML;
+            autoTranslateIndicatorBtn.innerHTML = '<i class="fas fa-spinner fa-spin w-4 h-4 mr-2"></i>Translating...';
+            autoTranslateIndicatorBtn.disabled = true;
+
+            // Call auto-translate API
+            fetch('/admin/api/auto-translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    type: 'form_item',
+                    permission_context: 'indicator_bank',
+                    permission_code: 'admin.indicator_bank.create',
+                    text: indicatorName,
+                    target_languages: targetLanguages
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Populate label translations (indicator names)
+                    if (data.translations.label_translations) {
+                        // Map language codes to form field IDs
+                        const languageMapping = {};
+                        translatableLanguages.forEach(code => {
+                            languageMapping[code] = `name_${code}`;
+                        });
+
+                        // Populate form fields with translations
+                        for (const [langCode, translation] of Object.entries(data.translations.label_translations)) {
+                            const fieldId = languageMapping[langCode];
+                            if (fieldId) {
+                                document.getElementById(fieldId).value = translation || '';
+                            }
+                        }
+                    }
+
+                    // Show success message
+                    autoTranslateIndicatorBtn.innerHTML = '<i class="fas fa-check w-4 h-4 mr-2"></i>Translated!';
+                    setTimeout(() => {
+                        autoTranslateIndicatorBtn.innerHTML = originalText;
+                        autoTranslateIndicatorBtn.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error(data.message || 'Translation failed');
+                }
+            })
+            .catch(error => {
+                console.error('Auto-translate error:', error);
+                showToast({{ _('Translation failed')|tojson|safe }} + ': ' + (error && error.message ? error.message : ''), 'error', 7000);
+                autoTranslateIndicatorBtn.innerHTML = originalText;
+                autoTranslateIndicatorBtn.disabled = false;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

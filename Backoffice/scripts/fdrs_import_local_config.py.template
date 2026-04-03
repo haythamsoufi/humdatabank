@@ -1,0 +1,22 @@
+"""
+Local-only config for the FDRS import pipeline.
+
+Usage:
+1) Copy this file to `fdrs_import_local_config.py` in the same directory.
+2) Fill in values (prefer environment variables / secret store).
+3) Do NOT commit `fdrs_import_local_config.py` (it is ignored by git).
+
+This file is intentionally a template and contains no secrets.
+"""
+
+# data-api.ifrc.org (fdrsdata, KpiImputedValue, entities/ns, indicator, datareport)
+FDRS_DATA_API_BASE = "https://data-api.ifrc.org"
+FDRS_DATA_API_KEY = ""  # required for authenticated access
+
+# Indicator Bank API (FDRS code -> indicator_bank id; used when --indicator-mapping is not passed)
+INDICATOR_BANK_API_BASE = "https://ifrc-indicatorbank.azurewebsites.net"
+INDICATOR_BANK_API_KEY = ""  # required for authenticated access
+
+# Optional: override mapping with a CSV/Excel (then --indicator-mapping or this is used instead of API)
+FDRS_INDICATOR_MAPPING_CSV = None
+

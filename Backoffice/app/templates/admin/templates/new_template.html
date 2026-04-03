@@ -1,0 +1,654 @@
+{% extends "core/layout.html" %}
+{% from "components/_form_helpers.html" import render_field %} {# Import render_field macro #}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "macros/translation_modal.html" import translation_modal %}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+
+{% block title %}Create New Template{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title='Create New Template',
+    icon='fas fa-plus-circle',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'Template Management', 'url': url_for('form_builder.manage_templates')},
+        {'name': 'Create New Template'}
+    ]
+) }}
+
+{# The form for adding a new template #}
+{# Flash messages are handled in layout.html #}
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8"> {# Added background, padding, rounded corners, shadow, border, and bottom margin #}
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">Create New Form Template</h2> {# Added section heading #}
+    <form method="POST" action="{{ url_for('form_builder.new_template') }}" enctype="multipart/form-data"> {# Added enctype for file uploads #}
+        {{ form.csrf_token }}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> {# Use grid for better layout #}
+            <div class="mb-4 md:mb-0"> {# Added bottom margin for mobile #}
+                <div class="flex items-center justify-between mb-2">
+                    <label for="{{ form.name.id }}" class="block text-gray-700 text-sm font-semibold">{{ form.name.label.text }}</label>
+                    <button type="button" id="template-name-translations-btn" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium" title="Edit template name translations">
+                        <i class="fas fa-language w-4 h-4 mr-1"></i>
+                        Translations
+                    </button>
+                </div>
+                {{ form.name(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                <!-- Hidden fields for template name translations -->
+                <input type="hidden" name="name_translations" id="template-name-translations" value="{}" data-existing-translations="{{ (template.name_translations|tojson|e) if template and template.name_translations else '{}' }}">
+
+                <!-- Individual translation fields that the backend expects - using language codes directly -->
+                {% for code in SUPPORTED_LANGUAGES %}
+                    {% if code != 'en' %}
+                        <input type="hidden" name="name_{{ code }}" value="">
+                    {% endif %}
+                {% endfor %}
+
+                {% if form.name.errors %}
+                    {% for error in form.name.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- Template Access Management -->
+            <div class="mb-4"> {# Single column for template access #}
+                <label class="block text-sm font-medium text-gray-700 mb-2">Template Access</label>
+                <button type="button" id="template-access-btn" class="w-full py-2 px-3 text-left bg-white border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm hover:bg-gray-50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <svg class="h-5 w-5 text-blue-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                            </svg>
+                            <span id="template-access-summary">Manage template access...</span>
+                        </div>
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Hidden form fields for actual data -->
+                <input type="hidden" id="template-owner-field" name="{{ form.owned_by.name }}" value="{{ form.owned_by.data or current_user.id }}">
+                <div id="template-shared-fields">
+                    {% for value in form.shared_with_admins.data or [] %}
+                        <input type="hidden" name="{{ form.shared_with_admins.name }}" value="{{ value }}">
+                    {% endfor %}
+                </div>
+
+                {% if form.owned_by.errors %}
+                    {% for error in form.owned_by.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+                {% if form.shared_with_admins.errors %}
+                    {% for error in form.shared_with_admins.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            {# Template Clone Dropdown #}
+            <div class="mb-4">
+                <label for="clone-template-select" class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-copy mr-2"></i>Clone from Existing Template (Optional)
+                </label>
+                <select id="clone-template-select" class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <option value="">-- Select a template to clone --</option>
+                    {% for template in available_templates %}
+                        <option value="{{ template.id }}">{{ get_localized_template_name(template) }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-2 text-sm text-gray-500">Select a template to copy its settings and structure. You can modify the cloned template after creation.</p>
+            </div>
+
+
+            <div class="md:col-span-2 mb-4"> {# Span two columns on medium screens and up #}
+                 {{ render_field(form.description, rows="3") }} {# Render description field using macro #}
+            </div>
+
+             <div class="md:col-span-2 mb-4"> {# Span two columns on medium screens and up #}
+                 {# Manually render the add_to_self_report checkbox and its label for correct display #}
+                 <div class="flex items-center"> {# Use flex to align checkbox and label #}
+                     {{ form.add_to_self_report(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }} {# Render checkbox input #}
+                     {{ form.add_to_self_report.label(class="ml-2 block text-gray-700 text-sm font-semibold") }} {# Render label with margin #}
+                 </div>
+                 {# Display errors if any #}
+                 {% if form.add_to_self_report.errors %}
+                     {% for error in form.add_to_self_report.errors %}
+                         <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                     {% endfor %}
+                 {% endif %}
+             </div>
+        </div>
+
+
+        <div class="flex items-center justify-end gap-3 mt-6"> {# Align buttons to the right with gap #}
+            <button type="button" id="kobo-import-btn" class="btn btn-success" title="{{ _('Import from Kobo XLSForm') }}">
+                <i class="fas fa-file-import w-4 h-4 mr-2"></i>
+                {{ _('Import from Kobo XLS') }}
+            </button>
+            <button type="button" id="excel-import-btn" class="btn btn-success" title="{{ _('Import template structure from Excel file') }}">
+                <i class="fas fa-file-excel w-4 h-4 mr-2"></i>
+                {{ _('Import from Excel') }}
+            </button>
+            {{ form.submit(class="btn btn-success") }}
+        </div>
+    </form>
+</div>
+
+{# Excel Import Modal #}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% call modal_shell('excel-import-modal', _('Import Template from Excel'), max_width='max-w-lg', close_class='close-excel-modal') %}
+        <div class="mb-4">
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4" role="alert" aria-live="polite">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-blue-600 mt-0.5 mr-2" aria-hidden="true"></i>
+                    <div class="text-sm text-blue-800">
+                        <p class="font-semibold mb-1">{{ _('Note:') }}</p>
+                        <p>{{ _('Fill out the template details above (optional - Excel file may contain the name), then import an Excel file to populate the template structure. The template will be created with the information you provide, and the Excel file will add sections, pages, and items. If the Excel file contains a template name, it will be used.') }}</p>
+                    </div>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('form_builder.new_template') }}" enctype="multipart/form-data" id="import-excel-form" class="flex flex-col space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="import_from_excel" value="1"/>
+                {# Include all form fields as hidden inputs so they're submitted with the Excel file #}
+                <input type="hidden" name="name" id="excel-import-name">
+                <input type="hidden" name="description" id="excel-import-description">
+                <input type="hidden" name="add_to_self_report" id="excel-import-add-to-self-report">
+                <input type="hidden" name="display_order_visible" id="excel-import-display-order-visible">
+                <input type="hidden" name="is_paginated" id="excel-import-is-paginated">
+                <input type="hidden" name="enable_export_pdf" id="excel-import-enable-export-pdf">
+                <input type="hidden" name="enable_export_excel" id="excel-import-enable-export-excel">
+                <input type="hidden" name="enable_import_excel" id="excel-import-enable-import-excel">
+                <input type="hidden" name="enable_ai_validation" id="excel-import-enable-ai-validation">
+                <input type="hidden" name="owned_by" id="excel-import-owned-by">
+                <div id="excel-import-shared-fields"></div>
+                <input type="hidden" name="name_translations" id="excel-import-name-translations">
+                {% for code in SUPPORTED_LANGUAGES %}
+                    {% if code != 'en' %}
+                        <input type="hidden" name="name_{{ code }}" id="excel-import-name-{{ code }}">
+                    {% endif %}
+                {% endfor %}
+
+                <div class="file-upload-wrapper relative h-40 border-2 border-dashed border-gray-300 rounded-lg">
+                    <input type="file" name="excel_file" id="excel_file" accept=".xlsx,.xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select Excel file') }}">
+                    <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
+                        <div class="text-center">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                            <p class="text-sm text-gray-500">{{ _('Click or drag Excel file here to import') }}</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    {{ _('Supported formats: .xlsx, .xls') }}
+                </p>
+            </form>
+        </div>
+{% endcall %}
+
+{# Kobo XLS Import Modal #}
+{% call modal_shell('kobo-import-modal', _('Import from Kobo XLSForm'), max_width='max-w-lg', close_class='close-kobo-modal') %}
+        <div class="mb-4">
+            <div class="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4" role="alert" aria-live="polite">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-amber-600 mt-0.5 mr-2" aria-hidden="true"></i>
+                    <div class="text-sm text-amber-800">
+                        <p class="font-semibold mb-1">{{ _('Kobo XLSForm format') }}</p>
+                        <p>{{ _('Upload an Excel file exported from KoboToolbox or built with XLSForm. The wizard will import groups (sections), repeat groups, and supported question types: text, number, select one/many, date, note, and file uploads. Unsupported types (e.g. GPS, calculate) are skipped.') }}</p>
+                    </div>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('form_builder.import_kobo_xls') }}" enctype="multipart/form-data" id="import-kobo-form" class="flex flex-col space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="owned_by" id="kobo-import-owned-by">
+                <div id="kobo-import-shared-fields"></div>
+
+                <label for="kobo-import-name" class="block text-sm font-medium text-gray-700">{{ _('Template name (optional)') }}</label>
+                <input type="text" name="name" id="kobo-import-name" placeholder="{{ _('Uses form_title from settings sheet if blank') }}" class="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 sm:text-sm">
+
+                <div class="file-upload-wrapper relative h-40 border-2 border-dashed border-gray-300 rounded-lg">
+                    <input type="file" name="kobo_file" id="kobo_file" accept=".xlsx,.xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select Kobo XLSForm file') }}">
+                    <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
+                        <div class="text-center">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                            <p class="text-sm text-gray-500">{{ _('Click or drag Kobo XLSForm file here') }}</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ _('.xlsx or .xls') }}</p>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success w-full">
+                    <i class="fas fa-upload mr-2"></i>
+                    {{ _('Import and Create Template') }}
+                </button>
+            </form>
+        </div>
+{% endcall %}
+
+{# Template Name Translations Modal #}
+{{ translation_modal(
+    modal_id='template-name-translations-modal',
+    modal_title='Template Name Translations',
+    description='Add translations for this template name in different languages. You can also override the English text here if needed.',
+    context='template_name',
+    show_auto_translate=true,
+    css_prefix='template-name',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.create'
+) }}
+
+<script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function () {
+        // Template Clone functionality
+        const cloneSelect = document.getElementById('clone-template-select');
+        if (cloneSelect) {
+            cloneSelect.addEventListener('change', function() {
+                const templateId = this.value;
+                if (!templateId) {
+                    return; // No template selected
+                }
+
+                // Fetch template data
+                fetch(`{{ url_for('form_builder.get_template_clone_data', template_id=0) }}`.replace('0', templateId))
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch template data');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Populate form fields using name attributes (more reliable)
+                        const nameField = document.querySelector('input[name="name"]') || document.getElementById('{{ form.name.id }}');
+                        if (nameField) {
+                            nameField.value = data.name + ' (Copy)';
+                        }
+
+                        const descriptionField = document.querySelector('textarea[name="description"]') || document.getElementById('{{ form.description.id }}');
+                        if (descriptionField) {
+                            descriptionField.value = data.description || '';
+                        }
+
+                        const addToSelfReportField = document.querySelector('input[name="add_to_self_report"]') || document.getElementById('{{ form.add_to_self_report.id }}');
+                        if (addToSelfReportField) {
+                            addToSelfReportField.checked = data.add_to_self_report;
+                        }
+
+                        // Populate optional fields if they exist in the form
+                        const displayOrderVisibleField = document.querySelector('input[name="display_order_visible"]') || document.getElementById('{{ form.display_order_visible.id }}');
+                        if (displayOrderVisibleField) {
+                            displayOrderVisibleField.checked = data.display_order_visible;
+                        }
+
+                        const isPaginatedField = document.querySelector('input[name="is_paginated"]') || document.getElementById('{{ form.is_paginated.id }}');
+                        if (isPaginatedField) {
+                            isPaginatedField.checked = data.is_paginated;
+                        }
+
+                        const enableExportPdfField = document.querySelector('input[name="enable_export_pdf"]') || document.getElementById('{{ form.enable_export_pdf.id }}');
+                        if (enableExportPdfField) {
+                            enableExportPdfField.checked = data.enable_export_pdf;
+                        }
+
+                        const enableExportExcelField = document.querySelector('input[name="enable_export_excel"]') || document.getElementById('{{ form.enable_export_excel.id }}');
+                        if (enableExportExcelField) {
+                            enableExportExcelField.checked = data.enable_export_excel;
+                        }
+
+                        const enableImportExcelField = document.querySelector('input[name="enable_import_excel"]') || document.getElementById('{{ form.enable_import_excel.id }}');
+                        if (enableImportExcelField) {
+                            enableImportExcelField.checked = data.enable_import_excel;
+                        }
+
+                        const enableAiValidationField = document.querySelector('input[name="enable_ai_validation"]') || document.getElementById('{{ form.enable_ai_validation.id }}');
+                        if (enableAiValidationField) {
+                            enableAiValidationField.checked = data.enable_ai_validation === true;
+                        }
+
+                        // Handle name translations
+                        if (data.name_translations && Object.keys(data.name_translations).length > 0) {
+                            const translationsField = document.getElementById('template-name-translations');
+                            if (translationsField) {
+                                translationsField.value = JSON.stringify(data.name_translations);
+                            }
+
+                            // Update individual translation fields
+                            Object.keys(data.name_translations).forEach(code => {
+                                const field = document.querySelector(`input[name="name_${code}"]`);
+                                if (field) {
+                                    field.value = data.name_translations[code] || '';
+                                }
+                            });
+                        }
+
+                        // Show success message
+                        const cloneContainer = cloneSelect.closest('.mb-4');
+                        if (cloneContainer) {
+                            let successMsg = cloneContainer.querySelector('.clone-success-msg');
+                            if (!successMsg) {
+                                successMsg = document.createElement('p');
+                                successMsg.className = 'mt-2 text-sm text-green-600 clone-success-msg';
+                                cloneContainer.appendChild(successMsg);
+                            }
+                            successMsg.textContent = `✓ Template "${data.name}" loaded. Review and modify the fields as needed.`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching template data:', error);
+                        if (window.showAlert) window.showAlert('Failed to load template data. Please try again.', 'error');
+                        else console.error('Failed to load template data');
+                    });
+            });
+        }
+
+        // Template Access Modal functionality
+        const templateAccessBtn = document.getElementById('template-access-btn');
+        const templateAccessSummary = document.getElementById('template-access-summary');
+        const ownerField = document.getElementById('template-owner-field');
+        const sharedFieldsContainer = document.getElementById('template-shared-fields');
+
+        if (templateAccessBtn && templateAccessSummary) {
+            // Update summary text based on current values
+            function updateAccessSummary() {
+                const currentOwner = ownerField ? String(ownerField.value || '').trim() : '';
+                // Count shared users, excluding the owner
+                const sharedInputs = Array.from(sharedFieldsContainer.querySelectorAll('input[type="hidden"]'))
+                    .map(input => input.value)
+                    .filter(value => value && String(value) !== String(currentOwner)); // Exclude owner and empty values
+                const sharedCount = sharedInputs.length;
+
+                let summary = 'Manage template access...';
+                if (currentOwner || sharedCount > 0) {
+                    const parts = [];
+                    if (currentOwner) {
+                        // Find the owner's name from the choices
+                        const ownerChoices = {{ form.owned_by.choices | tojson | safe }};
+                        const ownerChoice = ownerChoices.find(choice => String(choice[0]) === String(currentOwner));
+                        const ownerName = ownerChoice ? ownerChoice[1] : 'Unknown';
+                        parts.push(`Owner: ${ownerName}`);
+                    }
+                    if (sharedCount > 0) {
+                        parts.push(`${sharedCount} shared`);
+                    }
+                    summary = parts.join(', ');
+                }
+                templateAccessSummary.textContent = summary;
+            }
+
+            // Initialize summary with preselected owner
+            updateAccessSummary();
+
+            // Handle button click
+            templateAccessBtn.addEventListener('click', function() {
+                // Prepare data for the modal
+                const ownerChoices = {{ form.owned_by.choices | tojson | safe }};
+                const sharedChoices = {{ form.shared_with_admins.choices | tojson | safe }};
+                const currentOwner = ownerField.value || '{{ current_user.id }}';
+                const currentShared = Array.from(sharedFieldsContainer.querySelectorAll('input[type="hidden"]'))
+                    .map(input => input.value)
+                    .filter(value => value); // Remove empty values
+
+                // Show the modal
+                if (window.showTemplateAccessModal) {
+                    window.showTemplateAccessModal({
+                        title: 'Template Access Management',
+                        ownerFieldName: '{{ form.owned_by.name }}',
+                        sharedFieldName: '{{ form.shared_with_admins.name }}',
+                        ownerChoices: ownerChoices,
+                        sharedChoices: sharedChoices,
+                        currentOwner: currentOwner,
+                        currentShared: currentShared,
+                        currentUserId: {{ current_user.id }},
+                        templateOwnerId: null, // New template, no owner yet
+                        onSave: function(data) {
+                            // Update owner field
+                            ownerField.value = data.owner;
+
+                            // Update shared fields
+                            sharedFieldsContainer.innerHTML = '';
+                            data.shared.forEach(value => {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = data.sharedFieldName;
+                                input.value = value;
+                                sharedFieldsContainer.appendChild(input);
+                            });
+
+                            // Update summary
+                            updateAccessSummary();
+                        }
+                    });
+                }
+            });
+        }
+
+        // Excel Import Modal functionality
+        const excelImportBtn = document.getElementById('excel-import-btn');
+        const excelImportModal = document.getElementById('excel-import-modal');
+        const importExcelForm = document.getElementById('import-excel-form');
+
+        if (excelImportBtn && excelImportModal) {
+            // Open modal
+            excelImportBtn.addEventListener('click', function() {
+                // Note: Name can be empty - Excel file may contain it
+                // Get form field references
+                const nameField = document.querySelector('input[name="name"]') || document.getElementById('{{ form.name.id }}');
+                const descriptionField = document.querySelector('textarea[name="description"]') || document.getElementById('{{ form.description.id }}');
+                const addToSelfReportField = document.querySelector('input[name="add_to_self_report"]') || document.getElementById('{{ form.add_to_self_report.id }}');
+                const displayOrderVisibleField = document.querySelector('input[name="display_order_visible"]') || document.getElementById('{{ form.display_order_visible.id }}');
+                const isPaginatedField = document.querySelector('input[name="is_paginated"]') || document.getElementById('{{ form.is_paginated.id }}');
+                const enableExportPdfField = document.querySelector('input[name="enable_export_pdf"]') || document.getElementById('{{ form.enable_export_pdf.id }}');
+                const enableExportExcelField = document.querySelector('input[name="enable_export_excel"]') || document.getElementById('{{ form.enable_export_excel.id }}');
+                const enableImportExcelField = document.querySelector('input[name="enable_import_excel"]') || document.getElementById('{{ form.enable_import_excel.id }}');
+                const enableAiValidationField = document.querySelector('input[name="enable_ai_validation"]') || document.getElementById('{{ form.enable_ai_validation.id }}');
+                const ownerField = document.getElementById('template-owner-field');
+                const sharedFieldsContainer = document.getElementById('template-shared-fields');
+                const nameTranslationsField = document.getElementById('template-name-translations');
+
+                // Populate hidden form fields with current form values before showing modal
+                // Copy values to hidden fields
+                if (nameField) {
+                    document.getElementById('excel-import-name').value = nameField.value || '';
+                }
+                if (descriptionField) {
+                    document.getElementById('excel-import-description').value = descriptionField.value || '';
+                }
+                if (addToSelfReportField) {
+                    document.getElementById('excel-import-add-to-self-report').value = addToSelfReportField.checked ? 'y' : '';
+                }
+                if (displayOrderVisibleField) {
+                    document.getElementById('excel-import-display-order-visible').value = displayOrderVisibleField.checked ? 'y' : '';
+                }
+                if (isPaginatedField) {
+                    document.getElementById('excel-import-is-paginated').value = isPaginatedField.checked ? 'y' : '';
+                }
+                if (enableExportPdfField) {
+                    document.getElementById('excel-import-enable-export-pdf').value = enableExportPdfField.checked ? 'y' : '';
+                }
+                if (enableExportExcelField) {
+                    document.getElementById('excel-import-enable-export-excel').value = enableExportExcelField.checked ? 'y' : '';
+                }
+                if (enableImportExcelField) {
+                    document.getElementById('excel-import-enable-import-excel').value = enableImportExcelField.checked ? 'y' : '';
+                }
+                if (enableAiValidationField) {
+                    document.getElementById('excel-import-enable-ai-validation').value = enableAiValidationField.checked ? 'y' : '';
+                }
+                if (ownerField) {
+                    document.getElementById('excel-import-owned-by').value = ownerField.value || '';
+                }
+                if (nameTranslationsField) {
+                    document.getElementById('excel-import-name-translations').value = nameTranslationsField.value || '{}';
+                }
+
+                // Copy shared fields
+                const excelImportSharedContainer = document.getElementById('excel-import-shared-fields');
+                if (excelImportSharedContainer && sharedFieldsContainer) {
+                    excelImportSharedContainer.innerHTML = '';
+                    sharedFieldsContainer.querySelectorAll('input[type="hidden"]').forEach(input => {
+                        const newInput = document.createElement('input');
+                        newInput.type = 'hidden';
+                        newInput.name = input.name;
+                        newInput.value = input.value;
+                        excelImportSharedContainer.appendChild(newInput);
+                    });
+                }
+
+                // Copy translation fields
+                {% for code in SUPPORTED_LANGUAGES %}
+                    {% if code != 'en' %}
+                    const name{{ code }}Field = document.querySelector('input[name="name_{{ code }}"]');
+                    if (name{{ code }}Field) {
+                        document.getElementById('excel-import-name-{{ code }}').value = name{{ code }}Field.value || '';
+                    }
+                    {% endif %}
+                {% endfor %}
+
+                excelImportModal.classList.remove('hidden');
+            });
+
+            // Close modal handlers
+            const closeButtons = excelImportModal.querySelectorAll('.close-excel-modal');
+            closeButtons.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    excelImportModal.classList.add('hidden');
+                    if (importExcelForm) {
+                        importExcelForm.reset();
+                    }
+                });
+            });
+
+            // Close on background click
+            excelImportModal.addEventListener('click', function(e) {
+                if (e.target === excelImportModal) {
+                    excelImportModal.classList.add('hidden');
+                    if (importExcelForm) {
+                        importExcelForm.reset();
+                    }
+                }
+            });
+
+            // Auto-submit form when file is selected
+            const excelFileInput = document.getElementById('excel_file');
+            if (excelFileInput && importExcelForm) {
+                excelFileInput.addEventListener('change', function() {
+                    if (this.files.length > 0) {
+                        importExcelForm.submit();
+                    }
+                });
+            }
+
+            // Kobo Import Modal
+            const koboImportBtn = document.getElementById('kobo-import-btn');
+            const koboImportModal = document.getElementById('kobo-import-modal');
+            if (koboImportBtn && koboImportModal) {
+                const openKoboModal = function() {
+                    const nameField = document.querySelector('input[name="name"]') || document.getElementById('{{ form.name.id }}');
+                    const ownerField = document.getElementById('template-owner-field');
+                    const sharedFieldsContainer = document.getElementById('template-shared-fields');
+                    const koboNameInput = document.getElementById('kobo-import-name');
+                    const koboOwnerInput = document.getElementById('kobo-import-owned-by');
+                    const koboSharedContainer = document.getElementById('kobo-import-shared-fields');
+
+                    if (koboNameInput && nameField) koboNameInput.value = nameField.value || '';
+                    if (koboOwnerInput && ownerField) koboOwnerInput.value = ownerField.value || '';
+                    if (koboSharedContainer && sharedFieldsContainer) {
+                        koboSharedContainer.innerHTML = '';
+                        sharedFieldsContainer.querySelectorAll('input[type="hidden"]').forEach(function(input) {
+                            const newInput = document.createElement('input');
+                            newInput.type = 'hidden';
+                            newInput.name = input.name;
+                            newInput.value = input.value;
+                            koboSharedContainer.appendChild(newInput);
+                        });
+                    }
+                    koboImportModal.classList.remove('hidden');
+                };
+                koboImportBtn.addEventListener('click', openKoboModal);
+                // Auto-open Kobo modal when ?import=kobo in URL
+                if (window.location.search && window.location.search.includes('import=kobo')) {
+                    openKoboModal();
+                }
+                koboImportModal.querySelectorAll('.close-kobo-modal').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        koboImportModal.classList.add('hidden');
+                    });
+                });
+                koboImportModal.addEventListener('click', function(e) {
+                    if (e.target === koboImportModal) koboImportModal.classList.add('hidden');
+                });
+            }
+
+            // Drag and drop handling
+            const dropZone = excelImportModal.querySelector('.file-upload-wrapper');
+            if (dropZone) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }, false);
+                });
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, function() {
+                        dropZone.classList.add('border-blue-500', 'bg-blue-50');
+                    }, false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, function() {
+                        dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+                    }, false);
+                });
+
+                dropZone.addEventListener('drop', function(e) {
+                    const dt = e.dataTransfer;
+                    const file = dt.files[0];
+
+                    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        excelFileInput.files = dataTransfer.files;
+                        excelFileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }, false);
+            }
+        }
+    });
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/template-access-modal.js') }}"></script>
+<script type="module" nonce="{{ csp_nonce() }}">
+import { TranslationModal } from '{{ static_url('js/components/translation-modal.js') }}';
+
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        TranslationModal.attach({
+            openButtonId: 'template-name-translations-btn',
+            modalId: 'template-name-translations-modal',
+            cssPrefix: 'template-name',
+            hiddenInputSelector: '#template-name-translations',
+            resolveEnglishText: () => {
+                const input = document.getElementById('{{ form.name.id }}') || document.querySelector('input[name="name"]');
+                return input ? input.value : '';
+            },
+            onSaveHiddenFields: (collected) => {
+                Object.keys(collected || {}).forEach(code => {
+                    const field = document.querySelector(`input[name="name_${code}"]`);
+                    if (field) field.value = collected[code] || '';
+                });
+            },
+            autoTranslateType: 'template_name'
+        });
+    } catch (e) {
+        // Fail silently if modal not present
+    }
+});
+</script>
+{% endblock %}

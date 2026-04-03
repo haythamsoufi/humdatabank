@@ -1,0 +1,230 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_manage_api = current_is_system_manager or has_permission('admin.api.manage') %}
+
+{% block title %}{{ _('API Key Details') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('API Key Details'),
+    icon='fas fa-key',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('API Key Management'), 'url': url_for('api_key_management.list_api_keys')},
+        {'name': api_key.client_name}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Back to List'),
+            'url': url_for('api_key_management.list_api_keys'),
+            'icon': 'fas fa-arrow-left',
+            'classes': 'professional-action-btn'
+        },
+        {
+            'type': 'link',
+            'text': _('Revoke Key'),
+            'url': url_for('api_key_management.revoke_api_key', key_id=api_key.id),
+            'icon': 'fas fa-ban',
+            'classes': 'professional-action-btn professional-action-btn-red' if not api_key.is_revoked else 'professional-action-btn professional-action-btn-disabled pointer-events-none'
+        } if (can_manage_api and not api_key.is_revoked) else None
+    ]
+) }}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Details -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Key Information -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Key Information') }}</h3>
+            <dl class="grid grid-cols-1 gap-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Client Name') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ api_key.client_name }}</dd>
+                </div>
+                {% if api_key.client_description %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Description') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ api_key.client_description }}</dd>
+                </div>
+                {% endif %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Key Prefix') }}</dt>
+                    <dd class="mt-1">
+                        <code class="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">{{ api_key.key_prefix }}...</code>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Status') }}</dt>
+                    <dd class="mt-1">
+                        {% if api_key.is_revoked %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <i class="fas fa-ban mr-1"></i>{{ _('Revoked') }}
+                            </span>
+                            {% if api_key.revoked_at %}
+                            <p class="text-xs text-gray-500 mt-1">{{ _('Revoked on') }}: {{ api_key.revoked_at|datetime_local('datetime') }}</p>
+                            {% endif %}
+                        {% elif api_key.expires_at and api_key.expires_at <= moment().utcnow() if moment else False %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                <i class="fas fa-clock mr-1"></i>{{ _('Expired') }}
+                            </span>
+                        {% elif api_key.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <i class="fas fa-check-circle mr-1"></i>{{ _('Active') }}
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                <i class="fas fa-pause-circle mr-1"></i>{{ _('Inactive') }}
+                            </span>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Rate Limit') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ api_key.rate_limit_per_minute }} {{ _('requests per minute') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Created') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ api_key.created_at|datetime_local('datetime') if api_key.created_at else 'N/A' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Last Used') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ api_key.last_used_at|datetime_local('datetime') if api_key.last_used_at else _('Never') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Expires') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ api_key.expires_at|datetime_local('datetime') if api_key.expires_at else _('Never') }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Usage Statistics -->
+        {% if usage_stats %}
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Usage Statistics') }}</h3>
+            <dl class="grid grid-cols-2 gap-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Total Requests') }}</dt>
+                    <dd class="mt-1 text-2xl font-bold text-gray-900">{{ usage_stats.total_requests or 0 }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Average Response Time') }}</dt>
+                    <dd class="mt-1 text-2xl font-bold text-gray-900">
+                        {{ "%.0f"|format(usage_stats.avg_response_time) if usage_stats.avg_response_time else 0 }}ms
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('First Used') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ usage_stats.first_used|datetime_local('datetime') if usage_stats.first_used else _('Never') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Last Used') }}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ usage_stats.last_used|datetime_local('datetime') if usage_stats.last_used else _('Never') }}</dd>
+                </div>
+            </dl>
+        </div>
+        {% endif %}
+
+        <!-- Usage by Endpoint -->
+        {% if usage_by_endpoint %}
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Usage by Endpoint') }}</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Endpoint') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Requests') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Avg Time') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Errors') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for endpoint_data in usage_by_endpoint %}
+                        <tr>
+                            <td class="px-4 py-3 text-sm font-mono text-gray-900">{{ endpoint_data.endpoint }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ endpoint_data.count }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ "%.0f"|format(endpoint_data.avg_time) if endpoint_data.avg_time else 0 }}ms</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ endpoint_data.errors or 0 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recent Usage -->
+        {% if recent_usage %}
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Recent Usage (Last 100 requests)') }}</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Timestamp') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Endpoint') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Method') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Status') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Response Time') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for usage in recent_usage %}
+                        <tr>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ usage.timestamp|datetime_local('datetime') if usage.timestamp else 'N/A' }}</td>
+                            <td class="px-4 py-3 text-sm font-mono text-gray-900">{{ usage.endpoint }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ usage.method }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                {% if usage.status_code >= 400 %}
+                                    <span class="text-red-600 font-semibold">{{ usage.status_code }}</span>
+                                {% elif usage.status_code >= 300 %}
+                                    <span class="text-yellow-600 font-semibold">{{ usage.status_code }}</span>
+                                {% else %}
+                                    <span class="text-green-600 font-semibold">{{ usage.status_code }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ "%.0f"|format(usage.response_time_ms) if usage.response_time_ms else 0 }}ms</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Quick Actions -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Quick Actions') }}</h3>
+            <div class="space-y-2">
+                {% if can_manage_api and not api_key.is_revoked %}
+                <a href="{{ url_for('api_key_management.revoke_api_key', key_id=api_key.id) }}"
+                   class="block w-full text-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50">
+                    <i class="fas fa-ban mr-2"></i>{{ _('Revoke Key') }}
+                </a>
+                {% endif %}
+                <a href="{{ url_for('api_key_management.list_api_keys') }}"
+                   class="block w-full text-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <i class="fas fa-arrow-left mr-2"></i>{{ _('Back to List') }}
+                </a>
+            </div>
+        </div>
+
+        <!-- Security Info -->
+        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <h4 class="text-sm font-medium text-blue-800 mb-2">{{ _('Security Information') }}</h4>
+            <ul class="text-xs text-blue-700 space-y-1">
+                <li>• {{ _('Key is stored as a hash') }}</li>
+                <li>• {{ _('Full key cannot be retrieved') }}</li>
+                <li>• {{ _('Revocation is permanent') }}</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

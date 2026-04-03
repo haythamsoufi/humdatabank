@@ -1,0 +1,285 @@
+{# Render a single dynamic indicator form item #}
+{% set is_sub_item = field.is_sub_item if hasattr(field, 'is_sub_item') else false %}
+{% set is_dynamic_indicator = true %}
+
+{# Unified FormItem approach - determine field type using item_type or legacy hasattr checks #}
+{% if hasattr(field, 'item_type') %}
+    {% set unified_item_type = field.item_type %}
+    {% set unified_item_id = field.id %}
+    {% set is_unified_indicator = unified_item_type == 'indicator' %}
+    {% set is_unified_question = unified_item_type == 'question' %}
+    {% set is_unified_document = unified_item_type == 'document_field' %}
+    {% set is_unified_matrix = unified_item_type == 'matrix' %}
+{% else %}
+    {# Legacy approach for backward compatibility #}
+    {% set unified_item_type = 'indicator' if (field.is_indicator or is_dynamic_indicator) else ('question' if field.is_question else ('matrix' if field.item_type == 'matrix' else 'document_field')) %}
+    {% set unified_item_id = field.id %}
+    {% set is_unified_indicator = field.is_indicator or is_dynamic_indicator %}
+    {% set is_unified_question = field.is_question %}
+    {% set is_unified_matrix = field.item_type == 'matrix' %}
+    {% set is_unified_document = not is_unified_indicator and not is_unified_question and not is_unified_matrix %}
+{% endif %}
+
+<div class="form-group form-item-block border p-4 rounded-md bg-white {{ 'ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item else '' }} {{ 'border-l-4 border-l-green-300 bg-green-50' if is_dynamic_indicator else '' }}"
+     data-item-id="{{ unified_item_id }}"
+     data-item-type="{{ unified_item_type }}"
+     data-layout-width="{{ field.layout_column_width or 12 }}"
+     data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
+     {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
+     {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
+     {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}
+     {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}"{% endif %}>
+    <div class="flex items-start justify-between">
+       <div class="flex-1 pr-2">
+            {# Use resolved display label if available (for variable replacement), otherwise use original #}
+            {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
+            <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                {% if is_sub_item %}
+                    <span class="text-gray-600">
+                        {% if template_structure.display_order_visible %}{{ section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}
+                    </span>
+                {% else %}
+                    {% if template_structure.display_order_visible %}{{ section.display_order }}.{{ field.display_order }}. {% endif %}{{ field_display_label }}
+                {% endif %}
+                {% if field.is_required_for_js %}<span class="text-red-500">*</span>{% endif %}
+            </label>
+        </div>
+
+        <div class="flex items-center gap-2 flex-shrink-0">
+            {% if field.is_indicator %}
+                {# Determine which label and definition to use #}
+                {% set _ind_label_text = None %}
+                {% set _ind_def_text = None %}
+
+                {# Try custom label with translations first #}
+                {% if field.label_translations %}
+                    {% set _ind_label_candidate = field.label_translations.get(translation_key) or field.label_translations.get('en') %}
+                    {% if _ind_label_candidate and _ind_label_candidate|trim %}{% set _ind_label_text = _ind_label_candidate %}{% endif %}
+                {% endif %}
+                {% if not _ind_label_text and field.label %}
+                    {% if field.label|trim %}{% set _ind_label_text = field.label %}{% endif %}
+                {% endif %}
+                {# Fall back to indicator bank name #}
+                {% if not _ind_label_text and field.source_indicator_from_bank %}
+                    {% set _ind_label_text = field.source_indicator_from_bank.name %}
+                {% endif %}
+
+                {# Try custom definition with translations first #}
+                {% if field.definition_translations %}
+                    {% set _ind_def_candidate = field.definition_translations.get(translation_key) or field.definition_translations.get('en') %}
+                    {% if _ind_def_candidate and _ind_def_candidate|trim %}{% set _ind_def_text = _ind_def_candidate %}{% endif %}
+                {% endif %}
+                {% if not _ind_def_text and field.definition %}
+                    {% if field.definition|trim %}{% set _ind_def_text = field.definition %}{% endif %}
+                {% endif %}
+                {# Fall back to indicator bank definition #}
+                {% if not _ind_def_text and field.source_indicator_from_bank %}
+                    {% set localized_definition = get_localized_indicator_definition(field.source_indicator_from_bank) %}
+                    {% set _ind_def_text = localized_definition if localized_definition else field.source_indicator_from_bank.definition %}
+                {% endif %}
+
+                {# Show tooltip if we have definition, metadata, or details link #}
+                {% set details_tpl = (ORGANIZATION_BRANDING.get('indicator_details_url_template') or '') %}
+                {% set has_details_link = details_tpl and details_tpl|trim and field.source_indicator_from_bank and field.source_indicator_from_bank.id %}
+                {% if _ind_def_text or (field.source_indicator_from_bank and (field.source_indicator_from_bank.type or field.source_indicator_from_bank.unit)) or has_details_link %}
+                <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
+                    <span class="tooltip-text">
+                        {% if _ind_def_text %}
+                        <div class="indicator-definition mb-2">
+                            <strong>{{ _('Definition') }}:</strong><br>
+                            {{ _ind_def_text }}
+                        </div>
+                        {% endif %}
+                        {% if field.source_indicator_from_bank %}
+                        <div class="indicator-meta">
+                            <strong>{{ _('Type') }}:</strong> {{ get_localized_indicator_type(field.source_indicator_from_bank.type) }}
+                            {% if field.source_indicator_from_bank.unit %} | <strong>{{ _('Unit') }}:</strong> {{ get_localized_indicator_unit(field.source_indicator_from_bank.unit) }}{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if has_details_link %}
+                        {% set details_url = details_tpl|replace('{id}', field.source_indicator_from_bank.id|string) %}
+                        <div class="indicator-link mt-2 pt-2 border-t border-gray-200">
+                            <a href="{{ details_url }}"
+                               target="_blank"
+                               class="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                <i class="fas fa-external-link-alt mr-1"></i>
+                                {{ _('View Full Details') }}
+                            </a>
+                        </div>
+                        {% endif %}
+                    </span>
+                </span>
+                {% endif %}
+            {% elif field.is_question and (field.definition or field.unit or field.type) %}
+                <span class="question-unit-tooltip cursor-help w-5 h-5 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
+                    <span class="tooltip-text">
+                        {% if field.definition %}
+                            <div class="question-definition mb-2">
+                                <strong>{{ _('Definition') }}:</strong><br>
+                                {{ field.definition }}
+                            </div>
+                        {% endif %}
+                        <div class="question-meta">
+                            {% if field.question_type %}
+                                <strong>{{ _('Type') }}:</strong> {{ field.question_type.value|title }}{% if field.unit %} | {% endif %}
+                            {% elif field.type %}
+                                <strong>{{ _('Type') }}:</strong> {{ field.type }}{% if field.unit %} | {% endif %}
+                            {% endif %}
+                            {% if field.unit %}<strong>{{ _('Unit') }}:</strong> {{ field.unit }}{% endif %}
+                        </div>
+                    </span>
+                </span>
+            {% elif unified_item_type == 'matrix' and field.description %}
+                <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
+                    <span class="tooltip-text">
+                        <div class="plugin-description mb-2">
+                            <strong>{{ _('Description') }}:</strong><br>
+                            {{ field.description|nl2br }}
+                        </div>
+                    </span>
+                </span>
+            {% endif %}
+
+            {% if is_dynamic_indicator and can_edit %}
+                {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
+                {% set field_label = field._display_label if hasattr(field, '_display_label') and field._display_label else field.label %}
+                {% set details_tpl = (ORGANIZATION_BRANDING.get('indicator_details_url_template') or '') %}
+                {% set can_propose_changes = details_tpl and details_tpl|trim %}
+                <div class="flex items-center gap-1">
+                    {% if can_propose_changes %}
+                    <button type="button"
+                            class="w-5 h-5 flex items-center justify-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors propose-changes-btn"
+                            data-indicator-id="{{ field.source_indicator_from_bank.id if field.source_indicator_from_bank else '' }}"
+                            data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator') }}"
+                            title="{{ _('Propose changes to this indicator') }}">
+                        <i class="fas fa-lightbulb text-xs"></i>
+                    </button>
+                    {% endif %}
+                    <button type="button"
+                            class="w-5 h-5 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors delete-dynamic-indicator-btn"
+                            data-assignment-id="{{ field.dynamic_assignment_id }}"
+                            data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator') }}"
+                            title="{{ _('Remove this indicator') }}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% set item_key = 'field_value[' ~ field.id ~ ']' %}
+    {% set existing_entry_data = existing_data.get(item_key) %}
+
+    {# --- DYNAMIC INDICATOR RENDERING --- #}
+    {% set current_reporting_mode = existing_entry_data.get('mode', field.allowed_disaggregation_options[0] if field.allowed_disaggregation_options else 'total') if isinstance(existing_entry_data, dict) else (field.allowed_disaggregation_options[0] if field.allowed_disaggregation_options else 'total') %}
+    {% set current_values = existing_entry_data.get('values', {}) if isinstance(existing_entry_data, dict) else {} %}
+    {% set raw_value_indicator = existing_entry_data if not isinstance(existing_entry_data, dict) else '' %}
+    {% set allowed_modes = field.allowed_disaggregation_options if field.unit and field.unit in ['People', 'Volunteers', 'Staff'] else ['total'] %}
+
+    {% if field.field_type_for_js|lower == 'number' or field.field_type_for_js|lower == 'currency' %}
+        {% if allowed_modes and allowed_modes|length > 1 %}
+             <div class="mb-3">
+                <div class="flex flex-wrap gap-x-4 gap-y-2 mt-1">
+                    {% for mode_key in allowed_modes %}
+                    <label class="inline-flex items-center">
+                        <input type="radio" id="field-{{ field.id }}-mode-{{ mode_key }}" name="dynamic_{{ field.dynamic_assignment_id }}_reporting_mode" value="{{ mode_key }}" class="form-radio h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500" {% if not can_edit %}disabled{% endif %} {% if mode_key == current_reporting_mode %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">{{ _(config.DISAGGREGATION_MODES.get(mode_key, mode_key|title)) }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="disaggregation-inputs" data-parent-id="{{ field.id }}" data-item-type="dynamic" data-mode="total" {% if 'total' != current_reporting_mode %}style="display: none;"{% endif %}>
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                        <label for="dynamic-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
+                        <input type="number" name="dynamic_{{ field.dynamic_assignment_id }}_total_value" id="dynamic-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white text-right" {% if not can_edit %}disabled{% endif %}>
+                    </div>
+                </div>
+            </div>
+            <div class="disaggregation-inputs" data-parent-id="{{ field.id }}" data-item-type="dynamic" data-mode="sex" {% if 'sex' != current_reporting_mode %}style="display: none;"{% endif %}>
+                <p class="block text-sm font-medium text-gray-700 mb-2">{{ _('By Sex:') }}</p>
+                <table class="min-w-full border-collapse border border-gray-300 text-xs"><thead><tr>{% for sex_cat in field.effective_sex_categories %}<th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600">{{ _(sex_cat) }}</th>{% endfor %}</tr></thead><tbody><tr>{% for sex_cat in field.effective_sex_categories %}{% set sex_slug = sex_cat|lower|replace(' ', '_')|replace('-', '_') %}<td class="border border-gray-300"><input type="number" name="dynamic_{{ field.dynamic_assignment_id }}_sex_{{ sex_slug }}" value="{{ current_values.get(sex_slug, '') |strip_commas }}" {% if not can_edit %}disabled{% endif %}></td>{% endfor %}</tr></tbody></table>
+            </div>
+            <div class="disaggregation-inputs" data-parent-id="{{ field.id }}" data-item-type="dynamic" data-mode="age" {% if 'age' != current_reporting_mode %}style="display: none;"{% endif %}>
+                <p class="block text-sm font-medium text-gray-700 mb-2">{{ _('By Age:') }}</p>
+                <table class="min-w-full border-collapse border border-gray-300 text-xs"><thead><tr>{% for age_group in field.effective_age_groups %}{% set age_slug = slugify_age_group(age_group) %}<th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600 whitespace-nowrap">{{ _(age_group) }}</th>{% endfor %}</tr></thead><tbody><tr>{% for age_group in field.effective_age_groups %}{% set age_slug = slugify_age_group(age_group) %}<td class="border border-gray-300"><input type="number" name="dynamic_{{ field.dynamic_assignment_id }}_age_{{ age_slug }}" value="{{ current_values.get(age_slug, '') |strip_commas }}" {% if not can_edit %}disabled{% endif %}></td>{% endfor %}</tr></tbody></table>
+            </div>
+            <div class="disaggregation-inputs" data-parent-id="{{ field.id }}" data-item-type="dynamic" data-mode="sex_age" {% if 'sex_age' != current_reporting_mode %}style="display: none;"{% endif %}>
+                <p class="block text-sm font-medium text-gray-700 mb-2">{{ _('By Sex and Age:') }}</p>
+                <table class="min-w-full border-collapse border border-gray-300 text-xs"><thead><tr><th class="border border-gray-300 px-2 py-1 bg-gray-100 text-left font-medium text-gray-600">{{ _('Sex') }}</th>{% for age_group in field.effective_age_groups %}{% set age_slug = slugify_age_group(age_group) %}<th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600 whitespace-nowrap">{{ _(age_group) }}</th>{% endfor %}</tr></thead><tbody>{% for sex_cat in config.DEFAULT_SEX_CATEGORIES %}{% set sex_slug = sex_cat|lower|replace(' ', '_')|replace('-', '_') %}<tr><td class="border border-gray-300 px-2 py-1 font-medium text-gray-700 bg-gray-50">{{ _(sex_cat) }}</td>{% for age_group in field.effective_age_groups %}{% set age_slug = slugify_age_group(age_group) %}{% set field_name_sa = "dynamic_" ~ field.dynamic_assignment_id ~ "_sexage_" ~ sex_slug ~ "_" ~ age_slug %}{% set value_key_sa = sex_slug ~ "_" ~ age_slug %}<td class="border border-gray-300"><input type="number" name="{{ field_name_sa }}" value="{{ current_values.get(value_key_sa, '') |strip_commas }}" {% if not can_edit %}disabled{% endif %}></td>{% endfor %}</tr>{% endfor %}</tbody></table>
+            </div>
+
+            {% if field.indirect_reach %}
+            {# Indirect reach with calculated total displayed adjacent #}
+            <div class="mt-3">
+                <div class="flex flex-wrap items-start gap-3 gap-y-2">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <label for="dynamic-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
+                        <input type="number" name="dynamic_{{ field.dynamic_assignment_id }}_indirect_reach" id="dynamic-indirect-reach-{{ field.id }}" value="{{ (existing_entry_data.get('values', {}).get('indirect', '') if isinstance(existing_entry_data, dict) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white text-right" {% if not can_edit %}disabled{% endif %}>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <label for="dynamic-total-calculated-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Total (Direct + Indirect):') }}</label>
+                        <input type="number" id="dynamic-total-calculated-{{ field.id }}" class="w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm text-right" readonly>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Centralized calculated total - only when no indirect reach #}
+            {% if (allowed_modes and allowed_modes|length > 1) and not field.indirect_reach %}
+                <div class="mt-3 calculated-total-section" data-parent-id="{{ field.id }}" {% if current_reporting_mode == 'total' %}style="display: none;"{% endif %}>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <label for="dynamic-total-calculated-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Total:') }}</label>
+                        <input type="number" id="dynamic-total-calculated-{{ field.id }}" class="w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm text-right" readonly>
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="flex flex-wrap items-start gap-3 gap-y-2">
+                <div class="flex flex-wrap items-center gap-3">
+                    <label for="dynamic-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
+                    <input type="number" name="dynamic_{{ field.dynamic_assignment_id }}_total_value" id="dynamic-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white text-right" {% if not can_edit %}disabled{% endif %}>
+                </div>
+                {% if field.indirect_reach %}
+                <div class="flex flex-wrap items-center gap-3">
+                    <label for="dynamic-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
+                    <input type="number" name="dynamic_{{ field.dynamic_assignment_id }}_indirect_reach" id="dynamic-indirect-reach-{{ field.id }}" value="{{ (existing_entry_data.get('values', {}).get('indirect', '') if isinstance(existing_entry_data, dict) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus-border-green-500 sm:text-sm bg-white text-right" {% if not can_edit %}disabled{% endif %}>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <label for="dynamic-total-calculated-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Total (Direct + Indirect):') }}</label>
+                    <input type="number" id="dynamic-total-calculated-{{ field.id }}" class="w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm text-right" readonly>
+                </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% elif field.field_type_for_js|lower == 'percentage' %}
+        <div class="inline-flex items-center gap-1">
+            <input type="number" name="dynamic_{{ field.dynamic_assignment_id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="w-20 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white text-right" placeholder="0" {% if not can_edit %}disabled{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}>
+            <span class="text-gray-700 font-medium text-sm">%</span>
+        </div>
+    {% elif field.field_type_for_js|lower == 'textarea' %}
+        <textarea name="dynamic_{{ field.dynamic_assignment_id }}_standard_value" id="field-{{ field.id }}" rows="3" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>{{ raw_value_indicator if raw_value_indicator is not none else '' }}</textarea>
+    {% elif field.field_type_for_js|lower == 'yesno' %}
+        {% set current_yesno_val = (existing_entry_data.get('values').get('value') | lower) if (existing_entry_data is mapping and existing_entry_data.get('values') and existing_entry_data.get('values').get('value')) else (raw_value_indicator | lower if raw_value_indicator is not none else '') %}
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="dynamic_{{ field.dynamic_assignment_id }}_standard_value" value="yes" class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500" {% if current_yesno_val == 'yes' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
+                    <span class="ml-2 text-sm font-medium text-green-700">{{ _('Yes') }}</span>
+                </label>
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="dynamic_{{ field.dynamic_assignment_id }}_standard_value" value="no" class="form-checkbox h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500" {% if current_yesno_val == 'no' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
+                    <span class="ml-2 text-sm font-medium text-red-700">{{ _('No') }}</span>
+                </label>
+            </div>
+        </div>
+    {% elif field.field_type_for_js|lower == 'date' %}
+        <input type="date" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (raw_value_indicator is none or raw_value_indicator|string|lower == 'none') else raw_value_indicator }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
+    {% elif field.field_type_for_js == 'datetime' %}
+        <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (raw_value_indicator is none or raw_value_indicator|string|lower == 'none') else raw_value_indicator }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
+    {% else %}
+        <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ raw_value_indicator if raw_value_indicator is not none else '' }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
+    {% endif %}
+</div>

@@ -1,0 +1,1316 @@
+{# templates/form_builder.html #}
+{% extends "core/layout.html" %}
+{% from "components/_form_helpers.html" import render_field, render_submit_button, render_checkbox_group %}
+{% from "components/_builder_items.html" import items_table_header, item_properties, item_actions %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_profile_icon.html" import profile_icon %}
+{% from "macros/translation_modal.html" import translation_modal, translation_matrix_modal %}
+{% from "components/_floating_progress_banner.html" import floating_progress_banner %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set actions = [
+    {
+        'type': 'link',
+        'text': _('Preview'),
+        'icon': 'fas fa-eye',
+        'url': url_for('forms.preview_template', template_id=template.id) + '?version_id=' + (active_version_id | string),
+        'classes': 'professional-action-btn professional-action-btn-blue',
+        'attributes': {'title': _('Preview Template'), 'target': '_blank'}
+    },
+    {
+        'type': 'link',
+        'text': _('Audit Trail'),
+        'icon': 'fas fa-history',
+        'url': url_for('analytics.audit_trail') + '?description=' + (template.name | urlencode) + '&endpoint=form_builder',
+        'classes': 'professional-action-btn professional-action-btn-purple',
+        'attributes': {'title': _('View Audit Trail for this Template')}
+    },
+    {
+        'type': 'button',
+        'text': _('Excel Import/Export'),
+        'icon': 'fas fa-file-excel',
+        'classes': 'professional-action-btn professional-action-btn-green',
+        'attributes': {'id': 'excel-options-btn', 'title': _('Export or import template structure to/from Excel')}
+    },
+    {
+        'type': 'button',
+        'text': _('Auto Translate All'),
+        'icon': 'fas fa-magic',
+        'classes': 'professional-action-btn professional-action-btn-orange',
+        'attributes': {'id': 'auto-translate-all-btn', 'title': _('Auto-translate all blank template names, section names, questions, document fields, and page names to all languages')}
+    }
+] %}
+
+{# Build title with version button inline #}
+{% if active_version_number %}
+    {% set version_btn_html %}
+        <button type="button" id="versions-modal-btn" class="inline-flex items-center ml-3 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-1 px-3 text-sm shadow-sm transition-all duration-200" title="{{ _('Manage template versions') }}">
+            <i class="fas fa-code-branch w-3 h-3 mr-1.5"></i>{{ _('Version') }} {{ active_version_number }}
+        </button>
+    {% endset %}
+    {% set title_with_version = title ~ ' ' ~ version_btn_html %}
+{% else %}
+    {% set title_with_version = title %}
+{% endif %}
+
+{{ page_header(
+    title=title_with_version|safe,
+    icon='fas fa-pen',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Template Management'), 'url': url_for('form_builder.manage_templates')},
+        {'name': _('Edit Template')}
+    ],
+    actions=actions
+) }}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static_url('css/form-builder-page.css') }}">
+{% endblock %}
+
+<script nonce="{{ csp_nonce() }}">
+    (function(){ try { document.documentElement.classList.add('form-builder-loading'); } catch(e) {} })();
+</script>
+
+<div class="container mx-auto px-4 py-6">
+
+    {# Loading overlay (shown until JS signals formBuilderInitialized) #}
+    <div id="form-builder-loading" class="w-full py-16 flex items-center justify-center" style="display:flex;">
+        <div class="text-center">
+            <div class="flex items-center justify-center">
+                <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+            </div>
+            <p class="mt-3 text-gray-700 font-medium">{{ _('Loading form builder…') }}</p>
+            <p id="form-builder-loading-detail" class="text-sm text-gray-600 mt-1">{{ _('Preparing components. Please wait.') }}</p>
+            {# display:none inline: .btn sets display:inline-flex and can override Tailwind .hidden #}
+            <button type="button" id="form-builder-loading-reload" class="btn btn-primary mt-4" style="display: none;" aria-hidden="true">
+                <i class="fas fa-sync-alt mr-2"></i>{{ _('Reload') }}
+            </button>
+        </div>
+    </div>
+
+    <div id="form-builder-ui">
+
+    {{ floating_progress_banner(
+        'form-builder-save-banner',
+        'form-builder-save-banner-text',
+        'form-builder-save-banner-detail',
+        'form-builder-save-banner-percent',
+        'form-builder-save-banner-bar',
+        spinner_id='form-builder-save-banner-spinner',
+        spinner_classes='hidden mt-0.5 animate-spin rounded-full h-4 w-4 flex-shrink-0',
+        title_default=_('Saving…'),
+        detail_default='',
+        detail_classes='text-xs truncate hidden',
+        percent_classes='text-xs font-medium tabular-nums flex-shrink-0 hidden',
+        buttons=[
+            {
+                'id': 'form-builder-save-banner-retry',
+                'label': _('Retry'),
+                'aria_label': _('Retry'),
+                'classes': 'hidden text-xs font-medium px-3 py-1.5 rounded border transition-colors',
+                'style': 'color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); background: transparent;'
+            },
+            {
+                'id': 'form-builder-save-banner-close',
+                'label': _('Dismiss'),
+                'aria_label': _('Dismiss'),
+                'classes': 'text-xs font-medium px-3 py-1.5 rounded border transition-colors',
+                'style': 'color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); background: transparent;'
+            }
+        ]
+    ) }}
+
+    {# Debug: warn if gettext function '_' is not callable in this rendering context #}
+    {% if _ is not callable %}
+    <script nonce="{{ csp_nonce() }}">
+    console.error('FormBuilder: gettext function (_) is not callable', {
+      templateId: {{ template.id }},
+      templateName: {{ template.name | tojson }}
+    });
+    </script>
+    {% endif %}
+
+    {# Notice: Draft version - prompt to deploy #}
+    {% if selected_version_is_draft %}
+    <div class="mb-6 rounded-lg border border-blue-300 bg-blue-50 text-blue-800 p-4 flex items-start justify-between">
+        <div class="flex items-start">
+            <i class="fas fa-info-circle mr-3 mt-1"></i>
+            <div>
+                <p class="font-semibold">{{ _('You are editing a draft version') }}</p>
+                <p class="text-sm mt-1">{{ _('This version is not yet published. When you\'re ready, deploy it to make it the live version.') }}</p>
+                {% if invalid_indicator_items_count and invalid_indicator_items_count > 0 %}
+                    <p class="text-sm mt-2 text-red-700 font-semibold">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        {{ _('This version has %(count)s indicator item(s) with missing/invalid indicator references. Fix them before deploying.', count=invalid_indicator_items_count) }}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="ml-4 flex-shrink-0">
+            <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-block deploy-version-form-banner">
+                <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
+                <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                <button type="button" id="deploy-version-from-banner"
+                        {% if invalid_indicator_items_count and invalid_indicator_items_count > 0 %}disabled aria-disabled="true"{% endif %}
+                        class="btn btn-success btn-sm inline-flex items-center {% if invalid_indicator_items_count and invalid_indicator_items_count > 0 %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}">
+                    <i class="fas fa-rocket w-4 h-4 mr-2"></i>{{ _('Deploy Version') }}
+                </button>
+            </form>
+        </div>
+    </div>
+    <script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function () {
+        const deployBtn = document.getElementById('deploy-version-from-banner');
+        if (deployBtn) {
+            deployBtn.addEventListener('click', function () {
+                const form = this.closest('form');
+                if (!form) return;
+
+                const message = {{ _("Deploy this version? This will publish it as the live version.") | tojson }};
+                const doSubmit = () => {
+                    form.dataset.confirmed = 'true';
+                    if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                        window.FormBuilderAjax.submit(form);
+                    } else if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                };
+                if (window.showSubmitConfirmation) {
+                    window.showSubmitConfirmation(
+                        message,
+                        () => {
+                            doSubmit();
+                        },
+                        null
+                    );
+                } else if (window.showConfirmation) {
+                    window.showConfirmation(
+                        message,
+                        () => {
+                            doSubmit();
+                        },
+                        null,
+                        {{ _('Deploy') | tojson }},
+                        {{ _('Cancel') | tojson }},
+                        {{ _('Deploy Version?') | tojson }}
+                    );
+                } else {
+                    doSubmit();
+                }
+            });
+        }
+    });
+    </script>
+    {% endif %}
+
+    {# Notice: Published/Archived version guard with quick open-versions action #}
+    {% if not selected_version_is_draft %}
+    <div class="mb-6 rounded-lg border {% if selected_version_status == 'archived' %}border-yellow-300 bg-yellow-50 text-yellow-800{% else %}border-red-400 bg-red-50 text-red-800{% endif %} p-4 flex items-start justify-between">
+        <div class="flex items-start">
+            <i class="fas {% if selected_version_status == 'archived' %}fa-lock{% else %}fa-exclamation-triangle{% endif %} mr-3 mt-1"></i>
+            <div>
+                {% if selected_version_status == 'archived' %}
+                    <p class="font-semibold">{{ _('Archived version: all edits and additions are disabled') }}</p>
+                    <p class="text-sm mt-1">{{ _('Restore or create a draft from another version to make changes.') }}</p>
+                {% else %}
+                    <p class="font-semibold">{{ _('WARNING: You are making direct changes to a PUBLISHED version') }}</p>
+                    <p class="text-sm mt-1">{{ _('Changes made here will immediately affect the live template. Consider creating a draft version instead for safer editing.') }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="ml-4 flex-shrink-0">
+            <button type="button" id="open-versions-from-banner" class="btn btn-primary">
+                <i class="fas fa-code-branch w-4 h-4 mr-2"></i>{{ _('Open Versions') }}
+            </button>
+        </div>
+    </div>
+    <script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function () {
+        const openBtn = document.getElementById('open-versions-from-banner');
+        if (openBtn) {
+            openBtn.addEventListener('click', function () {
+                const trigger = document.getElementById('versions-modal-btn');
+                if (trigger && typeof trigger.click === 'function') {
+                    trigger.click();
+                }
+            });
+        }
+
+        // Only disable and grey out common edit/add controls for archived versions
+        // Published versions now allow editing with a warning notice
+        {% if selected_version_status == 'archived' %}
+        try {
+            const whitelistIds = new Set(['versions-modal-btn', 'open-versions-from-banner']);
+            const whitelistText = [{{ _('Preview') | tojson }}, {{ _('Open Versions') | tojson }}, {{ _('Audit Trail') | tojson }}];
+            const keywords = [{{ _('Add') | tojson }}, {{ _('Edit') | tojson }}, {{ _('New') | tojson }}, {{ _('Duplicate') | tojson }}, {{ _('Clone') | tojson }}, {{ _('Create') | tojson }}, {{ _('Remove') | tojson }}, {{ _('Delete') | tojson }}];
+            const iconClasses = ['fa-plus', 'fa-plus-circle', 'fa-pencil', 'fa-pen', 'fa-trash', 'fa-times', 'fa-clone', 'fa-copy', 'fa-minus'];
+
+            const candidates = Array.from(document.querySelectorAll('button, a'));
+            candidates.forEach(function (el) {
+                const id = el.id || '';
+                if (whitelistIds.has(id)) { return; }
+                // Keep all controls inside the Versions modal enabled
+                if (el.closest('#versions-modal')) { return; }
+                const text = (el.textContent || '').trim();
+                if (whitelistText.some(function (w) { return text.includes(w); })) { return; }
+
+                const hasEditIcon = iconClasses.some(function (cls) { return el.querySelector('.' + cls) !== null; });
+                const isEditKeyword = keywords.some(function (k) { return text.includes(k); });
+                if (!(hasEditIcon || isEditKeyword)) { return; }
+
+                if (el.tagName.toLowerCase() === 'button') {
+                    el.disabled = true;
+                }
+                el.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+                el.setAttribute('aria-disabled', 'true');
+                if (el.tagName.toLowerCase() === 'a') {
+                    el.addEventListener('click', function (e) { e.preventDefault(); }, { capture: true });
+                }
+            });
+
+            // Explicitly disable delete section/item forms and their submit buttons
+            const deleteForms = Array.from(document.querySelectorAll('form.delete-section-form, form.delete-item-form'));
+            deleteForms.forEach(function (formEl) {
+                formEl.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+                formEl.setAttribute('aria-disabled', 'true');
+                formEl.addEventListener('submit', function (e) { e.preventDefault(); }, { capture: true });
+                const submitButtons = Array.from(formEl.querySelectorAll('button[type="submit"]'));
+                submitButtons.forEach(function (btn) {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+                    btn.setAttribute('aria-disabled', 'true');
+                });
+            });
+        } catch (_e) {
+            // No-op
+        }
+        {% endif %}
+    });
+    </script>
+    {% endif %}
+
+{# Template Details Section #}
+{% include 'forms/form_builder/partials/_template_details.html' %}
+
+<!-- Template data for JavaScript -->
+<script type="application/json" id="translation-data">
+{
+    "supportedLanguages": {{ SUPPORTED_LANGUAGES|tojson }},
+    "languageDisplayNames": {{ LANGUAGE_DISPLAY_NAMES|tojson }}
+}
+</script>
+
+<!-- Import translation modal components -->
+<script type="module" nonce="{{ csp_nonce() }}">
+    import { TranslationModal } from '/static/js/components/translation-modal.js';
+    import { TranslationMatrix } from '/static/js/components/translation-matrix.js';
+
+    // Make components available globally
+    window.TranslationModal = TranslationModal;
+    window.TranslationMatrix = TranslationMatrix;
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+    // Pagination toggle - translation utilities are provided by components
+    document.addEventListener('DOMContentLoaded', function () {
+        const paginatedCheckbox = document.querySelector('input[name="is_paginated"]');
+        const managePagesContainer = document.getElementById('manage-pages-fields-container');
+        const formContainer = document.getElementById('edit-template-details-form-container');
+        if (paginatedCheckbox && managePagesContainer) {
+            const updateVisibility = () => {
+                if (paginatedCheckbox.checked) {
+                    managePagesContainer.classList.remove('hidden');
+                    formContainer.classList.add('has-pages');
+                } else {
+                    managePagesContainer.classList.add('hidden');
+                    formContainer.classList.remove('has-pages');
+                }
+            };
+            updateVisibility();
+            paginatedCheckbox.addEventListener('change', updateVisibility);
+        }
+    });
+</script>
+
+{# Add Section Button and Toggle Archived Items #}
+<div class="mb-8 flex items-center justify-between gap-3">
+    <div class="flex items-center flex-wrap gap-3">
+        <button type="button" id="add-section-btn" class="btn btn-success">
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>{{ _('Add Section') }}</span>
+        </button>
+        <button type="button" id="template-variables-btn" class="btn template-variables-btn--empty">
+            <i class="fas fa-code" aria-hidden="true"></i>
+            <span id="template-variables-btn-text">{{ _('Template Variables') }}</span>
+            <span id="template-variables-count" class="tabular-nums" aria-live="polite"></span>
+        </button>
+        {% if has_archived_items %}
+        <div class="inline-flex items-center">
+            <button type="button" id="toggle-archived-items-btn" class="group relative inline-flex items-center px-4 py-2.5 transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 bg-gradient-to-r from-gray-50 to-gray-100" data-hide-text="{{ _('Hide Archived Items/Sections') }}" data-show-text="{{ _('Show Archived Items/Sections') }}" aria-label="{{ _('Toggle archived items') }}">
+                <div class="flex items-center space-x-3">
+                    <div class="relative flex items-center justify-center w-5 h-5">
+                        <i id="toggle-archived-icon" class="fas fa-eye-slash text-gray-500 transition-all duration-300 ease-in-out transform relative z-10"></i>
+                    </div>
+                    <span id="toggle-archived-text" class="text-sm font-semibold text-gray-700 transition-colors duration-300">{{ _('Archived Hidden') }}</span>
+                    <div id="toggle-archived-indicator" class="relative w-10 h-5 rounded-full transition-all duration-300 ease-in-out bg-gray-300 shadow-inner">
+                        <div id="toggle-archived-slider" class="absolute h-4 w-4 rounded-full bg-white transition-transform duration-300 ease-in-out" style="top: 2.5px; left: 3px; transform: translateX(0);"></div>
+                    </div>
+                </div>
+                <div id="toggle-archived-ripple" class="absolute inset-0 rounded-lg bg-blue-400 opacity-0 scale-0 transition-all duration-300 ease-in-out pointer-events-none"></div>
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="flex items-center gap-2 ml-auto">
+        <button type="button"
+                id="toggle-all-pages-btn"
+                class="inline-flex items-center py-1.5 text-gray-600 text-sm font-medium hover:text-gray-900 transition-colors focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                data-collapse-text="{{ _('Collapse all pages') }}"
+                data-expand-text="{{ _('Expand all pages') }}"
+                title="{{ _('Collapse/expand all pages') }}">
+            <i class="fas fa-angle-double-up w-4 h-4 mr-1.5"></i>
+            <span class="toggle-all-pages-text">{{ _('Collapse all pages') }}</span>
+        </button>
+        <button type="button"
+                id="toggle-all-sections-btn"
+                class="inline-flex items-center py-1.5 text-gray-600 text-sm font-medium hover:text-gray-900 transition-colors focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                data-collapse-text="{{ _('Collapse all sections') }}"
+                data-expand-text="{{ _('Expand all sections') }}"
+                title="{{ _('Collapse/expand all sections and sub-sections') }}">
+            <i class="fas fa-angle-double-up w-4 h-4 mr-1.5"></i>
+            <span class="toggle-all-sections-text">{{ _('Collapse all sections') }}</span>
+        </button>
+    </div>
+</div>
+
+{# Existing Sections and their Items (Indicators, Document Fields, or Questions) #}
+{% include 'forms/form_builder/partials/_sections_container.html' %}
+
+
+{# Modals Container #}
+{% include 'forms/form_builder/partials/_versions_modal.html' %}
+
+{# Modals - Excel and Variables #}
+{% include 'forms/form_builder/partials/_excel_modal.html' %}
+{% include 'forms/form_builder/partials/_variables_modal.html' %}
+
+{# Section Modal #}
+{% include 'forms/form_builder/partials/_section_modal.html' %}
+
+{# Section Translation Modal #}
+{{ translation_modal(
+    modal_id='section-translation-modal',
+    modal_title=_('Section Name Translations'),
+    description=_('Add translations for this section name in different languages. You can also override the English text here if needed.'),
+    context='section',
+    show_auto_translate=true,
+    css_prefix='section',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Template Name Translations Modal #}
+{{ translation_modal(
+    modal_id='template-name-translations-modal',
+    modal_title=_('Template Name Translations'),
+    description=_('Add translations for this template name in different languages. You can also override the English text here if needed.'),
+    context='template_name',
+    show_auto_translate=true,
+    css_prefix='template-name',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Page Translation Matrix Modal #}
+{{ translation_matrix_modal(
+    modal_id='page-translation-matrix-modal',
+    modal_title=_('Page Name Translations Matrix'),
+    description=_('Manage translations for all page names. Original English strings are shown in row headers, and you can add translations for each language.'),
+    context='pages',
+    table_body_id='page-translation-matrix-tbody',
+    show_auto_translate=true,
+    css_prefix='pages-matrix',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Question Options Translation Matrix Modal #}
+{{ translation_matrix_modal(
+    modal_id='question-options-translation-matrix-modal',
+    modal_title=_('Question Options Translations Matrix'),
+    context='options',
+    table_body_id='question-options-translation-matrix-tbody',
+    show_auto_translate=true,
+    css_prefix='options-matrix',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Item Type Picker Modal - Choose type before opening item config #}
+{% include 'forms/form_builder/partials/_item_type_picker_modal.html' %}
+
+{# ITEM: Add/Edit Item Modal (Handles all item types) #}
+{% include 'forms/form_builder/partials/_item_modal.html' %}
+
+{# Document field functionality is now part of the unified item modal above #}
+{# Edit Indicator Modal removed: item modal handles editing #}
+{# Edit Document Field Modal removed: unified item modal handles editing #}
+
+
+{# Edit Question Modal #}
+{% include 'forms/form_builder/partials/_question_modal.html' %}
+
+{# Translation Modal #}
+{{ translation_modal(
+    modal_id='translation-modal',
+    modal_title=_('Item Translations'),
+    context='form_item',
+    tabs=[
+        {'id': 'labels', 'name': _('Labels')},
+        {'id': 'definitions', 'name': _('Definitions')}
+    ],
+    show_auto_translate=true,
+    css_prefix='translation',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Document Field Translation Modal #}
+{{ translation_modal(
+    modal_id='document-translation-modal',
+    modal_title=_('Document Field Translations'),
+    context='document',
+    tabs=[
+        {'id': 'labels', 'name': _('Document Labels')},
+        {'id': 'descriptions', 'name': _('Document Descriptions')}
+    ],
+    show_auto_translate=true,
+    css_prefix='document',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Matrix Item Translation Modal #}
+{{ translation_modal(
+    modal_id='matrix-translation-modal',
+    modal_title=_('Matrix Item Translations'),
+    context='form_item',
+    tabs=[
+        {'id': 'labels', 'name': _('Matrix Labels')},
+        {'id': 'descriptions', 'name': _('Matrix Descriptions')}
+    ],
+    show_auto_translate=true,
+    css_prefix='matrix',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Matrix Legend Text Translation Modal #}
+{{ translation_modal(
+    modal_id='matrix-legend-text-translation-modal',
+    modal_title=_('Legend Text Translations'),
+    context='form_item',
+    show_auto_translate=true,
+    css_prefix='matrix-legend-text',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Matrix Column Headers Translation Matrix Modal #}
+{{ translation_matrix_modal(
+    modal_id='matrix-column-headers-translation-matrix-modal',
+    modal_title=_('Matrix Column Headers Translations Matrix'),
+    description=_('Manage translations for all column headers. Original English strings are shown in row headers, and you can add translations for each language.'),
+    context='column_headers',
+    table_body_id='matrix-column-headers-translation-matrix-tbody',
+    show_auto_translate=true,
+    css_prefix='column-headers-matrix',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+
+{# Auto-Translate Modal Configuration #}
+{% set auto_translate_config = {
+    'title': _('Auto-Translate All Template Items'),
+    'description': _('Translate all blank template names, section names, questions, document fields, and page names to all languages'),
+    'endpoint': url_for('utilities.api_auto_translate'),
+    'item_type': 'template items',
+    'permission_context': 'templates',
+    'permission_code': 'admin.templates.edit'
+} %}
+
+{# Include centralized auto-translate modal #}
+{% include "components/auto_translate_modal.html" with context %}
+
+{# Include centralized auto-translate modal JavaScript #}
+{% include "components/auto_translate_modal_js.html" with context %}
+
+{# Template data for JavaScript #}
+<script type="application/json" id="template-data">
+{
+    "translatableLanguages": {{ TRANSLATABLE_LANGUAGES | tojson | safe }},
+    "templateNameTranslations": {{ template.name_translations|tojson|safe if template.name_translations else '{}' }},
+    "templateId": {{ template.id }},
+    "templateName": {{ template.name|tojson|safe }}
+}
+</script>
+
+<script type="application/json" id="translation-endpoints">{"bulkUpdateTranslations": "{{ url_for('utilities.api_bulk_update_translations') }}"}</script>
+
+{# Data embedding for JavaScript #}
+<script type="application/json" id="csrf-token-data">{{ section_form.csrf_token.current_token | tojson | safe }}</script>
+<script type="application/json" id="indicator-bank-choices-data">{{ indicator_bank_choices_with_units_for_js | tojson | safe }}</script>
+<script type="application/json" id="disaggregation-choices-data">{{ add_indicator_modal_form.allowed_disaggregation_options.choices | tojson | safe }}</script>
+<script type="application/json" id="all-template-items-data">{{ all_template_items_for_js | tojson | safe }}</script>
+<script type="application/json" id="sections-with-items-data">{{ sections_with_items_for_js | tojson | safe }}</script>
+<script type="application/json" id="question-type-choices-data">{{ question_type_choices_for_js | tojson | safe }}</script>
+<script type="application/json" id="all-template-sections-data">{{ all_template_sections_for_js | tojson | safe }}</script>
+<script type="application/json" id="all-template-pages-data">{{ all_template_pages_for_js | tojson | safe }}</script>
+<script type="application/json" id="indicator-fields-config-data">{{ indicator_fields_config | tojson | safe }}</script>
+<script type="application/json" id="custom-field-types-data">{{ custom_field_types | tojson | safe }}</script>
+
+    </div> {# /#form-builder-ui #}
+    </div> {# /.container #}
+{% endblock %}
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+    // Note: Browser tracking prevention warnings (e.g., "Tracking Prevention blocked access to storage for gstatic.com")
+    // are harmless privacy features and can be safely ignored. They occur when third-party resources (like Select2)
+    // attempt to access storage but are blocked by the browser's privacy protection.
+
+    // Expose template ID to JavaScript (used by item-modal.js for API URLs)
+    window.templateId = "{{ template.id }}";
+
+    // Plugin-provided variables for section/item labels (e.g. [EO1], [EO2] from Emergency Operations plugin)
+    window.pluginLabelVariables = {{ plugin_label_variables|default([])|tojson|safe }};
+    // Built-in metadata tokens: usable directly as [entity_name], [template_name], etc.
+    // These do NOT require creating a Template Variable first.
+    window.builtInMetadataVariables = [
+        { key: 'entity_name', label: {{ _('Entity Name') | tojson }} },
+        { key: 'entity_name_hierarchy', label: {{ _('Entity Name (with hierarchy)') | tojson }} },
+        { key: 'entity_id', label: {{ _('Entity ID') | tojson }} },
+        { key: 'entity_type', label: {{ _('Entity Type') | tojson }} },
+        { key: 'national_society_name', label: {{ _('National Society Name') | tojson }} },
+        { key: 'template_name', label: {{ _('Template Name') | tojson }} },
+        { key: 'assignment_period', label: {{ _('Assignment Period') | tojson }} },
+    ];
+
+    // Handle options translations for edit question form
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get the sections data that contains the questions with translations
+        const sectionsData = JSON.parse(document.getElementById('sections-with-items-data').textContent);
+
+        // Function to populate options translations when edit question form is shown
+        function populateOptionsTranslations(questionId) {
+            // Find the question data
+            let questionData = null;
+            for (const section of sectionsData) {
+                for (const question of section.questions) {
+                    if (question.id === questionId) {
+                        questionData = question;
+                        break;
+                    }
+                }
+                if (questionData) break;
+            }
+
+            if (questionData && questionData.options_translations) {
+                const translationsInput = document.getElementById('edit_question_modal_options_translations_input');
+                if (translationsInput) {
+                    translationsInput.value = JSON.stringify(questionData.options_translations);
+                }
+            }
+        }
+
+        // Expose the function globally so it can be called when the edit question modal is shown
+        window.populateOptionsTranslations = populateOptionsTranslations;
+
+        // Also try to populate when the edit question modal is shown
+        const editQuestionModal = document.getElementById('edit-question-modal');
+        if (editQuestionModal) {
+            // Listen for when the modal is shown
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        if (!editQuestionModal.classList.contains('hidden')) {
+                            // Modal is shown, try to populate options translations
+                            const questionIdInput = document.getElementById('edit-question-id-input-modal');
+                            if (questionIdInput && questionIdInput.value) {
+                                populateOptionsTranslations(parseInt(questionIdInput.value));
+                            }
+                        }
+                    }
+                });
+            });
+
+            observer.observe(editQuestionModal, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+    });
+
+    // Get CSRF token from meta tag
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+</script>
+    {# Inline script for template-specific messages - will be moved to external file with data attributes #}
+    <script nonce="{{ csp_nonce() }}">
+        // Store template messages for use by external modules
+        window.formBuilderMessages = {
+            deployVersion: {{ _("Deploy this version? This will publish it as the live version.") | tojson }},
+            deleteVersion: {{ _("Delete this version? This cannot be undone.") | tojson }}
+        };
+    </script>
+    <script src="{{ static_url('js/floating-progress-banner.js') }}"></script>
+    <script type="module" src="{{ static_url('js/form_builder/main.js') }}"></script>
+    <script type="module" src="{{ static_url('js/form_builder/modules/section-modal-variables.js') }}"></script>
+    <script src="{{ static_url('js/template-access-modal.js') }}"></script>
+    <script type="module" nonce="{{ csp_nonce() }}">
+        import { initFormBuilder } from '/static/js/form_builder/modules/form-builder-init.js';
+        try {
+            initFormBuilder();
+            if (document.body && document.body.dataset) {
+                document.body.dataset.formBuilderInitialized = 'true';
+            }
+            document.dispatchEvent(new CustomEvent('formBuilder:initialized'));
+
+            // Console debugging: show which scripts/resources came from cache vs network (hint).
+            // Gated by formBuilderDebug so it only runs when form-builder-loader is enabled.
+            setTimeout(() => {
+                try {
+                    const fb = window.formBuilderDebug;
+                    if (!fb || !fb.isEnabled || !fb.isEnabled('form-builder-loader')) return;
+                    if (!performance || !performance.getEntriesByType) return;
+                    const entries = performance.getEntriesByType('resource') || [];
+                    const rows = entries
+                        .filter(e => typeof e.name === 'string' && e.name.includes('/static/js/'))
+                        .map(e => ({
+                            name: e.name.split('?')[0],
+                            initiatorType: e.initiatorType,
+                            // transferSize==0 often indicates cache (memory/disk), but can be 0 for other reasons; still a useful hint.
+                            source: (typeof e.transferSize === 'number')
+                                ? (e.transferSize === 0 ? 'cache' : 'network')
+                                : 'unknown',
+                            transferKB: (typeof e.transferSize === 'number') ? Math.round(e.transferSize / 1024) : undefined,
+                            decodedKB: (typeof e.decodedBodySize === 'number') ? Math.round(e.decodedBodySize / 1024) : undefined,
+                            durationMs: (typeof e.duration === 'number') ? Math.round(e.duration) : undefined
+                        }));
+
+                    window.__clientGroupCollapsed && window.__clientGroupCollapsed(`[form-builder] /static/js/* resources (${rows.length})`);
+                    window.__clientTable && window.__clientTable(rows);
+                    window.__clientGroupEnd && window.__clientGroupEnd();
+                } catch (e) {
+                    if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('form-builder-loader')) {
+                        window.__clientDebug && window.__clientDebug('[form-builder] failed to read resource timing', e);
+                    }
+                }
+            }, 0);
+        } catch (e) {
+            // Surface a generic message in the loading box; details stay in console.
+            console.error('FormBuilder init failed:', e);
+            document.dispatchEvent(new CustomEvent('formBuilder:failed'));
+            throw e;
+        }
+    </script>
+    <script type="module" nonce="{{ csp_nonce() }}" src="{{ static_url('js/form_builder/modules/translation-page.js') }}"></script>
+    <script type="module" nonce="{{ csp_nonce() }}" src="{{ static_url('js/form_builder/modules/translation-page-specific.js') }}"></script>
+
+    <script nonce="{{ csp_nonce() }}">
+        // Loading spinner controller (debug logging lives in /static/js/form_builder/modules/debug.js).
+        (function () {
+            'use strict';
+            var RELOAD_BUTTON_MIN_MS = 8000;
+            var loadStartedAt = Date.now();
+            var reloadRevealTimer = null;
+
+            const loadingEl = document.getElementById('form-builder-loading');
+            const detailEl = document.getElementById('form-builder-loading-detail');
+            const reloadBtn = document.getElementById('form-builder-loading-reload');
+
+            function isReady() {
+                return document.body && document.body.dataset && document.body.dataset.formBuilderInitialized === 'true';
+            }
+
+            function clearReloadRevealTimer() {
+                if (reloadRevealTimer) {
+                    clearTimeout(reloadRevealTimer);
+                    reloadRevealTimer = null;
+                }
+            }
+
+            function hideReloadButton() {
+                try {
+                    if (!reloadBtn) return;
+                    reloadBtn.style.display = 'none';
+                    reloadBtn.setAttribute('aria-hidden', 'true');
+                } catch (_e) { /* no-op */ }
+            }
+
+            function showReloadButton() {
+                try {
+                    if (isReady()) return;
+                    if (!reloadBtn) return;
+                    reloadBtn.style.display = 'inline-flex';
+                    reloadBtn.removeAttribute('aria-hidden');
+                } catch (_e) { /* no-op */ }
+            }
+
+            function scheduleReloadButtonReveal() {
+                clearReloadRevealTimer();
+                var elapsed = Date.now() - loadStartedAt;
+                var wait = Math.max(0, RELOAD_BUTTON_MIN_MS - elapsed);
+                reloadRevealTimer = setTimeout(function () {
+                    reloadRevealTimer = null;
+                    if (!isReady()) {
+                        showReloadButton();
+                    }
+                }, wait);
+            }
+
+            const hideLoading = () => {
+                try {
+                    clearReloadRevealTimer();
+                    hideReloadButton();
+                    if (loadingEl) loadingEl.style.display = 'none';
+                    document.documentElement.classList.remove('form-builder-loading');
+                } catch (_e) { /* no-op */ }
+            };
+
+            const showFailureMessage = () => {
+                try {
+                    if (detailEl) detailEl.textContent = {{ _("We ran into an issue while loading. Please reload the page.") | tojson }};
+                    scheduleReloadButtonReveal();
+                } catch (_e) { /* no-op */ }
+            };
+
+            if (reloadBtn) {
+                reloadBtn.addEventListener('click', () => window.location.reload());
+            }
+
+            if (isReady()) {
+                hideLoading();
+            } else {
+                document.addEventListener('formBuilder:initialized', hideLoading, { once: true });
+                document.addEventListener('formBuilder:failed', showFailureMessage, { once: true });
+                scheduleReloadButtonReveal();
+            }
+
+            setTimeout(() => {
+                if (!isReady() && detailEl) {
+                    detailEl.textContent = '{{ _("Still loading…") }}';
+                }
+            }, 15000);
+
+            // Do not tie reload visibility to generic window error/rejection events: many pages log
+            // benign errors while the builder is still loading. Confirmed failures use formBuilder:failed.
+        })();
+    </script>
+
+    <!-- Template Access Modal JavaScript -->
+    <script nonce="{{ csp_nonce() }}">
+        document.addEventListener('DOMContentLoaded', function() {
+            const templateAccessBtn = document.getElementById('template-access-btn');
+            const templateAccessSummary = document.getElementById('template-access-summary');
+            const ownerField = document.getElementById('template-owner-field');
+            const sharedFieldsContainer = document.getElementById('template-shared-fields');
+
+            if (templateAccessBtn && templateAccessSummary) {
+                // Update summary text based on current values
+                function updateAccessSummary() {
+                    const currentOwner = ownerField ? String(ownerField.value || '').trim() : '';
+                    // Count shared users, excluding the owner
+                    const sharedInputs = Array.from(sharedFieldsContainer.querySelectorAll('input[type="hidden"]'))
+                        .map(input => input.value)
+                        .filter(value => value && String(value) !== String(currentOwner)); // Exclude owner and empty values
+                    const sharedCount = sharedInputs.length;
+
+                    let summary = {{ _('Manage template access...') | tojson }};
+                    if (currentOwner || sharedCount > 0) {
+                        const parts = [];
+                        if (currentOwner) {
+                            // Find the owner's name from the choices
+                            const ownerChoices = {{ form.owned_by.choices | tojson | safe }};
+                            const ownerChoice = ownerChoices.find(choice => String(choice[0]) === String(currentOwner));
+                            const ownerName = ownerChoice ? ownerChoice[1] : {{ _('Unknown') | tojson }};
+                            parts.push({{ _('Owner: %(name)s', name='${ownerName}') | tojson }}.replace('${ownerName}', ownerName));
+                        }
+                        if (sharedCount > 0) {
+                            parts.push({{ _('%(count)s shared', count='${sharedCount}') | tojson }}.replace('${sharedCount}', sharedCount));
+                        }
+                        summary = parts.join(', ');
+                    }
+                    templateAccessSummary.textContent = summary;
+                }
+
+                // Initialize summary
+                updateAccessSummary();
+
+                // Handle button click
+                templateAccessBtn.addEventListener('click', function() {
+                    // Prepare data for the modal
+                    const ownerChoices = {{ form.owned_by.choices | tojson | safe }};
+                    const sharedChoices = {{ form.shared_with_admins.choices | tojson | safe }};
+                    const currentOwner = ownerField ? String(ownerField.value || '').trim() : '';
+                    const currentShared = Array.from(sharedFieldsContainer.querySelectorAll('input[type="hidden"]'))
+                        .map(input => input.value)
+                        .filter(value => value); // Remove empty values
+
+                    // Show the modal
+                    if (window.showTemplateAccessModal) {
+                        window.showTemplateAccessModal({
+                            title: {{ _('Template Access Management') | tojson }},
+                            ownerFieldName: '{{ form.owned_by.name }}',
+                            sharedFieldName: '{{ form.shared_with_admins.name }}',
+                            ownerChoices: ownerChoices,
+                            sharedChoices: sharedChoices,
+                            currentOwner: currentOwner,
+                            currentShared: currentShared,
+                            currentUserId: {{ current_user.id }},
+                            templateOwnerId: {{ template.owned_by }},
+                            onSave: function(data) {
+                                // Update owner field
+                                ownerField.value = data.owner;
+
+                                // Update shared fields
+                                // Safely remove all existing children
+                                while (sharedFieldsContainer.firstChild) {
+                                    sharedFieldsContainer.removeChild(sharedFieldsContainer.firstChild);
+                                }
+                                data.shared.forEach(value => {
+                                    const input = document.createElement('input');
+                                    input.type = 'hidden';
+                                    input.name = data.sharedFieldName;
+                                    input.value = value;
+                                    sharedFieldsContainer.appendChild(input);
+                                });
+
+                                // Update summary
+                                updateAccessSummary();
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        // Handle delete item and section forms with data deletion confirmation dialog
+        document.addEventListener('DOMContentLoaded', function() {
+            function showConfirmModal(message, onConfirm) {
+                if (window.showConfirmation) {
+                    window.showConfirmation(message, onConfirm);
+                } else if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(message, onConfirm);
+                } else {
+                    onConfirm();
+                }
+            }
+
+            function showDangerConfirmModal(message, onConfirm) {
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(message, onConfirm);
+                } else {
+                    showConfirmModal(message, onConfirm);
+                }
+            }
+
+            const duplicateConfirmDefaults = {
+                section: {{ _('Duplicate this section? This will copy the section, all sub-sections, and their items.') | tojson | safe }},
+                item: {{ _('Duplicate this item? This will copy the item and all of its configuration.') | tojson | safe }}
+            };
+            const deleteDataWarningTemplate = {{ _('This will permanently delete __count__ data entries.') | tojson }};
+
+            function attachDuplicateConfirmation(selector, defaultMessage) {
+                const forms = document.querySelectorAll(selector);
+                forms.forEach(form => {
+                    if (form.dataset.duplicateConfirmBound === 'true') {
+                        return;
+                    }
+                    form.dataset.duplicateConfirmBound = 'true';
+
+                    form.addEventListener('submit', function(e) {
+                        if (form.dataset.duplicateConfirmed === 'true') {
+                            form.dataset.duplicateConfirmed = 'false';
+                            return;
+                        }
+
+                        e.preventDefault();
+                        const message = form.getAttribute('data-confirm-message') || defaultMessage;
+                        const submitForm = () => {
+                            form.dataset.duplicateConfirmed = 'true';
+                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                window.FormBuilderAjax.submit(form);
+                            } else if (typeof form.requestSubmit === 'function') {
+                                form.requestSubmit();
+                            } else {
+                                form.submit();
+                            }
+                        };
+
+                        showConfirmModal(message, submitForm);
+                    });
+                });
+            }
+
+            attachDuplicateConfirmation('.duplicate-section-form', duplicateConfirmDefaults.section);
+            attachDuplicateConfirmation('.duplicate-item-form', duplicateConfirmDefaults.item);
+
+            // Handle delete item forms (indicators, questions, document fields, matrix, plugin items)
+            const deleteItemForms = document.querySelectorAll('.delete-item-form');
+            deleteItemForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    const dataCount = parseInt(form.getAttribute('data-data-count') || '0');
+                    const itemType = form.getAttribute('data-item-type') || 'item';
+                    const confirmMessage = form.getAttribute('data-confirm-message') || {{ _('Are you sure?') | tojson }};
+
+                    // If no data, just show a simple confirmation
+                    if (dataCount === 0) {
+                        const proceed = () => {
+                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                            if (deleteDataInput) {
+                                deleteDataInput.value = 'true';
+                            } else {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = 'delete_data';
+                                input.value = 'true';
+                                form.appendChild(input);
+                            }
+                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                window.FormBuilderAjax.submit(form);
+                            } else if (typeof form.requestSubmit === 'function') {
+                                form.requestSubmit();
+                            } else {
+                                form.submit();
+                            }
+                        };
+                        showDangerConfirmModal(confirmMessage, proceed);
+                        return;
+                    }
+
+                    // Show dialog with two options
+                    if (window.showDeleteDataConfirmation) {
+                        window.showDeleteDataConfirmation(
+                            confirmMessage,
+                            dataCount,
+                            function() {
+                                // User chose to delete data
+                                const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                                if (deleteDataInput) {
+                                    deleteDataInput.value = 'true';
+                                } else {
+                                    const input = document.createElement('input');
+                                    input.type = 'hidden';
+                                    input.name = 'delete_data';
+                                    input.value = 'true';
+                                    form.appendChild(input);
+                                }
+                                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                    window.FormBuilderAjax.submit(form);
+                                } else if (typeof form.requestSubmit === 'function') {
+                                    form.requestSubmit();
+                                } else {
+                                    form.submit();
+                                }
+                            },
+                            function(action) {
+                                // User chose to keep data but delete the item
+                                if (action === 'delete-item') {
+                                    const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                                    if (deleteDataInput) {
+                                        deleteDataInput.value = 'false-keep-data';
+                                    } else {
+                                        const input = document.createElement('input');
+                                        input.type = 'hidden';
+                                        input.name = 'delete_data';
+                                        input.value = 'false-keep-data';
+                                        form.appendChild(input);
+                                    }
+                                    if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                        window.FormBuilderAjax.submit(form);
+                                    } else if (typeof form.requestSubmit === 'function') {
+                                        form.requestSubmit();
+                                    } else {
+                                        form.submit();
+                                    }
+                                }
+                            },
+                            null,
+                            itemType,
+                            {
+                                delete: {{ _("Delete") | tojson }},
+                                this: {{ _("This") | tojson }},
+                                has: {{ _("has") | tojson }},
+                                savedDataEntries: {{ _("saved data entries.") | tojson }},
+                                mayHaveAssociatedData: {{ _("may have associated data.") | tojson }},
+                                chooseOption: {{ _("Choose an option:") | tojson }},
+                                deleteDataAndRemove: {{ _("Delete Data and Remove") | tojson }},
+                                permanentlyDelete: {{ _("Permanently delete all associated data entries and remove the") | tojson }},
+                                fromTemplate: {{ _("from the template.") | tojson }},
+                                keepDataAndRemoveItem: {{ _("Keep Data and Archive Item") | tojson }},
+                                keepDataButRemove: {{ _("Keep the data entries but archive the") | tojson }},
+                                itemWillBeArchived: {{ _("(The item will be archived and hidden from the template)") | tojson }},
+                                sectionWillBeArchived: {{ _("(The section and its items will be archived and hidden from the template)") | tojson }},
+                                cancel: {{ _("Cancel") | tojson }},
+                                continue: {{ _("Continue") | tojson }}
+                            }
+                        );
+                    } else {
+                        // Fallback to simple confirm if dialog function not available
+                        const fallbackMessage = confirmMessage + ' ' + deleteDataWarningTemplate.replace('__count__', dataCount);
+                        const proceed = () => {
+                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                            if (deleteDataInput) {
+                                deleteDataInput.value = 'true';
+                            } else {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = 'delete_data';
+                                input.value = 'true';
+                                form.appendChild(input);
+                            }
+                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                window.FormBuilderAjax.submit(form);
+                            } else if (typeof form.requestSubmit === 'function') {
+                                form.requestSubmit();
+                            } else {
+                                form.submit();
+                            }
+                        };
+                        showDangerConfirmModal(fallbackMessage, proceed);
+                    }
+                });
+            });
+
+            // Handle delete section forms — single confirmation summarizing section and data counts
+            const deleteSectionSingleNoData = {{ _('This will permanently delete this section and all its contents. Are you sure?') | tojson }};
+            const deleteSectionMultipleNoDataTemplate = {{ _('This will permanently delete 1 section and %(n)s sub-section(s) and all their contents. Are you sure?') | tojson }};
+            const deleteSectionSingleWithDataTemplate = {{ _('This section contains %(count)s saved data entries. Choose an option below.') | tojson }};
+            const deleteSectionMultipleWithDataTemplate = {{ _('This will remove 1 section and %(n)s sub-section(s) and %(count)s saved data entries. Choose an option below.') | tojson }};
+
+            const deleteSectionForms = document.querySelectorAll('.delete-section-form');
+            deleteSectionForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    const dataCount = parseInt(form.getAttribute('data-data-count') || '0');
+                    const itemType = form.getAttribute('data-item-type') || 'section';
+                    const childCount = parseInt(form.getAttribute('data-child-sections-count') || '0');
+                    const sectionCount = 1 + childCount;
+
+                    function buildSummaryMessage(noData) {
+                        if (noData) {
+                            return sectionCount === 1
+                                ? deleteSectionSingleNoData
+                                : deleteSectionMultipleNoDataTemplate.replace('%(n)s', childCount);
+                        }
+                        return sectionCount === 1
+                            ? deleteSectionSingleWithDataTemplate.replace('%(count)s', dataCount)
+                            : deleteSectionMultipleWithDataTemplate.replace('%(n)s', childCount).replace('%(count)s', dataCount);
+                    }
+
+                    const summaryMessage = buildSummaryMessage(dataCount === 0);
+
+                    // No saved data: single confirmation with section/data summary
+                    if (dataCount === 0) {
+                        const proceed = () => {
+                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                            if (deleteDataInput) {
+                                deleteDataInput.value = 'true';
+                            } else {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = 'delete_data';
+                                input.value = 'true';
+                                form.appendChild(input);
+                            }
+                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                window.FormBuilderAjax.submit(form);
+                            } else if (typeof form.requestSubmit === 'function') {
+                                form.requestSubmit();
+                            } else {
+                                form.submit();
+                            }
+                        };
+                        showDangerConfirmModal(summaryMessage, proceed);
+                        return;
+                    }
+
+                    // Has saved data: single dialog with section/data summary and delete vs keep-data options
+                    if (window.showDeleteDataConfirmation) {
+                        window.showDeleteDataConfirmation(
+                            summaryMessage,
+                            dataCount,
+                            function() {
+                                const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                                if (deleteDataInput) {
+                                    deleteDataInput.value = 'true';
+                                } else {
+                                    const input = document.createElement('input');
+                                    input.type = 'hidden';
+                                    input.name = 'delete_data';
+                                    input.value = 'true';
+                                    form.appendChild(input);
+                                }
+                                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                    window.FormBuilderAjax.submit(form);
+                                } else if (typeof form.requestSubmit === 'function') {
+                                    form.requestSubmit();
+                                } else {
+                                    form.submit();
+                                }
+                            },
+                            function(action) {
+                                if (action === 'delete-item') {
+                                    const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                                    if (deleteDataInput) {
+                                        deleteDataInput.value = 'false-keep-data';
+                                    } else {
+                                        const input = document.createElement('input');
+                                        input.type = 'hidden';
+                                        input.name = 'delete_data';
+                                        input.value = 'false-keep-data';
+                                        form.appendChild(input);
+                                    }
+                                    if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                        window.FormBuilderAjax.submit(form);
+                                    } else if (typeof form.requestSubmit === 'function') {
+                                        form.requestSubmit();
+                                    } else {
+                                        form.submit();
+                                    }
+                                }
+                            },
+                            null,
+                            itemType,
+                            {
+                                delete: {{ _("Delete") | tojson }},
+                                this: {{ _("This") | tojson }},
+                                has: {{ _("has") | tojson }},
+                                savedDataEntries: {{ _("saved data entries.") | tojson }},
+                                mayHaveAssociatedData: {{ _("may have associated data.") | tojson }},
+                                chooseOption: {{ _("Choose an option:") | tojson }},
+                                deleteDataAndRemove: {{ _("Delete Data and Remove") | tojson }},
+                                permanentlyDelete: {{ _("Permanently delete all associated data entries and remove the") | tojson }},
+                                fromTemplate: {{ _("from the template.") | tojson }},
+                                keepDataAndRemoveItem: {{ _("Keep Data and Archive Item") | tojson }},
+                                keepDataButRemove: {{ _("Keep the data entries but archive the") | tojson }},
+                                itemWillBeArchived: {{ _("(The item will be archived and hidden from the template)") | tojson }},
+                                sectionWillBeArchived: {{ _("(The section and its items will be archived and hidden from the template)") | tojson }},
+                                cancel: {{ _("Cancel") | tojson }},
+                                continue: {{ _("Continue") | tojson }}
+                            }
+                        );
+                    } else {
+                        const fallbackMessage = summaryMessage + ' ' + deleteDataWarningTemplate.replace('__count__', dataCount);
+                        const proceed = () => {
+                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
+                            if (deleteDataInput) {
+                                deleteDataInput.value = 'true';
+                            } else {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = 'delete_data';
+                                input.value = 'true';
+                                form.appendChild(input);
+                            }
+                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                                window.FormBuilderAjax.submit(form);
+                            } else if (typeof form.requestSubmit === 'function') {
+                                form.requestSubmit();
+                            } else {
+                                form.submit();
+                            }
+                        };
+                        showDangerConfirmModal(fallbackMessage, proceed);
+                    }
+                });
+            });
+        });
+
+        {# Excel modal and archived items toggle handlers moved to form-builder-init.js module #}
+    </script>
+
+    {# Tooltip System #}
+    <link rel="stylesheet" href="{{ static_url('css/tooltip.css') }}">
+    <script type="module" nonce="{{ csp_nonce() }}">
+        import { initTooltips } from '/static/js/tooltip.js';
+        document.addEventListener('DOMContentLoaded', function() {
+            initTooltips();
+        });
+    </script>
+
+    {# Variables Management JavaScript - Now in separate module #}
+    <script type="module" nonce="{{ csp_nonce() }}">
+        import { TemplateVariablesManager } from '/static/js/form_builder/modules/template-variables.js';
+        import { VariableFormatter } from '/static/js/form_builder/modules/variable-formatting.js';
+
+    // Make template variables globally available for use in item modal and matrix
+    window.templateVariables = {{ template_variables|tojson|safe }};
+
+        // Initialize variables manager
+        document.addEventListener('DOMContentLoaded', async function() {
+            const variablesManager = new TemplateVariablesManager({
+                templateId: {{ template.id }},
+                versionId: {{ active_version_id }},
+                templateVariables: window.templateVariables || {}
+            });
+
+            await variablesManager.init();
+
+            // Make manager available globally for potential external access
+            window.templateVariablesManager = variablesManager;
+        });
+
+        // Initialize variable formatting
+        document.addEventListener('DOMContentLoaded', function() {
+            VariableFormatter.init();
+        });
+    </script>
+
+    {# Show/hide max_entries field based on section type selection #}
+    <script nonce="{{ csp_nonce() }}">
+        document.addEventListener('change', function(e) {
+            if (e.target.name === 'section-section_type' || (e.target.id && e.target.id.includes('section-type-'))) {
+                const sectionType = e.target.value;
+                const maxEntriesContainer = document.getElementById('repeat-group-config');
+                const maxEntriesInput = document.getElementById('section-max-entries-input');
+
+                if (maxEntriesContainer && maxEntriesInput) {
+                    if (sectionType === 'repeat') {
+                        maxEntriesContainer.classList.remove('hidden');
+                    } else {
+                        maxEntriesContainer.classList.add('hidden');
+                        maxEntriesInput.value = '';
+                    }
+                }
+            }
+        });
+    </script>
+
+    {# Ensure Excel export/import checkboxes are unchecked and disabled (coming soon feature) #}
+    <script nonce="{{ csp_nonce() }}">
+        document.addEventListener('DOMContentLoaded', function() {
+            const exportExcelCheckbox = document.querySelector('input[name="enable_export_excel"]:not([type="hidden"])');
+            const importExcelCheckbox = document.querySelector('input[name="enable_import_excel"]:not([type="hidden"])');
+
+            if (exportExcelCheckbox) {
+                exportExcelCheckbox.checked = false;
+                exportExcelCheckbox.disabled = true;
+            }
+            if (importExcelCheckbox) {
+                importExcelCheckbox.checked = false;
+                importExcelCheckbox.disabled = true;
+            }
+        });
+    </script>
+{% endblock %}

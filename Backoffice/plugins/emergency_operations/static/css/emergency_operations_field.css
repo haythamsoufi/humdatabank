@@ -1,0 +1,5 @@
+.emops-field .emops-item + .emops-item { margin-top: 0.5rem; }
+.emops-field .emops-header .fa-flag { width: 1rem; height: 1rem; }
+
+/* Override global error styling that sets .text-red-600 to semi-bold */
+.emops-field .text-red-600 { font-weight: 400 !important; }

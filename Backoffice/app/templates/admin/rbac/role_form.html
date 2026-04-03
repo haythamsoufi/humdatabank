@@ -1,0 +1,122 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=(role.name if role else _('New Role')),
+    icon='fas fa-shield-alt',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('User Management'), 'url': url_for('user_management.manage_users')},
+        {'name': _('Roles'), 'url': url_for('rbac_management.manage_roles')},
+        {'name': (role.name if role else _('New Role'))}
+    ],
+    subtitle=(('Edit role: ' ~ role.code) if role else _('Create a new role by selecting permissions to include.'))
+) }}
+
+<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Role Code -->
+        <div class="mb-6">
+            <label for="code" class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Role Code') }}
+            </label>
+            <input
+                type="text"
+                id="code"
+                name="code"
+                value="{{ role.code if role else '' }}"
+                class="form-control w-full sm:w-1/2"
+                required
+                {% if role %}readonly{% endif %}
+            >
+            <p class="text-xs text-gray-500 mt-1">
+                {{ _('Unique identifier (lowercase, underscores allowed). Cannot be changed after creation.') }}
+            </p>
+        </div>
+
+        <!-- Role Name -->
+        <div class="mb-6">
+            <label for="name" class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Role Name') }}
+            </label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                value="{{ role.name if role else '' }}"
+                class="form-control w-full sm:w-1/2"
+                required
+            >
+        </div>
+
+        <!-- Description -->
+        <div class="mb-6">
+            <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Description') }}
+            </label>
+            <textarea
+                id="description"
+                name="description"
+                rows="3"
+                class="form-control w-full"
+            >{{ role.description if role else '' }}</textarea>
+        </div>
+
+        <!-- Permissions -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Permissions') }}
+            </label>
+            <p class="text-xs text-gray-600 mb-4">
+                {{ _('Select permissions to include in this role.') }}
+            </p>
+
+            {% for module, perms in permissions_by_module.items() %}
+            <div class="mb-6 border border-gray-200 rounded-md p-4 bg-gray-50">
+                <h4 class="font-semibold text-sm mb-3 text-gray-800 uppercase tracking-wider">
+                    {{ module }}
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {% for perm in perms %}
+                    <label class="flex items-start cursor-pointer hover:bg-white p-2 rounded transition-colors">
+                        <input
+                            type="checkbox"
+                            name="permissions"
+                            value="{{ perm.id }}"
+                            {% if role and perm.id in current_permission_ids %}checked{% endif %}
+                            class="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        >
+                        <div class="ml-3 flex-1">
+                            <div class="text-sm font-medium text-gray-900">
+                                <code class="text-xs bg-white border border-gray-200 px-1 py-0.5 rounded">{{ perm.code }}</code>
+                            </div>
+                            <div class="text-xs text-gray-700 mt-1">{{ perm.name }}</div>
+                            {% if perm.description and perm.description != perm.name %}
+                            <div class="text-xs text-gray-500 mt-0.5">{{ perm.description }}</div>
+                            {% endif %}
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save mr-2"></i>
+                {{ _('Update Role') if role else _('Create Role') }}
+            </button>
+            <a href="{{ url_for('rbac_management.manage_roles') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300">
+                {{ _('Cancel') }}
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

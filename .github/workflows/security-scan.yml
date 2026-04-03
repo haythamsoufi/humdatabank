@@ -1,0 +1,162 @@
+# Security Scanning Workflow
+# Runs secret detection and security analysis manually
+
+name: Security Scan
+
+on:
+  # Manual triggering only - go to Actions tab and click "Run workflow"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # Secret Detection with Gitleaks
+  gitleaks:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for scanning
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Optional: for enterprise features
+
+  # Python Security with Bandit
+  bandit:
+    name: Bandit Python Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit
+        run: |
+          bandit -c pyproject.toml -r Backoffice/app -f json -o bandit-results.json || true
+          bandit -c pyproject.toml -r Backoffice/app -ll --exit-zero
+
+      - name: Upload Bandit Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-results
+          path: bandit-results.json
+
+  # Custom Secret Scanner
+  custom-scan:
+    name: Custom Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Block __consoleSaved.* in Jinja templates
+        run: python Backoffice/scripts/check_no_console_saved_bypass.py
+
+      - name: Run Custom Scanner
+        run: |
+          python scripts/scan-secrets.py --path . --fail-on critical --json > scan-results.json || exit_code=$?
+          python scripts/scan-secrets.py --path . --fix
+          exit ${exit_code:-0}
+
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: secret-scan-results
+          path: scan-results.json
+
+  # Dependency Security Check
+  dependency-check:
+    name: Dependency Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        working-directory: Backoffice
+        run: |
+          pip-audit -r requirements.txt --format json --output pip-audit-results.json || true
+          pip-audit -r requirements.txt || true
+
+      - name: Upload pip-audit Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-results
+          path: Backoffice/pip-audit-results.json
+
+  # Node.js dependency check for Website
+  npm-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run npm audit (Website)
+        working-directory: Website
+        run: |
+          npm ci --ignore-scripts
+          npm audit --json > npm-audit-results.json || true
+          npm audit || true
+
+      - name: Upload npm audit Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-results
+          path: Website/npm-audit-results.json
+
+  # Summary job that requires all scans to pass
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [gitleaks, bandit, custom-scan, dependency-check, npm-audit]
+    if: always()
+    steps:
+      - name: Check scan results
+        run: |
+          if [[ "${{ needs.gitleaks.result }}" == "failure" ]]; then
+            echo "❌ Gitleaks detected secrets!"
+            exit 1
+          fi
+          if [[ "${{ needs.custom-scan.result }}" == "failure" ]]; then
+            echo "❌ Custom scanner detected critical secrets!"
+            exit 1
+          fi
+          echo "✅ All security scans passed or reported warnings only"

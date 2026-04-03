@@ -1,0 +1,69 @@
+{# templates/admin_public_assignment_form.html #}
+{% extends "core/layout.html" %}
+{% from "components/_form_helpers.html" import render_field, render_countries_by_region %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=title,
+    icon='fas fa-' + ('edit' if is_edit else 'plus-circle'),
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'Assignment Management', 'url': url_for('assignment_management.manage_assignments')},
+        {'name': title}
+    ]
+) }}
+
+{# The form for public assignment #}
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">{{ 'Edit' if is_edit else 'Create New' }} Public Form Link</h2>
+    <form method="POST" action="{{ url_for('assignment_management.edit_public_assignment', public_assignment_id=public_assignment.id) if is_edit else url_for('assignment_management.new_public_assignment') }}">
+        {{ form.csrf_token }}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="mb-4 md:mb-0">
+                {{ form.template_id.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                {{ form.template_id(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                {% for error in form.template_id.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="mb-4 md:mb-0">
+                {{ form.period_name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                {{ form.period_name(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md", placeholder="e.g., 2024-2025 (Optional)") }}
+                {% for error in form.period_name.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="md:col-span-2 mb-4">
+                <div class="flex items-center">
+                    {{ form.is_active(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                    {{ form.is_active.label(class="ml-2 block text-sm text-gray-900") }}
+                </div>
+                {% for error in form.is_active.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Countries Selection #}
+        <div class="mt-6">
+            {{ render_countries_by_region(form.countries, countries_by_region, "Assign to Countries (Leave empty for all countries)") }}
+        </div>
+
+        <div class="flex items-center justify-between mt-6">
+            <a href="{{ url_for('assignment_management.manage_assignments') }}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Back to Public Form Links
+            </a>
+            {{ form.submit(class="btn btn-success") }}
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,707 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block content %}
+<div class="sharp-ui">
+{{ page_header(
+    title=_(title),
+    icon='fas fa-server',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('System Monitoring'), 'url': url_for('monitoring.system_monitoring')}
+    ]
+) }}
+
+{% if error %}
+<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+    <p><strong>{{ _('Error') }}:</strong> {{ error }}</p>
+</div>
+{% endif %}
+
+<!-- Monitoring Status -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <!-- Memory Monitoring Status -->
+    <div class="bg-white rounded-lg shadow-md p-4">
+        <div class="flex items-center mb-2">
+            <i class="fas fa-memory mr-2 text-blue-500"></i>
+            <span class="font-medium">{{ _('Memory Monitoring') }}</span>
+        </div>
+        <div class="text-sm">
+            {% if memory_monitoring_enabled %}
+                <span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>{{ _('Enabled') }}</span>
+            {% else %}
+                <span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>{{ _('Disabled') }}</span>
+            {% endif %}
+            {% if log_file_exists %}
+                <div class="mt-2 text-gray-600">
+                    {% if log_file_size < 1024 %}
+                        {{ log_file_size }} B
+                    {% elif log_file_size < 1048576 %}
+                        {{ "%.2f"|format(log_file_size / 1024) }} KB
+                    {% else %}
+                        {{ "%.2f"|format(log_file_size / 1048576) }} MB
+                    {% endif %}
+                </div>
+                {% if log_file_modified %}
+                    <div class="text-gray-500 text-xs mt-1">{{ log_file_modified|datetime_local('datetime') }}</div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- System Monitoring Status -->
+    <div class="bg-white rounded-lg shadow-md p-4">
+        <div class="flex items-center mb-2">
+            <i class="fas fa-server mr-2 text-purple-500"></i>
+            <span class="font-medium">{{ _('System Monitoring') }}</span>
+        </div>
+        <div class="text-sm">
+            {% if system_monitoring_enabled %}
+                <span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>{{ _('Enabled') }}</span>
+            {% else %}
+                <span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>{{ _('Disabled') }}</span>
+            {% endif %}
+            {% if system_log_file_exists %}
+                <div class="mt-2 text-gray-600">
+                    {% if system_log_file_size < 1024 %}
+                        {{ system_log_file_size }} B
+                    {% elif system_log_file_size < 1048576 %}
+                        {{ "%.2f"|format(system_log_file_size / 1024) }} KB
+                    {% else %}
+                        {{ "%.2f"|format(system_log_file_size / 1048576) }} MB
+                    {% endif %}
+                </div>
+                {% if system_log_file_modified %}
+                    <div class="text-gray-500 text-xs mt-1">{{ system_log_file_modified|datetime_local('datetime') }}</div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Application Log Status -->
+    <div class="bg-white rounded-lg shadow-md p-4">
+        <div class="flex items-center mb-2">
+            <i class="fas fa-bug mr-2 text-red-500"></i>
+            <span class="font-medium">{{ _('Application Log') }}</span>
+        </div>
+        <div class="text-sm">
+            {% if application_log_enabled %}
+                <span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>{{ _('Enabled') }}</span>
+            {% else %}
+                <span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>{{ _('Disabled') }}</span>
+            {% endif %}
+            {% if application_log_file_exists %}
+                <div class="mt-2 text-gray-600">
+                    {% if application_log_file_size < 1024 %}
+                        {{ application_log_file_size }} B
+                    {% elif application_log_file_size < 1048576 %}
+                        {{ "%.2f"|format(application_log_file_size / 1024) }} KB
+                    {% else %}
+                        {{ "%.2f"|format(application_log_file_size / 1048576) }} MB
+                    {% endif %}
+                </div>
+                {% if application_log_file_modified %}
+                    <div class="text-gray-500 text-xs mt-1">{{ application_log_file_modified|datetime_local('datetime') }}</div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Current System Metrics -->
+{% if system_monitoring_enabled %}
+<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold flex items-center">
+            <i class="fas fa-tachometer-alt mr-2 text-indigo-500"></i>
+            {{ _('Current System Metrics') }}
+        </h2>
+        <button id="refresh-metrics" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+            <i class="fas fa-sync-alt mr-1"></i>{{ _('Refresh') }}
+        </button>
+    </div>
+
+    <div id="system-metrics-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div class="text-center py-4">
+            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+            <p class="text-sm text-gray-500 mt-2">{{ _('Loading metrics...') }}</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Current Memory Usage -->
+{% if current_memory and memory_monitoring_enabled %}
+<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4 flex items-center">
+        <i class="fas fa-chart-line mr-2 text-green-500"></i>
+        {{ _('Current Memory Usage') }}
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% if current_memory.rss_mb %}
+        <div class="bg-blue-50 p-4 rounded">
+            <p class="text-sm text-gray-600 mb-1">{{ _('RSS (Resident Set Size)') }}</p>
+            <p class="text-2xl font-bold text-blue-600">{{ "%.1f"|format(current_memory.rss_mb) }} MB</p>
+        </div>
+
+        <div class="bg-purple-50 p-4 rounded">
+            <p class="text-sm text-gray-600 mb-1">{{ _('VMS (Virtual Memory)') }}</p>
+            <p class="text-2xl font-bold text-purple-600">{{ "%.1f"|format(current_memory.vms_mb) }} MB</p>
+        </div>
+
+        <div class="bg-green-50 p-4 rounded">
+            <p class="text-sm text-gray-600 mb-1">{{ _('Memory Usage') }}</p>
+            <p class="text-2xl font-bold text-green-600">{{ "%.1f"|format(current_memory.percent) }}%</p>
+        </div>
+        {% else %}
+        <div class="col-span-3">
+            <p class="text-sm text-gray-600">{{ _('Memory statistics not available') }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Monitoring Logs Viewer -->
+{% if (memory_monitoring_enabled and log_file_exists) or (system_monitoring_enabled and system_log_file_exists) or (application_log_enabled and application_log_file_exists) %}
+<div class="bg-white rounded-lg shadow-md p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold flex items-center">
+            <i class="fas fa-file-alt mr-2 text-indigo-500"></i>
+            {{ _('Monitoring Logs') }}
+        </h2>
+        <div class="flex gap-2">
+            <button id="refresh-logs" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-sync-alt mr-1"></i>{{ _('Refresh') }}
+            </button>
+            <a href="{{ url_for('monitoring.download_monitoring_logs') }}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                <i class="fas fa-download mr-1"></i>{{ _('Download') }}
+            </a>
+            <button id="clear-logs" class="btn btn-danger">
+                <i class="fas fa-trash mr-1"></i>{{ _('Clear') }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Search') }}</label>
+            <input type="text" id="log-search" class="form-input w-full" placeholder="{{ _('Search logs...') }}">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Log Source') }}</label>
+            <select id="log-source" class="form-select w-full">
+                <option value="all">{{ _('All Sources') }}</option>
+                <option value="memory">{{ _('Memory') }}</option>
+                <option value="system">{{ _('System') }}</option>
+                <option value="application">{{ _('Application') }}</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Log Level') }}</label>
+            <select id="log-level" class="form-select w-full">
+                <option value="all">{{ _('All Levels') }}</option>
+                <option value="error">{{ _('Error') }}</option>
+                <option value="warning">{{ _('Warning') }}</option>
+                <option value="info">{{ _('Info') }}</option>
+                <option value="verbose">{{ _('Verbose') }}</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Lines per Page') }}</label>
+            <select id="log-per-page" class="form-select w-full">
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Logs Container -->
+    <div class="bg-gray-900 rounded-lg p-4 mb-4" style="max-height: 600px; overflow-y: auto;">
+        <div id="logs-container" class="font-mono text-sm whitespace-pre-wrap">Loading logs...</div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="flex items-center justify-between">
+        <div class="text-sm text-gray-600">
+            <span id="log-count">0</span> {{ _('log entries') }}
+        </div>
+        <div class="flex gap-2">
+            <button id="prev-page" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <i class="fas fa-chevron-left mr-1"></i>{{ _('Previous') }}
+            </button>
+            <span id="page-info" class="px-4 py-2 text-sm text-gray-700">Page 1 of 1</span>
+            <button id="next-page" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                {{ _('Next') }}<i class="fas fa-chevron-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% elif (memory_monitoring_enabled or system_monitoring_enabled or application_log_enabled) and not log_file_exists and not system_log_file_exists and not application_log_file_exists %}
+<div class="bg-white rounded-lg shadow-md p-6">
+    <div class="text-center py-8">
+        <i class="fas fa-file-alt text-gray-400 text-4xl mb-4"></i>
+        <p class="text-gray-600">{{ _('No log files found. Monitoring logs will appear here once monitoring starts recording.') }}</p>
+    </div>
+</div>
+{% endif %}
+
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function() {
+    let currentPage = 1;
+    let currentSearch = '';
+    let currentLogSource = 'all';
+    let currentLogLevels = ['error', 'warning', 'info', 'verbose']; // Default: all selected
+    let currentPerPage = 100;
+
+    function loadLogs() {
+        const container = document.getElementById('logs-container');
+        container.textContent = 'Loading logs...';
+
+        const params = new URLSearchParams({
+            page: currentPage,
+            per_page: currentPerPage,
+            search: currentSearch,
+            log_source: currentLogSource
+        });
+
+        // Add log levels as comma-separated values
+        if (currentLogLevels.length > 0) {
+            params.append('log_level', currentLogLevels.join(','));
+        }
+
+        fetch(`{{ url_for('monitoring.get_monitoring_logs') }}?${params}`, {
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.logs.length === 0) {
+                    container.textContent = 'No logs found.';
+                } else {
+                    // Create HTML with log type indicators and level-based coloring
+                    const logTypes = data.log_types || [];
+                    const logLines = data.logs.map((line, index) => {
+                        const logType = logTypes[index] || 'unknown';
+
+                        // Detect log level from the line (matching backend logic)
+                        let logLevel = 'info'; // default
+                        let levelColor = 'text-gray-300'; // default color
+
+                        // Pattern 1: Flask format: [timestamp] LEVELNAME in module:
+                        // Pattern 2: System format: [timestamp] LEVELNAME:
+                        // Pattern 3: Simple: LEVELNAME:
+                        const lineUpper = line.toUpperCase();
+                        const hasFlaskError = /\]\s+ERROR\s+IN\s+/.test(lineUpper);
+                        const hasFlaskWarning = /\]\s+WARNING\s+IN\s+/.test(lineUpper);
+                        const hasFlaskInfo = /\]\s+INFO\s+IN\s+/.test(lineUpper);
+                        const hasFlaskDebug = /\]\s+DEBUG\s+IN\s+/.test(lineUpper);
+
+                        const hasSystemError = /\]\s+ERROR\s*:/.test(lineUpper);
+                        const hasSystemWarning = /\]\s+WARNING\s*:/.test(lineUpper);
+                        const hasSystemInfo = /\]\s+INFO\s*:/.test(lineUpper);
+                        const hasSystemDebug = /\]\s+DEBUG\s*:/.test(lineUpper);
+
+                        const hasSimpleError = /(?:^|\s|\[)ERROR\s*:/.test(lineUpper);
+                        const hasSimpleWarning = /(?:^|\s|\[)WARNING\s*:/.test(lineUpper);
+                        const hasSimpleInfo = /(?:^|\s|\[)INFO\s*:/.test(lineUpper);
+                        const hasSimpleDebug = /(?:^|\s|\[)DEBUG\s*:/.test(lineUpper);
+
+                        if (hasFlaskError || hasSystemError || hasSimpleError) {
+                            logLevel = 'error';
+                            levelColor = 'text-red-400';
+                        } else if (hasFlaskWarning || hasSystemWarning || hasSimpleWarning) {
+                            logLevel = 'warning';
+                            levelColor = 'text-yellow-400';
+                        } else if (hasFlaskInfo || hasSystemInfo || hasSimpleInfo) {
+                            logLevel = 'info';
+                            levelColor = 'text-green-400';
+                        } else if (hasFlaskDebug || hasSystemDebug || hasSimpleDebug) {
+                            logLevel = 'verbose';
+                            levelColor = 'text-gray-400';
+                        } else {
+                            // No explicit level - default based on log type
+                            if (logType === 'memory' || logType === 'system') {
+                                logLevel = 'info';
+                                levelColor = 'text-green-400';
+                            } else {
+                                logLevel = 'verbose';
+                                levelColor = 'text-gray-400';
+                            }
+                        }
+
+                        // Add type indicator
+                        let typePrefix = '';
+                        if (logType === 'memory') {
+                            typePrefix = '<span class="text-blue-400">[MEM]</span> ';
+                        } else if (logType === 'system') {
+                            typePrefix = '<span class="text-purple-400">[SYS]</span> ';
+                        } else if (logType === 'application') {
+                            typePrefix = '<span class="text-cyan-400">[APP]</span> ';
+                        }
+
+                        // Wrap the entire line in a span with the appropriate color
+                        return `<span class="${levelColor}">${typePrefix}${escapeHtml(line)}</span>`;
+                    });
+                    container.innerHTML = logLines.join('\n');
+                }
+
+                // Update pagination
+                document.getElementById('log-count').textContent = data.pagination.total;
+                document.getElementById('page-info').textContent =
+                    `Page ${data.pagination.page} of ${data.pagination.total_pages}`;
+
+                document.getElementById('prev-page').disabled = data.pagination.page <= 1;
+                document.getElementById('next-page').disabled = data.pagination.page >= data.pagination.total_pages;
+
+                // Auto-scroll to top
+                container.parentElement.scrollTop = 0;
+            } else {
+                container.textContent = `Error: ${data.error || 'Failed to load logs'}`;
+            }
+        })
+        .catch(error => {
+            container.textContent = `Error loading logs: ${error.message}`;
+        });
+    }
+
+    // Event listeners
+    document.getElementById('refresh-logs')?.addEventListener('click', () => {
+        loadLogs();
+    });
+
+    document.getElementById('log-search')?.addEventListener('input', (e) => {
+        currentSearch = e.target.value;
+        currentPage = 1;
+        loadLogs();
+    });
+
+    document.getElementById('log-source')?.addEventListener('change', (e) => {
+        currentLogSource = e.target.value;
+        currentPage = 1;
+        loadLogs();
+    });
+
+    // Handle log level checkboxes
+    function updateLogLevels() {
+        const checkboxes = document.querySelectorAll('.log-level-checkbox:checked');
+        currentLogLevels = Array.from(checkboxes).map(cb => cb.value);
+        currentPage = 1;
+        loadLogs();
+    }
+
+    document.querySelectorAll('.log-level-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateLogLevels);
+    });
+
+    document.getElementById('log-per-page')?.addEventListener('change', (e) => {
+        currentPerPage = parseInt(e.target.value);
+        currentPage = 1;
+        loadLogs();
+    });
+
+    document.getElementById('prev-page')?.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            loadLogs();
+        }
+    });
+
+    document.getElementById('next-page')?.addEventListener('click', () => {
+        currentPage++;
+        loadLogs();
+    });
+
+    function updatePeakFilterIndicator() {
+        const indicator = document.getElementById('peak-filter-active');
+        if (showPeaksOnly) {
+            indicator.classList.remove('hidden');
+        } else {
+            indicator.classList.add('hidden');
+        }
+    }
+
+    document.getElementById('clear-peak-filter')?.addEventListener('click', () => {
+        showPeaksOnly = false;
+        currentFilter = 'all';
+        document.getElementById('log-filter').value = 'all';
+        currentPage = 1;
+        updatePeakFilterIndicator();
+        loadLogs();
+    });
+
+    document.getElementById('clear-logs')?.addEventListener('click', () => {
+        const clearMsg = '{{ _("Are you sure you want to clear all monitoring logs? This action cannot be undone.") }}';
+        const doClear = () => fetch('{{ url_for("monitoring.clear_monitoring_logs") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (window.showAlert) window.showAlert(data.message || '{{ _("All monitoring logs cleared successfully.") }}', 'success');
+                else window.__clientLog && window.__clientLog(data.message);
+                loadLogs();
+            } else {
+                if (window.showAlert) window.showAlert(`{{ _("Error") }}: ${data.error || '{{ _("Failed to clear logs") }}'}`, 'error');
+                else console.error(data.error);
+            }
+        })
+        .catch(error => {
+            if (window.showAlert) window.showAlert(`{{ _("Error") }}: ${error.message}`, 'error');
+            else console.error(error.message);
+        });
+        if (window.showDangerConfirmation) {
+            window.showDangerConfirmation(clearMsg, doClear, null, '{{ _("Clear") }}', '{{ _("Cancel") }}', '{{ _("Clear Logs?") }}');
+        } else {
+            doClear();
+        }
+    });
+
+    // Load system metrics
+    function loadSystemMetrics() {
+        {% if system_monitoring_enabled %}
+        fetch('{{ url_for("monitoring.get_current_system_metrics") }}', {
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.metrics) {
+                const metrics = data.metrics;
+                const container = document.getElementById('system-metrics-container');
+
+                let html = '';
+
+                // CPU Metrics
+                if (metrics.cpu && !metrics.cpu.error) {
+                    const cpuPercent = metrics.cpu.process_cpu_percent || 0;
+                    let cpuBgClass = 'bg-green-50';
+                    let cpuBorderClass = 'border-green-500';
+                    let cpuTextClass = 'text-green-600';
+                    if (cpuPercent > 80) {
+                        cpuBgClass = 'bg-red-50';
+                        cpuBorderClass = 'border-red-500';
+                        cpuTextClass = 'text-red-600';
+                    } else if (cpuPercent > 50) {
+                        cpuBgClass = 'bg-orange-50';
+                        cpuBorderClass = 'border-orange-500';
+                        cpuTextClass = 'text-orange-600';
+                    }
+                    html += `
+                        <div class="${cpuBgClass} p-4 rounded border-l-4 ${cpuBorderClass}">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-sm font-medium text-gray-700">{{ _('CPU Usage') }}</p>
+                                <i class="fas fa-microchip ${cpuTextClass}"></i>
+                            </div>
+                            <p class="text-2xl font-bold ${cpuTextClass}">${cpuPercent.toFixed(1)}%</p>
+                            <p class="text-xs text-gray-500 mt-1">System: ${(metrics.cpu.system_cpu_percent || 0).toFixed(1)}% | Cores: ${metrics.cpu.cpu_count || 'N/A'}</p>
+                        </div>
+                    `;
+                }
+
+                // Disk Metrics
+                if (metrics.disk && !metrics.disk.error) {
+                    const diskPercent = metrics.disk.percent || 0;
+                    let diskBgClass = 'bg-green-50';
+                    let diskBorderClass = 'border-green-500';
+                    let diskTextClass = 'text-green-600';
+                    if (diskPercent > 90) {
+                        diskBgClass = 'bg-red-50';
+                        diskBorderClass = 'border-red-500';
+                        diskTextClass = 'text-red-600';
+                    } else if (diskPercent > 75) {
+                        diskBgClass = 'bg-orange-50';
+                        diskBorderClass = 'border-orange-500';
+                        diskTextClass = 'text-orange-600';
+                    }
+                    html += `
+                        <div class="${diskBgClass} p-4 rounded border-l-4 ${diskBorderClass}">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-sm font-medium text-gray-700">{{ _('Disk Usage') }}</p>
+                                <i class="fas fa-hdd ${diskTextClass}"></i>
+                            </div>
+                            <p class="text-2xl font-bold ${diskTextClass}">${diskPercent.toFixed(1)}%</p>
+                            <p class="text-xs text-gray-500 mt-1">Free: ${metrics.disk.free_gb.toFixed(1)}GB / ${metrics.disk.total_gb.toFixed(1)}GB</p>
+                        </div>
+                    `;
+                }
+
+                // Database Pool Metrics
+                if (metrics.database_pool && !metrics.database_pool.error) {
+                    const pool = metrics.database_pool;
+                    const poolUsage = pool.size > 0 ? (pool.checked_out / pool.size) * 100 : 0;
+                    let poolBgClass = 'bg-green-50';
+                    let poolBorderClass = 'border-green-500';
+                    let poolTextClass = 'text-green-600';
+                    if (poolUsage > 80) {
+                        poolBgClass = 'bg-red-50';
+                        poolBorderClass = 'border-red-500';
+                        poolTextClass = 'text-red-600';
+                    } else if (poolUsage > 60) {
+                        poolBgClass = 'bg-orange-50';
+                        poolBorderClass = 'border-orange-500';
+                        poolTextClass = 'text-orange-600';
+                    }
+                    html += `
+                        <div class="${poolBgClass} p-4 rounded border-l-4 ${poolBorderClass}">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-sm font-medium text-gray-700">{{ _('Database Pool') }}</p>
+                                <i class="fas fa-database ${poolTextClass}"></i>
+                            </div>
+                            <p class="text-2xl font-bold ${poolTextClass}">${pool.checked_out}/${pool.size}</p>
+                            <p class="text-xs text-gray-500 mt-1">Checked In: ${pool.checked_in} | Overflow: ${pool.overflow}</p>
+                        </div>
+                    `;
+                }
+
+                // Thread Metrics
+                if (metrics.threads && !metrics.threads.error) {
+                    const threadCount = metrics.threads.active_count || 0;
+                    let threadBgClass = 'bg-green-50';
+                    let threadBorderClass = 'border-green-500';
+                    let threadTextClass = 'text-green-600';
+                    if (threadCount > 50) {
+                        threadBgClass = 'bg-orange-50';
+                        threadBorderClass = 'border-orange-500';
+                        threadTextClass = 'text-orange-600';
+                    }
+                    html += `
+                        <div class="${threadBgClass} p-4 rounded border-l-4 ${threadBorderClass}">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-sm font-medium text-gray-700">{{ _('Active Threads') }}</p>
+                                <i class="fas fa-tasks ${threadTextClass}"></i>
+                            </div>
+                            <p class="text-2xl font-bold ${threadTextClass}">${threadCount}</p>
+                        </div>
+                    `;
+                }
+
+                // Network I/O
+                if (metrics.network && !metrics.network.error) {
+                    html += `
+                        <div class="bg-blue-50 p-4 rounded border-l-4 border-blue-500">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-sm font-medium text-gray-700">{{ _('Network I/O') }}</p>
+                                <i class="fas fa-network-wired text-blue-600"></i>
+                            </div>
+                            <p class="text-sm text-gray-700">Sent: ${metrics.network.bytes_sent_mb.toFixed(2)}MB</p>
+                            <p class="text-sm text-gray-700">Recv: ${metrics.network.bytes_recv_mb.toFixed(2)}MB</p>
+                        </div>
+                    `;
+                }
+
+                if (html === '') {
+                    html = '<div class="col-span-3"><p class="text-sm text-gray-600">{{ _("No metrics available") }}</p></div>';
+                }
+
+                container.innerHTML = html;
+            } else {
+                document.getElementById('system-metrics-container').innerHTML =
+                    '<div class="col-span-3"><p class="text-sm text-red-600">Error loading metrics</p></div>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('system-metrics-container').innerHTML =
+                '<div class="col-span-3"><p class="text-sm text-red-600">Error: ' + escapeHtml(String(error && error.message ? error.message : 'Unknown error')) + '</p></div>';
+        });
+        {% endif %}
+    }
+
+    document.getElementById('refresh-metrics')?.addEventListener('click', () => {
+        loadSystemMetrics();
+    });
+
+    // Auto-refresh intervals (reduced frequency to prevent server overload)
+    let logsInterval = null;
+    let metricsInterval = null;
+    let autoRefreshEnabled = true;
+
+    // Pause polling when page is not visible to reduce server load
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            // Page is hidden, pause polling
+            if (logsInterval) {
+                clearInterval(logsInterval);
+                logsInterval = null;
+            }
+            if (metricsInterval) {
+                clearInterval(metricsInterval);
+                metricsInterval = null;
+            }
+        } else if (autoRefreshEnabled) {
+            // Page is visible again, resume polling
+            {% if (memory_monitoring_enabled and log_file_exists) or (system_monitoring_enabled and system_log_file_exists) or (application_log_enabled and application_log_file_exists) %}
+            if (!logsInterval) {
+                logsInterval = setInterval(loadLogs, 60000); // 60 seconds instead of 30
+            }
+            {% endif %}
+
+            {% if system_monitoring_enabled %}
+            if (!metricsInterval) {
+                metricsInterval = setInterval(loadSystemMetrics, 30000); // 30 seconds instead of 10
+            }
+            {% endif %}
+        }
+    });
+
+    // Initial load
+    {% if (memory_monitoring_enabled and log_file_exists) or (system_monitoring_enabled and system_log_file_exists) or (application_log_enabled and application_log_file_exists) %}
+    loadLogs();
+
+    // Auto-refresh every 60 seconds (reduced from 30 to prevent server overload)
+    if (!document.hidden && autoRefreshEnabled) {
+        logsInterval = setInterval(loadLogs, 60000);
+    }
+    {% endif %}
+
+    {% if system_monitoring_enabled %}
+    loadSystemMetrics();
+    // Auto-refresh metrics every 30 seconds (reduced from 10 to prevent server overload)
+    if (!document.hidden && autoRefreshEnabled) {
+        metricsInterval = setInterval(loadSystemMetrics, 30000);
+    }
+    {% endif %}
+});
+</script>
+
+<style>
+#logs-container {
+    font-family: 'Courier New', monospace;
+    line-height: 1.5;
+}
+
+#logs-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#logs-container::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+#logs-container::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+#logs-container::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+</style>
+
+{% endblock %}

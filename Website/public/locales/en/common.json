@@ -1,0 +1,1386 @@
+{
+  "navigation": {
+    "home": "Global Overview",
+    "indicatorBank": "Indicator Bank",
+    "publications": "Resources",
+    "analysis": "Analysis",
+    "dataVisualization": "Explore Data",
+    "disaggregationAnalysis": "Disaggregation Analysis",
+    "globalInitiative": "Global Initiatives",
+    "unifiedPlanningReporting": "Unified Planning and Reporting",
+    "chat": "Chat",
+    "countries": "Countries",
+    "organizationalStructure": "Organizational Structure",
+    "apiBuilder": "API Builder",
+    "language": "Language",
+    "siteTitle": "NGO Databank",
+    "databank": "Databank",
+    "login": "Login",
+    "openMainMenu": "Open main menu",
+    "showNavigation": "Show Navigation",
+    "hideNavigation": "Hide Navigation"
+  },
+  "demoBanner": {
+    "badge": "DEMO",
+    "description": "This is a demo environment.",
+    "scope": "Scope",
+    "global": "Global",
+    "select": "Select...",
+    "searchPlaceholder": "Search countries...",
+    "noCountriesFound": "No countries found"
+  },
+  "homepage": {
+    "hero": {
+      "title": "The NGO Databank",
+      "subtitle": "Access to data, visualizations, and insights",
+      "description": "Explore comprehensive humanitarian data, indicators, and publications from the NGO Databank ecosystem.",
+      "exploreButton": "Explore Data",
+      "learnMoreButton": "Learn More"
+    },
+    "features": {
+      "title": "What We Offer",
+      "dataAccess": {
+        "title": "Data Access",
+        "description": "Comprehensive access to humanitarian data and indicators"
+      },
+      "visualizations": {
+        "title": "Visualizations",
+        "description": "Interactive charts and graphs for data analysis"
+      },
+      "publications": {
+        "title": "Publications",
+        "description": "Research reports and publications"
+      },
+      "insights": {
+        "title": "Insights",
+        "description": "Data-driven insights and analysis"
+      }
+    },
+    "featureCards": {
+      "visualizations": {
+        "title": "Interactive Visualizations",
+        "description": "Analyze trends and patterns with sophisticated charts and maps.",
+        "button": "Go to Data Viz →"
+      },
+      "chat": {
+        "title": "Chat with our Data",
+        "description": "Ask questions about humanitarian data in natural language.",
+        "button": "Chat with Data →"
+      },
+      "countries": {
+        "title": "Country Profiles",
+        "description": "Explore detailed information and statistics for individual countries.",
+        "button": "Browse Countries →"
+      }
+    },
+    "latestFromField": {
+      "title": "Latest from the Field",
+      "story1": {
+        "title": "Emergency Response in Region X",
+        "description": "Providing vital aid to communities affected by recent flooding...",
+        "link": "Read More →"
+      },
+      "story2": {
+        "title": "Health Initiative Impact",
+        "description": "New mobile clinics expand healthcare access for remote villages...",
+        "link": "Read More →"
+      },
+      "story3": {
+        "title": "Discover More Stories",
+        "description": "Explore humanitarian impact around the globe.",
+        "link": "View All Updates →"
+      }
+    },
+    "stats": {
+      "title": "Our Impact",
+      "countries": "Countries",
+      "indicators": "Indicators",
+      "publications": "Publications",
+      "dataPoints": "Data Points"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "notFound": "Page not found",
+    "backToHome": "Back to Home",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "close": "Close",
+    "next": "Next",
+    "previous": "Previous",
+    "download": "Download",
+    "share": "Share",
+    "more": "More",
+    "less": "Less",
+    "tryAgain": "Try again",
+    "home": "Home",
+    "yes": "Yes",
+    "no": "No",
+    "select": "Select"
+  },
+  "indicatorBank": {
+    "title": "Indicator Bank",
+    "meta": {
+      "description": "Browse indicators from the indicator bank."
+    },
+    "hero": {
+      "title": "Indicator Bank",
+      "description": "Explore our comprehensive collection of indicators used across network operations."
+    },
+    "loading": {
+      "title": "Loading Indicator Bank",
+      "description": "Please wait while we fetch the indicators..."
+    },
+    "error": {
+      "title": "Indicator Bank Error"
+    },
+    "search": {
+      "placeholder": "Search indicators..."
+    },
+    "filter": {
+      "placeholder": "Filter indicators..."
+    },
+    "viewMode": {
+      "grid": "Grid View",
+      "table": "Table View"
+    },
+    "indicator": "indicator",
+    "indicators": "indicators",
+    "filters": {
+      "title": "Filters",
+      "active": "Active",
+      "search": {
+        "title": "Search",
+        "placeholder": "Search indicators by name or definition..."
+      },
+      "type": {
+        "label": "Type",
+        "all": "All Types"
+      },
+      "sector": {
+        "label": "Sector",
+        "all": "All Sectors"
+      },
+      "subsector": {
+        "label": "Sub-Sector",
+        "all": "All Sub-Sectors"
+      },
+      "status": {
+        "label": "Status",
+        "activeOnly": "Active Only",
+        "all": "All",
+        "archivedOnly": "Archived Only"
+      },
+      "apply": "Apply Filters",
+      "clearAll": "Clear All"
+    },
+    "results": {
+      "showing": "Showing",
+      "matching": "matching",
+      "noResults": "No indicators found matching your criteria.",
+      "noIndicators": "No indicators found."
+    },
+    "table": {
+      "name": "Name",
+      "type": "Type",
+      "sector": "Sector",
+      "subsector": "Sub-Sector",
+      "unit": "Unit"
+    },
+    "guide": {
+      "title": "How to Use the Indicator Bank",
+      "step1": {
+        "title": "Browse by Sector",
+        "description": "Start by exploring indicators organized by humanitarian sectors like Health, Shelter, or Water & Sanitation."
+      },
+      "step2": {
+        "title": "Use Filters",
+        "description": "Narrow down your search using filters for type, sector, or specific keywords."
+      },
+      "step3": {
+        "title": "View Details",
+        "description": "Click on any indicator to see its full definition, usage, and related information."
+      }
+    },
+    "proposeNewIndicator": "Cannot find an indicator? Propose a new one here.",
+    "proposeModal": {
+      "thankYou": "Thank You!",
+      "successMessage": "Your indicator proposal has been submitted successfully. We'll review it and get back to you if needed.",
+      "confirmationEmailSent": "Confirmation Email Sent",
+      "confirmationEmailMessage": "A confirmation email has been sent to {{email}}. Please check your inbox (and spam folder) for details about your submission.",
+      "close": "Close",
+      "clearAll": "Clear All",
+      "cancel": "Cancel",
+      "submitting": "Submitting...",
+      "submitProposal": "Submit Proposal",
+      "failedToSubmit": "Failed to submit proposal: {{message}}"
+    }
+  },
+  "commonWords": {
+    "title": "Common Words",
+    "description": "Manage common terms and their meanings for tooltips",
+    "addNew": "Add New Common Word",
+    "edit": "Edit Common Word",
+    "delete": "Delete Common Word",
+    "term": "Term",
+    "meaning": "Meaning",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "created": "Created",
+    "updated": "Updated",
+    "actions": "Actions",
+    "searchPlaceholder": "Search terms or meanings...",
+    "noResults": "No common words found",
+    "noResultsSearch": "No common words match your search criteria",
+    "getStarted": "Get started by adding your first common word",
+    "addFirst": "Add First Common Word",
+    "total": "Total",
+    "commonWords": "common words",
+    "confirmDelete": "Are you sure you want to delete this common word?",
+    "bulkOperations": "Bulk Operations",
+    "bulkOperationsDescription": "Import common words from Excel or export existing ones",
+    "exportToExcel": "Export to Excel",
+    "importFromExcel": "Import from Excel",
+    "importModalTitle": "Import Common Words from Excel",
+    "instructions": "Instructions",
+    "format": "Format",
+    "formatDescription": "Excel file (.xlsx) with columns: Term, Meaning, French, Spanish, Arabic, Chinese, Russian, Hindi, Active",
+    "termRequired": "Required - The word or phrase to highlight",
+    "meaningRequired": "Required - English definition",
+    "languageColumns": "Language Columns",
+    "activeOptional": "Optional - TRUE/FALSE (default: TRUE)",
+    "downloadTemplate": "Download Excel Template",
+    "selectExcelFile": "Select Excel File",
+    "overwriteExisting": "Overwrite existing terms if they already exist",
+    "cancel": "Cancel",
+    "importCommonWords": "Import Common Words",
+    "pleaseSelectFile": "Please select a file to import",
+    "selectValidExcelFile": "Please select a valid Excel file (.xlsx or .xls)",
+    "fileSizeLimit": "File size must be less than 10MB",
+    "basicInfo": "Basic Information",
+    "multilingualMeanings": "Multilingual Meanings",
+    "termPlaceholder": "e.g., Emergency, Response, Humanitarian",
+    "meaningPlaceholder": "Definition or explanation of this term",
+    "isActive": "Active",
+    "translationsDescription": "Add translations of the meaning in different languages. Leave blank if not available.",
+    "save": "Save Common Word",
+    "update": "Update Common Word",
+    "editing": "Currently editing",
+    "french": "French",
+    "spanish": "Spanish",
+    "arabic": "Arabic",
+    "chinese": "Chinese",
+    "russian": "Russian",
+    "hindi": "Hindi",
+    "frenchPlaceholder": "French translation of the meaning",
+    "spanishPlaceholder": "Spanish translation of the meaning",
+    "arabicPlaceholder": "Arabic translation of the meaning",
+    "chinesePlaceholder": "Chinese translation of the meaning",
+    "russianPlaceholder": "Russian translation of the meaning",
+    "hindiPlaceholder": "Hindi translation of the meaning"
+  },
+  "resources": {
+    "title": "Resources",
+    "meta": {
+      "description": "Browse research reports, publications, and resources from the databank."
+    },
+    "hero": {
+      "title": "Resources",
+      "description": "Research reports, publications, and resources from the databank"
+    },
+    "loading": {
+      "title": "Loading Resources",
+      "description": "Please wait while we fetch the resources..."
+    },
+    "error": {
+      "title": "Resources Error",
+      "loadFailed": "Could not load resources. Please try again later."
+    },
+    "search": {
+      "placeholder": "Search resources...",
+      "button": "Search"
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page",
+      "of": "of"
+    },
+    "pdfViewer": {
+      "loading": "Loading PDF...",
+      "error": "Failed to load PDF. Please try downloading the file instead.",
+      "download": "Download PDF",
+      "close": "Close",
+      "previousPage": "Previous Page",
+      "nextPage": "Next Page",
+      "pageOf": "Page {{current}} of {{total}}",
+      "pageError": "Failed to load PDF page. Please try downloading the file instead."
+    },
+    "noResults": "No resources found matching your search criteria.",
+    "noResources": "No resources available at the moment.",
+    "sections": {
+      "publications": {
+        "title": "Publications",
+        "expand": "Expand Publications",
+        "collapse": "Collapse Publications",
+        "pagination": "Publications Pagination",
+        "none": "No publications available.",
+        "noResults": "No publications found matching your search."
+      },
+      "otherResources": {
+        "title": "Other Resources",
+        "expand": "Expand Other Resources",
+        "collapse": "Collapse Other Resources",
+        "pagination": "Other Resources Pagination",
+        "loading": "Loading other resources...",
+        "none": "No other resources available",
+        "noResults": "No other resources found",
+        "tryAdjusting": "Try adjusting your search terms.",
+        "comingSoon": "Additional resource types will be added here as they become available."
+      }
+    }
+  },
+  "dataVisualization": {
+    "title": "Data Visualizations",
+    "meta": {
+      "description": "Explore interactive data visualizations from the databank."
+    },
+    "hero": {
+      "title": "Data Visualizations",
+      "description": "Interact with key humanitarian data through charts, maps, and dashboards."
+    },
+    "sections": {
+      "fundingOverview": {
+        "title": "Funding Overview",
+        "placeholder": "Chart Component (e.g., Recharts BarChart) will go here."
+      },
+      "globalReach": {
+        "title": "Global Reach Map",
+        "placeholder": "Interactive Map Component (e.g., Leaflet, Mapbox) will go here."
+      },
+      "sectoralImpact": {
+        "title": "Sectoral Impact",
+        "healthImpact": "Chart for Health Impact",
+        "washActivities": "Chart for WASH Activities"
+      }
+    }
+  },
+  "exploreData": {
+    "title": "Explore Data",
+    "meta": {
+      "description": "Create custom data visualizations and explore databank data by selecting indicators, countries, and chart types."
+    },
+    "hero": {
+      "title": "Explore Data",
+      "description": "Create custom data visualizations by selecting indicators, countries, and chart types. Download your charts for reports and presentations."
+    },
+    "configure": {
+      "title": "Configure Your Visualization",
+      "step1": "Select Indicator",
+      "step2": "Select Countries",
+      "step3": "Select Period & Chart Type",
+      "filterBySector": "Filter by Sector (Optional)",
+      "allSectors": "All Sectors",
+      "selectIndicator": "Select Indicator *",
+      "chooseIndicator": "Choose an indicator...",
+      "noIndicatorsAvailable": "No indicators available",
+      "loading": "Loading...",
+      "selectCountries": "Select Countries *",
+      "chooseCountries": "Choose countries...",
+      "allCountriesSelected": "All countries selected",
+      "regionsSelected": "{{count}} region(s) selected",
+      "selected": "Selected:",
+      "countriesSelected": "{{count}} countries selected",
+      "chartType": "Chart Type",
+      "timePeriod": "Time Period *",
+      "singleYear": "Single Year",
+      "range": "Range",
+      "selectYear": "Select a year...",
+      "loadingPeriods": "Loading periods...",
+      "fromYear": "From Year",
+      "toYear": "To Year",
+      "from": "From...",
+      "to": "To...",
+      "selectedRange": "Selected range: {{from}} - {{to}}",
+      "years": "{{count}} years",
+      "generateChart": "Generate Chart",
+      "generating": "Generating...",
+      "clearSavedConfiguration": "Clear Saved Configuration",
+      "summary": "Summary",
+      "indicator": "Indicator:",
+      "countries": "Countries:",
+      "period": "Period:",
+      "notSelected": "Not selected"
+    },
+    "chart": {
+      "title": "Data Visualization",
+      "chart": "Chart",
+      "table": "Table",
+      "generatedOn": "Generated on",
+      "downloadData": "Download data as CSV",
+      "data": "Data",
+      "downloadChart": "Download chart as PNG",
+      "noChartData": "No chart data available",
+      "checkConsole": "Please check the console for debugging information",
+      "configuration": "Configuration",
+      "sector": "Sector:",
+      "chartType": "Chart Type:",
+      "years": "Years:",
+      "dataSummary": "Data Summary",
+      "totalDataPoints": "Total Data Points:",
+      "maxValue": "Max Value:",
+      "minValue": "Min Value:",
+      "average": "Average:",
+      "allCountries": "All Countries",
+      "regions": "Regions ({{count}})",
+      "countries": "Countries ({{count}})",
+      "allCountriesSelected": "All countries selected",
+      "entireRegion": "(entire region)",
+      "moreCountries": "+{{count}} more countries",
+      "keyStatistics": "Key Statistics",
+      "totalGrowth": "Total Growth",
+      "currentTotal": "Current Total",
+      "averageAnnualGrowth": "Average Annual Growth",
+      "tableHeaders": {
+        "value": "Value",
+        "year": "Year",
+        "country": "Country"
+      }
+    },
+    "placeholder": {
+      "title": "Data Visualization",
+      "subtitle": "Ready to explore your data",
+      "noChartGenerated": "No Chart Generated Yet",
+      "description": "Select your preferred sector, indicator, countries, and chart type, then click \"Generate Visualization\" to create your custom data view.",
+      "feature1": "Choose from multiple chart types (Line, Bar, Pie)",
+      "feature2": "Compare data across different countries",
+      "feature3": "Analyze trends over time"
+    },
+    "loading": {
+      "generating": "Generating your visualization...",
+      "loadingData": "Loading sectors and indicators..."
+    },
+    "chartTypes": {
+      "line": {
+        "name": "Line Chart",
+        "description": "Shows trends over time"
+      },
+      "bar": {
+        "name": "Bar Chart",
+        "description": "Compares values across categories"
+      },
+      "pie": {
+        "name": "Pie Chart",
+        "description": "Shows proportions of a whole"
+      }
+    },
+    "confirmClearCache": "Are you sure you want to clear all saved configuration? This will reset your selections and chart data."
+  },
+  "chat": {
+    "title": "Chat with our data",
+    "meta": {
+      "description": "Ask questions about humanitarian data using the AI assistant."
+    },
+    "hero": {
+      "title": "Chat with our data",
+      "description": "Type your questions about our data below."
+    },
+    "messages": {
+      "welcome": "Hello! How can I help you explore the databank today?",
+      "thinking": "Thinking...",
+      "placeholder": "Ask about funding, programs, countries..."
+    },
+    "actions": {
+      "send": "Send"
+    },
+    "placeholder": {
+      "response": "I received your message: \"{{message}}\". As a placeholder, I can't access real-time data yet, but I'm designed to answer questions about humanitarian activities, funding, and impact based on the available databank."
+    },
+    "conversations": {
+      "none": "No conversations yet",
+      "untitled": "Untitled Conversation",
+      "sources": "Sources:"
+    }
+  },
+  "globalOverview": {
+    "title": "Global Overview",
+    "meta": {
+      "description": "Explore global humanitarian data and indicators from the databank."
+    },
+    "hero": {
+      "title": "Global Overview",
+      "description": "Explore comprehensive humanitarian data, indicators, and insights from the International Federation of Red Cross and Red Crescent Societies."
+    },
+    "indicators": {
+      "volunteers": "Volunteers",
+      "staff": "Staff",
+      "branches": "Branches",
+      "localUnits": "Local Units",
+      "bloodDonors": "Blood Donors",
+      "firstAid": "First Aid",
+      "peopleReached": "People Reached",
+      "income": "Income",
+      "expenditure": "Expenditure"
+    },
+    "peopleReached": {
+      "crossCutting": "Cross-cutting",
+      "crossCuttingDesc": "Cross-cutting humanitarian activities and interventions",
+      "climateEnvironmental": "Climate and environmental crises",
+      "climateEnvironmentalDesc": "People reached through climate and environmental crisis response",
+      "evolvingCrises": "Evolving crises and disasters",
+      "evolvingCrisesDesc": "People reached through evolving crisis and disaster response",
+      "healthWellbeing": "Growing gaps in health and well-being",
+      "healthWellbeingDesc": "People reached through health and well-being programs",
+      "migrationIdentity": "Migration and identity",
+      "migrationIdentityDesc": "People reached through migration and identity support programs",
+      "valuesPowerInclusion": "Values, Power and Inclusion",
+      "valuesPowerInclusionDesc": "People reached through values, power and inclusion initiatives",
+      "subIndicators": {
+        "longTermServices": "Number of people reached with long term services and programmes",
+        "emergencyResponse": "Number of people reached with emergency response and early recovery programmes",
+        "climateAdaptation": "Climate Adaptation",
+        "environmentalProtection": "Environmental Protection",
+        "disasterRiskReduction": "Disaster Risk Reduction",
+        "sustainableDevelopment": "Sustainable Development",
+        "emergencyResponseRecovery": "Emergency Response",
+        "recoveryRehabilitation": "Recovery and Rehabilitation",
+        "earlyWarningSystems": "Early Warning Systems",
+        "crisisPreparedness": "Crisis Preparedness",
+        "primaryHealthcare": "Primary Healthcare",
+        "mentalHealthSupport": "Mental Health Support",
+        "nutritionPrograms": "Nutrition Programs",
+        "healthEducation": "Health Education",
+        "migrantAssistance": "Migrant Assistance",
+        "refugeeSupport": "Refugee Support",
+        "communityIntegration": "Community Integration",
+        "identityProtection": "Identity Protection",
+        "genderEquality": "Gender Equality",
+        "youthEmpowerment": "Youth Empowerment",
+        "socialInclusion": "Social Inclusion",
+        "humanitarianValues": "Humanitarian Values"
+      }
+    },
+    "regions": {
+      "global": "Global Overview",
+      "globalDesc": "View data from all regions",
+      "africa": "Africa",
+      "africaDesc": "African countries",
+      "americas": "Americas",
+      "americasDesc": "North and South America",
+      "asiaPacific": "Asia Pacific",
+      "asiaPacificDesc": "Asia Pacific countries",
+      "europeCentralAsia": "Europe & Central Asia",
+      "europeCentralAsiaDesc": "European and Central Asian countries",
+      "mena": "Middle East and North Africa",
+      "menaDesc": "Middle Eastern and North African countries"
+    },
+    "map": {
+      "title": "{{region}} Humanitarian Overview",
+      "description": "Interactive map showing {{organization}} activities, indicators, and impact {{location}} {{year}}. {{indicatorInstruction}}",
+      "globalLocation": "across the globe",
+      "regionalLocation": "in {{region}}",
+      "nationalLocation": "in {{country}}",
+      "yearFilter": "for {{year}}",
+      "peopleReachedInstruction": "Select a sub-category above to view specific data.",
+      "indicatorInstruction": "Select an indicator above to filter the data.",
+      "regionSelector": "Region:",
+      "countriesInRegion": "{{count}} countries in {{region}}",
+      "allRegions": "All regions",
+      "total": "Total: {{value}}",
+      "globalTotal": "Global Total",
+      "selectedCountry": "Selected country",
+      "dataRange": "Data Range",
+      "bubbleSize": "Bubble Size",
+      "choroplethMap": "Choropleth Map",
+      "bubbleMap": "Bubble Map",
+      "barChart": "Bar Chart",
+      "showAbbreviated": "Show abbreviated values (K, M, B)",
+      "showFull": "Show full values (1,234,567)",
+      "stopAnimation": "Stop Animation",
+      "startBarChartRace": "Start Bar Chart Race",
+      "startTimeAnimation": "Start Time Animation",
+      "scrollToTop": "Scroll to top",
+      "admin": "Admin",
+      "showAdmin": "Show {{level}}",
+      "countries": "countries",
+      "areas": "areas",
+      "areasEstimated": "areas (estimated)",
+      "downloadCSV": "Download data as CSV file",
+      "downloadPNG": "Download map as PNG image",
+      "cacheStatus": {
+        "cached": "📦 Cached",
+        "live": "🔄 Live",
+        "clearCache": "🗑️ Clear",
+        "clearCacheTitle": "Clear cache"
+      }
+    },
+    "quickPrompts": {
+      "afghanVolunteers": "Tell me about Afghan Red Crescent volunteers",
+      "disasterResponse": "Show me global disaster response data",
+      "humanitarianIndicators": "What are the key humanitarian indicators?"
+    },
+    "aiResponses": {
+      "afghanRedCrescent": "Over the past years, the Afghan Red Crescent Society (ARCS) has relied heavily on its volunteer network to respond to natural disasters, health crises, and conflict-related emergencies across Afghanistan. In 2013, ARCS reported having around 23,440 active volunteers (<a href=\"https://arcs.af/sites/default/files/2021-05/English%20Booklet%20size%209%20x%2014%20cm.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">source</a>), contributing to activities in nearly all provinces. A longitudinal review of ARCS's volunteer engagement efforts, supported by the Swedish Red Cross and ICRC, is detailed in a case study (<a href=\"https://ifrc.org/sites/default/files/2024-10/Longitudunal%20Review%20Case%20study_Afghan%20Red%20Crescent.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">source</a>). Volunteers played crucial roles in major emergencies such as the 2015 avalanches, the 2022 Paktika earthquake, and the 2023 Herat earthquakes. According to the NGO Databank's <a href=\"/resources\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline inline-flex items-center\"><svg class=\"w-4 h-4 mr-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1\" /></svg>Everyone Counts Report 2022</a>, ARCS reported 393,077 volunteers contributing over 2.1 million hours of service, including 257,437 hours in health-related activities, with 56,456 people trained and 31,600 receiving first aid. These figures highlight the scale and impact of volunteerism in ARCS operations, though other sources suggest fluctuations in volunteer numbers over time.",
+      "disasterResponse": "Humanitarian networks respond to hundreds of disasters and emergencies annually, providing critical assistance worldwide. In 2023, large-scale disaster response reached many millions of people affected by climate-related disasters, conflicts, and health emergencies. Key response areas include emergency shelter, food security, water and sanitation, health services, and psychosocial support. Response is often coordinated through emergency funds and appeals, ensuring rapid assistance to affected communities.",
+      "humanitarianIndicators": "The databank tracks several key humanitarian indicators including volunteers, staff, local units, blood donors, first aid recipients, people reached, income, and expenditure. These indicators provide comprehensive insights into the network's capacity, reach, and impact across different regions and contexts. The data helps measure progress towards humanitarian goals and informs strategic decision-making for future operations.",
+      "regionalComparison": "Regional comparison of volunteer numbers shows varying levels of engagement across different parts of the world. Africa and Asia typically have the highest volunteer numbers, reflecting the extensive community-based programs in these regions. Europe and the Americas show strong volunteer engagement in specific areas like disaster response and health services. The Middle East demonstrates growing volunteer participation, particularly in emergency response and community health initiatives."
+    },
+    "chartTitles": {
+      "arcsVolunteers": "ARCS Volunteers (2019-2023)",
+      "disasterResponse": "Disaster response operations (2019-2023)",
+      "humanitarianIndicators": "Key Humanitarian Indicators (2023)",
+      "regionalComparison": "Volunteers by Region (2023)",
+      "afghanistanVolunteers": "Volunteers in Afghanistan ({{year}})"
+    },
+    "copyButton": {
+      "copy": "Copy text to clipboard",
+      "copied": "✓ Copied!"
+    }
+  },
+  "countries": {
+    "title": "Country Profiles",
+    "meta": {
+      "description": "Explore activities and data by country."
+    },
+    "hero": {
+      "title": "Country Profiles",
+      "description": "Select a country to view detailed information, data, and impact stories."
+    },
+    "loading": {
+      "title": "Loading Countries",
+      "description": "Please wait while we fetch the country profiles..."
+    },
+    "error": {
+      "title": "Countries Error",
+      "loadFailed": "Could not load countries list."
+    },
+    "search": {
+      "label": "Search countries",
+      "placeholder": "Search by country, National Society, or ISO code...",
+      "noResults": "No countries found matching your search."
+    },
+    "noCountries": "No countries to display at the moment.",
+    "regions": "Regions",
+    "countries": "countries",
+    "selectRegion": "Select a region",
+    "card": {
+      "viewProfile": "View Profile",
+      "comingSoon": "Coming Soon",
+      "profileDataComingSoon": "{{name}} - Profile data coming soon",
+      "viewProfileFor": "View profile for {{name}}"
+    },
+    "detail": {
+      "title": "Country Profile",
+      "notFound": "Country Profile Not Found",
+      "error": "The requested country profile could not be found or is not yet available.",
+      "backToList": "Back to Countries List",
+      "atAGlance": "At a Glance",
+      "nationalSociety": "National Society"
+    }
+  },
+  "regions": {
+    "overview": "Overview of {{count}} countries in {{region}}",
+    "totalCountries": "Total Countries",
+    "nationalSocieties": "National Societies",
+    "region": "Region",
+    "countriesInRegion": "Countries in {{region}}",
+    "clickToViewOverview": "Click to view {{region}} overview",
+    "seeRegionOverview": "See {{region}} Region Overview",
+    "notFound": "Region Not Found",
+    "regionNotFound": "The requested region could not be found or is not yet available."
+  },
+  "sectorIndicators": {
+    "title": "Sector Indicators",
+    "loading": {
+      "title": "Loading Indicators",
+      "description": "Please wait while we fetch the indicators..."
+    },
+    "error": {
+      "title": "Error",
+      "loadFailed": "Could not load indicators. Please try again later.",
+      "invalidFilter": "Invalid filter type"
+    },
+    "search": {
+      "placeholder": "Search indicators in this category...",
+      "button": "Search",
+      "clear": "Clear"
+    },
+    "breadcrumb": {
+      "indicatorBank": "Indicator Bank",
+      "sector": "sector",
+      "subsector": "subsector"
+    },
+    "hero": {
+      "title": "{{displayValue}} Indicators",
+      "description": "Explore indicators in the {{displayValue}} {{filterType}}."
+    },
+    "results": {
+      "showing": "Showing {{count}} indicator",
+      "showingPlural": "Showing {{count}} indicators",
+      "matching": " matching \"{{searchTerm}}\"",
+      "noResults": "No indicators found matching your search criteria.",
+      "noIndicators": "No indicators available in the {{displayValue}} {{filterType}}."
+    },
+    "indicator": {
+      "archived": "Archived",
+      "type": "Type",
+      "unit": "Unit",
+      "sector": "Sector",
+      "emergency": "Emergency",
+      "relatedPrograms": "Related Programs"
+    },
+    "backToBank": "Back to Indicator Bank"
+  },
+  "countryProfile": {
+    "title": "Country Profile",
+    "loading": {
+      "title": "Loading Country Profile",
+      "description": "Please wait while we fetch the country profile..."
+    },
+    "error": {
+      "title": "Country Profile Error",
+      "notFound": "Country Profile Not Found",
+      "loadFailed": "Could not load profile data. It might not be available yet."
+    },
+    "hero": {
+      "nationalSociety": "National Society"
+    },
+    "region": "Region",
+    "iso3": "ISO3 Code",
+    "sections": {
+      "atAGlance": "At a Glance",
+      "overview": "Overview",
+      "ourWork": "Our Work in {{country}}",
+      "keyIndicators": "Key Indicators",
+      "operationalAreas": "Operational Areas",
+      "relatedPublications": "Related Publications"
+    },
+    "stats": {
+      "peopleAssisted": "People Assisted (Last Year)",
+      "activePrograms": "Active Programs",
+      "keyFocusAreas": "Key Focus Areas"
+    },
+    "indicators": {
+      "period": "Period",
+      "moreCharts": "More detailed charts coming soon!"
+    },
+    "allIndicators": "All Indicators",
+    "allIndicatorsDescription": "Comprehensive view of all indicators and data for this National Society.",
+    "noIndicators": "No indicators available for this country.",
+    "searchIndicators": "Search indicators...",
+    "allPeriods": "All Periods",
+    "showing": "Showing",
+    "of": "of",
+    "indicatorsLabel": "indicators",
+    "noIndicatorsFound": "No indicators found matching your search criteria.",
+    "keyIndicators": "Key Indicators",
+    "keyIndicatorsDescription": "Explore key humanitarian indicators with interactive timeseries data for this National Society.",
+    "timeseries": "Timeseries Data",
+    "timeseriesDescription": "Historical data showing trends over time for the selected indicator.",
+    "currentValue": "Current Value",
+    "totalGrowth": "Total Growth",
+    "avgAnnualGrowth": "Avg Annual Growth",
+    "noTimeseriesData": "No timeseries data available",
+    "noTimeseriesDataDescription": "Historical data is not available for this indicator in this country.",
+    "documents": "Documents & Resources",
+    "documentsDescription": "Official documents, reports, and resources from this National Society.",
+    "noDocuments": "No documents available for this country.",
+    "allDocuments": "All Documents",
+    "download": "Download",
+    "noDocumentsFound": "No documents found for the selected type.",
+    "map": {
+      "placeholder": "Interactive Country Map Placeholder",
+      "adminLevels": {
+        "ADM0": "Country",
+        "ADM1": "Province",
+        "ADM2": "District",
+        "ADM3": "Sub-district",
+        "label": "Level"
+      }
+    },
+    "publications": {
+      "comingSoon": "Publications specific to {{country}} will be listed here once backend filtering is implemented.",
+      "viewAll": "View all publications"
+    },
+    "actions": {
+      "backToList": "Back to Countries List"
+    },
+    "topStrengths": "National Society Strengths",
+    "topStrengthsDescription": "The top three indicators where this National Society shows exceptional performance and impact.",
+    "noTopIndicators": "No top indicators available at this time.",
+    "strength": "Strength",
+    "keyStrength": "Key National Society Strength",
+    "topSectors": "Top Sectors",
+    "topSectorsDescription": "The top three sectors where this National Society shows the highest maximum indicator values.",
+    "noTopSectors": "No sector data available at this time.",
+    "sector": "Sector",
+    "topSector": "Top Sector",
+    "totalValue": "Total Value",
+    "maxValue": "Max Value",
+    "indicatorsCount": "Indicators",
+    "topIndicatorsInSector": "Top indicators in this sector",
+    "more": "more",
+    "nav": {
+      "overview": "Overview",
+      "strengths": "Strengths",
+      "indicators": "Indicators",
+      "documents": "Documents"
+    },
+    "timeoutWarning": {
+      "title": "Loading Issues Detected",
+      "message": "Some data is taking longer than expected to load. This may be due to network conditions or server load.",
+      "dismiss": "Dismiss"
+    }
+  },
+  "footer": {
+    "copyright": "© 2024 {orgName}. All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "contact": "Contact Us",
+    "mobileApps": {
+      "title": "Mobile Apps",
+      "description": "Download our mobile app for Android and iOS devices",
+      "downloadAndroid": "Download Android App",
+      "downloadIOS": "Download iOS App"
+    },
+    "api": {
+      "readDocs": "Read API Documentation"
+    },
+    "orgLogoAlt": "Organization logo",
+    "organizationName": "Humanitarian organization",
+    "developerTools": {
+      "title": "Developer Tools",
+      "description": "Build and test API endpoints for accessing our data programmatically",
+      "moreInfo": "For full details, read the API documentation covering endpoints, parameters, pagination and the disaggregation flag.",
+      "readDocs": "Read API documentation"
+    },
+    "developedBy": "Built by Haytham Alsoufi, volunteer of Syrian Arab Red Crescent"
+  },
+  "downloadApps": {
+    "title": "Download Mobile Apps",
+    "meta": {
+      "description": "Download the NGO Databank mobile app for Android and iOS devices."
+    },
+    "hero": {
+      "title": "Download Mobile Apps",
+      "description": "Get the NGO Databank mobile app for Android and iOS devices."
+    },
+    "android": {
+      "title": "Android App",
+      "description": "Download the APK file for Android devices",
+      "downloadButton": "Download APK",
+      "version": "Version 1.0.0"
+    },
+    "ios": {
+      "title": "iOS App",
+      "description": "Download the IPA file for iOS devices",
+      "downloadButton": "Download IPA",
+      "version": "Version 1.0.0"
+    },
+    "instructions": {
+      "title": "Installation Instructions",
+      "android": {
+        "title": "Android",
+        "step1": "Download the APK file using the button above",
+        "step2": "Enable 'Install from Unknown Sources' in your device settings",
+        "step3": "Open the downloaded APK file and follow the installation prompts"
+      },
+      "ios": {
+        "title": "iOS",
+        "step1": "Download the IPA file using the button above",
+        "step2": "Connect your iOS device to your computer",
+        "step3": "Use iTunes or Finder to install the IPA file on your device",
+        "step4": "Trust the developer certificate in Settings > General > Device Management"
+      }
+    }
+  },
+  "apiBuilder": {
+    "title": "API Endpoint Builder",
+    "meta": {
+      "description": "Build and test API endpoints for accessing databank data."
+    },
+    "hero": {
+      "title": "API Endpoint Builder",
+      "description": "Build and test API endpoints to access databank data programmatically."
+    },
+    "navigation": {
+      "overview": "Overview",
+      "documentation": "Documentation",
+      "builder": "Builder"
+    },
+    "description": {
+      "title": "Data Access API",
+      "text": "Use this tool to build API endpoints for accessing databank data. The data endpoint allows you to retrieve form submissions, indicators, and other data with various filters and parameters.",
+      "note": "Note: This tool is for the public data endpoint only. For full API access, contact your administrator."
+    },
+    "endpoint": {
+      "title": "Endpoint",
+      "method": "GET",
+      "path": "http://localhost:5000/api/v1/data",
+      "description": "Retrieve data from databank forms and submissions (API key automatically included)"
+    },
+    "parameters": {
+      "title": "Query Parameters",
+      "description": "Select and configure the parameters you want to include in your API request:",
+      "clearAll": "Clear All",
+      "loadingOptions": "Loading parameter options...",
+      "template_id": {
+        "label": "Template",
+        "description": "Filter by specific form template",
+        "placeholder": "Select a template"
+      },
+      "submission_id": {
+        "label": "Submission ID",
+        "description": "Filter by specific submission ID",
+        "placeholder": "Enter submission ID (number)"
+      },
+      "item_type": {
+        "label": "Item Type",
+        "description": "Filter by item type",
+        "options": {
+          "indicator": "Indicator",
+          "question": "Question",
+          "document_field": "Document Field"
+        }
+      },
+      "item_id": {
+        "label": "Item ID",
+        "description": "Filter by form item ID",
+        "placeholder": "Enter item ID (number)"
+      },
+      "period_name": {
+        "label": "Period Name",
+        "description": "Filter by period name",
+        "placeholder": "Enter period name"
+      },
+      "country_id": {
+        "label": "Country",
+        "description": "Filter by specific country",
+        "placeholder": "Select a country"
+      },
+      "submission_type": {
+        "label": "Submission Type",
+        "description": "Filter by submission type",
+        "options": {
+          "assigned": "Assigned",
+          "public": "Public"
+        }
+      },
+      "disagg": {
+        "label": "Include Disaggregation",
+        "description": "Include disaggregation data in results when available",
+        "placeholder": "Select yes or no"
+      },
+      "page": {
+        "label": "Page",
+        "description": "Page number for pagination (default: 1)",
+        "placeholder": "Enter page number"
+      },
+      "per_page": {
+        "label": "Items per Page",
+        "description": "Number of items per page (default: 20)",
+        "placeholder": "Enter items per page"
+      }
+    },
+    "generatedUrl": {
+      "title": "Generated URL",
+      "description": "Your API endpoint URL with selected parameters:",
+      "copy": "Copy URL",
+      "copied": "Copied!",
+      "test": "Test Endpoint",
+      "testing": "Testing...",
+      "error": "Error testing endpoint"
+    },
+    "docs": {
+      "title": "API Documentation",
+      "intro": "Construct requests and learn how to use the Databank API effectively. Below are essentials for authentication, filtering, pagination, and disaggregation.",
+      "authentication": "Authentication",
+      "authInstruction": "Pass your API key via the {{param}} query parameter.",
+      "queryParameters": "Query Parameters",
+      "examplesTitle": "Examples",
+      "exampleBasic": "Basic request (without disaggregation)",
+      "exampleDisagg": "Include disaggregation data",
+      "exampleFilterPaginate": "Filter by template, period, and paginate",
+      "exampleCurlTitle": "cURL example",
+      "errorsTitle": "Errors",
+      "errors": {
+        "400": "400: Invalid parameter or value",
+        "401": "401: Missing or invalid api_key",
+        "404": "404: Resource not found",
+        "500": "500: Server error"
+      }
+    },
+    "labels": {
+      "baseUrl": "Base URL",
+      "endpoint": "Endpoint"
+    },
+    "builder": {
+      "title": "Build Endpoint"
+    },
+    "fieldType": {
+      "select": "Select",
+      "number": "Number",
+      "text": "Text"
+    },
+    "quickStart": {
+      "title": "Quick Start Guide",
+      "step1": "Select the parameters you want to filter by using the checkboxes",
+      "step2": "Enter values for the selected parameters",
+      "step3": "Copy the generated URL or test it directly",
+      "step4": "Use the URL in your applications or scripts"
+    },
+    "activeParams": {
+      "title": "Active Parameters",
+      "none": "No parameters selected"
+    },
+    "download": {
+      "excel": "Download as Excel",
+      "preparingExcel": "Preparing Excel…"
+    },
+    "response": {
+      "title": "Response Preview",
+      "loading": "Loading response...",
+      "error": "Error loading response",
+      "noData": "No data returned",
+      "status": "Status: {{code}}",
+      "showRaw": "Show raw response"
+    },
+    "examples": {
+      "title": "Example Queries",
+      "description": "Try these example queries to get started:",
+      "allData": "All Data",
+      "assignedSubmissions": "Assigned Submissions Only",
+      "publicSubmissions": "Public Submissions Only",
+      "indicatorsOnly": "Indicators Only",
+      "first10Results": "First 10 Results",
+      "dataFromTemplate": "Data from {{templateName}}",
+      "dataFromCountry": "Data from {{countryName}}"
+    }
+  },
+  "indicatorDetail": {
+    "title": "Indicator Details",
+    "error": {
+      "title": "Indicator Error",
+      "notFound": "Indicator not found.",
+      "loadFailed": "Could not load indicator details. Please try again later."
+    },
+    "loading": {
+      "title": "Loading Indicator",
+      "message": "Please wait while we fetch the indicator details..."
+    },
+    "sidebar": {
+      "title": "All Indicators",
+      "of": "of",
+      "searchPlaceholder": "Search indicators...",
+      "noResults": "No indicators found matching \"{{searchTerm}}\""
+    },
+    "header": {
+      "id": "Indicator ID",
+      "suggestUpdates": "Suggest Updates",
+      "archived": "Archived"
+    },
+    "content": {
+      "definition": "Definition",
+      "keyProperties": "Key Properties",
+      "type": "Type",
+      "unit": "Unit of Measurement",
+      "sector": "Sector",
+      "subSector": "Sub-Sector",
+      "emergencyContext": "Emergency Context",
+      "status": "Status",
+      "active": "Active",
+      "archived": "Archived",
+      "relatedPrograms": "Related Programs",
+      "unknownProgram": "Unknown Program",
+      "metadata": "Metadata",
+      "created": "Created",
+      "lastUpdated": "Last Updated"
+    },
+    "footer": {
+      "backToBank": "Back to Indicator Bank",
+      "goBack": "Go Back"
+    },
+    "suggestModal": {
+      "suggestionTypes": {
+        "correction": "Correction to existing indicator",
+        "improvement": "Improvement to existing indicator",
+        "newIndicator": "Propose new indicator",
+        "other": "Other"
+      }
+    }
+  },
+  "disaggregationAnalysis": {
+    "title": "Disaggregation Analysis",
+    "meta": {
+      "description": "Comprehensive analysis of disaggregated data across all indicators including volunteers, staff, leadership, and people reached by sex and age groups"
+    },
+    "hero": {
+      "title": "Disaggregation Analysis",
+      "description": "Comprehensive analysis of disaggregated data across all platform indicators including volunteers, staff, governing board members, and people reached, with special focus on gender representation in leadership and volunteering"
+    },
+    "stats": {
+      "avgDisaggregation": "Avg Disaggregation",
+      "ageDisaggregation": "Age Disaggregation",
+      "womenLeadership": "Women Leadership",
+      "womenVolunteering": "Women Volunteering",
+      "womenStaff": "Women Staff"
+    },
+    "tooltip": {
+      "trendData": "Trend Data",
+      "fiveYearTrends": "5-Year Trends",
+      "historicalTrendNotAvailable": "Historical trend data not available for this metric",
+      "historicalTrendsDescription": "Historical trends for this metric over time",
+      "noHistoricalData": "No historical data available",
+      "onlyCurrentPeriod": "Only current period data shown",
+      "average": "Average:"
+    },
+    "error": {
+      "title": "Error Loading Data",
+      "retry": "Retry"
+    },
+    "filters": {
+      "title": "Filters & Analysis Options",
+      "countries": "Countries",
+      "period": "Period",
+      "indicator": "Indicator",
+      "chartType": "Chart Type",
+      "allPeriods": "All Periods",
+      "allIndicators": "All Indicators",
+      "barChart": "Bar Chart",
+      "pieChart": "Pie Chart",
+      "lineChart": "Line Chart",
+      "clearFilters": "Clear Filters",
+      "refreshData": "Refresh Data",
+      "loading": "Loading...",
+      "selectMultiple": "Hold Ctrl/Cmd to select multiple",
+      "disaggregatedRecords": "{{count}} disaggregated / {{total}} total records"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "byIndicator": "By Indicator",
+      "womenLeadership": "Women in Leadership",
+      "bySex": "By Sex",
+      "byAge": "By Age",
+      "bySexAge": "Sex & Age",
+      "byCountry": "Countries",
+      "countryDisaggregation": "Coverage",
+      "trends": "Trends"
+    },
+    "overview": {
+      "topCountries": "Top Countries by People Covered (Average)",
+      "overallDistribution": "Overall Distribution by Sex",
+      "noData": "No data available"
+    },
+    "byIndicator": {
+      "title": "Analysis by Indicator Type (with Age/Sex Disaggregation)",
+      "description": "Distribution by Indicator with Age/Sex Disaggregation",
+      "noData": "No indicators with age/sex disaggregation data available",
+      "noDataDescription": "Only indicators with demographic breakdowns are shown in this view"
+    },
+    "womenLeadership": {
+      "comparison": "Women in Leadership vs Staff vs Volunteering",
+      "representationPercentage": "Women's Representation Percentage",
+      "leadershipRoles": "Leadership Roles",
+      "volunteering": "Volunteering",
+      "staff": "Staff",
+      "womenOutOf": "{{value}} women out of {{total}} total",
+      "byCountry": "Women in Leadership by Country",
+      "percentageTitle": "Percentage of Women in Leadership Positions",
+      "trends": "Women's Participation Trends",
+      "leadershipOverTime": "Women in Leadership Over Time",
+      "volunteeringOverTime": "Women in Volunteering Over Time",
+      "noData": "No gender-disaggregated leadership data available"
+    },
+    "bySex": {
+      "title": "Analysis by Sex",
+      "description": "Distribution by Sex (All Indicators)",
+      "noData": "No sex-disaggregated data available"
+    },
+    "byAge": {
+      "title": "Analysis by Age Group",
+      "description": "Distribution by Age Group (All Indicators)",
+      "noData": "No age-disaggregated data available"
+    },
+    "bySexAge": {
+      "title": "Analysis by Sex and Age",
+      "description": "Distribution by Sex and Age Groups (All Indicators)",
+      "noData": "No sex-age disaggregated data available"
+    },
+    "byCountry": {
+      "title": "Analysis by Country (Average)",
+      "description": "Distribution by Country (All Indicators)",
+      "noData": "No country data available"
+    },
+    "coverage": {
+      "title": "Disaggregation Coverage by Country (Grouped by Region)",
+      "regionalSummary": "Regional Summary",
+      "detailedBreakdown": "Detailed Breakdown by Region",
+      "country": "Country",
+      "totalRecords": "Total Records",
+      "sexPercentage": "Sex %",
+      "agePercentage": "Age %",
+      "sexAgePercentage": "Sex+Age %",
+      "overallPercentage": "Overall %",
+      "barChart": "Bar Chart",
+      "countries": "countries",
+      "average": "Average",
+      "noData": "No disaggregation data available",
+      "downloadCSV": "Download CSV",
+      "downloadPNG": "Download PNG",
+      "downloadRegionalSummary": "Download Regional Summary as PNG",
+      "downloadRegion": "Download {{region}} as PNG"
+    },
+    "trends": {
+      "noDisaggregationData": "No disaggregation data available",
+      "governingBoard": "Women in Governing Board - Trends Over Time",
+      "governingBoardTitle": "Women in Governing Board - Trends Over Time",
+      "governingBoardChartTitle": "Percentage of Women in Governing Board Over Time",
+      "staff": "Women in Staff - Trends Over Time",
+      "staffTitle": "Women in Staff - Trends Over Time",
+      "staffChartTitle": "Percentage of Women in Staff Positions Over Time",
+      "volunteers": "Women in Volunteers - Trends Over Time",
+      "volunteersTitle": "Percentage of Women in Volunteering Over Time",
+      "volunteeringChartTitle": "Percentage of Women in Volunteering Over Time",
+      "leadershipOverTime": "Women in Leadership Over Time",
+      "volunteeringOverTime": "Women in Volunteering Over Time",
+      "participationAllCategories": "Women's Participation Across All Categories",
+      "noGoverningBoardTrend": "No governing board trend data available",
+      "noStaffTrend": "No staff trend data available",
+      "noVolunteeringTrend": "No volunteering trend data available",
+      "noTrendData": "No trend data available",
+      "noComparisonData": "No comparison data available",
+      "comparison": "Women's Participation Comparison - All Categories",
+      "comparisonTitle": "Governing Board vs Staff vs Volunteers",
+      "comparisonDescription": "Women's Participation Across All Categories",
+      "latestPeriodSummary": "Latest Period Summary",
+      "noGoverningBoardData": "No governing board trend data available",
+      "noStaffData": "No staff trend data available",
+      "noVolunteersData": "No volunteering trend data available"
+    },
+    "loading": {
+      "message": "Loading disaggregated data..."
+    }
+  },
+  "nsStructure": {
+    "loading": {
+      "title": "Loading organizational structure..."
+    },
+    "branches": "Branches",
+    "subbranches": "Sub-branches",
+    "selectBranch": "Select a branch",
+    "selectBranchToView": "Select a branch to view sub-branches",
+    "noBranches": "No branches found",
+    "noSubbranches": "No sub-branches found"
+  },
+  "errors": {
+    "404": {
+      "title": "404 - Page Not Found",
+      "message": "Sorry, we couldn't find that page."
+    },
+    "error": {
+      "title": "Error",
+      "server": "An error {{statusCode}} occurred on server",
+      "client": "An error occurred on client"
+    },
+    "failedToLoadIndicatorData": "Failed to load indicator data. Please try again later.",
+    "failedToLoadIndicatorDetails": "Failed to load indicator details.",
+    "indicatorNotFound": "Indicator not found.",
+    "failedToLoadCountriesList": "Failed to load countries list",
+    "failedToLoadRegionData": "Failed to load region data",
+    "failedToProcessData": "Failed to process data. Please try again.",
+    "failedToLoadAvailableYears": "Failed to load available years",
+    "failedToLoadIndicatorBankData": "Failed to load indicator bank data",
+    "failedToLoadKeyFigures": "Failed to load key figures"
+  },
+  "dataHealth": {
+    "title": "Data Store Health",
+    "metaTitle": "Data Store Health",
+    "description": "Monitor the status of local data store, cache, and backend connectivity",
+    "lastUpdated": "Last updated:",
+    "refresh": "Refresh",
+    "dataStore": {
+      "title": "Data Store",
+      "status": "Status:",
+      "lastSync": "Last Sync",
+      "fileSizes": "File Sizes",
+      "metadata": "Metadata",
+      "issues": "Issues",
+      "noIssues": "✓ No issues detected",
+      "noData": "No data available",
+      "unknown": "UNKNOWN"
+    },
+    "backoffice": {
+      "title": "Backoffice API",
+      "status": "Status:",
+      "connection": "Connection",
+      "lastCheck": "Last Check",
+      "responseData": "Response Data",
+      "error": "Error",
+      "reachable": "✓ Backoffice is reachable",
+      "noData": "No data available",
+      "unknown": "Unknown"
+    },
+    "configuration": {
+      "title": "Configuration",
+      "localStore": "Local Store",
+      "clientSide": "Client-side (IndexedDB)",
+      "serverSide": "Server-side (JSON files)",
+      "environment": "Environment"
+    },
+    "time": {
+      "unknown": "Unknown",
+      "minutesAgo": "{{minutes}} minutes ago",
+      "hoursAgo": "{{hours}} hour ago",
+      "hoursAgoPlural": "{{hours}} hours ago",
+      "daysAgo": "{{days}} day ago",
+      "daysAgoPlural": "{{days}} days ago"
+    }
+  },
+  "fallbacks": {
+    "unknownCountry": "Unknown Country",
+    "unknownIndicator": "Unknown Indicator",
+    "unknownProgram": "Unknown Program",
+    "unknown": "Unknown"
+  },
+  "forms": {
+    "placeholders": {
+      "sectorPrimary": "e.g., Health, Emergency Response",
+      "sectorSecondary": "e.g., Primary Healthcare",
+      "sectorTertiary": "e.g., Emergency Care",
+      "subsectorPrimary": "e.g., Primary Healthcare",
+      "subsectorSecondary": "e.g., Emergency Care",
+      "subsectorTertiary": "e.g., Trauma Care",
+      "programs": "Separate multiple programs with commas",
+      "reasonForChange": "Please explain why this change is needed",
+      "additionalNotes": "Any additional information or context",
+      "indicatorNeeded": "Please explain why this indicator is needed"
+    },
+    "validation": {
+      "primarySectorRequired": "⚠️ Please enter primary sector",
+      "primarySubsectorRequired": "⚠️ Please enter primary subsector"
+    }
+  },
+  "alerts": {
+    "selectSectorLevel": "Please select at least one sector level (Primary, Secondary, or Tertiary).",
+    "selectSubsectorLevel": "Please select at least one subsector level (Primary, Secondary, or Tertiary).",
+    "failedToSubmit": "Failed to submit {{type}}: {{message}}",
+    "failedToDownloadExcel": "Failed to download Excel. Please try again."
+  },
+  "data": {
+    "noData": "No data",
+    "noTrendData": "No trend data",
+    "allPeriods": "All Periods",
+    "allRegions": "All Regions",
+    "regionalSummary": "Regional Summary",
+    "noDataAvailable": "No data available"
+  }
+}

@@ -1,0 +1,66 @@
+plugins {
+    // Add the dependency for the Google services Gradle plugin
+    id 'com.google.gms.google-services' version '4.4.4' apply false
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    project.evaluationDependsOn(':app')
+}
+
+// Configure all Android subprojects to use compileSdkVersion 36
+// Use beforeProject to register afterEvaluate hooks before projects are evaluated
+gradle.beforeProject { project ->
+    if (project != rootProject) {
+        project.afterEvaluate {
+            if (it.hasProperty('android')) {
+                it.android {
+                    // Force compileSdk 36 for all Android projects (newer syntax)
+                    // Also set compileSdkVersion for older plugin compatibility
+                    compileSdk 36
+                    compileSdkVersion 36
+                    compileOptions {
+                        sourceCompatibility JavaVersion.VERSION_17
+                        targetCompatibility JavaVersion.VERSION_17
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Configure Kotlin and Java tasks after all projects are evaluated
+gradle.projectsEvaluated {
+    subprojects { subProject ->
+        // Configure Kotlin JVM target for all subprojects that use Kotlin
+        subProject.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = '17'
+            }
+        }
+
+        // Set Java version for all Java compilation tasks and suppress warnings from dependencies
+        subProject.tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
+            // Suppress various warnings from dependencies (these are informational only)
+            options.compilerArgs.addAll([
+                '-Xlint:-options',      // Suppress obsolete Java version warnings
+                '-Xlint:-deprecation',  // Suppress deprecation warnings from dependencies
+                '-Xlint:-unchecked'     // Suppress unchecked/unsafe operation warnings from dependencies
+            ])
+        }
+    }
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}

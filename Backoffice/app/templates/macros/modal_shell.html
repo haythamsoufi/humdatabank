@@ -1,0 +1,44 @@
+{#
+    Reusable modal shell macro for consistent modal markup across Backoffice templates.
+
+    Parameters:
+    - modal_id: Unique ID for the modal
+    - modal_title: Title to display in modal header
+    - aria_label: Optional aria-label for the dialog (defaults to modal_title)
+    - max_width: Tailwind max-width class (default: 'max-w-2xl'). Options: max-w-md, max-w-lg, max-w-xl, max-w-2xl, max-w-4xl, max-w-5xl
+    - align: 'center' or 'start' for vertical alignment (default: center)
+    - z_index: z-index value (default: 50)
+    - title_safe: If true, render modal_title as safe HTML (default: false)
+    - close_class: Additional classes for close button (default: ''). Use 'close-excel-modal' etc. for page-specific handlers.
+    - close_id: Optional id for the close button (e.g. 'fdrs-sync-modal-close') for JS that targets it by id.
+    - data_attrs: Optional dict of data attributes for the outer div, e.g. {'label_upload': 'Upload', 'label_replace': 'Replace'} -> data-label-upload="Upload" data-label-replace="Replace"
+    - title_class: Optional additional classes for the h3 title (e.g. 'flex items-center mb-5')
+    - content_class: Optional additional classes for the modal content div (e.g. 'flex flex-col min-h-0 max-h-[85vh] overflow-hidden')
+
+    Usage:
+    {% from "macros/modal_shell.html" import modal_shell %}
+    {% call modal_shell('my-modal', _('Modal Title')) %}
+        <p>Modal content goes here</p>
+        <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+    {% endcall %}
+#}
+{% macro modal_shell(modal_id, modal_title, aria_label=None, max_width='max-w-2xl', align='center', z_index=50, title_safe=false, close_class='', close_id=None, data_attrs=None, title_class='', content_class='') -%}
+<div id="{{ modal_id }}"
+     class="fixed inset-0 modal-backdrop overflow-y-auto h-full w-full hidden flex items-{{ align }} justify-center px-4 py-8"
+     style="z-index: {{ z_index }};"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="{{ modal_id }}-title"
+     aria-label="{{ aria_label or modal_title }}"
+     {% for k, v in (data_attrs or {}).items() %} data-{{ k|replace('_', '-') }}="{{ v|e }}"{% endfor %}>
+    <div class="relative p-6 border w-full {{ max_width }} shadow-xl rounded-lg bg-white mx-auto modal-shell-content">
+        <button type="button"{% if close_id %} id="{{ close_id }}"{% endif %} class="absolute top-3 right-3 btn-close-icon text-gray-400 hover:text-gray-600 close-modal {{ close_class }}" aria-label="{{ _('Close') }}">
+            <i class="fas fa-times w-5 h-5"></i>
+        </button>
+        <h3 id="{{ modal_id }}-title" class="text-xl font-semibold text-gray-800 pr-8 {{ title_class }}">{% if title_safe %}{{ modal_title|safe }}{% else %}{{ modal_title }}{% endif %}</h3>
+        <div class="mt-4 modal-content {{ content_class }}">
+            {{ caller() }}
+        </div>
+    </div>
+</div>
+{%- endmacro %}

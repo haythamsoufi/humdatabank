@@ -1,0 +1,152 @@
+/* Enhanced Search Dropdown Styles */
+
+.enhanced-search-dropdown {
+    position: relative;
+}
+
+/* Ensure dropdown positions correctly relative to the input container */
+.enhanced-search-dropdown .relative {
+    position: relative;
+}
+
+/* Compact layout for dashboard header */
+.enhanced-search-dropdown .flex {
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.enhanced-search-dropdown label {
+    white-space: nowrap;
+    font-size: 0.875rem;
+    margin-right: 0.25rem;
+}
+
+/* Make the entire dropdown component more compact */
+.enhanced-search-dropdown {
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.enhanced-search-dropdown .dropdown-option {
+    transition: all 0.15s ease-in-out;
+    position: relative;
+}
+
+.enhanced-search-dropdown .dropdown-option:hover {
+    background-color: #eff6ff;
+    color: #1e40af;
+}
+
+.enhanced-search-dropdown .dropdown-option.highlighted {
+    background-color: #dbeafe;
+    color: #1e40af;
+    border-left: 3px solid #3b82f6;
+}
+
+.enhanced-search-dropdown .dropdown-option.selected {
+    background-color: #eff6ff;
+    color: #1e40af;
+    font-weight: 500;
+}
+
+.enhanced-search-dropdown .dropdown-option.hidden {
+    display: none;
+}
+
+.enhanced-search-dropdown #search_dropdown {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border: 1px solid #d1d5db;
+    z-index: 9999;
+}
+
+.enhanced-search-dropdown #search_input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Smooth transitions for dropdown */
+.enhanced-search-dropdown #search_dropdown {
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.enhanced-search-dropdown #search_dropdown.hidden {
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+}
+
+.enhanced-search-dropdown #search_dropdown:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Clear search button styles */
+.enhanced-search-dropdown #clear_search {
+    transition: all 0.15s ease-in-out;
+}
+
+.enhanced-search-dropdown #clear_search:hover {
+    transform: scale(1.1);
+}
+
+/* Scrollbar styling for dropdown */
+.enhanced-search-dropdown #search_dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.enhanced-search-dropdown #search_dropdown::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.enhanced-search-dropdown #search_dropdown::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.enhanced-search-dropdown #search_dropdown::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Firefox scrollbar */
+.enhanced-search-dropdown #search_dropdown {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .enhanced-search-dropdown #search_dropdown {
+        width: 100% !important;
+        max-width: none;
+    }
+
+    .enhanced-search-dropdown #search_input {
+        width: 100% !important;
+    }
+}
+
+/* RTL support */
+[dir="rtl"] .enhanced-search-dropdown .dropdown-option.highlighted {
+    border-left: none;
+    border-right: 3px solid #3b82f6;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .enhanced-search-dropdown .dropdown-option:hover,
+    .enhanced-search-dropdown .dropdown-option.highlighted,
+    .enhanced-search-dropdown .dropdown-option.selected {
+        background-color: #000;
+        color: #fff;
+        border-color: #fff;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .enhanced-search-dropdown .dropdown-option,
+    .enhanced-search-dropdown #search_dropdown,
+    .enhanced-search-dropdown #clear_search {
+        transition: none;
+    }
+}

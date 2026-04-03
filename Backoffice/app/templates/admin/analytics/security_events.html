@@ -1,0 +1,618 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container %}
+
+{% block title %}Security Events - Admin Panel{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style nonce="{{ csp_style_nonce() }}">
+    /* Styles for the modal backdrop and transition */
+    .modal-backdrop {
+        transition: opacity 0.3s ease-out;
+    }
+    .modal-container {
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    }
+    /* Ensure details pre tag respects whitespace and wraps */
+    .details-pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+    /* Row styling based on severity */
+    .ag-row-severity-critical {
+        background-color: #fef2f2 !important;
+    }
+    .ag-row-severity-critical:hover {
+        background-color: #fee2e2 !important;
+    }
+    .ag-row-severity-high {
+        background-color: #fefce8 !important;
+    }
+    .ag-row-severity-high:hover {
+        background-color: #fef9c3 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+
+    {% from "components/_page_header.html" import page_header %}
+
+    {# Determine which blueprint we're using for route references #}
+    {% set is_security_route = request.endpoint and 'security' in request.endpoint %}
+    {% set route_prefix = 'security' if is_security_route else 'analytics' %}
+    {% set breadcrumb_parent = {'name': 'Security', 'url': url_for('security.security_dashboard')} if is_security_route else {'name': 'Analytics', 'url': url_for('analytics.analytics_dashboard')} %}
+
+    {{ page_header(
+        title='Security Events',
+        icon='fas fa-shield-alt',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            breadcrumb_parent,
+            {'name': 'Security Events'}
+        ]
+    ) }}
+
+    <div class="bg-gray-50 p-4 sm:p-6 rounded-lg shadow mb-8">
+        <h5 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+            <i class="fas fa-filter mr-2"></i> Filters
+        </h5>
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+            <div>
+                <label for="severity" class="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                <select class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="severity" name="severity">
+                    <option value="">All Severities</option>
+                    <option value="low" {% if filters.severity == 'low' %}selected{% endif %}>Low</option>
+                    <option value="medium" {% if filters.severity == 'medium' %}selected{% endif %}>Medium</option>
+                    <option value="high" {% if filters.severity == 'high' %}selected{% endif %}>High</option>
+                    <option value="critical" {% if filters.severity == 'critical' %}selected{% endif %}>Critical</option>
+                </select>
+            </div>
+            <div>
+                <label for="event_type" class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                <select class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="event_type" name="event_type">
+                    <option value="">All Types</option>
+                    <option value="suspicious_login" {% if filters.event_type == 'suspicious_login' %}selected{% endif %}>Suspicious Login</option>
+                    <option value="deactivated_account_login_attempt" {% if filters.event_type == 'deactivated_account_login_attempt' %}selected{% endif %}>Deactivated Account Login Attempt</option>
+                    <option value="brute_force" {% if filters.event_type == 'brute_force' %}selected{% endif %}>Brute Force</option>
+                    <option value="unusual_access" {% if filters.event_type == 'unusual_access' %}selected{% endif %}>Unusual Access</option>
+                    <option value="data_breach" {% if filters.event_type == 'data_breach' %}selected{% endif %}>Data Breach</option>
+                    <option value="privilege_escalation" {% if filters.event_type == 'privilege_escalation' %}selected{% endif %}>Privilege Escalation</option>
+                    {# Add other event types as needed #}
+                </select>
+            </div>
+            <div class="flex items-center pt-7"> {# pt-7 to align with other inputs that have labels #}
+                <input class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" type="checkbox" id="unresolved_only"
+                       name="unresolved_only" value="1" {% if filters.unresolved_only %}checked{% endif %}>
+                <label class="text-sm font-medium text-gray-700" for="unresolved_only">
+                    Show Unresolved Only
+                </label>
+            </div>
+            <div class="col-span-1 sm:col-span-2 lg:col-span-3 flex flex-col sm:flex-row gap-3 sm:items-end justify-start pt-2">
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                    <i class="fas fa-filter mr-2"></i> Filter
+                </button>
+                <a href="{{ url_for(route_prefix + '.security_events') }}" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Clear Filters
+                </a>
+            </div>
+        </form>
+    </div>
+
+    {# AG Grid Container #}
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <h5 class="text-xl font-semibold text-gray-800 mb-2 sm:mb-0">
+                <i class="fas fa-shield-virus mr-2"></i> Security Events <span class="text-sm text-gray-500 font-normal">({{ events.total }} total)</span>
+            </h5>
+        </div>
+        <div class="p-6 relative">
+            {{ ag_grid_container('securityEventsGrid', loading_text=_('Loading security events...'), empty_message=_('No security events found matching your criteria.'), include_card=false) }}
+        </div>
+    </div>
+</div>
+
+<div id="resolveModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" aria-labelledby="resolveModalLabel" role="dialog" aria-modal="true">
+    <div id="resolveModalBackdrop" class="fixed inset-0 bg-gray-500 bg-opacity-75 modal-backdrop"></div>
+
+    <div id="resolveModalContainer" class="modal-container bg-white rounded-lg shadow-xl overflow-hidden transform transition-all sm:max-w-lg sm:w-full opacity-0 scale-95">
+        <form id="resolveForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-check-double text-green-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="resolveModalLabel">Resolve Security Event</h3>
+                        <div class="mt-4">
+                            <label for="eventDescriptionModal" class="block text-sm font-medium text-gray-700">Event Description</label>
+                            <input type="text" id="eventDescriptionModal" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-100 text-sm p-2" readonly>
+                        </div>
+                        <div class="mt-4">
+                            <label for="resolution_notes" class="block text-sm font-medium text-gray-700">Resolution Notes</label>
+                            <textarea id="resolution_notes" name="resolution_notes" rows="4" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" placeholder="Describe how this event was resolved..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" class="btn btn-success w-full sm:ml-3 sm:w-auto sm:text-sm">
+                    <i class="fas fa-check mr-2"></i> Mark as Resolved
+                </button>
+                <button type="button" id="cancelResolveModal" class="btn btn-secondary mt-3 w-full sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ ag_grid_js() }}
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    'use strict';
+
+    {# Determine which blueprint we're using for route references (needed in JS block) #}
+    {% set is_security_route = request.endpoint and 'security' in request.endpoint %}
+    {% set route_prefix = 'security' if is_security_route else 'analytics' %}
+
+    // Base URL for resolve endpoint - will be populated with event ID
+    // Support both analytics and security routes
+    const resolveUrlBase = "{{ url_for(route_prefix + '.resolve_security_event', event_id=0) }}";
+    const eventDetailUrlBase = "{{ url_for(route_prefix + '.security_event_detail', event_id=0) }}";
+
+    // Transform events data for ag-grid
+    const eventsData = [
+        {% for event in events.items %}
+        {
+            id: {{ event.id }},
+            timestamp: {{ event.timestamp.isoformat()|tojson|safe }},
+            event_type: {{ event.event_type|tojson|safe }},
+            severity: {{ event.severity|tojson|safe }},
+            description: {{ event.description|tojson|safe }},
+            ip_address: {{ (event.ip_address or '')|tojson|safe }},
+            user_id: {{ (event.user_id if event.user_id else None)|tojson|safe }},
+            user_name: {{ ((event.user.name if event.user else '') or '')|tojson|safe }},
+            user_email: {{ ((event.user.email if event.user else '') or '')|tojson|safe }},
+            user_title: {{ ((event.user.title if event.user else '') or '')|tojson|safe }},
+            user_active: {{ (event.user.active if event.user else True)|tojson|safe }},
+            user_profile_color: {{ ((event.user.profile_color if event.user and event.user.profile_color else '') or '')|tojson|safe }},
+            is_resolved: {{ event.is_resolved|tojson|safe }},
+            resolved_by_name: {{ ((event.resolved_by.name if event.resolved_by else '') or '')|tojson|safe }},
+            resolved_by_email: {{ ((event.resolved_by.email if event.resolved_by else '') or '')|tojson|safe }},
+            resolved_at: {{ (event.resolved_at.isoformat() if event.resolved_at else '')|tojson|safe }},
+            resolution_notes: {{ (event.resolution_notes or '')|tojson|safe }},
+            context_data: {{ (event.context_data|tojson if event.context_data else {})|tojson|safe }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Custom cell renderers
+    const securityEventRenderers = {
+        severityBadge: function(params) {
+            const severity = (params.value || '').toLowerCase();
+            const severityText = severity.charAt(0).toUpperCase() + severity.slice(1);
+            let classes = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full ';
+
+            if (severity === 'critical') {
+                classes += 'bg-red-100 text-red-800';
+            } else if (severity === 'high') {
+                classes += 'bg-yellow-100 text-yellow-800';
+            } else if (severity === 'medium') {
+                classes += 'bg-blue-100 text-blue-800';
+            } else if (severity === 'low') {
+                classes += 'bg-green-100 text-green-800';
+            } else {
+                classes += 'bg-gray-100 text-gray-800';
+            }
+
+            return '<span class="' + classes + '">' + escapeHtml(severityText) + '</span>';
+        },
+
+        eventTypeBadge: function(params) {
+            const eventType = (params.value || '').toLowerCase();
+            const eventTypeText = eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            let classes = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full ';
+
+            if (eventType === 'suspicious_login') {
+                classes += 'bg-yellow-100 text-yellow-800';
+            } else if (eventType === 'brute_force') {
+                classes += 'bg-red-100 text-red-800';
+            } else if (eventType === 'unusual_access') {
+                classes += 'bg-blue-100 text-blue-800';
+            } else if (eventType === 'data_breach') {
+                classes += 'bg-pink-100 text-pink-800';
+            } else if (eventType === 'privilege_escalation') {
+                classes += 'bg-purple-100 text-purple-800';
+            } else {
+                classes += 'bg-gray-100 text-gray-800';
+            }
+
+            return '<span class="' + classes + '">' + escapeHtml(eventTypeText) + '</span>';
+        },
+
+        statusBadge: function(params) {
+            const data = params.data;
+            if (!data) return '';
+
+            if (data.is_resolved) {
+                let html = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">' +
+                    '<i class="fas fa-check-circle mr-1"></i> Resolved</span>';
+
+                if (data.resolved_by_name || data.resolved_by_email) {
+                    html += '<div class="text-xs text-gray-500 mt-1">by ' + escapeHtml(data.resolved_by_name || data.resolved_by_email) + '</div>';
+                }
+                if (data.resolved_at) {
+                    html += '<div class="text-xs text-gray-500">' + escapeHtml(data.resolved_at) + '</div>';
+                }
+                return html;
+            } else {
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">' +
+                    '<i class="fas fa-hourglass-half mr-1"></i> Pending</span>';
+            }
+        },
+
+        descriptionCell: function(params) {
+            const data = params.data;
+            if (!data) return '';
+
+            let html = '<div class="text-sm text-gray-900" title="' + escapeHtmlAttr(data.description) + '">' +
+                escapeHtml(data.description.length > 80 ? data.description.substring(0, 80) + '...' : data.description) + '</div>';
+
+            if (data.context_data && Object.keys(data.context_data).length > 0) {
+                const detailsId = 'details-' + data.id;
+                const contextText = JSON.stringify(data.context_data, null, 2);
+                html += '<button class="text-xs text-blue-500 hover:text-blue-700 mt-1 toggle-details-btn" type="button" data-details-id="' + detailsId + '">View Context</button>';
+                html += '<div class="hidden mt-2 p-3 bg-gray-100 rounded-md border border-gray-200" id="' + detailsId + '">';
+                html += '<div class="flex justify-end mb-2">';
+                html += '<button class="text-xs text-gray-600 hover:text-blue-700 copy-context-btn inline-flex items-center" type="button" data-context-text="' + escapeHtmlAttr(contextText) + '" title="Copy context">';
+                html += '<i class="fas fa-copy mr-1 copy-context-icon"></i><span class="copy-context-label">Copy</span></button>';
+                html += '</div>';
+                html += '<pre class="text-xs text-gray-700 details-pre">' + escapeHtml(contextText) + '</pre>';
+                html += '</div>';
+            }
+
+            return html;
+        },
+
+        userCell: function(params) {
+            return AgGridRenderers.userHoverCell(params, {
+                idField: 'user_id',
+                nameField: 'user_name',
+                emailField: 'user_email',
+                titleField: 'user_title',
+                activeField: 'user_active',
+                profileColorField: 'user_profile_color',
+                fallbackLabel: '{{ _("Unknown User") }}',
+                showEmail: true
+            });
+        },
+
+        actionsCell: function(params) {
+            const data = params.data;
+            if (!data) return '';
+
+            if (!data.is_resolved) {
+                return '<button class="btn btn-success btn-sm resolve-event-btn" ' +
+                    'data-event-id="' + data.id + '" data-event-description="' + escapeHtmlAttr(data.description) + '">' +
+                    '<i class="fas fa-check mr-1"></i> Resolve</button>';
+            } else if (data.resolution_notes) {
+                const resolutionId = 'resolution-' + data.id;
+                return '<button class="text-xs text-blue-500 hover:text-blue-700 toggle-details-btn" type="button" data-details-id="' + resolutionId + '">View Resolution</button>' +
+                    '<div class="hidden mt-2 p-3 bg-gray-100 rounded-md border border-gray-200 max-w-xs" id="' + resolutionId + '">' +
+                    '<p class="text-xs text-gray-700 details-pre">' + escapeHtml(data.resolution_notes) + '</p></div>';
+            }
+            return '';
+        }
+    };
+
+    var escapeHtml = AgGridRenderers.escapeHtml;
+    var escapeHtmlAttr = AgGridRenderers.escapeHtmlAttr;
+
+    function formatDescriptionForClipboard(data) {
+        if (!data) return '';
+        const description = data.description || '';
+        const contextData = data.context_data;
+        if (!contextData || Object.keys(contextData).length === 0) {
+            return description;
+        }
+        return description + '\n\nContext:\n' + JSON.stringify(contextData, null, 2);
+    }
+
+    function fallbackCopyText(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+        } catch (err) {
+            window.__clientWarn && window.__clientWarn('Failed to copy context text', err);
+        } finally {
+            document.body.removeChild(textArea);
+        }
+    }
+
+    function showCopySuccess(buttonEl) {
+        if (!buttonEl) return;
+        const iconEl = buttonEl.querySelector('.copy-context-icon');
+        const labelEl = buttonEl.querySelector('.copy-context-label');
+        if (!iconEl || !labelEl) return;
+
+        if (!buttonEl.dataset.originalIconClass) {
+            buttonEl.dataset.originalIconClass = iconEl.className;
+        }
+        if (!buttonEl.dataset.originalLabel) {
+            buttonEl.dataset.originalLabel = labelEl.textContent || 'Copy';
+        }
+
+        iconEl.className = 'fas fa-check mr-1 copy-context-icon';
+        labelEl.textContent = 'Copied!';
+        buttonEl.classList.remove('text-gray-600', 'hover:text-blue-700');
+        buttonEl.classList.add('text-green-600');
+
+        if (buttonEl._copyResetTimer) {
+            clearTimeout(buttonEl._copyResetTimer);
+        }
+        buttonEl._copyResetTimer = setTimeout(function() {
+            iconEl.className = buttonEl.dataset.originalIconClass || 'fas fa-copy mr-1 copy-context-icon';
+            labelEl.textContent = buttonEl.dataset.originalLabel || 'Copy';
+            buttonEl.classList.remove('text-green-600');
+            buttonEl.classList.add('text-gray-600', 'hover:text-blue-700');
+            buttonEl._copyResetTimer = null;
+        }, 1500);
+    }
+
+    function copyTextToClipboard(text, onSuccess) {
+        if (!text) return;
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(text).then(function() {
+                if (typeof onSuccess === 'function') onSuccess();
+            }).catch(function() {
+                fallbackCopyText(text);
+                if (typeof onSuccess === 'function') onSuccess();
+            });
+        } else {
+            fallbackCopyText(text);
+            if (typeof onSuccess === 'function') onSuccess();
+        }
+    }
+
+    // Column definitions
+    const columnDefs = [
+        {
+            field: 'timestamp',
+            headerName: '{{ _("Timestamp") }}',
+            width: 180,
+            cellRenderer: AgGridRenderers.dateTime,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            lockVisible: true
+        },
+        {
+            field: 'event_type',
+            headerName: '{{ _("Event Type") }}',
+            width: 180,
+            cellRenderer: securityEventRenderers.eventTypeBadge,
+            filter: 'customSetFilter',
+            sortable: true
+        },
+        {
+            field: 'severity',
+            headerName: '{{ _("Severity") }}',
+            width: 120,
+            cellRenderer: securityEventRenderers.severityBadge,
+            filter: 'customSetFilter',
+            sortable: true,
+            comparator: function(a, b) {
+                const order = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+                return (order[a] || 99) - (order[b] || 99);
+            }
+        },
+        {
+            field: 'description',
+            headerName: '{{ _("Description") }}',
+            flex: 1,
+            minWidth: 200,
+            cellRenderer: securityEventRenderers.descriptionCell,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            tooltipValueGetter: function(params) {
+                return params.data ? params.data.description : '';
+            }
+        },
+        {
+            field: 'ip_address',
+            headerName: '{{ _("IP Address") }}',
+            width: 150,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (params.value) {
+                    return '<div class="text-sm text-gray-900 font-mono">' + escapeHtml(params.value) + '</div>';
+                }
+                return '<span class="text-sm text-gray-500">N/A</span>';
+            }
+        },
+        {
+            field: 'user_email',
+            headerName: '{{ _("User") }}',
+            width: 200,
+            cellRenderer: securityEventRenderers.userCell,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            valueGetter: function(params) {
+                return params.data ? (params.data.user_name || params.data.user_email || 'Unknown') : '';
+            }
+        },
+        {
+            field: 'is_resolved',
+            headerName: '{{ _("Status") }}',
+            width: 150,
+            cellRenderer: securityEventRenderers.statusBadge,
+            filter: 'customSetFilter',
+            sortable: true
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 150,
+            cellRenderer: securityEventRenderers.actionsCell,
+            sortable: false,
+            filter: false,
+            pinned: 'right',
+            lockPinned: true
+        }
+    ];
+
+    // Get DOM elements
+    const loadingEl = document.getElementById('securityEventsGrid-loading');
+    const emptyEl = document.getElementById('securityEventsGrid-empty');
+    const containerEl = document.getElementById('securityEventsGrid-container');
+
+    // Handle empty data
+    if (!eventsData || eventsData.length === 0) {
+        // Hide loading indicator and show empty message
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'block';
+        if (containerEl) containerEl.style.display = 'none';
+
+        // Expose empty state for debugging
+        window.securityEventsGridApi = null;
+        window.securityEventsGridHelper = null;
+        return;
+    }
+
+    // Initialize grid
+    const gridHelper = new AgGridHelper({
+        containerId: 'securityEventsGrid',
+        templateId: 'security-events-{{ route_prefix }}',
+        columnDefs: columnDefs,
+        rowData: eventsData,
+        columnVisibilityOptions: {
+            persistOnChange: true,
+            showPanelButton: true,
+            enableExport: true,
+            enableReset: true
+        },
+        gridOptions: {
+            pagination: true,
+            paginationPageSize: 25,
+            paginationPageSizeSelector: [10, 25, 50, 100],
+            rowHeight: 60,
+            processCellForClipboard: function(params) {
+                if (!params || !params.column || !params.node || !params.node.data) {
+                    return params && params.value != null ? params.value : '';
+                }
+                if (params.column.getColId() === 'description') {
+                    return formatDescriptionForClipboard(params.node.data);
+                }
+                return params.value != null ? params.value : '';
+            },
+            getRowClass: function(params) {
+                if (params.data) {
+                    if (params.data.severity === 'critical') {
+                        return 'ag-row-severity-critical';
+                    } else if (params.data.severity === 'high') {
+                        return 'ag-row-severity-high';
+                    }
+                }
+                return '';
+            },
+        }
+    });
+
+    const gridApi = gridHelper.initialize();
+
+    // Hide loading indicator and show grid
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (containerEl) containerEl.style.display = 'block';
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    // Modal functions
+    const resolveModal = document.getElementById('resolveModal');
+    const resolveModalContainer = document.getElementById('resolveModalContainer');
+    const resolveModalBackdrop = document.getElementById('resolveModalBackdrop');
+    const resolveForm = document.getElementById('resolveForm');
+    const eventDescriptionModalInput = document.getElementById('eventDescriptionModal');
+    const cancelResolveModalButton = document.getElementById('cancelResolveModal');
+
+    function openResolveModal(eventId, description) {
+        if (resolveModal && resolveForm && eventDescriptionModalInput) {
+            resolveForm.action = resolveUrlBase.replace(/\/0\/resolve$/, '/' + String(eventId) + '/resolve');
+            eventDescriptionModalInput.value = description;
+            resolveModal.classList.remove('hidden');
+            resolveModalBackdrop.offsetWidth;
+            resolveModalContainer.offsetWidth;
+            resolveModalBackdrop.classList.remove('opacity-0');
+            resolveModalContainer.classList.remove('opacity-0', 'scale-95');
+            resolveModalContainer.classList.add('opacity-100', 'scale-100');
+        }
+    }
+
+    function closeResolveModal() {
+        if (resolveModal) {
+            resolveModalBackdrop.classList.add('opacity-0');
+            resolveModalContainer.classList.add('opacity-0', 'scale-95');
+            resolveModalContainer.classList.remove('opacity-100', 'scale-100');
+            setTimeout(() => {
+                resolveModal.classList.add('hidden');
+            }, 300);
+        }
+    }
+
+    function toggleDetails(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.classList.toggle('hidden');
+        }
+    }
+
+    if (cancelResolveModalButton) {
+        cancelResolveModalButton.addEventListener('click', closeResolveModal);
+    }
+    if (resolveModalBackdrop) {
+        resolveModalBackdrop.addEventListener('click', closeResolveModal);
+    }
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && resolveModal && !resolveModal.classList.contains('hidden')) {
+            closeResolveModal();
+        }
+    });
+
+    // Event delegation for buttons in grid cells
+    document.addEventListener('click', function(event) {
+        if (event.target.closest('.resolve-event-btn')) {
+            const btn = event.target.closest('.resolve-event-btn');
+            const eventId = btn.getAttribute('data-event-id');
+            const description = btn.getAttribute('data-event-description');
+            openResolveModal(eventId, description);
+        } else if (event.target.closest('.copy-context-btn')) {
+            const btn = event.target.closest('.copy-context-btn');
+            const contextText = btn.getAttribute('data-context-text') || '';
+            copyTextToClipboard(contextText, function() {
+                showCopySuccess(btn);
+            });
+        } else if (event.target.closest('.toggle-details-btn')) {
+            const btn = event.target.closest('.toggle-details-btn');
+            const detailsId = btn.getAttribute('data-details-id');
+            toggleDetails(detailsId);
+        }
+    });
+
+    // Expose for debugging
+    window.securityEventsGridApi = gridApi;
+    window.securityEventsGridHelper = gridHelper;
+})();
+</script>
+{% endblock %}

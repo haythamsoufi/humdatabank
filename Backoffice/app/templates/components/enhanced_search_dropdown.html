@@ -1,0 +1,87 @@
+{# Enhanced Search Dropdown Component Template #}
+{#
+  Usage:
+  {% include 'components/enhanced_search_dropdown.html' %}
+
+  Required variables:
+  - items: List of item objects
+  - selected_item: Currently selected item object (optional)
+  - form_action: URL for form submission
+  - csrf_token: CSRF token for form
+
+  Optional variables:
+  - input_width: CSS width for the input (default: w-48)
+  - dropdown_width: CSS width for the dropdown (default: w-80)
+  - placeholder: Placeholder text (default: 'Search...')
+  - label_text: Label text (default: 'Select:')
+  - item_name_attr: Attribute name for item name (default: 'name')
+  - item_id_attr: Attribute name for item ID (default: 'id')
+#}
+
+{% set input_width = input_width|default('w-48') %}
+{% set dropdown_width = dropdown_width|default('w-80') %}
+{% set placeholder = placeholder|default(_('Search...')) %}
+{% set label_text = label_text|default(_('Select:')) %}
+{% set item_name_attr = item_name_attr|default('name') %}
+{% set item_id_attr = item_id_attr|default('id') %}
+
+<div class="enhanced-search-dropdown relative">
+    <div class="flex items-center gap-2">
+        <label for="search_input" class="text-sm font-medium text-gray-700 flex-shrink-0">{{ label_text }}</label>
+        <div class="relative">
+            <input type="text"
+                   id="search_input"
+                   placeholder="{{ placeholder }}"
+                   class="block {{ input_width }} py-2 px-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                   autocomplete="off">
+            <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                <button type="button"
+                        id="clear_search"
+                        class="text-gray-400 hover:text-gray-600 mr-1 hidden"
+                        title="{{ _('Clear search') }}">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    {# Hidden form for submission #}
+    <form id="search_form" method="POST" action="{{ form_action }}" class="hidden">
+        <input type="hidden" id="search_select" name="selected_item" value="">
+        {% if csrf_token %}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% endif %}
+    </form>
+
+    {# Dropdown with search results #}
+    <div id="search_dropdown" class="absolute z-50 {{ dropdown_width }} mt-1 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-60 overflow-y-auto">
+        <div id="search_list" class="py-1">
+            {% for item in items %}
+                <div class="dropdown-option px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-center justify-between"
+                     data-item-id="{{ item[item_id_attr] }}"
+                     data-item-name="{{ item[item_name_attr] }}"
+                     {% if selected_item and selected_item[item_id_attr] == item[item_id_attr] %}data-selected="true"{% endif %}>
+                    <span class="item-name">{{ item[item_name_attr] }}</span>
+                    {% if selected_item and selected_item[item_id_attr] == item[item_id_attr] %}
+                        <svg class="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+        <div id="no_results" class="px-3 py-2 text-sm text-gray-500 hidden">
+            <div class="text-center py-2">
+                <svg class="mx-auto h-6 w-6 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                {{ _('No items found matching your search.') }}
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ORG_NAME }}</title>
+    <!-- Tailwind output + FontAwesome -->
+    <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
+    <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
+    <style nonce="{{ csp_style_nonce() }}">
+        /* Custom font for impact */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        /* Simple fade-in animation */
+        [data-animate] { opacity: 0; transform: translateY(20px); transition: opacity .6s, transform .6s; }
+        [data-animate].visible { opacity: 1; transform: translateY(0); }
+        /* Canvas styles */
+        #network-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .pattern-bg {
+             background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+             background-size: 16px 16px;
+        }
+        .feature-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .feature-scroll::-webkit-scrollbar { display: none; }
+        .feature-card { transition: box-shadow .3s, transform .3s; }
+        .feature-card:hover { box-shadow: 0 8px 32px 0 rgba(31,41,55,0.15); transform: scale(1.045); border-color: #1e293b; }
+        .blur-bg {
+            position: absolute; left: 50%; top: 0; width: 900px; height: 900px; z-index: 0;
+            background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 70%, #fff0 100%);
+            filter: blur(80px); opacity: 0.5; transform: translateX(-50%);
+        }
+        .diagonal-divider {
+            position: absolute; left: 0; top: 0; width: 100%; height: 100px; z-index: 2;
+            background: linear-gradient(120deg, #1f2937 60%, transparent 100%);
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 60%);
+        }
+        .testimonial {
+            background: #f3f4f6; border-left: 4px solid #ef4444; padding: 2.5rem 2rem; border-radius: 1.25rem;
+            font-size: 1.18rem; font-style: italic; color: #374151; margin-top: 2.5rem;
+        }
+        .back-to-top {
+            position: fixed; bottom: 2.5rem; right: 2.5rem; z-index: 50;
+            background: #1e293b; color: #fff; border-radius: 50%; width: 52px; height: 52px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.7rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12); cursor: pointer; opacity: 0.85;
+            transition: background .2s, opacity .2s;
+        }
+        .back-to-top:hover { background: #0f172a; opacity: 1; }
+        @media (max-width: 640px) {
+            .feature-card { min-width: 85vw; padding: 1.5rem 1rem; }
+            .testimonial { padding: 1.5rem 1rem; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased">
+
+    <!-- Integrated Header -->
+    <header class="absolute top-0 left-0 right-0 z-30 py-8 px-4 md:px-12">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <a href="#" class="flex items-center gap-3 font-semibold text-white">
+                <img src="{{ static_url('IFRC_logo.svg') }}" alt="IFRC Logo" class="h-10 w-auto">
+                <span class="hidden sm:inline">Network Databank</span>
+            </a>
+            <a href="{{ url_for('auth.login') }}" class="px-6 py-3 rounded-lg bg-white text-blue-900 font-semibold hover:bg-gray-200 transition shadow-md text-base">
+                <span class="hidden sm:inline">Portal Login</span>
+                <i class="fa-solid fa-arrow-right-to-bracket sm:hidden"></i>
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="relative min-h-[650px] flex flex-col items-center justify-center overflow-hidden pt-24 pb-20 md:pt-36 md:pb-32" style="background: linear-gradient(120deg, #0f172a 0%, #1e293b 100%);">
+        <div class="blur-bg"></div>
+        <canvas id="network-canvas"></canvas>
+        <div class="relative z-10 max-w-2xl mx-auto px-6 py-20 text-center flex flex-col items-center">
+            <img src="{{ static_url('IFRC_logo.svg') }}" alt="IFRC Logo" class="h-24 w-auto mb-8" data-animate>
+            <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6 md:mb-8 text-white" data-animate>
+                Uniting Data. Empowering Action.
+            </h1>
+            <p class="max-w-xl text-lg md:text-2xl mb-12 text-blue-100" data-animate>
+                {{ ORG_NAME }} brings together information from across the organization, providing a clear view of capacities, resources, and impact worldwide.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-6 justify-center w-full" data-animate>
+                <a href="#features" class="flex-1 px-10 py-5 bg-white text-blue-900 font-semibold rounded-xl shadow-lg hover:bg-gray-200 transform hover:scale-105 transition text-lg">
+                    Explore Features
+                </a>
+                <a href="{{ url_for('auth.login') }}" class="flex-1 px-10 py-5 border-2 border-white text-white font-semibold rounded-xl hover:bg-white hover:text-blue-900 transition text-lg">
+                    Get Started
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Grid -->
+    <section id="features" class="py-28 bg-gray-50 pattern-bg">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-20">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4 text-blue-900" data-animate>Key Features</h2>
+                <p class="text-lg text-gray-600 mt-3" data-animate>Everything you need to collect, analyse, and act on data.</p>
+            </div>
+            <div class="feature-scroll flex gap-10 overflow-x-auto pb-6 md:grid md:grid-cols-3 md:gap-10 md:overflow-x-visible">
+                {% set features = [
+                  {"icon": "fa-chart-bar", "color": "bg-blue-100 text-blue-900", "title": "Interactive Dashboards", "desc": "Visualise key metrics with real-time charts and custom analytics."},
+                  {"icon": "fa-database", "color": "bg-gray-200 text-blue-900", "title": "Unified Data Collection", "desc": "Gather assessments, programme data & indicators in one streamlined flow."},
+                  {"icon": "fa-user-shield", "color": "bg-blue-200 text-blue-900", "title": "Granular Permissions", "desc": "Control access down to the field level to protect sensitive information."},
+                  {"icon": "fa-cloud-arrow-up", "color": "bg-gray-200 text-blue-900", "title": "Secure & Automated", "desc": "Rest easy with daily encrypted backups and robust security protocols."},
+                  {"icon": "fa-language", "color": "bg-blue-100 text-blue-900", "title": "Multi-language UI", "desc": "Collaborate globally with a fully localised interface and RTL support."},
+                  {"icon": "fa-plug-circle-check", "color": "bg-blue-200 text-blue-900", "title": "Open API", "desc": "Integrate easily and share live data through robust REST endpoints."}
+                ] %}
+                {% for f in features %}
+                <div class="feature-card min-w-[290px] bg-white rounded-2xl shadow-lg border border-gray-200 hover:-translate-y-2 transition-transform duration-300 p-10 flex flex-col items-center text-center" data-animate>
+                    <div class="mb-8 w-16 h-16 rounded-full flex items-center justify-center {{ f.color }} shadow">
+                        <i class="fa-solid {{ f.icon }} text-2xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-3 text-blue-900">{{ f.title }}</h3>
+                    <p class="text-gray-600 text-base leading-relaxed">{{ f.desc }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="relative bg-white py-28 overflow-hidden">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="grid md:grid-cols-2 gap-x-20 gap-y-14 items-center">
+                <div class="relative" data-animate>
+                    <img src="{{ static_url('IFRC_logo.png') }}" alt="IFRC Community" class="w-full rounded-2xl shadow-2xl relative z-10">
+                    <div class="hidden md:block absolute top-1/2 -left-24 -translate-y-1/2 w-80 h-80 bg-blue-50 rounded-full -z-0"></div>
+                </div>
+                <div data-animate>
+                    <h2 class="text-3xl md:text-4xl font-bold mb-8 text-blue-900">From Silos to Synergy</h2>
+                    <p class="text-gray-600 leading-relaxed mb-8">Disparate spreadsheets, siloed systems, and inconsistent reporting make it difficult for National Societies to gain the insights they need. The Network Databank brings everything together—securely and intuitively—so teams can focus on what matters most: delivering humanitarian impact.</p>
+                    <ul class="space-y-5 text-gray-700 mb-10">
+                        <li class="flex items-center gap-3"><i class="fa-solid fa-check-circle text-green-500"></i> Evidence-based planning & advocacy</li>
+                        <li class="flex items-center gap-3"><i class="fa-solid fa-check-circle text-green-500"></i> Streamlined reporting to donors & partners</li>
+                        <li class="flex items-center gap-3"><i class="fa-solid fa-check-circle text-green-500"></i> Shared learning across the Movement</li>
+                    </ul>
+                    <div class="testimonial">
+                        "The Databank has transformed how we collaborate and report. It's a game-changer for our National Society."<br>
+                        <span class="block mt-3 font-semibold text-blue-900">— {{ ORG_NAME }} {{ _('National Society Leader') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call To Action -->
+    <section class="relative bg-gray-800 text-white py-28 overflow-hidden">
+        <div class="diagonal-divider"></div>
+        <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
+            <h2 class="text-3xl md:text-4xl font-bold mb-6" data-animate>Ready to Dive Deeper?</h2>
+            <p class="mb-12 text-lg md:text-xl text-gray-300" data-animate>
+                Sign in to explore country dashboards, manage forms, and contribute data that drives humanitarian action.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-6 justify-center w-full" data-animate>
+                <a href="{{ url_for('auth.login') }}" class="flex-1 px-12 py-5 bg-blue-900 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-800 transform hover:scale-105 transition text-lg">
+                    Access the Databank
+                </a>
+                <a href="#about" class="flex-1 px-12 py-5 border-2 border-gray-400 text-white font-semibold rounded-xl hover:bg-white hover:text-blue-900 transition text-lg">
+                    Learn More
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-10 relative">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row gap-8 items-center justify-between text-base">
+            <span>&copy; {{ current_year }} {{ ORG_NAME }}. {{ _('All rights reserved.') }}</span>
+            {% set org_domain = get_organization_domain() %}
+            {% if org_domain %}
+            <div class="flex gap-8 text-lg">
+                <a href="https://www.{{ org_domain }}/" target="_blank" class="hover:text-white transition"><i class="fa-solid fa-globe"></i></a>
+            </div>
+            {% endif %}
+            </div>
+        </div>
+        <button class="back-to-top" title="Back to top">
+            <i class="fa-solid fa-arrow-up"></i>
+        </button>
+    </footer>
+
+    <script nonce="{{ csp_nonce() }}">
+        // IntersectionObserver to reveal elements on scroll
+        document.addEventListener('DOMContentLoaded', () => {
+            // Back-to-top (CSP-safe: no inline onclick)
+            const backToTopBtn = document.querySelector('.back-to-top');
+            if (backToTopBtn) {
+                backToTopBtn.addEventListener('click', () => {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(e => {
+                    if (e.isIntersecting) e.target.classList.add('visible');
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('[data-animate]').forEach(el => observer.observe(el));
+
+            // Animated Canvas Background
+            const canvas = document.getElementById('network-canvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                let w, h, particles;
+                const particleDistance = 40, particleColor = "rgba(255, 255, 255, 0.15)";
+
+                function init() {
+                    w = canvas.width = window.innerWidth;
+                    h = canvas.height = canvas.parentElement.offsetHeight;
+                    particles = [];
+                    for (let y = 0; y < h; y += particleDistance) {
+                        for (let x = 0; x < w; x += particleDistance) {
+                            particles.push({ x: x, y: y, ox: x, oy: y, vx: 0, vy: 0 });
+                        }
+                    }
+                }
+
+                function draw() {
+                    ctx.clearRect(0, 0, w, h);
+                    ctx.strokeStyle = particleColor;
+                    for (let i = 0; i < particles.length; i++) {
+                        let p1 = particles[i];
+                        for (let j = i + 1; j < particles.length; j++) {
+                            let p2 = particles[j];
+                            let dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+                            if (dist < particleDistance * 1.5) {
+                                ctx.beginPath();
+                                ctx.moveTo(p1.x, p1.y);
+                                ctx.lineTo(p2.x, p2.y);
+                                ctx.stroke();
+                            }
+                        }
+                    }
+                }
+
+                let mouse = { x: 9999, y: 9999 };
+                function update() {
+                    for (const p of particles) {
+                        const dx = mouse.x - p.x;
+                        const dy = mouse.y - p.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const force = -70 / dist;
+                        if (dist < 100) {
+                            p.vx += force * (dx / dist);
+                            p.vy += force * (dy / dist);
+                        }
+                        p.vx *= 0.96;
+                        p.vy *= 0.96;
+                        p.x += p.vx + (p.ox - p.x) * 0.05;
+                        p.y += p.vy + (p.oy - p.y) * 0.05;
+                    }
+                }
+
+                function loop() {
+                    update();
+                    draw();
+                    requestAnimationFrame(loop);
+                }
+
+                init();
+                loop();
+
+                window.addEventListener('resize', init);
+                canvas.addEventListener('mousemove', e => {
+                    mouse.x = e.clientX;
+                    mouse.y = e.clientY;
+                });
+                canvas.addEventListener('mouseleave', () => {
+                     mouse.x = 9999;
+                     mouse.y = 9999;
+                });
+            }
+        });
+    </script>
+</body>
+</html>

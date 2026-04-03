@@ -1,0 +1,467 @@
+/* AI Knowledge Base / Documents page - moved from inline template styles */
+
+.upload-zone {
+    border: 2px dashed #d1d5db;
+    transition: all 0.2s ease;
+}
+.upload-zone:hover,
+.upload-zone.dragover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+.tab-button.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+}
+.tab-content {
+    display: block;
+}
+.tab-content.hidden {
+    display: none;
+}
+
+/* Upload/Import modal: keep dialog in viewport; tab panels use flex so lists scroll inside.
+   Do NOT use overflow-y:auto on .bg-white here — it breaks flex min-height and lets the panel grow past the viewport. */
+#uploadImportModal > .modal-shell-content {
+    max-height: min(92vh, calc(100vh - 2rem));
+    /* visible so IFRC Type popover is not clipped at modal bottom (absolute child would be cut off) */
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 0 1 auto;
+}
+#uploadImportModal .modal-shell-content > h3 {
+    flex-shrink: 0;
+}
+#uploadImportModal .modal-content {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: visible;
+    max-height: none;
+}
+/* Override global .tab-content { display: block } so flex-1 / min-h-0 apply to tab panels */
+#uploadImportModal .tab-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+#uploadImportModal .tab-content.hidden {
+    display: none;
+}
+.import-doc-item {
+    transition: all 0.2s ease;
+}
+.import-doc-item:hover {
+    background-color: #f9fafb;
+}
+.import-doc-item.selected {
+    background-color: #eff6ff;
+    border-color: #3b82f6;
+}
+
+/* IFRC Type filter: chevron rotation when dropdown open */
+#ifrcTypeFilterToggle .ifrc-type-dd-chevron.rotate-180 {
+    transform: rotate(180deg);
+}
+
+/* IFRC type multiselect: scrollable list + clean bottom (padding + radius) */
+#ifrcTypeFilterDropdown {
+    border-radius: 0.375rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+}
+#ifrcTypeFilterList.ifrc-type-filter-list {
+    max-height: min(15rem, 45vh);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.625rem;
+    scroll-padding-bottom: 0.5rem;
+    border-bottom-left-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+    background-color: #fff;
+}
+
+/* Markdown formatting styles */
+.ai-answer-markdown {
+    line-height: 1.6;
+}
+.ai-answer-markdown strong,
+.ai-answer-markdown b {
+    font-weight: 600;
+    color: #1f2937;
+}
+.ai-answer-markdown em,
+.ai-answer-markdown i {
+    font-style: italic;
+}
+.ai-answer-markdown code {
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.875em;
+    color: #dc2626;
+}
+.ai-answer-markdown pre {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+}
+.ai-answer-markdown pre code {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    color: #374151;
+    display: block;
+}
+.ai-answer-markdown ul,
+.ai-answer-markdown ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+.ai-answer-markdown ul {
+    list-style-type: disc;
+}
+.ai-answer-markdown ol {
+    list-style-type: decimal;
+}
+.ai-answer-markdown li {
+    margin: 0.25rem 0;
+}
+.ai-answer-markdown p {
+    margin: 0.75rem 0;
+}
+.ai-answer-markdown p:first-child {
+    margin-top: 0;
+}
+.ai-answer-markdown p:last-child {
+    margin-bottom: 0;
+}
+.ai-answer-markdown h1,
+.ai-answer-markdown h2,
+.ai-answer-markdown h3,
+.ai-answer-markdown h4 {
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: #111827;
+}
+.ai-answer-markdown h1 {
+    font-size: 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+}
+.ai-answer-markdown h2 {
+    font-size: 1.25rem;
+}
+.ai-answer-markdown h3 {
+    font-size: 1.125rem;
+}
+.ai-answer-markdown h4 {
+    font-size: 1rem;
+}
+.ai-answer-markdown a {
+    color: #2563eb;
+    text-decoration: underline;
+}
+.ai-answer-markdown a:hover {
+    color: #1d4ed8;
+}
+.ai-answer-markdown blockquote {
+    border-left: 4px solid #3b82f6;
+    padding-left: 1rem;
+    margin: 0.75rem 0;
+    color: #4b5563;
+    font-style: italic;
+}
+.ai-answer-markdown hr {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 1rem 0;
+}
+.ai-answer-markdown table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.75rem 0;
+}
+.ai-answer-markdown table th,
+.ai-answer-markdown table td {
+    border: 1px solid #e5e7eb;
+    padding: 0.5rem;
+    text-align: left;
+}
+.ai-answer-markdown table th {
+    background-color: #f9fafb;
+    font-weight: 600;
+}
+.ai-answer-markdown .citation {
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.875em;
+    font-weight: 600;
+    color: #1e40af;
+    margin: 0 0.125rem;
+}
+.ai-answer-markdown ul ul,
+.ai-answer-markdown ol ol,
+.ai-answer-markdown ul ol,
+.ai-answer-markdown ol ul {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+.ai-answer-markdown li > ul,
+.ai-answer-markdown li > ol {
+    margin-top: 0.5rem;
+}
+
+/* Prose styling for answer section */
+.prose {
+    color: #374151;
+}
+.prose p {
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.prose p:first-child {
+    margin-top: 0;
+}
+.prose p:last-child {
+    margin-bottom: 0;
+}
+.prose strong {
+    font-weight: 600;
+    color: #111827;
+}
+.prose code {
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.875em;
+    color: #dc2626;
+}
+.prose pre {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+}
+.prose pre code {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    color: #374151;
+}
+.prose ul,
+.prose ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+.prose ul {
+    list-style-type: disc;
+}
+.prose ol {
+    list-style-type: decimal;
+}
+.prose li {
+    margin: 0.25rem 0;
+}
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: #111827;
+}
+.prose h1 {
+    font-size: 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+}
+.prose h2 {
+    font-size: 1.25rem;
+}
+.prose h3 {
+    font-size: 1.125rem;
+}
+.prose h4 {
+    font-size: 1rem;
+}
+.prose a {
+    color: #2563eb;
+    text-decoration: underline;
+}
+.prose a:hover {
+    color: #1d4ed8;
+}
+.prose blockquote {
+    border-left: 4px solid #3b82f6;
+    padding-left: 1rem;
+    margin: 0.75rem 0;
+    color: #4b5563;
+    font-style: italic;
+}
+.prose hr {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 1rem 0;
+}
+.prose table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.75rem 0;
+}
+.prose table th,
+.prose table td {
+    border: 1px solid #e5e7eb;
+    padding: 0.5rem;
+    text-align: left;
+}
+.prose table th {
+    background-color: #f9fafb;
+    font-weight: 600;
+}
+.prose .citation {
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.875em;
+    font-weight: 600;
+    color: #1e40af;
+    margin: 0 0.125rem;
+}
+
+.ai-query-header {
+    background: linear-gradient(to right, #2563eb, #1d4ed8) !important;
+    background-color: #2563eb !important;
+}
+.ai-query-header,
+.ai-query-header h3,
+.ai-query-header p,
+.ai-query-header span,
+.ai-query-header div,
+.ai-query-header i,
+.ai-query-header * {
+    color: #ffffff !important;
+}
+.ai-query-header .text-white,
+.ai-query-header .text-gray-900,
+.ai-query-header .text-gray-800,
+.ai-query-header .text-gray-700,
+.ai-query-header .text-gray-600 {
+    color: #ffffff !important;
+}
+
+#aiSearchBtn {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+#aiSearchBtn i {
+    color: #2563eb !important;
+    transition: color 0.2s ease;
+}
+#aiSearchBtn:hover:not(:disabled) i {
+    color: #1d4ed8 !important;
+}
+#aiSearchBtn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+#aiSearchQuery:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.chat-bubble {
+    position: relative;
+}
+.chat-bubble::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 20px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 8px 8px 8px 0;
+    border-color: transparent #dbeafe transparent transparent;
+}
+.chat-bubble::after {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 21px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 7px 7px 7px 0;
+    border-color: transparent #eff6ff transparent transparent;
+}
+
+.flex-shrink-0.w-10 .fa-robot,
+.flex-shrink-0 .fa-robot,
+.flex-shrink-0 i.fa-robot {
+    color: #ffffff !important;
+    font-size: 1rem !important;
+    display: inline-block !important;
+    visibility: visible !important;
+}
+
+/* Upload modal z-index: set via modal_shell(..., z_index=11000) in documents.html — inline z-index beats this file; must exceed .ag-column-visibility-panel (10001). */
+
+.ai-typing-indicator {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+}
+.ai-typing-indicator span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #000000;
+    animation: ai-typing 1.4s infinite;
+}
+.ai-typing-indicator span:nth-child(1) {
+    animation-delay: 0s;
+}
+.ai-typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+.ai-typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+@keyframes ai-typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.7;
+    }
+    30% {
+        transform: translateY(-8px);
+        opacity: 1;
+    }
+}
+
+.processing-status-cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+    border-color: rgba(255, 255, 255, 0.6) !important;
+}
+.processing-status-cancel-btn:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.6);
+    outline-offset: 2px;
+}

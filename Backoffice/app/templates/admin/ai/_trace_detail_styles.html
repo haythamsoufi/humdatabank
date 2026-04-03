@@ -1,0 +1,281 @@
+/* Trace detail page: layout and step cards */
+.trace-detail-page {
+    min-width: 0;
+}
+
+.step-card {
+    /* Step card styling (Tailwind handles most) */
+}
+
+/* JSON blocks: prevent overflow from breaking layout */
+.trace-json-wrap {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.trace-json-wrap pre.json-display {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+/* Chat bubble (trace card uses same class names as chat) */
+.chat-bubble {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Final answer block: collapse when long */
+.trace-final-answer-wrapper {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.trace-final-answer-collapsed {
+    max-height: 200px;
+    overflow: hidden;
+}
+
+.trace-final-answer-expand-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0.45rem 0.75rem;
+    margin-top: 0.25rem;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.trace-final-answer-expand-row:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    color: #334155;
+}
+
+.trace-final-answer-expand-label {
+    opacity: 0.95;
+}
+
+.trace-final-answer-expand-icon {
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
+/* Sources block (same structure as chat) */
+.chat-response-sources {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.chat-response-sources .chat-response-sources-body {
+    max-width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 0;
+    padding: 0.1rem 0;
+}
+
+.chat-response-sources summary {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.2rem 0.15rem 0.35rem;
+    margin: 0;
+    list-style: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+}
+
+.chat-response-sources summary::-webkit-details-marker {
+    display: none;
+}
+
+.chat-response-sources summary::before {
+    content: '';
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: #3b82f6;
+}
+
+/* Source lines: one per source, truncate preview, click to expand */
+.chat-source-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+    margin: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 0.8125rem;
+    color: #64748b;
+    line-height: 1.4;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.chat-source-line:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.chat-source-line .chat-source-line-preview {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-source-line .chat-source-line-toggle {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.chat-source-line .chat-source-line-full {
+    display: none;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+
+.chat-source-line.expanded .chat-source-line-preview,
+.chat-source-line.expanded .chat-source-line-toggle {
+    display: none;
+}
+
+.chat-source-line.expanded .chat-source-line-full {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.chat-source-line-hidden {
+    display: none !important;
+}
+
+.chat-sources-expand-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0.45rem 0.75rem;
+    margin-top: 0.25rem;
+    margin-left: 0.2rem;
+    margin-right: 0.2rem;
+    border-radius: 999px;
+    cursor: pointer;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 600;
+    transition: background 0.15s, border-color 0.15s;
+    width: calc(100% - 0.4rem);
+    box-sizing: border-box;
+}
+
+.chat-sources-expand-row:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+}
+
+.chat-sources-expand-label {
+    opacity: 0.95;
+}
+
+.chat-sources-expand-icon {
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
+/* AI tables in final answer (markdown-rendered or injected) */
+.chat-ai-table {
+    width: 100%;
+    max-width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0.75rem;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.chat-ai-table th,
+.chat-ai-table td {
+    border: 1px solid #e2e8f0;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+}
+
+.chat-ai-table th {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #334155;
+}
+
+.chat-ai-table tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.chat-ai-table-row-hidden {
+    display: none !important;
+}
+
+.chat-ai-table-expand-row {
+    cursor: pointer;
+    background: #f8fafc !important;
+    border-top: 1px solid #e2e8f0;
+    transition: background 0.15s;
+}
+
+.chat-ai-table-expand-row:hover {
+    background: #f1f5f9 !important;
+}
+
+.chat-ai-table-expand-row td {
+    padding: 0.5rem 0.75rem !important;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.8125rem;
+    border: none !important;
+    border-top: 1px solid #e2e8f0;
+}
+
+.chat-ai-table-expand-label {
+    opacity: 0.85;
+    margin-right: 0.35rem;
+}
+
+.chat-ai-table-expand-icon {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    vertical-align: middle;
+}

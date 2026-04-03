@@ -1,0 +1,406 @@
+{# Renders one full trace card. Used by trace_detail (once) and conversation_traces (per trace). #}
+{# Required: trace, user, tool_usages, id_prefix (e.g. "trace" or "trace-123-") #}
+{# Optional: quality_debug (default none), final_answer_mode: "render" = script+div for JS, "plain" = raw text only #}
+{% set _quality_debug = quality_debug if quality_debug is defined else none %}
+{% set _final_answer_mode = final_answer_mode if final_answer_mode is defined else 'render' %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div class="lg:col-span-2 bg-white shadow rounded-lg p-6 min-w-0">
+        <div class="flex items-start gap-3 mb-6">
+            <div class="flex-shrink-0">
+                {% if user %}
+                    {% set initials = (user.name.split() | map('first') | join('') if user.name else user.email.split('@')[0]) %}
+                    <div class="w-10 h-10 rounded-full text-white text-xs font-semibold flex items-center justify-center shadow-sm"
+                         style="background-color: {{ user.profile_color if user.profile_color else '#3B82F6' }};">
+                        {{ initials | upper | truncate(2, true, '') }}
+                    </div>
+                {% else %}
+                    <div class="w-10 h-10 rounded-full bg-gray-400 text-white text-xs font-semibold flex items-center justify-center shadow-sm">?</div>
+                {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-semibold text-gray-700">{{ (user.name or user.email) if user else _('Unknown user') }}</span>
+                </div>
+                {% if trace.original_query %}
+                <div class="mb-3">
+                    <p class="text-xs font-semibold text-gray-500 uppercase mb-1">{{ _('Original query') }}</p>
+                    <div class="chat-bubble bg-gray-50 border border-gray-200 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                        <p class="text-gray-600 whitespace-pre-wrap mb-0">{{ trace.original_query }}</p>
+                    </div>
+                </div>
+                <p class="text-xs font-semibold text-gray-500 uppercase mb-1">{{ _('Query sent to agent') }}</p>
+                {% endif %}
+                <div class="chat-bubble bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                    <p class="text-gray-700 whitespace-pre-wrap mb-0">{{ trace.query }}</p>
+                </div>
+            </div>
+        </div>
+
+        {% if trace.display_answer or trace.final_answer %}
+        <div class="flex items-start gap-3 mb-6">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb);">
+                <i class="fas fa-robot text-white" style="font-size: 1rem;"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-semibold text-gray-700">{{ _('AI Assistant') }}</span>
+                </div>
+                <div class="chat-bubble trace-final-answer bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                    {% if _final_answer_mode == 'plain' %}
+                    <div class="trace-final-answer-wrapper trace-step-content">
+                        <p class="text-gray-700 whitespace-pre-wrap mb-0">{{ trace.display_answer or trace.final_answer }}</p>
+                    </div>
+                    {% else %}
+                    <div class="trace-final-answer-wrapper" id="{{ id_prefix }}FinalAnswerWrapper">
+                        <div id="{{ id_prefix }}FinalAnswerContent" class="chat-message-content prose prose-sm max-w-none text-gray-700 min-w-0"></div>
+                    </div>
+                    <script type="application/json" id="{{ id_prefix }}FinalAnswerRaw">{{ (trace.display_answer or trace.final_answer) | tojson }}</script>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if trace.error_message %}
+        <h3 class="text-lg font-semibold text-red-600 mt-6 mb-4">{{ _('Error') }}</h3>
+        <div class="trace-final-answer bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
+            {{ trace.error_message }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ _('Details') }}</h3>
+        <dl class="space-y-3">
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Status') }}</dt>
+                <dd class="mt-1">
+                    {% if trace.status == 'completed' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> {{ (trace.status or '')|replace('_', ' ')|title }}</span>
+                    {% elif trace.status == 'error' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><i class="fas fa-times-circle mr-1"></i> {{ (trace.status or '')|replace('_', ' ')|title }}</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ (trace.status or '')|replace('_', ' ')|title }}</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Created') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+            </div>
+            {% if user %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('User') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ user.email }}</dd>
+            </div>
+            {% endif %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('LLM Provider') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.llm_provider or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Model') }}</dt>
+                <dd class="text-sm font-medium text-gray-900 font-mono text-xs">{{ trace.llm_model or '-' }}</dd>
+            </div>
+            {% if trace.execution_path %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Execution path') }}</dt>
+                <dd class="text-sm font-medium text-gray-900 font-mono">{{ trace.execution_path }}</dd>
+            </div>
+            {% endif %}
+            {% if trace.original_query %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Original query') }}</dt>
+                <dd class="text-sm font-medium text-gray-900 mt-1 break-words whitespace-pre-wrap">{{ trace.original_query }}</dd>
+            </div>
+            {% endif %}
+            {% if trace.query_language %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Query language') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.query_language }}</dd>
+            </div>
+            {% endif %}
+            {% if trace.output_payloads %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Structured output (chart/map payload)') }}</dt>
+                <dd class="mt-1 text-sm">
+                    <span class="text-gray-600">{{ trace.output_payloads.keys() | list | join(', ') }}</span>
+                    <details class="mt-2">
+                        <summary class="cursor-pointer text-blue-600 hover:underline">{{ _('Show payload JSON') }}</summary>
+                        <pre class="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto max-h-64 overflow-y-auto">{{ trace.output_payloads | tojson(indent=2) }}</pre>
+                    </details>
+                </dd>
+            </div>
+            {% endif %}
+            {% if trace.user_rating %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('User rating') }}</dt>
+                <dd class="mt-1">
+                    {% if trace.user_rating == 'like' %}
+                    <span class="inline-flex items-center text-green-700" title="{{ _('Like') }}"><i class="fas fa-thumbs-up mr-1"></i> {{ _('Like') }}</span>
+                    {% elif trace.user_rating == 'dislike' %}
+                    <span class="inline-flex items-center text-red-700" title="{{ _('Dislike') }}"><i class="fas fa-thumbs-down mr-1"></i> {{ _('Dislike') }}</span>
+                    {% else %}
+                    <span class="text-gray-600">{{ trace.user_rating }}</span>
+                    {% endif %}
+                </dd>
+            </div>
+            {% endif %}
+            {% if trace.grounding_score is not none or trace.confidence_level %}
+            <div class="border-t pt-3">
+                <dt class="text-sm text-gray-500">{{ _('Grounding / Confidence') }}</dt>
+                <dd class="mt-1">
+                    {% if trace.grounding_score is not none %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {% if trace.grounding_score >= 0.75 %}bg-green-100 text-green-800
+                        {% elif trace.grounding_score >= 0.45 %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ "%.2f"|format(trace.grounding_score) }}
+                    </span>
+                    {% endif %}
+                    {% if trace.confidence_level %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {% if trace.confidence_level == 'high' %}bg-green-100 text-green-800
+                        {% elif trace.confidence_level == 'medium' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-red-100 text-red-800{% endif %} ml-1">
+                        {{ trace.confidence_level }}
+                    </span>
+                    {% endif %}
+                </dd>
+            </div>
+            {% endif %}
+            {% if trace.llm_quality_score is not none or trace.llm_quality_verdict %}
+            <div class="border-t pt-3">
+                <dt class="text-sm text-gray-500">
+                    <i class="fas fa-gavel mr-1 text-indigo-400"></i>{{ _('LLM Quality Judge') }}
+                    {% if trace.llm_needs_review %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 ml-1">
+                        <i class="fas fa-flag mr-0.5"></i>{{ _('Review') }}
+                    </span>
+                    {% endif %}
+                </dt>
+                <dd class="mt-1">
+                    {% if trace.llm_quality_score is not none %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {% if trace.llm_quality_score >= 0.7 %}bg-green-100 text-green-800
+                        {% elif trace.llm_quality_score >= 0.5 %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ "%.0f"|format(trace.llm_quality_score * 100) }}%
+                    </span>
+                    {% endif %}
+                    {% if trace.llm_quality_verdict %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ml-1
+                        {% if trace.llm_quality_verdict == 'excellent' %}bg-green-100 text-green-800
+                        {% elif trace.llm_quality_verdict == 'good' %}bg-blue-100 text-blue-800
+                        {% elif trace.llm_quality_verdict == 'acceptable' %}bg-yellow-100 text-yellow-800
+                        {% elif trace.llm_quality_verdict == 'poor' %}bg-orange-100 text-orange-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ (trace.llm_quality_verdict or '')|replace('_', ' ')|title }}
+                    </span>
+                    {% endif %}
+                    {% if trace.llm_quality_reasoning %}
+                    <p class="text-xs text-gray-600 mt-2 leading-relaxed">{{ trace.llm_quality_reasoning }}</p>
+                    {% endif %}
+                </dd>
+            </div>
+            {% endif %}
+            <div class="border-t pt-3">
+                <dt class="text-sm text-gray-500">{{ _('Iterations') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.actual_iterations }} / {{ trace.max_iterations }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Tool Calls') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.tool_call_count or 0 }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Execution Time') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{% if trace.execution_time_ms %}{{ (trace.execution_time_ms / 1000)|round(2) }}s{% else %}-{% endif %}</dd>
+            </div>
+            <div class="border-t pt-3">
+                <dt class="text-sm text-gray-500">{{ _('Input Tokens') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.total_input_tokens or 0 }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Output Tokens') }}</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.total_output_tokens or 0 }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Total Cost') }}</dt>
+                <dd class="text-lg font-bold text-blue-600">{% if trace.total_cost_usd %}${{ "%.6f"|format(trace.total_cost_usd) }}{% else %}-{% endif %}</dd>
+            </div>
+        </dl>
+        {% if trace.tools_used %}
+        <h4 class="text-sm font-semibold text-gray-600 mt-6 mb-2">{{ _('Tools Used') }}</h4>
+        <div class="flex flex-wrap gap-1">
+            {% for tool in trace.tools_used %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-mono">{{ tool }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if _quality_debug %}
+        <h4 class="text-sm font-semibold text-gray-600 mt-6 mb-2">{{ _('Quality Debug') }}</h4>
+        <dl class="space-y-2 text-sm">
+            <div><dt class="text-xs text-gray-500">{{ _('Analysis Mode') }}</dt><dd class="font-medium text-gray-900">{{ _quality_debug.analysis_mode or '-' }}</dd></div>
+            <div><dt class="text-xs text-gray-500">{{ _('LLM Synthesis Used') }}</dt><dd class="font-medium text-gray-900">{% if _quality_debug.llm_synthesis_used is sameas true %}Yes{% elif _quality_debug.llm_synthesis_used is sameas false %}No{% else %}-{% endif %}</dd></div>
+            <div><dt class="text-xs text-gray-500">{{ _('Analyzer Runtime') }}</dt><dd class="font-medium text-gray-900">{% if _quality_debug.run_elapsed_ms %}{{ _quality_debug.run_elapsed_ms }}ms{% else %}-{% endif %}</dd></div>
+            <div><dt class="text-xs text-gray-500">{{ _('Excluded No-Mention Plans') }}</dt><dd class="font-medium text-gray-900">{{ _quality_debug.excluded_no_target_areas if _quality_debug.excluded_no_target_areas is not none else '-' }}</dd></div>
+            {% if _quality_debug.semantic_config %}
+            <details class="border-t pt-2"><summary class="text-xs text-blue-600 cursor-pointer">{{ _('Semantic Thresholds') }}</summary><div class="trace-json-wrap mt-2"><pre class="json-display">{{ _quality_debug.semantic_config | tojson(indent=2) }}</pre></div></details>
+            {% endif %}
+            {% if _quality_debug.semantic_concept_stats %}
+            <details><summary class="text-xs text-blue-600 cursor-pointer">{{ _('Concept Gate Stats') }}</summary><div class="trace-json-wrap mt-2"><pre class="json-display">{{ _quality_debug.semantic_concept_stats | tojson(indent=2) }}</pre></div></details>
+            {% endif %}
+            {% if _quality_debug.llm_synthesis_debug %}
+            <details><summary class="text-xs text-blue-600 cursor-pointer">{{ _('LLM Synthesis Debug') }}</summary><div class="trace-json-wrap mt-2"><pre class="json-display">{{ _quality_debug.llm_synthesis_debug | tojson(indent=2) }}</pre></div></details>
+            {% endif %}
+            {% if _quality_debug.quality_debug %}
+            <details class="mt-2"><summary class="text-xs text-blue-600 cursor-pointer">{{ _('Full quality_debug payload') }}</summary><div class="trace-json-wrap mt-2"><pre class="json-display">{{ _quality_debug.quality_debug | tojson(indent=2) }}</pre></div></details>
+            {% endif %}
+        </dl>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Reasoning Steps -->
+<div class="bg-white shadow rounded-lg p-6 mb-8 min-w-0">
+    {% set has_observations = trace.steps and (trace.steps | selectattr('observation') | list | length > 0) %}
+    {% if trace.steps %}
+    <script type="application/json" id="{{ id_prefix }}StepsRaw">{{ trace.steps | tojson }}</script>
+    {% endif %}
+    <script type="application/json" id="{{ id_prefix }}TraceMeta">{{ {
+        'id': trace.id,
+        'status': trace.status,
+        'original_query': trace.original_query or '',
+        'query': trace.query,
+        'query_language': trace.query_language or 'en',
+        'execution_path': trace.execution_path or '',
+        'llm_model': trace.llm_model or '',
+        'llm_provider': trace.llm_provider or '',
+        'actual_iterations': trace.actual_iterations or 0,
+        'max_iterations': trace.max_iterations or 0,
+        'execution_time_ms': trace.execution_time_ms,
+        'total_cost_usd': trace.total_cost_usd,
+        'total_input_tokens': trace.total_input_tokens or 0,
+        'total_output_tokens': trace.total_output_tokens or 0,
+        'grounding_score': trace.grounding_score,
+        'confidence_level': trace.confidence_level or '',
+        'llm_quality_score': trace.llm_quality_score,
+        'llm_quality_verdict': trace.llm_quality_verdict or '',
+        'llm_quality_reasoning': trace.llm_quality_reasoning or '',
+        'llm_needs_review': trace.llm_needs_review if trace.llm_needs_review is not none else None,
+        'error_message': trace.error_message or '',
+        'tools_used': trace.tools_used or [],
+        'final_answer': (trace.display_answer or trace.final_answer or ''),
+        'output_payloads': trace.output_payloads or {},
+        'user_rating': trace.user_rating or ''
+    } | tojson }}</script>
+    <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list-ol text-purple-500 mr-2"></i>{{ _('Reasoning Steps') }}</h3>
+        <div class="flex items-center gap-2">
+            {% if trace.steps %}
+            <button type="button" id="{{ id_prefix }}CopyForAIReview" class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy full trace with metadata for AI review') }}">
+                <i class="fas fa-robot mr-0.5" aria-hidden="true"></i>
+                <span id="{{ id_prefix }}CopyForAIReviewLabel">{{ _('Copy for AI Review') }}</span>
+            </button>
+            <button type="button" id="{{ id_prefix }}CopySteps" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy all steps with details') }}">
+                <i class="fas fa-copy mr-0.5" aria-hidden="true"></i>
+                <span id="{{ id_prefix }}CopyStepsLabel">{{ _('Copy') }}</span>
+            </button>
+            <button type="button" id="{{ id_prefix }}CopyStepsSummarised" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy all steps with observations limited to 30 lines each') }}">
+                <i class="fas fa-copy mr-0.5" aria-hidden="true"></i>
+                <span id="{{ id_prefix }}CopyStepsSummarisedLabel">{{ _('Copy Summarised') }}</span>
+            </button>
+            {% endif %}
+            {% if has_observations %}
+            <button type="button" id="{{ id_prefix }}ExpandAllObservations" class="text-sm font-medium text-green-600 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded px-2 py-1" data-expand-label="{{ _('Expand all observations') }}" data-collapse-label="{{ _('Collapse all observations') }}">
+                <i class="fas fa-chevron-down mr-1" id="{{ id_prefix }}ExpandCollapseIcon"></i>
+                <span id="{{ id_prefix }}ExpandCollapseLabel">{{ _('Expand all observations') }}</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% if trace.steps %}
+    <div class="space-y-4 pl-4">
+        {% for step in trace.steps %}
+        <div class="step-card trace-step-content {% if step.action == 'finish' %}step-finish{% else %}step-action{% endif %} pl-6 py-3 bg-gray-50 rounded-r-lg">
+            <div class="flex items-center justify-between mb-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ _('Step') }} {{ step.step or loop.index }}</span>
+                {% if step.timestamp %}<span class="text-xs text-gray-400">{{ step.timestamp }}</span>{% endif %}
+            </div>
+            {% if step.thought %}
+            <div class="mb-3">
+                <div class="text-xs font-semibold text-blue-600 uppercase mb-1">{{ _('Thought') }}</div>
+                <p class="text-sm text-gray-700">{{ step.thought }}</p>
+            </div>
+            {% endif %}
+            {% if step.action %}
+            <div class="mb-3">
+                <div class="text-xs font-semibold text-purple-600 uppercase mb-1">{{ _('Action') }}</div>
+                <code class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-sm">{{ step.action }}</code>
+                {% if step.action_input %}
+                <div class="trace-json-wrap mt-2 min-w-0"><pre class="json-display">{{ step.action_input | tojson(indent=2) }}</pre></div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if step.observation %}
+            <details class="step-observation-details group min-w-0 max-w-full">
+                <summary class="text-xs font-semibold text-green-600 uppercase mb-1 cursor-pointer list-none flex items-center gap-1 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded">
+                    <i class="fas fa-chevron-right text-green-500 transition-transform group-open:rotate-90"></i>
+                    <span>{{ _('Observation') }}</span>
+                </summary>
+                <div class="trace-json-wrap bg-green-50 rounded p-3 mt-1">
+                    {% if step.observation is mapping %}
+                    <pre class="json-display text-green-800">{{ step.observation | tojson(indent=2) }}</pre>
+                    {% else %}
+                    <p class="text-sm text-green-800 whitespace-pre-wrap">{{ step.observation }}</p>
+                    {% endif %}
+                </div>
+            </details>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-500 text-center py-8">{{ _('No reasoning steps recorded.') }}</p>
+    {% endif %}
+</div>
+
+{% if tool_usages %}
+<div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-6"><i class="fas fa-tools text-gray-500 mr-2"></i>{{ _('Tool Usage Details') }}</h3>
+    <div class="overflow-x-auto min-w-0">
+        <table class="trace-tool-usage-table min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Tool') }}</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Status') }}</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Time') }}</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Input') }}</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for usage in tool_usages %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3"><code class="text-sm font-mono text-purple-700">{{ usage.tool_name }}</code></td>
+                    <td class="px-4 py-3">
+                        {% if usage.success %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i> {{ _('Success') }}</span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-100 text-red-700" title="{{ usage.error_message or '' }}"><i class="fas fa-times mr-1"></i> {{ _('Failed') }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500">{% if usage.execution_time_ms %}{{ usage.execution_time_ms }}ms{% else %}-{% endif %}</td>
+                    <td class="px-4 py-3 min-w-0 max-w-md">
+                        {% if usage.tool_input %}
+                        <button type="button" class="js-trace-toggle-input text-xs text-blue-600 hover:text-blue-800"><i class="fas fa-eye mr-1"></i> {{ _('Show') }}</button>
+                        <div class="trace-json-wrap mt-2"><pre class="json-display hidden text-xs">{{ usage.tool_input | tojson(indent=2) }}</pre></div>
+                        {% else %}<span class="text-gray-400">-</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}

@@ -1,0 +1,367 @@
+{% extends "core/layout.html" %}
+{% from "components/_svg_icons.html" import svg_icon %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+
+{% block title %}{{ _('Notifications') }}{% endblock %}
+
+{% block content %}
+<div class="notification-center-container">
+    <!-- Header -->
+    {% set header_actions = [
+        {
+            'type': 'button',
+            'text': _('Export'),
+            'icon': 'download',
+            'classes': 'professional-action-btn professional-action-btn-green',
+            'attributes': {'id': 'export-notifications'}
+        },
+        {
+            'type': 'button',
+            'text': _('Preferences'),
+            'icon': 'cog',
+            'classes': 'professional-action-btn',
+            'attributes': {'id': 'preferences-toggle'}
+        }
+    ] %}
+    {{ page_header(
+        title=_('Notifications'),
+        icon='bell',
+        actions=header_actions
+    ) }}
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow stat-card">
+            <div class="text-sm text-gray-500">{{ _('Unread') }}</div>
+            <div class="text-2xl font-bold text-blue-600" id="stat-unread">0</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow stat-card">
+            <div class="text-sm text-gray-500">{{ _('This Week') }}</div>
+            <div class="text-2xl font-bold text-gray-900" id="stat-week">0</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow stat-card">
+            <div class="text-sm text-gray-500">{{ _('This Month') }}</div>
+            <div class="text-2xl font-bold text-gray-900" id="stat-month">0</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow stat-card">
+            <div class="text-sm text-gray-500">{{ _('Total') }}</div>
+            <div class="text-2xl font-bold text-gray-900" id="stat-total">0</div>
+        </div>
+    </div>
+
+    <!-- Preferences Panel (initially hidden) -->
+    <div id="preferences-panel" class="hidden bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">{{ _('Notification Preferences') }}</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Sound Notifications -->
+            <div class="pref-group">
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" id="pref-sound-enabled"
+                           class="form-checkbox h-5 w-5 text-blue-600"
+                           {% if preferences.sound_enabled %}checked{% endif %}>
+                    <span class="text-gray-700 font-medium">{{ _('Enable Sound') }}</span>
+                </label>
+                <p class="text-sm text-gray-500 mt-1 ml-8">{{ _('Play sound for new notifications') }}</p>
+            </div>
+
+            <!-- Notification Frequency -->
+            <div class="pref-group">
+                <label for="pref-frequency" class="block text-gray-700 font-medium mb-2">
+                    {{ _('Email Frequency') }}
+                </label>
+                <select id="pref-frequency" class="form-select w-full">
+                    <option value="instant" {% if preferences.notification_frequency == 'instant' %}selected{% endif %}>
+                        {{ _('Instant') }}
+                    </option>
+                    <option value="daily" {% if preferences.notification_frequency == 'daily' %}selected{% endif %}>
+                        {{ _('Daily Digest') }}
+                    </option>
+                    <option value="weekly" {% if preferences.notification_frequency == 'weekly' %}selected{% endif %}>
+                        {{ _('Weekly Digest') }}
+                    </option>
+                </select>
+                <p class="text-sm text-gray-500 mt-1">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    {{ _('Instant: Receive emails immediately. Daily/Weekly: Receive a summary at your chosen time.') }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Digest Schedule (shown when daily or weekly is selected) -->
+        <div id="digest-schedule-group" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6" style="display: none;">
+            <!-- Day Selection (for weekly digest) -->
+            <div id="digest-day-group" class="pref-group" style="display: none;">
+                <label for="pref-digest-day" class="block text-gray-700 font-medium mb-2">
+                    {{ _('Day of Week') }}
+                </label>
+                <select id="pref-digest-day" class="form-select w-full">
+                    <option value="monday" {% if preferences.digest_day == 'monday' %}selected{% endif %}>Monday</option>
+                    <option value="tuesday" {% if preferences.digest_day == 'tuesday' %}selected{% endif %}>Tuesday</option>
+                    <option value="wednesday" {% if preferences.digest_day == 'wednesday' %}selected{% endif %}>Wednesday</option>
+                    <option value="thursday" {% if preferences.digest_day == 'thursday' %}selected{% endif %}>Thursday</option>
+                    <option value="friday" {% if preferences.digest_day == 'friday' %}selected{% endif %}>Friday</option>
+                    <option value="saturday" {% if preferences.digest_day == 'saturday' %}selected{% endif %}>Saturday</option>
+                    <option value="sunday" {% if preferences.digest_day == 'sunday' %}selected{% endif %}>Sunday</option>
+                </select>
+            </div>
+
+            <!-- Time Selection -->
+            <div class="pref-group">
+                <label for="pref-digest-time" class="block text-gray-700 font-medium mb-2">
+                    {{ _('Time (Local Time)') }}
+                </label>
+                <input type="time" id="pref-digest-time" class="form-input w-full"
+                       value="{% if preferences.digest_time %}{{ preferences.digest_time }}{% else %}09:00{% endif %}">
+                <p class="text-sm text-gray-500 mt-1">{{ _('Select the time when you want to receive your digest') }}</p>
+            </div>
+        </div>
+
+        <!-- Digest Schedule Preview -->
+        <div id="digest-preview" class="hidden mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div class="flex items-start">
+                <i class="fas fa-info-circle text-blue-600 mt-0.5 mr-2"></i>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-blue-900 mb-1">{{ _('Digest Schedule') }}</p>
+                    <p id="digest-preview-text" class="text-sm text-blue-700"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Types Table -->
+        <div class="pref-group mt-6">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ _('Notification Types') }}</h3>
+                <p class="text-sm text-gray-600">{{ _('Configure which notification types to receive via email and push notifications') }}</p>
+                {% if notification_types_info.by_category %}
+                <div class="mt-2 text-xs text-gray-500">
+                    {% if notification_types_info.by_category.both %}
+                    <span class="inline-block mr-3">
+                        <span class="font-medium">Both roles:</span> {{ notification_types_info.by_category.both|length }} types
+                    </span>
+                    {% endif %}
+                    {% if notification_types_info.by_category.focal_point %}
+                    <span class="inline-block mr-3">
+                        <span class="font-medium">Focal Point:</span> {{ notification_types_info.by_category.focal_point|length }} types
+                    </span>
+                    {% endif %}
+                    {% if notification_types_info.by_category.admin %}
+                    <span class="inline-block">
+                        <span class="font-medium">Admin:</span> {{ notification_types_info.by_category.admin|length }} types
+                    </span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                                {{ _('Notification Type') }}
+                            </th>
+                            <th scope="col" class="px-6 py-4 text-center text-sm font-semibold text-gray-900">
+                                {{ _('Email') }}
+                            </th>
+                            <th scope="col" class="px-6 py-4 text-center text-sm font-semibold text-gray-900">
+                                {{ _('Push') }}
+                            </th>
+                        </tr>
+                        <tr class="bg-gray-50 border-t border-gray-200">
+                            <td class="px-6 py-2"></td>
+                            <td class="px-6 py-2 text-center">
+                                <label class="inline-flex items-center space-x-2 cursor-pointer group">
+                                    <input type="checkbox" id="select-all-email"
+                                           class="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded">
+                                    <span class="text-sm text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select All') }}</span>
+                                </label>
+                            </td>
+                            <td class="px-6 py-2 text-center">
+                                <label class="inline-flex items-center space-x-2 cursor-pointer group">
+                                    <input type="checkbox" id="select-all-push"
+                                           class="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded">
+                                    <span class="text-sm text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select All') }}</span>
+                                </label>
+                            </td>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for notif_type in notification_types %}
+                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-sm font-medium text-gray-900">{{ notification_type_labels.get(notif_type, notif_type.replace('_', ' ').title()) }}</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <input type="checkbox"
+                                       class="notification-type-email form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
+                                       data-type="{{ notif_type }}"
+                                       {% if not preferences.notification_types_enabled or notif_type in preferences.notification_types_enabled %}checked{% endif %}>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <input type="checkbox"
+                                       class="notification-type-push form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
+                                       data-type="{{ notif_type }}"
+                                       {% if not preferences.push_notification_types_enabled or notif_type in preferences.push_notification_types_enabled %}checked{% endif %}>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-6 flex justify-end space-x-3">
+            <button id="cancel-preferences" class="btn btn-secondary">{{ _('Cancel') }}</button>
+            <button id="save-preferences" class="btn btn-success">{{ _('Save Preferences') }}</button>
+        </div>
+    </div>
+
+
+    <!-- Filters Bar -->
+    <div class="filters-bar bg-white rounded-lg shadow-md p-4 mb-4">
+        <!-- Tabs -->
+        {% call scroll_tab_bar(wrapper_class='mb-4', inner_class='gap-2', aria_label=_('Notification list')) %}
+            <button class="tab-button active" data-tab="all">
+                {{ _('All') }}
+                <span class="tab-count" id="count-all">0</span>
+            </button>
+            <button class="tab-button" data-tab="unread">
+                {{ _('Unread') }}
+                <span class="tab-count" id="count-unread">0</span>
+            </button>
+            <button class="tab-button" data-tab="archived">
+                {{ _('Archived') }}
+                <span class="tab-count" id="count-archived">0</span>
+            </button>
+        {% endcall %}
+
+        <!-- Filters Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div>
+                <label for="type-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ _('Type') }}
+                </label>
+                <select id="type-filter" class="form-select w-full">
+                    <option value="">{{ _('All Types') }}</option>
+                    {% for notif_type in notification_types %}
+                    <option value="{{ notif_type }}">{{ notification_type_labels.get(notif_type, notif_type.replace('_', ' ').title()) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="category-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ _('Category') }}
+                </label>
+                <select id="category-filter" class="form-select w-full">
+                    <option value="">{{ _('All Categories') }}</option>
+                    <option value="assignment">{{ _('Assignment') }}</option>
+                    <option value="system">{{ _('System') }}</option>
+                    <option value="alert">{{ _('Alert') }}</option>
+                    <option value="reminder">{{ _('Reminder') }}</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="tags-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ _('Tags') }}
+                </label>
+                <input type="text" id="tags-filter" placeholder="{{ _('e.g., urgent, action-required') }}"
+                       class="form-input w-full">
+                <p class="text-xs text-gray-500 mt-1">{{ _('Comma-separated tags') }}</p>
+            </div>
+
+            <div>
+                <label for="date-from-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ _('From Date') }}
+                </label>
+                <input type="date" id="date-from-filter" class="form-input w-full">
+            </div>
+
+            <div>
+                <label for="date-to-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ _('To Date') }}
+                </label>
+                <input type="date" id="date-to-filter" class="form-input w-full">
+            </div>
+
+            <div>
+                <label for="search-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ _('Search') }}
+                </label>
+                <input type="text" id="search-filter" placeholder="{{ _('Search notifications...') }}"
+                       class="form-input w-full">
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-between items-center">
+            <button id="apply-filters" class="btn btn-primary">
+                {{ svg_icon('funnel', 'w-4 h-4 inline-block mr-2') }}
+                {{ _('Apply Filters') }}
+            </button>
+            <button id="clear-filters" class="btn btn-secondary">
+                {{ _('Clear') }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Bar (hidden by default) -->
+    <div id="bulk-actions-bar" class="bulk-actions-bar hidden bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
+        <div class="flex items-center justify-between">
+            <span class="text-gray-700 font-medium">
+                <span id="selected-count">0</span> {{ _('selected') }}
+            </span>
+            <div class="flex space-x-2">
+                <button id="bulk-mark-read" class="btn btn-sm btn-secondary">
+                    {{ svg_icon('check', 'w-4 h-4 inline-block mr-1') }}
+                    {{ _('Mark Read') }}
+                </button>
+                <button id="bulk-mark-unread" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-envelope w-4 h-4 inline-block mr-1"></i>
+                    {{ _('Mark Unread') }}
+                </button>
+                <button id="bulk-archive" class="btn btn-sm btn-secondary">
+                    {{ svg_icon('inbox', 'w-4 h-4 inline-block mr-1') }}
+                    {{ _('Archive') }}
+                </button>
+                <button id="bulk-delete" class="btn-sm btn-danger">
+                    {{ svg_icon('trash', 'w-4 h-4 inline-block mr-1') }}
+                    {{ _('Delete') }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications List -->
+    <div id="notifications-center-list" class="bg-white rounded-lg shadow-md">
+        <!-- Populated by JavaScript -->
+        <div class="p-8 text-center text-gray-500">
+            <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+            <p>{{ _('Loading notifications...') }}</p>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination-controls" class="mt-6 flex justify-center">
+        <!-- Populated by JavaScript -->
+    </div>
+</div>
+
+<!-- Include notification center JavaScript -->
+<link rel="stylesheet" href="{{ static_url('css/notifications.css') }}">
+<script nonce="{{ csp_nonce() }}">
+    // Provide translations to JavaScript
+    window.NOTIFICATION_TRANSLATIONS = {
+        'Mark as Read': {{ _('Mark as read')|tojson }},
+        'Mark as Unread': {{ _('Mark as Unread')|tojson }},
+        'Archive': {{ _('Archive')|tojson }},
+        'View': {{ _('View')|tojson }},
+        'Delete': {{ _('Delete')|tojson }},
+        'No Notifications': {{ _('No Notifications')|tojson }},
+        "You're all caught up!": {{ _("You're all caught up!")|tojson }}
+    };
+</script>
+<script src="{{ static_url('js/notifications-center.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,233 @@
+{% extends "core/layout.html" %}
+{% from "components/_svg_icons.html" import svg_icon %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Send Notifications') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+<div class="notification-send-container">
+    {{ page_header(
+        title=_('Send Notifications'),
+        icon='bell',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Send Notifications')}
+        ]
+    ) }}
+
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6 border-2 border-blue-200">
+        <div class="mb-4">
+            <h2 class="text-xl font-semibold text-gray-900">
+                {{ svg_icon('bell', 'w-5 h-5 inline-block mr-2') }}
+                {{ _('Send Custom Notification') }}
+            </h2>
+        </div>
+
+        <p class="text-sm text-gray-600 mb-6">
+            {{ _('Send a custom notification message to one or more selected users via email and/or mobile push notification.') }}
+        </p>
+
+        <form id="admin-notification-form" class="space-y-6">
+            <!-- Delivery Method Selection -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">
+                    {{ _('Delivery Method') }} <span class="text-red-500">*</span>
+                </label>
+                <div class="space-y-3">
+                    <label class="flex items-center space-x-3 cursor-pointer group">
+                        <input type="checkbox"
+                               id="send-email"
+                               class="form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded"
+                               checked>
+                        <div class="flex-1">
+                            <span class="text-gray-700 font-medium group-hover:text-gray-900">{{ _('Email') }}</span>
+                            <p class="text-xs text-gray-500">{{ _('Send notification via email') }}</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer group">
+                        <input type="checkbox"
+                               id="send-push"
+                               class="form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded"
+                               checked>
+                        <div class="flex-1">
+                            <span class="text-gray-700 font-medium group-hover:text-gray-900">{{ _('Mobile Push Notification') }}</span>
+                            <p class="text-xs text-gray-500">{{ _('Send push notification to mobile devices') }}</p>
+                        </div>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">{{ _('Select at least one delivery method') }}</p>
+            </div>
+
+            <!-- User Selection -->
+            <div>
+                <label for="admin-notification-users" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Select Users') }} <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                    <input type="text"
+                           id="admin-notification-user-search"
+                           placeholder="{{ _('Search users by name or email...') }}"
+                           class="form-input w-full pr-10"
+                           autocomplete="off">
+                    <div id="admin-notification-user-results" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+                <div id="admin-notification-selected-users" class="mt-3 flex flex-wrap gap-2">
+                    <!-- Selected users will appear here -->
+                </div>
+                <p class="text-xs text-gray-500 mt-1">{{ _('Start typing to search for users. Click on a user to select them.') }}</p>
+            </div>
+
+            <!-- Title -->
+            <div>
+                <label for="admin-notification-title" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Title') }} <span class="text-red-500">*</span>
+                </label>
+                <input type="text"
+                       id="admin-notification-title"
+                       placeholder="{{ _('Notification title') }}"
+                       class="form-input w-full"
+                       maxlength="100"
+                       required>
+                <p class="text-xs text-gray-500 mt-1">{{ _('Maximum 100 characters') }}</p>
+            </div>
+
+            <!-- Message -->
+            <div>
+                <label for="admin-notification-message" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Message') }} <span class="text-red-500">*</span>
+                </label>
+                <textarea id="admin-notification-message"
+                          placeholder="{{ _('Notification message') }}"
+                          class="form-textarea w-full"
+                          rows="4"
+                          maxlength="500"
+                          required></textarea>
+                <p class="text-xs text-gray-500 mt-1">{{ _('Maximum 500 characters') }}</p>
+            </div>
+
+            <!-- Priority -->
+            <div>
+                <label for="admin-notification-priority" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Priority') }}
+                </label>
+                <select id="admin-notification-priority" class="form-select w-full">
+                    <option value="normal">{{ _('Normal') }}</option>
+                    <option value="high">{{ _('High') }}</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">{{ _('High priority notifications are displayed with more prominence') }}</p>
+            </div>
+
+            <!-- Redirect URL/Screen (only for push notifications) -->
+            <div id="redirect-section">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Redirect URL or Screen') }}
+                    <span class="text-xs font-normal text-gray-500">({{ _('Optional - for push notifications only') }})</span>
+                </label>
+
+                <!-- Toggle between App Screen and Custom URL -->
+                <div class="mb-3 flex space-x-4 border-b border-gray-200">
+                    <button type="button"
+                            id="redirect-type-app"
+                            class="px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 redirect-type-btn active">
+                        {{ _('App Screen') }}
+                    </button>
+                    <button type="button"
+                            id="redirect-type-custom"
+                            class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 redirect-type-btn">
+                        {{ _('Custom URL') }}
+                    </button>
+                </div>
+
+                <!-- App Screen Selector (default) -->
+                <div id="redirect-app-screen-group" class="redirect-group">
+                    <select id="admin-notification-redirect-screen" class="form-select w-full">
+                        <option value="">{{ _('No redirect (open notification center)') }}</option>
+                        <optgroup label="{{ _('Main Screens') }}">
+                            <option value="/dashboard">{{ _('Dashboard') }}</option>
+                            <option value="/notifications">{{ _('Notifications') }}</option>
+                            <option value="/settings">{{ _('Settings') }}</option>
+                        </optgroup>
+                        <optgroup label="{{ _('Public Screens') }}">
+                            <option value="/resources">{{ _('Resources') }}</option>
+                            <option value="/indicator-bank">{{ _('Indicator Bank') }}</option>
+                            <option value="/disaggregation-analysis">{{ _('Disaggregation Analysis') }}</option>
+                        </optgroup>
+                        <optgroup label="{{ _('Admin Screens') }}">
+                            <option value="/admin/dashboard">{{ _('Admin Dashboard') }}</option>
+                            <option value="/admin/users">{{ _('User Management') }}</option>
+                            <option value="/admin/templates">{{ _('Templates') }}</option>
+                            <option value="/admin/assignments">{{ _('Assignments') }}</option>
+                            <option value="/admin/documents">{{ _('Document Management') }}</option>
+                            <option value="/admin/translations/manage">{{ _('Translation Management') }}</option>
+                            <option value="/admin/plugins">{{ _('Plugin Management') }}</option>
+                            <option value="/admin/settings">{{ _('System Configuration') }}</option>
+                            <option value="/admin/resources">{{ _('Resources Management') }}</option>
+                            <option value="/admin/organization">{{ _('Organizational Structure') }}</option>
+                            <option value="/admin/indicator_bank">{{ _('Indicator Bank Admin') }}</option>
+                            <option value="/admin/analytics/dashboard">{{ _('User Analytics') }}</option>
+                            <option value="/admin/analytics/audit-trail">{{ _('Audit Trail') }}</option>
+                            <option value="/admin/api-management">{{ _('API Management') }}</option>
+                        </optgroup>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ _('Select an app screen to navigate to when the push notification is clicked.') }}
+                    </p>
+                </div>
+
+                <!-- Custom URL Input (hidden by default) -->
+                <div id="redirect-custom-url-group" class="redirect-group hidden">
+                    <input type="text"
+                           id="admin-notification-redirect-url"
+                           placeholder="{{ _('e.g., https://example.com or /forms/assignment/123') }}"
+                           class="form-input w-full">
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ _('Enter a custom URL or route. Full URLs (http:// or https://) will open in webview.') }}
+                        <br>
+                        {{ _('Examples: https://example.com, /forms/assignment/123') }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button type="button" id="cancel-admin-notification" class="btn btn-secondary">
+                    {{ _('Cancel') }}
+                </button>
+                <button type="submit" id="send-admin-notification" class="btn btn-success">
+                    <i class="fas fa-paper-plane w-4 h-4 inline-block mr-2"></i>
+                    {{ _('Send Notification') }}
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+    // Provide translations to JavaScript
+    window.NOTIFICATION_TRANSLATIONS = {
+        'Mark as Read': {{ _('Mark as read')|tojson }},
+        'Mark as Unread': {{ _('Mark as Unread')|tojson }},
+        'Archive': {{ _('Archive')|tojson }},
+        'View': {{ _('View')|tojson }},
+        'Delete': {{ _('Delete')|tojson }},
+        'No Notifications': {{ _('No Notifications')|tojson }},
+        "You're all caught up!": {{ _("You're all caught up!")|tojson }}
+    };
+
+    // Inject organization branding for JavaScript
+    if (typeof window.ORG_NAME === 'undefined') {
+        window.ORG_NAME = {{ ORG_NAME | tojson }};
+        window.ORG_SHORT_NAME = {{ ORG_SHORT_NAME | tojson }};
+    }
+</script>
+<script src="{{ static_url('js/admin-notifications.js') }}"></script>
+{% endblock %}

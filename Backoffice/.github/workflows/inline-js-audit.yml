@@ -1,0 +1,60 @@
+name: Inline JS Pattern Audit
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Full history for diff checks
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Run inline JS pattern audit
+      working-directory: Backoffice
+      run: |
+        python docs/generate_inline_js_audit.py
+
+    - name: Check for regressions in diff
+      working-directory: Backoffice
+      run: |
+        python scripts/check_no_inline_js_in_diff.py
+      continue-on-error: false
+
+    - name: Upload audit report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: inline-js-audit-report
+        path: Backoffice/docs/INLINE_JS_PATTERN_AUDIT.md
+        retention-days: 30
+
+    - name: Comment PR with audit results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const reportPath = 'Backoffice/docs/INLINE_JS_PATTERN_AUDIT.md';
+          if (fs.existsSync(reportPath)) {
+            const report = fs.readFileSync(reportPath, 'utf8');
+            const summary = report.match(/## Summary.*?## Files flagged/s)?.[0] || 'No summary found';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Inline JS Pattern Audit Results\n\n<details>\n<summary>Click to view audit report</summary>\n\n\`\`\`\n${summary}\n\`\`\`\n\n</details>`
+            });
+          }

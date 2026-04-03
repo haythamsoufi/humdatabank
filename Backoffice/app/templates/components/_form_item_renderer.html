@@ -1,0 +1,268 @@
+{# Reusable Form Item Renderer #}
+{# This macro provides consistent rendering for all form items across sections, subsections, and repeat entries #}
+
+{% macro render_form_item(field, section_display_order='', is_sub_item=false, is_dynamic_indicator=false, container_context='main') %}
+{% set unified_item_id = field.id %}
+{% set unified_item_type = field.item_type if hasattr(field, 'item_type') else 'question' %}
+{% set is_blank_block = unified_item_type == 'blank' %}
+
+{# Determine CSS classes based on context #}
+{% set base_classes = 'form-group form-item-block border p-4 rounded-md bg-white' %}
+{% set context_classes = '' %}
+{% if is_sub_item %}
+    {% set context_classes = 'ml-6 border-l-4 border-l-blue-200 bg-blue-50' %}
+{% elif is_dynamic_indicator %}
+    {% set context_classes = 'border-l-4 border-l-green-300 bg-green-50' %}
+{% endif %}
+
+{% if is_blank_block %}
+    <div class="form-item-block px-2 flex items-center min-h-[2rem]"
+         data-item-id="{{ unified_item_id }}"
+         data-item-type="blank"
+         data-layout-width="{{ field.layout_column_width or 12 }}"
+         data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}">
+        {% if field.display_label %}
+            <div class="text-gray-600 text-sm italic">{{ field.display_label }}</div>
+        {% endif %}
+    </div>
+{% else %}
+    <div class="{{ base_classes }} {{ context_classes }}"
+         data-item-id="{{ unified_item_id }}"
+         data-item-type="{{ unified_item_type }}"
+         {% if unified_item_type == 'plugin' %}data-plugin-type="{{ field.plugin_type }}"{% endif %}
+         data-layout-width="{{ field.layout_column_width or 12 }}"
+         data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
+         {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}>
+
+        {# Call appropriate rendering macro based on item type #}
+        {% if unified_item_type == 'plugin' %}
+            {{ render_plugin_field(field, section_display_order, is_sub_item) }}
+        {% elif unified_item_type == 'document' or unified_item_type == 'document_field' %}
+            {{ render_document_field(field, section_display_order, is_sub_item) }}
+        {% elif unified_item_type == 'matrix' %}
+            {{ render_matrix_field(field, section_display_order, is_sub_item) }}
+        {% else %}
+            {{ render_standard_field(field, section_display_order, is_sub_item, is_dynamic_indicator) }}
+        {% endif %}
+    </div>
+{% endif %}
+{% endmacro %}
+
+{% macro render_plugin_field(field, section_display_order, is_sub_item) %}
+<div class="flex items-start justify-between">
+    <div class="flex-1 pr-2">
+        <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+            {% if is_sub_item %}
+                <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field.display_label }}</span>
+            {% else %}
+                {% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}{{ field.display_label }}
+            {% endif %}
+            {% if field.is_required %}<span class="text-red-500">*</span>{% endif %}
+        </label>
+
+        {% if field.display_definition %}
+            <p class="text-sm text-gray-600 mb-2 leading-relaxed">{{ field.display_definition }}</p>
+        {% endif %}
+
+        {# Plugin field rendering will be handled by plugin system #}
+        {# Generic plugin boot config for the client-side loader. #}
+        {% set _ft_cfg = (plugin_manager.get_field_type_config(field.plugin_type) if plugin_manager is defined and plugin_manager else None) %}
+        {% set _entry_cfg = (_ft_cfg['entry_form_config'] if _ft_cfg and _ft_cfg.get('entry_form_config') else {}) %}
+        <div class="plugin-field-container"
+             data-plugin-type="{{ field.plugin_type }}"
+             data-field-id="{{ field.id }}"
+             data-entry-form-config='{{ (_entry_cfg | tojson | e) if _entry_cfg else "{}" }}'>
+            {# Plugin content will be injected here by the plugin loader #}
+        </div>
+    </div>
+
+    {# Standard data availability controls #}
+    {{ render_data_availability_controls(field) }}
+</div>
+{% endmacro %}
+
+{% macro render_document_field(field, section_display_order, is_sub_item) %}
+{# Document field rendering logic - simplified and consistent #}
+<div class="document-field" data-field-id="{{ field.id }}">
+    <label class="block text-md font-semibold text-gray-800 mb-1">
+        {% if is_sub_item %}
+            <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field.display_label }}</span>
+        {% else %}
+            {% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}{{ field.display_label }}
+        {% endif %}
+        {% if field.is_required %}<span class="text-red-500">*</span>{% endif %}
+    </label>
+
+    {% if field.display_definition %}
+        <p class="text-sm text-gray-600 mb-2">{{ field.display_definition }}</p>
+    {% endif %}
+
+    {# Document upload interface will be rendered here #}
+    <div class="document-upload-container">
+        {# Document upload logic #}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro render_matrix_field(field, section_display_order, is_sub_item) %}
+{# Matrix field rendering logic #}
+<div class="matrix-field" data-field-id="{{ field.id }}">
+    <label class="block text-md font-semibold text-gray-800 mb-1">
+        {% if is_sub_item %}
+            <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field.display_label }}</span>
+        {% else %}
+            {% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}{{ field.display_label }}
+        {% endif %}
+        {% if field.is_required %}<span class="text-red-500">*</span>{% endif %}
+    </label>
+
+    {% if field.display_definition %}
+        <p class="text-sm text-gray-600 mb-2">{{ field.display_definition }}</p>
+    {% endif %}
+
+    {# Matrix table will be rendered here #}
+    <div class="matrix-table-container">
+        {# Matrix table logic #}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro render_standard_field(field, section_display_order, is_sub_item, is_dynamic_indicator) %}
+{# Standard indicator/question field rendering #}
+<div class="flex items-start justify-between">
+    <div class="flex-1 pr-2">
+        <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+            {% if is_sub_item %}
+                <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field.display_label }}</span>
+            {% else %}
+                {% if template_structure.display_order_visible %}{{ section_display_order }}.{{ field.display_order }}. {% endif %}{{ field.display_label }}
+            {% endif %}
+            {% if field.is_required %}<span class="text-red-500">*</span>{% endif %}
+            {% if is_dynamic_indicator %}
+                <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">{{ _('Dynamic') }}</span>
+            {% endif %}
+        </label>
+
+        {% if field.display_definition %}
+            <p class="text-sm text-gray-600 mb-2 leading-relaxed">{{ field.display_definition }}</p>
+        {% endif %}
+
+        {# Field input rendering based on type #}
+        {% if field.field_type == 'number' or field.unit %}
+            {{ render_numeric_field(field) }}
+        {% elif field.field_type == 'select' or field.options %}
+            {{ render_select_field(field) }}
+        {% elif field.field_type == 'checkbox' %}
+            {{ render_checkbox_field(field) }}
+        {% else %}
+            {{ render_text_field(field) }}
+        {% endif %}
+    </div>
+
+    {# Standard data availability controls #}
+    {{ render_data_availability_controls(field) }}
+</div>
+{% endmacro %}
+
+{% macro render_numeric_field(field) %}
+{# Consistent numeric field rendering with disaggregation support #}
+<div class="numeric-field-container">
+    {# Main value input #}
+    <input type="number"
+           id="field-{{ field.id }}"
+           name="field_value[{{ field.id }}]"
+           class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+           {% if field.is_required %}required{% endif %}>
+
+    {# Disaggregation controls if supported #}
+    {% if field.supports_disaggregation %}
+        <div class="disaggregation-controls mt-2">
+            {# Disaggregation mode selection and inputs #}
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro render_select_field(field) %}
+{# Consistent select field rendering #}
+<select id="field-{{ field.id }}"
+        name="field_value[{{ field.id }}]"
+        class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        {% if field.is_required %}required{% endif %}>
+    <option value="">{{ _('Please select...') }}</option>
+    {% for option in field.options %}
+        <option value="{{ option }}">{{ option }}</option>
+    {% endfor %}
+</select>
+{% endmacro %}
+
+{% macro render_checkbox_field(field) %}
+{# Consistent checkbox field rendering #}
+<div class="checkbox-field-container">
+    {% if field.options and field.options|length > 1 %}
+        {# Multi-choice checkboxes #}
+        {% for option in field.options %}
+            <label class="inline-flex items-center mr-4 mb-2">
+                <input type="checkbox"
+                       name="field_value[{{ field.id }}]"
+                       value="{{ option }}"
+                       class="form-checkbox h-4 w-4 text-blue-600">
+                <span class="ml-2 text-sm text-gray-700">{{ option }}</span>
+            </label>
+        {% endfor %}
+    {% else %}
+        {# Yes/No checkboxes #}
+        <div class="flex gap-4">
+            <label class="inline-flex items-center">
+                <input type="checkbox"
+                       name="field_value[{{ field.id }}]"
+                       value="yes"
+                       class="form-checkbox h-4 w-4 text-blue-600">
+                <span class="ml-2 text-sm text-gray-700">{{ _('Yes') }}</span>
+            </label>
+            <label class="inline-flex items-center">
+                <input type="checkbox"
+                       name="field_value[{{ field.id }}]"
+                       value="no"
+                       class="form-checkbox h-4 w-4 text-blue-600">
+                <span class="ml-2 text-sm text-gray-700">{{ _('No') }}</span>
+            </label>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro render_text_field(field) %}
+{# Consistent text field rendering #}
+<input type="text"
+       id="field-{{ field.id }}"
+       name="field_value[{{ field.id }}]"
+       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+       {% if field.is_required %}required{% endif %}>
+{% endmacro %}
+
+{% macro render_data_availability_controls(field) %}
+{# Consistent data availability controls across all field types #}
+{% if field.allow_data_not_available or field.allow_not_applicable %}
+    <div class="flex flex-col gap-2 ml-4">
+        {% if field.allow_data_not_available %}
+            <label class="inline-flex items-center text-sm">
+                <input type="checkbox"
+                       name="field_{{ field.id }}_data_not_available"
+                       value="1"
+                       class="form-checkbox h-4 w-4 text-gray-600 data-availability-checkbox">
+                <span class="ml-2 text-gray-600">{{ _('Data not available') }}</span>
+            </label>
+        {% endif %}
+        {% if field.allow_not_applicable %}
+            <label class="inline-flex items-center text-sm">
+                <input type="checkbox"
+                       name="field_{{ field.id }}_not_applicable"
+                       value="1"
+                       class="form-checkbox h-4 w-4 text-gray-600 data-availability-checkbox">
+                <span class="ml-2 text-gray-600">{{ _('Not applicable') }}</span>
+            </label>
+        {% endif %}
+    </div>
+{% endif %}
+{% endmacro %}

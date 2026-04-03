@@ -1,0 +1,268 @@
+{% from "components/_profile_icon.html" import profile_icon %}
+<!DOCTYPE html>
+<html lang="{{ session.get('language', 'en') }}" dir="{{ 'rtl' if session.get('language') == 'ar' else 'ltr' }}" class="chat-immersive-page-html">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    {% include 'components/_client_console_guard.html' %}
+    <title>{{ (CHATBOT_NAME if CHATBOT_NAME else title) }} - {{ ORG_NAME }}</title>
+    <link rel="icon" href="{{ static_url(((ORGANIZATION_BRANDING or {}).get('organization_favicon_path') or 'favicon.svg')|trim) }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/theme.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/chatbot.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/chat-immersive.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/rtl.css') }}">
+    <script nonce="{{ csp_nonce() }}">
+        window.ORG_NAME = {{ ORG_NAME | tojson }};
+        window.ORG_SHORT_NAME = {{ ORG_SHORT_NAME | tojson }};
+        window.CHATBOT_NAME = {{ (CHATBOT_NAME or '') | tojson }};
+        window.SUPPORTED_LANGUAGES = {{ (SUPPORTED_LANGUAGES or []) | tojson | safe }};
+        window.TRANSLATABLE_LANGUAGES = {{ (TRANSLATABLE_LANGUAGES or []) | tojson | safe }};
+        window.CHAT_WEBSOCKET_ENABLED = {{ 'true' if websocket_enabled|default(true) else 'false' }};
+        // Verbose client-side chat logs (stream lifecycle, inflight restore, etc.).
+        // chatbot.js gates on this; align with CLIENT_CONSOLE_LOGGING so dev can stay quiet when the env flag is off.
+        window.CHATBOT_DEBUG = {{ (config.DEBUG and config.CLIENT_CONSOLE_LOGGING) | tojson }};
+        // Sidebar "Running" state logs are opt-in only.
+        // Enable via URL: ?sidebar_running_debug=1
+        (function () {
+            var fromUrl = typeof window !== 'undefined' && window.location && (new URLSearchParams(window.location.search)).get('sidebar_running_debug') === '1';
+            window.CHAT_SIDEBAR_RUNNING_DEBUG = !!fromUrl;
+        })();
+        window.CHAT_UI_STRINGS = {
+            newChat: {{ _('New chat') | tojson }},
+            loading: {{ _('Loading…') | tojson }},
+            running: {{ _('Running…') | tojson }},
+            conversations: {{ _('Conversations') | tojson }},
+            noConversationsMatch: {{ _('No conversations match your search.') | tojson }},
+            deleteChat: {{ _('Delete chat') | tojson }},
+            deleteConversationConfirm: {{ _('Delete this conversation? This cannot be undone.') | tojson }},
+            deleteConversationTitle: {{ _('Delete conversation?') | tojson }},
+            clearAllConversationsConfirm: {{ _('Delete all conversations? This cannot be undone.') | tojson }},
+            clearAllConversationsTitle: {{ _('Clear all conversations?') | tojson }},
+            clearAll: {{ _('Clear all') | tojson }},
+            clearConversationConfirm: {{ _('Are you sure you want to clear the entire conversation? This action cannot be undone.') | tojson }},
+            clearConversationTitle: {{ _('Clear Conversation?') | tojson }},
+            clear: {{ _('Clear') | tojson }},
+            delete: {{ _('Delete') | tojson }},
+            cancel: {{ _('Cancel') | tojson }},
+            send: {{ _('Send') | tojson }},
+            stop: {{ _('Stop') | tojson }},
+            copy: {{ _('Copy') | tojson }},
+            copied: {{ _('Copied!') | tojson }},
+            like: {{ _('Like') | tojson }},
+            dislike: {{ _('Dislike') | tojson }},
+            feedbackReceived: {{ _('Thanks, feedback received.') | tojson }},
+            feedbackUnavailable: {{ _('Feedback isn\'t available for this message.') | tojson }},
+            feedbackSendFailed: {{ _('Couldn\'t send feedback.') | tojson }},
+            retry: {{ _('Retry') | tojson }},
+            edit: {{ _('Edit') | tojson }},
+            editMessage: {{ _('Edit message') | tojson }},
+            cancelEdit: {{ _('Cancel edit') | tojson }},
+            assistantIsTyping: {{ _('Assistant is typing') | tojson }},
+            preparingQuery: {{ _('Preparing query…') | tojson }},
+            stepsInProgress: {{ _('Steps in progress') | tojson }},
+            endTour: {{ _('End Tour') | tojson }},
+            serverError: {{ _('Server error') | tojson }},
+            requestCancelled: {{ _('Request cancelled') | tojson }},
+            aiPolicyAckRequired: {{ _('Please acknowledge the AI policy to continue.') | tojson }},
+            iUnderstand: {{ _('I understand') | tojson }}
+        };
+    </script>
+    <script src="{{ static_url('js/csrf.js') }}" defer></script>
+    <script src="{{ static_url('js/lib/platform-error-reporter.js') }}"></script>
+    <script src="{{ static_url('js/confirm-dialogs.js') }}"></script>
+    <script src="{{ static_url('js/chatbot-messages.js') }}" defer></script>
+    <script src="{{ static_url('js/chatbot.js') }}" defer></script>
+    <script src="{{ static_url('js/chat-immersive.js') }}" defer></script>
+</head>
+<body class="chat-immersive" data-language="{{ session.get('language', 'en') }}" data-chat-websocket-enabled="{{ 'true' if websocket_enabled|default(true) else 'false' }}">
+    {% if user_is_explicit_beta_tester(current_user) %}
+    <div class="chat-immersive-beta-banner" id="chatImmersiveBetaBanner" role="banner">
+        <i class="fas fa-flask" aria-hidden="true"></i>
+        <span>{{ _("You're a beta tester — thank you for helping us improve this feature!") }}</span>
+        <button type="button" class="chat-immersive-beta-banner-close" id="chatImmersiveBetaBannerClose" aria-label="{{ _('Dismiss') }}" title="{{ _('Dismiss') }}">
+            <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+    </div>
+    <script nonce="{{ csp_nonce() }}">
+    (function () {
+        try {
+            if (localStorage.getItem('ngodb_beta_banner_dismissed') === '1') {
+                var b = document.getElementById('chatImmersiveBetaBanner');
+                if (b) b.style.display = 'none';
+            }
+        } catch (_) {}
+        document.addEventListener('DOMContentLoaded', function () {
+            var btn = document.getElementById('chatImmersiveBetaBannerClose');
+            var banner = document.getElementById('chatImmersiveBetaBanner');
+            if (btn && banner) {
+                btn.addEventListener('click', function () {
+                    banner.style.display = 'none';
+                    try { localStorage.setItem('ngodb_beta_banner_dismissed', '1'); } catch (_) {}
+                });
+            }
+        });
+    })();
+    </script>
+    {% endif %}
+    <div id="chatImmersivePage" class="chat-immersive-page{% if user_is_explicit_beta_tester(current_user) %} chat-immersive-page--has-banner{% endif %}">
+        <!-- Sidebar: ChatGPT-style -->
+        <aside class="chat-immersive-sidebar" id="chatImmersiveSidebar">
+            <div class="chat-immersive-sidebar-header">
+                <a href="{{ url_for('main.dashboard') }}" class="chat-immersive-sidebar-user-link" aria-label="{{ _('Back to app') }}">
+                    {{ profile_icon(current_user, 'sm', false, false, false, 'chat-immersive-sidebar-profile') }}
+                </a>
+                <span class="chat-immersive-sidebar-user-name">{{ current_user.name or current_user.email }}</span>
+                <button type="button" class="chat-immersive-sidebar-toggle chat-immersive-sidebar-toggle-in" id="chatImmersiveSidebarToggle" aria-label="{{ _('Toggle sidebar') }}" title="{{ _('Toggle sidebar') }}">
+                    <i class="fas fa-chevron-left chat-immersive-sidebar-icon-open" aria-hidden="true"></i>
+                    <i class="fas fa-bars chat-immersive-sidebar-icon-closed" aria-hidden="true"></i>
+                </button>
+            </div>
+            <button type="button" class="chat-immersive-new-chat" id="chatImmersiveNewChat" aria-label="{{ _('New chat') }}">
+                <i class="fas fa-plus"></i>
+                <span>{{ _('New chat') }}</span>
+            </button>
+            <div class="chat-immersive-search-wrapper">
+                <div class="chat-immersive-search-inner">
+                    <i class="fas fa-search chat-immersive-search-icon" aria-hidden="true"></i>
+                    <input type="search" id="chatImmersiveSearch" class="chat-immersive-search-input" placeholder="{{ _('Search conversations') }}" autocomplete="off" aria-label="{{ _('Search conversations') }}">
+                </div>
+            </div>
+            <div class="chat-immersive-chat-list-wrapper">
+                <div class="chat-immersive-chat-list-label">{{ _('Conversations') }}</div>
+                <ul class="chat-immersive-chat-list" id="chatImmersiveChatList" role="list">
+                    <!-- Populated by chat-immersive.js -->
+                </ul>
+            </div>
+            <div class="chat-immersive-sidebar-footer">
+                <button type="button" class="chat-immersive-sidebar-link chat-immersive-clear-all" id="chatImmersiveClearAll" aria-label="{{ _('Clear all conversations') }}">
+                    <i class="fas fa-trash"></i>
+                    <span>{{ _('Clear all conversations') }}</span>
+                </button>
+                <a href="{{ url_for('main.dashboard') }}" class="chat-immersive-sidebar-link">
+                    <i class="fas fa-home"></i>
+                    <span>{{ _('Dashboard') }}</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Scrim: fixed overlay above chat, below sidebar (tap to close on mobile) -->
+        <div class="chat-immersive-sidebar-scrim" id="chatImmersiveSidebarScrim" aria-hidden="true" role="presentation"></div>
+
+        <!-- Main chat area -->
+        <main class="chat-immersive-main">
+            <div class="chat-immersive-main-header">
+                <button type="button" id="chatImmersiveSidebarToggleMain" class="chat-immersive-sidebar-toggle chat-immersive-sidebar-toggle-main" aria-label="{{ _('Toggle sidebar') }}" title="{{ _('Toggle sidebar') }}">
+                    <i class="fas fa-chevron-left chat-immersive-sidebar-icon-open" aria-hidden="true"></i>
+                    <i class="fas fa-bars chat-immersive-sidebar-icon-closed" aria-hidden="true"></i>
+                </button>
+                <h2 class="chat-immersive-main-title" id="chatImmersiveCurrentTitle">{{ _('New chat') }}</h2>
+                <div class="chat-immersive-main-spacer"></div>
+                {% if user_is_explicit_beta_tester(current_user) %}
+                <div class="chat-immersive-beta-pill" title="{{ _('You have early beta access — thank you for helping us build this!') }}">
+                    <i class="fas fa-flask" aria-hidden="true"></i>
+                    <span>{{ _('Beta') }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div id="aiChatWidget" class="chat-immersive-widget" role="main" aria-labelledby="chatTitle">
+                <div class="chat-immersive-widget-inner">
+                    <div class="chat-immersive-messages-scroll">
+                        <div class="chat-messages chat-immersive-messages" id="chatMessages">
+                            <!-- Messages populated by chatbot.js -->
+                        </div>
+                        <div class="chat-immersive-welcome-center" id="chatImmersiveWelcomeCenter" aria-hidden="false">
+                            <div class="chat-immersive-welcome-shape" aria-hidden="true">
+                                <i class="fas fa-comments" aria-hidden="true"></i>
+                            </div>
+                            <div class="chat-immersive-welcome-copy">
+                                <p class="chat-immersive-welcome-title">
+                                    {{ CHATBOT_NAME if CHATBOT_NAME else title }}
+                                    {% if user_is_explicit_beta_tester(current_user) %}
+                                    <span class="chat-beta-badge chat-beta-badge--welcome">Beta</span>
+                                    {% endif %}
+                                </p>
+                                <p class="chat-immersive-welcome-text">
+                                    {{ _('How can I help you today?') }}
+                                </p>
+                                <div class="chat-ai-notice-block chat-ai-notice-block-immersive" id="chatAiNoticeBlock" role="note" aria-label="{{ _('AI notice') }}">
+                                    <p class="chat-privacy-notice chat-privacy-notice-immersive">
+                                        {{ _("Don't share sensitive information. We use system traces/telemetry to improve the assistant.") }}
+                                    </p>
+                                    <p class="chat-immersive-disclaimer">
+                                        {{ _('AI can make mistakes. Check important information.') }}
+                                    </p>
+                                    <button type="button" id="chatAiPolicyLinkBtn" class="chat-ai-policy-link-btn">{{ _('View AI policy') }}</button>
+                                    <button type="button" id="chatAiPolicyAckBtn" class="chat-ai-policy-ack-btn">{{ _('I understand') }}</button>
+                                    <script nonce="{{ csp_nonce() }}">try{if(localStorage.getItem('ngodb_chatbot_ai_policy_acknowledged')==='1'){var b=document.getElementById('chatAiPolicyAckBtn');if(b)b.style.display='none';}}catch(_){}</script>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-immersive-quick-prompts" id="chatImmersiveQuickPrompts" aria-label="{{ _('Example prompts') }}">
+                            <p class="chat-immersive-quick-prompts-label">{{ _('Try asking') }}</p>
+                            <div class="chat-immersive-quick-prompts-list">
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('How many volunteers in Bangladesh?') }}">{{ _('How many volunteers in Bangladesh?') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Volunteers in Syria over time') }}">{{ _('Volunteers in Syria over time') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('World heatmap of volunteers by country') }}">{{ _('World heatmap of volunteers by country') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Number of branches in Kenya') }}">{{ _('Number of branches in Kenya') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Staff and local units in Nigeria') }}">{{ _('Staff and local units in Nigeria') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-wrapper-immersive">
+                        <div class="chat-input-container chat-immersive-input-container">
+                            <button type="button" class="chat-immersive-input-add" id="chatImmersiveAddBtn" aria-label="{{ _('Add') }}" title="{{ _('Add') }}" aria-disabled="true" disabled>
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <textarea
+                                class="chat-input chat-immersive-input"
+                                id="chatInput"
+                                dir="auto"
+                                placeholder="{{ _('Ask anything') }}"
+                                maxlength="4000"
+                                autocomplete="off"
+                                rows="1"
+                            ></textarea>
+                            <div id="chatImmersiveSources" class="relative">
+                                <button
+                                    id="chatImmersiveSourcesBtn"
+                                    type="button"
+                                    class="px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-150 ease-in-out rounded-md"
+                                    aria-label="{{ _('Configure data sources') }}"
+                                    title="{{ _('Configure data sources') }}"
+                                >
+                                    <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                                </button>
+                                <div
+                                    id="chatImmersiveSourcesMenu"
+                                    class="hidden absolute right-0 bottom-full mb-2 w-64 bg-white border border-gray-200 rounded-md shadow-lg p-3 z-50"
+                                >
+                                    <div class="text-xs font-semibold text-gray-700 mb-2">{{ _('Use sources:') }}</div>
+                                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                                        <input id="chat-ai-src-historical" type="checkbox" class="rounded border-gray-300" checked>
+                                        <span>{{ _('Databank') }}</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 text-sm text-gray-700 mt-2">
+                                        <input id="chat-ai-src-system" type="checkbox" class="rounded border-gray-300" checked>
+                                        <span>{{ _('System documents') }}</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 text-sm text-gray-700 mt-2">
+                                        <input id="chat-ai-src-upr" type="checkbox" class="rounded border-gray-300" checked>
+                                        <span>{{ _('UPR documents') }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="button" class="chat-send chat-immersive-send" id="chatSendBtn" aria-label="{{ _('Send') }}" title="{{ _('Send') }}" data-send-label="{{ _('Send') }}" data-stop-label="{{ _('Stop') }}">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    {% include 'components/_ai_policy_modal.html' %}
+</body>
+</html>

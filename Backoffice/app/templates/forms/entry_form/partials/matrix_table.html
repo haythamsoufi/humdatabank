@@ -1,0 +1,299 @@
+{# Matrix Table Template #}
+{# This template renders a matrix table for form fields #}
+
+{% set existing_matrix_data = existing_data.get('field_value[' ~ field.id ~ ']') %}
+{% set matrix_is_prefilled = existing_data.get('field_value[' ~ field.id ~ ']_is_prefilled', false) %}
+{% set matrix_is_imputed = existing_data.get('field_value[' ~ field.id ~ ']_is_imputed', false) %}
+{% set matrix_config = field.config.matrix_config if field.config and field.config.matrix_config else (field.config if field.config and field.config.get('rows') else {'type': 'matrix', 'rows': [], 'columns': []}) %}
+{% set is_advanced_mode = matrix_config.get('row_mode') == 'list_library' %}
+{# Use resolved matrix rows if available (with variables replaced), otherwise use original rows #}
+{% set matrix_rows = field._display_matrix_rows if hasattr(field, '_display_matrix_rows') and field._display_matrix_rows else matrix_config.get('rows', []) %}
+{% set matrix_columns = matrix_config.get('columns', []) %}
+{# translation_key is provided by the parent entry form; fallback to session language if not present #}
+{% set _tk = (translation_key if translation_key is defined else (session.get('language','en') or 'en')) %}
+{% if _tk is string %}
+  {% set translation_key = _tk.split('_', 1)[0] %}
+{% else %}
+  {% set translation_key = 'en' %}
+{% endif %}
+{# Localized matrix item label: use variable-resolved translations, then label_translations, then display_label/label #}
+{% set _matrix_label = none %}
+{% if hasattr(field, '_display_label_translations') and field._display_label_translations %}
+    {% set _matrix_label = field._display_label_translations.get(translation_key) or field._display_label_translations.get('en') %}
+{% endif %}
+{% if (not _matrix_label or not _matrix_label|trim) and field.label_translations %}
+    {% set _cand = field.label_translations.get(translation_key) or field.label_translations.get('en') %}
+    {% if _cand and _cand|trim %}{% set _matrix_label = _cand %}{% endif %}
+{% endif %}
+{% if not _matrix_label or not _matrix_label|trim %}
+    {% set _matrix_label = field.display_label or field.label %}
+{% endif %}
+
+<div class="matrix-container disaggregation-inputs{% if matrix_is_prefilled %} bg-yellow-50 border border-yellow-300 rounded-md p-2{% elif matrix_is_imputed %} bg-blue-50 border border-blue-300 rounded-md p-2{% endif %}"
+     data-field-id="{{ field.id }}"
+     data-matrix-config='{{ matrix_config | tojson }}'
+     {% if matrix_is_prefilled %}data-prefilled="true"{% endif %}
+     role="group"
+     aria-labelledby="field-{{ field.id }}"
+     aria-describedby="matrix-error-{{ field.id }}"
+     style="position: relative; overflow: visible;">
+
+    {% if matrix_is_prefilled %}
+        <div class="flex items-center justify-end mb-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800" title="{{ _('This matrix is prefilled') }}">{{ _('Prefilled') }}</span>
+        </div>
+    {% elif matrix_is_imputed %}
+        <div class="flex items-center justify-end mb-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800" title="{{ _('This matrix is imputed') }}">{{ _('Imputed') }}</span>
+        </div>
+    {% endif %}
+
+    {# Error Message Container #}
+    <div id="matrix-error-{{ field.id }}" class="text-red-600 text-sm mt-1 mb-2" style="display: none;" role="alert" aria-live="polite"></div>
+
+    {# Title for Advanced Mode - Removed to prevent duplicate labels #}
+    {# The field label should be handled by the parent form template #}
+
+    {% if (matrix_rows and matrix_columns) or is_advanced_mode %}
+        {% set show_row_totals = matrix_config.get('show_row_totals', true) %}
+        {% set show_column_totals = matrix_config.get('show_column_totals', true) %}
+        <div class="matrix-table-scroll overflow-x-auto">
+        <table class="min-w-full border-collapse border border-gray-300 text-xs"
+               role="table"
+               aria-label="{{ _('Data matrix for') }} {{ field.display_label or field.label }}">
+            <thead>
+                <tr role="row">
+                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-left font-medium text-gray-600"
+                        role="columnheader"
+                        scope="col"
+                        style="min-width: 80px; max-width: 400px;"></th>
+                    {% for column in matrix_columns %}
+                        {% set _col_key = column.name if column.name is defined and column.name else (column if column is string else '') %}
+                        {% set _col_display = _col_key %}
+                        {% if column is mapping and column.name_translations %}
+                            {% set _cand = column.name_translations.get(translation_key) or column.name_translations.get('en') %}
+                            {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
+                        {% endif %}
+                        <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                            role="columnheader"
+                            scope="col"
+                            data-column-type="{{ column.type if column.type else 'number' }}">
+                            {{ _col_display }}
+                        </th>
+                    {% endfor %}
+                    {% if show_row_totals %}
+                        <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                            role="columnheader"
+                            scope="col">{{ _('Total') }}</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody id="matrix-tbody-{{ field.id }}">
+                {% if is_advanced_mode %}
+                    {# Advanced mode: dynamic rows will be added here by JavaScript #}
+                {% else %}
+                    {# Manual mode: render predefined rows #}
+                    {# For manual mode, row label IS the row ID (labels are unique within a matrix) #}
+                    {% for row in matrix_rows %}
+                        <tr role="row" class="matrix-data-row group" data-row-label="{{ row }}" data-row-id="{{ row }}">
+                            <td class="border border-gray-300 font-medium text-gray-700 bg-gray-50"
+                                role="rowheader"
+                                scope="row"
+                                style="min-width: 80px; max-width: 400px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">{{ row }}
+                            </td>
+                            {% for column in matrix_columns %}
+                                {% set outer_loop = loop %}
+                                {% set column_name = column.name if column.name else column %}
+                                {% set column_type = column.type if column.type else 'number' %}
+                                {% set is_variable = column.is_variable if column.is_variable is defined else (column.type == 'variable' if column.type else False) %}
+                                {% set column_variable = column.variable_name if column.variable_name else (column.variable if column.variable else None) %}
+                                {# Use row as ID (standardized: rowId_columnName format) #}
+                                {% set cell_key = row ~ '_' ~ column_name %}
+                                {% set cell_value = existing_matrix_data.get(cell_key, '') if existing_matrix_data else '' %}
+                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' %} text-center{% endif %}" role="gridcell">
+                                    {% if is_variable and column_variable %}
+                                        {# Variable column - type can be number or tick, will be resolved via JavaScript with row entity context #}
+                                        {% set variable_readonly = column.variable_readonly if column.variable_readonly is defined else True %}
+                                        {% set variable_save_value = column.variable_save_value if column.variable_save_value is defined else True %}
+                                        {% if column_type == 'tick' %}
+                                            {# Variable tick column #}
+                                            <input type="checkbox"
+                                                   data-row="{{ row }}"
+                                                   data-row-id="{{ row }}"
+                                                   data-column="{{ column_name }}"
+                                                   data-cell-key="{{ cell_key }}"
+                                                   data-column-type="variable"
+                                                   data-variable-name="{{ column_variable }}"
+                                                   data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
+                                                   data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
+                                                   value="1"
+                                                   {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
+                                                   class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}"
+                                                   aria-label="{{ _('Variable tick for') }} {{ row }} {{ _('and') }} {{ column_name }}"
+                                                   {% if variable_readonly %}readonly{% endif %}
+                                                   {% if not can_edit %}disabled{% endif %}>
+                                        {% else %}
+                                            {# Variable number column #}
+                                            <input type="number"
+                                                   data-row="{{ row }}"
+                                                   data-row-id="{{ row }}"
+                                                   data-column="{{ column_name }}"
+                                                   data-cell-key="{{ cell_key }}"
+                                                   data-column-type="variable"
+                                                   data-variable-name="{{ column_variable }}"
+                                                   data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
+                                                   data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
+                                                   value="{{ cell_value }}"
+                                                   class="w-full px-2 py-1 border-0 {% if variable_readonly %}bg-gray-100{% endif %} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                   aria-label="{{ _('Variable value for') }} {{ row }} {{ _('and') }} {{ column_name }}"
+                                                   min="0"
+                                                   step="0.01"
+                                                   {% if variable_readonly %}readonly{% endif %}
+                                                   {% if not can_edit %}disabled{% endif %}>
+                                        {% endif %}
+                                    {% elif column_type == 'tick' %}
+                                        <input type="checkbox"
+                                               data-row="{{ row }}"
+                                               data-row-id="{{ row }}"
+                                               data-column="{{ column_name }}"
+                                               data-cell-key="{{ cell_key }}"
+                                               data-column-type="tick"
+                                               value="1"
+                                               {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
+                                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto"
+                                               aria-label="{{ _('Tick for') }} {{ row }} {{ _('and') }} {{ column_name }}"
+                                               {% if not can_edit %}disabled{% endif %}>
+                                    {% else %}
+                                        <input type="number"
+                                               data-row="{{ row }}"
+                                               data-row-id="{{ row }}"
+                                               data-column="{{ column_name }}"
+                                               data-cell-key="{{ cell_key }}"
+                                               data-column-type="number"
+                                               value="{{ cell_value }}"
+                                               class="w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                               aria-label="{{ _('Value for') }} {{ row }} {{ _('and') }} {{ column_name }}"
+                                               min="0"
+                                               step="0.01"
+                                               {% if not can_edit %}disabled{% endif %}>
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                            {% if show_row_totals %}
+                                <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
+                                    <span class="matrix-row-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
+                                          data-row="{{ row }}"
+                                          data-row-id="{{ row }}"
+                                          aria-label="{{ _('Total for row') }} {{ row }}">0</span>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                {% if show_column_totals %}
+                    <tr role="row">
+                        <td class="border border-gray-300 bg-gray-100 font-medium text-gray-700"
+                            role="rowheader"
+                            scope="row">{{ _('Total') }}</td>
+                        {% for column in matrix_columns %}
+                            {% set column_name = column.name if column.name else column %}
+                            <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
+                                <span class="matrix-column-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
+                                      data-column="{{ column_name }}"
+                                      data-column-type="{{ column.type if column.type else 'number' }}"
+                                      aria-label="{{ _('Total for column') }} {{ column_name }}">0</span>
+                            </td>
+                        {% endfor %}
+                        {% if show_row_totals %}
+                            <td class="border border-gray-300 px-2 py-1 bg-orange-100" role="gridcell">
+                                <span class="matrix-grand-total inline-block w-full px-2 py-1 text-center text-sm font-bold"
+                                      data-field-id="{{ field.id }}"
+                                      aria-label="{{ _('Grand total for matrix') }} {{ _matrix_label }}">0</span>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endif %}
+
+                {# Add row search interface as last row for advanced mode #}
+                {% if is_advanced_mode and can_edit %}
+                    <tr class="matrix-add-row-interface">
+                        <td class="border border-gray-300 px-2 py-2 bg-blue-50" colspan="{{ matrix_columns|length + (1 if show_row_totals else 0) + 1 }}">
+                            <div class="flex items-center space-x-2">
+                                <div class="flex-1">
+                                    <input type="text"
+                                           id="matrix-row-search-{{ field.id }}"
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="{{ matrix_config.get('search_placeholder', 'Search and select a row to add...') }}"
+                                           autocomplete="off"
+                                           data-field-id="{{ field.id }}"
+                                           data-lookup-list-id="{{ field.lookup_list_id or '' }}"
+                                           data-display-column="{{ field.list_display_column or '' }}"
+                                           data-filters='{{ field.list_filters_json or "[]" }}'>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    {% else %}
+        <div class="text-gray-500 italic text-sm" role="alert">
+            {{ _('Matrix configuration not available. Please contact the administrator.') }}
+        </div>
+    {% endif %}
+
+    {# Search results dropdown — position: absolute within this container so it grows page height rather than overlaying content #}
+    {% if is_advanced_mode and can_edit %}
+        <div id="matrix-search-results-{{ field.id }}"
+             class="absolute bg-white border border-gray-200 rounded-md shadow-lg z-50 hidden"
+             style="min-width: 250px;">
+            <div class="p-3 text-gray-500 text-sm text-center">
+                Type to search for rows to add...
+            </div>
+        </div>
+    {% endif %}
+
+    {# Hidden field to store matrix data as JSON #}
+    <input type="hidden"
+           name="field_value[{{ field.id }}]"
+           id="matrix-data-{{ field.id }}"
+           value='{{ existing_matrix_data | tojson if existing_matrix_data else "" }}'>
+</div>
+
+{# Live region for announcing total updates to screen readers #}
+<div id="matrix-totals-announce-{{ field.id }}"
+     class="sr-only"
+     aria-live="polite"
+     aria-atomic="true"></div>
+
+
+{# Data Availability Options for Matrix #}
+{% if can_edit and (field.config.allow_data_not_available or field.config.allow_not_applicable) %}
+    <div class="mt-3 flex items-center justify-end gap-4 text-sm" role="group" aria-label="{{ _('Data availability options') }}">
+        {% if field.config.allow_data_not_available %}
+            <label class="inline-flex items-center">
+                <input type="checkbox"
+                       name="matrix_{{ field.id }}_data_not_available"
+                       value="1"
+                       class="form-checkbox h-4 w-4 text-gray-500 border-gray-300 rounded focus:ring-gray-500"
+                       {% if existing_data.get('matrix_' ~ field.id ~ '_data_not_available') %}checked{% endif %}
+                       {% if not can_edit %}disabled{% endif %}
+                       aria-describedby="matrix-description-{{ field.id }}">
+                <span class="ml-2 text-gray-600 font-medium">{{ _('Applicable but data not available') }}</span>
+            </label>
+        {% endif %}
+        {% if field.config.allow_not_applicable %}
+            <label class="inline-flex items-center">
+                <input type="checkbox"
+                       name="matrix_{{ field.id }}_not_applicable"
+                       value="1"
+                       class="form-checkbox h-4 w-4 text-gray-500 border-gray-300 rounded focus:ring-gray-500"
+                       {% if existing_data.get('matrix_' ~ field.id ~ '_not_applicable') %}checked{% endif %}
+                       {% if not can_edit %}disabled{% endif %}
+                       aria-describedby="matrix-description-{{ field.id }}">
+                <span class="ml-2 text-gray-600 font-medium">{{ _('Not applicable') }}</span>
+            </label>
+        {% endif %}
+    </div>
+{% endif %}

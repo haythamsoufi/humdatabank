@@ -1,0 +1,273 @@
+{# Reusable Countries component: table + modal + JS. Uses AG Grid for data display. #}
+
+<div id="countriesComponentRoot"
+     data-error-loading="{{ _('Error loading country data. Please try again.') | e }}"
+     data-validation-failed="{{ _('Validation failed: ') | e }}"
+     data-error-prefix="{{ _('Error: ') | e }}"
+     data-generic-error="{{ _('An error occurred. Please try again.') | e }}">
+
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+        {% if countries %}
+            <div id="countries-table-container" class="overflow-x-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('Countries') }}</h3>
+                    <div class="flex gap-2 items-center">
+                        <div id="countries-column-visibility-button-placeholder"></div>
+                        {% if can_manage_countries %}
+                            <button type="button" id="countries-excel-btn" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-file-excel mr-2"></i>
+                                {{ _('Excel') }}
+                            </button>
+                            <button id="auto-translate-all-countries-btn" class="btn btn-warning">
+                                <i class="fas fa-language mr-2"></i>
+                                {{ _('Auto Translate All') }}
+                            </button>
+                            <a href="{{ url_for(new_country_endpoint_name if new_country_endpoint_name is defined else 'system_admin.new_country') }}"
+                               class="btn btn-success">
+                                <i class="fas fa-plus mr-2"></i>
+                                {{ _('Add New Country') }}
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="countriesGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="countries-column-visibility-button-placeholder"></div>
+            </div>
+        {% else %}
+            <p class="text-gray-700">{{ _('No countries found.') }}</p>
+        {% endif %}
+    </div>
+
+    {% if can_manage_countries %}
+    {# Edit Country Modal #}
+    <div id="editCountryModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Edit Country') }}</h3>
+                            <form id="editCountryForm" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="mb-6">
+                                    <h4 class="text-md font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">{{ _('Basic Information') }}</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="edit_name" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Country Name') }}</label>
+                                            <input type="text" id="edit_name" name="name" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                        </div>
+                                        <div>
+                                            <label for="edit_short_name" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Short Name') }}</label>
+                                            <input type="text" id="edit_short_name" name="short_name" maxlength="50" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                        </div>
+                                        <div>
+                                            <label for="edit_iso3" class="block text-sm font-medium text-gray-700 mb-1">{{ _('ISO3 Code') }}</label>
+                                            <input type="text" id="edit_iso3" name="iso3" required maxlength="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                        </div>
+                                        <div>
+                                            <label for="edit_status" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Status') }}</label>
+                                            <select id="edit_status" name="status" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                                <option value="Active">{{ _('Active') }}</option>
+                                                <option value="Inactive">{{ _('Inactive') }}</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="edit_preferred_language" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Preferred Language') }}</label>
+                                            <select id="edit_preferred_language" name="preferred_language" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                                {% for code in SUPPORTED_LANGUAGES %}
+                                                    <option value="{{ code }}">{{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="edit_currency_code" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Currency Code') }}</label>
+                                            <input type="text" id="edit_currency_code" name="currency_code" maxlength="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-6">
+                                    <h4 class="text-md font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">{{ _('Country Names in Other Languages') }}</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label for="edit_name_{{ code }}" class="block text-sm font-medium text-gray-700 mb-1">
+                                                {{ _('Country Name') }} ({{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }})
+                                            </label>
+                                            <input type="text"
+                                                   id="edit_name_{{ code }}"
+                                                   name="name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="shadow-sm focus:ring-blue-500 focus-border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" form="editCountryForm" class="btn btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm">
+                        {{ _('Save Changes') }}
+                    </button>
+                    <button type="button" class="modal-close mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        {{ _('Cancel') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {# Countries Excel Import/Export Modal #}
+    <div id="countriesExcelModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Countries – Excel') }}</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 mb-2">{{ _('Export') }}</p>
+                            <a href="{{ url_for('organization.export_countries') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-download mr-2"></i>
+                                {{ _('Download as Excel') }}
+                            </a>
+                        </div>
+                        <hr class="border-gray-200">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 mb-2">{{ _('Import') }}</p>
+                            <form method="POST" action="{{ url_for('organization.import_countries') }}" enctype="multipart/form-data" id="countriesImportForm">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="mb-3">
+                                    <label for="countries-excel-file" class="block text-sm text-gray-600 mb-1">{{ _('Excel file') }}</label>
+                                    <input type="file" id="countries-excel-file" name="excel_file" accept=".xlsx,.xls" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                </div>
+                                <div class="flex items-center mb-3">
+                                    <input type="checkbox" id="countries-overwrite-existing" name="overwrite_existing" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="countries-overwrite-existing" class="ml-2 block text-sm text-gray-700">{{ _('Overwrite existing (match by ISO3)') }}</label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-upload mr-2"></i>
+                                    {{ _('Import') }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="countries-excel-modal-close inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        {{ _('Close') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .status-badge { display: inline-flex !important; align-items: center !important; padding: 0.25rem 0.625rem !important; border-radius: 9999px !important; font-size: 0.75rem !important; font-weight: 500 !important; line-height: 1 !important; }
+    .status-badge[data-status="active"] { background-color: #dcfce7 !important; color: #166534 !important; }
+    .status-badge[data-status="active"]::before { content: "✓ " !important; font-weight: bold !important; margin-right: 0.25rem !important; }
+    .status-badge[data-status="inactive"], .status-badge[data-status="dissolved"] { background-color: #fef2f2 !important; color: #991b1b !important; }
+    .status-badge[data-status="inactive"]::before, .status-badge[data-status="dissolved"]::before { content: "✕ " !important; font-weight: bold !important; margin-right: 0.25rem !important; }
+    .status-badge[data-status="suspended"] { background-color: #fef3c7 !important; color: #92400e !important; }
+    .status-badge[data-status="suspended"]::before { content: "⚠ " !important; font-weight: bold !important; margin-right: 0.25rem !important; }
+    #countriesTable { width: 100%; }
+    .sector-items { display: flex; flex-wrap: wrap; }
+    .sector-items > div { margin-right: 0.25rem; margin-bottom: 0.25rem; }
+    /* Column width controls to prevent squeezing */
+    th.col-id, td.col-id { min-width: 100px; white-space: nowrap; }
+    th.col-name, td.col-name { min-width: 280px; }
+    th.col-iso3, td.col-iso3 { min-width: 120px; white-space: nowrap; text-transform: uppercase; }
+    th.col-status, td.col-status { min-width: 140px; white-space: nowrap; text-align: center; }
+    th.col-pref-lang, td.col-pref-lang { min-width: 220px; }
+    th.col-currency, td.col-currency { min-width: 140px; white-space: nowrap; text-transform: uppercase; }
+    th[class^="col-name-"], td[class^="col-name-"] { min-width: 250px; }
+    th.col-actions, td.col-actions { min-width: 120px; text-align: center; }
+</style>
+
+<script nonce="{{ csp_nonce() }}">
+    $(document).ready(function() {
+        var container = $('#countriesComponentRoot');
+        var errorLoadingData = container.data('error-loading');
+        var validationFailed = container.data('validation-failed');
+        var errorPrefix = container.data('error-prefix');
+        var genericError = container.data('generic-error');
+
+        // Table is now always visible, no initialization needed
+        window.__clientLog && window.__clientLog('[DEBUG] Countries component loaded. Table container should be visible.');
+
+        var editModal = $('#editCountryModal');
+        var editForm = $('#editCountryForm');
+
+        {% if can_manage_countries %}
+        $(document).on('click', '.edit-country-btn', function() {
+            var countryId = $(this).data('country-id');
+            $.get('/admin/countries/' + countryId + '/data')
+                .done(function(data) {
+                    $('#edit_name').val(data.name);
+                    $('#edit_short_name').val(data.short_name || '');
+                    $('#edit_iso3').val(data.iso3);
+                    $('#edit_status').val(data.status);
+                    $('#edit_preferred_language').val(data.preferred_language);
+                    $('#edit_currency_code').val(data.currency_code);
+                    // Populate dynamic name translations
+                    var trans = (data && data.name_translations) ? data.name_translations : {};
+                    {% for code in TRANSLATABLE_LANGUAGES %}
+                    $('#edit_name_{{ code }}').val(trans['{{ code }}'] || '');
+                    {% endfor %}
+                    editForm.attr('action', '/admin/countries/edit/' + countryId);
+                    editModal.removeClass('hidden');
+                })
+                .fail(function() { if (window.showAlert) window.showAlert(errorLoadingData, 'error'); else console.error(errorLoadingData); });
+        });
+
+        $('.modal-close').on('click', function() { editModal.addClass('hidden'); });
+
+        $('#countries-excel-btn').on('click', function() { $('#countriesExcelModal').removeClass('hidden'); });
+        $('.countries-excel-modal-close').on('click', function() { $('#countriesExcelModal').addClass('hidden'); });
+
+        editForm.on('submit', function(e) {
+            e.preventDefault();
+            var formData = $(this).serialize();
+            var actionUrl = $(this).attr('action');
+            var submitBtn = $(this).find('button[type="submit"]');
+
+            // Prevent double submission
+            if (submitBtn.prop('disabled')) return;
+            submitBtn.prop('disabled', true);
+            submitBtn.addClass('opacity-50 cursor-not-allowed');
+            var originalText = submitBtn.html();
+            submitBtn.html('<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Saving...") }}');
+
+            $.post(actionUrl, formData)
+                .done(function(response) {
+                    if (response.success) { location.reload(); }
+                    else {
+                        if (window.showAlert) window.showAlert(validationFailed + response.message, 'error'); else console.error(validationFailed, response.message);
+                        submitBtn.prop('disabled', false);
+                        submitBtn.removeClass('opacity-50 cursor-not-allowed');
+                        submitBtn.html(originalText);
+                    }
+                })
+                .fail(function(xhr) {
+                    var response = xhr.responseJSON;
+                    if (response && response.message) { if (window.showAlert) window.showAlert(errorPrefix + response.message, 'error'); else console.error(errorPrefix, response.message); }
+                    else { if (window.showAlert) window.showAlert(genericError, 'error'); else console.error(genericError); }
+                    submitBtn.prop('disabled', false);
+                    submitBtn.removeClass('opacity-50 cursor-not-allowed');
+                    submitBtn.html(originalText);
+                });
+        });
+        {% endif %}
+    });
+</script>

@@ -1,0 +1,194 @@
+name: Build Android
+
+on:
+  workflow_dispatch:  # Manual trigger only - auto-run disabled
+    inputs:
+      environment:
+        description: 'Build environment (controls app behavior, e.g., test login buttons)'
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+        default: 'production'
+      backend_url:
+        description: 'Backend URL'
+        required: true
+        type: choice
+        options:
+          - http://localhost:5000
+          - http://10.0.2.2:5000
+          - https://backoffice-databank.fly.dev
+          - https://your-backoffice.example.org
+        default: 'https://backoffice-databank.fly.dev'
+      frontend_url:
+        description: 'Frontend/Website URL'
+        required: true
+        type: choice
+        options:
+          - http://localhost:3000
+          - http://10.0.2.2:3000
+          - https://website-databank.fly.dev
+        default: 'https://website-databank.fly.dev'
+      organization_config:
+        description: 'Organization configuration (determines branding and app name)'
+        required: true
+        type: choice
+        options:
+          - ''
+          - ifrc
+        default: ''
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'  # Flutter version with Dart 3.8.0+ for flutter_lints 6.0.0
+          channel: 'stable'
+          cache: true
+
+      - name: Determine Flutter project path
+        id: flutter_path
+        run: |
+          if [ -f "MobileApp/pubspec.yaml" ]; then
+            echo "path=MobileApp" >> $GITHUB_OUTPUT
+          elif [ -f "pubspec.yaml" ]; then
+            echo "path=." >> $GITHUB_OUTPUT
+          else
+            echo "Error: Could not find Flutter project"
+            exit 1
+          fi
+
+      - name: Create .env file with configuration
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          # Create .env file with backend and frontend URLs (independent of environment flag)
+          echo "BACKEND_URL=${{ inputs.backend_url }}" > .env
+          echo "FRONTEND_URL=${{ inputs.frontend_url }}" >> .env
+          echo "Created .env file with:"
+          echo "  BACKEND_URL=${{ inputs.backend_url }}"
+          echo "  FRONTEND_URL=${{ inputs.frontend_url }}"
+
+      - name: Get Flutter dependencies
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: flutter pub get
+
+      - name: Configure alternate package name and app name
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          # Change package name to allow side-by-side installation
+          # Original: com.ifrc.ifrcDatabankApp
+          # New: com.ifrc.ifrcDatabankApp.ci
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/applicationId "com\.ifrc\.ifrcDatabankApp"/applicationId "com.ifrc.ifrcDatabankApp.ci"/g' android/app/build.gradle
+          fi
+
+          # Change app display name to distinguish from other version
+          # This allows users to identify which version is which on their device
+          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+            # Update app label if android:label exists
+            sed -i 's/android:label="[^"]*"/android:label="IFRC Data (CI)"/g' android/app/src/main/AndroidManifest.xml || true
+            # If android:label doesn't exist, we'll add it to the application tag
+            if ! grep -q 'android:label' android/app/src/main/AndroidManifest.xml; then
+              sed -i 's/<application\([^>]*\)>/<application android:label="NGO Databank (CI)"\1>/g' android/app/src/main/AndroidManifest.xml
+            fi
+          fi
+
+      - name: Build APK (release)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          # Build with environment flag and API keys passed via --dart-define flags from GitHub secrets
+          # Backend and frontend URLs are configured via .env file (created in previous step)
+          # Environment flag controls app behavior (e.g., test login buttons)
+          if [ "${{ inputs.environment }}" == "production" ]; then
+            ENV_FLAG="PRODUCTION=true"
+          elif [ "${{ inputs.environment }}" == "staging" ]; then
+            ENV_FLAG="STAGING=true"
+          else
+            ENV_FLAG="DEVELOPMENT=true"
+          fi
+
+          # Build with organization config if specified
+          ORG_CONFIG=""
+          if [ -n "${{ inputs.organization_config }}" ]; then
+            ORG_CONFIG="--dart-define=ORGANIZATION_CONFIG=${{ inputs.organization_config }}"
+          fi
+
+          flutter build apk --release \
+            --dart-define=$ENV_FLAG \
+            $ORG_CONFIG \
+            --dart-define=API_KEY="${{ secrets.API_KEY }}" \
+            --dart-define=MOBILE_NOTIFICATION_API_KEY="${{ secrets.MOBILE_NOTIFICATION_API_KEY }}" \
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+
+      - name: Build App Bundle (optional, for Play Store)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          # Build with environment flag and API keys passed via --dart-define flags from GitHub secrets
+          # Backend and frontend URLs are configured via .env file (created in previous step)
+          # Environment flag controls app behavior (e.g., test login buttons)
+          if [ "${{ inputs.environment }}" == "production" ]; then
+            ENV_FLAG="PRODUCTION=true"
+          elif [ "${{ inputs.environment }}" == "staging" ]; then
+            ENV_FLAG="STAGING=true"
+          else
+            ENV_FLAG="DEVELOPMENT=true"
+          fi
+
+          # Build with organization config if specified
+          ORG_CONFIG=""
+          if [ -n "${{ inputs.organization_config }}" ]; then
+            ORG_CONFIG="--dart-define=ORGANIZATION_CONFIG=${{ inputs.organization_config }}"
+          fi
+
+          flutter build appbundle --release \
+            --dart-define=$ENV_FLAG \
+            $ORG_CONFIG \
+            --dart-define=API_KEY="${{ secrets.API_KEY }}" \
+            --dart-define=MOBILE_NOTIFICATION_API_KEY="${{ secrets.MOBILE_NOTIFICATION_API_KEY }}" \
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+        continue-on-error: true  # Don't fail if bundle build fails
+
+      - name: Archive Android build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-ci
+          path: |
+            ${{ steps.flutter_path.outputs.path }}/build/app/outputs/flutter-apk/*.apk
+            ${{ steps.flutter_path.outputs.path }}/build/app/outputs/bundle/release/*.aab
+          retention-days: 30
+
+      # Optional: Build signed APK (requires keystore)
+      # Uncomment and configure the following steps if you have signing keys
+      # - name: Setup Java
+      #   uses: actions/setup-java@v4
+      #   with:
+      #     distribution: 'temurin'
+      #     java-version: '17'
+      #
+      # - name: Create keystore properties
+      #   run: |
+      #     echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #     echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #     echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #     echo "storeFile=${{ secrets.ANDROID_KEYSTORE_FILE }}" >> ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #
+      # - name: Build signed APK
+      #   working-directory: ${{ steps.flutter_path.outputs.path }}
+      #   run: |
+      #     flutter build apk --release --dart-define=PRODUCTION=true
+      #
+      # - name: Upload signed APK
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: android-apk-signed
+      #     path: ${{ steps.flutter_path.outputs.path }}/build/app/outputs/flutter-apk/*.apk
+      #     retention-days: 30

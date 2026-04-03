@@ -1,0 +1,754 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Governance Dashboard') }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style nonce="{{ csp_style_nonce() }}">
+/* Sticky side-nav */
+#gov-sidenav { position: sticky; top: 72px; max-height: calc(100vh - 90px); overflow-y: auto; }
+#gov-sidenav a { display: block; padding: 6px 12px; border-left: 3px solid transparent; color: #6b7280; font-size: 0.82rem; transition: all .15s; }
+#gov-sidenav a.active, #gov-sidenav a:hover { border-color: #1d4ed8; color: #1d4ed8; background: #eff6ff; }
+
+/* Health score ring */
+.score-ring { transform: rotate(-90deg); transform-origin: center; transform-box: fill-box; }
+.score-ring-track { fill: none; stroke: #e5e7eb; stroke-width: 10; }
+.score-ring-fill  { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+
+/* Severity badges */
+.badge { display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:.72rem;font-weight:600; }
+.badge-critical  { background:#fee2e2;color:#991b1b; }
+.badge-high      { background:#ffedd5;color:#9a3412; }
+.badge-medium    { background:#fef9c3;color:#854d0e; }
+.badge-warning   { background:#fff7ed;color:#c2410c; }
+.badge-info      { background:#e0f2fe;color:#0369a1; }
+.badge-ok        { background:#dcfce7;color:#166534; }
+
+/* Progress bar */
+.pbar { height: 8px; border-radius: 4px; overflow: hidden; background: #e5e7eb; }
+.pbar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+
+/* Collapsible flag tables */
+.flag-toggle { cursor:pointer; user-select:none; }
+.flag-table  { display:none; }
+.flag-table.open { display:table; }
+
+/* Section anchors scroll margin */
+section[id] { scroll-margin-top: 80px; }
+
+/* KPI strip */
+.kpi-card { border-top: 4px solid; }
+.kpi-ok    { border-color: #22c55e; }
+.kpi-warn  { border-color: #f59e0b; }
+.kpi-bad   { border-color: #ef4444; }
+
+/* Governance tooltips */
+.gov-tip-icon { color: #d1d5db; transition: color .15s; }
+.gov-tip-icon--red { color: #fca5a5; font-size: 12px; }
+.group:hover > .gov-tip-icon { color: #6b7280; }
+.group:hover > .gov-tip-icon--red { color: #ef4444; }
+.group:hover > .gov-tooltip { opacity: 1 !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Governance Dashboard'),
+    icon='fas fa-balance-scale',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Governance')}
+    ]
+) }}
+
+{% set hs  = metrics.health_score %}
+{% set o   = metrics.ownership %}
+{% set ac  = metrics.access_control %}
+{% set q   = metrics.quality %}
+{% set c   = metrics.compliance %}
+{% set m   = metrics.metadata %}
+
+{# ─── Page layout ───────────────────────────────────────────────────────── #}
+<div class="flex gap-6">
+
+  {# ─── Sticky nav ─────────────────────────────────────────────────────── #}
+  <nav id="gov-sidenav" class="hidden lg:block w-44 shrink-0 text-sm">
+    <p class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Sections</p>
+    <a href="#hero">① Health Score</a>
+    <a href="#kpi-strip">② KPI Strip</a>
+    <a href="#ownership">③ Data Ownership</a>
+    <a href="#access">④ Access Control</a>
+    <a href="#quality">⑤ Quality</a>
+    <a href="#compliance">⑥ Compliance</a>
+    <a href="#metadata">⑦ Metadata</a>
+    <a href="#policies">⑧ Policies</a>
+  </nav>
+
+  {# ─── Main content ───────────────────────────────────────────────────── #}
+  <div class="flex-1 min-w-0 space-y-8">
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ① Hero: Health Score + quote                                       #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="hero">
+      <div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex flex-col md:flex-row items-center gap-6">
+
+        {# Score ring #}
+        {% set score = hs.score | default(0) | int %}
+        {% set circ = 282 %}
+        {% set offset = circ - (score / 100 * circ) %}
+        {% set ring_color = '#22c55e' if score >= 75 else '#f59e0b' if score >= 50 else '#ef4444' %}
+        <div class="flex flex-col items-center shrink-0">
+          <svg width="140" height="140" viewBox="0 0 100 100">
+            <circle class="score-ring-track" cx="50" cy="50" r="45"/>
+            <circle class="score-ring score-ring-fill" cx="50" cy="50" r="45"
+                    stroke="{{ ring_color }}"
+                    stroke-dasharray="{{ circ }}"
+                    stroke-dashoffset="{{ offset }}"/>
+            <text x="50" y="44" text-anchor="middle" font-size="22" font-weight="bold" fill="{{ ring_color }}" dominant-baseline="middle">{{ score }}</text>
+            <text x="50" y="62" text-anchor="middle" font-size="11" fill="#6b7280">Grade {{ hs.grade | default('?') }}</text>
+          </svg>
+          <p class="text-xs text-gray-400 mt-1">Governance Health Score</p>
+        </div>
+
+        {# Quote + pillar bars #}
+        <div class="flex-1">
+          <blockquote class="text-blue-800 font-semibold text-lg mb-1">
+            "Governance without management = speed limits with no highway."
+          </blockquote>
+          <p class="text-gray-500 text-sm mb-4">The system enforces governance by design — ownership is required before data flows, access is scoped through RBAC, quality gates block incomplete submissions, and this dashboard surfaces every violation so nothing slips through unchecked.</p>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            {% set pillar_scores = hs.pillar_scores | default({}) %}
+            {% for pillar, label in [
+              ('ownership','Ownership'),('access_control','Access Control'),
+              ('quality','Quality'),('compliance','Compliance'),
+              ('metadata','Metadata')
+            ] %}
+            {% set ps = pillar_scores.get(pillar, 0) | round(0) | int %}
+            {% set bar_color = 'bg-green-500' if ps >= 75 else 'bg-yellow-400' if ps >= 50 else 'bg-red-500' %}
+            <div>
+              <div class="flex justify-between mb-0.5">
+                <span class="text-gray-600">{{ label }}</span>
+                <span class="font-semibold">{{ ps }}%</span>
+              </div>
+              <div class="pbar"><div class="pbar-fill {{ bar_color }}" style="width:{{ ps }}%"></div></div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ② KPI Strip (7 pillars, one card each)                             #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="kpi-strip">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+
+        {% macro kpi(label, value, icon, cls='kpi-warn', tooltip=None) %}
+        <div class="bg-white rounded shadow border border-gray-200 p-3 kpi-card {{ cls }}">
+          <div class="text-2xl font-bold text-gray-800">{{ value }}</div>
+          <div class="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+            <i class="{{ icon }} text-gray-400"></i>{{ label }}
+            {% if tooltip %}
+            <span style="position:relative;cursor:help;margin-left:2px" class="group">
+              <i class="fas fa-info-circle gov-tip-icon"></i>
+              <span style="pointer-events:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;width:300px;border-radius:6px;background:#1f2937;padding:8px 12px;font-size:12px;line-height:1.5;color:#fff;text-align:center;opacity:0;transition:opacity .15s;box-shadow:0 4px 12px rgba(0,0,0,.25);z-index:50" class="gov-tooltip">{{ tooltip }}</span>
+            </span>
+            {% endif %}
+          </div>
+        </div>
+        {% endmacro %}
+
+        {% set fp_pct = ((o.countries_with_focal_point / o.total_countries * 100) | round(0) | int) if o.total_countries else 0 %}
+        {{ kpi('Focal Point %', fp_pct ~ '%', 'fas fa-flag', 'kpi-ok' if fp_pct >= 80 else 'kpi-bad') }}
+        {{ kpi('Active without Owner', o.active_assignments_without_data_owner | default(0), 'fas fa-user-slash', 'kpi-ok' if o.active_assignments_without_data_owner == 0 else 'kpi-bad') }}
+        {{ kpi('Ghost Access', ac.inactive_users_with_role | default(0), 'fas fa-ghost', 'kpi-ok' if ac.inactive_users_with_role == 0 else 'kpi-bad', tooltip='Deactivated users who still hold RBAC roles. Their access should be revoked to prevent unauthorized data exposure.') }}
+        {{ kpi('Submission Rate', q.submission_rate_pct | default(0) | round(0) | int ~ '%', 'fas fa-paper-plane', 'kpi-ok' if q.submission_rate_pct >= 70 else 'kpi-bad') }}
+        {{ kpi('Compliance', c.compliance_rate_pct | default(0) | round(0) | int ~ '%', 'fas fa-file-contract', 'kpi-ok' if c.compliance_rate_pct >= 70 else 'kpi-bad') }}
+      </div>
+    </section>
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ③ Data Ownership                                                   #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="ownership">
+      <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fas fa-user-lock text-blue-500"></i>
+          <h2 class="font-semibold text-gray-800 text-lg">Data Ownership</h2>
+        </div>
+        <div class="p-6 space-y-5">
+
+          {# Sub-row macro #}
+          {% macro ownership_row(label, has, total, flag_key, flag_list, severity='warning', manage_url=None) %}
+          {% set pct = (has / total * 100) | round(0) | int if total else 0 %}
+          {% set gap_count = total - has %}
+          {% set bar_color = 'bg-green-500' if pct >= 80 else 'bg-yellow-400' if pct >= 50 else 'bg-red-500' %}
+          <div>
+            <div class="flex items-center justify-between mb-1 text-sm">
+              <span class="font-medium text-gray-700">{{ label }}</span>
+              <span class="font-semibold text-gray-800">{{ has }}/{{ total }} ({{ pct }}%)</span>
+            </div>
+            <div class="pbar mb-1"><div class="pbar-fill {{ bar_color }}" style="width:{{ pct }}%"></div></div>
+            {% if flag_list %}
+            <button class="flag-toggle text-xs text-blue-600 hover:underline" data-flag="{{ flag_key }}">
+              <i class="fas fa-exclamation-triangle mr-1 text-amber-500"></i>{{ gap_count }} flagged — click to view{% if flag_list | length < gap_count %} (showing {{ flag_list | length }}){% endif %}
+            </button>
+            <div id="flag-{{ flag_key }}" class="flag-table mt-2 rounded overflow-hidden border border-gray-200">
+              <table class="min-w-full text-xs divide-y divide-gray-100">
+                <tbody class="bg-white divide-y divide-gray-50">
+                  {% for item in flag_list[:25] %}
+                  <tr>
+                    <td class="px-3 py-1.5 text-gray-700">{{ item.name | default(item.get('period_name', item.get('template_name', 'Unknown'))) }}</td>
+                    <td class="px-3 py-1.5 text-right">
+                      {% if manage_url %}
+                      <a href="{{ manage_url }}" class="text-blue-500 hover:underline">Fix →</a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <span class="text-xs text-green-600"><i class="fas fa-check-circle mr-1"></i>All covered</span>
+            {% endif %}
+          </div>
+          {% endmacro %}
+
+          {{ ownership_row(
+              'Countries with Focal Point',
+              o.countries_with_focal_point,
+              o.total_countries,
+              'fp',
+              o.flags.countries_without_focal_point,
+              manage_url=url_for('assignment_management.manage_assignments')
+          ) }}
+
+          {% set aa_total = o.total_active_assignments | default(0) %}
+          {% set aa_without = o.active_assignments_without_data_owner | default(0) %}
+          {% set aa_has = aa_total - aa_without %}
+          {% set aa_pct = (aa_has / aa_total * 100) | round(0) | int if aa_total else 0 %}
+          {% set aa_bar = 'bg-green-500' if aa_pct >= 80 else 'bg-yellow-400' if aa_pct >= 50 else 'bg-red-500' %}
+          <div>
+            <div class="flex items-center justify-between mb-1 text-sm">
+              <span class="font-medium text-gray-700">Active Assignments with Data Owner</span>
+              <span class="font-semibold text-gray-800">{{ aa_has }}/{{ aa_total }} ({{ aa_pct }}%)</span>
+            </div>
+            <div class="pbar mb-1"><div class="pbar-fill {{ aa_bar }}" style="width:{{ aa_pct }}%"></div></div>
+            {% if aa_without > 0 %}
+            <a href="{{ url_for('assignment_management.manage_assignments', no_data_owner=1) }}" class="text-xs text-blue-600 hover:underline">
+              <i class="fas fa-exclamation-triangle mr-1 text-amber-500"></i>{{ aa_without }} without data owner — view in Assignments →
+            </a>
+            {% else %}
+            <span class="text-xs text-green-600"><i class="fas fa-check-circle mr-1"></i>All covered</span>
+            {% endif %}
+          </div>
+
+          {# Additional gap metrics #}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            {% macro gap_chip(label, value, is_bad=True) %}
+            <div class="rounded border {{ 'border-red-200 bg-red-50' if value > 0 and is_bad else 'border-green-200 bg-green-50' }} p-3 text-center">
+              <div class="text-xl font-bold {{ 'text-red-700' if value > 0 and is_bad else 'text-green-700' }}">{{ value }}</div>
+              <div class="text-xs text-gray-600 mt-0.5">{{ label }}</div>
+            </div>
+            {% endmacro %}
+
+            {{ gap_chip('Templates without Owner', o.templates_without_owner) }}
+            {{ gap_chip('Approved AES without Approver', o.approved_aes_without_approver) }}
+            {{ gap_chip('Users with Entity, No Role', o.users_with_entities_no_role) }}
+          </div>
+
+          {% if o.flags.users_with_entities_no_role %}
+          <div class="mt-2">
+            <button class="flag-toggle text-xs text-amber-600 hover:underline" data-flag="entity_no_role">
+              <i class="fas fa-exclamation-triangle mr-1"></i>{{ o.flags.users_with_entities_no_role | length }} users with country access but no role
+            </button>
+            <div id="flag-entity_no_role" class="flag-table mt-2 rounded overflow-hidden border border-amber-200">
+              <table class="min-w-full text-xs">
+                <tbody class="bg-amber-50 divide-y divide-amber-100">
+                  {% for u in o.flags.users_with_entities_no_role %}
+                  <tr>
+                    <td class="px-3 py-1.5 text-gray-700">{{ u.name }} ({{ u.email }})</td>
+                    <td class="px-3 py-1.5 text-right">
+                      <a href="{{ url_for('user_management.edit_user', user_id=u.id) }}" class="text-blue-500 hover:underline">Edit →</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ④ Access Control                                                   #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="access">
+      <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fas fa-shield-alt text-indigo-500"></i>
+          <h2 class="font-semibold text-gray-800 text-lg">Access Control</h2>
+          <a href="{{ url_for('user_management.manage_users') }}" class="ml-auto text-xs text-blue-600 hover:underline">Manage Users →</a>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            {% macro ac_stat(label, value, icon, color='gray') %}
+            <div class="rounded border border-gray-100 bg-gray-50 p-3 text-center">
+              <i class="fas {{ icon }} text-{{ color }}-400 text-lg mb-1"></i>
+              <div class="text-xl font-bold text-gray-800">{{ value }}</div>
+              <div class="text-xs text-gray-500">{{ label }}</div>
+            </div>
+            {% endmacro %}
+            {{ ac_stat('Total Roles', ac.roles, 'fa-tag', 'blue') }}
+            {{ ac_stat('Users with Role', ac.users_with_role, 'fa-user-check', 'green') }}
+            {{ ac_stat('Users without Role', ac.users_without_role, 'fa-user-times', 'red') }}
+            {{ ac_stat('Scoped Grants', ac.scoped_grants, 'fa-key', 'yellow') }}
+          </div>
+
+          {# Ghost access alert #}
+          {% if ac.inactive_users_with_role %}
+          <div class="flex items-start gap-3 bg-red-50 border border-red-200 rounded p-3 mb-3">
+            <i class="fas fa-ghost text-red-500 mt-0.5"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-red-700">
+                Ghost Access: {{ ac.inactive_users_with_role }} inactive user(s) still hold RBAC roles
+                <span style="position:relative;cursor:help;display:inline-block;vertical-align:middle;margin-left:4px" class="group">
+                  <i class="fas fa-info-circle gov-tip-icon gov-tip-icon--red"></i>
+                  <span style="pointer-events:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;width:300px;border-radius:6px;background:#1f2937;padding:8px 12px;font-size:12px;line-height:1.5;color:#fff;text-align:center;font-weight:400;font-style:normal;opacity:0;transition:opacity .15s;box-shadow:0 4px 12px rgba(0,0,0,.25);z-index:50" class="gov-tooltip">Users who have been deactivated but whose role-based permissions were never removed. They can't log in, but their lingering access is a governance gap that should be cleaned up.</span>
+                </span>
+              </p>
+              <p class="text-xs text-red-600 mt-0.5">Deactivated users retaining roles is a security risk.</p>
+              {% if ac.flags.inactive_ghost_users %}
+              <button class="flag-toggle text-xs text-red-600 hover:underline mt-1" data-flag="ghost_users">View ghost users</button>
+              <div id="flag-ghost_users" class="flag-table mt-2 rounded overflow-hidden border border-red-200">
+                <table class="min-w-full text-xs">
+                  <tbody class="bg-red-50 divide-y divide-red-100">
+                    {% for u in ac.flags.inactive_ghost_users %}
+                    <tr>
+                      <td class="px-3 py-1.5 text-gray-700">{{ u.name }} ({{ u.email }})</td>
+                      <td class="px-3 py-1.5 text-right">
+                        <a href="{{ url_for('user_management.edit_user', user_id=u.id) }}" class="text-blue-500 hover:underline">Edit →</a>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if ac.orphan_permissions %}
+          <p class="text-xs text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>{{ ac.orphan_permissions }} orphan permission(s) not assigned to any role or grant.</p>
+          {% endif %}
+
+          {% if ac.flags.roles_with_no_users %}
+          <p class="text-xs text-gray-500 mt-2"><i class="fas fa-tag mr-1"></i>{{ ac.flags.roles_with_no_users | length }} role(s) have zero users: {{ ac.flags.roles_with_no_users | map(attribute='code') | join(', ') }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ⑤ Quality Standards                                                #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="quality">
+      <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fas fa-chart-line text-green-500"></i>
+          <h2 class="font-semibold text-gray-800 text-lg">Quality Standards</h2>
+        </div>
+        <div class="p-6 grid md:grid-cols-2 gap-6">
+
+          {# Left: metrics #}
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-700">Submission Rate</span>
+              <span class="font-bold text-gray-800">{{ q.submission_rate_pct | default(0) }}%</span>
+            </div>
+            <div class="pbar"><div class="pbar-fill bg-blue-500" style="width:{{ q.submission_rate_pct | default(0) }}%"></div></div>
+
+            <div class="grid grid-cols-3 gap-2 text-center text-xs mt-2">
+              {% macro severity_chip(label, count, cls) %}
+              <div class="rounded border p-2 {{ cls }}">
+                <div class="text-lg font-bold">{{ count }}</div>
+                <div>{{ label }}</div>
+              </div>
+              {% endmacro %}
+              {% set sev = q.overdue_by_severity | default({}) %}
+              {{ severity_chip('Critical Overdue', sev.critical | default(0), 'border-red-200 bg-red-50 text-red-700') }}
+              {{ severity_chip('High Overdue', sev.high | default(0), 'border-orange-200 bg-orange-50 text-orange-700') }}
+              {{ severity_chip('Medium Overdue', sev.medium | default(0), 'border-yellow-200 bg-yellow-50 text-yellow-700') }}
+            </div>
+
+            {# Never started #}
+            {% if q.never_started_count %}
+            <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded p-3">
+              <i class="fas fa-hourglass-start text-amber-500 mt-0.5"></i>
+              <div>
+                <p class="text-sm font-semibold text-amber-700">{{ q.never_started_count }} active assignment(s) never started</p>
+                <button class="flag-toggle text-xs text-amber-600 hover:underline mt-0.5" data-flag="never_started">View list</button>
+                <div id="flag-never_started" class="flag-table mt-2 rounded overflow-hidden border border-amber-200">
+                  <table class="min-w-full text-xs">
+                    <tbody class="bg-amber-50 divide-y divide-amber-100">
+                      {% for a in q.flags.never_started | default([]) %}
+                      <tr>
+                        <td class="px-3 py-1.5 text-gray-700">{{ a.template_name }} — {{ a.period_name }}</td>
+                        <td class="px-3 py-1.5 text-gray-500 text-right">{{ a.entity_count }} entities</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            {# Overdue flags #}
+            {% if q.flags.overdue %}
+            <div>
+              <button class="flag-toggle text-xs text-red-600 hover:underline" data-flag="overdue_list">
+                <i class="fas fa-clock mr-1"></i>{{ q.overdue_count }} overdue submission(s) — view detail
+              </button>
+              <div id="flag-overdue_list" class="flag-table mt-2 rounded overflow-hidden border border-red-200">
+                <table class="min-w-full text-xs divide-y divide-red-100">
+                  <thead class="bg-red-50"><tr>
+                    <th class="px-3 py-1 text-left text-gray-600">Template</th>
+                    <th class="px-3 py-1 text-left text-gray-600">Country</th>
+                    <th class="px-3 py-1 text-left text-gray-600">Due</th>
+                    <th class="px-3 py-1 text-left text-gray-600">Days</th>
+                  </tr></thead>
+                  <tbody class="bg-white divide-y divide-red-50">
+                    {% for r in q.flags.overdue %}
+                    <tr>
+                      <td class="px-3 py-1.5 text-gray-700">{{ r.template_name }}</td>
+                      <td class="px-3 py-1.5 text-gray-600">{{ r.country_name }}</td>
+                      <td class="px-3 py-1.5 text-gray-500">{{ r.due_date[:10] if r.due_date else '—' }}</td>
+                      <td class="px-3 py-1.5">
+                        <span class="badge badge-{{ r.severity }}">{{ r.days_overdue }}d</span>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          {# Right: donut chart #}
+          <div class="flex flex-col justify-center h-full">
+            <p class="text-sm font-medium text-gray-700 mb-3">Status Distribution</p>
+            <div class="flex items-center justify-center gap-8">
+              <div class="shrink-0" style="width:180px">
+                <canvas id="statusDonut"></canvas>
+              </div>
+              <div id="statusLegend" class="text-xs text-gray-600 space-y-1.5 min-w-0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ⑥ Compliance                                                       #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="compliance">
+      <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fas fa-file-contract text-purple-500"></i>
+          <h2 class="font-semibold text-gray-800 text-lg">Compliance (FDRS Documents)</h2>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="text-3xl font-bold text-gray-800">{{ c.compliance_rate_pct | default(0) }}%</div>
+            <div>
+              <p class="text-sm text-gray-600">{{ c.compliant_count }} compliant / {{ (c.compliant_count + c.non_compliant_count) }} total countries</p>
+              <p class="text-xs text-gray-400">Annual Report + Audited Financial Statement, last 3 periods</p>
+            </div>
+          </div>
+          <div class="pbar mb-4"><div class="pbar-fill bg-purple-500" style="width:{{ c.compliance_rate_pct | default(0) }}%"></div></div>
+
+          {% if c.flags.non_compliant_countries %}
+          <button class="flag-toggle text-xs text-red-600 hover:underline" data-flag="non_compliant">
+            <i class="fas fa-times-circle mr-1"></i>{{ c.non_compliant_count }} non-compliant countries — view list
+          </button>
+          <div id="flag-non_compliant" class="flag-table mt-2 rounded overflow-hidden border border-red-200">
+            <div class="max-h-64 overflow-y-auto">
+              <table class="min-w-full text-xs divide-y divide-red-100">
+                <tbody class="bg-white divide-y divide-red-50">
+                  {% for country in c.flags.non_compliant_countries %}
+                  <tr>
+                    <td class="px-3 py-1.5 text-gray-700">{{ country.name }}</td>
+                    <td class="px-3 py-1.5 text-gray-400">{{ country.iso3 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ⑦ Metadata                                                         #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="metadata">
+      <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fas fa-tags text-teal-500"></i>
+          <h2 class="font-semibold text-gray-800 text-lg">Metadata</h2>
+        </div>
+        <div class="p-6 space-y-4">
+          {# Progress bars – full width #}
+          {% set def_pct = (m.indicators_with_definition / m.indicators_total * 100) | round(0) | int if m.indicators_total else 0 %}
+          <div>
+            <div class="flex justify-between text-sm mb-1">
+              <span class="text-gray-700 font-medium">Indicators with Definition</span>
+              <span class="font-bold">{{ m.indicators_with_definition }}/{{ m.indicators_total }} ({{ def_pct }}%)</span>
+            </div>
+            <div class="pbar"><div class="pbar-fill" style="width:{{ def_pct }}%;background:#14b8a6"></div></div>
+          </div>
+          {% set desc_pct = (m.form_items_with_description / m.form_items_total * 100) | round(0) | int if m.form_items_total else 0 %}
+          <div>
+            <div class="flex justify-between text-sm mb-1">
+              <span class="text-gray-700 font-medium">Form Items with Description / Definition</span>
+              <span class="font-bold">{{ m.form_items_with_description }}/{{ m.form_items_total }} ({{ desc_pct }}%)</span>
+            </div>
+            <div class="pbar"><div class="pbar-fill" style="width:{{ desc_pct }}%;background:#2dd4bf"></div></div>
+          </div>
+
+          {# Stat chips – row of 2-4 #}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-center">
+            <div class="rounded border border-gray-200 bg-gray-50 p-2">
+              <div class="font-bold text-lg text-gray-800">{{ m.archived_indicators }}</div>
+              <div class="text-gray-500">Archived Indicators</div>
+            </div>
+            <div class="rounded border {{ 'border-amber-200 bg-amber-50' if m.indicator_suggestions_stale else 'border-gray-200 bg-gray-50' }} p-2">
+              <div class="font-bold text-lg {{ 'text-amber-700' if m.indicator_suggestions_stale else 'text-gray-800' }}">{{ m.indicator_suggestions_stale | default(0) }}</div>
+              <div class="{{ 'text-amber-600' if m.indicator_suggestions_stale else 'text-gray-500' }}">Stale Suggestions (>30d)</div>
+            </div>
+          </div>
+
+          {# Flags / alerts #}
+          {% if m.published_never_assigned %}
+          <div class="bg-amber-50 border border-amber-200 rounded p-3">
+            <p class="text-sm font-semibold text-amber-700"><i class="fas fa-file-times mr-1"></i>{{ m.published_never_assigned }} published template(s) never assigned</p>
+            <button class="flag-toggle text-xs text-amber-600 hover:underline mt-1" data-flag="pub_never_assign">View list</button>
+            <div id="flag-pub_never_assign" class="flag-table mt-2 rounded overflow-hidden border border-amber-200">
+              <table class="min-w-full text-xs">
+                <tbody class="bg-amber-50 divide-y divide-amber-100">
+                  {% for t in m.flags.published_never_assigned | default([]) %}
+                  <tr>
+                    <td class="px-3 py-1.5 text-gray-700">{{ t.name }}</td>
+                    <td class="px-3 py-1.5 text-right">
+                      <a href="{{ url_for('form_builder.manage_templates') }}" class="text-blue-500 hover:underline">View →</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if m.flags.stale_suggestions %}
+          <div>
+            <button class="flag-toggle text-xs text-orange-600 hover:underline" data-flag="stale_suggestions">
+              <i class="fas fa-inbox mr-1"></i>{{ m.flags.stale_suggestions | length }} stale suggestion(s) in queue
+            </button>
+            <div id="flag-stale_suggestions" class="flag-table mt-2 rounded overflow-hidden border border-orange-200">
+              <table class="min-w-full text-xs divide-y divide-orange-100">
+                <tbody class="bg-orange-50">
+                  {% for s in m.flags.stale_suggestions %}
+                  <tr>
+                    <td class="px-3 py-1.5 text-gray-700">{{ s.indicator_name }}</td>
+                    <td class="px-3 py-1.5 text-gray-500">{{ s.submitted_at[:10] if s.submitted_at else '—' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if not m.published_never_assigned and not m.flags.stale_suggestions %}
+          <div class="flex items-center gap-2 text-green-600 text-sm">
+            <i class="fas fa-check-circle"></i>No metadata gaps detected.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    {# ⑧ Policies & Accountabilities (sarcastic note included)            #}
+    {# ═══════════════════════════════════════════════════════════════════ #}
+    <section id="policies">
+      <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fas fa-scroll text-yellow-500"></i>
+          <h2 class="font-semibold text-gray-800 text-lg">Policies & Accountabilities</h2>
+        </div>
+        <div class="p-6">
+
+          <div class="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6 flex gap-3">
+            <i class="fas fa-quote-left text-yellow-400 text-xl shrink-0 mt-0.5"></i>
+            <div>
+              <p class="text-yellow-800 font-medium italic">"Great policies that never leave the paper."</p>
+              <p class="text-yellow-700 text-sm mt-1">
+                Below is the accountability matrix mapping each governance pillar to the people and tools responsible for enforcing it.
+                Unlike a static policy document, every row here is backed by live data from the sections above — if something is broken, you'll know, and you'll know exactly where to fix it.
+              </p>
+            </div>
+          </div>
+
+          {# Accountability matrix #}
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 border-b border-gray-200">Pillar</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 border-b border-gray-200">What it covers</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 border-b border-gray-200">Who is accountable</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 border-b border-gray-200">How to manage</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 border-b border-gray-200">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 bg-white">
+                {% set fp_pct = ((o.countries_with_focal_point / o.total_countries * 100) | round(0) | int) if o.total_countries else 0 %}
+                {% macro matrix_row(pillar, covers, accountable, how, ok) %}
+                <tr>
+                  <td class="px-4 py-3 font-medium text-gray-800">{{ pillar }}</td>
+                  <td class="px-4 py-3 text-gray-600">{{ covers }}</td>
+                  <td class="px-4 py-3 text-gray-600">{{ accountable }}</td>
+                  <td class="px-4 py-3 text-gray-600">{{ how }}</td>
+                  <td class="px-4 py-3">
+                    {% if ok %}<span class="badge badge-ok"><i class="fas fa-check mr-1"></i>OK</span>
+                    {% else %}<span class="badge badge-critical"><i class="fas fa-times mr-1"></i>Gaps</span>{% endif %}
+                  </td>
+                </tr>
+                {% endmacro %}
+
+                {{ matrix_row(
+                  'Data Ownership',
+                  'Focal points, assignment data owners',
+                  'System Manager',
+                  'User Management → Assign focal points; Assignments → Data owner field',
+                  o.countries_without_focal_point == 0 and o.active_assignments_without_data_owner == 0
+                ) }}
+                {{ matrix_row(
+                  'Access Control',
+                  'RBAC roles, permissions, scoped grants, ghost access',
+                  'System Manager',
+                  'User Management → RBAC tab; Review inactive users monthly',
+                  ac.inactive_users_with_role == 0 and ac.users_without_role == 0
+                ) }}
+                {{ matrix_row(
+                  'Quality Standards',
+                  'Submission rates, overdue tracking, never-started assignments',
+                  'Data Owners + Focal Points',
+                  'Assignment Management → Follow up on overdue; Data Owners to chase countries',
+                  q.overdue_count == 0 and q.never_started_count == 0
+                ) }}
+                {{ matrix_row(
+                  'Compliance',
+                  'FDRS Annual Report and Audited Financial Statements',
+                  'National Society Focal Points + central secretariat',
+                  'Assignment Management → Document submissions per country',
+                  c.compliance_rate_pct >= 70
+                ) }}
+                {{ matrix_row(
+                  'Metadata',
+                  'Indicator definitions, form labels, published template usage',
+                  'System Manager',
+                  'Indicator Bank → Edit indicators; Form Builder → Review labels',
+                  m.indicators_without_definition == 0 and m.form_items_without_description == 0
+                ) }}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </div>{# end main content #}
+</div>{# end flex #}
+
+{# Chart.js and dashboard JS — inside content block so Jinja2 vars are accessible #}
+<script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+// ─── Toggle flag tables ─────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-flag]');
+    if (!btn) return;
+    e.preventDefault();
+    const el = document.getElementById('flag-' + btn.dataset.flag);
+    if (el) el.classList.toggle('open');
+});
+
+// ─── Sticky nav active state ────────────────────────────────────────
+(function() {
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('#gov-sidenav a');
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navLinks.forEach(a => a.classList.remove('active'));
+                const active = document.querySelector(`#gov-sidenav a[href="#${entry.target.id}"]`);
+                if (active) active.classList.add('active');
+            }
+        });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    sections.forEach(s => observer.observe(s));
+})();
+
+// ─── Status Donut chart ──────────────────────────────────────────────
+(function() {
+    const ctx = document.getElementById('statusDonut');
+    if (!ctx) return;
+    const byStatus = {{ q.by_status | tojson | safe }};
+    const labels = Object.keys(byStatus);
+    const data   = Object.values(byStatus);
+    const COLORS = {
+        'Pending':     '#e5e7eb',
+        'Assigned':    '#93c5fd',
+        'In Progress': '#fbbf24',
+        'Submitted':   '#3b82f6',
+        'Approved':    '#22c55e',
+    };
+    const colors = labels.map(l => COLORS[l] || '#a5b4fc');
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 1 }] },
+        options: {
+            cutout: '60%',
+            plugins: { legend: { display: false } },
+            responsive: true,
+        }
+    });
+
+    // Legend
+    const legend = document.getElementById('statusLegend');
+    if (legend) {
+        legend.innerHTML = labels.map((l, i) =>
+            `<div class="flex items-center gap-1.5"><span style="width:10px;height:10px;background:${colors[i]};display:inline-block;border-radius:2px"></span>${l}: <strong>${data[i]}</strong></div>`
+        ).join('');
+    }
+})();
+
+</script>
+{% endblock %}

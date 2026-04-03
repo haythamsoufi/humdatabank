@@ -1,0 +1,62 @@
+{#
+  Admin / backoffice horizontal tab strips: scroll shell + optional underline tab class helpers.
+
+  ── Scroll shell (mobile-friendly horizontal scroll) ─────────────────
+  {% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+
+  {% call scroll_tab_bar(inner_id='my-tabs', aria_label=_('Sections')) %}
+    <button type="button" role="tab">…</button>
+  {% endcall %}
+
+  Flowbite-style <ul> tablist:
+  {% call scroll_tab_bar(inner_tag='ul', inner_id='entity-tabs', inner_class='list-none …') %}
+    <li class="me-2" role="presentation">…</li>
+  {% endcall %}
+
+  Options: border_bottom=False, lang_tabs_for='key' (data-lang-tabs-for), inner_tag='div', inner_role=''
+
+  ── Underline tab classes (keep in sync with static/js/admin-underline-tabs.js) ─────────────────
+  {% from "components/_scroll_tab_bar.html" import admin_underline_tab_btn_classes, admin_underline_tab_badge_classes %}
+
+  <button class="{{ admin_underline_tab_btn_classes(is_active) }}">…</button>
+  <span class="{{ admin_underline_tab_badge_classes(is_active) }}">12</span>
+
+  Sub-strips (Secretariat, NS hierarchy): admin_underline_subtab_btn_classes, admin_underline_subtab_count_classes
+#}
+
+{% macro scroll_tab_bar(inner_id=None, aria_label=None, wrapper_class='', inner_class='', border_bottom=True, inner_role='tablist', inner_tag='nav', lang_tabs_for=None) %}
+{# Outer clips vertical bleed; inner .scroll-tab-bar__track owns horizontal scroll (avoids a vertical scrollbar). #}
+<div class="scroll-tab-bar{% if border_bottom %} border-b border-gray-200{% endif %}{% if wrapper_class %} {{ wrapper_class }}{% endif %}">
+  <div class="scroll-tab-bar__track">
+  <{{ inner_tag }} class="flex gap-0 -mb-px whitespace-nowrap{% if inner_class %} {{ inner_class }}{% endif %}"
+       {% if inner_id %}id="{{ inner_id }}"{% endif %}
+       {% if inner_role %}role="{{ inner_role }}"{% endif %}
+       {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+       {% if lang_tabs_for %}data-lang-tabs-for="{{ lang_tabs_for }}"{% endif %}>
+    {{ caller() }}
+  </{{ inner_tag }}>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro admin_underline_tab_btn_classes(is_active, size='default', extra_classes='') -%}
+settings-tab inline-flex items-center whitespace-nowrap text-sm font-medium border-b-2 transition-colors
+{%- if size == 'compact' %} py-2 px-3{% else %} py-3 px-4 cursor-pointer{% endif %}
+{%- if is_active %} border-blue-500 text-blue-600{% else %} border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}
+{%- if extra_classes %} {{ extra_classes }}{% endif %}
+{%- endmacro %}
+
+{% macro admin_underline_tab_badge_classes(is_active) -%}
+org-main-tab-badge ml-2 py-0.5 px-2 text-xs font-medium border {% if is_active %}border-blue-200 bg-blue-50 text-blue-600{% else %}border-gray-200 bg-gray-100 text-gray-600{% endif %}
+{%- endmacro %}
+
+{# Sub-strip buttons use .tab-button for scoped JS; same visual tokens as settings-tab. #}
+{% macro admin_underline_subtab_btn_classes(is_active, extra_classes='') -%}
+tab-button settings-tab inline-flex items-center whitespace-nowrap cursor-pointer border-b-2 py-2 px-3 text-sm font-medium transition-colors
+{%- if is_active %} active border-blue-500 text-blue-600{% else %} border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}
+{%- if extra_classes %} {{ extra_classes }}{% endif %}
+{%- endmacro %}
+
+{% macro admin_underline_subtab_count_classes() -%}
+ml-1.5 py-0.5 px-2 text-xs font-medium border border-gray-200 bg-gray-100 text-gray-600
+{%- endmacro %}

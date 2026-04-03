@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% include 'components/_client_console_guard.html' %}
+    <title>{{ ORG_NAME }} API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.9.0/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.9.0/favicon-16x16.png" sizes="16x16" />
+    <style nonce="{{ csp_nonce() }}">
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+    <script nonce="{{ csp_nonce() }}">
+        window.onload = function() {
+            window.__clientLog && window.__clientLog('Swagger UI: Initializing...');
+
+            // Check if Swagger UI libraries loaded
+            if (typeof SwaggerUIBundle === 'undefined') {
+                console.error('Swagger UI: SwaggerUIBundle is not defined');
+                document.getElementById('swagger-ui').innerHTML =
+                    '<div style="padding: 20px; font-family: Arial;">' +
+                    '<h2>Error: Swagger UI libraries failed to load</h2>' +
+                    '<p>Please check your internet connection and refresh the page.</p>' +
+                    '</div>';
+                return;
+            }
+
+            if (typeof SwaggerUIStandalonePreset === 'undefined') {
+                console.error('Swagger UI: SwaggerUIStandalonePreset is not defined');
+                return;
+            }
+
+            const specUrl = window.location.origin + '/api-docs/openapi.json';
+            window.__clientLog && window.__clientLog('Swagger UI: Loading spec from', specUrl);
+
+            // Test if spec URL is accessible
+            fetch(specUrl)
+                .then(response => {
+                    window.__clientLog && window.__clientLog('Swagger UI: Spec fetch response status', response.status);
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(spec => {
+                    window.__clientLog && window.__clientLog('Swagger UI: Spec loaded successfully', {
+                        openapi: spec.openapi,
+                        paths: Object.keys(spec.paths || {}).length,
+                        tags: spec.tags?.length || 0
+                    });
+
+                    // Initialize Swagger UI with inline spec
+                    const ui = SwaggerUIBundle({
+                        spec: spec,  // Use inline spec for better error handling
+                        dom_id: '#swagger-ui',
+                        deepLinking: true,
+                        presets: [
+                            SwaggerUIBundle.presets.apis,
+                            SwaggerUIStandalonePreset
+                        ],
+                        plugins: [
+                            SwaggerUIBundle.plugins.DownloadUrl
+                        ],
+                        layout: "StandaloneLayout",
+                        validatorUrl: null,
+                        tryItOutEnabled: true,
+                        supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                        onComplete: function() {
+                            window.__clientLog && window.__clientLog('Swagger UI: Initialization complete');
+                        }
+                    });
+
+                    window.swaggerUI = ui;
+                    window.__clientLog && window.__clientLog('Swagger UI: Bundle created');
+                })
+                .catch(error => {
+                    console.error('Swagger UI: Error loading spec', error);
+                    document.getElementById('swagger-ui').innerHTML =
+                        '<div style="padding: 20px; font-family: Arial; color: red;">' +
+                        '<h2>Error Loading API Documentation</h2>' +
+                        '<p><strong>Error:</strong> ' + error.message + '</p>' +
+                        '<p>Please check:</p>' +
+                        '<ul>' +
+                        '<li>Server is running</li>' +
+                        '<li><a href="' + specUrl + '" target="_blank">OpenAPI JSON is accessible</a></li>' +
+                        '<li>Browser console for more details</li>' +
+                        '</ul>' +
+                        '</div>';
+                });
+        };
+    </script>
+</body>
+</html>

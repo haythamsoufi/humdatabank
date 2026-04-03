@@ -1,0 +1,3568 @@
+{% extends "core/layout.html" %}
+{% from "components/_form_helpers.html" import render_field, render_countries_by_region %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ 'Edit Assignment' if assignment else 'Create New Assignment' }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+
+{% set save_label = form.submit.label.text if form.submit and form.submit.label else _('Save') %}
+{% set header_actions = namespace(items=[]) %}
+{% set __ = header_actions.items.append({
+    'type': 'submit',
+    'text': save_label,
+    'classes': 'professional-action-btn professional-action-btn-blue',
+    'attributes': {'id': 'manageAssignmentSubmitBtn', 'form': 'manageAssignmentForm'}
+}) %}
+
+{{ page_header(
+    title='Edit Assignment' if assignment else 'Create New Assignment',
+    icon='fas fa-pen' if assignment else 'fas fa-plus-circle',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'Assignment Management', 'url': url_for('assignment_management.manage_assignments')},
+        {'name': 'Edit Assignment' if assignment else 'Create New Assignment'}
+    ],
+    actions=header_actions.items,
+    pin_actions_on_scroll=True
+) }}
+
+{% set resolved_entity_types = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
+{% set has_countries = 'countries' in resolved_entity_types %}
+{% set has_ns_structure = 'ns_structure' in resolved_entity_types %}
+{% set has_secretariat = 'secretariat' in resolved_entity_types %}
+{% set entity_tabs = namespace(order=[]) %}
+{% if assignment and assignment_entities %}
+{% set __ = entity_tabs.order.append('manage') %}{% endif %}
+{% if has_countries or has_secretariat %}
+{% set __ = entity_tabs.order.append('add_entities') %}{% endif %}
+{% if has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
+{% set default_entity_tab = entity_tabs.order[0] if entity_tabs.order else None %}
+{# Set default sub-tab for add_entities: countries if available, otherwise secretariat #}
+{% if default_entity_tab == 'add_entities' %}
+{% set default_add_entities_subtab = 'countries' if has_countries else 'secretariat' %}
+{% else %}
+{% set default_add_entities_subtab = None %}
+{% endif %}
+{# Determine if we should show tab navigation: hide if creating new assignment and only Add Entities tab would be shown #}
+{% set is_new_assignment = not (assignment and assignment_entities) %}
+{% set only_add_entities_tab = entity_tabs.order|length == 1 and entity_tabs.order[0] == 'add_entities' %}
+{% set show_entity_tabs = not (is_new_assignment and only_add_entities_tab) %}
+{# Determine if we should show sub-tabs within Add Entities: hide if only one sub-tab is available #}
+{% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_secretariat else 0) %}
+{% set show_add_entities_subtabs = sub_tabs_count > 1 %}
+
+{# The form for managing assignment details #}
+{# Flash messages are handled in layout.html #}
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">
+        {{ 'Edit Assignment Details: ' + assignment.period_name if assignment else 'Create New Form Assignment' }}
+    </h2>
+    <form id="manageAssignmentForm" method="POST" action="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if assignment else url_for('assignment_management.new_assignment') }}">
+        {{ form.csrf_token }}
+        {% if not assignment and form.confirm_duplicate is defined %}
+            {{ form.confirm_duplicate(class="hidden", id="confirm_duplicate") }}
+        {% endif %}
+
+        {# Row 1: Form Template + Period fields #}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+                {{ form.template_id.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                {{ form.template_id(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                {% for error in form.template_id.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Period Type') }}</label>
+                <select id="period-type" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                    <option value="single-year">{{ _('Single Year') }}</option>
+                    <option value="year-range">{{ _('Year Range') }}</option>
+                    <option value="month-range">{{ _('Month Range') }}</option>
+                </select>
+            </div>
+            <div>
+                <div id="single-year-fields" class="period-fields">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Year') }}</label>
+                    <input type="number" id="single-year" min="2000" max="2100"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                           placeholder="e.g., 2024">
+                </div>
+                <div id="year-range-start" class="period-fields hidden">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Start Year') }}</label>
+                    <input type="number" id="start-year" min="2000" max="2100"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                           placeholder="e.g., 2024">
+                </div>
+                <div id="year-range-end" class="period-fields hidden">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('End Year') }}</label>
+                    <input type="number" id="end-year" min="2000" max="2100"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                           placeholder="e.g., 2025">
+                </div>
+                <div id="month-range-start" class="period-fields hidden">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Start Period') }}</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="start-month-year" min="2000" max="2100"
+                               class="flex-1 shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                               placeholder="Year">
+                        <select id="start-month" class="flex-1 shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="month-range-end" class="period-fields hidden">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('End Period') }}</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="end-month-year" min="2000" max="2100"
+                               class="flex-1 shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                               placeholder="Year">
+                        <select id="end-month" class="flex-1 shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {{ form.period_name(class="hidden") }}
+            {% for error in form.period_name.errors %}
+                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+            {% endfor %}
+        </div>
+
+        {# Row 2: Data Owner + dates (new assignment shows due/expiry inline; edit shows them in their own section below) #}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mt-4">
+            {# Data Owner #}
+            {% if form.data_owner_id is defined %}
+            <div>
+                <label for="{{ form.data_owner_id.id }}" class="block text-gray-700 text-sm font-semibold mb-2">
+                    {{ form.data_owner_id.label.text }}
+                    <span class="ml-1 text-gray-400" title="{{ _('The person accountable for data quality in this collection cycle. Defaults to the template owner.') }}">
+                        <i class="fas fa-info-circle text-xs"></i>
+                    </span>
+                </label>
+                {{ form.data_owner_id(id="data_owner_id_select", class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                {% if assignment and assignment.data_owner_user %}
+                    <p class="mt-1 text-xs text-green-600"><i class="fas fa-user-check mr-1"></i>{{ assignment.data_owner_user.name }}</p>
+                {% elif assignment and not assignment.data_owner_user %}
+                    <p class="mt-1 text-xs text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('No data owner set — governance gap.') }}</p>
+                {% endif %}
+                {% for error in form.data_owner_id.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not assignment %}
+            <div>
+                {{ form.due_date.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                {{ form.due_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                {% for error in form.due_date.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+            <div>
+                {{ form.expiry_date.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                <p class="mt-1 text-xs text-gray-500">{{ _('After this date the assignment will be treated as Closed. Leave empty for no automatic closure.') }}</p>
+                {% for error in form.expiry_date.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {# Hidden fields for country selections (for new assignments) - populated from Entity Assignments tab #}
+        {% if not assignment %}
+        <div id="country-selections-container" class="hidden">
+            <!-- Hidden inputs will be dynamically added here by JavaScript -->
+        </div>
+        {% endif %}
+
+        {# Public URL & notification options - only show for new assignments #}
+        {% if not assignment %}
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        {{ form.generate_public_url(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                        {{ form.generate_public_url.label(class="ml-2 text-sm text-gray-700") }}
+                    </div>
+                    <div class="flex items-center" id="public-url-active-container" style="display: none;">
+                        {{ form.public_url_active(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                        {{ form.public_url_active.label(class="ml-2 text-sm text-gray-700") }}
+                    </div>
+                </div>
+                <span class="text-xs text-gray-500">Allow external submissions</span>
+            </div>
+            <div class="flex items-center pt-2 border-t border-gray-200">
+                <div class="flex items-center">
+                    {{ form.send_notifications(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                    {{ form.send_notifications.label(class="ml-2 text-sm text-gray-700") }}
+                </div>
+                <span class="ml-2 text-xs text-gray-500">{{ _('Focal points will be notified about the new assignment. Uncheck to create without sending notifications.') }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Public URL, Due Date & Expiry Date - only for existing assignments #}
+        {% if assignment %}
+        <div class="mt-6 border-t border-gray-200 pt-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {# Public URL #}
+                <div>
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">
+                        <i class="fas fa-link mr-1 text-gray-400"></i>
+                        {{ _('Public URL') }}
+                    </label>
+                    {% if assignment.has_public_url() %}
+                        <div class="flex items-center gap-2 mb-2 flex-wrap">
+                            {% if assignment.is_public_active %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <i class="fas fa-check-circle mr-1"></i>{{ _('Active') }}
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <i class="fas fa-times-circle mr-1"></i>{{ _('Inactive') }}
+                                </span>
+                            {% endif %}
+                            <button type="button" id="copy-public-url-btn"
+                                    class="btn btn-primary btn-sm"
+                                    data-url="{{ assignment.get_public_url() }}">
+                                <i class="fas fa-copy mr-1"></i>{{ _('Copy') }}
+                            </button>
+                            <button type="button" id="toggle-public-access-btn"
+                                    class="btn btn-warning btn-sm">
+                                <i class="fas {{ 'fa-toggle-on' if assignment.is_public_active else 'fa-toggle-off' }} mr-1"></i>
+                                {{ _('Deactivate') if assignment.is_public_active else _('Activate') }}
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 font-mono break-all mb-2">{{ assignment.get_public_url() }}</p>
+                        {% set total_countries = assignment.country_statuses.count() %}
+                        {% set public_count = assignment.country_statuses.filter_by(is_public_available=True).count() %}
+                        <p class="text-xs text-gray-600">
+                            <i class="fas fa-flag mr-1 text-gray-400"></i>
+                            <span class="font-medium">{{ public_count }}</span> / {{ total_countries }} {{ _('countries enabled for public submission') }}
+                        </p>
+                    {% else %}
+                        <p class="text-sm text-gray-400 italic py-2">{{ _('Not generated') }}</p>
+                        <button type="button" id="generate-public-url-btn"
+                                class="btn btn-success btn-sm"
+                                data-action="{{ url_for('assignment_management.generate_public_url', assignment_id=assignment.id) }}"
+                                data-next="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) }}">
+                            <i class="fas fa-link mr-1"></i>{{ _('Generate Public URL') }}
+                        </button>
+                    {% endif %}
+                </div>
+
+                {# Due Date #}
+                {% if has_countries %}
+                <div>
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">
+                        <i class="fas fa-calendar-alt mr-1 text-gray-400"></i>
+                        {{ _('Due Date') }}
+                    </label>
+                    {% if assignment.earliest_due_date %}
+                        <p class="text-sm text-gray-700 py-2"><span class="text-xs text-gray-500">{{ _('Earliest:') }}</span> <span class="font-medium">{{ assignment.earliest_due_date|datetime_local('date') }}</span></p>
+                        <p class="text-xs text-gray-500">{{ _('Managed per entity below.') }}</p>
+                        {% if assignment.has_multiple_due_dates %}
+                        <p class="text-xs text-amber-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('Multiple different due dates set across entities.') }}</p>
+                        {% endif %}
+                    {% else %}
+                        <p class="text-sm text-gray-400 italic py-2">{{ _('Not set') }}</p>
+                        <p class="text-xs text-gray-500">{{ _('Managed per entity below.') }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {# Expiry Date #}
+                <div>
+                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="expiry_date">
+                        <i class="fas fa-calendar-times mr-1 text-gray-400"></i>
+                        {{ _('Expiry Date') }}
+                    </label>
+                    {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                    <p class="mt-1 text-xs text-gray-500">{{ _('Auto-closes the assignment after this date.') }}</p>
+                    {% for error in form.expiry_date.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="flex flex-wrap items-center justify-end gap-4 mt-6">
+            <!-- Visible error message container for period name validation -->
+            <div id="period-name-error" class="hidden w-full sm:w-auto sm:ml-auto">
+                <p class="text-red-600 text-sm font-medium">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    Please select a valid period (year or date range) before submitting.
+                </p>
+            </div>
+        </div>
+    </form>
+</div>
+
+{# Entity Assignments Section - unified section for managing and assigning entities #}
+{% if entity_tabs.order %}
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+    <div class="mb-4">
+        <h2 class="text-xl font-semibold text-gray-700">
+            <i class="fas fa-sitemap mr-2 text-blue-600"></i>
+            Entity Assignments
+        </h2>
+        <p class="text-sm text-gray-600 mt-1">
+            {% if assignment %}
+            Manage existing entity assignments and assign new entities to this form. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).
+            {% else %}
+            Assign this form to specific organizational entities. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).
+            {% endif %}
+        </p>
+    </div>
+
+    <div id="entity-assignments-content">
+
+        {# Tab Navigation - only show if there are multiple tabs or existing assignment #}
+        {% if show_entity_tabs %}
+        {% call scroll_tab_bar(inner_tag='ul', inner_id='entity-tabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-4', aria_label=_('Entity assignment mode')) %}
+                {% if assignment and assignment_entities %}
+                {% set is_manage_active = default_entity_tab == 'manage' %}
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg {% if is_manage_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                            id="manage-entities-tab"
+                            data-tabs-target="#manage-entities-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="manage-entities-panel"
+                            aria-selected="{{ 'true' if is_manage_active else 'false' }}">
+                        <i class="fas fa-cog mr-2"></i>Manage Existing Entities
+                    </button>
+                </li>
+                {% endif %}
+                {% if has_countries or has_secretariat %}
+                {% set is_add_entities_active = default_entity_tab == 'add_entities' or default_entity_tab == 'countries' or default_entity_tab == 'secretariat' %}
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg {% if is_add_entities_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                            id="add-entities-tab"
+                            data-tabs-target="#add-entities-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="add-entities-panel"
+                            aria-selected="{{ 'true' if is_add_entities_active else 'false' }}">
+                        <i class="fas fa-plus-circle mr-2"></i>Add Entities
+                    </button>
+                </li>
+                {% endif %}
+                {% if has_ns_structure %}
+                {% set is_entity_ns_active = default_entity_tab == 'ns_structure' %}
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg {% if is_entity_ns_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                            id="ns-structure-tab"
+                            data-tabs-target="#ns-structure-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="ns-structure-panel"
+                            aria-selected="{{ 'true' if is_entity_ns_active else 'false' }}">
+                        <i class="fas fa-sitemap mr-2"></i>NS Structure
+                    </button>
+                </li>
+                {% endif %}
+        {% endcall %}
+        {% endif %}
+
+        {# Tab Panels #}
+        <div id="entity-tabs-content">
+            {# Manage Existing Entities Tab - only for existing assignments #}
+            {% if assignment and assignment_entities %}
+            <div class="p-4 rounded-lg bg-gray-50 {% if default_entity_tab != 'manage' %}hidden{% endif %}" id="manage-entities-panel" role="tabpanel" aria-labelledby="manage-entities-tab">
+                <div class="flex justify-end items-center gap-2 mb-4">
+                    <div id="column-visibility-button-placeholder"></div>
+                </div>
+                {% if has_countries %}
+                <div class="flex items-center gap-3 flex-wrap mb-4">
+                    <span class="text-sm font-bold text-gray-800">Part of:</span>
+                    <div id="category-filters-manage" class="flex items-center gap-3 flex-wrap">
+                        {# Category checkboxes will be dynamically added here #}
+                    </div>
+                </div>
+                {% endif %}
+                {# Bulk actions bar - shown when rows are selected in the grid #}
+                <div id="entity-grid-bulk-actions" class="hidden flex items-center gap-3 flex-wrap mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span id="entity-grid-selected-count" class="text-sm font-semibold text-gray-800">0 selected</span>
+                    <button type="button" id="entity-grid-bulk-delete-btn" class="btn btn-danger">
+                        <i class="fas fa-trash mr-1"></i>Delete selected
+                    </button>
+                    <button type="button" id="entity-grid-bulk-status-btn" class="btn btn-primary">
+                        <i class="fas fa-exchange-alt mr-1"></i>{{ _('Change status') }}
+                    </button>
+                    <button type="button" id="entity-grid-bulk-duedate-btn" class="btn btn-primary">
+                        <i class="fas fa-calendar-alt mr-1"></i>{{ _('Change due date') }}
+                    </button>
+                    {% if assignment and assignment.has_public_url() %}
+                    <button type="button" id="entity-grid-bulk-public-enable-btn" class="btn btn-success">
+                        <i class="fas fa-globe mr-1"></i>{{ _('Enable public reporting') }}
+                    </button>
+                    <button type="button" id="entity-grid-bulk-public-disable-btn" class="btn btn-dark">
+                        <i class="fas fa-globe mr-1"></i>{{ _('Disable public reporting') }}
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="overflow-x-auto">
+                    <div id="entityManagementGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Add Entities Tab - contains Countries and Secretariat as sub-tabs #}
+            {% if has_countries or has_secretariat %}
+            {% set is_add_entities_active = default_entity_tab == 'add_entities' or default_entity_tab == 'countries' or default_entity_tab == 'secretariat' %}
+            <div class="p-4 rounded-lg bg-gray-50 {% if show_entity_tabs and not is_add_entities_active %}hidden{% endif %}" id="add-entities-panel" role="tabpanel" aria-labelledby="add-entities-tab">
+                {# Sub-tab navigation for Add Entities - only show if multiple sub-tabs are available #}
+                {% if show_add_entities_subtabs %}
+                {% call scroll_tab_bar(inner_tag='ul', inner_id='add-entities-subtabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-4', aria_label=_('Add entities by')) %}
+                        {% if has_countries %}
+                        {% set is_countries_subtab_active = default_add_entities_subtab == 'countries' %}
+                        <li class="me-2" role="presentation">
+                            <button class="inline-block p-3 border-b-2 rounded-t-lg {% if is_countries_subtab_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                                    id="add-entities-countries-tab"
+                                    data-tabs-target="#add-entities-countries-panel"
+                                    type="button"
+                                    role="tab"
+                                    aria-controls="add-entities-countries-panel"
+                                    aria-selected="{{ 'true' if is_countries_subtab_active else 'false' }}">
+                                <i class="fas fa-flag mr-2"></i>Countries
+                            </button>
+                        </li>
+                        {% endif %}
+                        {% if has_secretariat %}
+                        {% set is_secretariat_subtab_active = default_add_entities_subtab == 'secretariat' %}
+                        <li class="me-2" role="presentation">
+                            <button class="inline-block p-3 border-b-2 rounded-t-lg {% if is_secretariat_subtab_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                                    id="add-entities-secretariat-tab"
+                                    data-tabs-target="#add-entities-secretariat-panel"
+                                    type="button"
+                                    role="tab"
+                                    aria-controls="add-entities-secretariat-panel"
+                                    aria-selected="{{ 'true' if is_secretariat_subtab_active else 'false' }}">
+                                <i class="fas fa-building mr-2"></i>Secretariat
+                            </button>
+                        </li>
+                        {% endif %}
+                {% endcall %}
+                {% endif %}
+
+                {# Sub-tab panels for Add Entities #}
+                <div id="add-entities-subtabs-content">
+                    {# Countries Sub-tab #}
+                    {% if has_countries %}
+                    {% set is_countries_subtab_active = default_add_entities_subtab == 'countries' %}
+                    <div class="{% if show_add_entities_subtabs and not is_countries_subtab_active %}hidden{% endif %}" id="add-entities-countries-panel" role="tabpanel" aria-labelledby="add-entities-countries-tab">
+                 <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">Assign Countries</label>
+                    <p class="text-sm text-gray-600 mb-3">
+                        {% if assignment %}
+                        Select countries to add to this assignment. Already assigned countries are pre-checked.
+                        {% else %}
+                        Select countries to assign to this assignment.
+                        {% endif %}
+                    </p>
+                </div>
+
+                {% if assignment %}
+                <form id="add-countries-form" action="{{ url_for('assignment_management.add_countries_to_assignment', assignment_id=assignment.id) }}" method="POST">
+                {% else %}
+                <form id="add-countries-form" action="#" method="POST">
+                {% endif %}
+                    {{ form.csrf_token }}
+                    <div class="p-4 border border-gray-200 rounded-md bg-white">
+                         {# Global Select All Checkbox and Part Of Filter #}
+                         <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200 flex-wrap gap-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="select-all-countries-entity" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                <label for="select-all-countries-entity" class="ml-2 block text-sm font-bold text-gray-800">Select All Countries</label>
+                            </div>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="text-sm font-bold text-gray-800">Part of:</span>
+                                <div id="category-filters-entity" class="flex items-center gap-3 flex-wrap">
+                                    {# Category checkboxes will be dynamically added here #}
+                                </div>
+                            </div>
+                         </div>
+
+                        {# Iterate through regions and their countries #}
+                           {% for region, countries in countries_by_region.items() %}
+                             <div class="mb-4 last:mb-0">
+                               <div class="flex items-center mb-2">
+                                 {# Region Checkbox (Select/Deselect All in Region) #}
+                                    <input type="checkbox" id="select-all-{{ region | replace(' ', '-') }}-entity" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 region-select-all-entity" data-region="{{ region | replace(' ', '-') }}">
+                                    <label for="select-all-{{ region | replace(' ', '-') }}-entity" class="ml-2 block text-sm font-bold text-gray-800">{{ region }}</label>
+                               </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pl-6 region-countries-entity" data-region="{{ region | replace(' ', '-') }}">
+                                    {# Iterate through countries in the current region #}
+                                 {% for country in countries %}
+                                        {% set country_assigned = assignment_countries | selectattr('country.id', 'equalto', country.id) | first %}
+                                   <div class="flex items-center">
+                                            {# Manually render the checkbox for the country #}
+                                     <input type="checkbox"
+                                            name="country_ids"
+                                                   id="country-entity-{{ country.id }}"
+                                            value="{{ country.id }}"
+                                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 country-checkbox-entity"
+                                                   {% if country_assigned %}checked disabled title="Already assigned"{% endif %}>
+                                            <label for="country-entity-{{ country.id }}" class="ml-2 block text-sm {% if country_assigned %}text-gray-500{% else %}text-gray-900{% endif %}">
+                                                {{ country.name }}
+                                                {% if country_assigned %}
+                                                    <span class="ml-1 text-xs text-blue-600">(assigned)</span>
+                                                {% endif %}
+                                            </label>
+                                   </div>
+                                 {% endfor %}
+                               </div>
+                             </div>
+                           {% endfor %}
+                         </div>
+
+
+                </form>
+                     </div>
+                    </div>
+                    {% endif %}
+
+                    {# Secretariat Sub-tab #}
+                    {% if has_secretariat %}
+                    {% set is_secretariat_subtab_active = default_add_entities_subtab == 'secretariat' %}
+                    <div class="{% if show_add_entities_subtabs and not is_secretariat_subtab_active %}hidden{% endif %}" id="add-entities-secretariat-panel" role="tabpanel" aria-labelledby="add-entities-secretariat-tab">
+            {% if has_ns_structure %}
+            <div class="p-4 rounded-lg bg-gray-50 {% if default_entity_tab != 'ns_structure' %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
+                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p class="text-xs text-blue-800">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>Note:</strong> Select entities by checking the boxes, then click "Save Changes" to apply them.
+                    </p>
+                 </div>
+                <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">Search NS Structure</label>
+                        <input type="text"
+                               id="ns-structure-search"
+                               class="form-input w-full rounded-md border-gray-300"
+                               placeholder="Search branches, sub-branches, or local units...">
+                 </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">Country</label>
+                        <select id="ns-country-select" class="form-select w-full rounded-md border-gray-300">
+                            <option value="">Select a country</option>
+                            {% for region, countries in countries_by_region.items() %}
+                                <optgroup label="{{ region }}">
+                                {% for country in countries %}
+                                    <option value="{{ country.id }}">{{ country.name }}</option>
+                                {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                 </div>
+             </div>
+                <div id="ns-structure-hierarchy-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
+                    <!-- Hierarchical NS structure will be loaded here by JavaScript -->
+                    <div class="text-center py-4">
+                        <i class="fas fa-info-circle text-gray-400"></i>
+                        <p class="text-sm text-gray-500 mt-2">Select a country to view NS structure.</p>
+                    </div>
+                </div>
+
+    </div>
+            </div>
+            {% endif %}
+
+                        <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <p class="text-xs text-blue-800">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <strong>Note:</strong> Select entities by checking the boxes, then click "Save Changes" to apply them.
+                            </p>
+                        </div>
+
+                        {# Sub-tab navigation for Secretariat #}
+                        {% call scroll_tab_bar(inner_tag='ul', inner_id='secretariat-subtabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-4', aria_label=_('Secretariat structure')) %}
+                                <li class="me-2" role="presentation">
+                                    <button class="inline-block p-3 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
+                                            id="secretariat-divisions-tab"
+                                            data-tabs-target="#secretariat-divisions-panel"
+                                            type="button"
+                                            role="tab"
+                                            aria-controls="secretariat-divisions-panel"
+                                            aria-selected="true">
+                                        <i class="fas fa-building mr-2"></i>Divisions & Departments
+                                    </button>
+                                </li>
+                                <li class="me-2" role="presentation">
+                                    <button class="inline-block p-3 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
+                                            id="secretariat-regions-tab"
+                                            data-tabs-target="#secretariat-regions-panel"
+                                            type="button"
+                                            role="tab"
+                                            aria-controls="secretariat-regions-panel"
+                                            aria-selected="false">
+                                        <i class="fas fa-globe-europe mr-2"></i>Regions
+                                    </button>
+                                </li>
+                        {% endcall %}
+
+                        {# Sub-tab panels for Secretariat #}
+                        <div id="secretariat-subtabs-content">
+                            {# Divisions & Departments panel #}
+                            <div class="p-2" id="secretariat-divisions-panel" role="tabpanel" aria-labelledby="secretariat-divisions-tab">
+                                <div class="mb-4">
+                                    <label class="block text-gray-700 text-sm font-semibold mb-2">Search Secretariat</label>
+                                    <input type="text"
+                                           id="secretariat-search"
+                                           class="form-input w-full rounded-md border-gray-300"
+                                           placeholder="Search divisions or departments...">
+                                </div>
+                                <div id="secretariat-hierarchy-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
+                                    <!-- Hierarchical Secretariat structure will be loaded here by JavaScript -->
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                                        <p class="text-sm text-gray-500 mt-2">Loading Secretariat structure...</p>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            {# Regions panel #}
+                            <div class="hidden p-2" id="secretariat-regions-panel" role="tabpanel" aria-labelledby="secretariat-regions-tab">
+                                <div class="mb-4">
+                                    <label class="block text-gray-700 text-sm font-semibold mb-2">Search Regions</label>
+                                    <input type="text"
+                                           id="secretariat-regions-search"
+                                           class="form-input w-full rounded-md border-gray-300"
+                                           placeholder="Search regional or cluster offices...">
+                                </div>
+                                <div id="secretariat-regions-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
+                                    <!-- Hierarchical Regions structure will be loaded here by JavaScript -->
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                                        <p class="text-sm text-gray-500 mt-2">Loading Regions structure...</p>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {# NS Structure Tab - Hierarchical view of Branches > Sub-branches > Local Units #}
+        </div>
+    </div> {# End of entity-assignments-content #}
+</div> {# End of Entity Assignments section #}
+{% endif %}
+
+{# Modal for editing AssignmentEntityStatus - only for existing assignments #}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% if assignment %}
+{% call modal_shell('edit-status-modal', 'Edit Status for <span id="edit-status-modal-entity-name" class="font-bold ml-1">Entity</span>', aria_label=_('Edit Status'), max_width='max-w-md', title_safe=true) %}
+        <form id="edit-status-actual-form" method="POST" action="">
+            {{ edit_aes_form.csrf_token }}
+            <input type="hidden" name="aes_id" id="edit-status-modal-aes-id">
+            <input type="hidden" name="entity_type" id="edit-status-modal-entity-type">
+            <input type="hidden" name="bulk_edit_mode" id="edit-status-modal-bulk-mode" value="0">
+
+            <div class="mb-4">
+                 {{ edit_aes_form.status.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                 {{ edit_aes_form.status(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                 {% for error in edit_aes_form.status.errors %}
+                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                 {% endfor %}
+            </div>
+
+            <div class="mb-6">
+                 {{ edit_aes_form.due_date.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                 {{ edit_aes_form.due_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                 {% for error in edit_aes_form.due_date.errors %}
+                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                 {% endfor %}
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                {{ edit_aes_form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+{% endcall %}
+
+{% if assignment %}
+{# Modal for bulk change status (entity grid selection) #}
+{% call modal_shell('bulk-status-modal', _('Change status of selected'), max_width='max-w-md') %}
+<form id="bulk-status-form">
+    <div class="mb-4">
+        <label for="bulk-status-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('New status') }}</label>
+        <select id="bulk-status-select" name="status" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+            <option value="">{{ _('Select status') }}</option>
+            <option value="Pending">{{ _('Pending') }}</option>
+            <option value="In Progress">{{ _('In Progress') }}</option>
+            <option value="Submitted">{{ _('Submitted') }}</option>
+            <option value="Approved">{{ _('Approved') }}</option>
+            <option value="Completed">{{ _('Completed') }}</option>
+        </select>
+    </div>
+    <div class="flex justify-end space-x-3">
+        <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ _('Apply') }}</button>
+    </div>
+</form>
+{% endcall %}
+
+{# Modal for bulk change due date (entity grid selection) #}
+{% call modal_shell('bulk-duedate-selected-modal', _('Change due date of selected'), max_width='max-w-md') %}
+<form id="bulk-duedate-selected-form">
+    <div class="mb-4">
+        <label for="bulk-duedate-selected-input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('New due date') }}</label>
+        <input type="date" id="bulk-duedate-selected-input" name="due_date"
+               class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" required>
+    </div>
+    <div class="flex justify-end space-x-3">
+        <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ _('Apply') }}</button>
+    </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endif %}
+
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- AG Grid JS -->
+{% from "components/ag_grid_includes.html" import ag_grid_js %}
+{{ ag_grid_js() }}
+<!-- Include utils for flash messages -->
+<script src="{{ static_url('js/form_builder/modules/utils.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+    try {
+        window.scriptLoaded = true;
+    } catch(e) {
+        if (window.showAlert) window.showAlert('Error in script initialization: ' + e.message, 'error');
+        else console.error('Error:', e.message);
+    }
+
+    $(document).ready(function() {
+
+        // Debug function to inspect current state (can be called from console)
+        window.debugEntityTabs = function() {
+            window.__clientLog && window.__clientLog('[DEBUG] ===== Entity Tabs Debug Info =====');
+            const tabsContainer = document.getElementById('entity-tabs');
+            const contentContainer = document.getElementById('entity-tabs-content');
+            const assignmentsContent = document.getElementById('entity-assignments-content');
+
+            window.__clientLog && window.__clientLog('[DEBUG] Tabs container exists:', !!tabsContainer);
+            window.__clientLog && window.__clientLog('[DEBUG] Content container exists:', !!contentContainer);
+            window.__clientLog && window.__clientLog('[DEBUG] Assignments content exists:', !!assignmentsContent);
+            window.__clientLog && window.__clientLog('[DEBUG] Assignments content hidden:', assignmentsContent ? assignmentsContent.classList.contains('hidden') : 'N/A');
+
+            if (tabsContainer) {
+                const buttons = tabsContainer.querySelectorAll('button[role="tab"]');
+                window.__clientLog && window.__clientLog('[DEBUG] Found', buttons.length, 'tab buttons:');
+                buttons.forEach((btn, i) => {
+                    window.__clientLog && window.__clientLog('[DEBUG]   Button', i + ':', {
+                        id: btn.id,
+                        text: btn.textContent.trim(),
+                        target: btn.getAttribute('data-tabs-target'),
+                        handlerAttached: btn.dataset.tabHandlerAttached === 'true'
+                    });
+                });
+            }
+
+            if (contentContainer) {
+                const panels = contentContainer.querySelectorAll('div[role="tabpanel"]');
+                window.__clientLog && window.__clientLog('[DEBUG] Found', panels.length, 'tab panels:');
+                panels.forEach((panel, i) => {
+                    const computedStyle = window.getComputedStyle(panel);
+                    window.__clientLog && window.__clientLog('[DEBUG]   Panel', i + ':', {
+                        id: panel.id,
+                        hasHiddenClass: panel.classList.contains('hidden'),
+                        display: computedStyle.display,
+                        visibility: computedStyle.visibility,
+                        height: computedStyle.height,
+                        width: computedStyle.width
+                    });
+                });
+            }
+
+            window.__clientLog && window.__clientLog('[DEBUG] Current entityTabButtons:', entityTabButtons ? entityTabButtons.length : 'null');
+            window.__clientLog && window.__clientLog('[DEBUG] Current entityTabPanels:', entityTabPanels ? entityTabPanels.length : 'null');
+            window.__clientLog && window.__clientLog('[DEBUG] Stored tab in localStorage:', localStorage.getItem('selectedAssignmentEntityTab'));
+            window.__clientLog && window.__clientLog('[DEBUG] ===== End Debug Info =====');
+        };
+
+        // Initialize Select2 for the "Select Countries to Add" dropdown
+        $('#add_country_select').select2({
+            placeholder: 'Select countries...',
+            allowClear: true,
+            width: '100%',
+            theme: "default"
+        });
+
+        // --- Period Name Generation and Parsing ---
+        const periodTypeSelect = document.getElementById('period-type');
+        const singleYearField = document.getElementById('single-year');
+        const startYearField = document.getElementById('start-year');
+        const endYearField = document.getElementById('end-year');
+        const startMonthYearField = document.getElementById('start-month-year');
+        const startMonthSelect = document.getElementById('start-month');
+        const endMonthYearField = document.getElementById('end-month-year');
+        const endMonthSelect = document.getElementById('end-month');
+        const hiddenPeriodNameField = document.querySelector('input[name="period_name"]');
+
+        // Month names for display
+        const monthNames = {
+            '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+            '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
+            '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'
+        };
+
+        // Function to show/hide period fields based on type
+        function togglePeriodFields() {
+            const periodType = periodTypeSelect.value;
+
+            // Hide all period fields
+            document.querySelectorAll('.period-fields').forEach(field => {
+                field.classList.add('hidden');
+            });
+
+            // Show relevant fields
+            if (periodType === 'single-year') {
+                document.getElementById('single-year-fields').classList.remove('hidden');
+            } else if (periodType === 'year-range') {
+                document.getElementById('year-range-start').classList.remove('hidden');
+                document.getElementById('year-range-end').classList.remove('hidden');
+            } else if (periodType === 'month-range') {
+                document.getElementById('month-range-start').classList.remove('hidden');
+                document.getElementById('month-range-end').classList.remove('hidden');
+            }
+
+            generatePeriodName();
+        }
+
+        // Function to generate period name based on current values
+        function generatePeriodName() {
+            const periodType = periodTypeSelect.value;
+            let periodName = '';
+
+            if (periodType === 'single-year') {
+                const year = singleYearField.value;
+                if (year) {
+                    periodName = year;
+                }
+            } else if (periodType === 'year-range') {
+                const startYear = startYearField.value;
+                const endYear = endYearField.value;
+                if (startYear && endYear) {
+                    if (startYear === endYear) {
+                        periodName = startYear;
+                    } else {
+                        periodName = `${startYear}-${endYear}`;
+                    }
+                } else if (startYear) {
+                    periodName = startYear;
+                }
+            } else if (periodType === 'month-range') {
+                const startYear = startMonthYearField.value;
+                const startMonth = startMonthSelect.value;
+                const endYear = endMonthYearField.value;
+                const endMonth = endMonthSelect.value;
+
+                if (startYear && startMonth && endYear && endMonth) {
+                    const startMonthName = monthNames[startMonth];
+                    const endMonthName = monthNames[endMonth];
+
+                    if (startYear === endYear && startMonth === endMonth) {
+                        periodName = `${startMonthName} ${startYear}`;
+                    } else if (startYear === endYear) {
+                        periodName = `${startMonthName}-${endMonthName} ${startYear}`;
+                    } else {
+                        periodName = `${startMonthName} ${startYear}-${endMonthName} ${endYear}`;
+                    }
+                }
+            }
+
+            // Update hidden field
+            hiddenPeriodNameField.value = periodName || '';
+
+            // Hide error message if period name is now valid
+            const errorContainer = document.getElementById('period-name-error');
+            if (periodName && errorContainer) {
+                errorContainer.classList.add('hidden');
+            }
+        }
+
+        // Function to parse existing period name and populate fields
+        function parseExistingPeriodName(periodName) {
+            if (!periodName) return;
+
+            // Try to detect the format and populate fields accordingly
+            const yearPattern = /^(\d{4})$/;
+            const yearRangePattern = /^(\d{4})-(\d{4})$/;
+            const monthPattern = /^([A-Za-z]{3})\s+(\d{4})$/;
+            const monthRangePattern = /^([A-Za-z]{3})\s+(\d{4})-([A-Za-z]{3})\s+(\d{4})$/;
+            const monthYearRangePattern = /^([A-Za-z]{3})\s+(\d{4})-([A-Za-z]{3})\s+(\d{4})$/;
+
+            if (yearPattern.test(periodName)) {
+                // Single year: "2024"
+                const match = periodName.match(yearPattern);
+                periodTypeSelect.value = 'single-year';
+                singleYearField.value = match[1];
+            } else if (yearRangePattern.test(periodName)) {
+                // Year range: "2024-2025"
+                const match = periodName.match(yearRangePattern);
+                periodTypeSelect.value = 'year-range';
+                startYearField.value = match[1];
+                endYearField.value = match[2];
+            } else if (monthRangePattern.test(periodName)) {
+                // Month range: "Jan 2024-Dec 2025" or "Jan-Dec 2024"
+                const match = periodName.match(monthRangePattern);
+                periodTypeSelect.value = 'month-range';
+
+                // Find month numbers
+                const monthToNumber = {
+                    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                    'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                    'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+                };
+
+                startMonthSelect.value = monthToNumber[match[1]];
+                startMonthYearField.value = match[2];
+                endMonthSelect.value = monthToNumber[match[3]];
+                endMonthYearField.value = match[4];
+            } else if (monthPattern.test(periodName)) {
+                // Single month: "Jan 2024"
+                const match = periodName.match(monthPattern);
+                periodTypeSelect.value = 'month-range';
+
+                const monthToNumber = {
+                    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                    'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                    'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+                };
+
+                startMonthSelect.value = monthToNumber[match[1]];
+                startMonthYearField.value = match[2];
+                endMonthSelect.value = monthToNumber[match[1]];
+                endMonthYearField.value = match[2];
+            }
+
+            togglePeriodFields();
+        }
+
+        // Event listeners
+        periodTypeSelect.addEventListener('change', togglePeriodFields);
+        singleYearField.addEventListener('input', generatePeriodName);
+        startYearField.addEventListener('input', generatePeriodName);
+        endYearField.addEventListener('input', generatePeriodName);
+        startMonthYearField.addEventListener('input', generatePeriodName);
+        startMonthSelect.addEventListener('change', generatePeriodName);
+        endMonthYearField.addEventListener('input', generatePeriodName);
+        endMonthSelect.addEventListener('change', generatePeriodName);
+
+        // Remove required attribute from hidden period_name field to prevent browser validation
+        // (we handle validation with JavaScript instead)
+        if (hiddenPeriodNameField) {
+            hiddenPeriodNameField.removeAttribute('required');
+        }
+
+        // Initialize with existing period name if editing
+        const existingPeriodName = JSON.parse('{{ (assignment.period_name if assignment and assignment.period_name else none) | tojson }}');
+        if (existingPeriodName) {
+            parseExistingPeriodName(existingPeriodName);
+        }
+
+        // --- Modal Handling ---
+        const editStatusModal = document.getElementById('edit-status-modal');
+        const editStatusActualForm = document.getElementById('edit-status-actual-form');
+        const editStatusModalEntityNameSpan = document.getElementById('edit-status-modal-entity-name');
+        const editStatusModalAesIdInput = document.getElementById('edit-status-modal-aes-id');
+        const editStatusModalEntityTypeInput = document.getElementById('edit-status-modal-entity-type');
+        const editStatusModalStatusSelect = document.getElementById('status');
+        const editStatusModalDueDateInput = document.getElementById('due_date');
+
+        const allModals = document.querySelectorAll('.fixed.inset-0.z-50');
+        const closeModalButtons = document.querySelectorAll('.close-modal');
+
+        function openModal(modalElement) { if(modalElement) modalElement.classList.remove('hidden'); }
+        function closeModal(modalElement) { if(modalElement) modalElement.classList.add('hidden'); }
+
+        closeModalButtons.forEach(btn => btn.addEventListener('click', function() { closeModal(this.closest('.fixed.inset-0.z-50')); }));
+        window.addEventListener('click', e => { allModals.forEach(modal => { if (e.target == modal) closeModal(modal); }); });
+
+        // --- Edit Entity Status Button Click Handler (using event delegation) ---
+        // Use event delegation so it works with AG Grid
+        document.addEventListener('click', function(e) {
+            // Check if the clicked element or its parent is an edit button
+            const editButton = e.target.closest('.edit-entity-status-btn');
+            if (editButton) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const aesId = editButton.dataset.aesId;
+                const entityName = editButton.dataset.entityName;
+                const entityType = editButton.dataset.entityType;
+                const currentStatus = editButton.dataset.currentStatus;
+                const currentDueDate = editButton.dataset.currentDueDate;
+
+                // Populate modal fields (single-entity mode)
+                const bulkModeInput = document.getElementById('edit-status-modal-bulk-mode');
+                if (bulkModeInput) bulkModeInput.value = '0';
+                if(editStatusModalEntityNameSpan) editStatusModalEntityNameSpan.textContent = entityName;
+                if(editStatusModalAesIdInput) editStatusModalAesIdInput.value = aesId;
+                if(editStatusModalEntityTypeInput) editStatusModalEntityTypeInput.value = entityType || '';
+                if(editStatusModalStatusSelect) editStatusModalStatusSelect.value = currentStatus;
+                if(editStatusModalDueDateInput) editStatusModalDueDateInput.value = currentDueDate;
+
+                // Set the form action URL dynamically - use entity status update endpoint
+                if(editStatusActualForm) {
+                    editStatusActualForm.action = `/admin/assignment_entity_status/edit/${aesId}`;
+                    editStatusActualForm.method = 'POST';
+                }
+
+                // Open the modal
+                openModal(editStatusModal);
+            }
+        });
+
+        // --- Edit Status Button Click Handler (legacy - for backward compatibility, using event delegation) ---
+        document.addEventListener('click', function(e) {
+            // Check if the clicked element or its parent is a legacy edit button
+            const editButton = e.target.closest('.edit-status-btn');
+            if (editButton) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const aesId = editButton.dataset.aesId;
+                const countryName = editButton.dataset.countryName;
+                const currentStatus = editButton.dataset.currentStatus;
+                const currentDueDate = editButton.dataset.currentDueDate;
+
+                // Populate modal fields (single-entity mode)
+                const bulkModeInputLegacy = document.getElementById('edit-status-modal-bulk-mode');
+                if (bulkModeInputLegacy) bulkModeInputLegacy.value = '0';
+                if(editStatusModalEntityNameSpan) editStatusModalEntityNameSpan.textContent = countryName;
+                if(editStatusModalAesIdInput) editStatusModalAesIdInput.value = aesId;
+                if(editStatusModalEntityTypeInput) editStatusModalEntityTypeInput.value = 'country';
+                if(editStatusModalStatusSelect) editStatusModalStatusSelect.value = currentStatus;
+                if(editStatusModalDueDateInput) editStatusModalDueDateInput.value = currentDueDate;
+
+                // Set the form action URL dynamically
+                if(editStatusActualForm) {
+                    editStatusActualForm.action = `/admin/assignment_entity_status/edit/${aesId}`;
+                    editStatusActualForm.method = 'POST';
+                }
+
+                // Open the modal
+                openModal(editStatusModal);
+            }
+        });
+
+        // --- Initialize AG Grid for entity management (LAZY INITIALIZATION) ---
+        window.__clientLog && window.__clientLog('[SETUP] Defining initializeEntityGrid function');
+        let entityGridInitialized = false;
+        let entityGridHelper = null;
+        let entityGridApi = null;
+
+        // Transform assignment entities data for ag-grid
+        const entityManagementData = [
+            {% for aes in assignment_entities %}
+            {
+                id: {{ aes.id }},
+                entity_type: {{ (aes.entity_type or '')|tojson|safe }},
+                entity_type_label: {{ (
+                    'Country' if aes.entity_type == 'country' else
+                    'NS Branch' if aes.entity_type == 'ns_branch' else
+                    'NS Sub-branch' if aes.entity_type == 'ns_subbranch' else
+                    'NS Local Unit' if aes.entity_type == 'ns_localunit' else
+                    'Division' if aes.entity_type == 'division' else
+                    'Department' if aes.entity_type == 'department' else
+                    'Regional Office' if aes.entity_type == 'regional_office' else
+                    'Cluster Office' if aes.entity_type == 'cluster_office' else
+                    (aes.entity_type | replace('_', ' ') | title)
+                )|tojson|safe }},
+                entity_name: {{ EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True)|tojson|safe }},
+                entity_id: {{ aes.entity_id|tojson|safe }},
+                status: {{ (aes.status or '')|tojson|safe }},
+                due_date: {{ (aes.due_date|datetime_iso if aes.due_date else '')|tojson|safe }},
+                is_public_available: {{ aes.is_public_available|tojson|safe }},
+                has_public_url: {{ assignment.has_public_url()|tojson|safe }},
+                edit_url: "#",
+                remove_from_public_url: {{ (url_for('assignment_management.remove_country_from_public', assignment_id=assignment.id, country_id=aes.entity_id) if assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson|safe }},
+                add_to_public_url: {{ (url_for('assignment_management.add_country_to_public', assignment_id=assignment.id, country_id=aes.entity_id) if assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson|safe }},
+                remove_country_url: {{ (url_for('assignment_management.remove_country_from_assignment', assignment_id=assignment.id, country_id=aes.entity_id) if aes.entity_type == 'country' else '')|tojson|safe }},
+                remove_entity_url: {{ (url_for('assignment_management.remove_entity_from_assignment', assignment_id=assignment.id, status_id=aes.id) if aes.entity_type != 'country' else '')|tojson|safe }},
+                remove_confirm: {{ ('Are you sure you want to remove ' + EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) + ' from this assignment and delete its data?')|tojson|safe }},
+                remove_public_confirm: {{ ('Remove ' + EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) + ' from public reporting?')|tojson|safe }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        const hasPublicColumn = {{ 'true' if (assignment and assignment.has_public_url()) else 'false' }};
+
+        // Helper function to render status badge
+        function renderStatusBadge(status) {
+            const statusLower = (status || '').toLowerCase();
+            let bgClass = 'bg-gray-100';
+            let textClass = 'text-gray-800';
+            if (statusLower === 'completed') {
+                bgClass = 'bg-green-100';
+                textClass = 'text-green-800';
+            } else if (statusLower === 'in progress') {
+                bgClass = 'bg-yellow-100';
+                textClass = 'text-yellow-800';
+            } else if (statusLower === 'pending') {
+                bgClass = 'bg-blue-100';
+                textClass = 'text-blue-800';
+            }
+            const statusTitle = String(status || '')
+                .replace(/_/g, ' ')
+                .trim()
+                .replace(/\s+/g, ' ')
+                .replace(/\b\w/g, function(chr) { return chr.toUpperCase(); });
+            return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + ' ' + textClass + '">' + statusTitle + '</span>';
+        }
+
+        // Helper function to render public reporting badge
+        function renderPublicBadge(isAvailable) {
+            if (isAvailable) {
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>Available</span>';
+            } else {
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800"><i class="fas fa-times-circle mr-1"></i>Not Available</span>';
+            }
+        }
+
+        // Column definitions for ag-grid (ag-grid adds its own checkbox column when rowSelection is used; do not add a second one)
+        const entityColumnDefs = [
+            {
+                field: 'entity_type_label',
+                headerName: 'Entity Type',
+                width: 150,
+                minWidth: 120,
+                maxWidth: 200,
+                filter: 'customSetFilter',
+                sortable: true,
+                cellRenderer: function(params) {
+                    return '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">' + (params.value || '') + '</span>';
+                }
+            },
+            {
+                field: 'entity_name',
+                headerName: 'Entity Name',
+                width: 300,
+                minWidth: 200,
+                maxWidth: 500,
+                filter: 'agTextColumnFilter',
+                sortable: true
+            },
+            {
+                field: 'status',
+                headerName: 'Assignment Status',
+                width: 180,
+                minWidth: 150,
+                maxWidth: 250,
+                filter: 'customSetFilter',
+                sortable: true,
+                cellRenderer: function(params) {
+                    return renderStatusBadge(params.value);
+                }
+            },
+            {
+                field: 'due_date',
+                headerName: 'Due Date',
+                width: 150,
+                minWidth: 120,
+                maxWidth: 200,
+                filter: 'agDateColumnFilter',
+                filterParams: AgGridRenderers.dateFilterParams,
+                sortable: true,
+                cellRenderer: function(params) {
+                    if (!params.value) return '<span class="text-gray-400 italic">Not set</span>';
+                    try {
+                        const d = new Date(params.value);
+                        if (isNaN(d.getTime())) return params.value;
+                        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    } catch(e) { return params.value; }
+                }
+            }{% if assignment and assignment.has_public_url() %},
+            {
+                field: 'is_public_available',
+                headerName: 'Public Reporting',
+                width: 180,
+                minWidth: 150,
+                maxWidth: 250,
+                filter: 'customSetFilter',
+                sortable: true,
+                cellRenderer: function(params) {
+                    return renderPublicBadge(params.value);
+                }
+            }{% endif %}
+        ];
+
+        function initializeEntityGrid() {
+            window.__clientLog && window.__clientLog('[INIT-FUNC] initializeEntityGrid function called');
+            if (entityGridInitialized) {
+                window.__clientLog && window.__clientLog('[INIT] Already initialized, returning');
+                return;
+            }
+
+            const gridContainer = document.getElementById('entityManagementGrid');
+            if (!gridContainer) {
+                window.__clientLog && window.__clientLog('[INIT] Grid container not found');
+                return;
+            }
+
+            window.__clientLog && window.__clientLog('[INIT] Initializing AG Grid for entity management');
+
+            entityGridHelper = new AgGridHelper({
+                containerId: 'entityManagementGrid',
+                templateId: 'entity-management',
+                columnDefs: entityColumnDefs,
+                rowData: entityManagementData,
+                options: {
+                    onSelectionChanged: function() {
+                        const bulkBar = document.getElementById('entity-grid-bulk-actions');
+                        const countEl = document.getElementById('entity-grid-selected-count');
+                        const api = window.entityGridApi;
+                        const selected = api ? (api.getSelectedRows && api.getSelectedRows()) : [];
+                        if (bulkBar && countEl) {
+                            if (selected && selected.length > 0) {
+                                bulkBar.classList.remove('hidden');
+                                bulkBar.classList.add('flex');
+                                countEl.textContent = selected.length + ' selected';
+                            } else {
+                                bulkBar.classList.add('hidden');
+                                bulkBar.classList.remove('flex');
+                                countEl.textContent = '0 selected';
+                            }
+                        }
+                    }
+                },
+                columnVisibilityOptions: {
+                    enableExport: false,
+                    enableReset: true
+                }
+            });
+
+            entityGridApi = entityGridHelper.initialize();
+            window.entityGridApi = entityGridApi;
+            window.entityGridHelper = entityGridHelper;
+
+            entityGridInitialized = true;
+            window.__clientLog && window.__clientLog('[INIT] Entity management grid initialized');
+        }
+
+        // --- Bulk actions for entity grid selection ---
+        function getEntityGridSelectedIds() {
+            const api = window.entityGridApi;
+            if (!api || typeof api.getSelectedRows !== 'function') return [];
+            const rows = api.getSelectedRows();
+            return (rows || []).map(function(r) { return r.id; }).filter(Boolean);
+        }
+
+        document.getElementById('entity-grid-bulk-delete-btn')?.addEventListener('click', function() {
+            const ids = getEntityGridSelectedIds();
+            if (ids.length === 0) return;
+            const msg = 'Are you sure you want to remove ' + ids.length + ' selected entit' + (ids.length === 1 ? 'y' : 'ies') + ' from this assignment? This will delete their data.';
+            function doRemove() {
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                fetch('/admin/assignments/{{ assignment.id }}/entities/bulk-remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
+                    body: JSON.stringify({ status_ids: ids })
+                }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+                  .then(function(result) {
+                      if (result.ok && result.data.success) { window.location.reload(); }
+                      else {
+                        var m = result.data.error || 'Failed to remove entities.';
+                        if (window.showAlert) window.showAlert(m, 'error');
+                      }
+                  })
+                  .catch(function() {
+                    if (window.showAlert) window.showAlert('Request failed.', 'error');
+                  });
+            }
+            if (window.showConfirmation) {
+                window.showConfirmation(msg, doRemove, function() {}, {{ _('Remove')|tojson }}, {{ _('Cancel')|tojson }}, {{ _('Remove entities')|tojson }});
+            } else {
+                doRemove();
+            }
+        });
+
+        // Bulk enable/disable public reporting for selected entities
+        function bulkUpdatePublicAvailability(enable) {
+            const ids = getEntityGridSelectedIds();
+            if (ids.length === 0) return;
+            const action = enable ? 'enable' : 'disable';
+            const msg = 'Are you sure you want to ' + action + ' public reporting for ' + ids.length + ' selected entit' + (ids.length === 1 ? 'y' : 'ies') + '?';
+            function doUpdate() {
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                fetch('/admin/assignments/{{ assignment.id }}/entities/bulk-update-public', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
+                    body: JSON.stringify({ status_ids: ids, enable: enable })
+                }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+                  .then(function(result) {
+                      if (result.ok && result.data.success) {
+                          if (typeof Utils !== 'undefined' && Utils.showSuccess) Utils.showSuccess(result.data.message);
+                          window.location.reload();
+                      } else {
+                          var m = result.data.error || result.data.message || 'Failed to update public reporting.';
+                          if (window.showAlert) window.showAlert(m, 'error');
+                      }
+                  })
+                  .catch(function() {
+                    if (window.showAlert) window.showAlert('Request failed.', 'error');
+                  });
+            }
+            if (window.showConfirmation) {
+                window.showConfirmation(msg, doUpdate, function() {}, {{ _('Confirm')|tojson }}, {{ _('Cancel')|tojson }}, {{ _('Public reporting')|tojson }});
+            } else {
+                doUpdate();
+            }
+        }
+        document.getElementById('entity-grid-bulk-public-enable-btn')?.addEventListener('click', function() { bulkUpdatePublicAvailability(true); });
+        document.getElementById('entity-grid-bulk-public-disable-btn')?.addEventListener('click', function() { bulkUpdatePublicAvailability(false); });
+
+        // "Change status" opens the bulk-status-modal (status only)
+        const bulkStatusModal = document.getElementById('bulk-status-modal');
+        document.getElementById('entity-grid-bulk-status-btn')?.addEventListener('click', function() {
+            const ids = getEntityGridSelectedIds();
+            if (ids.length === 0) return;
+            const select = document.getElementById('bulk-status-select');
+            if (select) select.value = '';
+            openModal(bulkStatusModal);
+        });
+
+        // Bulk status form submit
+        document.getElementById('bulk-status-form')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const ids = getEntityGridSelectedIds();
+            const status = document.getElementById('bulk-status-select')?.value;
+            if (ids.length === 0 || !status) {
+                if (!status) {
+                    if (window.showAlert) window.showAlert('Please select a status.', 'warning');
+                }
+                return;
+            }
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            fetch('/admin/assignments/{{ assignment.id }}/entities/bulk-update-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
+                body: JSON.stringify({ status_ids: ids, status: status })
+            }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+              .then(function(result) {
+                  if (result.ok && result.data.success) { closeModal(bulkStatusModal); window.location.reload(); }
+                  else {
+                    var m = result.data.error || 'Failed to update status.';
+                    if (window.showAlert) window.showAlert(m, 'error');
+                  }
+              })
+              .catch(function() {
+                if (window.showAlert) window.showAlert('Request failed.', 'error'); else window.__clientWarn && window.__clientWarn('Request failed.');
+              });
+        });
+
+        // "Change due date" opens the bulk-duedate-selected-modal
+        const bulkDuedateSelectedModal = document.getElementById('bulk-duedate-selected-modal');
+        document.getElementById('entity-grid-bulk-duedate-btn')?.addEventListener('click', function() {
+            const ids = getEntityGridSelectedIds();
+            if (ids.length === 0) return;
+            const input = document.getElementById('bulk-duedate-selected-input');
+            if (input) input.value = '';
+            openModal(bulkDuedateSelectedModal);
+        });
+
+        // Bulk due date form submit
+        document.getElementById('bulk-duedate-selected-form')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const ids = getEntityGridSelectedIds();
+            const dueDate = document.getElementById('bulk-duedate-selected-input')?.value;
+            if (ids.length === 0 || !dueDate) {
+                if (!dueDate) {
+                    if (window.showAlert) window.showAlert('Please select a date.', 'warning');
+                }
+                return;
+            }
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            fetch('/admin/assignments/{{ assignment.id }}/entities/bulk-update-due-date', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
+                body: JSON.stringify({ status_ids: ids, due_date: dueDate })
+            }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+              .then(function(result) {
+                  if (result.ok && result.data.success) { closeModal(bulkDuedateSelectedModal); window.location.reload(); }
+                  else {
+                    var m = result.data.error || 'Failed to update due date.';
+                    if (window.showAlert) window.showAlert(m, 'error');
+                  }
+              })
+              .catch(function() {
+                if (window.showAlert) window.showAlert('Request failed.', 'error'); else window.__clientWarn && window.__clientWarn('Request failed.');
+              });
+        });
+
+        // Initialize Select2 for the status dropdown within the modal
+        if (typeof $ !== 'undefined' && $.fn.select2) {
+             $('#status').select2({
+                 dropdownParent: $('#edit-status-modal'),
+                 width: '100%',
+                 theme: "default",
+                 minimumResultsForSearch: -1
+             });
+         } else {
+             window.__clientWarn && window.__clientWarn("jQuery or Select2 is not loaded. Select2 functionality for status dropdown will be unavailable.");
+         }
+
+        // --- Add Countries Section Checkbox Handling ---
+        const regionSelectAllCheckboxes = document.querySelectorAll('.region-select-all-entity');
+        const countryCheckboxes = document.querySelectorAll('.country-checkbox-entity');
+        const globalSelectAllCheckbox = document.getElementById('select-all-countries-entity');
+
+        // Function to update the state of a region "Select All" checkbox
+        function updateRegionSelectAll(region) {
+            const regionSelectAllCheckbox = document.querySelector(`.region-select-all-entity[data-region="${region}"]`);
+            const countriesInRegion = document.querySelectorAll(`.region-countries-entity[data-region="${region}"] .country-checkbox-entity`);
+            const enabledCheckboxes = Array.from(countriesInRegion).filter(cb => !cb.disabled);
+            const allChecked = enabledCheckboxes.length > 0 && enabledCheckboxes.every(cb => cb.checked);
+            if (regionSelectAllCheckbox) {
+                regionSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+        // Update all region select all checkboxes
+        function updateRegionSelectAlls() {
+            const regions = new Set();
+            document.querySelectorAll('.region-select-all-entity').forEach(cb => {
+                if (cb.dataset.region) {
+                    regions.add(cb.dataset.region);
+                }
+            });
+            regions.forEach(region => updateRegionSelectAll(region));
+        }
+
+        // Function to update the state of the global "Select All" checkbox
+        function updateGlobalSelectAll() {
+            const allCountryCheckboxes = document.querySelectorAll('.country-checkbox-entity');
+            const enabledCheckboxes = Array.from(allCountryCheckboxes).filter(cb => !cb.disabled);
+            const allChecked = enabledCheckboxes.length > 0 && enabledCheckboxes.every(cb => cb.checked);
+            if (globalSelectAllCheckbox) {
+                globalSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+        // Add event listener to the global "Select All" checkbox
+        if (globalSelectAllCheckbox) {
+            globalSelectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                countryCheckboxes.forEach(countryCheckbox => {
+                    countryCheckbox.checked = isChecked;
+                });
+                regionSelectAllCheckboxes.forEach(regionCheckbox => {
+                    regionCheckbox.checked = isChecked;
+                });
+            });
+        }
+
+        // Add event listener to each region "Select All" checkbox
+        regionSelectAllCheckboxes.forEach(regionCheckbox => {
+            regionCheckbox.addEventListener('change', function() {
+                const region = this.dataset.region;
+                const isChecked = this.checked;
+                const countriesInRegion = document.querySelectorAll(`.region-countries-entity[data-region="${region}"] .country-checkbox-entity`);
+                countriesInRegion.forEach(countryCheckbox => {
+                    if (!countryCheckbox.disabled) {
+                        countryCheckbox.checked = isChecked;
+                    }
+                });
+                updateGlobalSelectAll();
+            });
+        });
+
+        // Add event listener to individual country checkboxes
+        countryCheckboxes.forEach(countryCheckbox => {
+            countryCheckbox.addEventListener('change', function() {
+                const regionContainer = this.closest('.region-countries');
+                if (regionContainer) {
+                    const region = regionContainer.dataset.region;
+                    updateRegionSelectAll(region);
+                }
+                updateGlobalSelectAll();
+            });
+        });
+
+        // Initial state on page load
+        updateGlobalSelectAll();
+        regionSelectAllCheckboxes.forEach(regionCheckbox => {
+            const region = regionCheckbox.dataset.region;
+            updateRegionSelectAll(region);
+        });
+
+        // --- Copy Public URL Functionality ---
+        const copyPublicUrlBtn = document.getElementById('copy-public-url-btn');
+        if (copyPublicUrlBtn) {
+            copyPublicUrlBtn.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                navigator.clipboard.writeText(url).then(function() {
+                    // Show success feedback
+                    const originalText = copyPublicUrlBtn.innerHTML;
+                    copyPublicUrlBtn.innerHTML = '<i class="fas fa-check mr-1"></i> Copied!';
+                    copyPublicUrlBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    copyPublicUrlBtn.classList.add('bg-green-600');
+
+                    setTimeout(function() {
+                        copyPublicUrlBtn.innerHTML = originalText;
+                        copyPublicUrlBtn.classList.remove('bg-green-600');
+                        copyPublicUrlBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    }, 2000);
+                }).catch(function(err) {
+                    console.error('Failed to copy text: ', err);
+                    Utils.showError('Failed to copy URL. Please try again.');
+                });
+            });
+        }
+
+        // --- Public URL Options for New Assignments ---
+        const generatePublicUrlCheckbox = document.getElementById('generate_public_url');
+        const publicUrlActiveContainer = document.getElementById('public-url-active-container');
+
+        if (generatePublicUrlCheckbox && publicUrlActiveContainer) {
+            function togglePublicUrlActive() {
+                if (generatePublicUrlCheckbox.checked) {
+                    publicUrlActiveContainer.style.display = 'flex';
+                } else {
+                    publicUrlActiveContainer.style.display = 'none';
+                }
+            }
+
+            // Initial state
+            togglePublicUrlActive();
+
+            // Listen for changes
+            generatePublicUrlCheckbox.addEventListener('change', togglePublicUrlActive);
+        }
+
+        // --- Toggle Public Access (avoid nested form submission) ---
+        const togglePublicAccessBtn = document.getElementById('toggle-public-access-btn');
+        if (togglePublicAccessBtn) {
+            togglePublicAccessBtn.addEventListener('click', function() {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/assignments/{{ assignment.id }}/toggle_public_access';
+
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                const csrfField = document.querySelector('input[name="csrf_token"]');
+                csrfInput.value = csrfField ? csrfField.value : '';
+                form.appendChild(csrfInput);
+
+                const nextInput = document.createElement('input');
+                nextInput.type = 'hidden';
+                nextInput.name = 'next';
+                nextInput.value = window.location.href;
+                form.appendChild(nextInput);
+
+                document.body.appendChild(form);
+                HTMLFormElement.prototype.submit.call(form);
+            });
+        }
+
+        // --- Generate Public URL (avoid nested form submission) ---
+        const generatePublicUrlBtn = document.getElementById('generate-public-url-btn');
+        if (generatePublicUrlBtn) {
+            generatePublicUrlBtn.addEventListener('click', function() {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = this.dataset.action;
+
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                const csrfField = document.querySelector('input[name="csrf_token"]');
+                csrfInput.value = csrfField ? csrfField.value : '';
+                form.appendChild(csrfInput);
+
+                const nextInput = document.createElement('input');
+                nextInput.type = 'hidden';
+                nextInput.name = 'next';
+                nextInput.value = this.dataset.next;
+                form.appendChild(nextInput);
+
+                document.body.appendChild(form);
+                HTMLFormElement.prototype.submit.call(form);
+            });
+        }
+
+
+        // Initialize tab switching functionality for Entity Assignments
+        let entityTabButtons = null;
+        let entityTabPanels = null;
+
+        function getEntityTabElements() {
+            // Re-query elements each time to ensure we get them even if section was initially hidden
+            entityTabButtons = document.querySelectorAll('#entity-tabs button[role="tab"]');
+
+            // Use ID-based lookup as primary method since it's more reliable
+            // This ensures we find panels even if they're conditionally rendered or nested
+            const foundPanels = [];
+            entityTabButtons.forEach(btn => {
+                const targetPanelId = btn.getAttribute('data-tabs-target');
+                if (targetPanelId) {
+                    const panelId = targetPanelId.replace('#', '');
+                    const panel = document.getElementById(panelId);
+                    if (panel) {
+                        foundPanels.push(panel);
+                    }
+                }
+            });
+
+            // Fallback to querySelectorAll if ID-based lookup didn't find all panels
+            if (foundPanels.length < entityTabButtons.length) {
+                const queryPanels = document.querySelectorAll('#entity-tabs-content div[role="tabpanel"]');
+                // Merge any panels found by query that weren't found by ID
+                queryPanels.forEach(panel => {
+                    if (!foundPanels.includes(panel)) {
+                        foundPanels.push(panel);
+                    }
+                });
+            }
+
+            entityTabPanels = foundPanels;
+
+            // Only log warnings if there's a mismatch after all attempts
+            if (entityTabPanels.length < entityTabButtons.length) {
+                window.__clientWarn && window.__clientWarn('[DEBUG] getEntityTabElements: Mismatch detected - Found', entityTabPanels.length, 'panels but', entityTabButtons.length, 'buttons');
+            }
+
+            window.__clientLog && window.__clientLog('[DEBUG] getEntityTabElements: Found', entityTabButtons.length, 'buttons and', entityTabPanels.length, 'panels');
+            if (entityTabButtons.length > 0) {
+                window.__clientLog && window.__clientLog('[DEBUG] Tab buttons:', Array.from(entityTabButtons).map(btn => ({
+                    id: btn.id,
+                    target: btn.getAttribute('data-tabs-target'),
+                    text: btn.textContent.trim()
+                })));
+            }
+            if (entityTabPanels.length > 0) {
+                window.__clientLog && window.__clientLog('[DEBUG] Tab panels:', Array.from(entityTabPanels).map(panel => ({
+                    id: panel.id,
+                    hidden: panel.classList.contains('hidden'),
+                    display: window.getComputedStyle(panel).display
+                })));
+            } else if (entityTabButtons.length > 0) {
+                window.__clientWarn && window.__clientWarn('[DEBUG] getEntityTabElements: NO PANELS FOUND! Checking DOM structure...');
+                const tabsContent = document.getElementById('entity-tabs-content');
+                if (tabsContent) {
+                    window.__clientLog && window.__clientLog('[DEBUG] entity-tabs-content exists, children:', tabsContent.children.length);
+                    window.__clientLog && window.__clientLog('[DEBUG] entity-tabs-content HTML:', tabsContent.innerHTML.substring(0, 500));
+                } else {
+                    window.__clientWarn && window.__clientWarn('[DEBUG] entity-tabs-content does not exist!');
+                }
+            }
+        }
+
+        function activateEntityTab(tabId) {
+            window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab called with tabId:', tabId);
+            if (!tabId) {
+                window.__clientWarn && window.__clientWarn('[DEBUG] activateEntityTab: No tabId provided!');
+                return;
+            }
+
+            // Ensure we have fresh references to elements
+            getEntityTabElements();
+
+            // Update tab buttons
+            if (entityTabButtons) {
+                window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Updating', entityTabButtons.length, 'tab buttons');
+                entityTabButtons.forEach(btn => {
+                    const targetPanelId = btn.getAttribute('data-tabs-target');
+                    // Remove # prefix for comparison
+                    const panelId = targetPanelId ? targetPanelId.replace('#', '') : '';
+                    window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Button', btn.id, 'targets panel', panelId, 'comparing with', tabId);
+                    if (panelId === tabId) {
+                        btn.classList.add('text-blue-600', 'border-blue-600');
+                        btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                        btn.setAttribute('aria-selected', 'true');
+                        window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Activated button', btn.id);
+                    } else {
+                        btn.classList.remove('text-blue-600', 'border-blue-600');
+                        btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                        btn.setAttribute('aria-selected', 'false');
+                    }
+                });
+            } else {
+                window.__clientWarn && window.__clientWarn('[DEBUG] activateEntityTab: No tab buttons found!');
+            }
+
+            // Use panels already found by getEntityTabElements()
+            // If not available, fallback to direct lookup
+            let allPanels = entityTabPanels && entityTabPanels.length > 0
+                ? Array.from(entityTabPanels)
+                : [];
+
+            // Fallback: if panels weren't found, try direct ID lookup
+            if (allPanels.length === 0 && entityTabButtons) {
+                entityTabButtons.forEach(btn => {
+                    const targetPanelId = btn.getAttribute('data-tabs-target');
+                    if (targetPanelId) {
+                        const panelId = targetPanelId.replace('#', '');
+                        const panel = document.getElementById(panelId);
+                        if (panel && !allPanels.includes(panel)) {
+                            allPanels.push(panel);
+                        }
+                    }
+                });
+            }
+
+            window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Found', allPanels.length, 'panels to update');
+
+            let targetPanelFound = false;
+            allPanels.forEach(panel => {
+                const beforeHidden = panel.classList.contains('hidden');
+                const beforeDisplay = window.getComputedStyle(panel).display;
+                window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Panel', panel.id, 'before - hidden:', beforeHidden, 'display:', beforeDisplay);
+
+                if (panel.id === tabId) {
+                    // Remove hidden class and explicitly show the panel
+                    panel.classList.remove('hidden');
+                    // Use block display to ensure visibility (Tailwind's hidden uses display: none)
+                    panel.style.display = 'block';
+                    targetPanelFound = true;
+                    const afterHidden = panel.classList.contains('hidden');
+                    const afterDisplay = window.getComputedStyle(panel).display;
+                    window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: SHOWING panel', panel.id, 'after - hidden:', afterHidden, 'display:', afterDisplay);
+
+                    // Initialize AG Grid when "Manage Existing Entities" tab is shown
+                    if (panel.id === 'manage-entities-panel' && typeof initializeEntityGrid === 'function') {
+                        setTimeout(function() {
+                            window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Initializing grid for manage-entities-panel');
+                            initializeEntityGrid();
+                        }, 150);
+                    }
+                } else {
+                    // Add hidden class and explicitly hide
+                    panel.classList.add('hidden');
+                    panel.style.display = 'none';
+                    const afterHidden = panel.classList.contains('hidden');
+                    const afterDisplay = window.getComputedStyle(panel).display;
+                    window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: HIDING panel', panel.id, 'after - hidden:', afterHidden, 'display:', afterDisplay);
+                }
+            });
+
+            // If still not found, try finding the target panel directly by ID
+            if (!targetPanelFound) {
+                window.__clientWarn && window.__clientWarn('[DEBUG] activateEntityTab: Target panel not found in query results, trying direct ID lookup...');
+                const targetPanel = document.getElementById(tabId);
+                if (targetPanel) {
+                    window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Found target panel by direct ID lookup!', tabId);
+                    targetPanel.classList.remove('hidden');
+                    targetPanel.style.display = 'block';
+                    targetPanelFound = true;
+
+                    // Hide all other panels
+                    allPanels.forEach(panel => {
+                        if (panel.id !== tabId) {
+                            panel.classList.add('hidden');
+                            panel.style.display = 'none';
+                        }
+                    });
+                } else {
+                    window.__clientWarn && window.__clientWarn('[DEBUG] activateEntityTab: Target panel with id', tabId, 'NOT FOUND even with direct ID lookup!');
+                    window.__clientLog && window.__clientLog('[DEBUG] Available panel IDs from query:', Array.from(allPanels).map(p => p.id));
+                    // Check what panels actually exist in the DOM
+                    const allDivsInContent = document.querySelectorAll('#entity-tabs-content div');
+                    window.__clientLog && window.__clientLog('[DEBUG] All divs in entity-tabs-content:', Array.from(allDivsInContent).map(d => ({
+                        id: d.id,
+                        role: d.getAttribute('role'),
+                        classes: d.className
+                    })));
+                }
+            }
+
+            // Store selected tab in localStorage
+            localStorage.setItem('selectedAssignmentEntityTab', tabId);
+            window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Completed for tabId', tabId);
+        }
+
+        // Function to attach click handlers to tab buttons
+        function attachTabHandlers() {
+            window.__clientLog && window.__clientLog('[DEBUG] attachTabHandlers: Starting');
+            getEntityTabElements();
+            if (entityTabButtons) {
+                window.__clientLog && window.__clientLog('[DEBUG] attachTabHandlers: Processing', entityTabButtons.length, 'buttons');
+                entityTabButtons.forEach((btn, index) => {
+                    // Check if handler already attached (using data attribute)
+                    if (btn.dataset.tabHandlerAttached === 'true') {
+                        window.__clientLog && window.__clientLog('[DEBUG] attachTabHandlers: Button', btn.id, 'already has handler, skipping');
+                        return; // Skip if already attached
+                    }
+
+                    // Mark as attached
+                    btn.dataset.tabHandlerAttached = 'true';
+                    window.__clientLog && window.__clientLog('[DEBUG] attachTabHandlers: Attaching handler to button', btn.id, 'at index', index);
+
+                    // Attach click handler
+                    btn.addEventListener('click', function(e) {
+                        window.__clientLog && window.__clientLog('[DEBUG] Tab button clicked!', this.id);
+                        window.__clientLog && window.__clientLog('[DEBUG] Event target:', e.target);
+                        window.__clientLog && window.__clientLog('[DEBUG] Event currentTarget:', e.currentTarget);
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const targetPanelId = this.getAttribute('data-tabs-target');
+                        window.__clientLog && window.__clientLog('[DEBUG] Click handler: targetPanelId from attribute:', targetPanelId);
+                        if (targetPanelId) {
+                            // Remove # prefix
+                            const panelId = targetPanelId.replace('#', '');
+                            window.__clientLog && window.__clientLog('[DEBUG] Click handler: Calling activateEntityTab with panelId:', panelId);
+                            activateEntityTab(panelId);
+                        } else {
+                            window.__clientWarn && window.__clientWarn('[DEBUG] Click handler: No data-tabs-target attribute found on button', this.id);
+                        }
+                    });
+                    window.__clientLog && window.__clientLog('[DEBUG] attachTabHandlers: Handler attached to button', btn.id);
+                });
+                window.__clientLog && window.__clientLog('[DEBUG] attachTabHandlers: Completed, attached handlers to', entityTabButtons.length, 'buttons');
+            } else {
+                window.__clientWarn && window.__clientWarn('[DEBUG] attachTabHandlers: No tab buttons found!');
+            }
+        }
+
+        // Attach handlers initially and when section expands
+        attachTabHandlers();
+
+        // Handle sub-tabs within "Add entities" panel
+        function initializeAddEntitiesSubTabs() {
+            const addEntitiesSubTabButtons = document.querySelectorAll('#add-entities-subtabs button[role="tab"]');
+            const addEntitiesSubTabPanels = document.querySelectorAll('#add-entities-subtabs-content > div[role="tabpanel"]');
+
+            if (addEntitiesSubTabButtons.length === 0) return;
+
+            function activateAddEntitiesSubTab(panelId) {
+                // Update buttons
+                addEntitiesSubTabButtons.forEach(btn => {
+                    const targetPanelId = btn.getAttribute('data-tabs-target');
+                    const btnPanelId = targetPanelId ? targetPanelId.replace('#', '') : '';
+                    if (btnPanelId === panelId) {
+                        btn.classList.add('text-blue-600', 'border-blue-600');
+                        btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                        btn.setAttribute('aria-selected', 'true');
+                    } else {
+                        btn.classList.remove('text-blue-600', 'border-blue-600');
+                        btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                        btn.setAttribute('aria-selected', 'false');
+                    }
+                });
+
+                // Update panels
+                addEntitiesSubTabPanels.forEach(panel => {
+                    if (panel.id === panelId) {
+                        panel.classList.remove('hidden');
+                        panel.style.display = 'block';
+                    } else {
+                        panel.classList.add('hidden');
+                        panel.style.display = 'none';
+                    }
+                });
+            }
+
+            // Attach click handlers
+            addEntitiesSubTabButtons.forEach(btn => {
+                if (btn.dataset.addEntitiesSubTabHandlerAttached === 'true') return;
+                btn.dataset.addEntitiesSubTabHandlerAttached = 'true';
+
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const targetPanelId = this.getAttribute('data-tabs-target');
+                    if (targetPanelId) {
+                        const panelId = targetPanelId.replace('#', '');
+                        activateAddEntitiesSubTab(panelId);
+                    }
+                });
+            });
+
+            // Initialize with first visible sub-tab if add-entities panel is active
+            const addEntitiesPanel = document.getElementById('add-entities-panel');
+            if (addEntitiesPanel && !addEntitiesPanel.classList.contains('hidden')) {
+                const firstSubTab = addEntitiesSubTabButtons[0];
+                if (firstSubTab) {
+                    const targetPanelId = firstSubTab.getAttribute('data-tabs-target');
+                    if (targetPanelId) {
+                        const panelId = targetPanelId.replace('#', '');
+                        activateAddEntitiesSubTab(panelId);
+                    }
+                }
+            }
+        }
+
+        // Initialize add entities sub-tabs when add-entities panel is shown
+        const originalActivateEntityTab = activateEntityTab;
+        activateEntityTab = function(tabId) {
+            originalActivateEntityTab(tabId);
+            if (tabId === 'add-entities-panel') {
+                setTimeout(initializeAddEntitiesSubTabs, 50);
+            }
+        };
+
+        // Initialize on page load if add-entities panel is visible
+        setTimeout(function() {
+            const addEntitiesPanel = document.getElementById('add-entities-panel');
+            if (addEntitiesPanel && !addEntitiesPanel.classList.contains('hidden')) {
+                initializeAddEntitiesSubTabs();
+            }
+        }, 100);
+
+        function getDefaultAssignmentEntityTab() {
+            window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: Starting');
+            getEntityTabElements();
+            if (entityTabButtons && entityTabButtons.length > 0) {
+                const firstButton = entityTabButtons[0];
+                const target = firstButton.getAttribute('data-tabs-target');
+                window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: First button', firstButton.id, 'targets', target);
+                if (target) {
+                    const panelId = target.replace('#', '');
+                    window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: Returning', panelId);
+                    return panelId;
+                }
+            }
+            window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: No default tab found, returning null');
+            return null;
+        }
+
+        // Initialize with stored tab or default to first available
+        // This will be called again when section is expanded to ensure correct state
+        function initializeEntityTabs(useStoredTab = true) {
+            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Starting, useStoredTab:', useStoredTab);
+            // Ensure elements are available
+            getEntityTabElements();
+
+            if (!entityTabButtons || entityTabButtons.length === 0) {
+                window.__clientWarn && window.__clientWarn('[DEBUG] initializeEntityTabs: No tabs available yet, returning');
+                return; // No tabs available yet
+            }
+
+            // Check if section is visible - if hidden, default to first tab when it opens
+            const assignmentsContent = document.getElementById('entity-assignments-content');
+            const isSectionVisible = assignmentsContent && !assignmentsContent.classList.contains('hidden');
+            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Section is visible:', isSectionVisible);
+
+            // If section is not visible or we're explicitly told not to use stored tab, default to first tab
+            if (!isSectionVisible || !useStoredTab) {
+                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Section hidden or useStoredTab=false, defaulting to first tab');
+                const fallbackAssignmentTab = getDefaultAssignmentEntityTab();
+                if (fallbackAssignmentTab && document.getElementById(fallbackAssignmentTab)) {
+                    window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating first tab', fallbackAssignmentTab);
+                    activateEntityTab(fallbackAssignmentTab);
+                    return;
+                }
+            }
+
+            const storedEntityTab = localStorage.getItem('selectedAssignmentEntityTab');
+            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Stored tab from localStorage:', storedEntityTab);
+
+            if (storedEntityTab && document.getElementById(storedEntityTab)) {
+                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating stored tab', storedEntityTab);
+                activateEntityTab(storedEntityTab);
+            } else {
+                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: No valid stored tab, using first tab');
+                const fallbackAssignmentTab = getDefaultAssignmentEntityTab();
+                if (fallbackAssignmentTab && document.getElementById(fallbackAssignmentTab)) {
+                    window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating first tab', fallbackAssignmentTab);
+                    activateEntityTab(fallbackAssignmentTab);
+                } else {
+                    window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Fallback failed, trying first button');
+                    // Fallback: activate first visible tab
+                    if (entityTabButtons.length > 0) {
+                        const firstButton = entityTabButtons[0];
+                        const targetPanelId = firstButton.getAttribute('data-tabs-target');
+                        window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: First button', firstButton.id, 'targets', targetPanelId);
+                        if (targetPanelId) {
+                            const panelId = targetPanelId.replace('#', '');
+                            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating first tab', panelId);
+                            activateEntityTab(panelId);
+                        }
+                    }
+                }
+            }
+            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Completed');
+        }
+
+        // Initialize on page load
+        // Check if section is visible - if hidden, don't initialize yet (will be initialized when expanded)
+        window.__clientLog && window.__clientLog('[DEBUG] Page load: Checking if section is visible');
+        const assignmentsContentOnLoad = document.getElementById('entity-assignments-content');
+        const isSectionVisibleOnLoad = assignmentsContentOnLoad && !assignmentsContentOnLoad.classList.contains('hidden');
+
+        if (isSectionVisibleOnLoad) {
+            window.__clientLog && window.__clientLog('[DEBUG] Page load: Section is visible, initializing tabs with stored preference');
+            initializeEntityTabs(true); // Use stored tab if section is already visible
+
+            // Initialize grid if "Manage Existing Entities" tab is active by default
+            setTimeout(function() {
+                const managePanel = document.getElementById('manage-entities-panel');
+                if (managePanel && !managePanel.classList.contains('hidden') && typeof initializeEntityGrid === 'function') {
+                    window.__clientLog && window.__clientLog('[DEBUG] Page load: Manage entities panel is visible, initializing grid');
+                    initializeEntityGrid();
+                }
+            }, 200);
+        } else {
+            window.__clientLog && window.__clientLog('[DEBUG] Page load: Section is hidden, will initialize with first tab when expanded');
+            // Don't initialize yet - will be initialized when section is expanded
+        }
+
+        // ---------------------------------------------------------------------
+        // Freeze hierarchy columns (NS Structure and Secretariat tabs)
+        // Distribute top-level items into fixed columns once, based on initial
+        // viewport width, and never reshuffle columns on expansion.
+        // ---------------------------------------------------------------------
+        function computeInitialColumnCount() {
+            const w = window.innerWidth || document.documentElement.clientWidth || 0;
+            if (w >= 1280) return 5; // xl
+            if (w >= 1024) return 4; // lg
+            if (w >= 768) return 3;  // md
+            if (w >= 640) return 2;  // sm
+            return 1;
+        }
+
+        function freezeHierarchyColumns(container) {
+            if (!container) return;
+            // Avoid re-freezing if grid already exists
+            if (container.querySelector(':scope > .fc-grid')) return;
+
+            const topLevelUl = container.querySelector(':scope > ul');
+            if (!topLevelUl) return;
+            const items = Array.from(topLevelUl.children).filter(node => node && node.nodeName === 'LI');
+            if (items.length === 0) return;
+
+            const colCount = computeInitialColumnCount();
+            const grid = document.createElement('div');
+            grid.className = 'fc-grid';
+            grid.style.setProperty('--fc-col-count', String(colCount));
+
+            const columns = [];
+            for (let i = 0; i < colCount; i++) {
+                const colUl = document.createElement('ul');
+                colUl.className = 'fc-col';
+                columns.push(colUl);
+                grid.appendChild(colUl);
+            }
+
+            items.forEach((li, index) => {
+                const targetCol = columns[index % colCount];
+                targetCol.appendChild(li);
+            });
+
+            // Remove original UL and attach the frozen grid
+            topLevelUl.remove();
+            container.appendChild(grid);
+        }
+
+        function initFixedColumnsObserver(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            // Try immediately if content already present
+            freezeHierarchyColumns(container);
+
+            // Observe for first-time hierarchy load/reload
+            const observer = new MutationObserver(() => {
+                // If a direct UL appears and we haven't frozen yet, freeze now
+                const hasGrid = !!container.querySelector(':scope > .fc-grid');
+                const hasTopUl = !!container.querySelector(':scope > ul');
+                if (!hasGrid && hasTopUl) {
+                    freezeHierarchyColumns(container);
+                }
+            });
+            observer.observe(container, { childList: true });
+        }
+
+        // Attach to all hierarchical containers used on this page
+        initFixedColumnsObserver('ns-structure-hierarchy-container');
+        initFixedColumnsObserver('secretariat-hierarchy-container');
+        initFixedColumnsObserver('secretariat-regions-container');
+
+        // Predeclare hierarchical selector refs so they're available before first save-state update
+        var nsStructureSelector = null;
+        var secretariatSelector = null;
+        var secretariatRegionsSelector = null;
+
+        // --- Entity Countries Tab Checkbox Handling ---
+        const entityRegionSelectAllCheckboxes = document.querySelectorAll('.region-select-all-entity');
+        const entityCountryCheckboxes = document.querySelectorAll('.country-checkbox-entity:not([disabled])');
+        const entityGlobalSelectAllCheckbox = document.getElementById('select-all-countries-entity');
+
+        // --- Category-based Country Selection ---
+        let availableCategories = [];
+        let categoryToCountriesMap = {}; // Maps category name to array of country IDs
+
+        // Load categories and build mapping
+        function loadCategoriesAndMapping() {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            // Load categories list
+            fetch("{{ url_for('organization.api_get_part_of_programs') }}", {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && (data.categories || data.programs)) {
+                    availableCategories = data.categories || data.programs;
+                    renderCategoryFilters();
+                    loadCategoryToCountriesMapping();
+                }
+            })
+            .catch(error => {
+                console.error('Error loading categories:', error);
+            });
+        }
+
+        // Load mapping of categories to countries (via NSs)
+        function loadCategoryToCountriesMapping() {
+            // Fetch NSs data with part_of information
+            // Use the organization index API endpoint
+            const url = "{{ url_for('organization.index') }}?tab=nss";
+            window.__clientLog && window.__clientLog('Fetching NSs data from:', url);
+
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.national_societies) {
+                    // Build mapping: category -> [country_ids]
+                    categoryToCountriesMap = {};
+
+                    window.__clientLog && window.__clientLog('NSs data received:', data.national_societies.length, 'NSs');
+
+                    data.national_societies.forEach(ns => {
+                        // Handle both array and string formats for part_of
+                        let partOfArray = [];
+                        if (ns.part_of) {
+                            if (Array.isArray(ns.part_of)) {
+                                partOfArray = ns.part_of;
+                            } else if (typeof ns.part_of === 'string') {
+                                try {
+                                    partOfArray = JSON.parse(ns.part_of);
+                                    if (!Array.isArray(partOfArray)) {
+                                        partOfArray = [];
+                                    }
+                                } catch (e) {
+                                    window.__clientWarn && window.__clientWarn('Failed to parse part_of for NS', ns.id, ':', e);
+                                    partOfArray = [];
+                                }
+                            }
+                        }
+
+                        if (partOfArray.length > 0 && ns.country_id) {
+                            partOfArray.forEach(category => {
+                                if (category && typeof category === 'string') {
+                                    if (!categoryToCountriesMap[category]) {
+                                        categoryToCountriesMap[category] = new Set();
+                                    }
+                                    categoryToCountriesMap[category].add(ns.country_id);
+                                }
+                            });
+                        }
+                    });
+
+                    // Convert Sets to Arrays
+                    for (let category in categoryToCountriesMap) {
+                        categoryToCountriesMap[category] = Array.from(categoryToCountriesMap[category]);
+                    }
+
+                    window.__clientLog && window.__clientLog('Category to countries mapping:', categoryToCountriesMap);
+                } else {
+                    window.__clientWarn && window.__clientWarn('Failed to load NSs data or no data returned');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading category to countries mapping:', error);
+            });
+        }
+
+        // Render category filter checkboxes into a container with a given change handler
+        function renderCategoryFiltersTo(containerId, onChange) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            if (availableCategories.length === 0) {
+                container.innerHTML = '<span class="text-xs text-gray-500">No categories available</span>';
+                return;
+            }
+
+            availableCategories.forEach(category => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2 cursor-pointer';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'category-filter-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500';
+                checkbox.value = category;
+                checkbox.dataset.category = category;
+                if (containerId === 'category-filters-manage') {
+                    checkbox.classList.add('category-filter-manage');
+                }
+
+                const span = document.createElement('span');
+                span.className = 'text-sm text-gray-700';
+                span.textContent = category;
+
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                container.appendChild(label);
+
+                checkbox.addEventListener('change', function() {
+                    onChange(category, this.checked);
+                });
+            });
+        }
+
+        // Render category filters in both Add Entities and Manage Existing Entities panels
+        function renderCategoryFilters() {
+            renderCategoryFiltersTo('category-filters-entity', handleCategoryFilterChange);
+            renderCategoryFiltersTo('category-filters-manage', handleManageCategoryFilterChange);
+        }
+
+        // Handle category filter checkbox change
+        function handleCategoryFilterChange(category, isChecked) {
+            // Wait a bit if mapping is still being built
+            if (Object.keys(categoryToCountriesMap).length === 0) {
+                window.__clientLog && window.__clientLog('Category mapping not ready yet, waiting...');
+                setTimeout(() => handleCategoryFilterChange(category, isChecked), 500);
+                return;
+            }
+
+            const countryIds = categoryToCountriesMap[category] || [];
+
+            if (countryIds.length === 0) {
+                window.__clientWarn && window.__clientWarn(`No countries found for category: ${category}`);
+                window.__clientLog && window.__clientLog('Available categories in mapping:', Object.keys(categoryToCountriesMap));
+                window.__clientLog && window.__clientLog('Full mapping:', categoryToCountriesMap);
+                return;
+            }
+
+            // Select/deselect countries that have NSs part of this category
+            countryIds.forEach(countryId => {
+                const countryCheckbox = document.getElementById(`country-entity-${countryId}`);
+                if (countryCheckbox && !countryCheckbox.disabled) {
+                    countryCheckbox.checked = isChecked;
+                }
+            });
+
+            // Update region and global select all checkboxes (entity-specific)
+            const regions = new Set();
+            countryIds.forEach(countryId => {
+                const countryCheckbox = document.getElementById(`country-entity-${countryId}`);
+                if (countryCheckbox) {
+                    const regionContainer = countryCheckbox.closest('.region-countries-entity');
+                    if (regionContainer && regionContainer.dataset.region) {
+                        regions.add(regionContainer.dataset.region);
+                    }
+                }
+            });
+            regions.forEach(region => {
+                if (typeof updateEntityRegionSelectAll === 'function') {
+                    updateEntityRegionSelectAll(region);
+                }
+            });
+
+            if (typeof updateEntityGlobalSelectAll === 'function') {
+                updateEntityGlobalSelectAll();
+            }
+
+            if (typeof updateGlobalSaveButtonState === 'function') {
+                updateGlobalSaveButtonState();
+            }
+        }
+
+        // Handle category filter change in Manage Existing Entities: filter grid by Part of selection
+        function handleManageCategoryFilterChange(category, isChecked) {
+            if (Object.keys(categoryToCountriesMap).length === 0) {
+                setTimeout(() => handleManageCategoryFilterChange(category, isChecked), 500);
+                return;
+            }
+            const manageContainer = document.getElementById('category-filters-manage');
+            if (!manageContainer) return;
+            const checkedBoxes = manageContainer.querySelectorAll('.category-filter-manage:checked');
+            const selectedCountryIds = new Set();
+            checkedBoxes.forEach(cb => {
+                const cat = cb.value || cb.dataset.category;
+                (categoryToCountriesMap[cat] || []).forEach(id => selectedCountryIds.add(Number(id)));
+            });
+            const gridApi = window.entityGridApi;
+            if (!gridApi || typeof entityManagementData === 'undefined') return;
+            if (selectedCountryIds.size === 0) {
+                gridApi.setGridOption('rowData', entityManagementData);
+                return;
+            }
+            const filtered = entityManagementData.filter(row => {
+                if (row.entity_type !== 'country') return false;
+                const eid = row.entity_id != null ? Number(row.entity_id) : null;
+                return eid != null && selectedCountryIds.has(eid);
+            });
+            gridApi.setGridOption('rowData', filtered);
+        }
+
+        // Initialize category filters on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadCategoriesAndMapping);
+        } else {
+            loadCategoriesAndMapping();
+        }
+
+        // Function to update the state of a region "Select All" checkbox
+        function updateEntityRegionSelectAll(region) {
+            const regionSelectAllCheckbox = document.querySelector(`.region-select-all-entity[data-region="${region}"]`);
+            // Only count enabled checkboxes
+            const countriesInRegion = document.querySelectorAll(`.region-countries-entity[data-region="${region}"] .country-checkbox-entity:not([disabled])`);
+            const allChecked = countriesInRegion.length > 0 && Array.from(countriesInRegion).every(cb => cb.checked);
+            if (regionSelectAllCheckbox) {
+                regionSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+        // Function to update the state of the global "Select All" checkbox
+        function updateEntityGlobalSelectAll() {
+            // Only count enabled checkboxes
+            const allCountryCheckboxes = document.querySelectorAll('.country-checkbox-entity:not([disabled])');
+            const allChecked = allCountryCheckboxes.length > 0 && Array.from(allCountryCheckboxes).every(cb => cb.checked);
+            if (entityGlobalSelectAllCheckbox) {
+                entityGlobalSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+        // Add event listener to the global "Select All" checkbox
+        if (entityGlobalSelectAllCheckbox) {
+            entityGlobalSelectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                // Only update enabled checkboxes
+                document.querySelectorAll('.country-checkbox-entity:not([disabled])').forEach(countryCheckbox => {
+                    countryCheckbox.checked = isChecked;
+                });
+                entityRegionSelectAllCheckboxes.forEach(regionCheckbox => {
+                    regionCheckbox.checked = isChecked;
+                });
+                updateGlobalSaveButtonState();
+            });
+        }
+
+        // Add event listener to each region "Select All" checkbox
+        entityRegionSelectAllCheckboxes.forEach(regionCheckbox => {
+            regionCheckbox.addEventListener('change', function() {
+                const region = this.dataset.region;
+                const isChecked = this.checked;
+                // Only update enabled checkboxes
+                const countriesInRegion = document.querySelectorAll(`.region-countries-entity[data-region="${region}"] .country-checkbox-entity:not([disabled])`);
+                countriesInRegion.forEach(countryCheckbox => {
+                    countryCheckbox.checked = isChecked;
+                });
+                updateEntityGlobalSelectAll();
+                updateGlobalSaveButtonState();
+            });
+        });
+
+        // Add event listener to individual country checkboxes
+        entityCountryCheckboxes.forEach(countryCheckbox => {
+            countryCheckbox.addEventListener('change', function() {
+                const regionContainer = this.closest('.region-countries-entity');
+                if (regionContainer) {
+                    const region = regionContainer.dataset.region;
+                    updateEntityRegionSelectAll(region);
+                }
+                updateEntityGlobalSelectAll();
+                updateGlobalSaveButtonState();
+            });
+        });
+
+        // Initial state on page load
+        updateEntityGlobalSelectAll();
+        entityRegionSelectAllCheckboxes.forEach(regionCheckbox => {
+            const region = regionCheckbox.dataset.region;
+            updateEntityRegionSelectAll(region);
+        });
+        updateGlobalSaveButtonState();
+
+        // Sync country selections to main form for new assignments
+        {% if not assignment %}
+        function syncCountriesToMainForm() {
+            const container = document.getElementById('country-selections-container');
+            if (!container) return;
+
+            // Clear existing hidden inputs
+            container.innerHTML = '';
+
+            // Get all checked country checkboxes
+            const checkedCountries = document.querySelectorAll('.country-checkbox-entity:checked:not([disabled])');
+            checkedCountries.forEach(checkbox => {
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'countries'; // Match the form field name (form.countries.data)
+                hiddenInput.value = checkbox.value;
+                container.appendChild(hiddenInput);
+            });
+        }
+
+        // Sync on checkbox change
+        entityCountryCheckboxes.forEach(countryCheckbox => {
+            countryCheckbox.addEventListener('change', syncCountriesToMainForm);
+        });
+        if (entityGlobalSelectAllCheckbox) {
+            entityGlobalSelectAllCheckbox.addEventListener('change', syncCountriesToMainForm);
+        }
+        entityRegionSelectAllCheckboxes.forEach(regionCheckbox => {
+            regionCheckbox.addEventListener('change', syncCountriesToMainForm);
+        });
+
+        // Initial sync
+        syncCountriesToMainForm();
+        {% endif %}
+
+        // Initialize Hierarchical Entity Selectors for NS Structure and Secretariat
+
+        // Global save button state helpers (cumulative adds across all tabs)
+        function computeAddsCountAll() {
+            let totalAdds = 0;
+            // Countries (entity tab)
+            const countryAdds = document.querySelectorAll('.country-checkbox-entity:not([disabled]):checked').length;
+            totalAdds += countryAdds;
+            // NS Structure
+            if (nsStructureSelector && nsStructureSelector.pendingAdditions) {
+                totalAdds += nsStructureSelector.pendingAdditions.size;
+            }
+            // Secretariat Divisions & Departments
+            if (secretariatSelector && secretariatSelector.pendingAdditions) {
+                totalAdds += secretariatSelector.pendingAdditions.size;
+            }
+            // Secretariat Regions
+            if (secretariatRegionsSelector && secretariatRegionsSelector.pendingAdditions) {
+                totalAdds += secretariatRegionsSelector.pendingAdditions.size;
+            }
+            return totalAdds;
+        }
+
+        function hasAnyChanges() {
+            // Adds in countries
+            if (document.querySelectorAll('.country-checkbox-entity:not([disabled]):checked').length > 0) return true;
+            // Any pending adds/removals in hierarchical selectors
+            const selectors = [nsStructureSelector, secretariatSelector, secretariatRegionsSelector];
+            for (const sel of selectors) {
+                if (!sel) continue;
+                if (sel.pendingAdditions && sel.pendingAdditions.size > 0) return true;
+                if (sel.pendingRemovals && sel.pendingRemovals.size > 0) return true;
+            }
+            return false;
+        }
+
+        // Function to save all entity changes (used before form submission)
+        async function saveAllEntityChanges() {
+            let totalAdded = 0;
+            let hadError = false;
+            const tasks = [];
+
+            // Save NS Structure pending changes
+            if (nsStructureSelector) {
+                tasks.push(
+                    nsStructureSelector.savePendingChanges()
+                        .then(res => { if (res) { totalAdded += (res.added || 0); if (!res.success) hadError = true; } })
+                        .catch(() => { hadError = true; })
+                );
+            }
+
+            // Save Secretariat Divisions & Departments pending changes
+            if (secretariatSelector) {
+                tasks.push(
+                    secretariatSelector.savePendingChanges()
+                        .then(res => { if (res) { totalAdded += (res.added || 0); if (!res.success) hadError = true; } })
+                        .catch(() => { hadError = true; })
+                );
+            }
+
+            // Save Secretariat Regions pending changes
+            if (secretariatRegionsSelector) {
+                tasks.push(
+                    secretariatRegionsSelector.savePendingChanges()
+                        .then(res => { if (res) { totalAdded += (res.added || 0); if (!res.success) hadError = true; } })
+                        .catch(() => { hadError = true; })
+                );
+            }
+
+            // Add Countries (entity tab) selections
+            const countryAdds = document.querySelectorAll('.country-checkbox-entity:not([disabled]):checked').length;
+            const addCountriesForm = document.getElementById('add-countries-form');
+            if (addCountriesForm && countryAdds > 0) {
+                const fd = new FormData(addCountriesForm);
+                tasks.push(
+                    fetch(addCountriesForm.action, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams(fd)
+                    })
+                    .then(() => { totalAdded += countryAdds; })
+                    .catch(() => { hadError = true; })
+                );
+            }
+
+            try {
+                await Promise.all(tasks);
+            } catch (_) {
+                hadError = true;
+            }
+
+            return { success: !hadError, totalAdded };
+        }
+
+        function updateGlobalSaveButtonState() {
+            // No-op: button removed, but keeping function for compatibility
+        }
+
+        // Create a custom class that extends HierarchicalEntitySelector functionality for assignments
+        {% if assignment %}
+        class AssignmentHierarchicalEntitySelector extends HierarchicalEntitySelector {
+            constructor(config) {
+                // Call parent constructor FIRST before accessing 'this'
+                // Override targetUserId to null since we're using targetAssignmentId instead
+                super({...config, targetUserId: null});
+                // Now we can safely access 'this'
+                // Store targetAssignmentId instead of targetUserId
+                this.targetAssignmentId = config.targetAssignmentId;
+                // Store status_id mapping separately
+                this.statusIdMap = new Map(); // Maps "entityType:entityId" to status_id
+                // Track pending changes
+                this.pendingAdditions = new Set();
+                this.pendingRemovals = new Set();
+                // Save button element ID
+                this.saveButtonId = config.saveButtonId || null;
+            }
+
+            async loadAssignedEntities() {
+                if (!this.targetAssignmentId) return;
+
+                try {
+                    const response = await fetch(`/admin/assignments/${this.targetAssignmentId}/entities`);
+                    const data = await response.json();
+
+                    // Clear pending changes when reloading
+                    this.pendingAdditions = new Set();
+                    this.pendingRemovals = new Set();
+
+                    // Filter to only entity types we're displaying
+                    const entities = data.entities || [];
+                    for (const entity of entities) {
+                        if (this.entityTypes.includes(entity.entity_type)) {
+                            const entityKey = `${entity.entity_type}:${entity.entity_id}`;
+                            // Store in assignedEntities for checkbox checking
+                            this.assignedEntities.add(entityKey);
+                            // Store status_id separately for removal
+                            this.statusIdMap.set(entityKey, entity.status_id);
+                        }
+                    }
+
+                    // Initialize hidden form fields with existing permissions
+                    this.updateHiddenFormFields();
+                    // Update save button state
+                    this.updateSaveButtonState();
+                    // Mark as loaded so callers can avoid duplicate fetches
+                    this._assignedLoaded = true;
+                } catch (error) {
+                    console.error('Error loading assigned entities:', error);
+                }
+            }
+
+            async addEntity(entityType, entityId) {
+                if (!this.targetAssignmentId) return;
+
+                try {
+                    const response = await fetch(`/admin/assignments/${this.targetAssignmentId}/entities/add`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        },
+                        body: JSON.stringify({
+                            entity_type: entityType,
+                            entity_id: entityId
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        const entityKey = `${entityType}:${entityId}`;
+                        this.assignedEntities.add(entityKey);
+                        this.statusIdMap.set(entityKey, data.status_id);
+                        this.updateHiddenFormFields();
+                        this.render();
+                        if (this.onChange) this.onChange({type: 'add', entityType, entityId});
+                    }
+                    return data;
+                } catch (error) {
+                    console.error('Error adding entity:', error);
+                    return {success: false, error: error.message};
+                }
+            }
+
+            async removeEntity(entityType, entityId, statusId) {
+                if (!this.targetAssignmentId) return;
+
+                try {
+                    const response = await fetch(`/admin/assignments/${this.targetAssignmentId}/entities/remove/${statusId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        const entityKey = `${entityType}:${entityId}`;
+                        this.assignedEntities.delete(entityKey);
+                        this.statusIdMap.delete(entityKey);
+                        this.updateHiddenFormFields();
+                        this.render();
+                        if (this.onChange) this.onChange({type: 'remove', entityType, entityId});
+                    }
+                    return data;
+                } catch (error) {
+                    console.error('Error removing entity:', error);
+                    return {success: false, error: error.message};
+                }
+            }
+
+            getStatusId(entityType, entityId) {
+                const entityKey = `${entityType}:${entityId}`;
+                return this.statusIdMap.get(entityKey) || null;
+            }
+
+            toggleEntityPermission(entityType, entityId, entityName, isChecked, checkboxElement) {
+                const entityKey = `${entityType}:${entityId}`;
+
+                // Ensure checkbox state matches what the user clicked
+                if (checkboxElement) {
+                    checkboxElement.checked = isChecked;
+                }
+
+                // Track pending changes instead of saving immediately
+                // Initialize pending changes sets if they don't exist
+                if (!this.pendingAdditions) {
+                    this.pendingAdditions = new Set();
+                }
+                if (!this.pendingRemovals) {
+                    this.pendingRemovals = new Set();
+                }
+
+                if (isChecked) {
+                    // Mark as pending addition
+                    // Remove from pending removals if it was there
+                    this.pendingRemovals.delete(entityKey);
+                    // Add to pending additions if not already assigned
+                    if (!this.assignedEntities.has(entityKey)) {
+                        this.pendingAdditions.add(entityKey);
+                    } else {
+                        // If already assigned, remove from pending additions
+                        this.pendingAdditions.delete(entityKey);
+                    }
+                } else {
+                    // Mark as pending removal
+                    // Remove from pending additions if it was there
+                    this.pendingAdditions.delete(entityKey);
+                    // Add to pending removals if currently assigned
+                    if (this.assignedEntities.has(entityKey)) {
+                        this.pendingRemovals.add(entityKey);
+                    } else {
+                        // If not assigned, remove from pending removals
+                        this.pendingRemovals.delete(entityKey);
+                    }
+                }
+
+                // Update hidden form fields
+                this.updateHiddenFormFields();
+
+                // Call onChange callback if provided (for UI updates)
+                if (this.onChange) {
+                    this.onChange({
+                        entity_type: entityType,
+                        entity_id: entityId,
+                        action: isChecked ? 'pending_add' : 'pending_remove'
+                    });
+                }
+
+                // Update save button state
+                this.updateSaveButtonState();
+            }
+
+            updateSaveButtonState() {
+                // Update save button enabled/disabled state
+                if (this.saveButtonId) {
+                    const saveButton = document.getElementById(this.saveButtonId);
+                    if (saveButton) {
+                        const hasChanges = (this.pendingAdditions && this.pendingAdditions.size > 0) ||
+                                         (this.pendingRemovals && this.pendingRemovals.size > 0);
+                        saveButton.disabled = !hasChanges;
+                        const addCount = this.pendingAdditions ? this.pendingAdditions.size : 0;
+                        const removeCount = this.pendingRemovals ? this.pendingRemovals.size : 0;
+                        let label = '<i class="fas fa-save mr-1"></i> Save Changes';
+                        if (hasChanges && (addCount > 0 || removeCount > 0)) {
+                            const parts = [];
+                            if (addCount > 0) parts.push(`${addCount} to add`);
+                            if (removeCount > 0) parts.push(`${removeCount} to remove`);
+                            label = `<i class="fas fa-save mr-1"></i> Save Changes (${parts.join(', ')})`;
+                        }
+                        saveButton.innerHTML = label;
+                    }
+                }
+            }
+
+            async savePendingChanges() {
+                if (!this.pendingAdditions && !this.pendingRemovals) {
+                    return {success: true, message: 'No changes to save'};
+                }
+
+                const results = {
+                    added: 0,
+                    removed: 0,
+                    errors: []
+                };
+
+                // Process removals first
+                if (this.pendingRemovals && this.pendingRemovals.size > 0) {
+                    for (const entityKey of this.pendingRemovals) {
+                        const [entityType, entityId] = entityKey.split(':');
+                        const statusId = this.getStatusId(entityType, parseInt(entityId));
+                        if (statusId) {
+                            try {
+                                const result = await this.removeEntity(entityType, parseInt(entityId), statusId);
+                                if (result.success) {
+                                    results.removed++;
+                                    this.pendingRemovals.delete(entityKey);
+                                    // Update assigned entities state
+                                    this.assignedEntities.delete(entityKey);
+                                    this.statusIdMap.delete(entityKey);
+                                } else {
+                                    results.errors.push(`Failed to remove ${entityType}:${entityId}`);
+                                }
+                            } catch (error) {
+                                results.errors.push(`Error removing ${entityType}:${entityId}: ${error.message}`);
+                            }
+                        }
+                    }
+                }
+
+                // Process additions
+                if (this.pendingAdditions && this.pendingAdditions.size > 0) {
+                    for (const entityKey of this.pendingAdditions) {
+                        const [entityType, entityId] = entityKey.split(':');
+                            try {
+                                const result = await this.addEntity(entityType, parseInt(entityId));
+                                if (result.success) {
+                                    results.added++;
+                                    this.pendingAdditions.delete(entityKey);
+                                    // Update assigned entities state
+                                    this.assignedEntities.add(entityKey);
+                                    if (result.status_id) {
+                                        this.statusIdMap.set(entityKey, result.status_id);
+                                    }
+                                } else {
+                                    results.errors.push(`Failed to add ${entityType}:${entityId}`);
+                                }
+                            } catch (error) {
+                                results.errors.push(`Error adding ${entityType}:${entityId}: ${error.message}`);
+                            }
+                    }
+                }
+
+                // Update save button state
+                this.updateSaveButtonState();
+
+                return {
+                    success: results.errors.length === 0,
+                    added: results.added,
+                    removed: results.removed,
+                    errors: results.errors
+                };
+            }
+        }
+        {% endif %}
+
+        // Initialize NS Structure hierarchical selector
+        if (document.getElementById('ns-structure-hierarchy-container')) {
+            {% if assignment %}
+            nsStructureSelector = new AssignmentHierarchicalEntitySelector({
+                containerId: 'ns-structure-hierarchy-container',
+                apiBaseUrl: '', // Empty since blueprint already has /admin prefix
+                targetAssignmentId: {{ assignment.id }},
+                entityTypes: ['ns_branch', 'ns_subbranch', 'ns_localunit'],
+                saveButtonId: 'save-ns-structure-changes-btn',
+                onChange: function(data) {
+                    updateGlobalSaveButtonState();
+                }
+            });
+
+
+            {% else %}
+            // For new assignments, use regular HierarchicalEntitySelector (no assigned entities yet)
+            nsStructureSelector = new HierarchicalEntitySelector({
+                containerId: 'ns-structure-hierarchy-container',
+                apiBaseUrl: '',
+                targetUserId: null,
+                entityTypes: ['ns_branch', 'ns_subbranch', 'ns_localunit'],
+                onChange: function(data) {
+                    // Just update hidden form fields - no need to reload from server
+                    // Changes will be saved when form is submitted
+                }
+            });
+            {% endif %}
+
+            // Country select wiring for NS Structure
+            const nsCountrySelect = document.getElementById('ns-country-select');
+            const nsContainer = document.getElementById('ns-structure-hierarchy-container');
+            function loadNsForCountry(countryId) {
+                if (!countryId) {
+                    nsContainer.innerHTML = `
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle text-gray-400"></i>
+                            <p class="text-sm text-gray-500 mt-2">Select a country to view NS structure.</p>
+                        </div>`;
+                    return;
+                }
+                nsContainer.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                        <p class="text-sm text-gray-500 mt-2">Loading NS structure...</p>
+                    </div>`;
+                // Ensure assigned entities are loaded before rendering hierarchy so checkboxes reflect current state
+                const ensureAssignedLoaded = (nsStructureSelector && nsStructureSelector._assignedLoaded)
+                    ? Promise.resolve()
+                    : nsStructureSelector.loadAssignedEntities();
+                ensureAssignedLoaded.then(() => {
+                    nsStructureSelector.loadHierarchy(`/admin/structure/ns-hierarchy?country_id=${countryId}`);
+                });
+            }
+            if (nsCountrySelect) {
+                nsCountrySelect.addEventListener('change', function() {
+                    loadNsForCountry(this.value);
+                });
+                // If editing an assignment and it has countries, preselect the first
+                {% if assignment %}
+                const assignmentCountryIds = new Set([
+                    {%- for aes in assignment_countries -%}
+                        {{ aes.country.id }}
+                        {%- if not loop.last -%},{%- endif -%}
+                    {%- endfor -%}
+                ]);
+                const firstCountryId = Array.from(assignmentCountryIds)[0];
+                if (firstCountryId) {
+                    nsCountrySelect.value = String(firstCountryId);
+                    loadNsForCountry(firstCountryId);
+                }
+                {% endif %}
+            }
+
+            // Add search functionality
+            const nsSearchInput = document.getElementById('ns-structure-search');
+            if (nsSearchInput && nsStructureSelector) {
+                let searchTimeout;
+                nsSearchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        nsStructureSelector.filterHierarchy(e.target.value);
+                    }, 300);
+                });
+            }
+        }
+
+        // Initialize Secretariat hierarchical selector (Divisions & Departments)
+        if (document.getElementById('secretariat-hierarchy-container')) {
+            {% if assignment %}
+            secretariatSelector = new AssignmentHierarchicalEntitySelector({
+                containerId: 'secretariat-hierarchy-container',
+                apiBaseUrl: '', // Empty since blueprint already has /admin prefix
+                targetAssignmentId: {{ assignment.id }},
+                entityTypes: ['division', 'department'],
+                saveButtonId: 'save-secretariat-changes-btn',
+                onChange: function(data) {
+                    updateGlobalSaveButtonState();
+                }
+            });
+
+            // Load Secretariat hierarchy after ensuring assigned entities are loaded so checkboxes reflect current state
+            const ensureSecretariatAssignedLoaded = (secretariatSelector && secretariatSelector._assignedLoaded)
+                ? Promise.resolve()
+                : secretariatSelector.loadAssignedEntities();
+            ensureSecretariatAssignedLoaded.then(() => {
+                secretariatSelector.loadHierarchy('/admin/structure/secretariat-hierarchy');
+            });
+            {% else %}
+            // For new assignments, use regular HierarchicalEntitySelector (no assigned entities yet)
+            secretariatSelector = new HierarchicalEntitySelector({
+                containerId: 'secretariat-hierarchy-container',
+                apiBaseUrl: '',
+                targetUserId: null,
+                entityTypes: ['division', 'department'],
+                onChange: function(data) {
+                    // Just update hidden form fields - no need to reload from server
+                    // Changes will be saved when form is submitted
+                }
+            });
+
+            // Load Secretariat hierarchy immediately for new assignments
+            secretariatSelector.loadHierarchy('/admin/structure/secretariat-hierarchy');
+            {% endif %}
+
+            // Add search functionality
+            const secretariatSearchInput = document.getElementById('secretariat-search');
+            if (secretariatSearchInput && secretariatSelector) {
+                let searchTimeout;
+                secretariatSearchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        secretariatSelector.filterHierarchy(e.target.value);
+                    }, 300);
+                });
+            }
+        }
+
+        // Initialize Secretariat Regions hierarchical selector
+        if (document.getElementById('secretariat-regions-container')) {
+            {% if assignment %}
+            secretariatRegionsSelector = new AssignmentHierarchicalEntitySelector({
+                containerId: 'secretariat-regions-container',
+                apiBaseUrl: '',
+                targetAssignmentId: {{ assignment.id }},
+                entityTypes: ['regional_office', 'cluster_office'],
+                saveButtonId: 'save-secretariat-regions-changes-btn',
+                onChange: function(data) { updateGlobalSaveButtonState(); }
+            });
+
+            const ensureRegionsAssignedLoaded = (secretariatRegionsSelector && secretariatRegionsSelector._assignedLoaded)
+                ? Promise.resolve()
+                : secretariatRegionsSelector.loadAssignedEntities();
+            ensureRegionsAssignedLoaded.then(() => {
+                secretariatRegionsSelector.loadHierarchy('/admin/structure/secretariat-regions-hierarchy');
+            });
+            {% else %}
+            // For new assignments, use regular HierarchicalEntitySelector (no assigned entities yet)
+            secretariatRegionsSelector = new HierarchicalEntitySelector({
+                containerId: 'secretariat-regions-container',
+                apiBaseUrl: '',
+                targetUserId: null,
+                entityTypes: ['regional_office', 'cluster_office'],
+                onChange: function(data) {
+                    // Just update hidden form fields - no need to reload from server
+                    // Changes will be saved when form is submitted
+                }
+            });
+
+            // Load Secretariat Regions hierarchy immediately for new assignments
+            secretariatRegionsSelector.loadHierarchy('/admin/structure/secretariat-regions-hierarchy');
+            {% endif %}
+
+            const secretariatRegionsSearchInput = document.getElementById('secretariat-regions-search');
+            if (secretariatRegionsSearchInput && secretariatRegionsSelector) {
+                let searchTimeout;
+                secretariatRegionsSearchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        secretariatRegionsSelector.filterHierarchy(e.target.value);
+                    }, 300);
+                });
+            }
+        }
+
+        // Secretariat sub-tabs behavior
+        const secretariatSubtabButtons = document.querySelectorAll('#secretariat-subtabs button[role="tab"]');
+        const secretariatSubtabPanels = document.querySelectorAll('#secretariat-subtabs-content > div[role="tabpanel"]');
+        function activateSecretariatSubtab(panelId) {
+            secretariatSubtabButtons.forEach(btn => {
+                const target = btn.getAttribute('data-tabs-target');
+                if (target === '#' + panelId) {
+                    btn.classList.add('text-blue-600', 'border-blue-600');
+                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'true');
+                } else {
+                    btn.classList.remove('text-blue-600', 'border-blue-600');
+                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+                    btn.setAttribute('aria-selected', 'false');
+                }
+            });
+            secretariatSubtabPanels.forEach(panel => {
+                if (panel.id === panelId) {
+                    panel.classList.remove('hidden');
+                } else {
+                    panel.classList.add('hidden');
+                }
+            });
+            localStorage.setItem('selectedAssignmentSecretariatSubtab', panelId);
+        }
+        secretariatSubtabButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetPanelId = this.getAttribute('data-tabs-target').substring(1);
+                activateSecretariatSubtab(targetPanelId);
+            });
+        });
+        const storedAssignmentSecretariatSubtab = localStorage.getItem('selectedAssignmentSecretariatSubtab');
+        if (storedAssignmentSecretariatSubtab && document.getElementById(storedAssignmentSecretariatSubtab)) {
+            activateSecretariatSubtab(storedAssignmentSecretariatSubtab);
+        } else {
+            activateSecretariatSubtab('secretariat-divisions-panel');
+        }
+
+        // Function to validate period name before form submission
+        function validatePeriodName(form) {
+            const periodNameField = document.querySelector('input[name="period_name"]');
+            const errorContainer = document.getElementById('period-name-error');
+
+            if (!periodNameField) {
+                return true; // No period name field, skip validation
+            }
+
+            const periodName = periodNameField.value.trim();
+
+            if (!periodName) {
+                // Show error message
+                if (errorContainer) {
+                    errorContainer.classList.remove('hidden');
+                    // Scroll to error message
+                    errorContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+
+                return false;
+            } else {
+                // Hide error message if it was shown
+                if (errorContainer) {
+                    errorContainer.classList.add('hidden');
+                }
+                return true;
+            }
+        }
+
+        // Intercept form submission to save entity changes first (for existing assignments)
+        {% if assignment %}
+        const mainForm = document.getElementById('manageAssignmentForm') ||
+                        document.querySelector('form[action*="edit_assignment"]') ||
+                        document.querySelector('form[method="POST"]');
+
+        if (mainForm) {
+            // Change submit button to type="button" to prevent automatic disabling
+            // We'll submit the form programmatically only if validation passes
+            const submitButton = mainForm.querySelector('button[type="submit"], input[type="submit"]') ||
+                document.getElementById('manageAssignmentSubmitBtn');
+            if (submitButton) {
+                // Store original type and change to button to prevent auto-disable
+                submitButton.type = 'button';
+
+                // Handle button click
+                submitButton.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Validate period name first
+                    if (!validatePeriodName(mainForm)) {
+                        return false;
+                    }
+
+                    // If validation passes, create a temporary submit button and click it
+                    // This triggers form submission without disabling our main button
+                    const tempSubmit = document.createElement('button');
+                    tempSubmit.type = 'submit';
+                    tempSubmit.style.display = 'none';
+                    mainForm.appendChild(tempSubmit);
+                    tempSubmit.click();
+                    mainForm.removeChild(tempSubmit);
+                });
+            }
+
+            // Use capture phase to ensure we run before any other handlers
+            mainForm.addEventListener('submit', async function(e) {
+                // Validate period name first - prevent default immediately if validation fails
+                if (!validatePeriodName(mainForm)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+
+                // Check if there are any entity changes to save
+                const hasEntityChanges = hasAnyChanges() ||
+                    document.querySelectorAll('.country-checkbox-entity:not([disabled]):checked').length > 0;
+
+                if (hasEntityChanges) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const submitBtn = mainForm.querySelector('button[type="submit"], input[type="submit"]') ||
+                        document.getElementById('manageAssignmentSubmitBtn');
+                    const originalHTML = submitBtn ? submitBtn.innerHTML : '';
+                    const originalDisabled = submitBtn ? submitBtn.disabled : false;
+
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
+                    }
+
+                    // Save entity changes first
+                    const result = await saveAllEntityChanges();
+
+                    if (result.success) {
+                        // Now submit the form
+                        if (submitBtn) {
+                            submitBtn.innerHTML = originalHTML;
+                            submitBtn.disabled = originalDisabled;
+                        }
+                        // Use prototype method to avoid shadowing by form elements named "submit"
+                        HTMLFormElement.prototype.submit.call(mainForm);
+                    } else {
+                        Utils.showError('Some entity changes could not be saved. Please try again.');
+                        if (submitBtn) {
+                            submitBtn.innerHTML = originalHTML;
+                            submitBtn.disabled = originalDisabled;
+                        }
+                    }
+                }
+                // If no entity changes, let form submit normally
+            });
+        }
+        {% endif %}
+
+        // Store selectors globally for debugging
+        window.nsStructureSelector = nsStructureSelector;
+        window.secretariatSelector = secretariatSelector;
+
+        // Sync all entity selections to form before submission (for new assignments only)
+        {% if not assignment %}
+        // Find the main assignment form - try multiple selectors to be sure we get it
+        const mainForm = document.getElementById('manageAssignmentForm') ||
+                        document.querySelector('form[action*="new_assignment"]') ||
+                        document.querySelector('form[method="POST"]') ||
+                        document.querySelector('form');
+
+        if (mainForm) {
+            // Change submit button to type="button" to prevent automatic disabling
+            // We'll submit the form programmatically only if validation passes
+            const submitButton = mainForm.querySelector('button[type="submit"], input[type="submit"]') ||
+                document.getElementById('manageAssignmentSubmitBtn');
+            if (submitButton) {
+                // Store original type and change to button to prevent auto-disable
+                submitButton.type = 'button';
+
+                // Handle button click
+                submitButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Validate period name first
+                    if (!validatePeriodName(mainForm)) {
+                        return false;
+                    }
+
+                    // If validation passes, create a temporary submit button and click it
+                    // This triggers form submission without disabling our main button
+                    const tempSubmit = document.createElement('button');
+                    tempSubmit.type = 'submit';
+                    tempSubmit.style.display = 'none';
+                    mainForm.appendChild(tempSubmit);
+                    tempSubmit.click();
+                    mainForm.removeChild(tempSubmit);
+                });
+            }
+
+            // Duplicate preflight (avoid losing JS selections by round-tripping the page)
+            const DUPLICATE_CHECK_URL = "{{ url_for('assignment_management.check_assignment_duplicate') }}";
+
+            async function preflightDuplicateIfNeeded() {
+                const confirmField = mainForm.querySelector('input[name="confirm_duplicate"]');
+                const alreadyConfirmed = confirmField && (confirmField.value === '1');
+                if (alreadyConfirmed) {
+                    return { ok: true };
+                }
+
+                const templateSelect = mainForm.querySelector('select[name="template_id"]');
+                const periodNameField = mainForm.querySelector('input[name="period_name"]');
+                const templateId = templateSelect ? parseInt(templateSelect.value, 10) : null;
+                const periodName = periodNameField ? (periodNameField.value || '').trim() : '';
+
+                if (!templateId || !periodName) {
+                    return { ok: true };
+                }
+
+                try {
+                    const url = `${DUPLICATE_CHECK_URL}?template_id=${encodeURIComponent(templateId)}&period_name=${encodeURIComponent(periodName)}`;
+                    const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const data = await resp.json();
+                    if (!data || !data.success || !data.exists) {
+                        return { ok: true };
+                    }
+
+                    const a = data.assignment || {};
+                    const statusBits = [];
+                    if (a.is_effectively_closed) statusBits.push('closed/expired');
+                    if (a.is_closed) statusBits.push('closed');
+                    if (a.is_active === false) statusBits.push('inactive');
+                    const statusText = statusBits.length ? statusBits.join(', ') : 'active';
+
+                    const msg =
+                        `An assignment already exists for this template and period.\n\n` +
+                        `Existing ID: ${a.id}\n` +
+                        `Template: ${a.template_name || ''}\n` +
+                        `Period: ${a.period_name || ''}\n` +
+                        `Status: ${statusText}\n\n` +
+                        `Create a NEW duplicate assignment anyway?`;
+
+                    return new Promise(function(resolve) {
+                        if (window.showConfirmation) {
+                            window.showConfirmation(
+                                msg,
+                                function() {
+                                    if (confirmField) confirmField.value = '1';
+                                    resolve({ ok: true });
+                                },
+                                function() { resolve({ ok: false }); },
+                                {{ _('Create anyway')|tojson }},
+                                {{ _('Cancel')|tojson }},
+                                {{ _('Duplicate assignment')|tojson }}
+                            );
+                        } else {
+                            if (window.showConfirmation) {
+                                window.showConfirmation(msg, function() { if (confirmField) confirmField.value = '1'; resolve({ ok: true }); }, function() { resolve({ ok: false }); }, {{ _('Create anyway')|tojson }}, {{ _('Cancel')|tojson }}, {{ _('Duplicate assignment')|tojson }});
+                            } else {
+                                resolve({ ok: false });
+                            }
+                        }
+                    });
+                } catch (err) {
+                    // If the check fails, don't block creation (server-side guard still exists)
+                    return { ok: true };
+                }
+            }
+
+            // Use capture phase to ensure we run before any other handlers
+            mainForm.addEventListener('submit', async function(e) {
+                // Validate period name first - prevent default immediately if validation fails
+                if (!validatePeriodName(mainForm)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+
+                // We'll submit programmatically after syncing hidden inputs + duplicate preflight.
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+
+                window.__clientLog && window.__clientLog('[DEBUG] Form submit event triggered');
+
+                // Collect all selected entities from checked checkboxes (primary source of truth)
+                const allSelectedEntities = new Set();
+
+                // Get selected entities from NS Structure selector
+                const nsContainer = document.getElementById('ns-structure-hierarchy-container');
+                if (nsContainer) {
+                    // Check all checkboxes, even in hidden containers
+                    const checkedBoxes = nsContainer.querySelectorAll('.entity-checkbox:checked');
+                    window.__clientLog && window.__clientLog('[DEBUG] NS Structure: Found', checkedBoxes.length, 'checked checkboxes');
+                    checkedBoxes.forEach(checkbox => {
+                        const entityType = checkbox.dataset.entityType;
+                        const entityId = checkbox.dataset.entityId;
+                        if (entityType && entityId) {
+                            const entityKey = `${entityType}:${entityId}`;
+                            allSelectedEntities.add(entityKey);
+                            window.__clientLog && window.__clientLog('[DEBUG] NS Structure: Added', entityKey);
+                        }
+                    });
+                    // Also check assignedEntities Set as fallback
+                    if (nsStructureSelector && nsStructureSelector.assignedEntities) {
+                        nsStructureSelector.assignedEntities.forEach(entityKey => {
+                            allSelectedEntities.add(entityKey);
+                            window.__clientLog && window.__clientLog('[DEBUG] NS Structure: Added from assignedEntities', entityKey);
+                        });
+                    }
+                }
+
+                // Get selected entities from Secretariat Divisions & Departments selector
+                const secretariatContainer = document.getElementById('secretariat-hierarchy-container');
+                if (secretariatContainer) {
+                    const checkedBoxes = secretariatContainer.querySelectorAll('.entity-checkbox:checked');
+                    window.__clientLog && window.__clientLog('[DEBUG] Secretariat: Found', checkedBoxes.length, 'checked checkboxes');
+                    checkedBoxes.forEach(checkbox => {
+                        const entityType = checkbox.dataset.entityType;
+                        const entityId = checkbox.dataset.entityId;
+                        if (entityType && entityId) {
+                            const entityKey = `${entityType}:${entityId}`;
+                            allSelectedEntities.add(entityKey);
+                            window.__clientLog && window.__clientLog('[DEBUG] Secretariat: Added', entityKey);
+                        }
+                    });
+                    // Also check assignedEntities Set as fallback
+                    if (secretariatSelector && secretariatSelector.assignedEntities) {
+                        secretariatSelector.assignedEntities.forEach(entityKey => {
+                            allSelectedEntities.add(entityKey);
+                            window.__clientLog && window.__clientLog('[DEBUG] Secretariat: Added from assignedEntities', entityKey);
+                        });
+                    }
+                }
+
+                // Get selected entities from Secretariat Regions selector
+                const regionsContainer = document.getElementById('secretariat-regions-container');
+                if (regionsContainer) {
+                    const checkedBoxes = regionsContainer.querySelectorAll('.entity-checkbox:checked');
+                    window.__clientLog && window.__clientLog('[DEBUG] Secretariat Regions: Found', checkedBoxes.length, 'checked checkboxes');
+                    checkedBoxes.forEach(checkbox => {
+                        const entityType = checkbox.dataset.entityType;
+                        const entityId = checkbox.dataset.entityId;
+                        if (entityType && entityId) {
+                            const entityKey = `${entityType}:${entityId}`;
+                            allSelectedEntities.add(entityKey);
+                            window.__clientLog && window.__clientLog('[DEBUG] Secretariat Regions: Added', entityKey);
+                        }
+                    });
+                    // Also check assignedEntities Set as fallback
+                    if (secretariatRegionsSelector && secretariatRegionsSelector.assignedEntities) {
+                        secretariatRegionsSelector.assignedEntities.forEach(entityKey => {
+                            allSelectedEntities.add(entityKey);
+                            window.__clientLog && window.__clientLog('[DEBUG] Secretariat Regions: Added from assignedEntities', entityKey);
+                        });
+                    }
+                }
+
+                // Remove any existing entity_permissions fields from the form
+                mainForm.querySelectorAll('input[name="entity_permissions"]').forEach(input => {
+                    input.remove();
+                });
+
+                // Create hidden inputs for each selected entity and add directly to form
+                allSelectedEntities.forEach(entityKey => {
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'entity_permissions';
+                    hiddenInput.value = entityKey;
+                    mainForm.appendChild(hiddenInput);
+                    window.__clientLog && window.__clientLog('[DEBUG] Added hidden input:', entityKey);
+                });
+
+                window.__clientLog && window.__clientLog('[DEBUG] Form submit: Total entities collected:', allSelectedEntities.size, Array.from(allSelectedEntities));
+
+                // Verify the fields are in the form before submission
+                const finalFields = mainForm.querySelectorAll('input[name="entity_permissions"]');
+                window.__clientLog && window.__clientLog('[DEBUG] Final entity_permissions fields in form:', finalFields.length);
+                finalFields.forEach(field => {
+                    window.__clientLog && window.__clientLog('[DEBUG]   -', field.value);
+                });
+
+                const dup = await preflightDuplicateIfNeeded();
+                if (!dup.ok) {
+                    return false;
+                }
+
+                // Notification confirmation: user must confirm they understand notifications will or won't be sent
+                const sendNotifCheckbox = mainForm.querySelector('input[name="send_notifications"]');
+                const sendNotifications = sendNotifCheckbox ? sendNotifCheckbox.checked : true;
+                const confirmMsgSend = {{ _('Assigned entities (focal points) will be notified about this new assignment. Do you want to continue?')|tojson }};
+                const confirmMsgNoSend = {{ _('This assignment will be created without sending notifications to assigned entities. Do you want to continue?')|tojson }};
+                const confirmMsg = sendNotifications ? confirmMsgSend : confirmMsgNoSend;
+                const confirmTitle = {{ _('Create assignment')|tojson }};
+                const confirmContinue = {{ _('Continue')|tojson }};
+                const confirmCancel = {{ _('Cancel')|tojson }};
+
+                function doSubmit() {
+                    HTMLFormElement.prototype.submit.call(mainForm);
+                }
+                if (window.showConfirmation) {
+                    window.showConfirmation(confirmMsg, doSubmit, function() {}, confirmContinue, confirmCancel, confirmTitle);
+                } else {
+                    doSubmit();
+                }
+            });
+        } else {
+            window.__clientWarn && window.__clientWarn('[DEBUG] Could not find main form element!');
+        }
+        {% endif %}
+
+        window.__clientLog && window.__clientLog('[SCRIPT] Document ready function completed - all initialization code executed');
+        window.__clientLog && window.__clientLog('[SCRIPT] You can now call window.testLogging() or window.logColumnWidths() from console');
+
+        // Event delegation for remove public and remove entity buttons (use custom confirmation)
+        $(document).on('click', '.remove-public-btn, .remove-entity-btn', function(e) {
+            const confirmMsg = $(this).data('confirm');
+            if (!confirmMsg) return;
+            e.preventDefault();
+            const form = $(this).closest('form')[0];
+            if (window.showConfirmation) {
+                window.showConfirmation(
+                    confirmMsg,
+                    function() { if (form) HTMLFormElement.prototype.submit.call(form); },
+                    function() {},
+                    {{ _('Confirm')|tojson }},
+                    {{ _('Cancel')|tojson }},
+                    {{ _('Confirm action')|tojson }}
+                );
+            } else if (form) {
+                HTMLFormElement.prototype.submit.call(form);
+            }
+            return false;
+        });
+    });
+</script>
+<style>
+/* Responsive multi-column layout for NS Structure and Secretariat trees */
+#ns-structure-hierarchy-container > ul,
+#secretariat-hierarchy-container > ul,
+#secretariat-regions-container > ul {
+  column-gap: 1.5rem;
+  column-count: 1;
+}
+
+@media (min-width: 640px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 768px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1024px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 4;
+  }
+}
+
+@media (min-width: 1280px) {
+  #ns-structure-hierarchy-container > ul,
+  #secretariat-hierarchy-container > ul,
+  #secretariat-regions-container > ul {
+    column-count: 5; /* max 5 columns */
+  }
+}
+
+/* Prevent items from breaking across columns */
+#ns-structure-hierarchy-container li,
+#secretariat-hierarchy-container li,
+#secretariat-regions-container li {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Entity Management AG Grid styling */
+#entityManagementGrid {
+    width: 100%;
+    height: 600px;
+}
+
+/*
+  Fixed columns grid: freeze column assignment after first render so expanding
+  nodes only push content down within their column and never reshuffle columns.
+*/
+.fc-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--fc-col-count, 1), minmax(0, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Ensure items avoid breaking within a column during expansion */
+.fc-grid .fc-col li {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+</style>
+<script src="{{ static_url('js/hierarchical_entity_selector.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    // Pre-fill data owner from template's owned_by when template selection changes
+    const templateSelect = document.querySelector('select[name="template_id"]');
+    const dataOwnerSelect = document.getElementById('data_owner_id_select');
+    if (!templateSelect || !dataOwnerSelect) return;
+
+    const TEMPLATES_API = "{{ url_for('system_admin.manage_indicator_bank') | replace('/indicator-bank', '') }}";
+
+    async function prefillDataOwnerFromTemplate(templateId) {
+        if (!templateId) return;
+        try {
+            const resp = await fetch(`/admin/templates/${templateId}/owned-by`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data && data.owned_by_user_id) {
+                // Only pre-fill if data owner is not already set
+                if (!dataOwnerSelect.value || dataOwnerSelect.value === '') {
+                    dataOwnerSelect.value = data.owned_by_user_id;
+                }
+            }
+        } catch (e) {
+            // Non-critical: silently ignore if API fails
+        }
+    }
+
+    // On template change (new assignment form)
+    templateSelect.addEventListener('change', function () {
+        prefillDataOwnerFromTemplate(this.value);
+    });
+
+    // Auto-trigger on page load for new assignments with a pre-selected template and no data owner
+    {% if not assignment %}
+    if (templateSelect.value && (!dataOwnerSelect.value || dataOwnerSelect.value === '')) {
+        prefillDataOwnerFromTemplate(templateSelect.value);
+    }
+    {% endif %}
+})();
+</script>
+{% endblock %}

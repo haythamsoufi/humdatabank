@@ -1,0 +1,15 @@
+{
+  "name": "NGO Databank",
+  "short_name": "NGO DB",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ba0c2f",
+  "icons": [
+    {
+      "src": "/static/IFRC_logo_square.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,2567 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "macros/translation_modal.html" import translation_modal, translation_matrix_modal %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+{% set version_action %}
+<span id="version-badge" class="inline-flex items-center gap-2 text-xs text-gray-500">
+  <span>v{{ config.APP_VERSION }}</span>
+  <button type="button" id="check-updates-btn"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:text-blue-600 hover:border-blue-400 transition text-xs"
+          title="{{ _('Check for updates') }}">
+    <i class="fas fa-sync-alt text-[10px]"></i>{{ _('Updates') }}
+  </button>
+</span>
+{% endset %}
+
+{{ page_header(
+    title=_('System Configuration'),
+    icon='fas fa-cog',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('System Configuration')}
+    ],
+    info_tooltip=_('Configure system-wide settings for your organization. Manage supported languages for internationalization, define document types for uploads, set age groups for demographic disaggregation, configure sex categories for data analysis, and customize organization branding. Changes here affect the entire system and all forms.'),
+    actions=[
+        {
+            'type': 'custom',
+            'content': version_action
+        }
+    ]
+) }}
+
+<div class="bg-white shadow-md border border-gray-200">
+  {# no-submit-guard: async save calls preventDefault(); global FormSubmitGuard would reset the button in bubble phase. #}
+  <form id="manage-settings-form" class="no-submit-guard" method="POST" action="{{ url_for('settings.manage_settings') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+    {# ── Tab navigation ──────────────────────────────────── #}
+    {% call scroll_tab_bar(inner_id='settings-tabs', aria_label=_('Settings sections')) %}
+        <button type="button" role="tab" data-tab="general"
+                class="{{ admin_underline_tab_btn_classes(true) }}">
+          <i class="fas fa-cog mr-1.5"></i>{{ _('General') }}
+        </button>
+        <button type="button" role="tab" data-tab="data"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-database mr-1.5"></i>{{ _('Data') }}
+        </button>
+        <button type="button" role="tab" data-tab="branding"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-palette mr-1.5"></i>{{ _('Branding') }}
+        </button>
+        <button type="button" role="tab" data-tab="emails"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-envelope mr-1.5"></i>{{ _('Emails') }}
+        </button>
+        <button type="button" role="tab" data-tab="notifications"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-bell mr-1.5"></i>{{ _('Notifications') }}
+        </button>
+        <button type="button" role="tab" data-tab="ai"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-brain mr-1.5"></i>{{ _('AI') }}
+        </button>
+    {% endcall %}
+
+    <div class="p-6">
+
+    {# ═══════════════ TAB: General ═══════════════ #}
+    <div class="settings-panel" id="panel-general">
+
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Supported Languages') }}</label>
+      <p class="text-xs text-gray-500 mb-2">
+        {{ _('Note: the interface is translated only for languages that have translation files installed; otherwise it falls back to English.') }}
+      </p>
+
+      {# Hidden multi-select keeps form submission working (synced by JS) #}
+      <select id="supported-languages-select"
+              name="languages"
+              multiple
+              style="display:none !important; position:absolute; width:0; height:0; overflow:hidden;"
+              aria-hidden="true"
+              tabindex="-1">
+        {% for code in all_known_languages %}
+          {% set display_name = (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code|upper) %}
+          <option value="{{ code }}"
+                  {% if code in current_supported %}selected{% endif %}
+                  {% if code == 'en' %}disabled{% endif %}>
+            {{ display_name }} ({{ code }}){% if code == 'en' %} — Base{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+
+      <input type="hidden" id="languages-order-input" name="languages_order" value="" />
+      <div id="languages-row" class="flex flex-wrap items-center gap-2">
+        {# Chips are inserted here by JS, before the sentinel #}
+        <span id="languages-add-sentinel" class="inline-flex items-center gap-2">
+          <select id="add-language-select"
+                  class="w-56 rounded-md border-gray-300 border-dashed shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm text-gray-400">
+            <option value="">+ {{ _('Add…') }}</option>
+            {% for code in all_known_languages %}
+              {% if code != 'en' %}
+              {% set display_name = (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code|upper) %}
+              <option value="{{ code }}" {% if code in current_supported %}disabled class="hidden"{% endif %}>
+                {{ display_name }} ({{ code }})
+              </option>
+              {% endif %}
+            {% endfor %}
+          </select>
+          <label class="flex items-center text-xs text-gray-500 whitespace-nowrap">
+            <input type="checkbox"
+                   name="show_language_flags"
+                   value="1"
+                   class="mr-1.5 h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                   {% if current_show_language_flags %}checked{% endif %}>
+            {{ _('Flags') }}
+          </label>
+        </span>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Enabled Entity Types') }}</label>
+      <p class="text-xs text-gray-500 mb-3">
+        {{ _('Choose which entity selectors appear across admin tools like User Management and Assignment Management. Disable a type to hide the related tabs, forms, and drag-and-drop panels shown in those pages.') }}
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {% set entity_options = [
+          {
+            'key': 'countries',
+            'title': _('Countries'),
+            'description': _('Keep national-level assignment, country permissions, and Select All by region controls visible (recommended).')
+          },
+          {
+            'key': 'ns_structure',
+            'title': _('National Society Structure'),
+            'description': _('Show the hierarchical NS Branch/Sub-branch/Local Unit selector (mirrors the tabs in user_form.html and manage_assignment.html).')
+          },
+          {
+            'key': 'secretariat',
+            'title': _('Secretariat'),
+            'description': _('Enable Secretariat Divisions/Departments and Regions tabs for granular entity assignments.')
+          }
+        ] %}
+        {% for option in entity_options %}
+        <label class="border border-gray-200 rounded-lg p-4 flex items-start space-x-3 hover:border-blue-300 transition">
+          <input type="checkbox"
+                 class="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                 name="enabled_entity_types[]"
+                 value="{{ option.key }}"
+                 {% if option.key in current_entity_types %}checked{% endif %}>
+          <span>
+            <span class="block text-sm font-semibold text-gray-800">{{ option.title }}</span>
+            <span class="block text-xs text-gray-500 leading-snug mt-1">{{ option.description }}</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="mt-2 text-xs text-gray-500">
+        {{ _('At least one entity type must remain enabled. Changes update the UI immediately; restart only needed if background workers cache the setting.') }}
+      </p>
+    </div>
+
+    </div>{# /panel-general #}
+
+    {# ═══════════════ TAB: Data ═══════════════ #}
+    <div class="settings-panel hidden" id="panel-data">
+
+    {# ── Reusable chip-list macro for editable tag lists with translations ── #}
+    {% macro chip_list(id, field_name, items, label, description, translations_key, translations_data, placeholder='+ Add…', maxlength=100) %}
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">{{ label }}</label>
+          <p class="text-xs text-gray-500 mt-0.5">{{ description }}</p>
+        </div>
+        <button type="button"
+                class="open-chip-translations-btn inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition"
+                data-list-id="{{ id }}">
+          <i class="fas fa-language mr-1.5"></i>{{ _('Translations') }}
+        </button>
+      </div>
+      <div id="{{ id }}" class="flex flex-wrap items-center gap-2"
+           data-field="{{ field_name }}"
+           data-translations-key="{{ translations_key }}"
+           data-maxlength="{{ maxlength }}">
+        {% for val in items %}
+        <div class="chip-item inline-flex items-center gap-2 border border-gray-200 rounded px-2 py-1 bg-gray-50 select-none text-sm"
+             draggable="true"
+             data-translations="{{ (translations_data.get(val, {}) | tojson | forceescape) }}">
+          <span class="cursor-move text-gray-400">≡</span>
+          <span class="chip-label text-gray-700" contenteditable="true" spellcheck="false">{{ val }}</span>
+          <input type="hidden" name="{{ field_name }}" value="{{ val }}" />
+          <button type="button" class="chip-remove ml-0.5 text-gray-400 hover:text-red-600 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        {% endfor %}
+        <span class="chip-list-sentinel inline-flex items-center">
+          <input type="text"
+                 class="chip-add-input w-32 rounded-md border-gray-300 border-dashed text-sm text-gray-400 placeholder-gray-400 px-2 py-1"
+                 placeholder="{{ placeholder }}"
+                 maxlength="{{ maxlength }}" />
+        </span>
+      </div>
+      <input type="hidden" name="{{ translations_key }}_translations" id="{{ id }}-translations-json"
+             value="{{ translations_data | tojson | forceescape }}" />
+    </div>
+    {% endmacro %}
+
+    {{ chip_list(
+        id='doc-types-list',
+        field_name='document_types[]',
+        items=current_doc_types,
+        label=_('Document Types'),
+        description=_('Manage the list used in the document upload type dropdown.'),
+        translations_key='document_types',
+        translations_data=doc_types_translations,
+        placeholder='+ ' ~ _('Add Type'),
+        maxlength=100
+    ) }}
+
+    {{ chip_list(
+        id='age-groups-list',
+        field_name='age_groups[]',
+        items=current_age_groups,
+        label=_('Age Groups'),
+        description=_('Manage default age group buckets used for disaggregation. Drag to reorder.'),
+        translations_key='age_groups',
+        translations_data=age_groups_translations,
+        placeholder='+ ' ~ _('Add Group'),
+        maxlength=50
+    ) }}
+
+    {{ chip_list(
+        id='sex-categories-list',
+        field_name='sex_categories[]',
+        items=current_sex_categories,
+        label=_('Sex Categories'),
+        description=_('Manage default sex categories used for disaggregation. Drag to reorder.'),
+        translations_key='sex_categories',
+        translations_data=sex_categories_translations,
+        placeholder='+ ' ~ _('Add Category'),
+        maxlength=50
+    ) }}
+
+    </div>{# /panel-data #}
+
+{# ── Shared translation matrix modal for chip lists ── #}
+{{ translation_matrix_modal(
+    modal_id='chip-list-translations-modal',
+    modal_title=_('Manage Translations'),
+    description=_('Translate each item into supported languages. Use Auto Translate to fill all fields at once.'),
+    context='chip_list',
+    table_body_id='chip-list-translations-tbody',
+    show_auto_translate=true,
+    css_prefix='chip-translations',
+    auto_translate_permission_context='settings',
+    auto_translate_permission_code='admin.settings.manage'
+) }}
+
+    {# ═══════════════ TAB: Branding ═══════════════ #}
+    <div class="settings-panel hidden" id="panel-branding">
+
+    {# ── Organization Identity ─────────────────────────── #}
+    <div class="pb-6 mb-6 border-b border-gray-200">
+      <h3 class="text-sm font-medium text-gray-900 mb-3">{{ _('Organization Identity') }}</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Organization Name') }} <span class="text-red-500">*</span></label>
+          <input type="text"
+                 id="organization-name-en-input"
+                 value="{{ org_name_en_value or '' }}"
+                 maxlength="200"
+                 required
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., NGO Databank') }}" />
+          <input type="hidden"
+                 id="organization-name-translations-input"
+                 name="organization_name_translations"
+                 value="{{ (org_name_translations_json or '{}') | e }}"
+                 data-existing-translations="{{ (org_name_translations_json or '{}') | e }}" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Organization Short Name') }}</label>
+          <input type="text"
+                 id="organization-short-name-en-input"
+                 value="{{ org_short_name_en_value or '' }}"
+                 maxlength="100"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., NGO') }}" />
+          <input type="hidden"
+                 id="organization-short-name-translations-input"
+                 name="organization_short_name_translations"
+                 value="{{ (org_short_name_translations_json or '{}') | e }}"
+                 data-existing-translations="{{ (org_short_name_translations_json or '{}') | e }}" />
+        </div>
+      </div>
+      <div class="mt-3">
+        <button type="button"
+                id="open-org-branding-translations-btn"
+                class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition">
+          <i class="fas fa-language mr-1.5"></i>
+          {{ _('Manage Translations') }}
+        </button>
+      </div>
+    </div>
+
+    {# ── Domains ───────────────────────────────────────── #}
+    <div class="pb-6 mb-6 border-b border-gray-200">
+      <h3 class="text-sm font-medium text-gray-900 mb-3">{{ _('Domains') }}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Organization Domain') }} <span class="text-red-500">*</span></label>
+          <input type="text"
+                 name="organization_domain"
+                 value="{{ current_branding.get('organization_domain', '') }}"
+                 maxlength="200"
+                 required
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., ngodatabank.org') }}" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Email Domain') }}</label>
+          <input type="text"
+                 name="organization_email_domain"
+                 value="{{ current_branding.get('organization_email_domain', '') }}"
+                 maxlength="200"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., ngodatabank.org') }}" />
+          <p class="text-xs text-gray-400 mt-1">{{ _('Falls back to organization domain if empty.') }}</p>
+        </div>
+      </div>
+    </div>
+
+    {# ── Visual Assets ─────────────────────────────────── #}
+    <div class="pb-6 mb-6 border-b border-gray-200">
+      <h3 class="text-sm font-medium text-gray-900 mb-3">{{ _('Visual Assets') }}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Logo Path') }}</label>
+          <input type="text"
+                 name="organization_logo_path"
+                 value="{{ current_branding.get('organization_logo_path', '') }}"
+                 maxlength="200"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., logo.svg') }}" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Favicon Path') }}</label>
+          <input type="text"
+                 name="organization_favicon_path"
+                 value="{{ current_branding.get('organization_favicon_path', '') }}"
+                 maxlength="200"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., favicon.svg') }}" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Copyright Year') }}</label>
+          <input type="text"
+                 name="organization_copyright_year"
+                 value="{{ current_branding.get('organization_copyright_year', '') }}"
+                 maxlength="4"
+                 pattern="[0-9]{4}"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., 2024') }}" />
+          <p class="text-xs text-gray-400 mt-1">{{ _('Defaults to current year if empty.') }}</p>
+        </div>
+      </div>
+    </div>
+
+    {# ── Chatbot ───────────────────────────────────────── #}
+    <div class="pb-6 mb-6 border-b border-gray-200">
+      <h3 class="text-sm font-medium text-gray-900 mb-3">{{ _('Chatbot') }}</h3>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">{{ _('Chatbot Name') }}</label>
+        <input type="text"
+               name="chatbot_name"
+               value="{{ current_chatbot_name or '' }}"
+               maxlength="80"
+               class="w-full md:w-1/3 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+               placeholder="ChatFDS" />
+        <p class="text-xs text-gray-400 mt-1">{{ _('Leave empty to use the generic assistant label.') }}</p>
+      </div>
+    </div>
+
+    {# ── External Links ────────────────────────────────── #}
+    <div>
+      <h3 class="text-sm font-medium text-gray-900 mb-3">{{ _('External Links') }}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Indicator Details URL') }}</label>
+          <input type="text"
+                 name="indicator_details_url_template"
+                 value="{{ current_branding.get('indicator_details_url_template', '') }}"
+                 maxlength="500"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., https://ngo.org/{id}') }}" />
+          <p class="text-xs text-gray-400 mt-1">{{ _('Use {id} as placeholder for indicator bank id.') }}</p>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Propose New Indicator URL') }}</label>
+          <input type="text"
+                 name="propose_new_indicator_url"
+                 value="{{ current_branding.get('propose_new_indicator_url', '') }}"
+                 maxlength="500"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., https://ngo.org/indicator-bank') }}" />
+        </div>
+      </div>
+    </div>
+
+    </div>{# /panel-branding #}
+
+    {# ═══════════════ TAB: Emails ═══════════════ #}
+    <div class="settings-panel hidden" id="panel-emails">
+    {# NOTE: Email templates are saved via JSON (base64) to avoid WAF false positives. #}
+    <input type="hidden" name="email_templates_present" value="0" />
+
+    {# ── Group: Email Templates ────────────────────────── #}
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Email & Notification Templates') }}</label>
+      {# Placeholder names stay literal (not gettext): they match Jinja variables and should not be auto-translated. #}
+      <p class="text-xs text-gray-500 mb-3">
+        {{ _('Templates are used for both system emails and the Notifications Center. Each template has an HTML body (per language) and optional pre-fill fields (title, message, priority) used when composing a notification. Use Jinja2 syntax. Typical placeholder names include:') }}
+        <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">org_name, org_short_name, copyright_year, user_name, submitter_name, etc.</span>
+      </p>
+
+      {% set email_templates = [
+        {
+          'key': 'email_template_suggestion_confirmation',
+          'label': _('Indicator Suggestion Confirmation'),
+          'description': _('Email sent to users when they submit an indicator suggestion. Variables: submitter_name, suggestion_type_display, indicator_name, submitted_date, suggestion_details, org_name, copyright_year')
+        },
+        {
+          'key': 'email_template_admin_notification',
+          'label': _('Admin Notification (New Suggestion)'),
+          'description': _('Email sent to admins when a new indicator suggestion is submitted. Variables: submitter_name, submitter_email, suggestion_type_display, indicator_name, submitted_date, suggestion_details, reason, additional_notes, admin_url, org_name, copyright_year')
+        },
+        {
+          'key': 'email_template_security_alert',
+          'label': _('Security Alert'),
+          'description': _('Email sent to admins for security events. Variables: event_type, severity, description, ip_address, user_email, user_id, timestamp, admin_url, org_name, copyright_year')
+        },
+        {
+          'key': 'email_template_welcome',
+          'label': _('Welcome Email'),
+          'description': _('Email sent to new users upon registration. Variables: user_name, dashboard_url, notifications_url, org_name, copyright_year')
+        },
+        {
+          'key': 'email_template_notification',
+          'label': _('Notification Email Wrapper'),
+          'description': _('HTML wrapper used when sending notifications from the Notifications Center via email. Variables: title, message, org_name')
+        }
+      ] %}
+
+      <div class="mb-4">
+        <label for="email-template-selector" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Template to Edit') }}</label>
+        <select
+          id="email-template-selector"
+          class="w-full md:w-1/2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+          {% for template in email_templates %}
+          <option value="{{ template.key }}" {% if loop.first %}selected{% endif %}>{{ template.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% for template in email_templates %}
+      <div class="email-template-editor mb-6 border border-gray-200 rounded-lg p-4"
+           id="editor-{{ template.key }}"
+           {% if not loop.first %}style="display: none;"{% endif %}>
+
+        {# ── Header: label, description, variable insertion ── #}
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ template.label }}</label>
+            <p class="text-xs text-gray-500 mb-1">{{ template.description }}</p>
+          </div>
+          <div class="ml-4 flex-shrink-0">
+            <div class="flex flex-wrap gap-1">
+              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ org_name }}' }}" data-target="{{ template.key }}">{{ _('Org Name') }}</button>
+              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ copyright_year }}' }}" data-target="{{ template.key }}">{{ _('Year') }}</button>
+              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ user_name }}' }}" data-target="{{ template.key }}">{{ _('User Name') }}</button>
+              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ submitter_name }}' }}" data-target="{{ template.key }}">{{ _('Submitter') }}</button>
+            </div>
+          </div>
+        </div>
+
+        {# ── Language sub-tabs ── #}
+        {% call scroll_tab_bar(border_bottom=False, lang_tabs_for=template.key, inner_class='items-center gap-0.5') %}
+          {% for lang in current_supported %}
+          <button type="button"
+                  class="email-lang-tab px-3 py-1.5 text-xs font-medium border border-b-0 rounded-t-md transition-colors
+                         {% if lang == 'en' %}bg-white text-blue-600 border-gray-200 relative z-10{% else %}bg-gray-50 text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-100{% endif %}"
+                  data-template-key="{{ template.key }}"
+                  data-lang="{{ lang }}">
+            {{ LANGUAGE_DISPLAY_NAMES.get(lang, lang|upper) }}
+            {% if lang == 'en' %}<span class="text-gray-400 font-normal ml-0.5">({{ _('default') }})</span>{% endif %}
+          </button>
+          {% endfor %}
+        {% endcall %}
+
+        {# ── Textarea ── #}
+        <textarea
+          id="{{ template.key }}"
+          data-current-lang="en"
+          rows="20"
+          class="w-full font-mono text-xs rounded-md rounded-tl-none border-gray-200 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_email_templates.get(template.key, {}).get('en', '') }}</textarea>
+
+        {# Hidden input carrying all per-language content as JSON #}
+        <input type="hidden"
+               id="{{ template.key }}-translations"
+               data-settings-email-template-hidden="1"
+               value="{{ current_email_templates.get(template.key, {}) | tojson | forceescape }}" />
+
+        {# Notification Center pre-fill (same template, used when composing a notification) #}
+        {% set meta = current_template_metadata.get(template.key, {}) %}
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <p class="text-xs font-medium text-gray-600 mb-2">{{ _('Notifications Center pre-fill') }}</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">{{ _('Display label') }}</label>
+              <input type="text" class="template-metadata-label w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.label or '' }}" placeholder="{{ template.label }}">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill priority') }}</label>
+              <select class="template-metadata-priority w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}">
+                <option value="normal" {% if (meta.priority or 'normal') != 'high' %}selected{% endif %}>{{ _('Normal') }}</option>
+                <option value="high" {% if meta.priority == 'high' %}selected{% endif %}>{{ _('High') }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill title') }}</label>
+            <input type="text" class="template-metadata-title w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.title or '' }}" placeholder="{{ _('Title when used in Notifications Center') }}">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill message') }}</label>
+            <textarea class="template-metadata-message w-full text-xs rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" rows="2" placeholder="{{ _('Message body when used in Notifications Center') }}">{{ meta.message or '' }}</textarea>
+          </div>
+        </div>
+
+        <p class="text-xs text-gray-400 mt-1">
+          {{ _('Leave empty to use system default template. Non-English versions fall back to English when empty.') }}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <input type="hidden" id="template-metadata-json" data-settings-email-metadata-hidden="1" value="{{ current_template_metadata | tojson | forceescape }}" />
+
+    </div>{# /panel-emails #}
+
+    {# ═══════════════ TAB: Notifications ═══════════════ #}
+    <div class="settings-panel hidden" id="panel-notifications">
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Notification Priorities') }}</label>
+      <p class="text-xs text-gray-500 mb-3">
+        {{ _('Set the priority level for each notification type. High/urgent priorities trigger immediate emails and action-required styling.') }}
+      </p>
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Notification Type') }}</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Priority') }}</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            {% for nt_key, nt_label in notification_type_labels %}
+            <tr>
+              <td class="px-4 py-2 text-sm text-gray-700">{{ nt_label }}</td>
+              <td class="px-4 py-2">
+                <select name="notification_priority_{{ nt_key }}"
+                        class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                  <option value="normal" {% if (notification_priorities.get(nt_key) or 'normal') == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
+                  <option value="high" {% if notification_priorities.get(nt_key) == 'high' %}selected{% endif %}>{{ _('High') }}</option>
+                  <option value="urgent" {% if notification_priorities.get(nt_key) == 'urgent' %}selected{% endif %}>{{ _('Urgent') }}</option>
+                  <option value="low" {% if notification_priorities.get(nt_key) == 'low' %}selected{% endif %}>{{ _('Low') }}</option>
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>{# /panel-notifications #}
+
+    {# ═══════════════ TAB: AI ═══════════════ #}
+    <div class="settings-panel hidden" id="panel-ai">
+    <input type="hidden" name="ai_settings_present" value="1" />
+
+    {# ── Reusable macro for rendering a single AI setting field ── #}
+    {% macro ai_field(f) %}
+    {% if f.type == 'heading' %}
+    {% set _provider_heading_map = {'_h_openai': 'openai', '_h_azure': 'azure', '_h_copilot': 'copilot', '_h_gemini': 'gemini'} %}
+    {% set _provider_name_map = {'_h_openai': 'OpenAI', '_h_azure': 'Azure OpenAI', '_h_copilot': 'GitHub Copilot', '_h_gemini': 'Google Gemini'} %}
+    <div class="col-span-1 md:col-span-2 lg:col-span-3 border-t border-gray-200 mt-2 pt-3 first:mt-0 first:border-t-0">
+      <span class="text-xs font-semibold text-gray-700 tracking-wide"
+            {% if f.key in _provider_heading_map %}
+            data-provider-heading="{{ _provider_heading_map[f.key] }}"
+            data-provider-name="{{ _provider_name_map[f.key] }}"
+            {% endif %}>{{ _(f.label) }}</span>
+    </div>
+    {% else %}
+    <div{% if f.show_when %} data-ai-show-when="{{ f.show_when | tojson | forceescape }}"{% endif %}>
+      <label class="block text-xs font-medium text-gray-600 mb-1">
+        {{ _(f.label) }}
+        {% if f.is_set == 'env' %}
+          <span class="ml-1 px-1.5 py-0.5 text-[10px] font-normal bg-green-100 text-green-700 rounded">{{ _('env') }}</span>
+        {% endif %}
+      </label>
+
+      {% if f.env_only %}
+        <input type="text" disabled readonly
+               placeholder="{{ _('Set via environment variable') }}"
+               class="w-full rounded-md border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed text-sm" />
+        <p class="text-xs text-gray-400 mt-1">{{ _('Sensitive; not stored in database. Set in environment.') }}</p>
+      {% elif f.type == 'password' %}
+        <div class="flex gap-2 items-center">
+          <input type="password" name="ai_{{ f.key }}"
+                 placeholder="{{ _('Enter new value…') if f.is_set else _('Not configured') }}"
+                 autocomplete="new-password"
+                 class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" />
+          <button type="button"
+                  class="ai-toggle-pw text-gray-400 hover:text-gray-600 transition"
+                  title="{{ _('Show/hide') }}">
+            <i class="fas fa-eye text-xs"></i>
+          </button>
+          {% if f.is_set %}
+          <label class="flex items-center text-xs text-red-500 whitespace-nowrap cursor-pointer select-none">
+            <input type="checkbox" name="ai_{{ f.key }}_clear" value="1" class="mr-1 h-3 w-3 rounded border-gray-300 text-red-500 focus:ring-red-400">
+            {{ _('Clear') }}
+          </label>
+          {% endif %}
+        </div>
+
+      {% elif f.type == 'bool' %}
+        <label class="relative inline-flex items-center cursor-pointer select-none">
+          <input type="checkbox" name="ai_{{ f.key }}" value="1"
+                 {% if f.value %}checked{% endif %}
+                 class="sr-only peer" />
+          <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+
+      {% elif f.type == 'select' %}
+        <select name="ai_{{ f.key }}"
+                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+          {% for opt in f.options %}
+            <option value="{{ opt.value }}" {% if f.value|string == opt.value|string %}selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+
+      {% elif f.type == 'int' %}
+        <input type="number" name="ai_{{ f.key }}"
+               value="{{ f.value if f.value is not none and f.is_set == 'db' else '' }}"
+               placeholder="{{ f.value if f.is_set and f.is_set != 'db' else f.default }}"
+               step="1"
+               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" />
+
+      {% elif f.type == 'float' %}
+        <input type="number" name="ai_{{ f.key }}"
+               value="{{ f.value if f.value is not none and f.is_set == 'db' else '' }}"
+               placeholder="{{ f.value if f.is_set and f.is_set != 'db' else f.default }}"
+               step="0.01"
+               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" />
+
+      {% else %}
+        <input type="text" name="ai_{{ f.key }}"
+               value="{{ f.value if f.value is not none and f.is_set == 'db' else '' }}"
+               placeholder="{{ f.value if f.is_set and f.is_set != 'db' else f.default }}"
+               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" />
+      {% endif %}
+
+      {% if f.help and not f.env_only %}
+        <p class="text-xs text-gray-400 mt-1">{{ _(f.help) }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endmacro %}
+
+    <div class="flex items-center justify-between mb-4">
+      <p class="text-xs text-gray-500">
+        {{ _('Manage AI provider keys, model selection, and all AI subsystem parameters. All values are stored in the database except sensitive keys (API keys, secrets), which are env-only and set via environment variables. Leave a field empty to use the default shown in the placeholder.') }}
+      </p>
+      <div class="flex items-center gap-3 ml-4 shrink-0">
+        <button type="button" id="ai-reset-all"
+                class="text-xs text-red-500 hover:text-red-700 transition cursor-pointer select-none"
+                title="{{ _('Clear all database-saved AI settings and revert to defaults') }}">
+          <i class="fas fa-undo mr-0.5"></i>{{ _('Reset to defaults') }}
+        </button>
+        <span class="text-gray-300">|</span>
+        <button type="button" id="ai-toggle-all" class="text-xs text-blue-600 hover:text-blue-800 transition cursor-pointer select-none">{{ _('Collapse all') }}</button>
+      </div>
+    </div>
+
+    <div class="mb-5 p-4 border border-amber-200 rounded-lg bg-amber-50/40">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900">{{ _('AI Beta Access') }}</h4>
+          <p class="text-xs text-gray-600 mt-1">
+            {{ _('When OFF, all users have access to the AI assistant — no restriction is applied. When ON, access is limited to system managers and the users added below (admins must also be added to the list).') }}
+          </p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer select-none shrink-0">
+          <input type="checkbox" name="ai_beta_enabled" value="1"
+                 {% if ai_beta_enabled %}checked{% endif %}
+                 class="sr-only peer" />
+          <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
+      <div class="mt-3">
+        <label for="ai-beta-users-select" class="block text-xs font-medium text-gray-600 mb-1">
+          {{ _('Allowed Users') }}
+        </label>
+        <select id="ai-beta-users-select"
+                name="ai_beta_allowed_user_ids[]"
+                multiple
+                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+          {% for u in ai_beta_user_options %}
+            <option value="{{ u.id }}" {% if u.id in ai_beta_allowed_user_ids %}selected{% endif %}>
+              {{ u.name }}{% if u.email %} ({{ u.email }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    {% for group in ai_groups %}
+    <details class="ai-group mb-3 border border-gray-200 rounded-lg overflow-hidden" open>
+      <summary class="px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 transition select-none flex items-center justify-between">
+        <span class="text-sm font-medium text-gray-900">
+          <i class="{{ group.icon }} mr-1.5 text-gray-400 w-4 text-center"></i>{{ _(group.title) }}
+        </span>
+        <span class="text-xs text-gray-400">{{ group.fields | selectattr('type', 'ne', 'heading') | list | length }} {{ _('settings') }}</span>
+      </summary>
+      <div class="px-4 py-4 border-t border-gray-100">
+        {% if group.description %}
+          <p class="text-xs text-gray-500 mb-3">{{ _(group.description) }}</p>
+        {% endif %}
+
+        {# ── Provider tabs + tabbed content (providers group only) ── #}
+        {% if group.id == 'providers' and group.provider_blocks %}
+        <div class="mb-5">
+          <label class="block text-xs font-medium text-gray-600 mb-1">
+            <i class="fas fa-sort-amount-down mr-1 text-gray-400"></i>{{ _('Provider Priority') }}
+          </label>
+          <p class="text-xs text-gray-400 mb-2">
+            {{ _('Click a provider to edit its settings. Drag to reorder fallback order.') }}
+          </p>
+          <div id="provider-priority-row" class="flex flex-wrap items-center gap-2 mb-4">
+            {% for block in group.provider_blocks %}
+            <div class="provider-tab-chip provider-priority-chip inline-flex items-center gap-2 border rounded-lg px-3 py-2 select-none text-sm transition-all cursor-pointer
+                        {% if loop.first %}border-blue-500 bg-blue-50 text-blue-700 shadow-sm{% else %}border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-gray-50{% endif %}"
+                 draggable="true" data-provider-id="{{ block.id }}" role="tab" aria-selected="{{ 'true' if loop.first else 'false' }}">
+              <span class="text-gray-300 text-xs pointer-events-none">⠿</span>
+              <span class="provider-circle inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 rounded font-bold text-sm {% if loop.first %}bg-blue-200 text-blue-800{% else %}bg-gray-100 text-gray-600{% endif %}">{{ loop.index }}</span>
+              <i class="{{ block.icon }} text-xs w-3.5 text-center"></i>
+              <span class="font-medium">{{ _(block.label) }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          <input type="hidden" id="provider-priority-input" name="ai_provider_priority"
+                 value="{{ group.provider_order | tojson | forceescape }}" />
+
+          <div id="provider-tab-panels" class="min-h-[200px]">
+            {% for block in group.provider_blocks %}
+            <div class="provider-fields-panel {% if not loop.first %}hidden{% endif %}" data-provider-id="{{ block.id }}" role="tabpanel">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                {% for field in block.fields %}
+                  {{ ai_field(field) }}
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="mt-5 pt-4 border-t border-gray-200">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+              {% for field in group.provider_other_fields %}
+                {{ ai_field(field) }}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+          {% for field in group.fields %}
+            {{ ai_field(field) }}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+
+    </div>{# /panel-ai #}
+
+    {# ── Save bar (always visible) ───────────────── #}
+    <div class="flex items-center justify-end border-t border-gray-200 pt-4">
+      <label class="flex items-center mr-4 text-sm text-gray-600">
+        <input type="checkbox" name="restart" value="1" class="mr-2">
+        {{ _('Restart app after saving (recommended to apply across all processes)') }}
+      </label>
+      <button type="submit" id="settings-save-btn" class="btn btn-success min-w-44">{{ _('Save Settings') }}</button>
+    </div>
+
+    </div>{# /p-6 content wrapper #}
+  </form>
+</div>
+
+{# ── Tab switching logic ─────────────────────────── #}
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  'use strict';
+  var A = window.AdminUnderlineTabs;
+  var tabs = document.querySelectorAll('#settings-tabs .settings-tab');
+  var panels = document.querySelectorAll('.settings-panel');
+  if (!tabs.length || !panels.length || !A) return;
+
+  function activate(tabId) {
+    A.activateStripTab('#settings-tabs', tabId, { panelSelector: '.settings-panel' });
+  }
+
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = this.getAttribute('data-tab');
+      activate(id);
+      history.replaceState(null, '', '#' + id);
+      document.dispatchEvent(new CustomEvent('settings-tab-activated', { detail: { tab: id } }));
+    });
+  });
+
+  var hash = (location.hash || '').replace('#', '');
+  if (hash && document.getElementById('panel-' + hash)) {
+    activate(hash);
+  }
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+/* ── AI settings panel helpers ─────────────── */
+(function () {
+  'use strict';
+
+  /* Password field toggle visibility */
+  document.querySelectorAll('.ai-toggle-pw').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var input = this.closest('div').querySelector('input[type="password"], input[type="text"]');
+      if (!input) return;
+      var isPw = input.type === 'password';
+      input.type = isPw ? 'text' : 'password';
+      var icon = this.querySelector('i');
+      if (icon) {
+        icon.classList.toggle('fa-eye', !isPw);
+        icon.classList.toggle('fa-eye-slash', isPw);
+      }
+    });
+  });
+
+  /* Expand / Collapse all groups */
+  var toggleBtn = document.getElementById('ai-toggle-all');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function () {
+      var groups = document.querySelectorAll('#panel-ai details.ai-group');
+      var anyOpen = [].some.call(groups, function (d) { return d.open; });
+      groups.forEach(function (d) { d.open = !anyOpen; });
+      toggleBtn.textContent = anyOpen ? '{{ _("Expand all") }}' : '{{ _("Collapse all") }}';
+    });
+  }
+
+  /* Reset all AI settings to defaults */
+  var resetBtn = document.getElementById('ai-reset-all');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      var msg = '{{ _("Reset all AI settings to their defaults? This will remove all database-saved overrides.") }}';
+      var doReset = function () {
+      var csrf = document.querySelector('input[name="csrf_token"]');
+      fetch('{{ url_for("settings.api_ai_settings_reset") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrf ? csrf.value : ''
+        }
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          if (window.showAlert) window.showAlert(data.message || '{{ _("Reset failed.") }}', 'error');
+          else console.error(data.message || 'Reset failed');
+        }
+      })
+      .catch(function () {
+        if (window.showAlert) window.showAlert('{{ _("Network error.") }}', 'error');
+        else console.error('Network error');
+      });
+      };
+      if (window.showConfirmation) {
+        window.showConfirmation(msg, doReset, null, '{{ _("Reset") }}', '{{ _("Cancel") }}', '{{ _("Reset AI Settings?") }}');
+      } else {
+        doReset();
+      }
+    });
+  }
+
+  /* Conditional field visibility */
+  (function () {
+    var panel = document.getElementById('panel-ai');
+    if (!panel) return;
+
+    var conditionals = panel.querySelectorAll('[data-ai-show-when]');
+    if (!conditionals.length) return;
+
+    function getFieldValue(key) {
+      var input = panel.querySelector('[name="ai_' + key + '"]');
+      if (!input) return undefined;
+      if (input.type === 'checkbox') return input.checked;
+      return input.value;
+    }
+
+    function evaluate() {
+      conditionals.forEach(function (el) {
+        var rules;
+        try { rules = JSON.parse(el.dataset.aiShowWhen); } catch (_) { return; }
+        if (!Array.isArray(rules)) return;
+        var visible = rules.every(function (r) {
+          var val = getFieldValue(r.field);
+          if (val === undefined) return true;
+          if ('not_eq' in r) {
+            if (typeof r.not_eq === 'boolean') return val !== r.not_eq;
+            return String(val) !== String(r.not_eq);
+          }
+          if (typeof r.eq === 'boolean') return val === r.eq;
+          return String(val) === String(r.eq);
+        });
+        el.style.display = visible ? '' : 'none';
+      });
+    }
+
+    panel.addEventListener('change', evaluate);
+    panel.addEventListener('input', evaluate);
+    evaluate();
+  })();
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  'use strict';
+
+  function initAiBetaSelect2() {
+    var $ = window.jQuery;
+    if (!$ || !$.fn || !$.fn.select2) return false;
+    var sel = document.getElementById('ai-beta-users-select');
+    if (!sel) return false;
+    // Already initialized
+    if ($(sel).data('select2')) return true;
+    try {
+      $(sel).select2({
+        width: '100%',
+        placeholder: '{{ _("Select users…") }}',
+        allowClear: true,
+        closeOnSelect: false
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (initAiBetaSelect2()) return;
+    // Retry loop: Select2 or jQuery may load asynchronously
+    var n = 0;
+    var t = setInterval(function () {
+      if (initAiBetaSelect2() || ++n >= 40) clearInterval(t);
+    }, 100);
+  });
+
+  // Re-trigger when the AI tab becomes visible (Select2 needs non-zero width to render correctly)
+  document.addEventListener('settings-tab-activated', function (e) {
+    if (!e.detail || e.detail.tab !== 'ai') return;
+    var $ = window.jQuery;
+    if (!$ || !$.fn || !$.fn.select2) return;
+    var sel = document.getElementById('ai-beta-users-select');
+    if (!sel) return;
+    if (!$(sel).data('select2')) {
+      initAiBetaSelect2();
+    } else {
+      try { $(sel).select2('destroy'); } catch (_) {}
+      initAiBetaSelect2();
+    }
+  });
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+/* ── Check for updates via GitHub releases ─────────── */
+(function () {
+  'use strict';
+  var btn   = document.getElementById('check-updates-btn');
+  var badge = document.getElementById('version-badge');
+  if (!btn) return;
+
+  function checkForUpdates() {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-[10px]"></i> {{ _("Checking…") }}';
+
+    fetch('{{ url_for("settings.api_check_updates") }}')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.success) {
+          btn.innerHTML = '<i class="fas fa-exclamation-triangle text-[10px] text-amber-500"></i> {{ _("Error") }}';
+          btn.title = data.message || 'Unknown error';
+          setTimeout(function () { resetBtn(); }, 4000);
+          return;
+        }
+        if (data.update_available) {
+          var esc = function (s) {
+            if (s == null) return '';
+            var d = document.createElement('div');
+            d.textContent = String(s);
+            return d.innerHTML;
+          };
+          var raw = String(data.release_url || '').trim();
+          var safeUrl = (raw.indexOf('https://') === 0 || raw.indexOf('http://') === 0) ? raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '#';
+          badge.innerHTML =
+            '<span class="text-xs text-gray-500">v{{ config.APP_VERSION }}</span>' +
+            '<a href="' + safeUrl + '" target="_blank" rel="noopener" ' +
+            '   class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-50 border border-green-300 text-green-700 hover:bg-green-100 transition text-xs" ' +
+            '   title="' + esc(data.latest_name || data.latest_version) + '">' +
+            '<i class="fas fa-arrow-up text-[10px]"></i> v' + esc(data.latest_version) + ' {{ _("available") }}' +
+            '</a>';
+        } else {
+          btn.innerHTML = '<i class="fas fa-check text-[10px] text-green-600"></i> {{ _("Up to date") }}';
+          btn.classList.add('border-green-300', 'text-green-600');
+          btn.classList.remove('text-gray-500', 'border-gray-300');
+          btn.disabled = true;
+        }
+      })
+      .catch(function () {
+        btn.innerHTML = '<i class="fas fa-exclamation-triangle text-[10px] text-amber-500"></i> {{ _("Failed") }}';
+        setTimeout(function () { resetBtn(); }, 4000);
+      });
+  }
+
+  btn.addEventListener('click', checkForUpdates);
+
+  function resetBtn() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sync-alt text-[10px]"></i> {{ _("Updates") }}';
+    btn.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:text-blue-600 hover:border-blue-400 transition text-xs';
+  }
+
+  // Automatically check for updates on page load
+  checkForUpdates();
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+/* ── Unified editable chip-list initializer ─────────── */
+(function () {
+  'use strict';
+  var CLOSE_SVG = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+                + '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+
+  function initChipList(container) {
+    var fieldName  = container.dataset.field;
+    var maxLen     = parseInt(container.dataset.maxlength, 10) || 100;
+    var sentinel   = container.querySelector('.chip-list-sentinel');
+    var addInput   = container.querySelector('.chip-add-input');
+    if (!sentinel || !addInput) return;
+
+    /* ── Create a new chip element ──────────────────── */
+    function createChip(value) {
+      var chip = document.createElement('div');
+      chip.className = 'chip-item inline-flex items-center gap-2 border border-gray-200 rounded px-2 py-1 bg-gray-50 select-none text-sm';
+      chip.draggable = true;
+
+      var handle = document.createElement('span');
+      handle.className = 'cursor-move text-gray-400';
+      handle.textContent = '≡';
+
+      var label = document.createElement('span');
+      label.className = 'chip-label text-gray-700';
+      label.contentEditable = 'true';
+      label.spellcheck = false;
+      label.textContent = value;
+
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = fieldName;
+      hidden.value = value;
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip-remove ml-0.5 text-gray-400 hover:text-red-600 transition-colors';
+      btn.innerHTML = CLOSE_SVG;
+
+      chip.appendChild(handle);
+      chip.appendChild(label);
+      chip.appendChild(hidden);
+      chip.appendChild(btn);
+
+      // Sync hidden input when label is edited
+      label.addEventListener('input', function () {
+        var txt = this.textContent.trim().substring(0, maxLen);
+        hidden.value = txt;
+      });
+      label.addEventListener('blur', function () {
+        var txt = this.textContent.trim().substring(0, maxLen);
+        this.textContent = txt;
+        hidden.value = txt;
+        if (!txt) chip.remove();
+      });
+      label.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
+      });
+
+      // Remove
+      btn.addEventListener('click', function () { chip.remove(); });
+
+      // Drag events
+      chip.addEventListener('dragstart', onDragStart);
+      chip.addEventListener('dragend',   onDragEnd);
+      chip.addEventListener('dragover',  onDragOver);
+
+      return chip;
+    }
+
+    /* ── Add via input ──────────────────────────────── */
+    addInput.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      var val = this.value.trim();
+      if (!val) return;
+      container.insertBefore(createChip(val), sentinel);
+      this.value = '';
+    });
+
+    /* ── Drag-and-drop ──────────────────────────────── */
+    var dragSrc = null;
+    function onDragStart(e) {
+      dragSrc = this;
+      this.style.opacity = '0.5';
+      try { e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+    }
+    function onDragEnd() { this.style.opacity = ''; dragSrc = null; }
+    function onDragOver(e) {
+      e.preventDefault();
+      var target = e.target.closest('.chip-item');
+      if (!target || !dragSrc || target === dragSrc) return;
+      var mid = target.getBoundingClientRect().left + target.offsetWidth / 2;
+      var ref = (e.clientX < mid) ? target : (target.nextElementSibling || sentinel);
+      if (!ref.classList || !ref.classList.contains('chip-item')) ref = sentinel;
+      container.insertBefore(dragSrc, ref);
+    }
+
+    // Attach drag events to server-rendered chips
+    container.querySelectorAll('.chip-item').forEach(function (chip) {
+      var label  = chip.querySelector('.chip-label');
+      var hidden = chip.querySelector('input[type="hidden"]');
+      var btn    = chip.querySelector('.chip-remove');
+      if (label && hidden) {
+        label.addEventListener('input', function () { hidden.value = this.textContent.trim().substring(0, maxLen); });
+        label.addEventListener('blur', function () {
+          var txt = this.textContent.trim().substring(0, maxLen);
+          this.textContent = txt;
+          hidden.value = txt;
+          if (!txt) chip.remove();
+        });
+        label.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); this.blur(); } });
+      }
+      if (btn) btn.addEventListener('click', function () { chip.remove(); });
+      chip.addEventListener('dragstart', onDragStart);
+      chip.addEventListener('dragend',   onDragEnd);
+      chip.addEventListener('dragover',  onDragOver);
+    });
+  }
+
+  // Initialize all chip-list containers
+  document.querySelectorAll('[data-field]').forEach(initChipList);
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+/* ── Chip-list translation matrix controller ─────────── */
+(function () {
+  'use strict';
+
+  var MODAL_ID   = 'chip-list-translations-modal';
+  var TBODY_ID   = 'chip-list-translations-tbody';
+  var PREFIX     = 'chip-translations';
+  var activeList = null;  // the [data-field] container currently being translated
+
+  var modal   = document.getElementById(MODAL_ID);
+  var saveBtn = document.getElementById('save-' + PREFIX + '-btn');
+  var autoBtn = document.getElementById('auto-translate-' + PREFIX + '-btn');
+  var clearBtn = document.getElementById('clear-' + PREFIX + '-btn');
+  if (!modal) return;
+
+  function decodeEntities(s) {
+    if (!s) return '';
+    var txt = document.createElement('textarea');
+    txt.innerHTML = s;
+    return txt.value;
+  }
+
+  function getChips(container) {
+    return Array.from(container.querySelectorAll('.chip-item'));
+  }
+
+  function getChipText(chip) {
+    var label = chip.querySelector('.chip-label');
+    return label ? label.textContent.trim() : '';
+  }
+
+  function getChipTranslations(chip) {
+    var raw = chip.getAttribute('data-translations') || '{}';
+    try { return normalizeTranslationsObject(JSON.parse(decodeEntities(raw))); } catch (_) { return {}; }
+  }
+
+  function normalizeTranslationsObject(input) {
+    var source = input;
+    if (typeof source === 'string') {
+      try { source = JSON.parse(source); } catch (_) { return {}; }
+    }
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
+
+    var normalized = {};
+    for (var lang in source) {
+      if (!Object.prototype.hasOwnProperty.call(source, lang)) continue;
+      var value = source[lang];
+      if (typeof value !== 'string') continue;
+      var text = value.trim();
+      if (!text) continue;
+      var code = String(lang || '').toLowerCase().split('_')[0].split('-')[0].trim();
+      if (!code || code === 'en') continue;
+      normalized[code] = text;
+    }
+    return normalized;
+  }
+
+  function getListTranslationsMap(container) {
+    if (!container || !container.id) return {};
+    var jsonInput = document.getElementById(container.id + '-translations-json');
+    if (!jsonInput) return {};
+    var raw = (jsonInput.value || '').trim();
+    if (!raw) return {};
+    try {
+      var parsed = JSON.parse(decodeEntities(raw));
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch (_) { return {}; }
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+      var out = {};
+      for (var key in parsed) {
+        if (!Object.prototype.hasOwnProperty.call(parsed, key)) continue;
+        out[String(key)] = normalizeTranslationsObject(parsed[key]);
+      }
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function resolveTranslationsForText(translationsMap, text) {
+    if (!translationsMap || !text) return {};
+    if (translationsMap[text] && typeof translationsMap[text] === 'object') return translationsMap[text];
+
+    var trimmedText = String(text).trim();
+    if (translationsMap[trimmedText] && typeof translationsMap[trimmedText] === 'object') return translationsMap[trimmedText];
+
+    var lowerText = trimmedText.toLowerCase();
+    for (var key in translationsMap) {
+      if (!Object.prototype.hasOwnProperty.call(translationsMap, key)) continue;
+      if (String(key).trim().toLowerCase() === lowerText && typeof translationsMap[key] === 'object') {
+        return translationsMap[key];
+      }
+    }
+
+    // Robust fallback: normalize punctuation/spacing to match near-identical labels
+    function canonicalize(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/['"`.,:;!?()[\]{}\-_/\\]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    var canonicalText = canonicalize(trimmedText);
+    if (!canonicalText) return {};
+    for (var key2 in translationsMap) {
+      if (!Object.prototype.hasOwnProperty.call(translationsMap, key2)) continue;
+      if (canonicalize(key2) === canonicalText && typeof translationsMap[key2] === 'object') {
+        return translationsMap[key2];
+      }
+    }
+
+    return {};
+  }
+
+  function generateCells(translations) {
+    if (window.TranslationModalUtils && typeof window.TranslationModalUtils.generateMatrixCells === 'function') {
+      return window.TranslationModalUtils.generateMatrixCells(translations || {});
+    }
+    return '';
+  }
+
+  /* ── Populate the matrix table from chips ─────────── */
+  function populate() {
+    var tbody = document.getElementById(TBODY_ID);
+    if (!tbody || !activeList) return;
+    tbody.replaceChildren();
+    var translationsMap = getListTranslationsMap(activeList);
+
+    getChips(activeList).forEach(function (chip, idx) {
+      var text = getChipText(chip);
+      if (!text) return;
+      var chipTranslations = getChipTranslations(chip);
+      var translations = chipTranslations;
+      if (!chipTranslations || Object.keys(chipTranslations).length === 0) {
+        translations = resolveTranslationsForText(translationsMap, text);
+      }
+
+      var tr = document.createElement('tr');
+      tr.className = 'border-b border-gray-200 hover:bg-gray-50';
+      tr.dataset.chipIndex = idx;
+
+      // Build full row HTML so <td> elements are parsed inside <tr> context
+      var firstCell = '<td class="px-4 py-3 text-sm font-medium text-gray-900 border-r border-gray-300 whitespace-nowrap">' + escapeHtml(text) + '</td>';
+      tr.innerHTML = firstCell + generateCells(translations);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  /* ── Save back from matrix rows to chip data-attrs ── */
+  function saveToChips() {
+    if (!activeList) return;
+    var chips = getChips(activeList);
+    var matrixRows = document.querySelectorAll('#' + TBODY_ID + ' tr');
+    var allTranslations = {};
+
+    matrixRows.forEach(function (row) {
+      var idx = parseInt(row.dataset.chipIndex, 10);
+      var chip = chips[idx];
+      if (!chip) return;
+      var enText = getChipText(chip);
+      var translations = {};
+      row.querySelectorAll('textarea[data-language]').forEach(function (ta) {
+        var val = ta.value.trim();
+        if (val) translations[ta.dataset.language] = val;
+      });
+      chip.setAttribute('data-translations', JSON.stringify(translations));
+      if (Object.keys(translations).length > 0) {
+        allTranslations[enText] = translations;
+      }
+    });
+
+    // Write to the hidden JSON input for form submission
+    var jsonInput = document.getElementById(activeList.id + '-translations-json');
+    if (jsonInput) jsonInput.value = JSON.stringify(allTranslations);
+  }
+
+  /* ── Open button handler ─────────────────────────── */
+  document.querySelectorAll('.open-chip-translations-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var listId = this.getAttribute('data-list-id');
+      activeList = document.getElementById(listId);
+      if (!activeList) return;
+      populate();
+      modal.classList.remove('hidden');
+    });
+  });
+
+  /* ── Save handler ────────────────────────────────── */
+  if (saveBtn) {
+    saveBtn.addEventListener('click', function () {
+      saveToChips();
+      modal.classList.add('hidden');
+    });
+  }
+
+  /* ── Clear handler ───────────────────────────────── */
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      document.querySelectorAll('#' + TBODY_ID + ' textarea').forEach(function (ta) { ta.value = ''; });
+    });
+  }
+
+  /* ── Auto-translate handler ──────────────────────── */
+  if (autoBtn) {
+    autoBtn.addEventListener('click', function () {
+      if (!activeList) return;
+      var permCtx  = modal.dataset.autoTranslatePermissionContext || '';
+      var permCode = modal.dataset.autoTranslatePermissionCode || '';
+      var chips = getChips(activeList);
+      var texts = chips.map(getChipText).filter(function (t) { return !!t; });
+      if (!texts.length) return;
+
+      var origNodes = Array.from(autoBtn.childNodes).map(function (n) { return n.cloneNode(true); });
+      function restoreAutoButton() {
+        autoBtn.replaceChildren.apply(autoBtn, origNodes.map(function (n) { return n.cloneNode(true); }));
+        autoBtn.disabled = false;
+      }
+
+      autoBtn.replaceChildren();
+      var icon = document.createElement('i');
+      icon.className = 'fas fa-spinner fa-spin w-4 h-4 mr-2';
+      autoBtn.append(icon, document.createTextNode('Translating...'));
+      autoBtn.disabled = true;
+
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      var csrf = csrfMeta ? csrfMeta.getAttribute('content') : '';
+      var targetLangs = window.TranslationModalUtils ? window.TranslationModalUtils.getTargetLanguages() : [];
+
+      function requestTranslation(text, translationType) {
+        // Send base64 payload to avoid WAF false positives on strings like "-- none --"
+        var textB64 = btoa(unescape(encodeURIComponent(String(text || ''))));
+        return fetch('/admin/api/auto-translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+          body: JSON.stringify({
+            type: translationType,
+            permission_context: permCtx,
+            permission_code: permCode,
+            text_b64: textB64,
+            target_languages: targetLangs
+          })
+        }).then(function (r) {
+          return window.TranslationModalUtils ? window.TranslationModalUtils.handleAutoTranslateResponse(r) : r.json();
+        });
+      }
+
+      Promise.all(texts.map(function (text) {
+        // First try option mode; if provider returns empty/no-result, retry as template_name.
+        return requestTranslation(text, 'question_option')
+          .then(function (res) {
+            return { ok: true, text: text, res: res };
+          })
+          .catch(function (firstErr) {
+            return requestTranslation(text, 'template_name')
+              .then(function (res) {
+                return { ok: true, text: text, res: res };
+              })
+              .catch(function (secondErr) {
+                return {
+                  ok: false,
+                  text: text,
+                  error: (secondErr && secondErr.message) || (firstErr && firstErr.message) || 'Unknown translation error'
+                };
+              });
+          });
+      }))
+      .then(function (results) {
+        var rows = document.querySelectorAll('#' + TBODY_ID + ' tr');
+        var successCount = 0;
+        var failed = [];
+
+        results.forEach(function (entry, i) {
+          if (entry && entry.ok && entry.res && entry.res.success && entry.res.translations && rows[i]) {
+            successCount += 1;
+            rows[i].querySelectorAll('textarea[data-language]').forEach(function (ta) {
+              if (entry.res.translations[ta.dataset.language]) ta.value = entry.res.translations[ta.dataset.language];
+            });
+          } else if (entry && !entry.ok) {
+            failed.push(entry.text);
+          }
+        });
+
+        if (successCount > 0) {
+          autoBtn.replaceChildren();
+          var ok = document.createElement('i');
+          ok.className = 'fas fa-check w-4 h-4 mr-2';
+          autoBtn.append(ok, document.createTextNode(failed.length ? ('Translated with ' + failed.length + ' skipped') : 'Translated!'));
+          setTimeout(function () {
+            restoreAutoButton();
+          }, 2200);
+          if (failed.length) {
+            var m = 'Some items could not be translated automatically: ' + failed.join(', ');
+            if (window.showAlert) window.showAlert(m, 'warning'); else window.__clientWarn && window.__clientWarn(m);
+          }
+        } else {
+          var firstFailure = (results.find(function (r) { return r && !r.ok; }) || {});
+          if (window.TranslationModalUtils) {
+            window.TranslationModalUtils.showAutoTranslateError(
+              autoBtn,
+              '',
+              firstFailure.error || 'Translation failed for all items',
+              { originalNodes: origNodes, restoreDelayMs: 2500 }
+            );
+          } else {
+            restoreAutoButton();
+          }
+        }
+      })
+      .catch(function (err) {
+        if (window.TranslationModalUtils) {
+          window.TranslationModalUtils.showAutoTranslateError(
+            autoBtn,
+            '',
+            (err && err.message) || 'Unexpected translation error',
+            { originalNodes: origNodes, restoreDelayMs: 2500 }
+          );
+        } else {
+          restoreAutoButton();
+        }
+      });
+    });
+  }
+
+  /* ── Close handlers ──────────────────────────────── */
+  modal.querySelectorAll('.close-modal').forEach(function (btn) {
+    btn.addEventListener('click', function () { modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.add('hidden'); });
+
+  /* ── Sync translations JSON on form submit ─────── */
+  var form = document.getElementById('manage-settings-form');
+  if (form) {
+    form.addEventListener('submit', function () {
+      document.querySelectorAll('[data-translations-key]').forEach(function (container) {
+        var chips = getChips(container);
+        var all = {};
+        chips.forEach(function (chip) {
+          var t = getChipTranslations(chip);
+          var text = getChipText(chip);
+          if (text && Object.keys(t).length > 0) all[text] = t;
+        });
+        var jsonInput = document.getElementById(container.id + '-translations-json');
+        if (jsonInput) jsonInput.value = JSON.stringify(all);
+      });
+    });
+  }
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  'use strict';
+
+  /* ── Constants & config ────────────────────────────────── */
+  var BASE_LANG  = 'en';
+  var CHIP_CLASS = 'lang-order-chip';
+  var CHIP_CLS_EXTRA = 'inline-flex items-center gap-2 border border-gray-200 rounded px-2 py-1 bg-gray-50 select-none text-sm';
+  var CLOSE_SVG  = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+                 + '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+
+  /* ── DOM refs ──────────────────────────────────────────── */
+  var hiddenSelect = document.getElementById('supported-languages-select');
+  var addSelect    = document.getElementById('add-language-select');
+  var rowEl        = document.getElementById('languages-row');
+  var sentinel     = document.getElementById('languages-add-sentinel');
+  var hiddenInput  = document.getElementById('languages-order-input');
+  if (!hiddenSelect || !addSelect || !rowEl || !sentinel || !hiddenInput) return;
+
+  /* ── Utility helpers ───────────────────────────────────── */
+  function norm(code) {
+    return code ? String(code).toLowerCase().replace('-', '_').split('_')[0] : '';
+  }
+
+  function dedupe(arr) {
+    var seen = {}, out = [];
+    (arr || []).forEach(function (x) {
+      var c = norm(x);
+      if (c && !seen[c]) { seen[c] = true; out.push(c); }
+    });
+    return out;
+  }
+
+  function pinBase(arr) {
+    var out = dedupe(arr).filter(function (c) { return c !== BASE_LANG; });
+    out.unshift(BASE_LANG);
+    return out;
+  }
+
+  function toSet(arr) {
+    var s = {};
+    arr.forEach(function (c) { s[c] = true; });
+    return s;
+  }
+
+  /* ── Build display-name map from hidden <select> options ─ */
+  var nameMap = {};
+  Array.prototype.forEach.call(hiddenSelect.options, function (opt) {
+    var c = norm(opt.value);
+    if (c) nameMap[c] = (opt.textContent || '').trim() || c.toUpperCase();
+  });
+
+  /* ── State ─────────────────────────────────────────────── */
+  var order = pinBase({{ (current_supported or []) | tojson }});
+
+  /* ── Sync: hidden <select multiple> ← order ───────────── */
+  function syncHiddenSelect() {
+    var set = toSet(order);
+    Array.prototype.forEach.call(hiddenSelect.options, function (opt) {
+      opt.selected = !!set[norm(opt.value)];
+    });
+  }
+
+  /* ── Sync: "Add" dropdown — hide already-selected ──────── */
+  function syncAddDropdown() {
+    var set = toSet(order);
+    Array.prototype.forEach.call(addSelect.options, function (opt) {
+      if (!opt.value) return;
+      var added = !!set[norm(opt.value)];
+      opt.disabled     = added;
+      opt.style.display = added ? 'none' : '';
+    });
+    addSelect.value = '';
+    if (window.jQuery) {
+      try { window.jQuery(addSelect).val('').trigger('change.select2'); } catch (_) {}
+    }
+  }
+
+  /* ── Sync: hidden input ← order ────────────────────────── */
+  function writeHidden() { hiddenInput.value = order.join(','); }
+
+  /* ── Read chip order from DOM (after drag) ─────────────── */
+  function readChipOrder() {
+    var codes = [];
+    rowEl.querySelectorAll('.' + CHIP_CLASS).forEach(function (el) {
+      if (el.dataset.code) codes.push(el.dataset.code);
+    });
+    return pinBase(codes);
+  }
+
+  /* ── Build a single chip element ───────────────────────── */
+  function createChip(code) {
+    var isBase = (code === BASE_LANG);
+
+    var chip = document.createElement('div');
+    chip.className = CHIP_CLASS + ' ' + CHIP_CLS_EXTRA;
+    chip.dataset.code = code;
+    chip.draggable = !isBase;
+
+    var handle = document.createElement('span');
+    handle.className = isBase ? 'text-gray-300' : 'cursor-move text-gray-400';
+    handle.textContent = '≡';
+
+    var label = document.createElement('span');
+    label.className = 'text-sm text-gray-700';
+    label.textContent = nameMap[code] || code.toUpperCase();
+
+    chip.appendChild(handle);
+    chip.appendChild(label);
+
+    if (!isBase) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ml-1 text-gray-400 hover:text-red-600 transition-colors';
+      btn.innerHTML = CLOSE_SVG;
+      btn.addEventListener('click', function () { removeLanguage(code); });
+      chip.appendChild(btn);
+
+      chip.addEventListener('dragstart', onDragStart);
+      chip.addEventListener('dragend',   onDragEnd);
+      chip.addEventListener('dragover',  onDragOver);
+    }
+
+    return chip;
+  }
+
+  /* ── Render all chips ──────────────────────────────────── */
+  function render() {
+    rowEl.querySelectorAll('.' + CHIP_CLASS).forEach(function (el) { el.remove(); });
+    order.forEach(function (code) { rowEl.insertBefore(createChip(code), sentinel); });
+    syncHiddenSelect();
+    syncAddDropdown();
+    writeHidden();
+  }
+
+  /* ── Add / remove handlers ─────────────────────────────── */
+  function addLanguage(code) {
+    var c = norm(code);
+    if (!c || c === BASE_LANG || order.indexOf(c) !== -1) return;
+    order.push(c);
+    render();
+  }
+
+  function removeLanguage(code) {
+    order = order.filter(function (c) { return c !== code; });
+    render();
+  }
+
+  /* ── Drag-and-drop ─────────────────────────────────────── */
+  var dragSrc = null;
+
+  function onDragStart(e) {
+    dragSrc = this;
+    this.style.opacity = '0.5';
+    try { e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+  }
+
+  function onDragEnd() {
+    this.style.opacity = '';
+    dragSrc = null;
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    var target = e.target.closest('.' + CHIP_CLASS);
+    if (!target || !dragSrc || target === dragSrc || target.dataset.code === BASE_LANG) return;
+    var mid = target.getBoundingClientRect().left + target.offsetWidth / 2;
+    var ref = (e.clientX < mid) ? target : (target.nextElementSibling || sentinel);
+    if (!ref.classList || !ref.classList.contains(CHIP_CLASS)) ref = sentinel;
+    rowEl.insertBefore(dragSrc, ref);
+    order = readChipOrder();
+    writeHidden();
+  }
+
+  /* ── "Add language" event wiring ───────────────────────── */
+  addSelect.addEventListener('change', function () { addLanguage(this.value); });
+  if (window.jQuery) {
+    try {
+      window.jQuery(addSelect).on('select2:select', function (e) {
+        addLanguage(e.params && e.params.data ? e.params.data.id : '');
+      });
+    } catch (_) {}
+  }
+
+  /* ── Form submit safety ────────────────────────────────── */
+  var form = hiddenSelect.closest('form');
+  if (form) {
+    form.addEventListener('submit', function () { syncHiddenSelect(); writeHidden(); });
+  }
+
+  /* ── Select2 upgrade for the "Add" dropdown ────────────── */
+  function upgradeToSelect2() {
+    if (!window.jQuery || !window.jQuery.fn.select2) return false;
+    try {
+      var $el = window.jQuery(addSelect);
+      $el.select2({
+        width: '14rem',
+        placeholder: (addSelect.options[0] || {}).textContent || '+ Add…',
+        allowClear: true,
+        templateResult: function (d) {
+          return (!d.id || d.disabled) ? null : d.text;
+        }
+      });
+      var s2 = $el.data('select2');
+      if (s2 && s2.$container) {
+        s2.$container.addClass('select2-compact select2-dashed select2-muted');
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  /* ── Bootstrap ─────────────────────────────────────────── */
+  function boot() {
+    if (upgradeToSelect2() || !window.jQuery) { render(); return; }
+    var n = 0;
+    var t = setInterval(function () {
+      if (upgradeToSelect2() || ++n >= 30) { clearInterval(t); render(); }
+    }, 100);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+
+
+<script nonce="{{ csp_nonce() }}">
+/* ── Email template editor: selector, language tabs, variable insertion ─── */
+(function () {
+  'use strict';
+
+  /* ── In-memory store: { templateKey: { lang: content } } ── */
+  var templateLangData = {};
+  var templateInitialData = {};
+  var metadataInitial = '';
+  var emailTemplatesDirty = false;
+
+  /* Decode HTML entities that Jinja's forceescape may introduce */
+  function decodeEntities(s) {
+    if (!s) return '';
+    var t = document.createElement('textarea');
+    t.innerHTML = s;
+    return t.value;
+  }
+
+  function stableStringify(obj) {
+    try {
+      if (!obj || typeof obj !== 'object') return JSON.stringify(obj || {});
+      var keys = Object.keys(obj).sort();
+      var out = {};
+      keys.forEach(function (k) {
+        out[k] = obj[k];
+      });
+      return JSON.stringify(out);
+    } catch (_) {
+      try { return JSON.stringify(obj || {}); } catch (__) { return '{}'; }
+    }
+  }
+
+  function normalizeTemplateMap(input) {
+    var parsed = input;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    var out = {};
+    Object.keys(parsed).forEach(function (lang) {
+      var val = parsed[lang];
+      if (typeof val !== 'string') return;
+      var trimmed = val.trim();
+      if (!trimmed) return;
+      out[String(lang)] = trimmed;
+    });
+    return out;
+  }
+
+  /* Initialise in-memory data from hidden inputs */
+  document.querySelectorAll('.email-template-editor').forEach(function (editor) {
+    var hiddenInput = editor.querySelector('input[type="hidden"][id$="-translations"]');
+    var textarea    = editor.querySelector('textarea');
+    if (!hiddenInput || !textarea) return;
+    var key = textarea.id;
+    var parsed = {};
+    try { parsed = JSON.parse(decodeEntities(hiddenInput.value)) || {}; } catch (_) {}
+    if (typeof parsed !== 'object' || Array.isArray(parsed)) parsed = {};
+    templateInitialData[key] = normalizeTemplateMap(parsed);
+    templateLangData[key] = Object.assign({}, templateInitialData[key]);
+    // Ensure textarea shows the English content
+    textarea.value = (templateLangData[key] && templateLangData[key]['en']) ? templateLangData[key]['en'] : '';
+    textarea.dataset.currentLang = 'en';
+  });
+
+  /* Template metadata initial snapshot (Notification Center pre-fill) */
+  (function initMetadataSnapshot() {
+    var metaInput = document.getElementById('template-metadata-json');
+    if (!metaInput) { metadataInitial = '{}'; return; }
+    metadataInitial = (decodeEntities(metaInput.value || '') || '').trim() || '{}';
+  })();
+
+  /* ── Template selector (dropdown) ── */
+  function showEmailTemplate(templateKey) {
+    document.querySelectorAll('.email-template-editor').forEach(function (ed) {
+      ed.style.display = 'none';
+    });
+    if (templateKey) {
+      var el = document.getElementById('editor-' + templateKey);
+      if (el) el.style.display = 'block';
+    }
+  }
+
+  var selector = document.getElementById('email-template-selector');
+  if (selector) {
+    selector.addEventListener('change', function () { showEmailTemplate(this.value); });
+    // Auto-show the first template on load
+    if (selector.value) {
+      showEmailTemplate(selector.value);
+    }
+  }
+
+  /* ── Language tab switching ── */
+  var LANG_ACTIVE   = 'bg-white text-blue-600 border-gray-200 relative z-10';
+  var LANG_INACTIVE = 'bg-gray-50 text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-100';
+
+  function switchLangClasses(btn, active) {
+    LANG_ACTIVE.split(' ').forEach(function (c) { btn.classList.toggle(c, active); });
+    LANG_INACTIVE.split(' ').forEach(function (c) { btn.classList.toggle(c, !active); });
+  }
+
+  document.querySelectorAll('.email-lang-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var templateKey = this.dataset.templateKey;
+      var lang        = this.dataset.lang;
+      var textarea    = document.getElementById(templateKey);
+      if (!textarea || !templateKey) return;
+
+      // Save current content to in-memory map
+      var currentLang = textarea.dataset.currentLang || 'en';
+      if (!templateLangData[templateKey]) templateLangData[templateKey] = {};
+      templateLangData[templateKey][currentLang] = textarea.value;
+      emailTemplatesDirty = true;
+
+      // Load target language
+      textarea.value = templateLangData[templateKey][lang] || '';
+      textarea.dataset.currentLang = lang;
+
+      // Update tab visuals
+      var tabRow = this.closest('[data-lang-tabs-for]');
+      if (tabRow) {
+        tabRow.querySelectorAll('.email-lang-tab').forEach(function (t) {
+          switchLangClasses(t, t.dataset.lang === lang);
+        });
+      }
+    });
+  });
+
+  /* ── Sync in-memory data → hidden inputs on form submit ── */
+  var form = document.getElementById('manage-settings-form');
+  if (form) {
+    form.addEventListener('submit', function () {
+      document.querySelectorAll('.email-template-editor').forEach(function (editor) {
+        var textarea    = editor.querySelector('textarea[id^="email_template_"]');
+        var hiddenInput = editor.querySelector('input[type="hidden"][id$="-translations"]');
+        if (!textarea || !hiddenInput) return;
+        var key = textarea.id;
+        if (!templateLangData[key]) templateLangData[key] = {};
+        var currentLang = textarea.dataset.currentLang || 'en';
+        templateLangData[key][currentLang] = textarea.value;
+        var cleaned = {};
+        for (var lang in templateLangData[key]) {
+          if (templateLangData[key].hasOwnProperty(lang)) {
+            var val = (templateLangData[key][lang] || '').trim();
+            if (val) cleaned[lang] = val;
+          }
+        }
+        hiddenInput.value = JSON.stringify(cleaned);
+      });
+    });
+  }
+
+  /* ── Variable insertion ── */
+  document.querySelectorAll('.insert-variable-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var variable = this.getAttribute('data-variable');
+      var targetId = this.getAttribute('data-target');
+      var textarea = document.getElementById(targetId);
+      if (!textarea) return;
+      var start  = textarea.selectionStart;
+      var end    = textarea.selectionEnd;
+      var text   = textarea.value;
+      textarea.value = text.substring(0, start) + variable + text.substring(end);
+      textarea.focus();
+      textarea.setSelectionRange(start + variable.length, start + variable.length);
+      emailTemplatesDirty = true;
+    });
+  });
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+/* ── Settings save orchestrator (avoid WAF) ─────────────────────────────── */
+(function () {
+  'use strict';
+
+  var LOG = '[settings-save]';
+  /** Verbose traces: use window.__clientLog so CLIENT_CONSOLE_LOGGING is respected. */
+  var _clientLogFallback = {{ config.CLIENT_CONSOLE_LOGGING | tojson }};
+  function log(step, extra) {
+    var msg = LOG + ' ' + step + (extra !== undefined && extra !== null && extra !== '' ? ' ' + extra : '');
+    if (typeof window.__clientLog === 'function') {
+      window.__clientLog(msg);
+      return;
+    }
+    if ((_clientLogFallback || window.CLIENT_CONSOLE_LOGGING) && window.console && console.log) {
+      console.log(msg);
+    }
+  }
+
+  var form = document.getElementById('manage-settings-form');
+  if (!form) {
+    log('init-skip', 'no #manage-settings-form');
+    return;
+  }
+  log('init', 'bound');
+
+  var savingLabel = {{ _('Saving...') | tojson }};
+  var savingBtnHtml =
+    '<span class="inline-flex items-center justify-center gap-2">' +
+    '<span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full shrink-0" aria-hidden="true"></span>' +
+    '<span>' + savingLabel + '</span></span>';
+
+  function saveButton() {
+    return document.getElementById('settings-save-btn') || form.querySelector('button[type="submit"]');
+  }
+
+  var SAVING_BTN_CLASSES = ['opacity-50', 'cursor-wait', 'pointer-events-none'];
+
+  function setSaveButtonSaving(isSaving, restoreHtml) {
+    var btn = saveButton();
+    if (!btn) {
+      log('button-missing');
+      return;
+    }
+    if (isSaving) {
+      btn.innerHTML = savingBtnHtml;
+      btn.setAttribute('disabled', 'disabled');
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+      btn.setAttribute('aria-disabled', 'true');
+      SAVING_BTN_CLASSES.forEach(function (c) { btn.classList.add(c); });
+      log('ui-saving', 'disabled=' + String(btn.disabled));
+      return;
+    }
+    SAVING_BTN_CLASSES.forEach(function (c) { btn.classList.remove(c); });
+    if (restoreHtml != null) btn.innerHTML = restoreHtml;
+    btn.removeAttribute('disabled');
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    btn.removeAttribute('aria-disabled');
+    log('ui-restored');
+  }
+
+  function decodeEntities(s) {
+    if (!s) return '';
+    var t = document.createElement('textarea');
+    t.innerHTML = s;
+    return t.value;
+  }
+
+  function base64EncodeUtf8(str) {
+    try {
+      return btoa(unescape(encodeURIComponent(String(str || ''))));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getCsrfToken() {
+    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    if (csrfMeta && csrfMeta.getAttribute('content')) return csrfMeta.getAttribute('content');
+    var csrfInput = form.querySelector('input[name="csrf_token"]');
+    return csrfInput ? (csrfInput.value || '') : '';
+  }
+
+  function collectTemplateMetadataFromEditors() {
+    var meta = {};
+    document.querySelectorAll('.email-template-editor').forEach(function (editor) {
+      var id = editor.id || '';
+      if (id.indexOf('editor-') !== 0) return;
+      var key = id.replace('editor-', '');
+      var labelEl = editor.querySelector('.template-metadata-label');
+      var titleEl = editor.querySelector('.template-metadata-title');
+      var messageEl = editor.querySelector('.template-metadata-message');
+      var priorityEl = editor.querySelector('.template-metadata-priority');
+      meta[key] = {
+        label: (labelEl && labelEl.value) ? labelEl.value.trim() : '',
+        notification_title: (titleEl && titleEl.value) ? titleEl.value.trim() : '',
+        notification_message: (messageEl && messageEl.value) ? messageEl.value.trim() : '',
+        priority: (priorityEl && priorityEl.value) ? priorityEl.value.trim() : 'normal'
+      };
+    });
+    return meta;
+  }
+
+  function collectEmailTemplatesFromHidden() {
+    // Each hidden input contains JSON { lang: html }
+    var out = {};
+    document.querySelectorAll('input[data-settings-email-template-hidden="1"]').forEach(function (inp) {
+      var id = inp.id || '';
+      if (!id || id.indexOf('-translations') === -1) return;
+      var key = id.replace(/-translations$/, '');
+      var parsed = {};
+      try { parsed = JSON.parse(decodeEntities(inp.value || '') || '{}') || {}; } catch (_) { parsed = {}; }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) parsed = {};
+      out[key] = parsed;
+    });
+    return out;
+  }
+
+  function stableJson(obj) {
+    try { return JSON.stringify(obj || {}); } catch (_) { return '{}'; }
+  }
+
+  async function saveEmailTemplatesIfChanged() {
+    var currentTemplates = collectEmailTemplatesFromHidden();
+    var currentMeta = collectTemplateMetadataFromEditors();
+
+    // Compare to initial snapshots stored in the hidden metadata input (server-rendered).
+    var metaInput = document.getElementById('template-metadata-json');
+    var metaInitialRaw = metaInput ? ((decodeEntities(metaInput.value || '') || '').trim() || '{}') : '{}';
+
+    // Initial template values are already present in the hidden inputs on load; we compare raw JSON.
+    // This is intentionally conservative: if any editor wrote changes into hidden inputs, we treat as dirty.
+    var templatesInitialRaw = {};
+    document.querySelectorAll('input[data-settings-email-template-hidden="1"]').forEach(function (inp) {
+      var id = inp.id || '';
+      var key = id.replace(/-translations$/, '');
+      templatesInitialRaw[key] = (decodeEntities(inp.defaultValue || inp.value || '') || '').trim() || '{}';
+    });
+
+    var templatesNowRaw = {};
+    Object.keys(currentTemplates || {}).forEach(function (k) {
+      templatesNowRaw[k] = stableJson(currentTemplates[k]);
+    });
+
+    var metaChanged = stableJson(currentMeta) !== metaInitialRaw;
+    var templatesChanged = false;
+    Object.keys(templatesNowRaw).forEach(function (k) {
+      if ((templatesInitialRaw[k] || '{}') !== templatesNowRaw[k]) templatesChanged = true;
+    });
+
+    if (!metaChanged && !templatesChanged) {
+      return { success: true, skipped: true };
+    }
+
+    // Build base64 payload: { tpl_key: { lang: b64(html) } }
+    var b64 = {};
+    Object.keys(currentTemplates || {}).forEach(function (tplKey) {
+      var langMap = currentTemplates[tplKey] || {};
+      if (!langMap || typeof langMap !== 'object') return;
+      b64[tplKey] = {};
+      Object.keys(langMap).forEach(function (lang) {
+        var html = langMap[lang];
+        if (typeof html !== 'string') return;
+        var trimmed = html.trim();
+        if (!trimmed) return;
+        b64[tplKey][lang] = base64EncodeUtf8(trimmed);
+      });
+    });
+
+    var csrf = getCsrfToken();
+    var resp = await fetch('{{ url_for("settings.api_settings_email_templates") }}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf
+      },
+      body: JSON.stringify({
+        email_templates_b64: b64,
+        template_metadata: currentMeta
+      })
+    });
+    var payload = {};
+    try { payload = await resp.json(); } catch (_) {}
+    if (!resp.ok || !payload || payload.success !== true) {
+      throw new Error((payload && payload.message) ? payload.message : ('Failed to save email templates (' + resp.status + ')'));
+    }
+    return payload;
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (form.dataset.settingsSaveInFlight === '1') {
+      log('submit-blocked', 'already saving');
+      return;
+    }
+    form.dataset.settingsSaveInFlight = '1';
+    log('submit');
+
+    var btn = saveButton();
+    var originalSubmitHtml = btn ? btn.innerHTML : '';
+    setSaveButtonSaving(true);
+
+    try {
+      log('email-templates');
+      await saveEmailTemplatesIfChanged();
+      log('email-templates-done');
+
+      // Second: submit the "light" settings without email-template blobs.
+      // Ensure legacy flag stays off so backend doesn't expect those fields.
+      var emailPresent = form.querySelector('input[name="email_templates_present"]');
+      if (emailPresent) emailPresent.value = '0';
+
+      // Temporarily disable hidden email-template inputs and metadata to keep request small.
+      var disabled = [];
+      document.querySelectorAll('input[data-settings-email-template-hidden="1"], input[data-settings-email-metadata-hidden="1"]').forEach(function (inp) {
+        if (!inp.disabled) {
+          inp.disabled = true;
+          disabled.push(inp);
+        }
+      });
+
+      var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+      var payloadObj = window.formDataToJson ? window.formDataToJson(form) : null;
+      if (!payloadObj) throw new Error('JSON payload helper is not available');
+      var csrfEl = form.querySelector('input[name="csrf_token"]');
+      var csrfToken = csrfEl ? csrfEl.value : '';
+      // Encode the entire payload so WAF does not pattern-match rich strings (translations JSON, URLs, etc.)
+      var payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
+      log('main-request');
+      var resp = await fetchFn(form.action, {
+        method: 'POST',
+        body: JSON.stringify({ payload: payloadB64 }),
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        }
+      });
+      disabled.forEach(function (inp) { inp.disabled = false; });
+
+      if (!resp.ok) {
+        throw new Error('Failed to save settings (' + resp.status + ')');
+      }
+
+      log('redirect', String(resp.status));
+      window.location.href = resp.url || form.action;
+    } catch (err) {
+      delete form.dataset.settingsSaveInFlight;
+      var m = (err && err.message) ? err.message : 'Failed to save settings';
+      log('error', m);
+      if (window.showAlert) window.showAlert(m, 'error'); else console.error(m);
+      setSaveButtonSaving(false, originalSubmitHtml);
+    }
+  });
+})();
+</script>
+
+{# Translation data for JavaScript (required by translation-utils.js) #}
+<script type="application/json" id="translation-data">
+{
+    "supportedLanguages": {{ current_supported | tojson }},
+    "languageDisplayNames": {{ LANGUAGE_DISPLAY_NAMES | tojson }}
+}
+</script>
+
+{# Combined Translation Modal for Organization Branding #}
+{{ translation_modal(
+    modal_id='org-branding-translations-modal',
+    modal_title=_('Organization Branding Translations'),
+    description=_('Add translations for organization name and short name in different languages. The English values can be edited in the main fields above.'),
+    context='organization_branding',
+    tabs=[
+        {'id': 'labels', 'name': _('Organization Name')},
+        {'id': 'definitions', 'name': _('Organization Short Name')}
+    ],
+    show_auto_translate=true,
+    css_prefix='org-branding',
+    auto_translate_permission_context='settings',
+    auto_translate_permission_code='admin.settings.manage'
+) }}
+
+<script nonce="{{ csp_nonce() }}">
+/* ── Provider tabs + drag-and-drop ───────────────────────────────────────── */
+(function () {
+  'use strict';
+
+  var row = document.getElementById('provider-priority-row');
+  var hiddenInput = document.getElementById('provider-priority-input');
+  var panelsContainer = document.getElementById('provider-tab-panels');
+  if (!row || !hiddenInput) return;
+
+  var dragSrc = null;
+  var justDragged = false;
+
+  /* Show the panel for the given provider id and set active chip */
+  function showProviderPanel(providerId) {
+    var chips = row.querySelectorAll('.provider-priority-chip');
+    var panels = panelsContainer ? panelsContainer.querySelectorAll('.provider-fields-panel') : [];
+
+    chips.forEach(function (chip) {
+      var isActive = chip.dataset.providerId === providerId;
+      chip.classList.toggle('border-blue-500', isActive);
+      chip.classList.toggle('bg-blue-50', isActive);
+      chip.classList.toggle('text-blue-700', isActive);
+      chip.classList.toggle('shadow-sm', isActive);
+      chip.classList.toggle('border-gray-200', !isActive);
+      chip.classList.toggle('bg-white', !isActive);
+      chip.classList.toggle('text-gray-600', !isActive);
+      chip.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      var circle = chip.querySelector('.provider-circle');
+      if (circle) {
+        circle.classList.toggle('bg-blue-200', isActive);
+        circle.classList.toggle('text-blue-800', isActive);
+        circle.classList.toggle('bg-gray-100', !isActive);
+        circle.classList.toggle('text-gray-600', !isActive);
+      }
+    });
+
+    panels.forEach(function (panel) {
+      panel.classList.toggle('hidden', panel.dataset.providerId !== providerId);
+    });
+  }
+
+  /* Update priority numbers after every reorder and sync hidden input */
+  function updateState() {
+    var chips = row.querySelectorAll('.provider-priority-chip');
+    chips.forEach(function (chip, i) {
+      var circle = chip.querySelector('.provider-circle');
+      if (circle) circle.textContent = String(i + 1);
+    });
+    hiddenInput.value = JSON.stringify(
+      Array.from(chips).map(function (c) { return c.dataset.providerId; })
+    );
+  }
+
+  /* Also sync heading labels inside the provider form sections */
+  function syncHeadingLabels() {
+    var chips = row.querySelectorAll('.provider-priority-chip');
+    chips.forEach(function (chip, i) {
+      var pid = chip.dataset.providerId;
+      var suffix = i === 0 ? ' (Primary)' : ' (Fallback)';
+      var num = String(i + 1);
+      var heading = document.querySelector(
+        '#panel-ai [data-provider-heading="' + pid + '"]'
+      );
+      if (heading) heading.textContent = num + '. ' + heading.dataset.providerName + suffix;
+    });
+  }
+
+  /* Tab click: show that provider's panel (unless we just finished a drag) */
+  row.addEventListener('click', function (e) {
+    var chip = e.target.closest('.provider-priority-chip');
+    if (!chip) return;
+    if (justDragged) {
+      justDragged = false;
+      return;
+    }
+    e.preventDefault();
+    showProviderPanel(chip.dataset.providerId);
+  });
+
+  row.addEventListener('dragstart', function (e) {
+    var chip = e.target.closest('.provider-priority-chip');
+    if (!chip) return;
+    dragSrc = chip;
+    justDragged = true;
+    chip.style.opacity = '0.4';
+    chip.style.cursor = 'grabbing';
+    try { e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+  });
+
+  row.addEventListener('dragend', function (e) {
+    var chip = e.target.closest('.provider-priority-chip');
+    if (chip) { chip.style.opacity = ''; chip.style.cursor = ''; }
+    dragSrc = null;
+  });
+
+  row.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    if (!dragSrc) return;
+    var target = e.target.closest('.provider-priority-chip');
+    if (!target || target === dragSrc) return;
+    var rect = target.getBoundingClientRect();
+    var insertBefore = e.clientX < rect.left + rect.width / 2;
+    row.insertBefore(dragSrc, insertBefore ? target : target.nextSibling);
+    updateState();
+    syncHeadingLabels();
+  });
+
+  row.addEventListener('drop', function (e) { e.preventDefault(); });
+
+  /* Touch fallback (mobile) */
+  var touchDragSrc = null;
+  var touchClone = null;
+  row.addEventListener('touchstart', function (e) {
+    var chip = e.target.closest('.provider-priority-chip');
+    if (!chip) return;
+    touchDragSrc = chip;
+    touchClone = chip.cloneNode(true);
+    touchClone.style.position = 'fixed';
+    touchClone.style.opacity = '0.7';
+    touchClone.style.pointerEvents = 'none';
+    touchClone.style.zIndex = '9999';
+    touchClone.style.minWidth = chip.offsetWidth + 'px';
+    document.body.appendChild(touchClone);
+    chip.style.opacity = '0.3';
+  }, { passive: true });
+
+  row.addEventListener('touchmove', function (e) {
+    if (!touchClone || !touchDragSrc) return;
+    var t = e.touches[0];
+    touchClone.style.left = (t.clientX - touchClone.offsetWidth / 2) + 'px';
+    touchClone.style.top  = (t.clientY - touchClone.offsetHeight / 2) + 'px';
+    var chips = Array.from(row.querySelectorAll('.provider-priority-chip'));
+    for (var i = 0; i < chips.length; i++) {
+      var chip = chips[i];
+      if (chip === touchDragSrc) continue;
+      var rect = chip.getBoundingClientRect();
+      if (t.clientX > rect.left && t.clientX < rect.right && t.clientY > rect.top && t.clientY < rect.bottom) {
+        var insertBefore = t.clientX < rect.left + rect.width / 2;
+        row.insertBefore(touchDragSrc, insertBefore ? chip : chip.nextSibling);
+        break;
+      }
+    }
+  }, { passive: true });
+
+  row.addEventListener('touchend', function () {
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    if (touchDragSrc) {
+      touchDragSrc.style.opacity = '';
+      touchDragSrc = null;
+      justDragged = true;
+    }
+    updateState();
+    syncHeadingLabels();
+  }, { passive: true });
+})();
+</script>
+
+{# Import translation modal JavaScript and utilities #}
+<script type="module" nonce="{{ csp_nonce() }}">
+  import { TranslationModal } from '/static/js/components/translation-modal.js';
+  import { TranslationUtils } from '/static/js/components/translation-utils.js';
+
+  // Make TranslationUtils available globally (required by translation-modal.js)
+  if (typeof window !== 'undefined') {
+    window.TranslationModalUtils = TranslationUtils;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const orgNameEnInput = document.getElementById('organization-name-en-input');
+    const orgNameTranslationsInput = document.getElementById('organization-name-translations-input');
+    const orgShortNameEnInput = document.getElementById('organization-short-name-en-input');
+    const orgShortNameTranslationsInput = document.getElementById('organization-short-name-translations-input');
+    const cssPrefix = 'org-branding';
+
+    /**
+     * Decode basic HTML entities that can sneak into attribute values.
+     */
+    function decodeHtmlEntities(value) {
+      if (typeof value !== 'string') {
+        return '';
+      }
+      return value
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');
+    }
+
+    /**
+     * Parse JSON stored in hidden inputs without surfacing console errors when malformed.
+     */
+    function safeParseJSON(input, fallback = {}) {
+      if (input === null || input === undefined) {
+        return fallback;
+      }
+      const decoded = decodeHtmlEntities(String(input)).trim();
+      if (!decoded || decoded === '{}' || decoded === 'null') {
+        return fallback;
+      }
+      const looksLikeObject = decoded.startsWith('{') && decoded.endsWith('}');
+      if (!looksLikeObject) {
+        return fallback;
+      }
+      try {
+        const parsed = JSON.parse(decoded);
+        return (parsed && typeof parsed === 'object') ? parsed : fallback;
+      } catch (error) {
+        try {
+          window.__clientDebug && window.__clientDebug('[settings] Ignored invalid translation JSON', {
+            preview: decoded.slice(0, 120),
+            message: error && error.message ? error.message : error
+          });
+        } catch (_) {}
+        return fallback;
+      }
+    }
+
+    /**
+     * Populate or clear translation fields for a given tab suffix.
+     */
+    function populateModalTab(translations, suffix) {
+      const entries = Object.entries(translations || {}).filter(([key]) => key !== 'en');
+      const map = Object.fromEntries(entries);
+      const selectorPrefix = suffix ? `${cssPrefix}-translation-${suffix}-` : `${cssPrefix}-translation-`;
+      const fields = document.querySelectorAll(`[id^="${selectorPrefix}"]`);
+      fields.forEach(field => {
+        if (!field || !field.id) return;
+        const langCode = field.id.replace(selectorPrefix, '');
+        field.value = map[langCode] || '';
+      });
+      // Keep utility helpers in sync (ensures auto-translate buttons see latest values)
+      if (window.TranslationModalUtils) {
+        if (entries.length > 0) {
+          window.TranslationModalUtils.populateFields(cssPrefix, map, '', suffix);
+        } else {
+          window.TranslationModalUtils.clearFields(cssPrefix, suffix);
+        }
+      }
+    }
+
+    /**
+     * Read the latest values from the hidden inputs and push them into the modal fields.
+     */
+    function syncModalFromHiddenInputs() {
+      const nameValue = orgNameTranslationsInput ? orgNameTranslationsInput.value : '';
+      const nameTranslations = safeParseJSON(nameValue, {});
+      populateModalTab(nameTranslations, 'labels');
+
+      const shortNameValue = orgShortNameTranslationsInput ? orgShortNameTranslationsInput.value : '';
+      const shortNameTranslations = safeParseJSON(shortNameValue, {});
+      populateModalTab(shortNameTranslations, 'definitions');
+    }
+
+    // Initial sync to ensure modal reflects server-rendered data on first load
+    syncModalFromHiddenInputs();
+
+    // Combined tabbed modal for both organization name and short name
+    TranslationModal.attach({
+      openButtonId: 'open-org-branding-translations-btn',
+      modalId: 'org-branding-translations-modal',
+      cssPrefix: 'org-branding',
+      tabSuffixes: ['labels', 'definitions'],
+      defaultTabSuffix: 'labels',
+      resolveTextsByTab: function() {
+        // Get English text from inputs, ensuring they're non-empty strings
+        const orgName = orgNameEnInput ? orgNameEnInput.value.trim() : '';
+        const orgShortName = orgShortNameEnInput ? orgShortNameEnInput.value.trim() : '';
+        return {
+          labels: orgName || '',
+          definitions: orgShortName || ''
+        };
+      },
+      onSaveHiddenFields: function(translationsByTab) {
+        // translationsByTab is { labels: {...}, definitions: {...} }
+        if (translationsByTab && translationsByTab.labels) {
+          const nameTranslations = translationsByTab.labels;
+          const enValue = orgNameEnInput ? orgNameEnInput.value.trim() : '';
+          if (enValue) {
+            nameTranslations['en'] = enValue;
+          }
+          if (orgNameTranslationsInput) {
+            orgNameTranslationsInput.value = JSON.stringify(nameTranslations);
+          }
+        }
+
+        if (translationsByTab && translationsByTab.definitions) {
+          const shortNameTranslations = translationsByTab.definitions;
+          const enValue = orgShortNameEnInput ? orgShortNameEnInput.value.trim() : '';
+          if (enValue) {
+            shortNameTranslations['en'] = enValue;
+          }
+          if (orgShortNameTranslationsInput) {
+            orgShortNameTranslationsInput.value = JSON.stringify(shortNameTranslations);
+          }
+        }
+      },
+      autoTranslateType: 'template_name',
+      onModalOpen: function() {
+        // Ensure modal fields reflect the freshest hidden input values every time it opens
+        try {
+          syncModalFromHiddenInputs();
+        } catch (error) {
+          window.__clientWarn && window.__clientWarn('Failed to sync organization branding translations', error);
+        }
+      }
+    });
+
+    // Update hidden inputs when English fields change
+    if (orgNameEnInput && orgNameTranslationsInput) {
+      orgNameEnInput.addEventListener('blur', function() {
+        const translations = safeParseJSON(orgNameTranslationsInput.value, {});
+        const enValue = this.value.trim();
+        if (enValue) {
+          translations['en'] = enValue;
+          orgNameTranslationsInput.value = JSON.stringify(translations);
+        }
+        syncModalFromHiddenInputs();
+      });
+    }
+
+    if (orgShortNameEnInput && orgShortNameTranslationsInput) {
+      orgShortNameEnInput.addEventListener('blur', function() {
+        const translations = safeParseJSON(orgShortNameTranslationsInput.value, {});
+        const enValue = this.value.trim();
+        if (enValue) {
+          translations['en'] = enValue;
+          orgShortNameTranslationsInput.value = JSON.stringify(translations);
+        }
+        syncModalFromHiddenInputs();
+      });
+    }
+  });
+</script>
+
+{% endblock %}

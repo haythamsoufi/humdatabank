@@ -1,0 +1,1365 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ _('Login') }}{% endblock %}
+
+{% set _org_logo = ((ORGANIZATION_BRANDING or {}).get('organization_favicon_path') or 'favicon.svg')|trim %}
+
+{% block content %}
+<style nonce="{{ csp_nonce() }}">
+/* Import and apply Montserrat font */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+/* Apply Montserrat to all elements in the login page */
+body, p, span, div, h1, h2, h3, h4, h5, h6, a, input, textarea, select, button, label, table, tr, td, th, li, ul, ol, .main-container, .left-section, .right-section, .fullscreen-content {
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+/* Preserve Font Awesome icons */
+i.fa,
+i.fas,
+i.far,
+i.fab,
+i.fal,
+i.fa-solid,
+i.fa-regular,
+i.fa-brands,
+i[class*="fa-"] {
+    font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 6 Brands", "FontAwesome" !important;
+}
+
+/*
+ * Organization SSO (Azure) — IFRC brand red; extends unified .btn from components.css.
+ * Not semantic "danger"; keep distinct from --btn-danger for login-only branding.
+ */
+.btn-login-oauth:not(.disabled):not([disabled]) {
+    background-color: #C8102E !important;
+    color: #fff !important;
+    border: none !important;
+    text-decoration: none !important;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.75rem 1rem !important;
+    font-size: 1rem !important;
+}
+.btn-login-oauth:not(.disabled):not([disabled]):hover {
+    background-color: #a50d25 !important;
+    color: #fff !important;
+}
+.btn-login-oauth:not(.disabled):not([disabled]):focus-visible {
+    outline: 2px solid #C8102E;
+    outline-offset: 2px;
+}
+.btn-login-oauth:not(.disabled):not([disabled]) * {
+    color: #fff !important;
+}
+.btn-login-oauth.disabled,
+.btn-login-oauth[disabled],
+a.btn-login-oauth.disabled,
+a.btn-login-oauth[disabled] {
+    background-color: #9ca3af !important;
+    color: #6b7280 !important;
+    cursor: not-allowed !important;
+    opacity: 0.65 !important;
+    pointer-events: none !important;
+}
+.btn-login-oauth.disabled *,
+.btn-login-oauth[disabled] * {
+    color: #6b7280 !important;
+}
+
+/* Logo and text animations */
+@keyframes fadeInScale {
+    0% { opacity: 0; transform: scale(0.8); }
+    100% { opacity: 1; transform: scale(1); }
+}
+.logo-animate {
+    animation: fadeInScale 1s ease-out forwards;
+}
+
+@keyframes slideIn {
+    0% { opacity: 0; transform: translateY(30px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+.text-animate {
+    animation: slideIn 1s ease-out forwards;
+    animation-delay: 0.3s;
+}
+
+/* Canvas settings */
+#networkBG {
+    margin: 0;
+    padding: 0;
+    display: block;
+}
+
+/* Fullscreen button styles */
+.fullscreen-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 20;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 18px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fullscreen-btn:hover {
+    color: rgba(255, 255, 255, 1);
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+.fullscreen-btn:active {
+    transform: scale(0.95);
+}
+
+
+/* Fullscreen mode styles */
+.fullscreen-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1000;
+    background: #011E41;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.fullscreen-container.active {
+    display: flex;
+}
+
+.fullscreen-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1001;
+}
+
+.fullscreen-content {
+    position: relative;
+    z-index: 1002;
+    text-align: center;
+    max-width: 800px;
+    padding: 20px;
+}
+
+.fullscreen-content img {
+    max-width: 300px;
+    margin-bottom: 40px;
+}
+
+.fullscreen-content h1 {
+    font-size: 3.5rem;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.fullscreen-content p {
+    font-size: 1.5rem;
+    line-height: 1.6;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.exit-fullscreen-btn {
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    z-index: 1003;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.exit-fullscreen-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+    .fullscreen-content h1 {
+        font-size: 2.5rem;
+    }
+    .fullscreen-content p {
+        font-size: 1.2rem;
+    }
+    .fullscreen-content img {
+        max-width: 200px;
+    }
+
+    /* Mobile responsive layout */
+    .main-container {
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    .left-section {
+        width: 100% !important;
+        min-height: 50vh;
+        max-height: 55vh;
+        padding: 2rem 1rem;
+        position: relative;
+    }
+
+    .left-section .content {
+        max-width: 95%;
+        transform: scale(0.9);
+    }
+
+    .left-section img {
+        width: 10rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .left-section h1 {
+        font-size: 1.5rem !important;
+        margin-bottom: 0.75rem !important;
+        line-height: 1.3;
+    }
+
+    .left-section p {
+        font-size: 0.8rem !important;
+        line-height: 1.4;
+        margin-bottom: 0;
+    }
+
+    .right-section {
+        width: 100% !important;
+        min-height: 45vh;
+        padding: 2rem 1rem;
+        flex: 1;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 1rem;
+    }
+
+    .right-section > div {
+        margin-top: 0;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: none;
+        border: none;
+        padding: 1.5rem;
+    }
+
+    .fullscreen-btn {
+        top: 1rem;
+        right: 1rem;
+        font-size: 16px;
+        width: 36px;
+        height: 36px;
+    }
+
+
+    /* Better mobile form styling */
+    .right-section h2 {
+        font-size: 1.5rem !important;
+        margin-bottom: 1.5rem;
+    }
+
+    .right-section form {
+        gap: 1rem;
+    }
+
+    .right-section input[type="email"],
+    .right-section input[type="password"] {
+        padding: 0.875rem 0.75rem 0.875rem 2.5rem !important;
+        font-size: 1rem;
+    }
+
+    .right-section button[type="submit"] {
+        padding: 0.875rem 1rem !important;
+        font-size: 1rem;
+    }
+}
+
+/* Register modal country selector enhancements */
+#registerModal .select2-container {
+    width: 100% !important;
+    z-index: 5002;
+}
+
+.register-country-dropdown {
+    top: calc(100% + 0.5rem) !important;
+    bottom: auto !important;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 35px rgba(0, 0, 0, 0.25);
+    border: 1px solid #e5e7eb;
+}
+
+.register-country-dropdown .select2-search__field {
+    padding: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.register-country-dropdown.select2-dropdown--above {
+    margin-top: 0 !important;
+}
+
+#registerModal .select2-selection--single {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-radius: 0.375rem;
+    border-color: #d1d5db;
+}
+
+#registerModal .select2-selection__rendered {
+    color: #111827;
+}
+
+#registerModalCard {
+    position: relative;
+}
+
+.password-field-wrapper {
+    position: relative;
+}
+
+#register_password_requirements {
+    margin-top: 0.5rem;
+    padding-left: 1.25rem;
+    font-size: 0.8rem;
+}
+
+#register_password_requirements li {
+    margin-bottom: 0.25rem;
+    color: #6b7280;
+}
+
+#register_password_requirements li.valid {
+    color: #16a34a;
+}
+
+#register_password_requirements li.invalid {
+    color: #dc2626;
+}
+
+#register_password_requirements_wrapper {
+    margin-top: 0.5rem;
+}
+
+#register_password_requirements_wrapper.popover-visible {
+    display: block;
+}
+
+@media (min-width: 1024px) {
+    #register_password_requirements_wrapper {
+        position: absolute;
+        top: 50%;
+        left: calc(100% + 1rem);
+        width: 240px;
+        transform: translateY(-50%);
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        box-shadow: 0 20px 35px rgba(0, 0, 0, 0.15);
+        display: none;
+        z-index: 20;
+    }
+
+    #register_password_requirements_wrapper::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: -8px;
+        width: 16px;
+        height: 16px;
+        background: #ffffff;
+        border-left: 1px solid #e5e7eb;
+        border-top: 1px solid #e5e7eb;
+        transform: translateY(-50%) rotate(45deg);
+    }
+
+    #register_password_requirements_wrapper ul {
+        margin-top: 0;
+    }
+}
+
+/* Register submit disabled: .btn:disabled in components.css */
+
+/* Modal z-index styles - moved from inline to support CSP nonces */
+#registerModal {
+    z-index: 5000;
+}
+
+#registerModalCard {
+    z-index: 5001;
+}
+
+#forgotModal {
+    z-index: 5000;
+}
+
+#forgotModal > div {
+    z-index: 5001;
+}
+
+/* Modal overlay styles - moved from inline to support CSP nonces */
+#registerModal {
+    background-color: rgba(0,0,0,0.75);
+    backdrop-filter: blur(1px);
+}
+
+#forgotModal {
+    background-color: rgba(0,0,0,0.75);
+    backdrop-filter: blur(1px);
+}
+
+/* Body overflow control for modals - used instead of inline styles for CSP compliance */
+body.modal-open {
+    overflow: hidden !important;
+}
+
+/* Logo placeholder (shown when no organization logo is configured or fails to load) */
+.login-logo-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12rem;
+    height: 12rem;
+    margin: 0 auto 2rem auto;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.login-logo-placeholder span {
+    font-size: 4rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 0.1em;
+    user-select: none;
+}
+
+.fullscreen-content .login-logo-placeholder {
+    width: 15rem;
+    height: 15rem;
+    margin-bottom: 2.5rem;
+}
+
+.fullscreen-content .login-logo-placeholder span {
+    font-size: 5rem;
+}
+
+@media (max-width: 768px) {
+    .login-logo-placeholder {
+        width: 8rem;
+        height: 8rem;
+        margin-bottom: 1rem;
+    }
+
+    .login-logo-placeholder span {
+        font-size: 2.5rem;
+    }
+}
+</style>
+
+<div class="flex min-h-[80vh] max-h-screen main-container">
+    <!-- Left Section with Logo, Info, and Network Background -->
+    <div class="w-1/2 bg-[#011E41] text-white flex flex-col justify-center items-center p-12 relative overflow-hidden left-section">
+        <!-- Network background canvas -->
+        <canvas id="networkBG" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
+
+        <!-- Fullscreen button -->
+        <button id="fullscreenBtn" class="fullscreen-btn">
+            <i class="fas fa-expand"></i>
+        </button>
+
+
+
+        <!-- Content -->
+        <div class="relative z-10 text-center max-w-xl content">
+            {% if _org_logo %}
+            <img src="{{ static_url(_org_logo) }}" alt="{{ ORG_NAME }} Logo" class="w-60 mb-8 logo-animate mx-auto" data-hide-on-error="true" data-show-next-on-error="flex">
+            {% endif %}
+            <div class="login-logo-placeholder logo-animate" {% if _org_logo %}style="display:none"{% endif %}>
+                <span>{{ (ORG_SHORT_NAME or ORG_NAME or 'DB')[:2] | upper }}</span>
+            </div>
+            <h1 class="text-4xl font-bold mb-4 text-white text-animate drop-shadow-lg">{{ _('Welcome to the') }} {{ ORG_NAME }}</h1>
+            <p class="text-lg leading-relaxed text-white text-animate drop-shadow-md">
+                {{ _('This is the one and only system for reporting data to') }} {{ ORG_NAME }}. {{ _('Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and logins — everything is now centralized and streamlined here.') }}
+            </p>
+
+        </div>
+    </div>
+
+    <!-- Right Section with Login Form -->
+    <div class="w-1/2 flex items-center justify-center bg-white right-section">
+        <div class="w-full max-w-md p-6 space-y-6 shadow-lg border border-gray-200 rounded-lg transition-transform duration-300 hover:scale-105">
+            <h2 class="text-center text-2xl font-bold text-gray-900">
+            {{ _('Log in with:') }}
+            </h2>
+
+            <form method="POST" id="loginForm" class="space-y-4">
+            {{ form.csrf_token(id="login_csrf_token") }}
+            <input type="hidden" name="remember" value="true">
+            {% if request.args.get('next') %}<input type="hidden" name="next" value="{{ request.args.get('next') }}">{% endif %}
+
+            <!-- Federation Login (Azure AD B2C) -->
+            <div class="space-y-2">
+                <a id="azureLoginButton" href="{{ url_for('auth.azure_login', next=request.args.get('next')) }}"
+                   class="btn btn-block btn-login-oauth no-underline whitespace-nowrap">
+                    {% if _org_logo %}<img src="{{ static_url(_org_logo) }}" alt="{{ ORG_SHORT_NAME or ORG_NAME }}" class="h-5 w-auto mr-2" data-hide-on-error="true">{% endif %}
+                    {{ _('Your account or create an account') }}
+                </a>
+            </div>
+
+            {# Quick Login Buttons (Testers) - Only shown in development environment #}
+            {% if flask_config is defined and (flask_config == 'development' or flask_config == 'default') %}
+            <!-- Quick Login Buttons (Testers) -->
+            <div class="p-3 rounded-md bg-yellow-50 border border-yellow-200 space-y-2">
+                <div class="flex items-center text-yellow-800 font-medium text-sm">
+                    <i class="fa-solid fa-flask mr-2"></i>
+                    {{ _('Quick login for testers') }}
+                </div>
+                <div class="grid grid-cols-1 gap-2">
+                    <button id="quickAdminLogin" type="button" aria-label="{{ _('Quick login as an Admin') }}" class="btn btn-block btn-dark">
+                        <i class="fa-solid fa-user-shield"></i>
+                        {{ _('Test as an Admin') }}
+                    </button>
+                    {# Temporarily disabled: System Manager quick login button
+                    <button id="quickSystemManagerLogin" type="button" aria-label="{{ _('Quick login as a System Manager') }}" class="btn btn-purple w-full">
+                        <i class="fa-solid fa-cogs mr-2"></i>
+                        {{ _('Test as System Manager') }}
+                        {% set test_domain = get_organization_email_domain() or get_organization_domain() or 'ngo.org' %}
+                        <span class="ml-2 text-xs opacity-80 hidden sm:inline">sys-manager@{{ test_domain }}</span>
+                    </button>
+                    #}
+                    <button id="quickFocalLogin" type="button" aria-label="{{ _('Quick login as Afghanistan Focal Point') }}" class="btn btn-block btn-primary">
+                        <i class="fa-solid fa-user"></i>
+                        {{ _('Test as a Focal Point') }}
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Manual login fields - commented out
+            <!-- Email -->
+            <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                <i class="fa-solid fa-envelope"></i>
+                </span>
+                {{ form.email(
+                id="login_email",
+                class="pl-10 block w-full px-4 py-3 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900
+                focus:outline-none focus:ring-2 focus:ring-[#1a237e] focus:border-[#1a237e] sm:text-sm",
+                placeholder=_('Email address'),
+                aria_label=_('Email address'),
+                autocomplete="username"
+                ) }}
+                {% for error in form.email.errors %}
+                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <!-- Password -->
+            <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                <i class="fa-solid fa-lock"></i>
+                </span>
+                {{ form.password(
+                id="login_password",
+                class="pl-10 block w-full px-4 py-3 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900
+                focus:outline-none focus:ring-2 focus:ring-[#1a237e] focus:border-[#1a237e] sm:text-sm",
+                placeholder=_('Password'),
+                aria_label=_('Password'),
+                autocomplete="current-password"
+                ) }}
+                {% for error in form.password.errors %}
+                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+                <label class="flex items-center text-gray-700">
+                <input type="checkbox" name="remember-me" class="h-4 w-4 text-[#1a237e] border-gray-300 rounded">
+                <span class="ml-2">{{ _('Remember me') }}</span>
+                </label>
+                <button type="button" id="openForgotModal" class="text-[#1a237e] hover:underline font-medium">{{ _('Forgot password?') }}</button>
+            </div>
+
+
+
+            <div>
+                <button type="submit" name="submit" class="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium
+                rounded-md text-white bg-[#1a237e] hover:bg-blue-900 focus:outline-none focus:ring-2
+                focus:ring-offset-2 focus:ring-[#1a237e]">
+                    {{ _('Login') }}
+                </button>
+            </div>
+            #}
+
+            {# Don't have an account? Register - commented out
+            <p class="text-center text-sm text-gray-600">
+                {{ _("Don't have an account?") }}
+                <button type="button" id="openRegisterModal" class="font-medium text-[#1a237e] hover:underline hover:scale-105 transition-transform">{{ _('Register') }}</button>
+            </p>
+            #}
+            </form>
+        </div>
+        </div>
+
+</div>
+
+<!-- Register Modal -->
+<div id="registerModal" class="fixed inset-0 hidden items-center justify-center bg-black/50">
+  <div id="registerModalCard" class="bg-white w-full max-w-md rounded-md shadow-lg p-6 relative">
+    <button type="button" id="closeRegisterModal" class="absolute top-3 right-3 btn-close-icon text-gray-500 hover:text-gray-800" aria-label="{{ _('Close') }}"><i class="fa-solid fa-xmark"></i></button>
+    <h2 class="text-xl font-semibold mb-4">{{ _('Create your account') }}</h2>
+    <form method="POST" action="{{ url_for('auth.register') }}" class="space-y-2">
+      {{ register_form.csrf_token(id="register_csrf_token") }}
+      {{ register_form.email(id="register_email", class="block w-full px-4 py-2 border rounded", placeholder=_('Email'), autocomplete="username") }}
+      {% for error in register_form.email.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      <p id="register_email_feedback" class="text-xs mt-1"></p>
+      {{ register_form.name(id="register_name", class="block w-full px-4 py-2 border rounded", placeholder=_('Name (optional)')) }}
+      {% for error in register_form.name.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      {{ register_form.title(id="register_title", class="block w-full px-4 py-2 border rounded", placeholder=_('Title (optional)'), autocomplete="organization-title") }}
+      {% for error in register_form.title.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      <div>
+        <label for="register_requested_country" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Country you will cover') }}</label>
+        {{ register_form.requested_country_id(id="register_requested_country", class="block w-full px-4 py-2 border rounded select2-country") }}
+        {% for error in register_form.requested_country_id.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+        <p class="text-xs text-gray-500 mt-1">{{ _('Select one country you request access to. An admin will review your request.') }}</p>
+      </div>
+      <div>
+        <label for="register_request_message" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Message to admins (optional)') }}</label>
+        {{ register_form.request_message(id="register_request_message", class="block w-full px-4 py-2 border rounded", placeholder=_('Briefly describe your role and why you need access')) }}
+        {% for error in register_form.request_message.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="password-field-wrapper">
+        {{ register_form.password(id="register_password", class="block w-full px-4 py-2 border rounded", placeholder=_('Password'), autocomplete="new-password") }}
+        {% for error in register_form.password.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+        <div id="register_password_requirements_wrapper">
+          <ul id="register_password_requirements">
+            <li data-rule="length">{{ _('At least 8 characters') }}</li>
+            <li data-rule="upper">{{ _('Contains an uppercase letter') }}</li>
+            <li data-rule="lower">{{ _('Contains a lowercase letter') }}</li>
+            <li data-rule="number">{{ _('Contains a number') }}</li>
+            <li data-rule="special">{{ _('Contains a special character (e.g. !@#$)') }}</li>
+          </ul>
+        </div>
+      </div>
+      {{ register_form.confirm_password(id="register_confirm_password", class="block w-full px-4 py-2 border rounded", placeholder=_('Confirm Password'), autocomplete="new-password") }}
+      {% for error in register_form.confirm_password.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      <p id="register_password_match" class="text-xs mt-1"></p>
+      {{ register_form.submit(id="register_submit", class="btn btn-success btn-block w-full mt-2", value=_('Create Account')) }}
+    </form>
+  </div>
+  </div>
+
+<!-- Forgot Password Modal -->
+<div id="forgotModal" class="fixed inset-0 hidden items-center justify-center bg-black/50">
+  <div class="bg-white w-full max-w-md rounded-md shadow-lg p-6 relative">
+    <button type="button" id="closeForgotModal" class="absolute top-3 right-3 btn-close-icon text-gray-500 hover:text-gray-800" aria-label="{{ _('Close') }}"><i class="fa-solid fa-xmark"></i></button>
+    <h2 class="text-xl font-semibold mb-2">{{ _('Forgot your password?') }}</h2>
+    <p class="text-sm text-gray-600 mb-4">{{ _('Enter your email and we\'ll send you a link to reset your password.') }}</p>
+    <form method="POST" action="{{ url_for('auth.forgot_password') }}" class="space-y-2">
+      {{ forgot_form.csrf_token(id="forgot_csrf_token") }}
+      {{ forgot_form.email(id="forgot_email", class="block w-full px-4 py-2 border rounded", placeholder=_('Email')) }}
+      {% for error in forgot_form.email.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      {{ forgot_form.submit(id="forgot_submit", class="btn btn-success btn-block w-full mt-2", value=_('Send Reset Link')) }}
+    </form>
+  </div>
+  </div>
+
+
+<!-- Fullscreen Network Animation Container -->
+<div id="fullscreenContainer" class="fullscreen-container">
+    <canvas id="fullscreenCanvas" class="fullscreen-canvas"></canvas>
+    <button id="exitFullscreenBtn" class="exit-fullscreen-btn">
+        <i class="fas fa-compress"></i>
+    </button>
+    <div class="fullscreen-content">
+        {% if _org_logo %}
+        <img src="{{ static_url(_org_logo) }}" alt="{{ ORG_NAME }} Logo" class="logo-animate" data-hide-on-error="true" data-show-next-on-error="flex">
+        {% endif %}
+        <div class="login-logo-placeholder logo-animate" {% if _org_logo %}style="display:none"{% endif %}>
+            <span>{{ (ORG_SHORT_NAME or ORG_NAME or 'DB')[:2] | upper }}</span>
+        </div>
+        <h1 class="text-white text-animate drop-shadow-lg">{{ _('Welcome to the') }} {{ ORG_NAME }}</h1>
+        <p class="text-white text-animate drop-shadow-md">
+            {{ _('This is the one and only system for reporting data to') }} {{ ORG_NAME }}. {{ _('Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and logins — everything is now centralized and streamlined here.') }}
+        </p>
+    </div>
+</div>
+
+<!-- Animated Network Background -->
+<script nonce="{{ csp_nonce() }}">
+const canvas = document.getElementById('networkBG');
+const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+const ctx = canvas.getContext('2d');
+const fullscreenCtx = fullscreenCanvas.getContext('2d');
+let nodes = [];
+let fullscreenNodes = [];
+let mouse = { x: null, y: null, active: true };
+let fullscreenMouse = { x: null, y: null, active: true };
+let pulseFrame = 0;
+let bursts = [];
+let fullscreenBursts = [];
+let isFullscreen = false;
+
+let resizeTimeout = null;
+let cachedCanvasWidth = 0;
+let cachedCanvasHeight = 0;
+let cachedWindowWidth = 0;
+let cachedWindowHeight = 0;
+
+// Cache bounding rects per canvas to avoid forced reflows (must be defined before use)
+const rectCache = new WeakMap();
+let rectCacheFrame = null;
+
+function invalidateRectCache(targetCanvas) {
+    rectCache.delete(targetCanvas);
+}
+
+function resizeCanvas() {
+    // Cache dimensions to avoid forced reflow
+    const newWidth = canvas.offsetWidth;
+    const newHeight = canvas.offsetHeight;
+    if (newWidth !== cachedCanvasWidth || newHeight !== cachedCanvasHeight) {
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        cachedCanvasWidth = newWidth;
+        cachedCanvasHeight = newHeight;
+        invalidateRectCache(canvas); // Invalidate rect cache when canvas resizes
+    }
+}
+
+function resizeFullscreenCanvas() {
+    // Cache dimensions to avoid forced reflow
+    const newWidth = window.innerWidth;
+    const newHeight = window.innerHeight;
+    if (newWidth !== cachedWindowWidth || newHeight !== cachedWindowHeight) {
+        fullscreenCanvas.width = newWidth;
+        fullscreenCanvas.height = newHeight;
+        cachedWindowWidth = newWidth;
+        cachedWindowHeight = newHeight;
+        invalidateRectCache(fullscreenCanvas); // Invalidate rect cache when canvas resizes
+    }
+}
+
+function handleResize() {
+    // Debounce resize events to prevent forced reflows
+    if (resizeTimeout) {
+        cancelAnimationFrame(resizeTimeout);
+    }
+    resizeTimeout = requestAnimationFrame(() => {
+        resizeCanvas();
+        if (isFullscreen) {
+            resizeFullscreenCanvas();
+        }
+        resizeTimeout = null;
+    });
+}
+
+window.addEventListener('resize', handleResize, { passive: true });
+
+// Initial resize
+resizeCanvas();
+
+function createNodes(count = 60, targetNodes = nodes, canvasWidth = canvas.width, canvasHeight = canvas.height) {
+    targetNodes.length = 0;
+    for (let i = 0; i < count; i++) {
+        targetNodes.push({
+            x: Math.random() * canvasWidth,
+            y: Math.random() * canvasHeight,
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: (Math.random() - 0.5) * 0.5,
+            radius: Math.random() * 2 + 1
+        });
+    }
+}
+
+function getCachedBoundingRect(targetCanvas) {
+    // Use requestAnimationFrame to batch layout reads
+    if (!rectCacheFrame) {
+        rectCacheFrame = requestAnimationFrame(() => {
+            // Update all cached rects in one frame
+            rectCacheFrame = null;
+        });
+    }
+
+    // Get cached rect or compute and cache it
+    if (!rectCache.has(targetCanvas)) {
+        rectCache.set(targetCanvas, targetCanvas.getBoundingClientRect());
+    }
+    return rectCache.get(targetCanvas);
+}
+
+function setupMouseEvents(targetCanvas, targetMouse, targetBursts) {
+    targetCanvas.addEventListener('mousemove', e => {
+        // Use clientX/Y directly with cached rect to minimize reflows
+        const rect = getCachedBoundingRect(targetCanvas);
+        targetMouse.x = e.clientX - rect.left;
+        targetMouse.y = e.clientY - rect.top;
+        targetMouse.active = true;
+    }, { passive: true });
+
+    targetCanvas.addEventListener('mouseleave', () => {
+        targetMouse.active = false;
+        invalidateRectCache(targetCanvas); // Clear cache on leave
+    });
+
+    targetCanvas.addEventListener('click', e => {
+        const rect = getCachedBoundingRect(targetCanvas);
+        targetBursts.push({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            radius: 0,
+            alpha: 0.4
+        });
+    }, { passive: true });
+
+    // Invalidate cache when canvas is resized
+    const resizeObserver = new ResizeObserver(() => {
+        invalidateRectCache(targetCanvas);
+    });
+    resizeObserver.observe(targetCanvas);
+}
+
+setupMouseEvents(canvas, mouse, bursts);
+
+function drawNetwork(targetCtx, targetNodes, targetMouse, targetBursts, canvasWidth, canvasHeight) {
+    targetCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Connections between nodes
+    for (let i = 0; i < targetNodes.length; i++) {
+        for (let j = i + 1; j < targetNodes.length; j++) {
+            const dx = targetNodes[i].x - targetNodes[j].x;
+            const dy = targetNodes[i].y - targetNodes[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < 120) {
+                targetCtx.beginPath();
+                targetCtx.strokeStyle = `rgba(255,255,255,${1 - dist / 120})`;
+                targetCtx.lineWidth = 0.5;
+                targetCtx.moveTo(targetNodes[i].x, targetNodes[i].y);
+                targetCtx.lineTo(targetNodes[j].x, targetNodes[j].y);
+                targetCtx.stroke();
+            }
+        }
+
+        // Line to mouse
+        if (targetMouse.active) {
+            const dx = targetNodes[i].x - targetMouse.x;
+            const dy = targetNodes[i].y - targetMouse.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 150) {
+                targetCtx.beginPath();
+                targetCtx.strokeStyle = `rgba(255,255,255,${1 - dist / 150})`;
+                targetCtx.lineWidth = 0.6;
+                targetCtx.moveTo(targetNodes[i].x, targetNodes[i].y);
+                targetCtx.lineTo(targetMouse.x, targetMouse.y);
+                targetCtx.stroke();
+            }
+        }
+    }
+
+    // Draw nodes
+    targetNodes.forEach(n => {
+        targetCtx.beginPath();
+        targetCtx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+        targetCtx.fillStyle = 'rgba(255,255,255,0.7)';
+        targetCtx.fill();
+
+        n.x += n.vx;
+        n.y += n.vy;
+
+        if (n.x < 0 || n.x > canvasWidth) n.vx *= -1;
+        if (n.y < 0 || n.y > canvasHeight) n.vy *= -1;
+    });
+
+    // Mouse pulse
+    if (targetMouse.active) {
+        const pulse = 3 + Math.sin(pulseFrame * 0.1) * 3;
+
+        // Glow ring
+        targetCtx.beginPath();
+        targetCtx.arc(targetMouse.x, targetMouse.y, 10 + pulse, 0, Math.PI * 2);
+        targetCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+        targetCtx.lineWidth = 2;
+        targetCtx.stroke();
+
+        // Core dot
+        targetCtx.beginPath();
+        targetCtx.arc(targetMouse.x, targetMouse.y, 3, 0, Math.PI * 2);
+        targetCtx.fillStyle = 'rgba(255,255,255,0.9)';
+        targetCtx.fill();
+    }
+
+    // Click bursts
+    targetBursts.forEach((b, i) => {
+        targetCtx.beginPath();
+        targetCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        targetCtx.strokeStyle = `rgba(255,255,255,${b.alpha})`;
+        targetCtx.lineWidth = 2;
+        targetCtx.stroke();
+
+        b.radius += 2;
+        b.alpha -= 0.01;
+
+        if (b.alpha <= 0) targetBursts.splice(i, 1);
+    });
+
+    // Auto-add a node if mouse is alone
+    if (targetMouse.active) {
+        const isNearAnyNode = targetNodes.some(n => {
+            const dx = n.x - targetMouse.x;
+            const dy = n.y - targetMouse.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist < 50;
+        });
+
+        if (!isNearAnyNode) {
+            targetNodes.push({
+                x: targetMouse.x,
+                y: targetMouse.y,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+                radius: Math.random() * 2 + 1
+            });
+        }
+    }
+}
+
+function animate() {
+    // Use cached dimensions to avoid reading layout properties
+    if (!isFullscreen) {
+        drawNetwork(ctx, nodes, mouse, bursts, cachedCanvasWidth || canvas.width, cachedCanvasHeight || canvas.height);
+    } else {
+        drawNetwork(fullscreenCtx, fullscreenNodes, fullscreenMouse, fullscreenBursts, cachedWindowWidth || fullscreenCanvas.width, cachedWindowHeight || fullscreenCanvas.height);
+    }
+
+    pulseFrame++;
+    requestAnimationFrame(animate);
+}
+
+// Fullscreen functionality
+document.getElementById('fullscreenBtn').addEventListener('click', async () => {
+    isFullscreen = true;
+    const fullscreenContainer = document.getElementById('fullscreenContainer');
+    fullscreenContainer.classList.add('active');
+
+    // Request browser fullscreen
+    try {
+        if (fullscreenContainer.requestFullscreen) {
+            await fullscreenContainer.requestFullscreen();
+        } else if (fullscreenContainer.mozRequestFullScreen) { // Firefox
+            await fullscreenContainer.mozRequestFullScreen();
+        } else if (fullscreenContainer.webkitRequestFullscreen) { // Chrome, Safari
+            await fullscreenContainer.webkitRequestFullscreen();
+        } else if (fullscreenContainer.msRequestFullscreen) { // IE/Edge
+            await fullscreenContainer.msRequestFullscreen();
+        }
+    } catch (err) {
+        window.__clientWarn && window.__clientWarn('Could not enter fullscreen mode:', err);
+    }
+
+    resizeFullscreenCanvas();
+    createNodes(100, fullscreenNodes, fullscreenCanvas.width, fullscreenCanvas.height);
+    setupMouseEvents(fullscreenCanvas, fullscreenMouse, fullscreenBursts);
+    document.body.classList.add('modal-open');
+});
+
+document.getElementById('exitFullscreenBtn').addEventListener('click', async () => {
+    isFullscreen = false;
+    const fullscreenContainer = document.getElementById('fullscreenContainer');
+    fullscreenContainer.classList.remove('active');
+
+    // Exit browser fullscreen
+    try {
+        if (document.exitFullscreen) {
+            await document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) { // Firefox
+            await document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) { // Chrome, Safari
+            await document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) { // IE/Edge
+            await document.msExitFullscreen();
+        }
+    } catch (err) {
+        window.__clientWarn && window.__clientWarn('Could not exit fullscreen mode:', err);
+    }
+
+    document.body.classList.remove('modal-open');
+});
+
+// Add fullscreen change event listener
+document.addEventListener('fullscreenchange', handleFullscreenChange);
+document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+function handleFullscreenChange() {
+    if (!document.fullscreenElement &&
+        !document.webkitFullscreenElement &&
+        !document.mozFullScreenElement &&
+        !document.msFullscreenElement) {
+        // User pressed ESC or exited fullscreen through browser controls
+        document.getElementById('exitFullscreenBtn').click();
+    }
+}
+
+// Quick login helpers
+function setupQuickLogin(buttonId, email, password) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    button.addEventListener('click', () => {
+        const form = document.getElementById('loginForm');
+        if (!form) return;
+
+        // Remove any existing hidden inputs from previous clicks
+        const existingEmail = form.querySelector('input[name="email"][type="hidden"]');
+        const existingPassword = form.querySelector('input[name="password"][type="hidden"]');
+        if (existingEmail) existingEmail.remove();
+        if (existingPassword) existingPassword.remove();
+
+        // Create hidden input fields for email and password
+        const emailInput = document.createElement('input');
+        emailInput.type = 'hidden';
+        emailInput.name = 'email';
+        emailInput.value = email;
+        emailInput.id = 'login_email';
+
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'hidden';
+        passwordInput.name = 'password';
+        passwordInput.value = password || '';
+        passwordInput.id = 'login_password';
+
+        // Add the hidden inputs to the form
+        form.appendChild(emailInput);
+        form.appendChild(passwordInput);
+
+        // Submit the form
+        if (form.requestSubmit) {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    });
+}
+
+// SECURITY: Only initialize test login buttons in development environment with DEBUG mode enabled.
+// Test passwords must be explicitly configured - never use hardcoded defaults in production.
+{% if flask_config is defined and (flask_config == 'development' or flask_config == 'default') and config.DEBUG %}
+{% if test_passwords is defined and test_passwords and test_passwords.get('admin') and test_passwords.get('focal') %}
+{% set test_domain = get_organization_email_domain() or get_organization_domain() or 'ngo.org' %}
+{% set test_admin_password = test_passwords['admin'] %}
+{% set test_focal_password = test_passwords['focal'] %}
+setupQuickLogin('quickAdminLogin', 'test_admin@{{ test_domain }}', '{{ test_admin_password }}');
+setupQuickLogin('quickFocalLogin', 'test_focal@{{ test_domain }}', '{{ test_focal_password }}');
+{% endif %}
+{% endif %}
+
+function initRegisterCountrySelect() {
+    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+        setTimeout(initRegisterCountrySelect, 250);
+        return;
+    }
+    const $select = window.jQuery('#register_requested_country');
+    if (!$select.length) {
+        return;
+    }
+    try {
+        if ($select.hasClass('select2-hidden-accessible')) {
+            $select.select2('destroy');
+        }
+        $select.select2({
+            dropdownParent: window.jQuery('#registerModal'),
+            width: '100%',
+            placeholder: "{{ _('Select a country') }}",
+            dropdownCssClass: 'register-country-dropdown',
+            minimumResultsForSearch: 0
+        }).on('select2:open', function() {
+            const dropdown = document.querySelector('.register-country-dropdown');
+            if (dropdown) {
+                dropdown.classList.remove('select2-dropdown--above');
+                dropdown.classList.add('select2-dropdown--below');
+            }
+            const searchField = document.querySelector('.select2-container--open .select2-search__field');
+            if (searchField) {
+                searchField.focus();
+            }
+        });
+    } catch (error) {
+        window.__clientWarn && window.__clientWarn('Could not initialize country selector:', error);
+    }
+}
+
+let registerEmailCheckInitialized = false;
+let registerEmailExists = false;
+let registerPasswordStrong = false;
+let registerPasswordsMatch = false;
+function setupRegisterEmailCheck() {
+    if (registerEmailCheckInitialized) return;
+    const emailInput = document.getElementById('register_email');
+    const feedback = document.getElementById('register_email_feedback');
+    const submitButton = document.getElementById('register_submit');
+    const registerForm = submitButton ? submitButton.closest('form') : null;
+    const passwordInput = document.getElementById('register_password');
+    const confirmPasswordInput = document.getElementById('register_confirm_password');
+    const requirementsWrapper = document.getElementById('register_password_requirements_wrapper');
+    const requirementsList = document.getElementById('register_password_requirements');
+    const passwordMatchFeedback = document.getElementById('register_password_match');
+    if (!emailInput || !feedback || !submitButton || !passwordInput || !confirmPasswordInput || !requirementsList || !passwordMatchFeedback || !requirementsWrapper) return;
+    registerEmailCheckInitialized = true;
+
+    function setFeedback(message, colorClass) {
+        feedback.textContent = message || '';
+        feedback.className = 'text-xs mt-1 ' + (colorClass || '');
+    }
+
+    function updateSubmitState() {
+        submitButton.disabled = registerEmailExists || !registerPasswordStrong || !registerPasswordsMatch;
+        submitButton.classList.toggle('opacity-70', submitButton.disabled);
+    }
+
+    // Cache window width to avoid forced reflows
+    let cachedWindowWidth = window.innerWidth;
+    let windowWidthCacheTimeout = null;
+
+    function updateWindowWidthCache() {
+        if (!windowWidthCacheTimeout) {
+            windowWidthCacheTimeout = requestAnimationFrame(() => {
+                cachedWindowWidth = window.innerWidth;
+                windowWidthCacheTimeout = null;
+            });
+        }
+    }
+
+    const shouldUsePopover = () => {
+        updateWindowWidthCache();
+        return cachedWindowWidth >= 1024;
+    };
+    let hidePopoverTimeout = null;
+
+    // Update cache on resize
+    window.addEventListener('resize', updateWindowWidthCache, { passive: true });
+
+    function showRequirementsPopover() {
+        if (!requirementsWrapper || !shouldUsePopover()) return;
+        if (hidePopoverTimeout) {
+            clearTimeout(hidePopoverTimeout);
+            hidePopoverTimeout = null;
+        }
+        requirementsWrapper.classList.add('popover-visible');
+    }
+
+    function scheduleHideRequirementsPopover() {
+        if (!requirementsWrapper || !shouldUsePopover()) return;
+        hidePopoverTimeout = setTimeout(() => {
+            requirementsWrapper.classList.remove('popover-visible');
+        }, 120);
+    }
+
+    function resetPopoverState() {
+        if (!requirementsWrapper) return;
+        requirementsWrapper.classList.remove('popover-visible');
+    }
+
+    function isLikelyValidEmail(value) {
+        // Basic email pattern; server does definitive validation
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
+
+    let currentAbort = null;
+    emailInput.addEventListener('blur', async () => {
+        const value = (emailInput.value || '').trim().toLowerCase();
+        setFeedback('', '');
+        registerEmailExists = false;
+        updateSubmitState();
+        if (!value) return;
+        if (!isLikelyValidEmail(value)) {
+            setFeedback("{{ _('Please enter a valid email address') }}", 'text-red-600');
+            return;
+        }
+        try {
+            if (currentAbort) currentAbort.abort();
+            currentAbort = new AbortController();
+            const resp = await fetch('{{ url_for("auth.check_register_email") }}?email=' + encodeURIComponent(value), {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                signal: currentAbort.signal
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data && data.ok === true) {
+                if (data.exists) {
+                    registerEmailExists = true;
+                    setFeedback("{{ _('This email is already registered. Try signing in or reset your password.') }}", 'text-red-600');
+                } else {
+                    registerEmailExists = false;
+                    setFeedback("{{ _('Great! This email is available.') }}", 'text-green-600');
+                }
+                updateSubmitState();
+            }
+        } catch (e) {
+            // Silence network/abort errors
+        }
+    });
+
+    updateSubmitState();
+
+    const requirementChecks = [
+        { key: 'length', test: (value) => value.length >= 8 },
+        { key: 'upper', test: (value) => /[A-Z]/.test(value) },
+        { key: 'lower', test: (value) => /[a-z]/.test(value) },
+        { key: 'number', test: (value) => /\d/.test(value) },
+        { key: 'special', test: (value) => /[!@#$%^&*(),.?":{}|<>_\-+=\\[\];'/`~]/.test(value) }
+    ];
+
+    function updateRequirementStyles(value) {
+        registerPasswordStrong = true;
+        requirementChecks.forEach(({ key, test }) => {
+            const item = requirementsList.querySelector(`[data-rule="${key}"]`);
+            const passes = test(value);
+            if (item) {
+                item.classList.remove('valid', 'invalid');
+                item.classList.add(passes ? 'valid' : 'invalid');
+            }
+            if (!passes) {
+                registerPasswordStrong = false;
+            }
+        });
+    }
+
+    function updatePasswordMatch() {
+        const passwordValue = passwordInput.value || '';
+        const confirmValue = confirmPasswordInput.value || '';
+        if (!confirmValue && !passwordValue) {
+            passwordMatchFeedback.textContent = '';
+            passwordMatchFeedback.className = 'text-xs mt-1';
+            registerPasswordsMatch = false;
+        } else if (passwordValue && confirmValue && passwordValue === confirmValue) {
+            passwordMatchFeedback.textContent = "{{ _('Passwords match') }}";
+            passwordMatchFeedback.className = 'text-xs mt-1 text-green-600';
+            registerPasswordsMatch = true;
+        } else {
+            passwordMatchFeedback.textContent = "{{ _('Passwords do not match') }}";
+            passwordMatchFeedback.className = 'text-xs mt-1 text-red-600';
+            registerPasswordsMatch = false;
+        }
+    }
+
+    function evaluatePasswords() {
+        const value = passwordInput.value || '';
+        updateRequirementStyles(value);
+        updatePasswordMatch();
+        updateSubmitState();
+    }
+
+    passwordInput.addEventListener('input', evaluatePasswords);
+    confirmPasswordInput.addEventListener('input', () => {
+        updatePasswordMatch();
+        updateSubmitState();
+    });
+    passwordInput.addEventListener('focus', showRequirementsPopover);
+    confirmPasswordInput.addEventListener('focus', showRequirementsPopover);
+    passwordInput.addEventListener('blur', scheduleHideRequirementsPopover);
+    confirmPasswordInput.addEventListener('blur', scheduleHideRequirementsPopover);
+    requirementsWrapper.addEventListener('mouseenter', showRequirementsPopover);
+    requirementsWrapper.addEventListener('mouseleave', scheduleHideRequirementsPopover);
+
+    window.addEventListener('resize', () => {
+        resetPopoverState();
+    });
+
+    evaluatePasswords();
+
+    if (registerForm) {
+        registerForm.addEventListener('submit', (e) => {
+            if (registerEmailExists || !registerPasswordStrong || !registerPasswordsMatch) {
+                e.preventDefault();
+                if (registerEmailExists) {
+                    setFeedback("{{ _('This email is already registered. Try signing in or reset your password.') }}", 'text-red-600');
+                    emailInput.focus();
+                } else if (!registerPasswordStrong) {
+                    passwordInput.focus();
+                } else {
+                    confirmPasswordInput.focus();
+                }
+            }
+        });
+    }
+}
+
+// Modal helpers
+function setupModal(openBtnId, modalId, closeBtnId) {
+    const openBtn = document.getElementById(openBtnId);
+    const modal = document.getElementById(modalId);
+    const closeBtn = document.getElementById(closeBtnId);
+    if (!openBtn || !modal || !closeBtn) return;
+    const show = () => {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.classList.add('modal-open');
+        if (modalId === 'registerModal') {
+            setTimeout(initRegisterCountrySelect, 0);
+            setTimeout(setupRegisterEmailCheck, 0);
+        }
+    };
+    const hide = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); document.body.classList.remove('modal-open'); };
+    openBtn.addEventListener('click', show);
+    closeBtn.addEventListener('click', hide);
+    // Prevent accidental closing when clicking outside of the modal content
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            e.stopPropagation();
+        }
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+}
+
+setupModal('openRegisterModal', 'registerModal', 'closeRegisterModal');
+setupModal('openForgotModal', 'forgotModal', 'closeForgotModal');
+
+// Auto-open modal when server indicates validation errors
+var openModalType = '{{ open_modal }}';
+document.addEventListener('DOMContentLoaded', function() {
+    if (openModalType === 'register') {
+        document.getElementById('registerModal').classList.remove('hidden');
+        document.getElementById('registerModal').classList.add('flex');
+        document.body.classList.add('modal-open');
+        setTimeout(initRegisterCountrySelect, 0);
+        setTimeout(setupRegisterEmailCheck, 0);
+    } else if (openModalType === 'forgot') {
+        document.getElementById('forgotModal').classList.remove('hidden');
+        document.getElementById('forgotModal').classList.add('flex');
+        document.body.classList.add('modal-open');
+    }
+});
+
+createNodes();
+animate();
+</script>
+
+{% endblock %}

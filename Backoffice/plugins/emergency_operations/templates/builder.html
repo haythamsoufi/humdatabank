@@ -1,0 +1,143 @@
+<div class="plugin-field-builder">
+  <h4 class="text-md font-semibold mb-3">Emergency Operations Field</h4>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="plugin-option-to-properties">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Maximum items to display</label>
+      <input type="number" name="max_items" value="{{ config.get('max_items', 10) }}" min="1" max="100" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+    </div>
+    <div class="plugin-option-to-properties">
+      <label class="inline-flex items-center text-sm text-gray-700">
+        <input type="checkbox" name="show_requested_amount" value="1" {% if config.get('show_requested_amount', True) %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span class="ml-2">Show requested amount</span>
+      </label>
+    </div>
+    <div class="plugin-option-to-properties">
+      <label class="inline-flex items-center text-sm text-gray-700">
+        <input type="checkbox" name="show_funded_amount" value="1" {% if config.get('show_funded_amount', True) %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span class="ml-2">Show funded amount</span>
+      </label>
+    </div>
+    <div class="plugin-option-to-properties">
+      <label class="inline-flex items-center text-sm text-gray-700">
+        <input type="checkbox" name="show_coverage" value="1" {% if config.get('show_coverage', True) %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span class="ml-2">Show coverage</span>
+      </label>
+    </div>
+    <div class="plugin-option-to-properties">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Start date</label>
+      <input type="date"
+             name="start_date"
+             value="{{ config.get('start_date', '') }}"
+             class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+      <p class="text-xs text-gray-500 mt-1">Include operations starting from this date (YYYY-MM-DD, optional)</p>
+    </div>
+    <div class="plugin-option-to-properties">
+      <label class="block text-sm font-medium text-gray-700 mb-1">End date</label>
+      <input type="date"
+             name="end_date_gt"
+             value="{{ config.get('end_date_gt', '2022-12-31') }}"
+             class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+      <p class="text-xs text-gray-500 mt-1">Include operations ending on or after this date (YYYY-MM-DD, inclusive)</p>
+    </div>
+    <div class="plugin-option-to-properties">
+      <label class="inline-flex items-center text-sm text-gray-700">
+        <input type="checkbox" name="show_closed_operations" value="1" {% if config.get('show_closed_operations', True) %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span class="ml-2">Show closed operations</span>
+      </label>
+    </div>
+    <div class="plugin-option-to-properties">
+      <label class="inline-flex items-center text-sm text-gray-700">
+        <input type="checkbox" name="enable_link" value="1" {% if config.get('enable_link', True) %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span class="ml-2">Make operation name a hyperlink</span>
+      </label>
+    </div>
+    <div class="plugin-option-to-properties md:col-span-2">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Operation types to include</label>
+      <div class="space-y-2">
+        {% set operation_types_raw = config.get('operation_types', ['All']) %}
+        {% set operation_types_list = ['All'] %}
+        {% if operation_types_raw is iterable and operation_types_raw is not string and operation_types_raw is not mapping %}
+          {% set operation_types_list = operation_types_raw %}
+        {% elif operation_types_raw is string %}
+          {% set operation_types_list = [operation_types_raw] %}
+        {% endif %}
+        <label class="inline-flex items-center text-sm text-gray-700">
+          <input type="checkbox" name="operation_types" value="All" {% if 'All' in operation_types_list %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <span class="ml-2">All Types</span>
+        </label>
+        <label class="inline-flex items-center text-sm text-gray-700">
+          <input type="checkbox" name="operation_types" value="Emergency Appeal" {% if 'Emergency Appeal' in operation_types_list %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <span class="ml-2">Emergency Appeal</span>
+        </label>
+        <label class="inline-flex items-center text-sm text-gray-700">
+          <input type="checkbox" name="operation_types" value="DREF" {% if 'DREF' in operation_types_list %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <span class="ml-2">DREF (Disaster Relief Emergency Fund)</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Configuration Storage (align with other plugins) -->
+  <input type="hidden" name="field_type" value="emergency_operations">
+  <input type="hidden" name="plugin_name" value="emergency_operations">
+</div>
+
+
+<script nonce="{{ csp_nonce() }}">
+(function() {
+  // Use IIFE to avoid polluting global scope and prevent duplicate execution
+  // This script runs when the template is loaded into the modal
+  const builderRoot = document.querySelector('.plugin-field-builder');
+  if (!builderRoot) return;
+
+  // Check if already initialized to prevent duplicate event listeners
+  if (builderRoot.dataset.initialized === 'true') return;
+  builderRoot.dataset.initialized = 'true';
+
+  // Try to use a provided field_id if available in template context
+  const fieldId = (typeof '{{ field_id }}' === 'string' && '{{ field_id }}'.indexOf('{') === -1) ? '{{ field_id }}' : '';
+
+  // Handle operation types checkboxes - allow multiple selections
+  const allTypeCheckboxes = builderRoot.querySelectorAll('input[name="operation_types"]');
+
+  // When any checkbox changes, update the "All" checkbox state
+  allTypeCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      const allCheckbox = builderRoot.querySelector('input[name="operation_types"][value="All"]');
+      const otherCheckboxes = Array.from(allTypeCheckboxes).filter(cb => cb.value !== 'All');
+
+      if (this.value === 'All') {
+        // If "All" is checked, uncheck others
+        if (this.checked) {
+          otherCheckboxes.forEach(cb => cb.checked = false);
+        }
+      } else {
+        // If any other checkbox is checked, uncheck "All"
+        if (this.checked && allCheckbox) {
+          allCheckbox.checked = false;
+        }
+        // If all other checkboxes are unchecked, check "All"
+        else if (!this.checked) {
+          const anyChecked = otherCheckboxes.some(cb => cb.checked);
+          if (!anyChecked && allCheckbox) {
+            allCheckbox.checked = true;
+          }
+        }
+      }
+    });
+  });
+
+  const inputs = builderRoot.querySelectorAll('input, select, textarea');
+  inputs.forEach(input => {
+    input.addEventListener('change', function() {
+      const event = new CustomEvent('pluginConfigChanged', {
+        detail: {
+          fieldId: fieldId,
+          pluginName: 'emergency_operations'
+        }
+      });
+      document.dispatchEvent(event);
+    });
+  });
+})();
+</script>

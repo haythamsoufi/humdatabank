@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1074470784722",
+    "project_id": "ifrc-data",
+    "storage_bucket": "ifrc-data.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074470784722:android:04f4dd67ee0c3ea3e8e70b",
+        "android_client_info": {
+          "package_name": "com.ifrc.databank"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUHWlsANTPvnFAf5ULXV_Z9KMspEbwdB4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074470784722:android:234e455df6f6f128e8e70b",
+        "android_client_info": {
+          "package_name": "com.ngo.databank"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUHWlsANTPvnFAf5ULXV_Z9KMspEbwdB4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

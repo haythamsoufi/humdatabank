@@ -1,0 +1,164 @@
+{#
+AG Grid Centralized Includes
+============================
+Use these macros to include AG Grid CSS and JS consistently across all templates.
+
+Usage (minimal — ag_grid_js loads everything including custom CSS):
+  {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container %}
+
+  {% block content %}
+      {{ ag_grid_container('myGrid', loading_text=_('Loading data...')) }}
+  {% endblock %}
+
+  {% block extra_js %}
+      {{ ag_grid_js() }}
+  {% endblock %}
+
+The ag_grid_container macro generates IDs that match AgGridHelper.create() auto-show:
+  - {grid_id}-loading  (overlay, hidden automatically after init)
+  - {grid_id}-container (shown automatically after init)
+
+For grids inside custom layouts, use include_card=false to skip the card wrapper,
+or use ag_grid_loading / ag_grid_element separately.
+
+Optionally call ag_grid_css() in the head block to preload custom CSS earlier
+(the core AG Grid CSS is bundled inside ag-grid-community.min.js and auto-injected):
+  {% block head %}
+      {{ super() }}
+      {{ ag_grid_css() }}
+  {% endblock %}
+#}
+
+{# AG Grid custom CSS — optional preload in head block.
+   Core AG Grid CSS (ag-grid.css, ag-theme-alpine.css) is bundled in the JS (v31+ CSS-in-JS).
+   These 3 custom stylesheets are also injected by ag_grid_js(), so calling this macro
+   is only needed if you want the CSS to load before the JS scripts. #}
+{% macro ag_grid_css() %}
+<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-set-filter-community.css') }}">
+<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-column-visibility-manager.css') }}">
+<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
+<link rel="stylesheet" href="{{ static_url('libs/user-hover-profile.css') }}">
+{% endmacro %}
+
+{# AG Grid JS includes (and custom CSS) - call in extra_js block #}
+{% macro ag_grid_js() %}
+{# Custom CSS that is NOT bundled in the JS — must be loaded explicitly #}
+<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-set-filter-community.css') }}">
+<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-column-visibility-manager.css') }}">
+<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
+<link rel="stylesheet" href="{{ static_url('libs/user-hover-profile.css') }}">
+<script src="{{ static_url('libs/ag-grid/ag-grid-community.min.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-set-filter-community.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-column-visibility-manager.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-helper.js') }}"></script>
+{# DateTimeUtils must load before cell-renderers so renderers can use it #}
+<script src="{{ static_url('js/lib/datetime-utils.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-cell-renderers.js') }}"></script>
+<script src="{{ static_url('libs/user-hover-profile.js') }}"></script>
+{% include "components/ag_grid_i18n_js.html" %}
+{% endmacro %}
+
+{#
+AG Grid Container with loading indicator
+Parameters:
+  - grid_id: The ID for the grid element (required)
+  - loading_text: Text to show while loading (optional, defaults to 'Loading...')
+  - placeholder_id: ID for column visibility button placeholder (optional)
+  - show_placeholder: Whether to show the column visibility placeholder (optional, default true)
+  - spinner_color: Loading spinner border color (optional, default 'blue-600')
+  - empty_message: Message to show when no data (optional)
+  - card_classes: Additional classes for the card wrapper (optional)
+  - grid_height: Fixed height for the grid element (optional, e.g. '600px')
+  - include_card: Whether to wrap in the standard card div (optional, default true)
+#}
+{% macro ag_grid_container(grid_id, loading_text=none, placeholder_id=none, show_placeholder=true, spinner_color='blue-600', empty_message=none, card_classes='', grid_height=none, include_card=true) %}
+{% set loading_msg = loading_text if loading_text else _('Loading...') %}
+{% set placeholder = placeholder_id if placeholder_id else 'column-visibility-button-placeholder' %}
+{% set grid_style = 'width: 100%;' ~ (' height: ' ~ grid_height ~ ';' if grid_height else '') %}
+{% if include_card %}<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative {{ card_classes }}">{% endif %}
+    {% if show_placeholder %}
+    <div class="flex justify-end items-center mb-4">
+        <div id="{{ placeholder }}"></div>
+    </div>
+    {% endif %}
+    <div id="{{ grid_id }}-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;">
+        <div class="flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-{{ spinner_color }}"></div>
+            <span class="text-gray-700 font-medium text-base">{{ loading_msg }}</span>
+        </div>
+    </div>
+    <div id="{{ grid_id }}-container" class="overflow-x-auto" style="display: none;">
+        <div id="{{ grid_id }}" class="ag-theme-alpine" style="{{ grid_style }}" data-placeholder-id="{{ placeholder }}"></div>
+    </div>
+    {% if empty_message %}
+    <div id="{{ grid_id }}-empty" class="text-center py-12 text-gray-500" style="display: none;">
+        <i class="fas fa-inbox text-4xl mb-4"></i>
+        <p class="text-lg">{{ empty_message }}</p>
+    </div>
+    {% endif %}
+{% if include_card %}</div>{% endif %}
+{% endmacro %}
+
+{#
+Simple loading indicator only (for use with custom card structure)
+Uses overlay style matching the standard loading_indicator component.
+#}
+{% macro ag_grid_loading(grid_id, loading_text=none, spinner_color='blue-600') %}
+{% set loading_msg = loading_text if loading_text else _('Loading...') %}
+<div id="{{ grid_id }}-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;">
+    <div class="flex items-center space-x-3">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-{{ spinner_color }}"></div>
+        <span class="text-gray-700 font-medium text-base">{{ loading_msg }}</span>
+    </div>
+</div>
+{% endmacro %}
+
+{#
+Grid element only (for use inside custom containers)
+#}
+{% macro ag_grid_element(grid_id, placeholder_id=none, height=none) %}
+{% set placeholder = placeholder_id if placeholder_id else 'column-visibility-button-placeholder' %}
+{% set style = 'width: 100%;' ~ (' height: ' ~ height ~ ';' if height else '') %}
+<div id="{{ grid_id }}" class="ag-theme-alpine" style="{{ style }}" data-placeholder-id="{{ placeholder }}"></div>
+{% endmacro %}
+
+{#
+Standard grid initialization script
+Parameters:
+  - grid_id: The grid element ID
+  - template_id: Unique template identifier for persistence
+  - column_defs_var: JavaScript variable name containing column definitions
+  - row_data_var: JavaScript variable name containing row data
+  - options: Additional grid options (as JS object literal string)
+  - on_ready: JavaScript code to run after grid is ready (optional)
+#}
+{% macro ag_grid_init_script(grid_id, template_id, column_defs_var='columnDefs', row_data_var='rowData', options='{}', on_ready='') %}
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    'use strict';
+
+    function initializeGrid() {
+        var result = AgGridHelper.create(
+            '{{ grid_id }}',
+            '{{ template_id }}',
+            {{ column_defs_var }},
+            {{ row_data_var }},
+            {{ options }}
+        );
+
+        window.gridHelper = result.helper;
+        window.gridApi = result.api;
+
+        {% if on_ready %}
+        {{ on_ready }}
+        {% endif %}
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+})();
+</script>
+{% endmacro %}

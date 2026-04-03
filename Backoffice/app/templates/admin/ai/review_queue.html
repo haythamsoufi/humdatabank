@@ -1,0 +1,166 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('AI Review Queue') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('AI Review Queue'),
+    icon='fas fa-clipboard-check',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'AI System', 'url': url_for('ai_management.ai_dashboard')},
+        {'name': 'Review Queue'}
+    ]
+) }}
+
+{% if error %}
+<div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+    <p class="text-sm text-red-700">{{ error }}</p>
+</div>
+{% endif %}
+
+<!-- Filters and auto-queue -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap gap-4 items-center justify-between">
+    <div class="flex gap-3 items-center flex-wrap">
+        <span class="text-sm font-medium text-gray-700">{{ _('Status:') }}</span>
+        {% for s_val, s_label in [('pending', _('Pending')), ('in_review', _('In Review')), ('completed', _('Completed')), ('all', _('All'))] %}
+        <a href="{{ url_for('ai_management.ai_review_queue', status=s_val) }}"
+           class="px-3 py-1.5 rounded-full text-xs font-medium transition
+                  {{ 'bg-blue-600 text-white' if status_filter == s_val else 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+            {{ s_label }}
+        </a>
+        {% endfor %}
+    </div>
+    <button id="autoQueueBtn"
+            class="btn btn-warning">
+        <i class="fas fa-robot"></i> {{ _('Auto-Queue Low-Quality') }}
+    </button>
+</div>
+
+<!-- Review table -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+    <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+        <h2 class="text-base font-semibold text-gray-900">
+            {{ _('Reviews') }} <span class="text-gray-400 font-normal text-sm">({{ total }})</span>
+        </h2>
+    </div>
+
+    {% if reviews %}
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Query') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Grounding') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Rating') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Verdict') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Queued') }}</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+        {% for review in reviews %}
+        {% set trace = review.trace %}
+        <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 max-w-xs">
+                <p class="text-sm text-gray-900 truncate" title="{{ trace.query if trace else '' }}">
+                    {{ (trace.query or '')[:80] }}{% if trace and trace.query|length > 80 %}…{% endif %}
+                </p>
+            </td>
+            <td class="px-4 py-3">
+                {% if trace and trace.grounding_score is not none %}
+                {% set pct = (trace.grounding_score * 100)|int %}
+                {% set color = 'text-green-700 bg-green-50' if pct >= 75 else ('text-yellow-700 bg-yellow-50' if pct >= 45 else 'text-red-700 bg-red-50') %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold {{ color }}">{{ pct }}%</span>
+                {% else %}
+                <span class="text-xs text-gray-400">—</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-3">
+                {% if trace and trace.user_rating == 'like' %}
+                <span class="text-green-600"><i class="fas fa-thumbs-up"></i></span>
+                {% elif trace and trace.user_rating == 'dislike' %}
+                <span class="text-red-500"><i class="fas fa-thumbs-down"></i></span>
+                {% else %}
+                <span class="text-gray-300">—</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-3">
+                {% set status_colors = {'pending': 'bg-yellow-50 text-yellow-800', 'in_review': 'bg-blue-50 text-blue-800', 'completed': 'bg-green-50 text-green-800', 'dismissed': 'bg-gray-100 text-gray-600'} %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ status_colors.get(review.status, 'bg-gray-100 text-gray-700') }}">
+                    {{ review.status|replace('_', ' ')|title }}
+                </span>
+            </td>
+            <td class="px-4 py-3">
+                {% if review.verdict %}
+                {% set verdict_colors = {'correct': 'text-green-700', 'partially_correct': 'text-yellow-700', 'incorrect': 'text-red-600', 'needs_improvement': 'text-orange-600'} %}
+                <span class="text-xs font-medium {{ verdict_colors.get(review.verdict, 'text-gray-600') }}">
+                    {{ review.verdict|replace('_', ' ')|title }}
+                </span>
+                {% else %}
+                <span class="text-xs text-gray-400">—</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                {{ review.created_at.strftime('%Y-%m-%d') if review.created_at else '—' }}
+            </td>
+            <td class="px-4 py-3 text-right">
+                <a href="{{ url_for('ai_management.ai_review_detail', review_id=review.id) }}"
+                   class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    {{ _('Review') }} <i class="fas fa-chevron-right ml-1 text-xs"></i>
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="py-12 text-center text-gray-400">
+        <i class="fas fa-clipboard-check text-4xl mb-3"></i>
+        <p class="text-sm">{{ _('No reviews in this queue.') }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Pagination -->
+{% if total > per_page %}
+<div class="flex justify-center gap-2">
+    {% for p in range(1, ((total - 1) // per_page) + 2) %}
+    <a href="{{ url_for('ai_management.ai_review_queue', page=p, status=status_filter) }}"
+       class="px-3 py-1.5 rounded text-sm {{ 'bg-blue-600 text-white' if p == page else 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50' }}">
+        {{ p }}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<script nonce="{{ csp_nonce() }}">
+const AUTO_QUEUE_URL = {{ url_for('ai_management.ai_review_auto_queue')|tojson|safe }};
+const FETCH_CLIENT = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
+
+document.getElementById('autoQueueBtn').addEventListener('click', async function() {
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> {{ _("Queueing...") }}';
+    try {
+        const resp = await FETCH_CLIENT(AUTO_QUEUE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threshold: 0.5 }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            alert('{{ _("Queued") }} ' + (data.queued || 0) + ' {{ _("traces for review.") }}');
+            window.location.reload();
+        } else {
+            alert('{{ _("Failed to auto-queue.") }}');
+        }
+    } catch(e) {
+        alert('{{ _("Error: ") }}' + e.message);
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-robot"></i> {{ _("Auto-Queue Low-Quality") }}';
+    }
+});
+</script>
+{% endblock %}

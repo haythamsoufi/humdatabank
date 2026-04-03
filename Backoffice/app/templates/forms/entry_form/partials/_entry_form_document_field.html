@@ -1,0 +1,201 @@
+{# Shared document field block for entry form (main sections + sub-sections).
+   Set before include:
+     entry_form_document_field — FormItem / field object
+     entry_form_document_section_order — int for section.display_order or sub_section.display_order
+#}
+{% set field = entry_form_document_field %}
+{% set section_order = entry_form_document_section_order %}
+{% set doc_item_id = field.id %}
+{% set is_sub_item_doc = field.is_sub_item %}
+{% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
+{% set doc_field_cfg = field.config if field.config is mapping else {} %}
+{% set ns_doc_period = namespace(locked=None) %}
+{% if doc_field_cfg and not doc_field_cfg.get('show_year') %}
+    {% if doc_field_cfg.get('preset_period_use_assignment') %}
+        {% if assignment_status and assignment_status.assigned_form and assignment_status.assigned_form.period_name %}
+            {% set ns_doc_period.locked = assignment_status.assigned_form.period_name %}
+        {% endif %}
+    {% elif doc_field_cfg.get('preset_period') %}
+        {% set ns_doc_period.locked = doc_field_cfg.get('preset_period') %}
+    {% endif %}
+{% endif %}
+{% set locked_period_for_label = ns_doc_period.locked %}
+{% set field_label_with_period = (field_display_label ~ ' (' ~ locked_period_for_label ~ ')') if locked_period_for_label else field_display_label %}
+{% set existing_docs = existing_submitted_documents.get('field_value[' ~ field.id ~ ']') %}
+<div class="form-group form-item-block border p-4 rounded-md bg-white {{ 'ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item_doc else '' }}"
+     data-item-id="{{ doc_item_id }}"
+     data-item-type="document_field"
+     data-layout-width="{{ field.layout_column_width or 12 }}"
+     data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
+     {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
+     {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
+     {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}>
+    <div class="flex items-start justify-between">
+        <div class="flex-1 pr-2">
+            <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                {% if is_sub_item_doc %}
+                    <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}{% if locked_period_for_label %} <span class="text-gray-600 font-normal">({{ locked_period_for_label }})</span>{% endif %}</span>
+                {% else %}
+                    {% if template_structure.display_order_visible %}{{ section_order }}.{{ field.display_order }}. {% endif %}{{ field_display_label }}{% if locked_period_for_label %} <span class="text-gray-600 font-normal">({{ locked_period_for_label }})</span>{% endif %}
+                {% endif %}
+                {% if field.is_required_for_js %}<span class="text-red-500">*</span>{% endif %}
+            </label>
+        </div>
+        {% set _desc_text = None %}
+        {% set _desc_candidate = None %}
+        {% if field.description_translations %}
+            {% set _desc_candidate = field.description_translations.get(translation_key) or field.description_translations.get('en') %}
+            {% if _desc_candidate and _desc_candidate|trim %}{% set _desc_text = _desc_candidate %}{% endif %}
+        {% endif %}
+        {% if not _desc_text and field.description %}
+            {% set _desc_obj = field.description if field.description is mapping else (field.description | fromjson if field.description else {}) %}
+            {% if _desc_obj and _desc_obj is mapping %}
+                {% set _desc_candidate = _desc_obj.get(translation_key) or _desc_obj.get('en') %}
+                {% if _desc_candidate and _desc_candidate|trim %}{% set _desc_text = _desc_candidate %}{% endif %}
+            {% elif field.description|trim %}
+                {% set _desc_text = field.description %}
+            {% endif %}
+        {% endif %}
+        <div class="flex items-center gap-2 flex-shrink-0">
+            {% if _desc_text %}
+                <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
+                    <span class="tooltip-text">
+                        <div class="question-definition mb-2">
+                            <strong>{{ _('Description') }}:</strong><br>
+                            {{ _desc_text|nl2br }}
+                        </div>
+                    </span>
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    {# Locked period without a value yet (assignment mode): warn only; resolved period is shown in the label above #}
+    {% if doc_field_cfg and not doc_field_cfg.get('show_year') and doc_field_cfg.get('preset_period_use_assignment') %}
+        {% if not (assignment_status and assignment_status.assigned_form and assignment_status.assigned_form.period_name) %}
+            <p class="text-xs text-amber-800 mt-1 mb-2" role="alert">{{ _('Assignment period is not set yet. Set the assignment period in the header, or ask an administrator.') }}</p>
+        {% endif %}
+    {% endif %}
+    {% if existing_docs %}
+        {% if existing_docs is sequence and existing_docs is not string %}
+            <div class="space-y-2 mb-3">
+                {% for doc in existing_docs %}
+                    <div class="flex flex-col px-4 py-3 relative mb-0 {% if doc.id in entity_repo_document_ids %}bg-blue-50 border border-blue-300 text-blue-900{% else %}bg-green-100 border border-green-400 text-green-700{% endif %}"
+                         data-entry-form-document="{% if doc.id in entity_repo_document_ids %}repository{% else %}submitted{% endif %}">
+                        {# Row 1: icon + title (+ actions). Row 2: full-width details use space under the icon. #}
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-file-alt w-5 h-5 shrink-0 mt-0.5 opacity-90" aria-hidden="true"></i>
+                            <div class="min-w-0 flex-1 flex items-start justify-between gap-2">
+                                <a href="{{ url_for('forms.download_document', submitted_document_id=doc.id) }}" class="font-semibold hover:underline text-sm block truncate min-w-0" download="{{ doc.filename }}" title="{{ doc.filename }}">
+                                    {{ doc.filename }}
+                                </a>
+                                {% if can_edit and doc.id not in entity_repo_document_ids %}
+                                <div class="flex items-center gap-2 shrink-0 pt-0.5">
+                                    <button type="button" class="btn btn-primary btn-icon btn-sm edit-document-btn"
+                                            data-doc-id="{{ doc.id }}"
+                                            data-field-id="{{ field.id }}"
+                                            data-field-label="{{ field_label_with_period | e }}"
+                                            data-filename="{{ doc.filename }}"
+                                            data-language="{{ doc.language }}"
+                                            data-document-type="{{ doc.document_label or '' }}"
+                                            data-year="{{ doc.year or '' }}"
+                                            data-is-public="{{ doc.is_public|lower }}"
+                                            {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
+                                            title="{{ _('Edit Document') }}"
+                                            aria-label="{{ _('Edit Document') }}">
+                                        <i class="fas fa-pen" aria-hidden="true"></i>
+                                    </button>
+                                    <input type="hidden" name="delete_document_{{ doc.id }}" id="delete_document_hidden_{{ doc.id }}" value="false">
+                                    <button type="button" class="btn btn-danger btn-icon btn-sm delete-document-btn" data-doc-id="{{ doc.id }}" title="{{ _('Delete Document') }}" aria-label="{{ _('Delete Document') }}" {% if not can_edit %}disabled{% endif %}>
+                                        <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mt-2 space-y-1 w-full">
+                            <span class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">{{ LANGUAGE_DISPLAY_NAMES.get(doc.language, doc.language or _('N/A')) }}</span>
+                            <p class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">({{ _('Uploaded by %(user)s on %(date)s', user=doc.uploaded_by_user.name if doc.uploaded_by_user else _('Unknown'), date=doc.uploaded_at|format_date_localized('medium')) }})</p>
+                            {% if doc.id in entity_repo_document_ids %}
+                            <span class="text-xs font-medium text-blue-800 block">{{ _("From this entity's document repository") }}</span>
+                            {% if documents_library_url is defined and documents_library_url %}
+                            <a href="{{ documents_library_url }}" class="btn btn-primary btn-sm mt-1 inline-flex items-start gap-1.5 self-start entry-form-doc-library-btn">
+                                <i class="fas fa-folder-open shrink-0 mt-0.5" aria-hidden="true"></i>
+                                <span>{{ _('Open documents library') }}</span>
+                            </a>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            {% set doc = existing_docs %}
+            <div class="flex flex-col px-4 py-3 relative mb-3 {% if doc.id in entity_repo_document_ids %}bg-blue-50 border border-blue-300 text-blue-900{% else %}bg-green-100 border border-green-400 text-green-700{% endif %}"
+                 data-entry-form-document="{% if doc.id in entity_repo_document_ids %}repository{% else %}submitted{% endif %}">
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-file-alt w-5 h-5 shrink-0 mt-0.5 opacity-90" aria-hidden="true"></i>
+                    <div class="min-w-0 flex-1 flex items-start justify-between gap-2">
+                        <a href="{{ url_for('forms.download_document', submitted_document_id=doc.id) }}" class="font-semibold hover:underline text-sm block truncate min-w-0" download="{{ doc.filename }}" title="{{ doc.filename }}">
+                            {{ doc.filename }}
+                        </a>
+                        {% if can_edit and doc.id not in entity_repo_document_ids %}
+                        <div class="flex items-center gap-2 shrink-0 pt-0.5">
+                            <button type="button" class="btn btn-primary btn-icon btn-sm edit-document-btn"
+                                    data-doc-id="{{ doc.id }}"
+                                    data-field-id="{{ field.id }}"
+                                    data-field-label="{{ field_label_with_period | e }}"
+                                    data-filename="{{ doc.filename }}"
+                                    data-language="{{ doc.language }}"
+                                    data-document-type="{{ doc.document_label or '' }}"
+                                    data-year="{{ doc.year or '' }}"
+                                    data-is-public="{{ doc.is_public|lower }}"
+                                    {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
+                                    title="{{ _('Edit Document') }}"
+                                    aria-label="{{ _('Edit Document') }}">
+                                <i class="fas fa-pen" aria-hidden="true"></i>
+                            </button>
+                            <input type="hidden" name="delete_document_{{ doc.id }}" id="delete_document_hidden_{{ doc.id }}" value="false">
+                            <button type="button" class="btn btn-danger btn-icon btn-sm delete-document-btn" data-doc-id="{{ doc.id }}" title="{{ _('Delete Document') }}" aria-label="{{ _('Delete Document') }}" {% if not can_edit %}disabled{% endif %}>
+                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mt-2 space-y-1 w-full">
+                    <span class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">{{ LANGUAGE_DISPLAY_NAMES.get(doc.language, doc.language or _('N/A')) }}</span>
+                    <p class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">({{ _('Uploaded by %(user)s on %(date)s', user=doc.uploaded_by_user.name if doc.uploaded_by_user else _('Unknown'), date=doc.uploaded_at|format_date_localized('medium')) }})</p>
+                    {% if doc.id in entity_repo_document_ids %}
+                    <span class="text-xs font-medium text-blue-800 block">{{ _("From this entity's document repository") }}</span>
+                    {% if documents_library_url is defined and documents_library_url %}
+                    <a href="{{ documents_library_url }}" class="btn btn-primary btn-sm mt-1 inline-flex items-start gap-1.5 self-start entry-form-doc-library-btn">
+                        <i class="fas fa-folder-open shrink-0 mt-0.5" aria-hidden="true"></i>
+                        <span>{{ _('Open documents library') }}</span>
+                    </a>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+    {% if can_edit %}
+    <div class="w-full">
+        <button type="button"
+                class="w-full flex justify-center items-center gap-2 text-purple-600 hover:text-purple-700 border-2 border-dashed border-gray-300 hover:border-purple-400 py-2 px-4 cursor-pointer transition duration-150 ease-in-out document-upload-btn"
+                data-field-id="{{ field.id }}"
+                data-field-label="{{ field_label_with_period | e }}"
+                data-label-upload="{{ _('Upload Document') | e }}"
+                data-label-add="{{ _('Add Another Document') | e }}"
+                data-is-required="{{ field.is_required_for_js|lower }}"
+                data-has-existing="{{ 'true' if existing_docs else 'false' }}"
+                {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
+                {% if field.config and field.config.max_documents %}data-max-documents="{{ field.config.max_documents }}"{% endif %}
+                title="{% if existing_docs %}{{ _('Add Another Document') }}{% else %}{{ _('Upload Document') }}{% endif %}">
+            <i class="fas {% if existing_docs %}fa-plus{% else %}fa-upload{% endif %} text-lg" aria-hidden="true"></i>
+            <span class="text-sm font-medium">{% if existing_docs %}{{ _('Add Another Document') }}{% else %}{{ _('Upload Document') }}{% endif %}</span>
+        </button>
+    </div>
+    {% endif %}
+    <div id="error-field-{{ field.id }}" class="text-red-600 text-sm mt-1" style="display: none;"></div>
+</div>

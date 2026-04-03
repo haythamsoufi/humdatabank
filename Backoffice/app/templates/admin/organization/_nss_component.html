@@ -1,0 +1,150 @@
+{# National Societies component: table + init. Uses AG Grid for data display. #}
+
+<div id="nssComponentRoot">
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+        {% if nss %}
+            <div id="nss-table-container" class="overflow-x-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('National Societies') }}</h3>
+                    <div class="flex gap-2 items-center">
+                        <div id="nss-column-visibility-button-placeholder"></div>
+                        {% if can_manage_org %}
+                            <button type="button" id="nss-excel-btn" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-file-excel mr-2"></i>
+                                {{ _('Excel') }}
+                            </button>
+                            <button id="add-category-btn" class="btn btn-primary">
+                                <i class="fas fa-plus-circle mr-2"></i>
+                                {{ _('Add Category') }}
+                            </button>
+                            <button id="auto-translate-all-nss-btn" class="btn btn-warning">
+                                <i class="fas fa-language mr-2"></i>
+                                {{ _('Auto Translate All') }}
+                            </button>
+                            <a href="{{ url_for('organization.new_national_society') }}"
+                               class="btn btn-success">
+                                <i class="fas fa-plus mr-2"></i>
+                                {{ _('Add New National Society') }}
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="nssGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="nss-column-visibility-button-placeholder"></div>
+            </div>
+        {% else %}
+            <p class="text-gray-700 text-sm">{{ _('No National Societies found.') }}</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if can_manage_org %}
+{# National Societies Excel Import/Export Modal #}
+<div id="nssExcelModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('National Societies – Excel') }}</h3>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700 mb-2">{{ _('Export') }}</p>
+                        <a href="{{ url_for('organization.export_national_societies') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            <i class="fas fa-download mr-2"></i>
+                            {{ _('Download as Excel') }}
+                        </a>
+                    </div>
+                    <hr class="border-gray-200">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700 mb-2">{{ _('Import') }}</p>
+                        <form method="POST" action="{{ url_for('organization.import_national_societies') }}" enctype="multipart/form-data" id="nssImportForm">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="nss-excel-file" class="block text-sm text-gray-600 mb-1">{{ _('Excel file') }}</label>
+                                <input type="file" id="nss-excel-file" name="excel_file" accept=".xlsx,.xls" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            </div>
+                            <div class="flex items-center mb-3">
+                                <input type="checkbox" id="nss-overwrite-existing" name="overwrite_existing" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="nss-overwrite-existing" class="ml-2 block text-sm text-gray-700">{{ _('Overwrite existing (match by Code or Name + Country)') }}</label>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload mr-2"></i>
+                                {{ _('Import') }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" class="nss-excel-modal-close inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    {{ _('Close') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Add Category Modal #}
+<div id="add-category-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center" role="dialog" aria-labelledby="add-category-modal-title" aria-modal="true">
+    <div class="relative p-6 border max-w-md w-full mx-4 shadow-xl rounded-lg bg-white">
+        <div class="flex justify-between items-center mb-5">
+            <h3 id="add-category-modal-title" class="text-xl font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-plus-circle w-6 h-6 mr-2 text-blue-600"></i>
+                {{ _('Add Category') }}
+            </h3>
+            <button type="button" id="close-add-category-modal-btn" class="text-gray-400 hover:text-gray-600" aria-label="{{ _('Close') }}">
+                <i class="fas fa-times w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form id="add-category-form">
+            <div class="mb-4">
+                <label for="category-name-input" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Category Name') }}
+                </label>
+                <input
+                    type="text"
+                    id="category-name-input"
+                    name="category_name"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="{{ _('Enter category name...') }}"
+                    required
+                    autofocus
+                >
+                <p class="mt-2 text-sm text-gray-500">
+                    {{ _('This will create a new column in the table for this category.') }}
+                </p>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button
+                    type="button"
+                    id="cancel-add-category-btn"
+                    class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                    {{ _('Cancel') }}
+                </button>
+                <button
+                    type="submit"
+                    id="submit-add-category-btn"
+                    class="btn btn-primary"
+                >
+                    <i class="fas fa-plus mr-2"></i>
+                    {{ _('Add Category') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if can_manage_org %}
+<script nonce="{{ csp_nonce() }}">
+    $(document).ready(function() {
+        $('#nss-excel-btn').on('click', function() { $('#nssExcelModal').removeClass('hidden'); });
+        $('.nss-excel-modal-close').on('click', function() { $('#nssExcelModal').addClass('hidden'); });
+    });
+</script>
+{% endif %}

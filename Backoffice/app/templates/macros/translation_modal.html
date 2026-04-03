@@ -1,0 +1,201 @@
+{#
+    Unified Translation Modal Macro
+
+    Parameters:
+    - modal_id: Unique ID for the modal
+    - modal_title: Title to display in modal header
+    - description: Optional description text
+    - context: Translation context (e.g., 'section', 'question', 'document', 'template_name')
+    - tabs: Optional list of tabs [{'id': 'labels', 'name': 'Labels'}, {'id': 'definitions', 'name': 'Definitions'}]
+    - show_auto_translate: Whether to show auto translate button (default: true)
+    - css_prefix: CSS prefix for field IDs (default: modal_id)
+#}
+
+{% macro translation_modal(modal_id, modal_title, description=None, context='general', tabs=None, show_auto_translate=true, css_prefix=None, auto_translate_permission_context=None, auto_translate_permission_code=None) -%}
+{% set css_prefix = css_prefix or modal_id %}
+{% set has_tabs = tabs and tabs|length > 0 %}
+
+{% from "macros/modal_shell.html" import modal_shell %}
+{% set modal_data_attrs = {
+    'auto_translate_permission_context': auto_translate_permission_context|default('', true),
+    'auto_translate_permission_code': auto_translate_permission_code|default('', true)
+} %}
+{% set modal_title_html %}<i class="fas fa-language w-6 h-6 mr-2 text-blue-600"></i>{{ modal_title }}{% endset %}
+{% call modal_shell(
+    modal_id,
+    modal_title_html,
+    aria_label=modal_title,
+    max_width='max-w-2xl',
+    z_index=9999,
+    title_safe=true,
+    title_class='flex items-center mb-5',
+    data_attrs=modal_data_attrs
+) %}
+
+        {% if description %}
+        <div class="mb-4">
+            <p class="text-sm text-gray-600 mb-4">{{ description }}</p>
+        </div>
+        {% endif %}
+
+        {% if has_tabs %}
+        <div class="mb-4">
+            <div class="flex space-x-4 mb-4">
+                {% for tab in tabs %}
+                <button type="button" id="{{ css_prefix }}-tab-{{ tab.id }}" class="px-3 py-2 text-sm font-medium rounded-md {% if loop.first %}bg-blue-100 text-blue-700 border-b-2 border-blue-500 active-tab{% else %}text-gray-500 hover:text-gray-700{% endif %}">{{ tab.name }}</button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <form id="{{ css_prefix }}-translation-form">
+            {% if has_tabs %}
+                {% for tab in tabs %}
+                <div id="{{ css_prefix }}-{{ tab.id }}-tab-content" class="space-y-4 {% if not loop.first %}hidden{% endif %}">
+                    {{ _render_translation_fields(css_prefix, tab.id) }}
+                </div>
+                {% endfor %}
+            {% else %}
+                {{ _render_translation_fields(css_prefix) }}
+            {% endif %}
+
+            <div class="flex {% if show_auto_translate %}justify-between{% else %}justify-end{% endif %} items-center gap-3 mt-6">
+                {% if show_auto_translate %}
+                <div class="flex gap-2">
+                    <button type="button" id="auto-translate-{{ css_prefix }}-btn" class="btn btn-warning" title="Uses AI to automatically translate text">
+                        <i class="fas fa-magic"></i>
+                        Auto Translate
+                    </button>
+                    <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
+                        <i class="fas fa-trash"></i>
+                        Clear
+                    </button>
+                </div>
+                {% else %}
+                <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
+                    <i class="fas fa-trash"></i>
+                    Clear Translations
+                </button>
+                {% endif %}
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
+                    <button type="button" id="save-{{ css_prefix }}-translations-btn" class="btn btn-success">{{ _('Save Translations') }}</button>
+                </div>
+            </div>
+        </form>
+{% endcall %}
+{%- endmacro %}
+
+{# Helper macro to render translation fields for supported languages #}
+{% macro _render_translation_fields(css_prefix, field_suffix='') -%}
+{% set field_id_suffix = '-' + field_suffix if field_suffix else '' %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for code in SUPPORTED_LANGUAGES %}
+        {% if code != 'en' %}
+        <div>
+            <label for="{{ css_prefix }}-translation{{ field_id_suffix }}-{{ code }}" class="block text-sm font-medium text-gray-700 mb-1">
+                {{ (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+            </label>
+            <textarea
+                name="{{ code }}"
+                id="{{ css_prefix }}-translation{{ field_id_suffix }}-{{ code }}"
+                rows="3"
+                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                placeholder="{{ (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }} translation"
+                {% if code in ['ar','fa','he','ur'] %}dir="rtl" style="font-family: 'Tajawal', Arial, sans-serif;"{% endif %}></textarea>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+{%- endmacro %}
+
+{#
+    Translation Matrix Modal Macro
+
+    Parameters:
+    - modal_id: Unique ID for the modal
+    - modal_title: Title to display in modal header
+    - description: Optional description text
+    - context: Translation context (e.g., 'pages', 'options')
+    - table_body_id: ID for the table body where rows are dynamically generated
+    - show_auto_translate: Whether to show auto translate button (default: true)
+    - css_prefix: CSS prefix for button IDs (default: modal_id)
+#}
+
+{% macro translation_matrix_modal(modal_id, modal_title, description=None, context='matrix', table_body_id=None, show_auto_translate=true, css_prefix=None, auto_translate_permission_context=None, auto_translate_permission_code=None) -%}
+{% set css_prefix = css_prefix or modal_id %}
+{% set table_body_id = table_body_id or (modal_id + '-tbody') %}
+
+{% from "macros/modal_shell.html" import modal_shell %}
+{% set modal_data_attrs = {
+    'auto_translate_permission_context': auto_translate_permission_context|default('', true),
+    'auto_translate_permission_code': auto_translate_permission_code|default('', true)
+} %}
+{% set modal_title_html %}<i class="fas fa-language w-6 h-6 mr-2 text-blue-600"></i>{{ modal_title }}{% endset %}
+{% call modal_shell(
+    modal_id,
+    modal_title_html,
+    aria_label=modal_title,
+    max_width='max-w-6xl',
+    z_index=9999,
+    title_safe=true,
+    title_class='flex items-center mb-5',
+    data_attrs=modal_data_attrs
+) %}
+
+        {% if description %}
+        <div class="mb-4">
+            <p class="text-sm text-gray-600 mb-4">{{ description }}</p>
+        </div>
+        {% endif %}
+
+        <form id="{{ css_prefix }}-form">
+            <div class="overflow-x-auto">
+                <table class="min-w-full border border-gray-300 rounded-lg">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-300">
+                                {% if context == 'pages' %}Page Name (English)
+                                {% elif context == 'options' %}Option Text (English)
+                                {% elif context == 'column_headers' %}Column Header (English)
+                                {% else %}Text (English){% endif %}
+                            </th>
+                            {% for code in SUPPORTED_LANGUAGES %}
+                                {% if code != 'en' %}
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-300">{{ (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}</th>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody id="{{ table_body_id }}">
+                        <!-- Rows will be dynamically generated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex {% if show_auto_translate %}justify-between{% else %}justify-end{% endif %} items-center gap-3 mt-6">
+                {% if show_auto_translate %}
+                <div class="flex gap-2">
+                    <button type="button" id="auto-translate-{{ css_prefix }}-btn" class="btn btn-warning" title="Uses AI to automatically translate all items">
+                        <i class="fas fa-magic"></i>
+                        Auto Translate All
+                    </button>
+                    <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
+                        <i class="fas fa-trash"></i>
+                        Clear All
+                    </button>
+                </div>
+                {% else %}
+                <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
+                    <i class="fas fa-trash"></i>
+                    Clear All Translations
+                </button>
+                {% endif %}
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
+                    <button type="button" id="save-{{ css_prefix }}-btn" class="btn btn-success">{{ _('Save All Translations') }}</button>
+                </div>
+            </div>
+        </form>
+{% endcall %}
+{%- endmacro %}

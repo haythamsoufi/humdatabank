@@ -1,0 +1,77 @@
+# ========== Production Dependencies ==========
+Flask>=3.1.3
+Flask-SQLAlchemy==3.1.1
+Flask-Login>=0.6.3
+Flask-Migrate==4.0.5
+Flask-Mail>=0.10.0
+Flask-WTF==1.2.1
+Flask-Cors>=6.0.0
+Flask-Babel==4.0.0
+Flask-Compress==1.14
+Flask-Limiter==3.5.0
+flask-sock>=0.7.0
+Werkzeug>=3.1.6
+polib==1.2.0
+APScheduler==3.10.4
+python-dotenv==1.0.0
+psutil>=5.9.0
+email_validator>=2.0.0
+alembic>=1.12.0
+psycopg2-binary>=2.9.9
+PyMuPDF>=1.23.0
+Pillow>=10.1.0
+openpyxl==3.1.2
+pandas>=2.1.0
+XlsxWriter>=3.1.0
+reportlab>=4.0.0
+user-agents>=2.2.0
+weasyprint>=60.0
+requests>=2.31.0
+PyJWT>=2.12.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.1
+# AI Chatbot Services
+openai>=1.0.0
+google-generativeai>=0.3.0
+# Security Dependencies
+bleach>=6.0.0
+jsonschema>=4.0.0
+# WSGI Servers
+waitress>=2.1.0
+gunicorn>=21.2.0
+gevent>=23.9.0
+gevent-websocket>=0.10.1
+# Azure-specific dependencies
+azure-storage-blob>=12.19.0
+# NOTE: opencensus-ext-azure and opencensus-ext-flask have been removed.
+# The opencensus project is deprecated and opencensus-ext-flask caps Flask < 3.0.
+# For Azure Monitor telemetry on Flask 3.x, use: azure-monitor-opentelemetry>=1.0.0
+# API Documentation
+PyYAML>=6.0
+
+# ==================== AI/RAG System Dependencies ====================
+# Vector database and embeddings
+pgvector>=0.2.5
+sentence-transformers>=2.3.0
+tiktoken>=0.5.2
+
+# Agent framework and tool orchestration
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-openai>=0.0.5
+langgraph>=0.0.20
+
+# Document processing
+unstructured>=0.12.0
+pdf2image>=1.17.0
+pytesseract>=0.3.10
+python-docx>=1.1.0
+xlrd>=2.0.1
+markdown>=3.5
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Performance and caching
+redis>=5.0.0
+diskcache>=5.6.0

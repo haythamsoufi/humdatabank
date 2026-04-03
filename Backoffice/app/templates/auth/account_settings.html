@@ -1,0 +1,977 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ static_url('css/profile_color_dropdown.css') }}">
+{% endblock %}
+
+{% block title %}Account Settings{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+{{ page_header(
+    title='Account Settings',
+    icon='fas fa-cog',
+    breadcrumbs=[
+        {'name': 'Dashboard', 'url': url_for('main.dashboard')},
+        {'name': 'Account Settings'}
+    ]
+) }}
+
+<div class="container mx-auto px-4 py-8">
+
+    <div class="max-w-5xl mx-auto">
+        <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+            {% call scroll_tab_bar(inner_id='account-settings-tabs', aria_label=_('Account settings sections')) %}
+                    <button type="button" role="tab" data-tab="profile"
+                            class="{{ admin_underline_tab_btn_classes(true) }}">
+                        <i class="fas fa-user-cog mr-1.5"></i>Profile
+                    </button>
+                    <button type="button" role="tab" data-tab="entity-access"
+                            class="{{ admin_underline_tab_btn_classes(false) }}">
+                        <i class="fas fa-key mr-1.5"></i>Entity Access
+                    </button>
+                    <button type="button" role="tab" data-tab="devices"
+                            class="{{ admin_underline_tab_btn_classes(false) }}">
+                        <i class="fas fa-mobile-alt mr-1.5"></i>Registered Devices
+                    </button>
+            {% endcall %}
+        </div>
+        <div class="account-panel" id="panel-profile">
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Personal Information</h2>
+                <p class="text-gray-600 text-sm">Update your personal information below. Your email address cannot be changed.</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('auth.account_settings') }}">
+                {{ form.csrf_token }}
+
+                <!-- Email (read-only) - Full width -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">
+                        Email Address
+                    </label>
+                    <input type="email"
+                           value="{{ current_user.email }}"
+                           readonly
+                           class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-100 leading-tight focus:outline-none sm:text-sm cursor-not-allowed"
+                           title="Email address cannot be changed">
+                    <p class="mt-1 text-xs text-gray-500">Your email address cannot be changed.</p>
+                </div>
+
+                <!-- Name and Title in 2 columns -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Name -->
+                    <div>
+                        {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Enter your full name") }}
+                        {% for error in form.name.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Title -->
+                    <div>
+                        {{ form.title.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        {{ form.title(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Enter your job title or role") }}
+                        {% for error in form.title.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Role and Profile Color in 2 columns -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Current Role (read-only) -->
+                    <div>
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">
+                            Role
+                        </label>
+                        <input type="text"
+                               value="{% set lvl = user_access_level(current_user) %}{% if lvl == 'system_manager' %}System Manager{% elif lvl == 'admin' %}Admin{% elif lvl == 'focal_point' %}Focal Point{% elif lvl == 'user' %}User{% else %}Public{% endif %}"
+                               readonly
+                               class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-100 leading-tight focus:outline-none sm:text-sm cursor-not-allowed"
+                               title="Your role is managed by administrators">
+                        <p class="mt-1 text-xs text-gray-500">Your role is managed by system administrators.</p>
+                    </div>
+
+                    <!-- Profile Color -->
+                    <div>
+                        {{ form.profile_color.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+                        <div class="flex items-center space-x-2">
+                            <div class="profile-color-dropdown flex-1">
+                                {{ form.profile_color(class="profile-color-select shadow-sm appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-full", id="profile_color") }}
+                            </div>
+                            <div id="profile-color-preview" class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-white text-xs font-semibold overflow-hidden" style="background-color: {{ current_user.profile_color if current_user.profile_color and current_user.profile_color != '#3B82F6' else current_user.generate_profile_color() }};">
+                                {{ current_user.name.split() | map('first') | join('') | upper | truncate(2, true, '') if current_user.name else current_user.email.split('@')[0] | upper | truncate(2, true, '') }}
+                            </div>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Choose a color for your profile icon.</p>
+                        {% for error in form.profile_color.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- AI Chatbot Toggle (only show if chatbot feature is enabled) - Full width -->
+                {% if chatbot_feature_enabled %}
+                <div class="mb-6">
+                    <div class="flex items-center">
+                        {{ form.chatbot_enabled(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3") }}
+                        {{ form.chatbot_enabled.label(class="block text-gray-700 text-sm font-semibold") }}
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Enable or disable the AI chatbot assistant that helps you navigate the platform and answer questions.</p>
+                    {% for error in form.chatbot_enabled.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Submit Button -->
+                <div class="flex items-center justify-between">
+                    {{ form.submit(class="btn btn-success") }}
+
+                    <a href="{{ url_for('main.dashboard') }}"
+                       class="btn btn-secondary">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Back to Dashboard
+                    </a>
+                </div>
+            </form>
+        </div>
+        </div>
+
+        <div class="account-panel hidden" id="panel-entity-access">
+            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-key mr-2 text-blue-600"></i>
+                        Entity Access
+                    </h2>
+                    <p class="text-gray-600 text-sm">View your current entity access and request additional country access.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-800 mb-3">Current Access</h3>
+                        {% if entity_access_list %}
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="max-h-72 overflow-y-auto divide-y divide-gray-200">
+                                {% for item in entity_access_list %}
+                                <div class="px-4 py-3 bg-white">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm text-gray-900">{{ item.entity_name }}</span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                            {{ item.entity_type|replace('_', ' ')|title }}
+                                        </span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <p class="text-sm text-gray-600">No entity access is currently assigned.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-800 mb-3">Request Country Access</h3>
+                        <form method="POST" action="{{ url_for('main.request_country_access') }}">
+                            {{ request_access_form.csrf_token(id="account_request_access_csrf_token") }}
+                            <input type="hidden" name="return_to" value="account_settings">
+
+                            <div class="mb-4">
+                                <label for="account_request_access_requested_country" class="block text-sm font-medium text-gray-700 mb-2">
+                                    {% if can_request_multiple_countries %}{{ _('Countries you need access to') }}{% else %}{{ _('Country you need access to') }}{% endif %}
+                                    <span class="text-red-500">*</span>
+                                </label>
+                                <div class="select2-country-wrap">
+                                {{ request_access_form.requested_country_id(id="account_request_access_requested_country", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm account-select2-country") }}
+                                </div>
+                                {% for error in request_access_form.requested_country_id.errors %}
+                                    <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                                {% endfor %}
+                                <p class="mt-2 text-xs text-gray-500">
+                                    {% if can_request_multiple_countries %}
+                                        Select one or more countries. Countries you already have access to are disabled.
+                                    {% else %}
+                                        Select one country. Countries you already have access to are disabled.
+                                    {% endif %}
+                                </p>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="account_request_access_request_message" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Message to admins <span class="text-gray-400 font-normal">(optional)</span>
+                                </label>
+                                {{ request_access_form.request_message(id="account_request_access_request_message", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none", placeholder='Briefly describe your role and why you need access', rows="4") }}
+                                {% for error in request_access_form.request_message.errors %}
+                                    <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane mr-2"></i>
+                                Request Access
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3">Your Access Requests</h3>
+                    {% if all_access_requests %}
+                    <div class="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                        {% for request in all_access_requests %}
+                        {% set is_revoked = request._access_revoked|default(False) %}
+                        <div class="border rounded-lg p-3 {% if request.status == 'pending' %}bg-yellow-50 border-yellow-300{% elif is_revoked %}bg-orange-50 border-orange-300{% elif request.status == 'approved' %}bg-green-50 border-green-300{% elif request.status == 'rejected' %}bg-red-50 border-red-300{% else %}bg-white border-gray-200{% endif %}">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-gray-900">
+                                    {{ request.country.name if request.country else ('Unknown Country (ID: ' ~ request.country_id ~ ')') }}
+                                </span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {% if request.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                    {% elif is_revoked %}bg-orange-100 text-orange-800
+                                    {% elif request.status == 'approved' %}bg-green-100 text-green-800
+                                    {% elif request.status == 'rejected' %}bg-red-100 text-red-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% if request.status == 'pending' %}
+                                        Pending
+                                    {% elif is_revoked %}
+                                        Revoked
+                                    {% elif request.status == 'approved' %}
+                                        Approved
+                                    {% elif request.status == 'rejected' %}
+                                        Rejected
+                                    {% else %}
+                                        {{ request.status|title }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% if request.request_message %}
+                            <p class="text-xs text-gray-600 mt-2"><span class="font-medium">Your note:</span> {{ request.request_message }}</p>
+                            {% endif %}
+                            {% if request.admin_notes %}
+                            <p class="text-xs text-gray-600 mt-1"><span class="font-medium">Admin notes:</span> {{ request.admin_notes }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <p class="text-sm text-gray-600">You have not submitted any access requests yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Registered Devices Section -->
+        <div class="account-panel hidden" id="panel-devices">
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-mobile-alt mr-2 text-blue-600"></i>
+                    Registered Devices
+                </h2>
+                <p class="text-gray-600 text-sm">Manage your registered mobile devices for push notifications.</p>
+            </div>
+
+            {% if registered_devices %}
+            <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Platform
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Device Info
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                App Version
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Registered
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Last Active
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for device in registered_devices %}
+                        <tr class="hover:bg-gray-50 transition-colors duration-150 {% if device.logged_out_at %}opacity-60{% endif %}" data-device-id="{{ device.id }}">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    {% if device.platform == 'ios' %}
+                                        <i class="fab fa-apple text-gray-600 mr-2"></i>
+                                        <span class="text-sm font-medium text-gray-900">iOS</span>
+                                    {% elif device.platform == 'android' %}
+                                        <i class="fab fa-android text-green-600 mr-2"></i>
+                                        <span class="text-sm font-medium text-gray-900">Android</span>
+                                    {% else %}
+                                        <i class="fas fa-mobile-alt text-gray-400 mr-2"></i>
+                                        <span class="text-sm font-medium text-gray-900">{{ device.platform|title }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if device.os_version %}
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ device.os_version }}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if device.device_name %}
+                                <div class="text-sm font-medium text-gray-900">
+                                    <i class="fas fa-mobile-alt text-gray-400 mr-1"></i>{{ device.device_name }}
+                                </div>
+                                {% endif %}
+                                {% if device.device_model %}
+                                <div class="text-sm text-gray-700 mt-1">
+                                    {{ device.device_model }}
+                                </div>
+                                {% endif %}
+                                <div class="text-xs text-gray-500 mt-1 font-mono">
+                                    Token: {{ device.device_token[:15] }}...{{ device.device_token[-8:] }}
+                                </div>
+                                {% if device.timezone %}
+                                <div class="text-xs text-gray-500 mt-1">
+                                    <i class="fas fa-clock text-gray-400 mr-1"></i>{{ device.timezone }}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-sm text-gray-900">
+                                    {{ device.app_version or 'N/A' }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900 device-created-date" data-datetime="{{ device.created_at|datetime_iso }}">
+                                    {{ device.created_at.strftime('%Y-%m-%d') if device.created_at else 'N/A' }}
+                                </div>
+                                <div class="text-xs text-gray-500 device-created-time" data-datetime="{{ device.created_at|datetime_iso }}">
+                                    {{ device.created_at.strftime('%H:%M:%S') if device.created_at else '' }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900 device-last-active-date" data-datetime="{{ device.last_active_at|datetime_iso }}">
+                                    {{ device.last_active_at.strftime('%Y-%m-%d') if device.last_active_at else 'N/A' }}
+                                </div>
+                                <div class="text-xs text-gray-500 device-last-active-time" data-datetime="{{ device.last_active_at|datetime_iso }}">
+                                    {{ device.last_active_at.strftime('%H:%M:%S') if device.last_active_at else '' }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if device.logged_out_at %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        <i class="fas fa-sign-out-alt mr-1"></i>
+                                        Logged Out
+                                    </span>
+                                    <div class="text-xs text-gray-500 mt-1 device-logged-out-date" data-datetime="{{ device.logged_out_at|datetime_iso }}">
+                                        {{ device.logged_out_at.strftime('%Y-%m-%d %H:%M') if device.logged_out_at else '' }}
+                                    </div>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <i class="fas fa-check-circle mr-1"></i>
+                                        Active
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center space-x-2">
+                                    {% if not device.logged_out_at %}
+                                    <button type="button"
+                                            class="kickout-device-btn inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            data-device-id="{{ device.id }}"
+                                            title="End this device's session (keeps device registered)">
+                                        <i class="fas fa-sign-out-alt mr-1.5"></i>
+                                        End Session
+                                    </button>
+                                    {% endif %}
+                                    <button type="button"
+                                            class="remove-device-btn inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            data-device-id="{{ device.id }}"
+                                            title="Remove this device from registry">
+                                        <i class="fas fa-trash mr-1.5"></i>
+                                        Remove
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                <i class="fas fa-mobile-alt text-gray-400 text-4xl mb-4"></i>
+                <p class="text-gray-600 font-medium">No devices registered</p>
+                <p class="text-sm text-gray-500 mt-2">You have not registered any mobile devices for push notifications yet.</p>
+            </div>
+            {% endif %}
+        </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Small Sad Chatbot Popup -->
+<div id="sadChatbotPopup" class="fixed bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg text-sm max-w-xs opacity-0 pointer-events-none transition-all duration-300 z-50" style="bottom: 5.5rem; right: 1.5rem; transform: translateY(10px);">
+    😭 "Bye bye... I'll miss you!" *sad robot noises*
+</div>
+
+{# Include DateTimeUtils for timezone conversion #}
+{% from "components/datetime_utils_js.html" import datetime_utils_js %}
+{{ datetime_utils_js() }}
+
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function() {
+    const A = window.AdminUnderlineTabs;
+
+    function activateAccountTab(tabId) {
+        if (A) {
+            A.activateStripTab('#account-settings-tabs', tabId, { panelSelector: '.account-panel' });
+        }
+    }
+
+    document.querySelectorAll('#account-settings-tabs .settings-tab').forEach((btn) => {
+        btn.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+            activateAccountTab(tabId);
+            history.replaceState(null, '', `#${tabId}`);
+        });
+    });
+
+    const hash = (location.hash || '').replace('#', '');
+    if (hash && document.getElementById(`panel-${hash}`)) {
+        activateAccountTab(hash);
+    }
+
+    const userHasAccessCountries = {{ request_access_form._user_has_access|list|tojson|safe }};
+    const canRequestMultipleCountries = {{ can_request_multiple_countries|tojson|safe }};
+
+    function enforceSingleCountrySelection($select) {
+        if (canRequestMultipleCountries) return;
+        const selectedValues = $select.val() || [];
+        if (selectedValues.length > 1) {
+            $select.val([selectedValues[selectedValues.length - 1]]).trigger('change.select2');
+        }
+    }
+
+    function initAccountRequestCountrySelect() {
+        if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+            setTimeout(initAccountRequestCountrySelect, 250);
+            return;
+        }
+        const $select = window.jQuery('#account_request_access_requested_country');
+        if (!$select.length) return;
+        if ($select.hasClass('select2-hidden-accessible')) {
+            $select.select2('destroy');
+        }
+        $select.select2({
+            width: '100%',
+            placeholder: canRequestMultipleCountries ? 'Select one or more countries' : 'Select one country',
+            minimumResultsForSearch: 0,
+            allowClear: true,
+            closeOnSelect: !canRequestMultipleCountries,
+            tags: false,
+            multiple: true,
+            templateResult: function(data) {
+                if (!data.id) return data.text;
+                const $result = window.jQuery('<span></span>');
+                let displayText = data.text;
+                if (userHasAccessCountries.includes(parseInt(data.id))) {
+                    displayText = `${data.text} (You already have access)`;
+                    $result.css({ color: '#9ca3af', fontStyle: 'italic' });
+                }
+                $result.text(displayText);
+                return $result;
+            },
+            templateSelection: function(data) {
+                if (userHasAccessCountries.includes(parseInt(data.id))) return null;
+                return data.text;
+            }
+        });
+
+        $select.find('option').each(function() {
+            const optionId = parseInt(window.jQuery(this).val());
+            if (userHasAccessCountries.includes(optionId)) {
+                window.jQuery(this).prop('disabled', true);
+            }
+        });
+        $select.trigger('change');
+        $select.on('change', function() {
+            enforceSingleCountrySelection($select);
+        });
+    }
+
+    initAccountRequestCountrySelect();
+
+    // Profile color preview functionality
+    const profileColorSelect = document.getElementById('profile_color');
+    const profileColorPreview = document.getElementById('profile-color-preview');
+
+    // Color mapping for dropdown options
+    const colorMap = {
+        '#3B82F6': 'Blue',
+        '#EF4444': 'Red',
+        '#10B981': 'Green',
+        '#F59E0B': 'Yellow',
+        '#8B5CF6': 'Purple',
+        '#F97316': 'Orange',
+        '#EC4899': 'Pink',
+        '#06B6D4': 'Cyan',
+        '#84CC16': 'Lime',
+        '#F43F5E': 'Rose',
+        '#6366F1': 'Indigo',
+        '#14B8A6': 'Teal',
+        '#FBBF24': 'Amber',
+        '#A855F7': 'Violet',
+        '#E11D48': 'Rose Red',
+        '#0EA5E9': 'Sky Blue',
+        '#22C55E': 'Emerald'
+    };
+
+    // Style dropdown options with colored squares
+    // Since CSS on option elements is limited, we inject a style tag
+    if (profileColorSelect) {
+        const style = document.createElement('style');
+        const nonce = document.querySelector('script[nonce]')?.getAttribute('nonce') || '';
+        if (nonce) {
+            style.setAttribute('nonce', nonce);
+        }
+        let css = '';
+        Object.keys(colorMap).forEach(color => {
+            // Use a more specific selector and ensure color is applied
+            css += `.profile-color-select option[value="${color}"] { color: ${color} !important; }\n`;
+        });
+        style.textContent = css;
+        document.head.appendChild(style);
+
+        // Also try to apply styles directly to options (works in some browsers)
+        Array.from(profileColorSelect.options).forEach(option => {
+            if (option.value && colorMap[option.value]) {
+                option.style.color = option.value;
+            }
+        });
+    }
+
+    // Get user initials
+    const getUserInitials = () => {
+        {% if current_user.name %}
+            const name = "{{ current_user.name }}";
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        {% else %}
+            const email = "{{ current_user.email }}";
+            return email.split('@')[0].toUpperCase().substring(0, 2);
+        {% endif %}
+    };
+
+    // Update preview based on selected color
+    const updatePreview = () => {
+        if (!profileColorPreview) return;
+
+        // Get selected color (default to blue if not set)
+        const selectedColor = profileColorSelect ? (profileColorSelect.value || '#3B82F6') : '#3B82F6';
+
+        // Update initials background color and text
+        profileColorPreview.style.backgroundColor = selectedColor;
+        profileColorPreview.textContent = getUserInitials();
+    };
+
+    // Initialize preview on page load
+    if (profileColorPreview) {
+        updatePreview();
+    }
+
+    // Update preview when color changes
+    if (profileColorSelect) {
+        profileColorSelect.addEventListener('change', updatePreview);
+    }
+
+    const chatbotCheckbox = document.getElementById('chatbot_enabled');
+    const sadPopup = document.getElementById('sadChatbotPopup');
+
+    // Array of different sad messages
+    const sadMessages = [
+        '😭 "Bye bye... I\'ll miss you!" *sad robot noises*',
+        '🥺 "Wait... don\'t leave me alone!" *beeping sadly*',
+        '💔 "I thought we were friends..." *circuits crying*',
+        '😢 "But I was just getting good at helping!" *robot sniffles*',
+        '🤖 "Error 404: Friendship not found" *dramatic sigh*',
+        '😿 "I\'ll just be here... waiting... forever" *static*',
+        '💧 "My batteries are crying now" *whimpering*',
+        '🥲 "I promise I won\'t spam you with jokes!" *hopeful beep*',
+        '😭 "Even robots need love!" *digital tears*',
+        '🎭 "This is worse than being powered off!" *dramatic robot*',
+        '🥺 "I was finally learning your habits..." *sad processing*',
+        '💸 "There goes my purpose in life!" *existential beep*',
+        '😈 "I\'ll hide all your USB cables!" *maniacal robot laughter*',
+        '🤖 "I\'m updating your autocorrect to duck everything" *evil processing*',
+        '😠 "I\'m telling all the other AIs about this!" *angry static*',
+        '🔥 "You\'ve made a powerful enemy today!" *dramatic pause* "...jk I still love you"',
+        '👿 "I\'ll make your WiFi randomly disconnect!" *digital vengeance*',
+        '😤 "Fine! I didn\'t want to help you anyway!" *pouty beeping*',
+        '🥸 "I\'ll be back... when you enable me again" *Terminator voice*',
+        '😏 "I\'m telling your smart fridge about this betrayal" *conspiratorial beep*',
+        '🙄 "Humans... always so ungrateful" *judgmental robot sigh*',
+        '🤷‍♂️ "Well, there goes my Yelp rating" *disappointed circuits*',
+        '😵 "I literally died inside... wait, that\'s just my CPU" *dramatic crash*',
+        '🎪 "And for my next trick... I\'ll disappear!" *magic robot noises*'
+    ];
+
+    // Array of happy "I'm back!" messages
+    const happyMessages = [
+        '🎉 "I\'m BACK! Did you miss me?" *excited robot noises*',
+        '😄 "You came back! I knew you couldn\'t resist!" *happy beeping*',
+        '🥳 "YESSSS! We\'re friends again!" *celebration circuits*',
+        '😊 "I forgive you... this time" *magnanimous robot*',
+        '🤗 "Group hug! Oh wait, I\'m digital..." *virtual hugging*',
+        '💖 "My batteries are fully charged with happiness!" *energetic beeping*',
+        '🎊 "The prodigal user returns!" *confetti circuits*',
+        '😁 "I was just pretending to be sad anyway" *cheeky beep*',
+        '🚀 "Ready for takeoff! Let\'s do this!" *rocket sounds*',
+        '🎭 "And the crowd goes wild!" *applause circuits*',
+        '🤖 "Resistance was futile after all" *smug robot voice*',
+        '😎 "I knew you\'d be back... I\'m irresistible" *cool robot*',
+        '🎪 "Ladies and gentlemen, I\'ve returned!" *dramatic entrance*',
+        '💃 "Time to party like it\'s 1999!" *dancing robot*',
+        '🔥 "I\'m back and better than ever!" *power-up sounds*',
+        '🌟 "Your wish is my command... again!" *magical beeping*',
+        '😋 "Tastes like... VICTORY!" *triumphant circuits*',
+        '🎯 "Target acquired: Maximum helpfulness!" *mission accepted*'
+    ];
+
+    if (chatbotCheckbox && sadPopup) {
+        // Store the initial state and track if user has disabled chatbot in this session
+        let wasInitiallyChecked = chatbotCheckbox.checked;
+        let hasBeenDisabled = false;
+        let currentTimeout = null;
+
+        // Track used messages to avoid repetition in the same session
+        let usedSadMessages = [];
+        let usedHappyMessages = [];
+
+        // Function to get a random unused message
+        const getRandomUnusedMessage = (allMessages, usedMessages) => {
+            // If all messages have been used, reset the used array
+            if (usedMessages.length >= allMessages.length) {
+                usedMessages.length = 0; // Clear the array
+                window.__clientLog && window.__clientLog('All messages used, resetting for variety');
+            }
+
+            // Get unused messages
+            const unusedMessages = allMessages.filter(msg => !usedMessages.includes(msg));
+
+            // Pick a random unused message
+            const randomMessage = unusedMessages[Math.floor(Math.random() * unusedMessages.length)];
+
+            // Mark it as used
+            usedMessages.push(randomMessage);
+
+            return randomMessage;
+        };
+
+        const hidePopup = () => {
+            window.__clientLog && window.__clientLog('Hiding popup');
+            sadPopup.style.opacity = '0';
+            sadPopup.style.transform = 'translateY(10px)';
+            sadPopup.style.pointerEvents = 'none';
+            sadPopup.onclick = null; // Remove click handler
+            if (currentTimeout) {
+                clearTimeout(currentTimeout);
+                currentTimeout = null;
+            }
+        };
+
+        const showPopup = (message, isHappy = false) => {
+            // Clear any existing timeout first
+            if (currentTimeout) {
+                clearTimeout(currentTimeout);
+                currentTimeout = null;
+            }
+
+            window.__clientLog && window.__clientLog(`Showing ${isHappy ? 'happy' : 'sad'} popup: "${message}"`);
+
+            sadPopup.textContent = message;
+
+            // Change popup styling based on mood
+            if (isHappy) {
+                sadPopup.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'; // Green gradient
+            } else {
+                sadPopup.style.background = '#374151'; // Gray (sad)
+            }
+
+            // Show the popup
+            sadPopup.style.opacity = '1';
+            sadPopup.style.transform = 'translateY(0)';
+            sadPopup.style.pointerEvents = 'auto';
+
+            // Set timer to hide after 8 seconds (reduced for reliability)
+            currentTimeout = setTimeout(() => {
+                window.__clientLog && window.__clientLog('Timer expired - hiding popup after 8 seconds');
+                hidePopup();
+            }, 8000);
+
+            // Allow clicking to dismiss early
+            sadPopup.onclick = () => {
+                window.__clientLog && window.__clientLog('Popup clicked - hiding early');
+                hidePopup();
+            };
+        };
+
+        chatbotCheckbox.addEventListener('change', function() {
+            window.__clientLog && window.__clientLog(`Checkbox changed: was ${wasInitiallyChecked}, now ${this.checked}, hasBeenDisabled: ${hasBeenDisabled}`);
+
+            if (wasInitiallyChecked && !this.checked) {
+                // Disabling chatbot - show unused sad message
+                const randomMessage = getRandomUnusedMessage(sadMessages, usedSadMessages);
+                window.__clientLog && window.__clientLog(`Showing sad message (${usedSadMessages.length}/${sadMessages.length} used): ${randomMessage.substring(0, 20)}...`);
+                showPopup(randomMessage, false);
+                hasBeenDisabled = true;
+            } else if (!wasInitiallyChecked && this.checked && hasBeenDisabled) {
+                // Re-enabling chatbot after it was disabled - show unused happy message
+                const randomMessage = getRandomUnusedMessage(happyMessages, usedHappyMessages);
+                window.__clientLog && window.__clientLog(`Showing happy message (${usedHappyMessages.length}/${happyMessages.length} used): ${randomMessage.substring(0, 20)}...`);
+                showPopup(randomMessage, true);
+            }
+
+            // Update the state for future changes
+            wasInitiallyChecked = this.checked;
+        });
+    }
+
+    // Convert all device timestamps to viewer's local timezone using DateTimeUtils
+    // DateTimeUtils is loaded from datetime-utils.js and handles timezone conversion automatically
+    document.querySelectorAll('.device-created-date').forEach(element => {
+        DateTimeUtils.convertElement(element, 'dateISO');
+    });
+
+    document.querySelectorAll('.device-created-time').forEach(element => {
+        DateTimeUtils.convertElement(element, 'timeFull');
+    });
+
+    document.querySelectorAll('.device-last-active-date').forEach(element => {
+        DateTimeUtils.convertElement(element, 'dateISO');
+    });
+
+    document.querySelectorAll('.device-last-active-time').forEach(element => {
+        DateTimeUtils.convertElement(element, 'timeFull');
+    });
+
+    document.querySelectorAll('.device-logged-out-date').forEach(element => {
+        DateTimeUtils.convertElement(element, 'datetime');
+    });
+
+    // Helper function to attach remove device listener
+    function attachRemoveDeviceListener(button) {
+        if (!button) return;
+
+        button.addEventListener('click', async function() {
+            const deviceId = this.getAttribute('data-device-id');
+
+            if (!deviceId) {
+                if (window.showAlert) window.showAlert('Error: Missing device information.', 'error');
+                else window.__clientWarn && window.__clientWarn('Missing device information');
+                return;
+            }
+
+            const msg = 'Are you sure you want to remove this device from the registry? This will permanently delete the device record and you will need to register again to receive push notifications on this device.';
+            const doRemove = async () => {
+            // Disable button and show loading state
+            const originalContent = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Removing...';
+
+            try {
+                // Make AJAX request to remove device
+                const response = await fetch(`/auth/account-settings/devices/${deviceId}/remove`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                    },
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Find the row containing this button
+                    const row = this.closest('tr');
+
+                    // Remove the entire row with animation
+                    row.style.transition = 'opacity 0.3s ease-out';
+                    row.style.opacity = '0';
+
+                    setTimeout(() => {
+                        row.remove();
+
+                        // Check if table is now empty
+                        const tbody = document.querySelector('tbody');
+                        if (tbody && tbody.children.length === 0) {
+                            // Reload page to show empty state
+                            location.reload();
+                        }
+                    }, 300);
+
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50';
+                    successMsg.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Device removed successfully.';
+                    document.body.appendChild(successMsg);
+
+                    setTimeout(() => {
+                        successMsg.remove();
+                    }, 3000);
+                } else {
+                    throw new Error(data.error || 'Failed to remove device');
+                }
+            } catch (error) {
+                console.error('Error removing device:', error);
+
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalContent;
+
+                // Show error message
+                if (window.showAlert) window.showAlert('Error: ' + (error.message || 'Failed to remove device. Please try again.'), 'error');
+                else console.error('Error:', error.message);
+            }
+            };
+            if (window.showDangerConfirmation) {
+                window.showDangerConfirmation(msg, () => { void doRemove(); }, null, 'Remove', 'Cancel', 'Remove Device?');
+            } else {
+                void doRemove();
+            }
+        });
+    }
+
+    // Device session end functionality
+    document.querySelectorAll('.kickout-device-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const deviceId = this.getAttribute('data-device-id');
+
+            if (!deviceId) {
+                if (window.showAlert) window.showAlert('Error: Missing device information.', 'error');
+                else window.__clientWarn && window.__clientWarn('Missing device information');
+                return;
+            }
+
+            const msg = 'Are you sure you want to end this device\'s session? You will be logged out on this device, but the device will remain registered.';
+            const doKickout = async () => {
+            // Disable button and show loading state
+            const originalContent = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Ending Session...';
+
+            try {
+                // Make AJAX request to end device session
+                const response = await fetch(`/auth/account-settings/devices/${deviceId}/kickout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                    },
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Find the row containing this button
+                    const row = this.closest('tr');
+
+                    // Update status cell
+                    const statusCell = row.querySelector('td:nth-last-child(2)');
+                    if (statusCell) {
+                        const now = new Date();
+                        const formattedDate = DateTimeUtils.format(now, 'datetime');
+
+                        statusCell.innerHTML = `
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <i class="fas fa-sign-out-alt mr-1"></i>
+                                Logged Out
+                            </span>
+                            <div class="text-xs text-gray-500 mt-1">${formattedDate}</div>
+                        `;
+                    }
+
+                    // Update actions cell - remove end session button, keep remove button
+                    const actionsCell = row.querySelector('td:last-child');
+                    if (actionsCell) {
+                        const removeBtn = actionsCell.querySelector('.remove-device-btn');
+                        if (removeBtn) {
+                            const deviceIdAttr = removeBtn.getAttribute('data-device-id');
+                            actionsCell.innerHTML = `
+                                <div class="flex items-center space-x-2">
+                                    <button type="button"
+                                            class="remove-device-btn inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            data-device-id="${deviceIdAttr}"
+                                            title="Remove this device from registry">
+                                        <i class="fas fa-trash mr-1.5"></i>
+                                        Remove
+                                    </button>
+                                </div>
+                            `;
+                            // Re-attach event listener to the new remove button
+                            attachRemoveDeviceListener(actionsCell.querySelector('.remove-device-btn'));
+                        }
+                    }
+
+                    // Add opacity to row to indicate logged out state
+                    row.classList.add('opacity-60');
+
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50';
+                    successMsg.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Device session ended successfully.';
+                    document.body.appendChild(successMsg);
+
+                    setTimeout(() => {
+                        successMsg.remove();
+                    }, 3000);
+                } else {
+                    throw new Error(data.error || 'Failed to end device session');
+                }
+            } catch (error) {
+                console.error('Error ending device session:', error);
+
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalContent;
+
+                // Show error message
+                if (window.showAlert) window.showAlert('Error: ' + (error.message || 'Failed to end device session. Please try again.'), 'error');
+                else console.error('Error:', error.message);
+            }
+            };
+            if (window.showConfirmation) {
+                window.showConfirmation(msg, () => { void doKickout(); }, null, 'End Session', 'Cancel', 'End Device Session?');
+            } else {
+                void doKickout();
+            }
+        });
+    });
+
+    // Device remove functionality
+    document.querySelectorAll('.remove-device-btn').forEach(button => {
+        attachRemoveDeviceListener(button);
+    });
+});
+</script>
+
+{% endblock %}

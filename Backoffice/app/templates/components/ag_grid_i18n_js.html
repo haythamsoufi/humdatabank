@@ -1,0 +1,101 @@
+{# Centralized AG Grid translations for all pages #}
+{# NOTE: Do not place Jinja comments inside the {{ { ... } }} expression below. #}
+<script id="ag-grid-i18n-json" type="application/json">{{ {
+  'columns': _('Columns'),
+  'showHideColumns': _('Show/Hide Columns'),
+  'columnVisibility': _('Column Visibility'),
+  'searchColumns': _('Search columns...'),
+  'resetToDefault': _('Reset to Default'),
+  'showAll': _('Show All'),
+  'columnCannotBeHidden': _('This column cannot be hidden'),
+  'noColumnsFound': _('No columns found'),
+
+  'filterByConditionOrSearch': _('Filter by condition or search values...'),
+  'selectAll': _('Select All'),
+  'apply': _('Apply'),
+  'clear': _('Clear'),
+  'reset': _('Reset'),
+  'noValuesFound': _('No values found'),
+  'moreValuesUseFilter': _('use filter input above to narrow down'),
+
+  'id': _('ID'),
+  'actions': _('Actions'),
+  'status': _('Status'),
+  'active': _('Active'),
+  'inactive': _('Inactive'),
+  'approved': _('Approved'),
+  'rejected': _('Rejected'),
+  'pending': _('Pending'),
+  'pendingReview': _('Pending Review'),
+  'deployed': _('Deployed'),
+  'notYet': _('Not Yet'),
+  'yes': _('Yes'),
+  'no': _('No'),
+  'allowed': _('Allowed'),
+  'notAllowed': _('Not Allowed'),
+  'public': _('Public'),
+  'private': _('Private'),
+  'archived': _('Archived'),
+  'emergency': _('Emergency'),
+  'owner': _('Owner'),
+  'date': _('Date'),
+  'more': _('more'),
+  'edit': _('Edit'),
+  'delete': _('Delete'),
+  'view': _('View'),
+  'preview': _('Preview'),
+  'duplicate': _('Duplicate'),
+  'deactivate': _('Deactivate'),
+  'reactivate': _('Reactivate'),
+
+  'localeText': {
+    'page': _('Page'),
+    'pageSize': _('Page Size'),
+    'pageSizeSelectorLabel': _('Page Size:'),
+    'ariaPageSizeSelectorLabel': _('Page Size'),
+    'firstPage': _('First Page'),
+    'previousPage': _('Previous Page'),
+    'nextPage': _('Next Page'),
+    'lastPage': _('Last Page'),
+    'more': _('More'),
+    'to': _('to'),
+    'of': _('of'),
+
+    'loadingOoo': _('Loading...'),
+    'noRowsToShow': _('No Rows To Show'),
+
+    'filterOoo': _('Filter...'),
+    'equals': _('Equals'),
+    'notEqual': _('Not equal'),
+    'lessThan': _('Less than'),
+    'greaterThan': _('Greater than'),
+    'inRange': _('In range'),
+    'contains': _('Contains'),
+    'notContains': _('Not contains'),
+    'startsWith': _('Starts with'),
+    'endsWith': _('Ends with'),
+    'andCondition': _('AND'),
+    'orCondition': _('OR'),
+    'applyFilter': _('Apply Filter'),
+    'resetFilter': _('Reset Filter'),
+    'clearFilter': _('Clear Filter')
+  }
+} | tojson | safe }}</script>
+
+<script nonce="{{ csp_nonce() }}">
+(function() {
+  const el = document.getElementById('ag-grid-i18n-json');
+  let data = {};
+  try {
+    data = el ? JSON.parse(el.textContent) : {};
+  } catch (e) {
+    data = {};
+  }
+
+  // Merge into a single global namespace used by the ag-grid helper/libs.
+  const existing = window.agGridTranslations || {};
+  const merged = Object.assign({}, existing, data);
+  merged.localeText = Object.assign({}, existing.localeText || {}, (data && data.localeText) || {});
+  window.agGridTranslations = merged;
+})();
+</script>

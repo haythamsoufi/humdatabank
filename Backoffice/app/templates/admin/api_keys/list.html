@@ -1,0 +1,210 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_manage_api = current_is_system_manager or has_permission('admin.api.manage') %}
+
+{% block title %}{{ _('API Key Management') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('API Key Management'),
+    icon='fas fa-key',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('API Key Management')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Create New API Key'),
+            'url': url_for('api_key_management.create_api_key'),
+            'icon': 'fas fa-plus',
+            'classes': 'professional-action-btn professional-action-btn-green'
+        } if can_manage_api else None
+    ] | reject('none') | list
+) }}
+
+<!-- Statistics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600">{{ _('Total Keys') }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ total_keys }}</p>
+            </div>
+            <i class="fas fa-key text-gray-400 text-2xl"></i>
+        </div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600">{{ _('Active Keys') }}</p>
+                <p class="text-2xl font-bold text-green-600">{{ active_keys }}</p>
+            </div>
+            <i class="fas fa-check-circle text-green-400 text-2xl"></i>
+        </div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600">{{ _('Revoked Keys') }}</p>
+                <p class="text-2xl font-bold text-red-600">{{ revoked_keys }}</p>
+            </div>
+            <i class="fas fa-ban text-red-400 text-2xl"></i>
+        </div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600">{{ _('Expired Keys') }}</p>
+                <p class="text-2xl font-bold text-orange-600">{{ expired_keys }}</p>
+            </div>
+            <i class="fas fa-clock text-orange-400 text-2xl"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Search -->
+<div class="bg-white p-4 rounded-lg shadow border border-gray-200 mb-6">
+    <form method="GET" action="{{ url_for('api_key_management.list_api_keys') }}" class="flex flex-col sm:flex-row gap-4">
+        <div class="flex-1">
+            <input type="text"
+                   name="search"
+                   value="{{ search_query }}"
+                   placeholder="{{ _('Search by client name, description, or key prefix...') }}"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+            <select name="status" id="status-filter" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>{{ _('All Keys') }}</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{{ _('Active Only') }}</option>
+                <option value="revoked" {% if status_filter == 'revoked' %}selected{% endif %}>{{ _('Revoked Only') }}</option>
+                <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>{{ _('Expired Only') }}</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit" class="btn btn-dark">
+                <i class="fas fa-search mr-2"></i>{{ _('Search') }}
+            </button>
+        </div>
+        {% if search_query or status_filter != 'all' %}
+        <div>
+            <a href="{{ url_for('api_key_management.list_api_keys') }}" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-md">
+                <i class="fas fa-times mr-2"></i>{{ _('Clear') }}
+            </a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- API Keys Table -->
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    {% if api_keys %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Client Name') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Key Prefix') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Rate Limit') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Created') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Last Used') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Expires') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Actions') }}</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for key in api_keys %}
+                <tr class="hover:bg-gray-50 {% if not key.is_valid() %}opacity-60{% endif %}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ key.client_name }}</div>
+                        {% if key.client_description %}
+                        <div class="text-xs text-gray-500 mt-1">{{ key.client_description[:50] }}{% if key.client_description|length > 50 %}...{% endif %}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <code class="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">{{ key.key_prefix }}...</code>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if key.is_revoked %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <i class="fas fa-ban mr-1"></i>{{ _('Revoked') }}
+                            </span>
+                        {% elif key.expires_at and key.expires_at <= now %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                <i class="fas fa-clock mr-1"></i>{{ _('Expired') }}
+                            </span>
+                        {% elif key.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <i class="fas fa-check-circle mr-1"></i>{{ _('Active') }}
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                <i class="fas fa-pause-circle mr-1"></i>{{ _('Inactive') }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ key.rate_limit_per_minute }}/min
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ key.created_at|datetime_local('date') if key.created_at else 'N/A' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ key.last_used_at|datetime_local('datetime') if key.last_used_at else _('Never') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ key.expires_at|datetime_local('date') if key.expires_at else _('Never') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex items-center space-x-2">
+                            <a href="{{ url_for('api_key_management.view_api_key', key_id=key.id) }}"
+                               class="text-blue-600 hover:text-blue-900"
+                               title="{{ _('View Details') }}">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            {% if can_manage_api and not key.is_revoked %}
+                            <a href="{{ url_for('api_key_management.revoke_api_key', key_id=key.id) }}"
+                               class="text-red-600 hover:text-red-900"
+                               title="{{ _('Revoke Key') }}">
+                                <i class="fas fa-ban"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-8 text-center">
+        <i class="fas fa-key text-gray-400 text-4xl mb-4"></i>
+        <p class="text-gray-600 font-medium">{{ _('No API keys found') }}</p>
+        <p class="text-sm text-gray-500 mt-2">{{ _('Create your first API key to get started') }}</p>
+        {% if can_manage_api %}
+        <a href="{{ url_for('api_key_management.create_api_key') }}"
+           class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>{{ _('Create API Key') }}
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusFilter = document.getElementById('status-filter');
+        if (statusFilter) {
+            statusFilter.addEventListener('change', function() {
+                this.form.submit();
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,933 @@
+[
+  {
+    "id": 914,
+    "type": "indicator",
+    "label": "Number of people on the National Society \r\nGoverning Board",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 256,
+      "name": "Governing Board",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 722,
+      "name": "Number of people on the National Society \nGoverning Board.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "The National Society Governing Board is the highest, national level decision-making governing body between sessions of the General Assembly. The Governing Board uses its authority to direct and make decisions on behalf of the National Society, in particular\nin regard to setting direction and priorities, being accountable to stakeholders and ensuring compliance with internal rules and agreements. The Governing Board traditionally includes the President, Vice President(s), Treasurer and other elected or appointed members. Do not include governing boards related to branches,\nsections or local units.",
+      "sector": {
+        "primary": 9,
+        "secondary": 11
+      },
+      "sub_sector": {
+        "primary": 12,
+        "secondary": 16
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 915,
+    "type": "indicator",
+    "label": "Number of National Society branches",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "6",
+    "layout_break_after": false,
+    "section": {
+      "id": 258,
+      "name": "Local Units and Branches",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Branch",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 1117,
+      "name": "Number of National Society branches.",
+      "type": "Number",
+      "unit": "Branch",
+      "definition": "The majority of National Societies have two or more organizational levels under their National Headquarters, with the aim of ensuring territorial reach and managing different aspects of National Society operations. Branch is the second layer immediately after the National Headquarters. A Branch has its roles and responsibilities and relationship with the National Headquarters defined through National Societies’ Statutes, including the level of autonomy given especially in the area of its legal status, mobilising local resources and building local partnership, and decisions it makes. It has local level decision making mechanism through its Branch members, board and volunteers, equally defined through National Societies’ Statutes.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 916,
+    "type": "indicator",
+    "label": "Number of people volunteering",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 259,
+      "name": "National Society Volunteers",
+      "order": 4,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 724,
+      "name": "Number of people volunteering.",
+      "type": "Number",
+      "unit": "Volunteers",
+      "definition": "People that have given their time voluntarily to support the delivery of services of the reporting National Society for at least four hours during the Reporting Year. This includes young people and/or participants in youth programs, while it excludes blood donors, who are counted separately.",
+      "sector": {
+        "primary": 20
+      },
+      "sub_sector": {
+        "primary": 37
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 917,
+    "type": "indicator",
+    "label": "Number of paid staff",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 260,
+      "name": "National Society Staff",
+      "order": 5,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 727,
+      "name": "Number of paid staff.",
+      "type": "Number",
+      "unit": "Staff",
+      "definition": "Paid staff: People who are contracted by the Reporting National Society for a minimum of three months in total during the Reporting Year and are either remunerated for their work or are interns.  Staff contracted by the Secretariat are not counted by the reporting National Society even if they are working for the NS within the country to which the reporting National Society belongs. Staff contracted by a reporting National Society are reported by that National Society regardless of who remunerates them and where they work, whether it is in-country, delegates in the field, out-of-country, or staff on-loan. If a person is contracted for the first three months to the reporting National Society and then is contracted again for the last three months, they should only be counted once.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 919,
+    "type": "matrix",
+    "label": "National Societies to which support was given",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 255,
+      "name": "Network Support",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 920,
+    "type": "indicator",
+    "label": "Number of people donating blood",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 251,
+      "name": "Blood and First Aid Activities",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 626,
+      "name": "Number of people donating blood.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "People who have donated blood at a blood donation centre / blood bank or similar, owned or run by thereporting National Society at least once during the Reporting Year. If the reporting National Society does not have blood donation facilities, but promotes blood donations, it should count people reached with these promotional activities as part of “People Reached” (irrespective of whether they actually donate blood at some other facility). People who would like to give blood but cannot (e.g., because of medical conditions, risk behaviors for transmissible infections, or other) should not be counted as people donating blood. Only the number of people, not number of times or quantity of blood given, should be reported. Therefore, a person who gives blood, say, four times during the reporting period, is still only counted once. Tip: If this service is not offered by your national society, please add “0” as value",
+      "sector": {
+        "primary": 7
+      },
+      "sub_sector": {
+        "primary": 31
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 925,
+    "type": "indicator",
+    "label": "Number of National Society Local Units",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "6",
+    "layout_break_after": false,
+    "section": {
+      "id": 258,
+      "name": "Local Units and Branches",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Local unit",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 723,
+      "name": "Number of National Society Local Units.",
+      "type": "Number",
+      "unit": "Local unit",
+      "definition": "Local units are any physical subdivisions of a National Society that coordinate and deliver services to people. These include branches, sections or chapters, headquarters, regional and intermediate offices. These count as Local Units: All units or subdivisions that directly provide services to people. This includes intermediate level subdivisions that provide support for local units, but also might work directly with the community; A HQ or regional office that serves the local population, such as the people in the city where they are located; A blood bank which is a Corporate Member and is counted as part of the reporting National Society; All units that directly provide service to people for corporate members that are considered to be part of the National Societies; If both a District Branch and a Town Branch (even within the same District) work directly with local populations, they both count as Local Units. These do not count as Local Units: A District Office that does not work directly with local populations. A regional subdivision (e.g., “North District”) which exists on paper but does not have a physical office. Corporate members that are independent from the National Society and not sufficiently integrated within the work of a National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 926,
+    "type": "indicator",
+    "label": "Number of volunteers covered by accident insurance.",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 259,
+      "name": "National Society Volunteers",
+      "order": 4,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 725,
+      "name": "Number of volunteers covered by accident insurance.",
+      "type": "Number",
+      "unit": "Volunteers",
+      "definition": "Active volunteers: registered as volunteer in a current year. Covered by accident insurance: Volunteers who are included in an insurance policy that provides financial protection and coverage for medical expenses, disability, or death resulting from accidents that occur during their volunteer activities. Covers health, accident, and death compensation: Provision of insurance policies or compensation schemes that offer financial protection for medical expenses, injuries sustained during volunteer activities, and compensation in the event of death.",
+      "sector": {
+        "primary": 20
+      },
+      "sub_sector": {
+        "primary": 37
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 927,
+    "type": "indicator",
+    "label": "Number of paid staff covered by accident insurance.",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 260,
+      "name": "National Society Staff",
+      "order": 5,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 728,
+      "name": "Number of paid staff covered by accident insurance.",
+      "type": "Number",
+      "unit": "Staff",
+      "definition": "Covered by accident insurance:  People who are covered under an accident insurance scheme of the National Society (e.g., the IFRC global accident insurance scheme or another similar scheme) during their activities for the National Society in the reporting year.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 936,
+    "type": "indicator",
+    "label": "Number of staff deaths on duty.",
+    "order": 3,
+    "display_order": "3",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 260,
+      "name": "National Society Staff",
+      "order": 5,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff_Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 729,
+      "name": "Number of staff deaths on duty.",
+      "type": "Number",
+      "unit": "Staff",
+      "definition": "People who have died during the Reporting Year while performing duties for the reporting National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 943,
+    "type": "matrix",
+    "label": "Income Sources",
+    "order": 6,
+    "display_order": "6",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 253,
+      "name": "National Society Financial Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 954,
+    "type": "matrix",
+    "label": "Longer term programmes",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 263,
+      "name": "People to be reached by [entity_name]",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 955,
+    "type": "matrix",
+    "label": "List National Societies supporting bilaterally",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 264,
+      "name": "Planned Bilateral Support",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 967,
+    "type": "matrix",
+    "label": "HNS and IFRC Secretariat",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 269,
+      "name": "Funding Requirements for [assignment_period]",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 968,
+    "type": "matrix",
+    "label": "HNS and IFRC Secretariat",
+    "order": 2,
+    "display_order": "2",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 271,
+      "name": "Funding Requirements for  [[assignment_period]+1]",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 970,
+    "type": "matrix",
+    "label": "Participating National Societies (PNSs)",
+    "order": 2,
+    "display_order": "2",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 269,
+      "name": "Funding Requirements for [assignment_period]",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 973,
+    "type": "matrix",
+    "label": "Participating National Societies (PNSs)",
+    "order": 3,
+    "display_order": "3",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 271,
+      "name": "Funding Requirements for  [[assignment_period]+1]",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 974,
+    "type": "matrix",
+    "label": "HNS and IFRC Secretariat",
+    "order": 2,
+    "display_order": "2",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 274,
+      "name": "Funding Requirements for  [[assignment_period]+2]",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 975,
+    "type": "matrix",
+    "label": "Participating National Societies (PNSs)",
+    "order": 3,
+    "display_order": "3",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 274,
+      "name": "Funding Requirements for  [[assignment_period]+2]",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 1261,
+    "type": "matrix",
+    "label": "Received Support",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 379,
+      "name": "Bilateral Support",
+      "order": 8,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 1278,
+    "type": "indicator",
+    "label": "Volunteers",
+    "order": 3,
+    "display_order": "3",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 724,
+      "name": "Number of people volunteering.",
+      "type": "Number",
+      "unit": "Volunteers",
+      "definition": "People that have given their time voluntarily to support the delivery of services of the reporting National Society for at least four hours during the Reporting Year. This includes young people and/or participants in youth programs, while it excludes blood donors, who are counted separately.",
+      "sector": {
+        "primary": 20
+      },
+      "sub_sector": {
+        "primary": 37
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1286,
+    "type": "indicator",
+    "label": "Staff",
+    "order": 4,
+    "display_order": "4",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 727,
+      "name": "Number of paid staff.",
+      "type": "Number",
+      "unit": "Staff",
+      "definition": "Paid staff: People who are contracted by the Reporting National Society for a minimum of three months in total during the Reporting Year and are either remunerated for their work or are interns.  Staff contracted by the Secretariat are not counted by the reporting National Society even if they are working for the NS within the country to which the reporting National Society belongs. Staff contracted by a reporting National Society are reported by that National Society regardless of who remunerates them and where they work, whether it is in-country, delegates in the field, out-of-country, or staff on-loan. If a person is contracted for the first three months to the reporting National Society and then is contracted again for the last three months, they should only be counted once.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1291,
+    "type": "indicator",
+    "label": "Local Units",
+    "order": 5,
+    "display_order": "5",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Local unit",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 723,
+      "name": "Number of National Society Local Units.",
+      "type": "Number",
+      "unit": "Local unit",
+      "definition": "Local units are any physical subdivisions of a National Society that coordinate and deliver services to people. These include branches, sections or chapters, headquarters, regional and intermediate offices. These count as Local Units: All units or subdivisions that directly provide services to people. This includes intermediate level subdivisions that provide support for local units, but also might work directly with the community; A HQ or regional office that serves the local population, such as the people in the city where they are located; A blood bank which is a Corporate Member and is counted as part of the reporting National Society; All units that directly provide service to people for corporate members that are considered to be part of the National Societies; If both a District Branch and a Town Branch (even within the same District) work directly with local populations, they both count as Local Units. These do not count as Local Units: A District Office that does not work directly with local populations. A regional subdivision (e.g., “North District”) which exists on paper but does not have a physical office. Corporate members that are independent from the National Society and not sufficiently integrated within the work of a National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1294,
+    "type": "indicator",
+    "label": "Branches",
+    "order": 6,
+    "display_order": "6",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Branch",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 1117,
+      "name": "Number of National Society branches.",
+      "type": "Number",
+      "unit": "Branch",
+      "definition": "The majority of National Societies have two or more organizational levels under their National Headquarters, with the aim of ensuring territorial reach and managing different aspects of National Society operations. Branch is the second layer immediately after the National Headquarters. A Branch has its roles and responsibilities and relationship with the National Headquarters defined through National Societies’ Statutes, including the level of autonomy given especially in the area of its legal status, mobilising local resources and building local partnership, and decisions it makes. It has local level decision making mechanism through its Branch members, board and volunteers, equally defined through National Societies’ Statutes.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  }
+]

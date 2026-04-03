@@ -1,0 +1,755 @@
+/* PDF Export button icon */
+#export-pdf-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* Disabled state */
+button[disabled] #export-pdf-btn svg { opacity: 0.5; }
+
+/* Use Tailwind's hidden utility; avoid overriding it globally to allow inline/hover display toggles */
+
+/* Hide only the original (pre-JS) fields in repeat sections to prevent flicker.
+   IMPORTANT: Do NOT hide fields inside `.repeat-entry`, otherwise repeat content disappears. */
+[data-section-type="repeat"] .space-y-6 > .form-item-block { display: none !important; }
+
+/* Repeat sub-sections use `.space-y-4 pl-6` as their fields container; hide only direct children there too. */
+[data-section-type="repeat"] .space-y-4.pl-6 > .form-item-block { display: none !important; }
+
+/* Show repeat entries */
+.repeat-entry { display: block !important; }
+
+.multi-select-dropdown {
+  position: fixed;
+  z-index: 9999;
+  min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  padding: 8px 0;
+}
+
+.multi-select-dropdown .option-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.multi-select-dropdown .option-item:hover {
+  background-color: #f3f4f6;
+}
+
+.multi-select-dropdown .option-item input[type="checkbox"] {
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.multi-select-dropdown .option-item label {
+  cursor: pointer;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  flex: 1;
+}
+
+/* Debug styles for relevance conditions */
+.relevance-debug .form-item-block[data-relevance-condition] {
+  border: 2px solid #10B981 !important;
+  position: relative;
+}
+.relevance-debug .form-item-block[data-relevance-condition].hidden {
+  border: 2px solid #EF4444 !important;
+  opacity: 0.5;
+  display: block !important;
+}
+.relevance-debug .form-item-block[data-relevance-condition]::before {
+  content: "ID: " attr(data-item-id);
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: #10B981;
+  color: white;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  border-radius: 3px;
+  z-index: 10;
+}
+.relevance-debug .form-item-block[data-relevance-condition].hidden::before {
+  background: #EF4444;
+  content: "HIDDEN: " attr(data-item-id);
+}
+
+/* Enhanced validation error styles */
+.form-item-block.border-red-500 { border-width: 2px !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.3) !important; }
+.form-item-block.bg-red-50 { background-color: #fef2f2 !important; }
+input.border-red-500, select.border-red-500, textarea.border-red-500 { border-color: #ef4444 !important; border-width: 2px !important; }
+input.border-red-500:focus, select.border-red-500:focus, textarea.border-red-500:focus { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.1) !important; }
+
+/* Error message styling */
+.text-red-600 { font-weight: 500 !important; }
+
+/* Error summary styling */
+#validation-error-summary { animation: shake 0.5s ease-in-out; }
+@keyframes shake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-5px);} 75%{transform:translateX(5px);} }
+
+/* Disaggregation table error styling */
+.form-item-block.border-red-500 .disaggregation-inputs table { border-color: #ef4444; }
+.form-item-block.border-red-500 .disaggregation-inputs input[type="number"] { background-color: #fef2f2 !important; }
+
+/* Global smooth scroll */
+html { scroll-behavior: smooth; }
+body.overflow-hidden { overflow: hidden; }
+
+/* Offline notice styling - ensure background is always visible */
+#offline-notice {
+    background-color: #fef3c7 !important;
+    border-left: 4px solid #f59e0b !important;
+    color: #92400e !important;
+    padding: 1rem !important;
+    margin-bottom: 1.5rem !important;
+}
+
+#offline-notice.hidden {
+    display: none !important;
+}
+
+/* Modal scrollbar styling */
+.modal-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+  overflow-x: hidden !important;
+}
+
+.modal-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-scrollable::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.modal-scrollable::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.modal-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Mobile Navigation FAB styling */
+#mobile-nav-toggle-button:hover {
+  background-color: #1d4ed8 !important;
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25), 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+#mobile-nav-toggle-button.active { background-color: #1e3a8a !important; transform: scale(1.05) translateY(-2px); }
+
+/* Floating FAB action menu (Save/Submit) */
+#fab-menu {
+  position: fixed;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+  display: flex !important; /* Use flex for proper button stacking */
+  flex-direction: column;
+  visibility: hidden; /* Use visibility instead of display for smoother transitions */
+  opacity: 0;
+  /* Add padding to create seamless hover area */
+  padding-bottom: 20px; /* This creates overlap with main FAB */
+  z-index: 49; /* Just below the toggle button (z-50) */
+}
+
+#fab-menu button {
+  pointer-events: auto;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+#fab-menu button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+}
+
+/* Create a hover container that includes both the FAB and menu */
+#mobile-nav-toggle-button:hover + #fab-menu,
+#fab-menu:hover {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto; /* Allow interaction when visible */
+}
+
+/* Ensure it's hidden on larger screens */
+@media (min-width: 1100px) {
+  #fab-menu {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* Tooltip styles for indicator definitions, question units, and matrix descriptions */
+.indicator-definition-tooltip, .question-unit-tooltip, .matrix-description-tooltip { position: relative; }
+.indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text {
+  visibility: hidden; width: 500px; max-width: 90vw; background-color: #1f2937; color: #fff; text-align: left; border-radius: 6px; padding: 12px; position: absolute; z-index: 1000; opacity: 0; transition: opacity .3s, visibility .3s; font-size: .875rem; font-weight: normal; line-height: 1.4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+}
+/* Default position for indicator-definition tooltips (no JS-driven positioning there) */
+.indicator-definition-tooltip .tooltip-text { top: 125%; right: 0; }
+.indicator-definition-tooltip .tooltip-text::after, .question-unit-tooltip .tooltip-text::after, .matrix-description-tooltip .tooltip-text::after {
+  content: ""; position: absolute; bottom: 100%; right: 12px; border-width: 5px; border-style: solid; border-color: transparent transparent #1f2937 transparent;
+}
+.indicator-definition-tooltip:hover .tooltip-text, .question-unit-tooltip:hover .tooltip-text, .matrix-description-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; display: block; }
+
+/* Indicator link styling in tooltips */
+.indicator-link {
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.indicator-link a {
+  color: #60a5fa;
+  text-decoration: none;
+  transition: color 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.indicator-link a:hover {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+
+.indicator-link a i {
+  margin-right: 4px;
+  font-size: 0.75rem;
+}
+
+/* Dropdown indicator tooltip */
+.dropdown-indicator-tooltip { position: relative; }
+.dropdown-indicator-tooltip .tooltip-text {
+  visibility: hidden; width: 400px; max-width: 90vw; background-color: #1f2937; color: #fff; text-align: left; border-radius: 6px; padding: 12px; position: fixed; z-index: 9999; opacity: 0; transition: opacity .3s, visibility .3s; font-size: .875rem; font-weight: normal; line-height: 1.4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); pointer-events: none;
+}
+.dropdown-indicator-tooltip .tooltip-text::after { content: ""; position: absolute; top: -5px; left: 20px; border-width: 5px; border-style: solid; border-color: transparent transparent #1f2937 transparent; transform: rotate(180deg); }
+.dropdown-indicator-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+/* Responsive tooltip adjustments */
+@media (max-width: 640px) {
+  .indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text { width: 350px; font-size: 0.8rem; }
+  .indicator-definition-tooltip .tooltip-text::after, .question-unit-tooltip .tooltip-text::after, .matrix-description-tooltip .tooltip-text::after { right: 24px; }
+}
+@media (max-width: 400px) {
+  .indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text { width: 280px; right: -20px; }
+  .indicator-definition-tooltip .tooltip-text::after, .question-unit-tooltip .tooltip-text::after, .matrix-description-tooltip .tooltip-text::after { right: 32px; }
+}
+
+/* Data availability checkbox styling */
+.data-availability-checkboxes { border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 8px; }
+
+/* Hide number input spinners/arrows */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* Disaggregation table styling - responsive input fields */
+.disaggregation-inputs table { table-layout: auto; width: 100%; min-width: 100%; border-collapse: collapse; border-spacing: 0; }
+.disaggregation-inputs table td { padding: 0; position: relative; min-width: 60px; height: 40px; vertical-align: middle; }
+.disaggregation-inputs table th { padding: 8px 4px; font-size: 0.75rem; text-align: center; min-width: 60px; word-wrap: break-word; hyphens: auto; height: auto; }
+.disaggregation-inputs table input[type="number"],
+.disaggregation-inputs table input[type="text"] {
+  border: none !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; padding: 0 4px !important; margin: 0 !important; width: 100% !important; height: 40px !important; text-align: center; font-size: .875rem; display: block; box-sizing: border-box !important; -webkit-appearance: none; -moz-appearance: textfield; appearance: none; line-height: 40px !important; outline: none !important;
+}
+.disaggregation-inputs table input[type="number"]:focus { outline: none; background-color: #f3f4f6; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 1; position: relative; }
+.disaggregation-inputs table input[type="number"]:disabled { background-color: #f9fafb; color: #9ca3af; }
+.disaggregation-inputs table .number-input-container .formatted-number { display: none !important; }
+.disaggregation-inputs[data-mode="sex_age"] table td:first-child { padding: 8px 12px; font-weight: 500; background-color: #f9fafb; min-width: 80px; white-space: nowrap; height: 40px; }
+
+/* Matrix table - ensure table layout allows column width constraints */
+.matrix-container table {
+    table-layout: auto !important;
+}
+
+/* Matrix table - first column header should match row header width constraints */
+.matrix-container table thead th:first-child {
+    min-width: 80px !important;
+    max-width: 400px !important;
+}
+
+/* Matrix table row labels - dynamic width with max threshold for text wrapping */
+.matrix-container table td[role="rowheader"] {
+    padding: 8px 12px !important;
+    font-weight: 500 !important;
+    background-color: #f9fafb !important;
+    min-width: 80px !important;
+    max-width: 400px !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    min-height: 40px !important;
+    vertical-align: middle !important;
+    hyphens: auto !important;
+    line-height: 1.4 !important;
+    box-sizing: border-box !important;
+}
+
+/* Matrix manual/duplicate row highlights
+   Note: rowheader background is set with !important above, so these also must be !important. */
+.matrix-container table td[role="rowheader"].matrix-manual-row-header {
+    background-color: #f5f5dc !important; /* Beige */
+}
+.matrix-container table td[role="rowheader"].matrix-duplicate-row-header {
+    background-color: #ffcccc !important; /* Light red */
+}
+/* Manual highlight should visually win if a row is both manual + duplicate */
+.matrix-container table td[role="rowheader"].matrix-manual-row-header.matrix-duplicate-row-header {
+    background-color: #f5f5dc !important;
+}
+
+/* Ensure row header content wraps - target direct text nodes and child elements */
+.matrix-container table td[role="rowheader"],
+.matrix-container table td[role="rowheader"] * {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+.disaggregation-inputs { overflow-x: auto; -webkit-overflow-scrolling: touch; min-height: 0; transition: none; padding-bottom: 8px; }
+.disaggregation-inputs table td:not(:first-child) { width: auto; min-width: 72px; }
+
+/* Variable modification indicator - light green background for modified variable fields */
+.matrix-container input.variable-modified {
+    background-color: #d4edda !important;
+}
+
+@media (max-width: 768px) {
+  .disaggregation-inputs table th { font-size: 0.7rem; padding: 6px 2px; min-width: 50px; }
+  .disaggregation-inputs table td { height: 36px; min-width: 56px; }
+  .disaggregation-inputs table input[type="number"] { font-size: 0.8rem; padding: 0 2px !important; height: 36px !important; line-height: 36px !important; }
+  .disaggregation-inputs table input[type="text"] { font-size: 0.8rem; padding: 0 2px !important; height: 36px !important; line-height: 36px !important; }
+  .disaggregation-inputs table td:not(:first-child) { min-width: 50px; }
+  .disaggregation-inputs[data-mode="sex_age"] table td:first-child { height: 36px; }
+}
+
+/* Calculated total display styling */
+.calculated-total-display {
+  padding: 8px 12px; background-color: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px; font-weight: 600; color: #0369a1; display: flex; align-items: center; gap: 8px; transition: all .2s ease-in-out; box-sizing: border-box; min-height: 40px; max-width: 100%; word-wrap: break-word; position: relative; z-index: 1;
+}
+.calculated-total-and-data-availability { margin-top: 8px; display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; }
+.calculated-total-and-data-availability .calculated-total-display { margin-top: 0; flex: 0 0 calc(33.333333% - 4px); max-width: calc(33.333333% - 4px); min-width: 0; }
+.calculated-total-and-data-availability .data-availability-options { flex: 0 0 calc(66.666667% - 8px); max-width: calc(66.666667% - 8px); min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; font-size: .875rem; }
+
+@media (max-width: 768px) {
+  .calculated-total-and-data-availability { flex-direction: column; align-items: stretch; gap: 8px; }
+  .calculated-total-and-data-availability .calculated-total-display,
+  .calculated-total-and-data-availability .data-availability-options { flex: 1; max-width: 100%; }
+  .calculated-total-and-data-availability .data-availability-options { justify-content: flex-start; gap: 12px; }
+}
+
+.calculated-total-display:hover { background-color: #e0f2fe; border-color: #0284c7; }
+.calculated-total-display .total-value { font-weight: 700; font-size: 1.1em; }
+.calculated-total-display.updated { animation: totalUpdate .3s ease-in-out; }
+@keyframes totalUpdate { 0%{transform:scale(1);} 50%{transform:scale(1.05);} 100%{transform:scale(1);} }
+
+@media (max-width: 480px) {
+  .disaggregation-inputs table th { font-size: 0.65rem; padding: 4px 1px; min-width: 45px; }
+  .disaggregation-inputs table td { height: 32px; }
+  .disaggregation-inputs table input[type="number"] { font-size: 0.75rem; padding: 0 1px !important; height: 32px !important; line-height: 32px !important; }
+  .disaggregation-inputs table td:not(:first-child) { min-width: 45px; }
+  .disaggregation-inputs[data-mode="sex_age"] table td:first-child { padding: 6px 8px; font-size: 0.75rem; min-width: 60px; height: 32px; }
+}
+
+/* Responsive layout for Indirect reach and Total (Direct + Indirect) fields */
+/* Force vertical stacking on mobile devices for containers with Indirect reach fields */
+@media (max-width: 767px) {
+  /* Target all flex containers inside mt-3 divs within form-item-block on mobile */
+  /* This ensures Indirect reach and Total (Direct + Indirect) stack vertically */
+  .form-item-block div.mt-3 > div[class*="flex"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Ensure inputs take full width on mobile for better UX */
+  .form-item-block input[id*="indirect-reach"],
+  .form-item-block input[id*="total-calculated"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Make the label+input containers (inner flex divs) full width on mobile */
+  .form-item-block div.mt-3 > div[class*="flex"] > div[class*="flex"] {
+    width: 100% !important;
+    flex-wrap: nowrap !important;
+  }
+}
+
+/* ========================================
+   SECTIONS PANE RESPONSIVE SYSTEM
+   ======================================== */
+
+/* Sections pane scrollbar styling */
+#section-navigation-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+#section-navigation-sidebar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#section-navigation-sidebar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+#section-navigation-sidebar::-webkit-scrollbar-thumb {
+  background-color: #94a3b8;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+}
+
+#section-navigation-sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b;
+}
+
+/* Large screens (≥1100px): Static pane with collapse functionality */
+@media (min-width: 1100px) {
+  /* Pane collapse animation */
+  #section-navigation-sidebar {
+    transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, max-width 0.3s ease-in-out,
+                opacity 0.3s ease-in-out, padding 0.3s ease-in-out, margin 0.3s ease-in-out;
+  }
+
+  /* Collapsed state */
+  #section-navigation-sidebar[data-collapsed="true"] {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Remove layout gap when sections pane is collapsed so it doesn't occupy space */
+  #entry-form-layout:has(#section-navigation-sidebar[data-collapsed="true"]) {
+    gap: 0;
+  }
+
+  /* Collapse button icon rotation */
+  #section-navigation-sidebar[data-collapsed="true"] #sidebar-collapse-toggle i {
+    transform: rotate(180deg);
+  }
+
+  /* Show expand button when collapsed (CSS fallback - JS handles this primarily) */
+  #section-navigation-sidebar[data-collapsed="true"] ~ #sidebar-expand-button {
+    display: flex !important;
+  }
+
+  /* Hide mobile toggle button by default */
+  #mobile-nav-toggle-button {
+    display: none !important;
+  }
+
+  /* Hide expand button by default - JS will show it when needed */
+  #sidebar-expand-button {
+    display: none;
+  }
+
+  /* Allow JS to override with inline styles */
+  #sidebar-expand-button[style*="display: flex"],
+  #sidebar-expand-button[style*="display:flex"] {
+    display: flex !important;
+  }
+
+  /* Ensure normal pane has sticky positioning */
+  #section-navigation-sidebar:not(.force-mobile-mode) {
+    position: sticky !important;
+    top: 1rem !important;
+    max-height: calc(100vh - 8rem) !important;
+    overflow-y: auto !important;
+    transform: none !important;
+    display: block !important;
+    opacity: 1 !important;
+  }
+}
+
+/* Small screens (<1100px): Mobile sidebar overlay */
+@media (max-width: 1099px) {
+  /* Mobile sidebar slide animation */
+  #section-navigation-sidebar {
+    transition: transform 0.3s ease-in-out !important;
+  }
+
+  /* Hide expand button */
+  #sidebar-expand-button {
+    display: none !important;
+  }
+
+  /* Show mobile toggle button */
+  #mobile-nav-toggle-button {
+    display: flex !important;
+  }
+}
+
+/* Force mobile mode: Override large screen behavior */
+#section-navigation-sidebar.force-mobile-mode {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: auto !important;
+  width: 80% !important;
+  max-width: 24rem !important;
+  height: 100vh !important;
+  z-index: 40 !important;
+  display: block !important;
+  transform: translateX(-100%) !important;
+  transition: transform 300ms ease-in-out !important;
+  border-radius: 0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  background: white !important;
+  padding: 1.5rem !important;
+  overflow-y: auto !important;
+  inset: 0 auto 0 0 !important;
+}
+
+/* Show sidebar in force mobile mode */
+#section-navigation-sidebar.force-mobile-mode.translate-x-0 {
+  transform: translateX(0) !important;
+}
+
+/* Button visibility in force mobile mode */
+#section-navigation-sidebar.force-mobile-mode ~ #mobile-nav-toggle-button {
+  display: flex !important;
+}
+
+#section-navigation-sidebar.force-mobile-mode ~ #sidebar-expand-button {
+  display: none !important;
+}
+
+/* Button icon transitions */
+#sidebar-collapse-toggle i,
+#sidebar-expand-button i {
+  transition: transform 0.3s ease-in-out;
+}
+
+/* Force visible class for overriding Tailwind hiding */
+.force-visible,
+.force-visible.xl\:hidden,
+button.force-visible,
+#mobile-nav-toggle-button.force-visible {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Hide button when sidebar is open */
+#mobile-nav-toggle-button.sidebar-open {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* Mobile-only positioning adjustments */
+@media (max-width: 1099px) {
+  #mobile-nav-toggle-button,
+  #mobile-nav-toggle-button.force-visible {
+    /* Align with global mobile menu FAB (left: 1.5rem) and position above it */
+    left: 1.5rem !important; /* ensure vertical alignment with #mobileMenuFAB */
+    bottom: 1.5rem !important; /* Position closer to bottom edge */
+  }
+
+  /* When mobile menu FAB is hidden (Flutter app), move sections button down to FAB position */
+  html[data-mobile-app="true"] #mobile-nav-toggle-button,
+  html.mobile-app #mobile-nav-toggle-button,
+  html[data-mobile-app="true"] #mobile-nav-toggle-button.force-visible,
+  html.mobile-app #mobile-nav-toggle-button.force-visible {
+    bottom: 1.5rem !important; /* Same position as mobile menu FAB would be */
+  }
+}
+
+/* Admin sidebar positioning adjustments */
+/* For large screens (≥1100px) */
+@media (min-width: 1100px) {
+  .content-with-sidebar #mobile-nav-toggle-button,
+  .content-with-sidebar #sidebar-expand-button {
+    left: 294px !important; /* 270px (expanded) + 24px */
+  }
+
+  /* When sidebar is collapsed, mainContent has content-with-collapsed-sidebar class */
+  .content-with-collapsed-sidebar #mobile-nav-toggle-button,
+  .content-with-collapsed-sidebar #sidebar-expand-button {
+    left: 104px !important; /* 80px (collapsed) + 24px */
+  }
+
+  /* Also handle cases where collapsed class is on sidebar itself */
+  .sidebar-initially-collapsed .content-with-sidebar #mobile-nav-toggle-button,
+  .admin-sidebar.collapsed ~ .content-with-sidebar #mobile-nav-toggle-button,
+  .sidebar-initially-collapsed .content-with-sidebar #sidebar-expand-button,
+  .admin-sidebar.collapsed ~ .content-with-sidebar #sidebar-expand-button {
+    left: 104px !important; /* 80px (collapsed) + 24px */
+  }
+}
+
+/* For tablet screens (769px - 1099px) - adjust mobile toggle button when admin sidebar is present */
+/* Note: Admin sidebar is hidden on mobile (<768px) so we only adjust for tablets */
+@media (min-width: 769px) and (max-width: 1099px) {
+  .content-with-sidebar #mobile-nav-toggle-button {
+    left: 294px !important; /* 270px (expanded) + 24px */
+  }
+
+  /* When sidebar is collapsed, mainContent has content-with-collapsed-sidebar class */
+  .content-with-collapsed-sidebar #mobile-nav-toggle-button {
+    left: 104px !important; /* 80px (collapsed) + 24px */
+  }
+
+  /* Also handle cases where collapsed class is on sidebar itself */
+  .sidebar-initially-collapsed .content-with-sidebar #mobile-nav-toggle-button,
+  .admin-sidebar.collapsed ~ .content-with-sidebar #mobile-nav-toggle-button {
+    left: 104px !important; /* 80px (collapsed) + 24px */
+  }
+}
+
+/* Responsive overrides for force-visible */
+@media (min-width: 1280px) {
+  .force-visible {
+    display: flex !important;
+  }
+}
+
+/* Custom FAB Tooltip Styles */
+.fab-tooltip {
+  position: relative;
+}
+
+.fab-tooltip .tooltip-text {
+  visibility: hidden;
+  width: auto;
+  min-width: 80px;
+  max-width: 140px;
+  background-color: rgba(31, 41, 55, 0.9);
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 6px 8px;
+  position: absolute;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  white-space: nowrap;
+  transform: translateY(5px);
+}
+
+/* Position tooltip to the right of the button */
+.fab-tooltip .tooltip-text {
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%) translateX(15px);
+}
+
+/* Arrow pointing left to the button */
+.fab-tooltip .tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent rgba(31, 41, 55, 0.9) transparent transparent;
+}
+
+/* Show tooltip on hover */
+.fab-tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(-50%) translateX(10px);
+}
+
+/* Responsive adjustments for FAB tooltips */
+@media (max-width: 640px) {
+  .fab-tooltip .tooltip-text {
+    font-size: 0.7rem;
+    padding: 4px 6px;
+    min-width: 70px;
+    /* On small screens, position tooltips above to avoid going off-screen */
+    top: auto;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-5px);
+  }
+
+  .fab-tooltip .tooltip-text::after {
+    /* Arrow pointing down on mobile */
+    top: 100%;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    border-color: rgba(31, 41, 55, 0.9) transparent transparent transparent;
+  }
+
+  .fab-tooltip:hover .tooltip-text {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Ensure tooltips don't interfere with button functionality */
+.fab-tooltip .tooltip-text {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* FAB menu tooltip positioning adjustments */
+#fab-menu .fab-tooltip .tooltip-text {
+  z-index: 1001; /* Higher than FAB menu */
+}
+
+/* Ensure tooltips are visible above other elements */
+.fab-tooltip:hover .tooltip-text {
+  z-index: 1002;
+}
+
+/* Entry form — document upload modal language select */
+.document-language-wrapper {
+  position: relative;
+}
+
+/* Entry form document cards: .btn is nowrap by default; allow full “Open documents library” label to wrap */
+a.btn.entry-form-doc-library-btn {
+  white-space: normal;
+  text-align: left;
+}
+
+.modal-document-language-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+  max-height: 200px;
+}

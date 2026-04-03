@@ -1,0 +1,500 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% from "components/_profile_icon.html" import profile_icon %}
+{% from "components/_floating_progress_banner.html" import floating_progress_banner %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+
+{% block title %}{{ _('AI Knowledge Base') }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static_url('css/ai-documents.css') }}">
+{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('AI Knowledge Base'),
+    icon='fas fa-brain',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'AI System', 'url': url_for('ai_management.ai_dashboard')},
+        {'name': 'Knowledge Base'}
+    ]
+) }}
+
+{% if error %}
+<div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <i class="fas fa-exclamation-circle text-red-400"></i>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm text-red-700">{{ error }}</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{{ floating_progress_banner(
+    'processingStatusBanner',
+    'processingStatusTitle',
+    'processingStatusDetail',
+    'processingStatusPercent',
+    'processingStatusBar',
+    title_default=_('Processing...'),
+    detail_default=_('Preparing...'),
+    cancel_wrap_id='processingStatusCancelWrap',
+    cancel_button_id='processingStatusCancelBtn',
+    cancel_button_label=_('Cancel'),
+    cancel_button_aria_label=_('Cancel import')
+) }}
+
+<!-- Statistics -->
+<div class="mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">{{ _('Overview') }}</h2>
+    <div class="grid gap-4" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-3xl font-bold text-gray-900 mb-2">{{ stats.total_documents or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600">{{ _('Total') }}</div>
+        </div>
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-3xl font-bold text-green-600 mb-2">{{ stats.completed or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600">{{ _('Completed') }}</div>
+        </div>
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-3xl font-bold text-yellow-600 mb-2">{{ stats.pending or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600">{{ _('Pending') }}</div>
+        </div>
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-3xl font-bold text-red-600 mb-2">{{ stats.failed or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600">{{ _('Failed') }}</div>
+        </div>
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-3xl font-bold text-purple-600 mb-2">{{ stats.total_embeddings or 0 }}</div>
+            <div class="text-sm font-medium text-gray-600">{{ _('Embeddings') }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- AI Query -->
+<div class="bg-white rounded-xl shadow-lg border border-gray-200 mb-6 overflow-hidden">
+    <!-- Header -->
+    <div class="ai-query-header px-6 py-5" style="background: linear-gradient(to right, #2563eb, #1d4ed8) !important; color: #ffffff !important;">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-white/25 rounded-lg backdrop-blur-sm border border-white/30">
+                    <i class="fas fa-robot text-xl" style="color: #ffffff !important;"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold leading-tight drop-shadow-sm" style="color: #ffffff !important;">{{ _('AI Query Assistant') }}</h3>
+                    <p class="text-sm mt-1 font-medium opacity-95" style="color: #ffffff !important;">{{ _('Ask questions about your document library') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Query Form -->
+    <div class="p-6 bg-white">
+        <form id="aiSearchForm" class="no-submit-guard">
+            <div class="mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="flex-shrink-0">
+                        {% if current_user %}
+                            {% set initials = (current_user.name.split() | map('first') | join('') if current_user.name else current_user.email.split('@')[0]) %}
+                            <div class="w-10 h-10 rounded-full text-white text-xs font-semibold flex items-center justify-center shadow-sm"
+                                 style="background-color: {{ current_user.profile_color if current_user.profile_color else '#3B82F6' }};">
+                                {{ initials | upper | truncate(2, true, '') }}
+                            </div>
+                        {% else %}
+                            <div class="w-10 h-10 rounded-full bg-gray-400 text-white text-xs font-semibold flex items-center justify-center shadow-sm">?</div>
+                        {% endif %}
+                    </div>
+                    <div class="relative flex-1">
+                        <input type="text" id="aiSearchQuery"
+                               placeholder="{{ _('Ask a question (AI will answer using the document library)...') }}"
+                               class="w-full pr-12 py-3 pl-4 border-2 border-gray-300 rounded-full shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-all duration-200">
+                        <button type="submit" id="aiSearchBtn"
+                                class="absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center justify-center focus:outline-none transition-all duration-200 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                title="{{ _('Send') }}">
+                            <i class="fas fa-paper-plane text-lg" style="color: #2563eb !important;"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div id="aiSearchStatus" class="hidden mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center gap-2">
+            <i class="fas fa-info-circle"></i>
+            <span></span>
+        </div>
+
+        <div id="aiAnswerSection" class="hidden mt-6 flex items-start gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb) !important;">
+                <i class="fas fa-robot" style="color: #ffffff !important; font-size: 1rem !important;"></i>
+            </div>
+            <div class="flex-1 relative">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-semibold text-gray-700">{{ _('AI Assistant') }}</span>
+                    <div id="aiAnswerStatus" class="hidden text-xs text-gray-500"></div>
+                </div>
+                <div class="chat-bubble bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                    <div id="aiAnswerOutput" class="text-sm text-gray-800 ai-answer-markdown min-h-[100px] prose prose-sm max-w-none"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6">
+            <div class="flex items-center gap-4 mb-2">
+                <button type="button" id="toggleAdvancedOptions"
+                        class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors">
+                    <i class="fas fa-cog text-gray-500"></i>
+                    <span>{{ _('Advanced Options') }}</span>
+                    <i class="fas fa-chevron-down text-xs ml-2 transition-transform" id="advancedChevron"></i>
+                </button>
+
+                <button type="button" id="toggleSources"
+                        class="hidden flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors">
+                    <i class="fas fa-link text-gray-500"></i>
+                    <span>{{ _('Sources') }}</span>
+                    <i class="fas fa-chevron-down text-xs ml-2 transition-transform" id="sourcesChevron"></i>
+                </button>
+            </div>
+
+            <div id="sharedContentArea" class="hidden">
+                <div id="advancedOptionsContent" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+                        <div class="flex flex-col min-w-0">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <label class="flex items-center text-xs font-semibold text-gray-700 whitespace-nowrap flex-shrink-0">
+                                    <i class="fas fa-filter text-blue-500 mr-1"></i>{{ _('Search Mode') }}
+                                </label>
+                                <select id="aiSearchMode" class="flex-1 min-w-[150px] border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+                                    <option value="hybrid">{{ _('Hybrid (keywords and embeddings)') }}</option>
+                                    <option value="vector">{{ _('Vector only') }}</option>
+                                </select>
+                            </div>
+                            <div class="min-h-[20px]"></div>
+                        </div>
+
+                        <div class="flex flex-col min-w-0">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <label class="flex items-center text-xs font-semibold text-gray-700 whitespace-nowrap flex-shrink-0">
+                                    <i class="fas fa-file-alt text-blue-500 mr-1"></i>{{ _('File Type') }}
+                                </label>
+                                <select id="aiSearchFileType" class="flex-1 min-w-[150px] border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+                                    <option value="">{{ _('All Types') }}</option>
+                                    {% for ft in file_types or [] %}
+                                    <option value="{{ ft }}">{{ ft|upper }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="min-h-[20px]"></div>
+                        </div>
+
+                        <div class="flex flex-col">
+                            <div class="flex items-center gap-2 mb-1">
+                                <label class="flex items-center text-xs font-semibold text-gray-700 whitespace-nowrap">
+                                    <i class="fas fa-list-ol text-blue-500 mr-1"></i>{{ _('Top K (Initial retrieval size)') }}
+                                </label>
+                                <select id="aiSearchTopK" class="flex-1 border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+                                    <option value="5">5</option>
+                                    <option value="10">10</option>
+                                    <option value="15">15</option>
+                                    <option value="20">20</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col">
+                            <div class="flex items-center gap-2 mb-1">
+                                <label class="flex items-center text-xs font-semibold text-gray-700 whitespace-nowrap">
+                                    <i class="fas fa-sliders-h text-blue-500 mr-1"></i>{{ _('Min Score') }}
+                                </label>
+                                <select id="aiSearchMinScore" class="flex-1 border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+                                    <option value="0.2">0.20</option>
+                                    <option value="0.3">0.30</option>
+                                    <option value="0.35" selected>0.35</option>
+                                    <option value="0.4">0.40</option>
+                                    <option value="0.5">0.50</option>
+                                </select>
+                            </div>
+                            <p class="text-xs text-gray-500 flex items-center gap-1 min-h-[20px]">
+                                <i class="fas fa-info-circle text-gray-400"></i>
+                                {{ _('Filter low-relevance chunks') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="sourcesContent" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div id="sourcesCount" class="text-xs text-gray-600 mb-2 font-medium"></div>
+                    <div class="space-y-2 text-sm text-gray-600"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload/Import Modal -->
+{# z_index above .ag-column-visibility-* (100–10001); modal_shell defaults to 50 and inline style beats #uploadImportModal in CSS #}
+{% call modal_shell('uploadImportModal', _('Upload/Import Documents'), max_width='max-w-4xl', close_id='closeUploadModalBtn', content_class='flex flex-col flex-1 min-h-0 overflow-hidden', z_index=11000) %}
+                <div class="py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0 gap-4 min-w-0">
+                    {% call scroll_tab_bar(border_bottom=False, wrapper_class='min-w-0 flex-1', inner_class='space-x-4', aria_label=_('Import source')) %}
+                        <button id="uploadTab"
+                                class="tab-button active px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-blue-600 transition-colors"
+                                role="tab"
+                                aria-selected="true"
+                                aria-controls="uploadContent"
+                                tabindex="0">
+                            <i class="fas fa-cloud-upload-alt mr-2"></i>{{ _('Upload New') }}
+                        </button>
+                        <button id="importTab"
+                                class="tab-button px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 transition-colors"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="importContent"
+                                tabindex="-1">
+                            <i class="fas fa-file-import mr-2"></i>{{ _('Import from System') }}
+                        </button>
+                        <button id="ifrcApiTab"
+                                class="tab-button px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 transition-colors"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="ifrcApiContent"
+                                tabindex="-1">
+                            <i class="fas fa-globe mr-2"></i>{{ _('Import from external API') }}
+                        </button>
+                    {% endcall %}
+                </div>
+
+                {# overflow-visible on this wrapper so IFRC Type dropdown (absolute) is not clipped; each tab panel clips its own scroll area #}
+                <div class="flex-1 min-h-0 flex flex-col">
+                <div id="uploadContent" class="tab-content p-6 flex flex-col flex-1 min-h-0 overflow-hidden" role="tabpanel" aria-labelledby="uploadTab" aria-hidden="false">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <label for="fileInput" class="upload-zone block w-full p-6 text-center rounded-lg cursor-pointer border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors" id="dropZone" role="button" tabindex="0" aria-label="{{ _('Select files to upload') }}">
+                            <i class="fas fa-file-upload text-3xl text-gray-400 mb-2"></i>
+                            <p class="text-sm font-medium text-gray-700 mb-1">{{ _('Drag and drop files here, or click to select') }}</p>
+                            <p class="text-xs text-gray-500">{{ _('Supported: PDF, Word, Excel, Text, Markdown, HTML') }}</p>
+                            <input type="file" id="fileInput" name="file" class="sr-only" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.html">
+                        </label>
+                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                            <input type="text" name="title" id="docTitle" placeholder="{{ _('Document title (optional)') }}" class="flex-1 min-w-[200px] border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" name="is_public" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="ml-2 text-sm text-gray-600">{{ _('Public') }}</span>
+                            </label>
+                            <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                                <i class="fas fa-upload mr-2"></i> {{ _('Upload') }}
+                            </button>
+                        </div>
+                    </form>
+                    <div id="uploadProgress" class="hidden mt-4">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%" id="progressBar"></div>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-2" id="uploadStatus">{{ _('Uploading...') }}</p>
+                    </div>
+                </div>
+
+                <div id="importContent" class="tab-content hidden p-6 flex flex-col flex-1 min-h-0 overflow-hidden" role="tabpanel" aria-labelledby="importTab" aria-hidden="true">
+                    <div class="mb-4 flex-shrink-0">
+                        <p class="text-sm text-gray-600 mb-4">
+                            <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                            {{ _('Import and process existing documents from the Document Management system') }}
+                        </p>
+                        <div class="flex gap-3 mb-4">
+                            <input type="text" id="importSearch" placeholder="{{ _('Search documents...') }}" class="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <button id="importRefreshBtn" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-sync-alt mr-2"></i> {{ _('Refresh') }}
+                            </button>
+                        </div>
+                    </div>
+                    <div id="importLoading" class="hidden text-center py-8 flex-shrink-0">
+                        <div class="inline-flex items-center space-x-3">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                            <span class="text-sm text-gray-600">{{ _('Loading documents...') }}</span>
+                        </div>
+                    </div>
+                    <div id="importDocumentsList" class="space-y-2 flex-1 min-h-0 overflow-y-auto"></div>
+                    <div id="importActions" class="hidden mt-4 pt-4 border-t border-gray-200 flex items-center justify-between flex-shrink-0">
+                        <span class="text-sm text-gray-600">
+                            <span id="selectedCount">0</span> {{ _('document(s) selected') }}
+                        </span>
+                        <button class="btn btn-primary" id="processSelectedBtn" disabled>
+                            <i class="fas fa-robot mr-2"></i> {{ _('Process Selected') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div id="ifrcApiContent" class="tab-content hidden px-6 pt-6 pb-3 flex flex-col flex-1 min-h-0" role="tabpanel" aria-labelledby="ifrcApiTab" aria-hidden="true">
+                    <div class="mb-4 flex-shrink-0 relative z-20">
+                        <p class="text-sm text-gray-600 mb-4">
+                            <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                            {{ _('Import documents from the connected external document API. Filter by document type, year, and country.') }}
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                            <div class="min-w-0">
+                                <label class="block text-xs font-medium text-gray-700 mb-1" id="ifrcTypeFilterLabel">{{ _('Type') }}</label>
+                                <div id="ifrcTypeFilter" class="relative w-full">
+                                    <button type="button" id="ifrcTypeFilterToggle"
+                                            class="w-full flex items-center justify-between gap-2 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            aria-haspopup="listbox" aria-expanded="false" aria-labelledby="ifrcTypeFilterLabel ifrcTypeFilterSummary">
+                                        <span class="truncate text-gray-700 flex-1 min-w-0" id="ifrcTypeFilterSummary">{{ _('All types') }}</span>
+                                        <i class="fas fa-chevron-down text-gray-400 text-xs flex-shrink-0 transition-transform ifrc-type-dd-chevron" aria-hidden="true"></i>
+                                    </button>
+                                    <div id="ifrcTypeFilterDropdown" class="hidden absolute left-0 right-0 top-full mt-1 z-[100] border border-gray-200 bg-white overflow-hidden flex flex-col">
+                                        <div class="px-2 py-1.5 border-b border-gray-100 flex items-center justify-between gap-2 bg-gray-50 rounded-t-md flex-shrink-0">
+                                            <span class="text-xs font-medium text-gray-600">{{ _('Document types') }}</span>
+                                            <div class="flex gap-2 shrink-0">
+                                                <button type="button" id="ifrcTypeSelectAll" class="text-xs text-blue-600 hover:underline focus:outline-none">{{ _('Select all') }}</button>
+                                                <button type="button" id="ifrcTypeClearAll" class="text-xs text-gray-600 hover:underline focus:outline-none">{{ _('Clear') }}</button>
+                                            </div>
+                                        </div>
+                                        <div id="ifrcTypeFilterList" class="ifrc-type-filter-list p-2 space-y-1 text-sm" role="group" aria-label="{{ _('Document types') }}"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">{{ _('Year') }}</label>
+                                <input type="text" id="ifrcYearFilter" placeholder="{{ _('e.g., 2023, 2024') }}" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            </div>
+                            <div class="min-w-0">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">{{ _('Country') }}</label>
+                                <select id="ifrcCountryNameFilter" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                    <option value="">{{ _('All Countries') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mb-4">
+                            <button id="ifrcSearchBtn" class="btn btn-primary">
+                                <i class="fas fa-search mr-2"></i> {{ _('Search') }}
+                            </button>
+                            <button id="ifrcRefreshBtn" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-sync-alt mr-2"></i> {{ _('Refresh') }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <div id="ifrcLoading" class="hidden text-center py-8 flex-shrink-0">
+                        <div class="inline-flex items-center space-x-3">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                            <span class="text-sm text-gray-600">{{ _('Loading documents from IFRC API...') }}</span>
+                        </div>
+                    </div>
+                    <div id="ifrcDocumentsList" class="space-y-2 flex-1 min-h-0 overflow-y-auto">
+                        <p class="text-sm text-gray-500 text-center py-6 px-2">{{ _('Click Search or Refresh to load documents from the IFRC API.') }}</p>
+                    </div>
+                    <div id="ifrcActions" class="hidden mt-4 pt-4 border-t border-gray-200 flex-shrink-0">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="ifrcSelectAll" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                                    <span class="text-sm font-medium text-gray-700">{{ _('Select All') }}</span>
+                                </label>
+                                <span class="text-sm text-gray-600">
+                                    <span id="ifrcSelectedCount">0</span> {{ _('document(s) selected') }}
+                                </span>
+                            </div>
+                            <button class="btn btn-success" id="ifrcImportSelectedBtn" disabled>
+                                <i class="fas fa-download mr-2"></i> {{ _('Import Selected') }}
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                </div>
+{% endcall %}
+
+<!-- Documents Table -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">{{ _('Documents') }}</h3>
+        <div class="flex items-center gap-3">
+            <div id="documentsBulkActions" class="hidden items-center gap-2">
+                <button type="button" id="bulkDownloadBtn" class="btn btn-success" disabled>
+                    <i class="fas fa-download"></i>
+                    <span id="bulkDownloadBtnLabel">{{ _('Download') }}</span>
+                </button>
+                <button type="button" id="bulkReprocessBtn" class="btn btn-primary" disabled>
+                    <i class="fas fa-redo"></i>
+                    <span id="bulkReprocessBtnLabel">{{ _('Reprocess') }}</span>
+                </button>
+                <button type="button" id="bulkRedetectCountryBtn" class="btn btn-primary" disabled title="{{ _('Re-run country detection (no re-chunk)') }}">
+                    <i class="fas fa-globe-americas"></i>
+                    <span id="bulkRedetectCountryBtnLabel">{{ _('Redetect country') }}</span>
+                </button>
+                <button type="button" id="bulkReprocessMetaBtn" class="btn btn-primary" disabled title="{{ _('Re-run metadata enrichment: date, language, category, quality, source org (no re-chunk)') }}">
+                    <i class="fas fa-tags"></i>
+                    <span id="bulkReprocessMetaBtnLabel">{{ _('Reprocess metadata') }}</span>
+                </button>
+                <button type="button" id="bulkDeleteBtn" class="btn btn-danger" disabled>
+                    <i class="fas fa-trash"></i>
+                    <span id="bulkDeleteBtnLabel">{{ _('Delete') }}</span>
+                </button>
+            </div>
+            <button type="button" id="openUploadModalBtn" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                <span>{{ _('Upload/Import') }}</span>
+            </button>
+            <div id="column-visibility-button-placeholder"></div>
+        </div>
+    </div>
+
+    <form method="get" action="{{ url_for('ai_management.document_library') }}" class="px-6 py-3 border-b border-gray-200 flex flex-wrap items-center gap-3 bg-gray-50">
+        <span class="text-sm font-medium text-gray-700">{{ _('Filters') }}:</span>
+        <select name="status" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+            <option value="">{{ _('All statuses') }}</option>
+            <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>{{ _('Completed') }}</option>
+            <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>{{ _('Pending') }}</option>
+            <option value="processing" {% if current_status == 'processing' %}selected{% endif %}>{{ _('Processing') }}</option>
+            <option value="failed" {% if current_status == 'failed' %}selected{% endif %}>{{ _('Failed') }}</option>
+        </select>
+        <select name="file_type" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+            <option value="">{{ _('All types') }}</option>
+            {% for ft in file_types or [] %}
+            <option value="{{ ft }}" {% if current_file_type == ft %}selected{% endif %}>{{ ft|upper }}</option>
+            {% endfor %}
+        </select>
+        <select name="category" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+            <option value="">{{ _('All categories') }}</option>
+            {% for c in categories or [] %}
+            <option value="{{ c }}" {% if current_category == c %}selected{% endif %}>{{ c.replace('_', ' ') }}</option>
+            {% endfor %}
+        </select>
+        <select name="language" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+            <option value="">{{ _('All languages') }}</option>
+            {% for la in languages or [] %}
+            <option value="{{ la }}" {% if current_language == la %}selected{% endif %}>{{ la|upper }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="q" value="{{ search_query or '' }}" placeholder="{{ _('Search title/filename...') }}" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5 w-48">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter mr-1"></i>{{ _('Apply') }}
+        </button>
+        {% if current_status or current_file_type or current_category or current_language or search_query %}
+        <a href="{{ url_for('ai_management.document_library') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ _('Clear') }}</a>
+        {% endif %}
+    </form>
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <div class="p-4 sm:p-6 relative">
+        {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), show_placeholder=false, grid_height='600px', include_card=false, empty_message=_('No documents found. Upload a document to get started.')) }}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ super() }}
+{% from "components/ag_grid_includes.html" import ag_grid_js %}
+{{ ag_grid_js() }}
+<script src="{{ static_url('js/floating-progress-banner.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+{# Documents grid, column defs, and all AI documents JS live in the partial below. #}
+{% include "admin/ai/_documents_script.html" %}
+</script>
+{% endblock %}

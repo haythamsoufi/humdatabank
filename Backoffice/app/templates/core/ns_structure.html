@@ -1,0 +1,35 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ _('NS Structure') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block content %}
+    {% from "components/_page_header.html" import page_header %}
+
+    <div class="pr-6">
+        {{ page_header(
+            title=_('National Society Structure'),
+            icon='fas fa-project-diagram',
+            breadcrumbs=[
+                {'name': _('Dashboard'), 'url': url_for('main.dashboard')},
+                {'name': _('NS Structure')}
+            ]
+        ) }}
+    </div>
+
+    <div id="ns-structure-tab-panel" class="tab-panel">
+        {% include "admin/organization/manage_ns_hierarchy.html" %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+{% endblock %}

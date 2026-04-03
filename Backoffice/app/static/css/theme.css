@@ -1,0 +1,223 @@
+/**
+ * Global button theme. Color semantics (use in all templates, modals, confirmations):
+ *
+ *   GREEN (success):  Submit, Deploy, Confirm, Add, Save (final), Approve, Update,
+ *                     Export, Import – actions that commit or produce something.
+ *   TEAL (primary):   Preview, View, Open, Edit, Reload, Save draft, Save (translations)
+ *                     – actions that navigate or edit without committing.
+ *   PURPLE:           Audit Trail, special view/analytics.
+ *   ORANGE:            Auto-translate, automation – keep distinct from purple and blue.
+ *   RED (danger):      Delete, Remove, Reject.
+ *   GRAY:              Cancel, Close.
+ *
+ * Keep adjacent header actions distinct: e.g. Preview=teal, Audit Trail=purple,
+ * Excel=green, Auto Translate=orange.
+ *
+ * Standard classes: .btn-confirm (green), .btn-cancel (gray), .btn-danger-standard (red).
+ */
+:root {
+  /* Primary (Save draft, Edit, Reload) – teal */
+  --btn-primary: #0d9488;
+  --btn-primary-hover: #0f766e;
+  --btn-primary-active: #115e59;
+  --btn-primary-focus: rgba(13, 148, 136, 0.2);
+
+  /* Success (Submit, Deploy, Confirm, Add, Approve) */
+  --btn-success: #16a34a;
+  --btn-success-hover: #15803d;
+  --btn-success-active: #166534;
+  --btn-success-focus: rgba(22, 163, 74, 0.2);
+
+  /* Danger */
+  --btn-danger: #dc2626;
+  --btn-danger-hover: #b91c1c;
+  --btn-danger-active: #991b1b;
+  --btn-danger-focus: rgba(220, 38, 38, 0.2);
+
+  /* Warning (orange) – auto-translate, automation, cautionary actions */
+  --btn-warning: #ea580c;
+  --btn-warning-hover: #c2410c;
+  --btn-warning-active: #9a3412;
+  --btn-warning-focus: rgba(234, 88, 12, 0.2);
+
+  /* Purple – analytics, audit trails, special views */
+  --btn-purple: #9333ea;
+  --btn-purple-hover: #7e22ce;
+  --btn-purple-active: #6b21a8;
+  --btn-purple-focus: rgba(147, 51, 234, 0.2);
+
+  /* Neutral / secondary – cancel, close, secondary actions */
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-bg-hover: #f9fafb;
+  --btn-secondary-border: #d1d5db;
+  --btn-secondary-color: #374151;
+}
+
+/*
+ * Sharp-corner enforcement for the design system.
+ * The .btn base class already sets border-radius: 0 (in components.css).
+ * The selectors below catch raw Tailwind-utility buttons that don't use .btn yet,
+ * ensuring visual consistency system-wide.
+ * Exclude .rounded-full (FAB / circular icon buttons) and .rounded-pill.
+ */
+button.bg-blue-600:not(.rounded-full):not(.rounded-pill),
+button.bg-green-600:not(.rounded-full):not(.rounded-pill),
+button.bg-red-600:not(.rounded-full):not(.rounded-pill),
+button.bg-orange-600:not(.rounded-full):not(.rounded-pill),
+button.bg-purple-600:not(.rounded-full):not(.rounded-pill),
+button.bg-teal-600:not(.rounded-full):not(.rounded-pill),
+button.bg-indigo-600:not(.rounded-full):not(.rounded-pill),
+a.bg-blue-600,
+a.bg-green-600,
+a.bg-red-600,
+a.bg-orange-600,
+a.bg-purple-600,
+a.bg-teal-600,
+.professional-action-btn,
+/* Cancel / secondary buttons */
+button.bg-white:not(.rounded-full):not(.rounded-pill),
+button.bg-gray-50:not(.rounded-full):not(.rounded-pill),
+button.bg-gray-200:not(.rounded-full):not(.rounded-pill),
+button.bg-gray-300:not(.rounded-full):not(.rounded-pill),
+a.bg-gray-200,
+a.bg-gray-300,
+a.bg-white,
+.close-modal-btn,
+button.close-modal:not(.rounded-full):not(.rounded-pill) {
+  border-radius: 0 !important;
+}
+
+/* Flat style :active (pressed) state – matches image: default → hover → active (darker) */
+.bg-blue-600:active,
+.bg-teal-600:active {
+  background-color: var(--btn-primary-active) !important;
+}
+.bg-green-600:active {
+  background-color: var(--btn-success-active) !important;
+}
+.bg-red-600:active {
+  background-color: var(--btn-danger-active) !important;
+}
+
+/*
+ * Semantic button aliases used in modals and confirmations.
+ * Full styling is in components.css (.btn + .btn-success / .btn-danger / .btn-secondary).
+ * These aliases are kept for backward compatibility; they inherit from the .btn system.
+ * Usage: class="btn btn-confirm"  /  class="btn btn-cancel"  /  class="btn btn-danger-standard"
+ *
+ * If you only apply the alias WITHOUT .btn, a minimal fallback is provided here so
+ * existing markup that predates the .btn base class still renders correctly.
+ */
+.btn-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.15s, box-shadow 0.15s;
+  background-color: var(--btn-success);
+  color: white;
+}
+.btn-confirm:hover { background-color: var(--btn-success-hover); }
+.btn-confirm:active { background-color: var(--btn-success-active); }
+.btn-confirm:focus { outline: none; box-shadow: 0 0 0 2px var(--btn-success-focus); }
+.btn-confirm:disabled, .btn-confirm[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+.btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid var(--btn-secondary-border, #d1d5db);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.15s, box-shadow 0.15s;
+  background-color: var(--btn-secondary-bg, #fff);
+  color: var(--btn-secondary-color, #374151);
+}
+.btn-cancel:hover { background-color: var(--btn-secondary-bg-hover, #f9fafb); }
+.btn-cancel:focus { outline: none; box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.2); }
+
+.btn-danger-standard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.15s, box-shadow 0.15s;
+  background-color: var(--btn-danger);
+  color: white;
+}
+.btn-danger-standard:hover { background-color: var(--btn-danger-hover); }
+.btn-danger-standard:active { background-color: var(--btn-danger-active); }
+.btn-danger-standard:focus { outline: none; box-shadow: 0 0 0 2px var(--btn-danger-focus); }
+.btn-danger-standard:disabled, .btn-danger-standard[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+/* Shared modal visuals (used by confirmation dialogs and admin delete modals). */
+.modal-backdrop {
+  background-color: rgba(107, 114, 128, 0.75);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/*
+ * .modal-action-btn: legacy helper for sizing modal footer buttons.
+ * Rounded override removed — all system buttons use sharp corners.
+ * Only layout properties are applied here.
+ */
+button.modal-action-btn,
+a.modal-action-btn {
+  min-width: 7rem;
+}
+
+/* Shared tab strips: .scroll-tab-bar layout + admin underline tab macros (components/_scroll_tab_bar.html) */
+.scroll-tab-bar {
+  overflow: hidden;
+}
+
+.scroll-tab-bar__track {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* Avoid subpixel vertical overflow from inline-flex children + borders */
+  line-height: 0;
+}
+
+.scroll-tab-bar__track > * {
+  line-height: normal;
+}
+
+/*
+ * Pretty-printed HTML can leave whitespace-only text nodes between flex children (extra flex items).
+ * Only apply to nav strips that use .settings-tab (skips .email-lang-tab rows and plain .tab-button strips).
+ */
+.scroll-tab-bar__track > nav.flex:has(> .settings-tab) {
+  font-size: 0;
+}
+
+.scroll-tab-bar__track > nav.flex:has(> .settings-tab) > .settings-tab {
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.25rem;
+}
+
+.scroll-tab-bar__track > ul.flex {
+  font-size: 0;
+}
+
+.scroll-tab-bar__track > ul.flex > li {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}

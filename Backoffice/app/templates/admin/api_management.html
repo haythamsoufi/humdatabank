@@ -1,0 +1,937 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ _('API Management') }}{% endblock %}
+
+{% block content %}
+<!-- Tailwind CSS and Font Awesome -->
+<link href="{{ static_url('css/output.css') }}" rel="stylesheet">
+<style nonce="{{ csp_style_nonce() }}">
+    /* Custom styles for Chart.js responsiveness */
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+</style>
+
+{# Helper function to generate API URLs (do not embed secrets in HTML) #}
+{% macro api_url(path) %}
+    {% set api_key_placeholder = 'YOUR_API_KEY' %}
+    {% if '?' in path %}
+        {{ path }}&api_key={{ api_key_placeholder }}
+    {% else %}
+        {{ path }}?api_key={{ api_key_placeholder }}
+    {% endif %}
+{% endmacro %}
+
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=_('API Management'),
+    icon='fas fa-cogs',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('API Management')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'url': url_for('api_key_management.list_api_keys'),
+            'text': _('API Key Management'),
+            'icon': 'fas fa-key',
+            'classes': 'professional-action-btn professional-action-btn-blue',
+            'attributes': {'title': _('API Key Management')}
+        }
+    ] if (current_user_has_role('system_manager') or has_permission('admin.api.manage')) else None
+) }}
+
+    <!-- Overview Cards -->
+    <div class="bg-gray-100 p-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
+            <div class="bg-blue-100 p-3 rounded-xl">
+                <i class="fas fa-chart-line fa-2x text-blue-500"></i>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-gray-500">{{ _('Total API Requests') }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ total_requests }}</p>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
+            <div class="bg-green-100 p-3 rounded-xl">
+                <i class="fas fa-clock fa-2x text-green-500"></i>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-gray-500">{{ _('Avg. Response Time') }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ "%.2f"|format(avg_response_time|default(0)) }} ms</p>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
+            <div class="bg-indigo-100 p-3 rounded-xl">
+                <i class="fas fa-check-circle fa-2x text-indigo-500"></i>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-gray-500">{{ _('Success Rate') }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(success_rate|default(0)) }}%</p>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
+            <div class="bg-yellow-100 p-3 rounded-xl">
+                <i class="fas fa-users fa-2x text-yellow-500"></i>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-gray-500">{{ _('Unique Users') }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ unique_ips }}</p>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- API Endpoints Table -->
+    <div class="bg-white p-6 shadow-sm mb-8">
+        <div class="flex flex-col gap-2 mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">{{ _('Available API Endpoints') }}</h2>
+            <p class="text-sm text-gray-600">
+                {{ _('Need a denormalized export? Use the new') }}
+                <code class="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700">/api/v1/data/tables</code>
+                {{ _('endpoint to receive data rows together with the related form item and country tables in a single response.') }}
+            </p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-gray-500">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3">{{ _('Endpoint') }}</th>
+                        <th scope="col" class="px-6 py-3">{{ _('Method') }}</th>
+                        <th scope="col" class="px-6 py-3">{{ _('Description') }}</th>
+                        <th scope="col" class="px-6 py-3 text-center">{{ _('Requests') }}</th>
+                        <th scope="col" class="px-6 py-3">{{ _('Success Rate') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for endpoint in endpoints %}
+                    <tr class="bg-white border-b hover:bg-gray-50">
+                        <td class="px-6 py-4 font-mono text-gray-700">
+                            <div class="flex items-center gap-2">
+                                {% if endpoint.featured %}
+                                <i class="fas fa-star text-yellow-400" title="{{ _('Featured endpoint') }}"></i>
+                                {% endif %}
+                                <a href="{{ api_url(endpoint.path) }}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline api-endpoint-link" data-endpoint-path="{{ endpoint.path }}">
+                                    <code>{{ endpoint.path }}</code>
+                                </a>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 font-semibold leading-tight text-blue-700 bg-blue-100 rounded-full">{{ endpoint.method }}</span>
+                        </td>
+                        <td class="px-6 py-4">{{ endpoint.description }}</td>
+                        <td class="px-6 py-4 text-center font-medium">{{ endpoint.total_requests }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-green-500 h-2.5 rounded-full" data-width="{{ endpoint.success_rate }}"></div>
+                                </div>
+                                <span class="font-medium text-gray-700">{{ "%.1f"|format(endpoint.success_rate) }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- API URL Builder -->
+    <div class="bg-white p-6 shadow-sm mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">{{ _('API URL Builder') }}</h2>
+            <button id="showDocsBtn" class="btn btn-primary">
+                <i class="fas fa-book"></i>
+                {{ _('Documentation') }}
+            </button>
+        </div>
+
+        <!-- Documentation Modal -->
+        <div id="docsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 shadow-lg rounded-md bg-white max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-bold text-gray-800">{{ _('API Documentation') }}</h3>
+                    <button id="closeDocsBtn" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Authentication Section -->
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-key text-blue-500"></i>
+                            {{ _('Authentication') }}
+                        </h4>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-700 mb-2"><strong>{{ _('Two Authentication Methods:') }}</strong></p>
+                            <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                                <li><strong>{{ _('API Key:') }}</strong> {{ _('Full system access with paginated responses. Use') }} <code class="bg-gray-200 px-1 rounded">?api_key=YOUR_API_KEY</code></li>
+                                <li><strong>{{ _('User Auth:') }}</strong> {{ _('HTTP Basic Auth or Flask-Login session. Returns all accessible data (no pagination) with access control filtering.') }}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- New Features Section -->
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-star text-yellow-500"></i>
+                            {{ _('New Features') }}
+                        </h4>
+                        <div class="space-y-4">
+                            <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+                                <h5 class="font-semibold text-gray-800 mb-2">{{ _('1. Date Range Filtering') }}</h5>
+                                <p class="text-sm text-gray-700 mb-2">{{ _('Filter submissions by date range using ISO format dates:') }}</p>
+                                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                                    <li><code class="bg-gray-200 px-1 rounded">date_from</code>: {{ _('Start date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)') }}</li>
+                                    <li><code class="bg-gray-200 px-1 rounded">date_to</code>: {{ _('End date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)') }}</li>
+                                </ul>
+                                <p class="text-xs text-gray-500 mt-2"><em>{{ _('Example:') }} <code>?date_from=2024-01-01&date_to=2024-12-31</code></em></p>
+                            </div>
+
+                            <div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500">
+                                <h5 class="font-semibold text-gray-800 mb-2">{{ _('2. Sorting Options') }}</h5>
+                                <p class="text-sm text-gray-700 mb-2">{{ _('Sort results by any field:') }}</p>
+                                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                                    <li><code class="bg-gray-200 px-1 rounded">sort</code>: {{ _('Field to sort by (submitted_at, template_id, country_id, period_name)') }}</li>
+                                    <li><code class="bg-gray-200 px-1 rounded">order</code>: {{ _('Sort order (asc or desc, default: desc)') }}</li>
+                                </ul>
+                                <p class="text-xs text-gray-500 mt-2"><em>{{ _('Example:') }} <code>?sort=submitted_at&order=desc</code></em></p>
+                            </div>
+
+                            <div class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-500">
+                                <h5 class="font-semibold text-gray-800 mb-2">{{ _('3. Response Compression') }}</h5>
+                                <p class="text-sm text-gray-700 mb-2">{{ _('Large responses are automatically compressed using gzip:') }}</p>
+                                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                                    <li>{{ _('Automatic compression for responses > 512 bytes') }}</li>
+                                    <li>{{ _('Compression level: 6 (balanced)') }}</li>
+                                    <li>{{ _('Supported formats: JSON, HTML, CSS, JavaScript') }}</li>
+                                </ul>
+                                <p class="text-xs text-gray-500 mt-2"><em>{{ _('Compression is handled automatically by the server. No client configuration needed.') }}</em></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pagination Section -->
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-list text-gray-500"></i>
+                            {{ _('Pagination') }}
+                        </h4>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-700 mb-2"><strong>{{ _('Important:') }}</strong></p>
+                            <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                                <li>{{ _('API Key auth: Pagination enabled. Use') }} <code class="bg-gray-200 px-1 rounded">page</code> {{ _('and') }} <code class="bg-gray-200 px-1 rounded">per_page</code> {{ _('parameters (max 1000 per page)') }}</li>
+                                <li>{{ _('User auth: No pagination. Returns all accessible data.') }} <code class="bg-gray-200 px-1 rounded">page</code> {{ _('and') }} <code class="bg-gray-200 px-1 rounded">per_page</code> {{ _('are ignored.') }}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Example Requests -->
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-code text-gray-500"></i>
+                            {{ _('Example Requests') }}
+                        </h4>
+                        <div class="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                            <div class="mb-2">
+                                <span class="text-green-400"># {{ _('API Key - Paginated with date range and sorting') }}</span><br>
+                                <span class="text-blue-400">GET</span> <span class="text-yellow-300">/api/v1/data?api_key=KEY&date_from=2024-01-01&date_to=2024-12-31&sort=submitted_at&order=desc&page=1&per_page=50</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-green-400"># {{ _('User Auth - All accessible data with filters') }}</span><br>
+                                <span class="text-blue-400">GET</span> <span class="text-yellow-300">/api/v1/data?template_id=1&date_from=2024-01-01</span><br>
+                                <span class="text-gray-500"># {{ _('(Uses HTTP Basic Auth or session cookie)') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API key input (client-side only; not stored server-side). Wrapped in <form> so Chromium does not warn about a lone password field. -->
+        <form class="mt-4 mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4" onsubmit="return false;" autocomplete="off" aria-label="{{ _('API key for URL builder') }}">
+            <label for="apiKeyInput" class="block text-sm font-medium text-blue-900 mb-2">
+                <i class="fas fa-key mr-1"></i>{{ _('API Key') }}
+            </label>
+            <input id="apiKeyInput" name="api_key" type="password" autocomplete="off"
+                   placeholder="{{ _('Paste an API key created in API Key Management') }}"
+                   class="w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono text-sm bg-white">
+            <p class="mt-2 text-xs text-blue-800">
+                {{ _('This key is kept only in your browser (local storage) to help build URLs. It is not rendered by the server.') }}
+            </p>
+        </form>
+        <div class="space-y-6">
+            <!-- Base URL Selection -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Endpoint') }}</label>
+                <select id="baseEndpoint" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                    {% for endpoint in endpoints %}
+                    <option value="{{ endpoint.path }}">{{ endpoint.method }} {{ endpoint.path }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Query Parameters -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Query Parameters') }}</label>
+                <div class="space-y-3" id="queryParams"></div>
+            </div>
+
+            <!-- Generated URL -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Generated URL') }}</label>
+                <div class="relative">
+                    <input type="text" id="generatedUrl" readonly
+                           class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 pr-32 font-mono">
+                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 flex space-x-2">
+                        <button id="openUrl" class="btn btn-success btn-sm">
+                            {{ _('Open') }}
+                        </button>
+                        <button id="copyUrl" class="btn btn-primary btn-sm">
+                            {{ _('Copy') }}
+                        </button>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-gray-500">{{ _('Click Copy to copy the URL to clipboard, or Open to test the endpoint') }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Request Volume Chart - Full Width -->
+    <div class="bg-white p-6 shadow-sm mb-8">
+         <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">{{ _('Request Volume') }}</h2>
+            <div class="flex gap-3">
+                <select id="endpointSelector" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto p-2.5">
+                    <option value="all" selected>{{ _('All Endpoints') }}</option>
+                    {% for endpoint in endpoints %}
+                    <option value="{{ endpoint.path }}">{{ endpoint.path }}</option>
+                    {% endfor %}
+                </select>
+                <select id="periodSelector" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto p-2.5">
+                    <option value="daily" selected>{{ _('Last 24 Hours') }}</option>
+                    <option value="weekly">{{ _('Last 7 Days') }}</option>
+                    <option value="monthly">{{ _('Last 30 Days') }}</option>
+                    <option value="quarterly">{{ _('Last Quarter') }}</option>
+                    <option value="yearly">{{ _('Last Year') }}</option>
+                </select>
+            </div>
+         </div>
+         <div class="chart-container">
+             <canvas id="requestVolumeChart"></canvas>
+         </div>
+     </div>
+
+    <!-- Recent Activity - Full Width -->
+    <div class="bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">{{ _('Recent API Activity') }}</h2>
+        <div class="space-y-4">
+            <div class="overflow-x-auto max-h-96">
+                <table class="w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">{{ _('Request') }}</th>
+                            <th scope="col" class="px-4 py-3">{{ _('Status') }}</th>
+                            <th scope="col" class="px-4 py-3">{{ _('Time') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for activity in recent_activity %}
+                        <tr class="bg-white border-b hover:bg-gray-50">
+                            <td class="px-4 py-3">
+                                <p class="font-mono text-xs text-gray-700"><code>{{ activity.method }} {{ activity.api_endpoint }}</code></p>
+                                <p class="text-xs text-gray-500">{{ activity.ip_address }}</p>
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if activity.status_code >= 400 %}
+                                <span class="px-2 py-1 font-semibold text-xs leading-tight text-red-700 bg-red-100 rounded-full">{{ activity.status_code }}</span>
+                                {% elif activity.status_code >= 300 %}
+                                <span class="px-2 py-1 font-semibold text-xs leading-tight text-yellow-700 bg-yellow-100 rounded-full">{{ activity.status_code }}</span>
+                                {% else %}
+                                <span class="px-2 py-1 font-semibold text-xs leading-tight text-green-700 bg-green-100 rounded-full">{{ activity.status_code }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ activity.timestamp|datetime_local('time') }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Make sure Chart.js is loaded first -->
+<script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
+
+<!-- Chart data as JSON -->
+<script type="application/json" id="chart-data">{{ chart_data|tojson|safe }}</script>
+
+<script nonce="{{ csp_nonce() }}">
+// Dynamic options injected from backend
+const indicatorBankSectorOptions = JSON.parse('{{ sector_options|tojson|safe }}');
+const indicatorBankSubSectorOptions = JSON.parse('{{ sub_sector_options|tojson|safe }}');
+const indicatorBankTypeOptions = JSON.parse('{{ type_options|tojson|safe }}');
+const templateOptions = JSON.parse('{{ templates|map(attribute="id")|list|tojson|safe }}');
+const templateLabels = JSON.parse('{{ templates|map(attribute="name")|list|tojson|safe }}');
+const countryOptions = JSON.parse('{{ countries|map(attribute="id")|list|tojson|safe }}');
+const countryLabels = JSON.parse('{{ countries|map(attribute="name")|list|tojson|safe }}');
+
+$(document).ready(function() {
+{% if config.CLIENT_CONSOLE_LOGGING %}
+function debugLog(message, data) {
+    window.__clientLog && window.__clientLog(message, data);
+    const debugOutput = document.getElementById('debug-output');
+    if (debugOutput) {
+        debugOutput.textContent += `${message}: ${JSON.stringify(data)}\n`;
+        debugOutput.classList.remove('hidden');
+    }
+}
+{% else %}
+function debugLog() {}
+{% endif %}
+
+try {
+        debugLog('DOM Content Loaded', new Date().toISOString());
+
+        // Get and validate canvas
+        const canvas = document.getElementById('requestVolumeChart');
+        if (!canvas) {
+            throw new Error('Canvas element not found');
+        }
+        debugLog('Canvas found', canvas.id);
+
+        const ctxVolume = canvas.getContext('2d');
+        if (!ctxVolume) {
+            throw new Error('Could not get canvas context');
+        }
+        debugLog('Canvas context obtained', 'success');
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { drawBorder: false },
+                    ticks: { precision: 0 }
+                },
+                x: { grid: { display: false } }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `{{ _('Requests') }}: ${context.parsed.y}`;
+                        }
+                    }
+                }
+            }
+        };
+        debugLog('Chart options configured', chartOptions);
+
+        var chartData;
+        try {
+            var chartDataElement = document.getElementById('chart-data');
+            if (chartDataElement) {
+                chartData = JSON.parse(chartDataElement.textContent);
+            } else {
+                throw new Error('Chart data element not found');
+            }
+        } catch (parseError) {
+            console.error('Failed to parse chart_data:', parseError);
+            chartData = [];
+        }
+        debugLog('Initial chart data', chartData);
+
+        if (!chartData || !Array.isArray(chartData)) {
+            throw new Error('Invalid chart data format');
+        }
+
+        let volumeChart = null;
+
+        function renderVolumeChart(data) {
+            debugLog('Rendering chart with data', data);
+
+            if (!data || !Array.isArray(data)) {
+                throw new Error('Invalid data format received');
+            }
+
+            if (volumeChart) {
+                debugLog('Destroying existing chart', 'cleanup');
+                volumeChart.destroy();
+            }
+
+            const labels = data.map(stat => stat.label);
+            const counts = data.map(stat => stat.count);
+
+            debugLog('Chart data processed', { labels, counts, total: counts.reduce((a, b) => a + b, 0) });
+
+            volumeChart = new Chart(ctxVolume, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '{{ _("Requests") }}',
+                        data: counts,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: 'rgb(59, 130, 246)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(59, 130, 246)'
+                    }]
+                },
+                options: chartOptions
+            });
+
+            debugLog('Chart created', 'success');
+        }
+
+        function fetchAndRenderVolumeChart(period = 'daily', endpoint = 'all') {
+            if (period === 'daily' && endpoint === 'all') {
+                renderVolumeChart(chartData);
+            } else {
+                // Build URL with parameters
+                let url = `/admin/api-management/stats?period=${period}`;
+                if (endpoint !== 'all') {
+                    url += `&endpoint=${encodeURIComponent(endpoint)}`;
+                }
+
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Network response was not ok: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data.stats) {
+                            throw new Error('No stats data in response');
+                        }
+                        renderVolumeChart(data.stats);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching stats:', error.message);
+                        // Show error in chart area
+                        const canvas = document.getElementById('requestVolumeChart');
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.font = "16px Arial";
+                        ctx.fillStyle = "red";
+                        ctx.textAlign = "center";
+                        ctx.fillText("{{ _('Error loading chart data') }}", canvas.width / 2, canvas.height / 2);
+                    });
+            }
+        }
+
+        fetchAndRenderVolumeChart('daily', 'all');
+
+        // Event listeners for both dropdowns
+        const periodSelector = document.getElementById('periodSelector');
+        const endpointSelector = document.getElementById('endpointSelector');
+
+        function updateChart() {
+            const period = periodSelector ? periodSelector.value : 'daily';
+            const endpoint = endpointSelector ? endpointSelector.value : 'all';
+            fetchAndRenderVolumeChart(period, endpoint);
+        }
+
+        if (periodSelector) {
+            periodSelector.addEventListener('change', updateChart);
+        }
+
+        if (endpointSelector) {
+            endpointSelector.addEventListener('change', updateChart);
+        }
+
+        // Initialize progress bars
+        document.querySelectorAll('[data-width]').forEach(function(element) {
+            var width = element.getAttribute('data-width');
+            element.style.width = width + '%';
+        });
+
+        // ------------------------------
+        // Enhanced URL Builder
+        // ------------------------------
+
+        // Mapping of endpoints to their available query parameters
+        const endpointParamMap = {
+            '/api/v1/data': [
+                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
+                {name: 'submission_id', type: 'number', placeholder: '{{ _("Submission ID") }}', description: '{{ _("Filter by submission ID") }}'},
+                {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: '{{ _("Filter by item type") }}'},
+                {name: 'item_id', type: 'number', placeholder: '{{ _("Item ID") }}', description: '{{ _("Filter by form item ID") }}'},
+                {name: 'period_name', type: 'text', placeholder: '{{ _("Period Name") }}', description: '{{ _("Filter by period name") }}'},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
+                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'},
+                {name: 'date_from', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date from (ISO format)") }}'},
+                {name: 'date_to', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date to (ISO format)") }}'},
+                {name: 'sort', type: 'select', options: ['', 'submitted_at', 'template_id', 'country_id', 'period_name'], description: '{{ _("Sort field (default: submitted_at)") }}'},
+                {name: 'order', type: 'select', options: ['desc', 'asc'], description: '{{ _("Sort order: desc (default) or asc") }}'},
+                {name: 'disagg', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Include disaggregation data (default: excluded)") }}'},
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1, API key auth only)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20, max 1000, API key auth only)") }}'}
+            ],
+            '/api/v1/data/tables': [
+                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
+                {name: 'submission_id', type: 'number', placeholder: '{{ _("Submission ID") }}', description: '{{ _("Filter by submission ID") }}'},
+                {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: '{{ _("Filter by item type") }}'},
+                {name: 'item_id', type: 'number', placeholder: '{{ _("Item ID") }}', description: '{{ _("Filter by form item ID") }}'},
+                {name: 'indicator_bank_id', type: 'number', placeholder: '{{ _("Indicator Bank ID") }}', description: '{{ _("Filter by indicator bank ID") }}'},
+                {name: 'period_name', type: 'text', placeholder: '{{ _("Period Name") }}', description: '{{ _("Filter by period name") }}'},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
+                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'},
+                {name: 'date_from', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date from (ISO format)") }}'},
+                {name: 'date_to', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date to (ISO format)") }}'},
+                {name: 'sort', type: 'select', options: ['', 'submitted_at', 'template_id', 'country_id', 'period_name'], description: '{{ _("Sort field (default: submitted_at)") }}'},
+                {name: 'order', type: 'select', options: ['desc', 'asc'], description: '{{ _("Sort order: desc (default) or asc") }}'},
+                {name: 'disagg', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Include disaggregation data (default: excluded)") }}'},
+                {name: 'related', type: 'select', options: ['', 'page', 'all'], description: '{{ _("Related tables scope: page (current page) or all (full dataset)") }}'},
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1, API key auth only)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20, max 1000, API key auth only)") }}'}
+            ],
+            '/api/v1/submissions': [
+                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
+                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'}
+            ],
+            '/api/v1/submissions/{submission_id}': [
+                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+            ],
+            '/api/v1/templates/{template_id}/data': [
+                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+            ],
+            '/api/v1/countries/{country_id}/data': [
+                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+            ],
+            '/api/v1/countrymap': [
+                {name: 'locale', type: 'text', placeholder: '{{ _("Locale code (en, fr, es, etc.)") }}', description: '{{ _("Two-letter locale code for localization") }}'},
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: all)") }}'},
+                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+            ],
+            '/api/v1/nationalsocietymap': [
+                {name: 'locale', type: 'text', placeholder: '{{ _("Locale code (en, fr, es, etc.)") }}', description: '{{ _("Two-letter locale code for localization") }}'},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
+                {name: 'is_active', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Filter by active status") }}'},
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: all)") }}'},
+                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+            ],
+            '/api/v1/users': [
+                {name: 'role', type: 'select', options: ['', 'admin', 'focal_point'], description: '{{ _("Filter by user role") }}'},
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'},
+                {name: 'search', type: 'text', placeholder: '{{ _("Search term") }}', description: '{{ _("Search by name or email") }}'}
+            ],
+            '/api/v1/users/{user_id}': [
+                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+            ],
+            '/api/v1/publications': [
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 10)") }}'},
+                {name: 'search', type: 'text', placeholder: '{{ _("Search term") }}', description: '{{ _("Search by publication title") }}'}
+            ],
+            '/api/v1/indicator-bank': [
+                {name: 'search', type: 'text', placeholder: '{{ _("Search term") }}', description: '{{ _("Search by name or definition") }}'},
+                {name: 'type', type: 'select', options: [''].concat(indicatorBankTypeOptions), description: '{{ _("Filter by indicator type") }}'},
+                {name: 'sector', type: 'select', options: [''].concat(indicatorBankSectorOptions), description: '{{ _("Filter by sector") }}'},
+                {name: 'sub_sector', type: 'select', options: [''].concat(indicatorBankSubSectorOptions), description: '{{ _("Filter by sub-sector") }}'},
+                {name: 'emergency', type: 'text', placeholder: '{{ _("Emergency type") }}', description: '{{ _("Filter by emergency type") }}'},
+                {name: 'archived', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Filter by archived status") }}'}
+            ],
+            '/api/v1/indicator-bank/{indicator_id}': [
+                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+            ],
+            '/api/v1/assigned-forms': [
+                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
+                {name: 'period_name', type: 'text', placeholder: '{{ _("Period Name") }}', description: '{{ _("Filter by period name") }}'},
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'}
+            ],
+            '/api/v1/submitted-documents': [
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
+                {name: 'document_type', type: 'text', placeholder: '{{ _("Document Type") }}', description: '{{ _("Filter by document type") }}'},
+                {name: 'language', type: 'text', placeholder: '{{ _("Language Code") }}', description: '{{ _("Filter by language code") }}'},
+                {name: 'is_public', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Filter by public status") }}'},
+                {name: 'status', type: 'select', options: ['', 'approved', 'pending', 'rejected'], description: '{{ _("Filter by approval status") }}'},
+                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
+                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'}
+            ]
+        };
+
+        // Fallback parameters if endpoint not listed above
+        const defaultParams = [
+            {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number") }}'},
+            {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page") }}'}
+        ];
+
+        let currentParamDefinitions = [];
+
+        // Build query parameter inputs dynamically
+        function createQueryParamInputs() {
+            const queryParamsContainer = document.getElementById('queryParams');
+            if (!queryParamsContainer) return;
+
+            queryParamsContainer.innerHTML = '';
+
+            const selectedEndpoint = document.getElementById('baseEndpoint').value;
+            const endpointKey = selectedEndpoint.replace(/\{[^}]+\}/g, '');
+
+            currentParamDefinitions = endpointParamMap[endpointKey] || defaultParams;
+
+            currentParamDefinitions.forEach(param => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-4 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors';
+
+                // Checkbox
+                const checkboxContainer = document.createElement('div');
+                checkboxContainer.className = 'w-1/4';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `enable_${param.name}`;
+                checkbox.className = 'mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500';
+                const label = document.createElement('label');
+                label.className = 'text-sm font-medium text-gray-700 cursor-pointer';
+                label.textContent = param.name;
+                label.htmlFor = `enable_${param.name}`;
+                checkboxContainer.appendChild(checkbox);
+                checkboxContainer.appendChild(label);
+
+                // Input / Select
+                let inputEl;
+                if (param.type === 'select') {
+                    inputEl = document.createElement('select');
+                    inputEl.className = 'w-1/4 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5';
+                    (param.options || []).forEach((opt, index) => {
+                        const optEl = document.createElement('option');
+                        optEl.value = opt;
+                        // Use labels if available, otherwise use the option value
+                        if (param.labels && param.labels[index]) {
+                            optEl.textContent = opt === '' ? '{{ _("-- none --") }}' : param.labels[index];
+                        } else {
+                            optEl.textContent = opt === '' ? '{{ _("-- none --") }}' : opt;
+                        }
+                        // For 'order' parameter, set 'desc' as default (first option)
+                        if (param.name === 'order' && opt === 'desc') {
+                            optEl.selected = true;
+                        }
+                        inputEl.appendChild(optEl);
+                    });
+                } else {
+                    inputEl = document.createElement('input');
+                    inputEl.type = param.type || 'text';
+                    inputEl.className = 'w-1/4 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5';
+                    if (param.placeholder) inputEl.placeholder = param.placeholder;
+                }
+                inputEl.id = param.name;
+                inputEl.disabled = true;
+
+                // Description
+                const desc = document.createElement('span');
+                desc.className = 'text-sm text-gray-500 flex-1';
+                desc.textContent = param.description || '';
+
+                row.appendChild(checkboxContainer);
+                row.appendChild(inputEl);
+                row.appendChild(desc);
+
+                queryParamsContainer.appendChild(row);
+
+                // Event listeners
+                checkbox.addEventListener('change', () => {
+                    inputEl.disabled = !checkbox.checked;
+                    if (checkbox.checked) {
+                        row.classList.add('border-blue-300', 'bg-blue-50');
+                        // For 'order' parameter, ensure it has a value when enabled
+                        if (param.name === 'order' && inputEl.value === '') {
+                            inputEl.value = 'desc';
+                        }
+                    } else {
+                        row.classList.remove('border-blue-300', 'bg-blue-50');
+                    }
+                    updateGeneratedUrl();
+                });
+                inputEl.addEventListener('input', updateGeneratedUrl);
+                inputEl.addEventListener('change', updateGeneratedUrl);
+            });
+
+            updateGeneratedUrl();
+        }
+
+        // Load API key from local storage (client-side only)
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const API_KEY_STORAGE = 'ngo_databank_api_management_api_key';
+        const LEGACY_API_KEY_STORAGE = 'ifrc_api_management_api_key';
+        if (apiKeyInput) {
+            try {
+                let stored = localStorage.getItem(API_KEY_STORAGE);
+                if (!stored) {
+                    stored = localStorage.getItem(LEGACY_API_KEY_STORAGE) || '';
+                    if (stored) localStorage.setItem(API_KEY_STORAGE, stored);
+                }
+                apiKeyInput.value = stored || '';
+            } catch (e) {}
+            apiKeyInput.addEventListener('input', function() {
+                try {
+                    localStorage.setItem(API_KEY_STORAGE, this.value || '');
+                } catch (e) {}
+                updateGeneratedUrl();
+                updateEndpointLinks();
+            });
+        }
+
+        function getApiKeyValue() {
+            const v = apiKeyInput ? (apiKeyInput.value || '') : '';
+            return String(v || '').trim();
+        }
+
+        function updateEndpointLinks() {
+            const apiKey = getApiKeyValue();
+            const links = document.querySelectorAll('a.api-endpoint-link[data-endpoint-path]');
+            links.forEach(a => {
+                const path = a.getAttribute('data-endpoint-path') || '';
+                if (!path) return;
+                const u = new URL(path, window.location.origin);
+                if (apiKey) {
+                    u.searchParams.set('api_key', apiKey);
+                } else {
+                    u.searchParams.delete('api_key');
+                }
+                a.href = u.toString();
+            });
+        }
+
+        // Updated URL generation to use dynamic parameters
+        function updateGeneratedUrl() {
+            let baseEndpoint = document.getElementById('baseEndpoint').value;
+            const params = new URLSearchParams();
+
+            // Append enabled query params
+            currentParamDefinitions.forEach(param => {
+                const checkbox = document.getElementById(`enable_${param.name}`);
+                const inputEl = document.getElementById(param.name);
+                if (checkbox && checkbox.checked && inputEl && inputEl.value !== '') {
+                    params.append(param.name, inputEl.value);
+                }
+            });
+
+            // Include API key only if provided by user
+            const apiKey = getApiKeyValue();
+            if (apiKey) {
+                params.append('api_key', apiKey);
+            }
+
+            // Final URL
+            const finalUrl = `${window.location.origin}${baseEndpoint}${params.toString() ? '?' + params.toString() : ''}`;
+            document.getElementById('generatedUrl').value = finalUrl;
+        }
+
+        // Endpoint change listener (rebuild both path & query inputs)
+        const baseEndpointSelect = document.getElementById('baseEndpoint');
+        baseEndpointSelect.addEventListener('change', () => {
+            createQueryParamInputs();
+        });
+
+        // Initial build
+        createQueryParamInputs();
+        updateEndpointLinks();
+
+        // Copy URL functionality
+        document.getElementById('copyUrl').addEventListener('click', function() {
+            const urlInput = document.getElementById('generatedUrl');
+            urlInput.select();
+            document.execCommand('copy');
+
+            // Show feedback
+            const originalText = this.textContent;
+            this.textContent = '{{ _("Copied!") }}';
+            this.classList.add('bg-green-500');
+
+            setTimeout(() => {
+                this.textContent = originalText;
+                this.classList.remove('bg-green-500');
+            }, 2000);
+        });
+
+        // Documentation modal functionality
+        const docsModal = document.getElementById('docsModal');
+        const showDocsBtn = document.getElementById('showDocsBtn');
+        const closeDocsBtn = document.getElementById('closeDocsBtn');
+
+        if (showDocsBtn) {
+            showDocsBtn.addEventListener('click', function() {
+                docsModal.classList.remove('hidden');
+            });
+        }
+
+        if (closeDocsBtn) {
+            closeDocsBtn.addEventListener('click', function() {
+                docsModal.classList.add('hidden');
+            });
+        }
+
+        // Close modal when clicking outside
+        if (docsModal) {
+            docsModal.addEventListener('click', function(e) {
+                if (e.target === docsModal) {
+                    docsModal.classList.add('hidden');
+                }
+            });
+        }
+
+        // Open URL functionality
+        document.getElementById('openUrl').addEventListener('click', function() {
+            const urlInput = document.getElementById('generatedUrl');
+            const url = urlInput.value;
+
+            if (url && url.trim() !== '') {
+                // Open URL in a new tab
+                window.open(url, '_blank');
+
+                // Show feedback
+                const originalText = this.textContent;
+                this.textContent = '{{ _("Opened!") }}';
+                this.classList.add('bg-blue-500');
+
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.classList.remove('bg-blue-500');
+                }, 2000);
+            } else {
+                // Show error feedback
+                const originalText = this.textContent;
+                this.textContent = '{{ _("No URL!") }}';
+                this.classList.add('bg-red-500');
+
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.classList.remove('bg-red-500');
+                }, 2000);
+            }
+        });
+
+    } catch (error) {
+        console.error('Critical error in chart initialization:', error);
+        const debugOutput = document.getElementById('debug-output');
+        if (debugOutput) {
+            debugOutput.textContent = `{{ _('Critical error') }}: ${error.message}`;
+            debugOutput.classList.remove('hidden');
+        }
+    }
+});
+</script>
+{% endblock %}

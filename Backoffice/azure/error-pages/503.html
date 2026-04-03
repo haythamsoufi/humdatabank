@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>503 - Service Unavailable</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;color:#1f2937}
+        .error-container{background:#fff;border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.15);max-width:600px;width:100%;padding:48px;text-align:center;position:relative;overflow:hidden}
+        .error-container:before{content:"";position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#f59e0b 0%,#f97316 50%,#f59e0b 100%)}
+        .error-icon{width:120px;height:120px;margin:0 auto 32px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#f59e0b;animation:pulse 2s ease-in-out infinite}
+        .error-icon svg{width:64px;height:64px;fill:currentColor}
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        .error-code{font-size:72px;font-weight:800;background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;margin-bottom:16px;line-height:1}
+        .error-title{font-size:28px;font-weight:700;color:#1f2937;margin-bottom:16px}
+        .error-message{font-size:16px;color:#6b7280;line-height:1.6;margin-bottom:32px}
+        .error-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+        .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:8px;font-weight:600;text-decoration:none;transition:all .2s;font-size:14px;border:none;cursor:pointer}
+        button.btn{font-family:inherit}
+        .btn-primary{background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);color:#fff;box-shadow:0 4px 12px rgba(245,158,11,.3)}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(245,158,11,.4)}
+        .btn-secondary{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
+        .btn-secondary:hover{background:#e5e7eb;transform:translateY(-2px)}
+        @media (max-width:640px){.error-container{padding:32px 24px}.error-code{font-size:56px}.error-title{font-size:24px}.error-icon{width:100px;height:100px}.error-icon svg{width:52px;height:52px}}
+    </style>
+    <script>
+        (function(){
+            var e=503;
+            var p=window.location.protocol;
+            if(p!=='http:'&&p!=='https:'){return;}
+
+            var k='err_log_'+e+'_'+window.location.pathname;
+            var seen=false;
+            try{
+                seen=!!sessionStorage.getItem(k);
+                if(!seen){sessionStorage.setItem(k,'1');}
+            }catch(_){}
+            if(seen){return;}
+
+            var d={error_code:e,url:window.location.href,referrer:document.referrer||null,user_agent:navigator.userAgent||null,timestamp:new Date().toISOString()};
+            var u='/api/v1/platform-error';
+            try{
+                if(navigator.sendBeacon){
+                    navigator.sendBeacon(u,new Blob([JSON.stringify(d)],{type:'application/json'}));
+                }else if(window.fetch){
+                    fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d),keepalive:true}).catch(function(){});
+                }
+            }catch(_){}
+        })();
+    </script>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon"><svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"/></svg></div>
+        <div class="error-code">503</div>
+        <h1 class="error-title">Service Unavailable</h1>
+        <p class="error-message">The service is temporarily unavailable due to maintenance or high load. Please try again later.</p>
+        <div class="error-actions">
+            <button class="btn btn-primary" onclick="window.location.reload()">Retry</button>
+            <a class="btn btn-secondary" href="/">Go to Homepage</a>
+        </div>
+    </div>
+</body>
+</html>

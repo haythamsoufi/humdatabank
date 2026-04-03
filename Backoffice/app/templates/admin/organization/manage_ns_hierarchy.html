@@ -1,0 +1,908 @@
+{# NS Hierarchy fragment for inclusion. Uses AG Grid for data display. #}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_subtab_btn_classes, admin_underline_subtab_count_classes %}
+
+<div id="nsHierarchyComponentRoot"
+     data-error-loading="{{ _('Error loading NS hierarchy data. Please try again.') | e }}"
+     data-validation-failed="{{ _('Validation failed: ') | e }}"
+     data-error-prefix="{{ _('Error: ') | e }}"
+     data-generic-error="{{ _('An error occurred. Please try again.') | e }}">
+
+    <!-- Tabs and Country Filter Row -->
+    <div class="mb-4 flex flex-col lg:flex-row lg:items-center gap-3">
+        <!-- Tabs for different entity types -->
+        {% call scroll_tab_bar(border_bottom=False, aria_label=_('NS hierarchy sections'), wrapper_class='min-w-0 w-full', inner_class='space-x-4') %}
+            <button type="button" role="tab" id="branches-tab" class="{{ admin_underline_subtab_btn_classes(true) }}" data-tab="branches">
+                <i class="fas fa-building mr-1.5"></i> {{ _('Branches') }}
+                <span class="{{ admin_underline_subtab_count_classes() }}">{{ branches|length }}</span>
+            </button>
+            <button type="button" role="tab" id="subbranches-tab" class="{{ admin_underline_subtab_btn_classes(false) }}" data-tab="subbranches">
+                <i class="fas fa-sitemap mr-1.5"></i> {{ _('Sub-Branches') }}
+                <span class="{{ admin_underline_subtab_count_classes() }}">{{ subbranches|length }}</span>
+            </button>
+            <button type="button" role="tab" id="localunits-tab" class="{{ admin_underline_subtab_btn_classes(false) }}" data-tab="localunits">
+                <i class="fas fa-map-marker-alt mr-1.5"></i> {{ _('Local Units') }}
+                <span class="{{ admin_underline_subtab_count_classes() }}">{{ (localunits if localunits is defined else (local_units if local_units is defined else []))|length }}</span>
+            </button>
+        {% endcall %}
+
+        <!-- Country Filter - Pushed to right edge (only show if countries available) -->
+        {% if countries %}
+        <div class="ml-auto">
+            <select id="countryFilter" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md min-w-40 py-1.5 px-2">
+                <option value="">{{ _('All Countries') }}</option>
+                {% for country in countries %}
+                <option value="{{ country.name }}">{{ country.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Branches Table -->
+    <div id="branches" class="tab-content bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+        {% if branches %}
+            <div id="branches-table-container" class="overflow-x-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('NS Branches') }}</h3>
+                    <div class="flex gap-2 items-center">
+                        <div id="branches-column-visibility-button-placeholder"></div>
+                        {% if can_manage_org %}
+                            <button id="auto-translate-all-ns-structure-btn" class="btn btn-warning">
+                                <i class="fas fa-language mr-2"></i>
+                                {{ _('Auto Translate All') }}
+                            </button>
+                            <a href="{{ url_for('organization.new_ns_branch') }}"
+                               class="btn btn-success">
+                                <i class="fas fa-plus mr-2"></i>
+                                {{ _('Add New Branch') }}
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="branchesGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="branches-column-visibility-button-placeholder"></div>
+            </div>
+        {% else %}
+            <p class="text-gray-700 text-sm">{{ _('No branches found.') }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Sub-Branches Table -->
+    <div id="subbranches" class="tab-content bg-white p-4 sm:p-6 shadow-md border border-gray-200" style="display: none;">
+        {% if subbranches %}
+            <div id="subbranches-table-container" class="overflow-x-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('NS Sub-Branches') }}</h3>
+                    <div class="flex gap-2 items-center">
+                        <div id="subbranches-column-visibility-button-placeholder"></div>
+                        {% if can_manage_org %}
+                            <button id="auto-translate-all-ns-structure-btn" class="btn btn-warning">
+                                <i class="fas fa-language mr-2"></i>
+                                {{ _('Auto Translate All') }}
+                            </button>
+                            <a href="{{ url_for('organization.new_ns_subbranch') }}"
+                               class="btn btn-success">
+                                <i class="fas fa-plus mr-2"></i>
+                                {{ _('Add New Sub-Branch') }}
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="subbranchesGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="subbranches-column-visibility-button-placeholder"></div>
+            </div>
+        {% else %}
+            <p class="text-gray-700 text-sm">{{ _('No sub-branches found.') }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Local Units Table -->
+    <div id="localunits" class="tab-content bg-white p-4 sm:p-6 shadow-md border border-gray-200" style="display: none;">
+        {% set local_units_data = localunits if localunits is defined else local_units if local_units is defined else [] %}
+        {% if local_units_data %}
+            <div id="localunits-table-container" class="overflow-x-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('NS Local Units') }}</h3>
+                    <div class="flex gap-2 items-center">
+                        <div id="localunits-column-visibility-button-placeholder"></div>
+                        {% if can_manage_org %}
+                            <button id="auto-translate-all-ns-structure-btn" class="btn btn-warning">
+                                <i class="fas fa-language mr-2"></i>
+                                {{ _('Auto Translate All') }}
+                            </button>
+                            <a href="{{ url_for('organization.new_ns_localunit') }}"
+                               class="btn btn-success">
+                                <i class="fas fa-plus mr-2"></i>
+                                {{ _('Add New Local Unit') }}
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="localunitsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="localunits-column-visibility-button-placeholder"></div>
+            </div>
+        {% else %}
+            <p class="text-gray-700 text-sm">{{ _('No local units found.') }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .status-badge {
+        display: inline-flex !important;
+        align-items: center !important;
+        padding: 0.125rem 0.5rem !important;
+        border-radius: 9999px !important;
+        font-size: 0.7rem !important;
+        font-weight: 500 !important;
+        line-height: 1 !important;
+    }
+    .status-badge[data-status="active"] { background-color: #dcfce7 !important; color: #166534 !important; }
+    .status-badge[data-status="inactive"] { background-color: #fef2f2 !important; color: #991b1b !important; }
+</style>
+
+<script nonce="{{ csp_nonce() }}">
+    // AG Grid helpers for NS hierarchy tables
+    let branchesGridHelper = null;
+    let subbranchesGridHelper = null;
+    let localunitsGridHelper = null;
+
+    // Make helpers globally accessible
+    window.branchesGridHelper = null;
+    window.subbranchesGridHelper = null;
+    window.localunitsGridHelper = null;
+
+    // Transform branches data for ag-grid
+    const branchesData = [
+        {% for branch in branches %}
+        {
+            id: {{ branch.id }},
+            code: {{ (branch.code or '')|tojson|safe }},
+            name: {{ (branch.name or '')|tojson|safe }},
+            description: {{ (branch.description or '')|tojson|safe }},
+            city: {{ (branch.city or '')|tojson|safe }},
+            country_name: {{ (branch.country.name if branch.country else '')|tojson|safe }},
+            is_active: {{ branch.is_active|tojson|safe }},
+            established_date: {{ (branch.established_date|datetime_iso if branch.established_date else '')|tojson|safe }},
+            display_order: {{ branch.display_order or 0 }},
+            edit_url: "{{ url_for('organization.edit_ns_branch', branch_id=branch.id) }}",
+            delete_url: "{{ url_for('organization.delete_ns_branch', branch_id=branch.id) }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this branch?') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for branches grid
+    const branchesColumnDefs = [
+        {
+            field: 'country_name',
+            headerName: '{{ _("Country") }}',
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'code',
+            headerName: '{{ _("Code") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 180,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400 text-xs">-</span>';
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + params.value + '</span>';
+            }
+        },
+        {
+            field: 'name',
+            headerName: '{{ _("Name") }}',
+            width: 300,
+            minWidth: 250,
+            maxWidth: 500,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const name = params.data.name || '';
+                const desc = params.data.description || '';
+                let html = '<div class="text-gray-900 font-medium text-sm">' + (name || '-') + '</div>';
+                if (desc) {
+                    const truncated = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+                    html += '<div class="text-gray-500 text-xs mt-0.5">' + truncated.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                }
+                return html;
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'city',
+            headerName: '{{ _("City") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'is_active',
+            headerName: '{{ _("Status") }}',
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                const text = isActive ? '{{ _("Active") }}' : '{{ _("Inactive") }}';
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'established_date',
+            headerName: '{{ _("Established") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 220,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'display_order',
+            headerName: '{{ _("Order") }}',
+            width: 100,
+            minWidth: 80,
+            maxWidth: 120,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const order = params.value || 0;
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + order + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || '{{ _("Are you sure you want to delete this branch?") }}';
+                return '<div class="flex items-center justify-center gap-2">' +
+                    '<a href="' + editUrl + '" title="{{ _("Edit") }}" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>' +
+                    '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">' +
+                    '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
+                    '<button type="submit" title="{{ _("Delete") }}" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>' +
+                    '</form>' +
+                    '</div>';
+            }
+        }
+    ];
+
+    // Transform subbranches data for ag-grid
+    const subbranchesData = [
+        {% for subbranch in subbranches %}
+        {
+            id: {{ subbranch.id }},
+            code: {{ (subbranch.code or '')|tojson|safe }},
+            name: {{ (subbranch.name or '')|tojson|safe }},
+            description: {{ (subbranch.description or '')|tojson|safe }},
+            branch_name: {{ (subbranch.branch.name if subbranch.branch else '')|tojson|safe }},
+            country_name: {{ (subbranch.branch.country.name if subbranch.branch and subbranch.branch.country else '')|tojson|safe }},
+            city: {{ (subbranch.city or '')|tojson|safe }},
+            is_active: {{ subbranch.is_active|tojson|safe }},
+            established_date: {{ (subbranch.established_date|datetime_iso if subbranch.established_date else '')|tojson|safe }},
+            display_order: {{ subbranch.display_order or 0 }},
+            edit_url: "{{ url_for('organization.edit_ns_subbranch', subbranch_id=subbranch.id) }}",
+            delete_url: "{{ url_for('organization.delete_ns_subbranch', subbranch_id=subbranch.id) }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this sub-branch?') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for subbranches grid
+    const subbranchesColumnDefs = [
+        {
+            field: 'country_name',
+            headerName: '{{ _("Country") }}',
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'code',
+            headerName: '{{ _("Code") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 180,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400 text-xs">-</span>';
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + params.value + '</span>';
+            }
+        },
+        {
+            field: 'name',
+            headerName: '{{ _("Name") }}',
+            width: 300,
+            minWidth: 250,
+            maxWidth: 500,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const name = params.data.name || '';
+                const desc = params.data.description || '';
+                let html = '<div class="text-gray-900 font-medium text-sm">' + (name || '-') + '</div>';
+                if (desc) {
+                    const truncated = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+                    html += '<div class="text-gray-500 text-xs mt-0.5">' + truncated.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                }
+                return html;
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'branch_name',
+            headerName: '{{ _("Branch") }}',
+            width: 220,
+            minWidth: 180,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'city',
+            headerName: '{{ _("City") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'is_active',
+            headerName: '{{ _("Status") }}',
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                const text = isActive ? '{{ _("Active") }}' : '{{ _("Inactive") }}';
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'established_date',
+            headerName: '{{ _("Established") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 220,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'display_order',
+            headerName: '{{ _("Order") }}',
+            width: 100,
+            minWidth: 80,
+            maxWidth: 120,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const order = params.value || 0;
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + order + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || '{{ _("Are you sure you want to delete this sub-branch?") }}';
+                return '<div class="flex items-center justify-center gap-2">' +
+                    '<a href="' + editUrl + '" title="{{ _("Edit") }}" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>' +
+                    '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">' +
+                    '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
+                    '<button type="submit" title="{{ _("Delete") }}" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>' +
+                    '</form>' +
+                    '</div>';
+            }
+        }
+    ];
+
+    // Transform local units data for ag-grid
+    const localunitsData = [
+        {% set local_units_data = localunits if localunits is defined else local_units if local_units is defined else [] %}
+        {% for localunit in local_units_data %}
+        {
+            id: {{ localunit.id }},
+            code: {{ (localunit.code or '')|tojson|safe }},
+            name: {{ (localunit.name or '')|tojson|safe }},
+            description: {{ (localunit.description or '')|tojson|safe }},
+            branch_name: {{ (localunit.branch.name if localunit.branch else '')|tojson|safe }},
+            subbranch_name: {{ (localunit.subbranch.name if localunit.subbranch else '')|tojson|safe }},
+            country_name: {{ (localunit.branch.country.name if localunit.branch and localunit.branch.country else '')|tojson|safe }},
+            city: {{ (localunit.city or '')|tojson|safe }},
+            is_active: {{ localunit.is_active|tojson|safe }},
+            established_date: {{ (localunit.established_date|datetime_iso if localunit.established_date else '')|tojson|safe }},
+            display_order: {{ localunit.display_order or 0 }},
+            edit_url: "{{ url_for('organization.edit_ns_localunit', localunit_id=localunit.id) }}",
+            delete_url: "{{ url_for('organization.delete_ns_localunit', localunit_id=localunit.id) }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this local unit?') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for local units grid
+    const localunitsColumnDefs = [
+        {
+            field: 'country_name',
+            headerName: '{{ _("Country") }}',
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'code',
+            headerName: '{{ _("Code") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 180,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400 text-xs">-</span>';
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + params.value + '</span>';
+            }
+        },
+        {
+            field: 'name',
+            headerName: '{{ _("Name") }}',
+            width: 300,
+            minWidth: 250,
+            maxWidth: 500,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const name = params.data.name || '';
+                const desc = params.data.description || '';
+                let html = '<div class="text-gray-900 font-medium text-sm">' + (name || '-') + '</div>';
+                if (desc) {
+                    const truncated = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+                    html += '<div class="text-gray-500 text-xs mt-0.5">' + truncated.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                }
+                return html;
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'branch_name',
+            headerName: '{{ _("Branch") }}',
+            width: 220,
+            minWidth: 180,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'subbranch_name',
+            headerName: '{{ _("Sub-Branch") }}',
+            width: 220,
+            minWidth: 180,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'city',
+            headerName: '{{ _("City") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'is_active',
+            headerName: '{{ _("Status") }}',
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                const text = isActive ? '{{ _("Active") }}' : '{{ _("Inactive") }}';
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'established_date',
+            headerName: '{{ _("Established") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 220,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'display_order',
+            headerName: '{{ _("Order") }}',
+            width: 100,
+            minWidth: 80,
+            maxWidth: 120,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const order = params.value || 0;
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + order + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || '{{ _("Are you sure you want to delete this local unit?") }}';
+                return '<div class="flex items-center justify-center gap-2">' +
+                    '<a href="' + editUrl + '" title="{{ _("Edit") }}" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>' +
+                    '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">' +
+                    '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
+                    '<button type="submit" title="{{ _("Delete") }}" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>' +
+                    '</form>' +
+                    '</div>';
+            }
+        }
+    ];
+
+    // Initialize branches grid
+    window.initializeBranchesGrid = function() {
+        if (!branchesData || branchesData.length === 0) return;
+        if (branchesGridHelper || window.branchesGridHelper) return; // Already initialized
+
+        // Check if AgGridHelper is available
+        if (typeof AgGridHelper === 'undefined') {
+            window.__clientWarn && window.__clientWarn('AgGridHelper not yet loaded, retrying in 100ms');
+            setTimeout(initializeBranchesGrid, 100);
+            return;
+        }
+
+        const container = document.getElementById('branchesGrid');
+        if (!container) return;
+
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Branches grid already exists in container, skipping initialization');
+            return;
+        }
+
+        container.innerHTML = '';
+
+        branchesGridHelper = new AgGridHelper({
+            containerId: 'branchesGrid',
+            templateId: 'ns-structure-branches',
+            columnDefs: branchesColumnDefs,
+            rowData: branchesData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = branchesGridHelper.initialize();
+        window.branchesGridHelper = branchesGridHelper;
+        window.branchesGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const desiredOrder = ['country_name', 'code', 'name', 'city', 'is_active', 'established_date', 'display_order', 'actions'];
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for branches:', e);
+        }
+    };
+
+    // Initialize subbranches grid
+    window.initializeSubbranchesGrid = function() {
+        if (!subbranchesData || subbranchesData.length === 0) return;
+        if (subbranchesGridHelper || window.subbranchesGridHelper) return; // Already initialized
+
+        // Check if AgGridHelper is available
+        if (typeof AgGridHelper === 'undefined') {
+            window.__clientWarn && window.__clientWarn('AgGridHelper not yet loaded, retrying in 100ms');
+            setTimeout(initializeSubbranchesGrid, 100);
+            return;
+        }
+
+        const container = document.getElementById('subbranchesGrid');
+        if (!container) return;
+
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Subbranches grid already exists in container, skipping initialization');
+            return;
+        }
+
+        container.innerHTML = '';
+
+        subbranchesGridHelper = new AgGridHelper({
+            containerId: 'subbranchesGrid',
+            templateId: 'ns-structure-subbranches',
+            columnDefs: subbranchesColumnDefs,
+            rowData: subbranchesData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = subbranchesGridHelper.initialize();
+        window.subbranchesGridHelper = subbranchesGridHelper;
+        window.subbranchesGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const desiredOrder = ['country_name', 'code', 'name', 'branch_name', 'city', 'is_active', 'established_date', 'display_order', 'actions'];
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for subbranches:', e);
+        }
+    };
+
+    // Initialize local units grid
+    window.initializeLocalunitsGrid = function() {
+        if (!localunitsData || localunitsData.length === 0) return;
+        if (localunitsGridHelper || window.localunitsGridHelper) return; // Already initialized
+
+        // Check if AgGridHelper is available
+        if (typeof AgGridHelper === 'undefined') {
+            window.__clientWarn && window.__clientWarn('AgGridHelper not yet loaded, retrying in 100ms');
+            setTimeout(initializeLocalunitsGrid, 100);
+            return;
+        }
+
+        const container = document.getElementById('localunitsGrid');
+        if (!container) return;
+
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Local units grid already exists in container, skipping initialization');
+            return;
+        }
+
+        container.innerHTML = '';
+
+        localunitsGridHelper = new AgGridHelper({
+            containerId: 'localunitsGrid',
+            templateId: 'ns-structure-localunits',
+            columnDefs: localunitsColumnDefs,
+            rowData: localunitsData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = localunitsGridHelper.initialize();
+        window.localunitsGridHelper = localunitsGridHelper;
+        window.localunitsGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const desiredOrder = ['country_name', 'code', 'name', 'branch_name', 'subbranch_name', 'city', 'is_active', 'established_date', 'display_order', 'actions'];
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for localunits:', e);
+        }
+    };
+
+    // Override nsSwitchTab function to switch tabs and initialize grids
+        window.nsSwitchTab = function(tabName) {
+            window.__clientLog && window.__clientLog('[DEBUG] nsSwitchTab called with tabName:', tabName);
+
+            // Hide all NS tab contents
+        document.querySelectorAll('#branches, #subbranches, #localunits').forEach(function(el) {
+            el.style.display = 'none';
+        });
+
+            // Reset tab button styles
+        var AU = window.AdminUnderlineTabs;
+        document.querySelectorAll('#branches-tab, #subbranches-tab, #localunits-tab').forEach(function(btn) {
+            if (AU) AU.setSubTabButton(btn, false);
+        });
+
+            // Show selected content
+        const selectedTab = document.getElementById(tabName);
+        if (selectedTab) {
+            selectedTab.style.display = '';
+
+            // Initialize grid when tab becomes visible
+            setTimeout(function() {
+                if (tabName === 'branches' && typeof initializeBranchesGrid === 'function' && !branchesGridHelper && !window.branchesGridHelper) {
+                    initializeBranchesGrid();
+                } else if (tabName === 'subbranches' && typeof initializeSubbranchesGrid === 'function' && !subbranchesGridHelper && !window.subbranchesGridHelper) {
+                    initializeSubbranchesGrid();
+                } else if (tabName === 'localunits' && typeof initializeLocalunitsGrid === 'function' && !localunitsGridHelper && !window.localunitsGridHelper) {
+                    initializeLocalunitsGrid();
+                }
+            }, 100);
+            }
+
+            // Update tab button
+        const tabButton = document.getElementById(tabName + '-tab');
+        if (tabButton && AU) {
+            AU.setSubTabButton(tabButton, true);
+        }
+    };
+
+        // Bind tab buttons (CSP-safe: no inline onclick)
+        document.querySelectorAll('#branches-tab, #subbranches-tab, #localunits-tab').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tab = btn.getAttribute('data-tab');
+                if (tab && typeof window.nsSwitchTab === 'function') {
+                    window.nsSwitchTab(tab);
+                }
+            });
+        });
+
+    // Wait for both DOM and AgGridHelper to be ready
+    function waitForAgGridHelper(callback) {
+        if (typeof AgGridHelper !== 'undefined') {
+            callback();
+        } else {
+            setTimeout(function() {
+                waitForAgGridHelper(callback);
+            }, 100);
+        }
+    }
+
+    // Country filter functionality for AG Grid
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait for AgGridHelper to be loaded
+        waitForAgGridHelper(function() {
+            const countryFilter = document.getElementById('countryFilter');
+            if (countryFilter) {
+                countryFilter.addEventListener('change', function() {
+                    const selected = this.value;
+
+                    // Apply filter to active grid
+                    if (branchesGridHelper && branchesGridHelper.gridApi && document.getElementById('branches').style.display !== 'none') {
+                        if (selected) {
+                            branchesGridHelper.gridApi.setFilterModel({
+                                country_name: {
+                                    type: 'equals',
+                                    filter: selected
+                                }
+                            });
+                        } else {
+                            branchesGridHelper.gridApi.setFilterModel(null);
+                        }
+                    } else if (subbranchesGridHelper && subbranchesGridHelper.gridApi && document.getElementById('subbranches').style.display !== 'none') {
+                        if (selected) {
+                            subbranchesGridHelper.gridApi.setFilterModel({
+                                country_name: {
+                                    type: 'equals',
+                                    filter: selected
+                                }
+                            });
+                        } else {
+                            subbranchesGridHelper.gridApi.setFilterModel(null);
+                        }
+                    } else if (localunitsGridHelper && localunitsGridHelper.gridApi && document.getElementById('localunits').style.display !== 'none') {
+                        if (selected) {
+                            localunitsGridHelper.gridApi.setFilterModel({
+                                country_name: {
+                                    type: 'equals',
+                                    filter: selected
+                                }
+                            });
+                        } else {
+                            localunitsGridHelper.gridApi.setFilterModel(null);
+                        }
+                    }
+                });
+            }
+
+        // Initialize on page load if panel is visible
+        var nsPanel = document.getElementById('ns-structure-tab-panel');
+        if (nsPanel && !nsPanel.classList.contains('hidden')) {
+            window.__clientLog && window.__clientLog('[DEBUG] NS Structure panel visible on load, initializing branches tab');
+            window.nsSwitchTab('branches');
+        }
+        });
+    });
+</script>

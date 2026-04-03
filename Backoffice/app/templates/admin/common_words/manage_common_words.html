@@ -1,0 +1,946 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% block title %}{{ _('Common Words') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <style nonce="{{ csp_style_nonce() }}">
+        .common-word-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .common-word-table th,
+        .common-word-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .common-word-table th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .common-word-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .term-cell {
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .meaning-cell {
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+
+        .actions-cell {
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-inactive {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            max-width: 400px;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        }
+
+        /* Import/Export styles */
+        .import-export-section {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+
+        .file-upload-area {
+            border: 2px dashed #d1d5db;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .file-upload-area:hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+
+        .file-upload-area.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            transform: scale(1.02);
+        }
+
+        /* Modal and form styles */
+        .modal-content {
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .error-message {
+            color: #dc2626;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .form-field-error {
+            border-color: #dc2626;
+        }
+
+        .form-field-error:focus {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        }
+
+        /* Notification styles */
+        .notification {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    {% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title='Common Words',
+        icon='fas fa-book',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+            {'name': 'Common Words'}
+        ],
+        actions=[
+            {
+                'type': 'button',
+                'text': 'Add New Common Word',
+                'icon': 'fas fa-plus',
+                'classes': 'professional-action-btn professional-action-btn-green w-full sm:w-auto',
+                'attributes': {'onclick': 'openAddModal()'}
+            }
+        ]
+    ) }}
+
+    <div class="bg-white p-6 shadow-md border border-gray-200">
+        <!-- Search Bar -->
+        <div class="search-container">
+            <form method="GET" action="{{ url_for('system_admin.manage_common_words') }}">
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ search }}"
+                    placeholder="Search terms or meanings..."
+                    class="search-input"
+                >
+            </form>
+        </div>
+
+        <!-- Import/Export Section -->
+        <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Bulk Operations</h3>
+                    <p class="text-sm text-gray-600">Import common words from Excel or export existing ones</p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <a href="{{ url_for('system_admin.export_common_words') }}"
+                       class="btn btn-success">
+                        <i class="fas fa-download"></i>
+                        Export to Excel
+                    </a>
+                    <button id="open-import-modal-btn"
+                            class="btn btn-primary">
+                        <i class="fas fa-upload"></i>
+                        Import from Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {% if common_words %}
+            {% from "components/ag_grid_includes.html" import ag_grid_container %}
+            <div class="relative">
+                {{ ag_grid_container('commonWordsGrid', loading_text=_('Loading common words...'), grid_height='600px', include_card=false) }}
+            </div>
+
+            <div class="mt-6 text-sm text-gray-600" id="total-count" style="display: none;">
+                Total: <span id="total-words-count">{{ common_words|length }}</span> common words
+            </div>
+        {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-book text-4xl text-gray-300 mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No common words found</h3>
+                <p class="text-gray-600 mb-6">
+                    {% if search %}
+                        No common words match your search criteria
+                    {% else %}
+                        Get started by adding your first common word
+                    {% endif %}
+                </p>
+                {% if not search %}
+                    <button id="open-add-modal-btn"
+                            class="btn btn-primary">
+                        Add First Common Word
+                    </button>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Import Modal -->
+    {% call modal_shell('importModal', 'Import Common Words from Excel', max_width='max-w-2xl', close_id='close-import-modal-btn') %}
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">Instructions</h3>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <ul class="text-sm text-blue-800 space-y-2">
+                                <li><strong>Format:</strong> Excel file (.xlsx) with columns: Term, Meaning, French, Spanish, Arabic, Chinese, Russian, Hindi, Active</li>
+                                <li><strong>Term:</strong> Required - The word or phrase to highlight</li>
+                                <li><strong>Meaning:</strong> Required - English definition</li>
+                                <li><strong>Language Columns:</strong> Optional translations in different languages</li>
+                                <li><strong>Active:</strong> Optional - TRUE/FALSE (default: TRUE)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">Download Excel Template</h3>
+                        <a href="{{ url_for('system_admin.download_common_words_template') }}"
+                           class="btn btn-success">
+                            <i class="fas fa-download"></i>
+                            Download Excel Template
+                        </a>
+                    </div>
+
+                    <form id="importForm" method="POST" action="{{ url_for('system_admin.import_common_words') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-6">
+                            <label for="excel_file" class="block text-sm font-medium text-gray-700 mb-2">
+                                Select Excel File *
+                            </label>
+                            <input type="file"
+                                   id="excel_file"
+                                   name="excel_file"
+                                   accept=".xlsx,.xls"
+                                   required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="flex items-center">
+                                <input type="checkbox"
+                                       id="overwrite_existing"
+                                       name="overwrite_existing"
+                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <span class="ml-2 text-sm text-gray-700">Overwrite existing terms if they already exist</span>
+                            </label>
+                        </div>
+
+                        <div class="flex justify-end gap-3">
+                            <button type="button"
+                                    id="cancel-import-modal-btn"
+                                    class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+                                Cancel
+                            </button>
+                            <button type="submit"
+                                    class="btn btn-primary">
+                                Import Common Words
+                            </button>
+                        </div>
+                    </form>
+    {% endcall %}
+
+    <!-- Add/Edit Common Word Modal -->
+    {% call modal_shell('editModal', 'Edit Common Word', max_width='max-w-4xl', close_id='close-edit-modal-btn') %}
+                    <p id="modalSubtitle" class="text-sm text-gray-600 mb-4">Editing: <span id="editTermDisplay" class="font-medium"></span></p>
+                    <form id="editForm" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" id="edit_id" name="id">
+
+                        <!-- Basic Information -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="edit_term" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Term *
+                                    </label>
+                                    <input type="text"
+                                           id="edit_term"
+                                           name="term"
+                                           required
+                                           placeholder="Enter the term or phrase"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox"
+                                               id="edit_is_active"
+                                               name="is_active"
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">Active</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="mt-4">
+                                <label for="edit_meaning" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Meaning *
+                                </label>
+                                <textarea id="edit_meaning"
+                                          name="meaning"
+                                          required
+                                          rows="4"
+                                          placeholder="Enter the meaning or definition"
+                                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Multilingual Meanings -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Multilingual Meanings</h3>
+                            <p class="text-sm text-gray-600 mb-4">Provide translations of the meaning in different languages (optional)</p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {% for code in TRANSLATABLE_LANGUAGES %}
+                                <div class="{% if code in ['ar','fa','he','ur'] %}md:col-span-2{% endif %}">
+                                    <label for="edit_meaning_{{ code }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                        {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                    </label>
+                                    <textarea id="edit_meaning_{{ code }}"
+                                              name="meaning_{{ code }}"
+                                              rows="3"
+                                              placeholder="{{ _('Enter translation') }}"
+                                              {% if code in ['ar','fa','he','ur'] %}dir="rtl"{% endif %}
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                            <button type="button"
+                                    id="cancel-edit-modal-btn"
+                                    class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+                                Cancel
+                            </button>
+                            <button type="submit"
+                                    id="submitButton"
+                                    class="btn btn-primary">
+                                Update
+                            </button>
+                        </div>
+                    </form>
+    {% endcall %}
+
+    <script nonce="{{ csp_nonce() }}">
+        // Import/Export functionality
+        function openImportModal() {
+            try {
+                const modal = document.getElementById('importModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    console.error('Import modal not found');
+                }
+            } catch (error) {
+                console.error('Error opening import modal:', error);
+            }
+        }
+
+        function closeImportModal() {
+            try {
+                const modal = document.getElementById('importModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                } else {
+                    console.error('Import modal not found for closing');
+                }
+            } catch (error) {
+                console.error('Error closing import modal:', error);
+            }
+        }
+
+        // Add/Edit Modal functionality
+        function openAddModal() {
+            try {
+                const modal = document.getElementById('editModal');
+                if (modal) {
+                    // Set modal to "add" mode
+                    const modalTitle = document.getElementById('editModal-title');
+                    const modalSubtitle = document.getElementById('modalSubtitle');
+                    const submitButton = document.getElementById('submitButton');
+                    const editForm = document.getElementById('editForm');
+                    const idField = document.getElementById('edit_id');
+
+                    if (modalTitle) modalTitle.textContent = 'Add New Common Word';
+                    if (modalSubtitle) modalSubtitle.style.display = 'none';
+                    if (submitButton) submitButton.textContent = 'Save';
+                    if (editForm) {
+                        editForm.action = '{{ url_for("system_admin.add_common_word_modal") }}';
+                    }
+                    if (idField) idField.value = '';
+
+                    // Reset form
+                    if (editForm) {
+                        editForm.reset();
+                        // Set is_active checkbox to checked by default for new entries
+                        const activeField = document.getElementById('edit_is_active');
+                        if (activeField) activeField.checked = true;
+                    }
+
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    console.error('Edit modal not found');
+                }
+            } catch (error) {
+                console.error('Error opening add modal:', error);
+            }
+        }
+
+        function openEditModal(id, term, meaning, isActive, translations) {
+            try {
+                const modal = document.getElementById('editModal');
+                if (modal) {
+                    // Set modal to "edit" mode
+                    const modalTitle = document.getElementById('editModal-title');
+                    const modalSubtitle = document.getElementById('modalSubtitle');
+                    const submitButton = document.getElementById('submitButton');
+                    const termDisplay = document.getElementById('editTermDisplay');
+
+                    if (modalTitle) modalTitle.textContent = 'Edit Common Word';
+                    if (modalSubtitle) {
+                        modalSubtitle.style.display = 'block';
+                    }
+                    if (submitButton) submitButton.textContent = 'Update';
+                    if (termDisplay) termDisplay.textContent = term;
+
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+
+                    // Populate form fields
+                    const idField = document.getElementById('edit_id');
+                    const termField = document.getElementById('edit_term');
+                    const meaningField = document.getElementById('edit_meaning');
+                    const activeField = document.getElementById('edit_is_active');
+
+                    if (idField) idField.value = id;
+                    if (termField) termField.value = term;
+                    if (meaningField) meaningField.value = meaning;
+                    if (activeField) activeField.checked = isActive;
+
+                    // Set form action
+                    const editForm = document.getElementById('editForm');
+                    if (editForm) {
+                        editForm.action = `{{ url_for('system_admin.edit_common_word_modal', id=0) }}`.replace('/0', `/${id}`);
+                    }
+
+                    // Populate translations dynamically
+                    const translationFields = {};
+                    const translatableLanguages = {{ TRANSLATABLE_LANGUAGES | tojson | safe }};
+                    translatableLanguages.forEach(code => {
+                        translationFields[code] = `edit_meaning_${code}`;
+                    });
+
+                    Object.keys(translationFields).forEach(lang => {
+                        const fieldId = translationFields[lang];
+                        const field = document.getElementById(fieldId);
+                        const value = translations && translations[lang] ? translations[lang] : '';
+                        if (field) field.value = value;
+                    });
+                } else {
+                    console.error('Edit modal not found');
+                }
+            } catch (error) {
+                console.error('Error opening edit modal:', error);
+            }
+        }
+
+        function closeEditModal() {
+            try {
+                const modal = document.getElementById('editModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                }
+            } catch (error) {
+                console.error('Error closing edit modal:', error);
+            }
+        }
+
+        // Handle form submissions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Edit form submission (used for both add and edit)
+            const editForm = document.getElementById('editForm');
+            if (editForm) {
+                editForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const idField = document.getElementById('edit_id');
+                    const isAddMode = !idField || !idField.value;
+                    submitForm(editForm, isAddMode ? 'add' : 'edit');
+                });
+            }
+        });
+
+        function submitForm(form, type) {
+            const formData = new FormData(form);
+            const url = form.action;
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            // Prevent double submission
+            if (submitBtn && submitBtn.disabled) return;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Saving...") }}';
+            }
+
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    showNotification(data.message, 'success');
+
+                    // Close modal
+                    closeEditModal();
+
+                    // Reload page to show updated data
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    // Show error message
+                    showNotification(data.message, 'error');
+
+                    // Show validation errors if any
+                    if (data.errors) {
+                        showValidationErrors(data.errors);
+                    }
+
+                    // Re-enable button on error
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        if (submitBtn.dataset.originalHtml) {
+                            submitBtn.innerHTML = submitBtn.dataset.originalHtml;
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while processing your request.', 'error');
+
+                // Re-enable button on error
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    if (submitBtn.dataset.originalHtml) {
+                        submitBtn.innerHTML = submitBtn.dataset.originalHtml;
+                    }
+                }
+            });
+        }
+
+        function showNotification(message, type) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+                type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`;
+            notification.textContent = message;
+
+            // Add to page
+            document.body.appendChild(notification);
+
+            // Remove after 5 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        function showValidationErrors(errors) {
+            // Clear previous error messages
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+            // Show new error messages
+            Object.keys(errors).forEach(field => {
+                const fieldElement = document.querySelector(`[name="${field}"]`);
+                if (fieldElement) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message text-red-600 text-sm mt-1';
+                    errorDiv.textContent = errors[field].join(', ');
+
+                    fieldElement.parentNode.appendChild(errorDiv);
+                }
+            });
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            const importModal = document.getElementById('importModal');
+            const editModal = document.getElementById('editModal');
+
+            // Import modal click outside
+            if (importModal) {
+                importModal.addEventListener('click', function(e) {
+                    if (e.target === importModal) {
+                        closeImportModal();
+                    }
+                });
+            }
+
+            // Edit modal click outside (used for both add and edit)
+            if (editModal) {
+                editModal.addEventListener('click', function(e) {
+                    if (e.target === editModal) {
+                        closeEditModal();
+                    }
+                });
+            }
+
+            // File upload drag and drop
+            const fileInput = document.getElementById('excel_file');
+            const form = document.getElementById('importForm');
+
+            if (fileInput) {
+                fileInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        validateFile(file);
+                    }
+                });
+            }
+
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const fileInput = document.getElementById('excel_file');
+                    if (!fileInput.files[0]) {
+                        e.preventDefault();
+                        if (window.showAlert) window.showAlert('Please select a file', 'warning');
+                        else window.__clientWarn && window.__clientWarn('Please select a file');
+                        return;
+                    }
+
+                    const file = fileInput.files[0];
+                    if (!validateFile(file)) {
+                        e.preventDefault();
+                        return;
+                    }
+                });
+            }
+        });
+
+        function validateFile(file) {
+            const allowedTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+                'application/vnd.ms-excel' // .xls
+            ];
+
+            if (!allowedTypes.includes(file.type)) {
+                if (window.showAlert) window.showAlert('Please select a valid Excel file (.xlsx or .xls)', 'warning');
+                else window.__clientWarn && window.__clientWarn('Please select a valid Excel file');
+                return false;
+            }
+
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                if (window.showAlert) window.showAlert('File size must be less than 10MB', 'warning');
+                else window.__clientWarn && window.__clientWarn('File size must be less than 10MB');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeImportModal();
+                closeEditModal();
+            }
+        });
+
+        // Debug: Log function availability
+        window.__clientLog && window.__clientLog('Common Words functions loaded:', {
+            openImportModal: typeof openImportModal,
+            closeImportModal: typeof closeImportModal,
+            openAddModal: typeof openAddModal,
+            openEditModal: typeof openEditModal,
+            closeEditModal: typeof closeEditModal
+        });
+    </script>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // Transform common words data for ag-grid
+    const commonWordsData = [
+        {% for word in common_words %}
+        {
+            id: {{ word.id }},
+            term: {{ word.term|tojson|safe }},
+            meaning: {{ word.meaning|tojson|safe }},
+            is_active: {{ word.is_active|lower }},
+            created_at: {{ (word.created_at|datetime_iso if word.created_at else '')|tojson|safe }},
+            meaning_translations: {{ (word.meaning_translations|tojson|safe if word.meaning_translations else '{}') }},
+            delete_url: "{{ url_for('system_admin.delete_common_word', id=word.id) }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        {
+            field: 'term',
+            headerName: 'Term',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'font-weight': '500', 'color': '#1f2937' }
+        },
+        {
+            field: 'meaning',
+            headerName: 'Meaning',
+            width: 400,
+            minWidth: 250,
+            maxWidth: 600,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellRenderer: function(params) {
+                if (!params.value) return '-';
+                const maxLength = 100;
+                if (params.value.length > maxLength) {
+                    return params.value.substring(0, maxLength) + '...';
+                }
+                return params.value;
+            }
+        },
+        {
+            field: 'is_active',
+            headerName: 'Status',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                if (isActive) {
+                    return '<span class="status-badge status-active"><i class="fas fa-check-circle mr-1"></i>Active</span>';
+                } else {
+                    return '<span class="status-badge status-inactive"><i class="fas fa-times-circle mr-1"></i>Inactive</span>';
+                }
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'created_at',
+            headerName: 'Created',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateOnly
+        },
+        {
+            field: 'actions',
+            headerName: 'Actions',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const data = params.data;
+                const termEscaped = (data.term || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const meaningEscaped = (data.meaning || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const translationsJson = JSON.stringify(data.meaning_translations || {}).replace(/'/g, "\\'");
+                const deleteUrl = data.delete_url || '';
+                const deleteConfirm = 'Are you sure you want to delete this common word?';
+
+                let html = '<div class="flex items-center justify-center gap-2">';
+                html += '<button class="edit-common-word-btn text-blue-600 hover:text-blue-800 transition-colors" ';
+                html += 'data-word-id="' + data.id + '" ';
+                html += 'data-term="' + termEscaped + '" ';
+                html += 'data-meaning="' + meaningEscaped + '" ';
+                html += 'data-is-active="' + data.is_active + '" ';
+                html += 'data-translations="' + translationsJson.replace(/"/g, '&quot;') + '" ';
+                html += 'title="Edit">';
+                html += '<i class="fas fa-pen"></i></button>';
+                html += '<form method="POST" action="' + deleteUrl + '" ';
+                html += 'class="inline delete-common-word-form" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '">';
+                html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                html += '<button type="submit" title="Delete" class="text-red-600 hover:text-red-800 transition-colors">';
+                html += '<i class="fas fa-trash"></i></button>';
+                html += '</form>';
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        {% if common_words %}
+        var result = AgGridHelper.create('commonWordsGrid', 'common-words', columnDefs, commonWordsData, {
+            onReady: function() {
+                var totalCountEl = document.getElementById('total-count');
+                if (totalCountEl) totalCountEl.style.display = 'block';
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+        {% endif %}
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+
+    // Event listeners for modal buttons
+    document.addEventListener('DOMContentLoaded', function() {
+        // Open import modal
+        const openImportBtn = document.getElementById('open-import-modal-btn');
+        if (openImportBtn && typeof openImportModal === 'function') {
+            openImportBtn.addEventListener('click', openImportModal);
+        }
+
+        // Close import modal
+        const closeImportBtn = document.getElementById('close-import-modal-btn');
+        const cancelImportBtn = document.getElementById('cancel-import-modal-btn');
+        if (closeImportBtn && typeof closeImportModal === 'function') {
+            closeImportBtn.addEventListener('click', closeImportModal);
+        }
+        if (cancelImportBtn && typeof closeImportModal === 'function') {
+            cancelImportBtn.addEventListener('click', closeImportModal);
+        }
+
+        // Open add modal
+        const openAddBtn = document.getElementById('open-add-modal-btn');
+        if (openAddBtn && typeof openAddModal === 'function') {
+            openAddBtn.addEventListener('click', openAddModal);
+        }
+
+        // Close edit modal
+        const closeEditBtn = document.getElementById('close-edit-modal-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-modal-btn');
+        if (closeEditBtn && typeof closeEditModal === 'function') {
+            closeEditBtn.addEventListener('click', closeEditModal);
+        }
+        if (cancelEditBtn && typeof closeEditModal === 'function') {
+            cancelEditBtn.addEventListener('click', closeEditModal);
+        }
+
+        // Edit common word button (event delegation for dynamically created buttons)
+        $(document).on('click', '.edit-common-word-btn', function() {
+            if (typeof openEditModal === 'function') {
+                const wordId = $(this).data('word-id');
+                const term = $(this).data('term');
+                const meaning = $(this).data('meaning');
+                const isActive = $(this).data('is-active');
+                const translations = $(this).data('translations');
+                openEditModal(wordId, term, meaning, isActive, translations);
+            }
+        });
+
+        // Delete common word form (event delegation)
+        $(document).on('submit', '.delete-common-word-form', function(e) {
+            const confirmMsg = $(this).data('confirm');
+            if (confirmMsg) {
+                e.preventDefault();
+                const form = this;
+                function doSubmit() { form.submit(); }
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(confirmMsg, doSubmit, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                } else if (window.showConfirmation) {
+                    window.showConfirmation(confirmMsg, doSubmit, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                } else {
+                    doSubmit();
+                }
+                return false;
+            }
+        });
+    });
+    </script>
+{% endblock %}

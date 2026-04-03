@@ -1,0 +1,137 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}Manage Publications{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+    // Optional: JS for clearing search
+    function clearSearch() {
+        document.getElementById('search_query_input').value = '';
+        document.getElementById('searchForm').submit();
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Clear search button
+        const clearBtn = document.getElementById('clear-search-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', clearSearch);
+        }
+
+        // Delete publication forms use global confirm handler (components.js) with data-confirm and data-confirm-danger
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title='Manage Publications',
+        icon='fas fa-book',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Publication Management'}
+        ],
+        actions=[
+            {
+                'type': 'link',
+                'text': 'Upload New Publication',
+                'url': url_for('content_management.new_publication'),
+                'icon': 'fas fa-plus',
+                'classes': 'professional-action-btn professional-action-btn-green'
+            }
+        ]
+    ) }}
+
+    <form method="GET" action="{{ url_for('content_management.manage_publications') }}" id="searchForm" class="mb-6">
+        <div class="flex flex-col sm:flex-row gap-2">
+            <input type="text" name="search" id="search_query_input" value="{{ search_query or '' }}" placeholder="Search by title..." class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            <button type="submit" class="btn btn-dark">Search</button>
+            {% if search_query %}
+            <button type="button" id="clear-search-btn" class="btn btn-secondary btn-sm whitespace-nowrap">Clear</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if publications and publications.items %}
+    <div class="overflow-x-auto bg-white rounded-lg shadow-md border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Publication Date</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Description</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for pub in publications.items %}
+                <tr>
+                    <td class="px-6 py-4 text-sm text-gray-900 align-top">{{ pub.title }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 align-top">{{ pub.publication_date|datetime_local('date') if pub.publication_date else '-' }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900 align-top break-all">{{ pub.filename }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700 align-top">{{ pub.description | truncate(100, true) if pub.description else '-' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2 align-top">
+                        <a href="{{ url_for('content_management.edit_publication', publication_id=pub.id) }}" class="text-indigo-600 hover:text-indigo-900" title="Edit {{ pub.title }}"><i class="fas fa-pen"></i> Edit</a>
+                        <form action="{{ url_for('content_management.delete_publication', publication_id=pub.id) }}" method="POST" class="inline-block delete-publication-form" data-confirm="Are you sure you want to delete '{{ pub.title|e }}'? This action cannot be undone." data-confirm-danger="true">
+                            {{ delete_form.csrf_token }}
+                            <button type="submit" class="text-red-600 hover:text-red-900" title="Delete {{ pub.title }}"><i class="fas fa-trash"></i> Delete</button>
+                        </form>
+                        <a href="{{ url_for('content_management.download_publication_file_admin', publication_id=pub.id) }}" class="text-green-600 hover:text-green-900" title="Download {{ pub.filename }}"><i class="fas fa-download"></i> Download</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if publications.pages > 1 %}
+    <nav class="mt-6" aria-label="Pagination">
+        <ul class="flex justify-center items-center space-x-2">
+            {# Previous Page Link #}
+            {% if publications.has_prev %}
+                <li><a href="{{ url_for('content_management.manage_publications', page=publications.prev_num, search=search_query) }}" class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">&laquo; Previous</a></li>
+            {% else %}
+                <li class="disabled"><span class="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed">&laquo; Previous</span></li>
+            {% endif %}
+
+            {# Page Numbers #}
+            {% for page_num in publications.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if publications.page == page_num %}
+                        <li><span class="px-3 py-1 bg-blue-600 text-white border border-blue-600 rounded-md text-sm font-medium z-10">{{ page_num }}</span></li>
+                    {% else %}
+                        <li><a href="{{ url_for('content_management.manage_publications', page=page_num, search=search_query) }}" class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">{{ page_num }}</a></li>
+                    {% endif %}
+                {% else %}
+                    <li><span class="px-3 py-1 text-sm">...</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {# Next Page Link #}
+            {% if publications.has_next %}
+                <li><a href="{{ url_for('content_management.manage_publications', page=publications.next_num, search=search_query) }}" class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Next &raquo;</a></li>
+            {% else %}
+                <li class="disabled"><span class="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed">Next &raquo;</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-8 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <i class="far fa-file-alt fa-3x mx-auto text-gray-400 mb-2"></i>
+        <p class="mt-2 text-sm font-medium text-gray-600">No publications found.</p>
+        {% if search_query %}
+             <p class="text-xs text-gray-500">Try adjusting your search terms or <a href="{{ url_for('content_management.manage_publications') }}" class="text-blue-600 hover:underline">clear the search</a>.</p>
+        {% else %}
+            <p class="text-xs text-gray-500">Click "Upload New Publication" to add one.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

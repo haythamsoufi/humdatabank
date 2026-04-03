@@ -1,0 +1,1090 @@
+{
+  "navigation": {
+    "home": "全球概览",
+    "indicatorBank": "指标库",
+    "publications": "资源",
+    "analysis": "分析",
+    "dataVisualization": "探索数据",
+    "disaggregationAnalysis": "分类分析",
+    "globalInitiative": "全球倡议",
+    "unifiedPlanningReporting": "统一规划与报告",
+    "chat": "聊天",
+    "countries": "国家",
+    "organizationalStructure": "组织结构",
+    "apiBuilder": "API构建器",
+    "language": "语言",
+    "siteTitle": "NGO 数据库",
+    "databank": "数据库",
+    "login": "登录",
+    "openMainMenu": "打开主菜单"
+  },
+  "demoBanner": {
+    "badge": "演示",
+    "description": "这是一个演示环境。",
+    "scope": "范围"
+  },
+  "homepage": {
+    "hero": {
+      "title": "NGO 数据库",
+      "subtitle": "访问数据、可视化和洞察",
+      "description": "探索来自国际红十字与红新月联合会综合人道主义数据、指标和出版物。",
+      "exploreButton": "探索数据",
+      "learnMoreButton": "了解更多"
+    },
+    "features": {
+      "title": "我们提供什么",
+      "dataAccess": {
+        "title": "数据访问",
+        "description": "全面访问人道主义数据和指标"
+      },
+      "visualizations": {
+        "title": "可视化",
+        "description": "用于数据分析的交互式图表"
+      },
+      "publications": {
+        "title": "出版物",
+        "description": "研究报告和出版物"
+      },
+      "insights": {
+        "title": "洞察",
+        "description": "基于数据的洞察和分析"
+      }
+    },
+    "featureCards": {
+      "visualizations": {
+        "title": "交互式可视化",
+        "description": "使用复杂的图表和地图分析趋势和模式。",
+        "button": "前往数据可视化 →"
+      },
+      "chat": {
+        "title": "与我们的数据聊天",
+        "description": "用自然语言询问平台数据相关问题。",
+        "button": "与数据聊天 →"
+      },
+      "countries": {
+        "title": "国家概况",
+        "description": "探索各个国家的详细信息和统计数据。",
+        "button": "浏览国家 →"
+      }
+    },
+    "latestFromField": {
+      "title": "来自现场的最新消息",
+      "story1": {
+        "title": "X地区紧急响应",
+        "description": "为受近期洪水影响的社区提供重要援助...",
+        "link": "阅读更多 →"
+      },
+      "story2": {
+        "title": "健康倡议的影响",
+        "description": "新的移动诊所为偏远村庄扩大医疗保健服务...",
+        "link": "阅读更多 →"
+      },
+      "story3": {
+        "title": "发现更多故事",
+        "description": "探索人道主义网络在全球工作的影响。",
+        "link": "查看所有更新 →"
+      }
+    },
+    "stats": {
+      "title": "我们的影响",
+      "countries": "国家",
+      "indicators": "指标",
+      "publications": "出版物",
+      "dataPoints": "数据点"
+    }
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "发生错误",
+    "notFound": "页面未找到",
+    "backToHome": "返回首页",
+    "search": "搜索",
+    "filter": "筛选",
+    "sort": "排序",
+    "view": "查看",
+    "edit": "编辑",
+    "delete": "删除",
+    "save": "保存",
+    "cancel": "取消",
+    "submit": "提交",
+    "close": "关闭",
+    "next": "下一个",
+    "previous": "上一个",
+    "download": "下载",
+    "share": "分享",
+    "more": "更多",
+    "less": "更少",
+    "tryAgain": "重试",
+    "home": "首页",
+    "yes": "是",
+    "no": "否",
+    "select": "选择"
+  },
+  "indicatorBank": {
+    "title": "指标库",
+    "meta": {
+      "description": "浏览NGO 指标库中的指标。"
+    },
+    "hero": {
+      "title": "NGO 指标库",
+      "description": "探索我们在NGO Databank 运营中使用的综合指标集合。"
+    },
+    "loading": {
+      "title": "正在加载指标库",
+      "description": "请稍候，我们正在获取指标..."
+    },
+    "error": {
+      "title": "指标库错误"
+    },
+    "search": {
+      "placeholder": "搜索指标..."
+    },
+    "filter": {
+      "placeholder": "筛选指标..."
+    },
+    "viewMode": {
+      "grid": "网格视图",
+      "table": "表格视图"
+    },
+    "indicator": "个指标",
+    "indicators": "个指标",
+    "filters": {
+      "title": "筛选器",
+      "active": "活跃",
+      "apply": "应用筛选器",
+      "clearAll": "清除全部",
+      "search": {
+        "title": "搜索指标",
+        "placeholder": "按指标名称或定义搜索..."
+      },
+      "type": {
+        "label": "类型",
+        "all": "所有类型"
+      },
+      "sector": {
+        "label": "部门",
+        "all": "所有部门"
+      },
+      "subsector": {
+        "label": "子部门",
+        "all": "所有子部门"
+      },
+      "status": {
+        "label": "状态",
+        "activeOnly": "仅活跃",
+        "all": "所有指标",
+        "archivedOnly": "仅已归档"
+      }
+    },
+    "results": {
+      "showing": "显示",
+      "matching": " 匹配 \"{{term}}\"",
+      "noResults": "未找到符合您条件的指标。",
+      "noIndicators": "目前没有可用的指标。"
+    },
+    "table": {
+      "name": "名称",
+      "type": "类型",
+      "sector": "部门",
+      "subsector": "子部门",
+      "unit": "单位"
+    },
+    "guide": {
+      "title": "指标选择指南",
+      "step1": {
+        "title": "定义目的",
+        "description": "选择指标的第一步应该是明确定义和理解其使用目的：指标将在哪里、在什么背景下以及为了什么目标使用？"
+      },
+      "step2": {
+        "title": "识别部门/子部门",
+        "description": "定义您的解决方案中需要存在的重点领域。此库中的指标按上述部门组织。每个部门进一步细分为子部门，指标按子部门分组。"
+      },
+      "step3": {
+        "title": "选择具体指标",
+        "description": "每个子部门随后细分为用于测量和数据收集的具体指标。您可以通过点击每个指标来了解更多信息。"
+      }
+    },
+    "proposeNewIndicator": "找不到指标？在此处提出新指标。",
+    "proposeModal": {
+      "thankYou": "谢谢！",
+      "successMessage": "您的指标提案已成功提交。我们将对其进行审查，如有需要会与您联系。",
+      "confirmationEmailSent": "确认邮件已发送",
+      "confirmationEmailMessage": "确认邮件已发送至 {{email}}。请检查您的收件箱（和垃圾邮件文件夹）以获取有关您提交的详细信息。",
+      "close": "关闭",
+      "clearAll": "清除全部",
+      "cancel": "取消",
+      "submitting": "提交中...",
+      "submitProposal": "提交提案",
+      "failedToSubmit": "提交提案失败：{{message}}"
+    }
+  },
+  "resources": {
+    "title": "资源",
+    "meta": {
+      "description": "浏览NGO Databank 的研究报告、出版物和资源。"
+    },
+    "hero": {
+      "title": "资源",
+      "description": "NGO Databank 的研究报告、出版物和资源"
+    },
+    "loading": {
+      "title": "正在加载资源",
+      "description": "请稍候，我们正在获取资源..."
+    },
+    "error": {
+      "title": "资源错误",
+      "loadFailed": "无法加载资源。请稍后再试。"
+    },
+    "search": {
+      "placeholder": "搜索资源...",
+      "button": "搜索"
+    },
+    "pagination": {
+      "previous": "上一个",
+      "next": "下一个",
+      "page": "页面",
+      "of": "共"
+    },
+    "noResults": "未找到符合您搜索条件的资源。",
+    "noResources": "目前没有可用的资源。",
+    "sections": {
+      "publications": {
+        "title": "出版物",
+        "expand": "展开出版物",
+        "collapse": "折叠出版物",
+        "pagination": "出版物分页",
+        "none": "没有可用的出版物。",
+        "noResults": "未找到与您的搜索匹配的出版物。"
+      },
+      "otherResources": {
+        "title": "其他资源",
+        "expand": "展开其他资源",
+        "collapse": "折叠其他资源",
+        "pagination": "其他资源分页",
+        "loading": "正在加载其他资源...",
+        "none": "没有其他可用资源",
+        "noResults": "未找到其他资源",
+        "tryAdjusting": "请尝试调整您的搜索词。",
+        "comingSoon": "其他资源类型将在可用时添加到这里。"
+      }
+    },
+    "pdfViewer": {
+      "loading": "正在加载PDF...",
+      "error": "无法加载PDF。请尝试下载文件。",
+      "download": "下载PDF",
+      "close": "关闭",
+      "previousPage": "上一页",
+      "nextPage": "下一页",
+      "pageOf": "第{{current}}页，共{{total}}页",
+      "pageError": "无法加载PDF页面。请尝试下载文件。"
+    }
+  },
+  "dataVisualization": {
+    "title": "数据可视化",
+    "meta": {
+      "description": "探索NGO Databank 的交互式数据可视化。"
+    },
+    "hero": {
+      "title": "数据可视化",
+      "description": "通过图表、地图和仪表板与关键人道主义数据进行交互。"
+    },
+    "sections": {
+      "fundingOverview": {
+        "title": "资金概览",
+        "placeholder": "图表组件（例如，Recharts BarChart）将在这里。"
+      },
+      "globalReach": {
+        "title": "全球覆盖地图",
+        "placeholder": "交互式地图组件（例如，Leaflet, Mapbox）将在这里。"
+      },
+      "sectoralImpact": {
+        "title": "部门影响",
+        "healthImpact": "健康影响图表",
+        "washActivities": "WASH活动图表"
+      }
+    }
+  },
+  "exploreData": {
+    "title": "探索数据",
+    "meta": {
+      "description": "通过选择指标、国家和图表类型创建自定义数据可视化并探索NGO Databank 数据。"
+    },
+    "hero": {
+      "title": "探索数据",
+      "description": "通过选择指标、国家和图表类型创建自定义数据可视化。下载图表用于报告和演示。"
+    },
+    "configure": {
+      "title": "配置您的可视化",
+      "step1": "选择指标",
+      "step2": "选择国家",
+      "step3": "选择期间和图表类型",
+      "filterBySector": "按部门筛选（可选）",
+      "allSectors": "所有部门",
+      "selectIndicator": "选择指标 *",
+      "chooseIndicator": "选择指标...",
+      "noIndicatorsAvailable": "没有可用指标",
+      "loading": "加载中...",
+      "selectCountries": "选择国家 *",
+      "chooseCountries": "选择国家...",
+      "allCountriesSelected": "已选择所有国家",
+      "regionsSelected": "已选择 {{count}} 个区域",
+      "selected": "已选择：",
+      "countriesSelected": "已选择 {{count}} 个国家",
+      "chartType": "图表类型",
+      "timePeriod": "期间 *",
+      "singleYear": "单年",
+      "range": "范围",
+      "selectYear": "选择年份...",
+      "loadingPeriods": "加载期间...",
+      "fromYear": "起始年份",
+      "toYear": "结束年份",
+      "from": "从...",
+      "to": "到...",
+      "selectedRange": "选择的范围：{{from}} - {{to}}",
+      "years": "{{count}} 年",
+      "generateChart": "生成图表",
+      "generating": "生成中...",
+      "clearSavedConfiguration": "清除已保存的配置",
+      "summary": "摘要",
+      "indicator": "指标：",
+      "countries": "国家：",
+      "period": "期间：",
+      "notSelected": "未选择"
+    },
+    "chart": {
+      "title": "数据可视化",
+      "chart": "图表",
+      "table": "表格",
+      "generatedOn": "生成于",
+      "downloadData": "下载数据为 CSV",
+      "data": "数据",
+      "downloadChart": "下载图表为 PNG",
+      "noChartData": "没有可用的图表数据",
+      "checkConsole": "请检查控制台以获取调试信息",
+      "configuration": "配置",
+      "sector": "部门：",
+      "chartType": "图表类型：",
+      "years": "年份：",
+      "dataSummary": "数据摘要",
+      "totalDataPoints": "总数据点：",
+      "maxValue": "最大值：",
+      "minValue": "最小值：",
+      "average": "平均值：",
+      "allCountries": "所有国家",
+      "regions": "区域（{{count}}）",
+      "countries": "国家（{{count}}）",
+      "allCountriesSelected": "已选择所有国家",
+      "entireRegion": "（整个区域）",
+      "moreCountries": "+{{count}} 个国家",
+      "keyStatistics": "关键统计",
+      "totalGrowth": "总增长",
+      "currentTotal": "当前总计",
+      "averageAnnualGrowth": "平均年增长率",
+      "tableHeaders": {
+        "value": "值",
+        "year": "年份",
+        "country": "国家"
+      }
+    },
+    "placeholder": {
+      "title": "数据可视化",
+      "subtitle": "准备探索您的数据",
+      "noChartGenerated": "尚未生成图表",
+      "description": "选择您喜欢的部门、指标、国家和图表类型，然后点击\"生成可视化\"以创建您的自定义数据视图。",
+      "feature1": "从多种图表类型中选择（折线图、柱状图、饼图）",
+      "feature2": "比较不同国家的数据",
+      "feature3": "分析随时间变化的趋势"
+    },
+    "loading": {
+      "generating": "正在生成您的可视化...",
+      "loadingData": "正在加载部门和指标..."
+    },
+    "chartTypes": {
+      "line": {
+        "name": "折线图",
+        "description": "显示随时间变化的趋势"
+      },
+      "bar": {
+        "name": "柱状图",
+        "description": "比较不同类别的值"
+      },
+      "pie": {
+        "name": "饼图",
+        "description": "显示整体的比例"
+      }
+    },
+    "confirmClearCache": "您确定要清除所有已保存的配置吗？这将重置您的选择和图表数据。"
+  },
+  "chat": {
+    "title": "与我们的数据聊天",
+    "meta": {
+      "description": "使用AI助手询问平台数据相关问题。"
+    },
+    "hero": {
+      "title": "与我们的数据聊天",
+      "description": "在下面输入您关于平台数据的问题。"
+    },
+    "messages": {
+      "welcome": "你好！我今天如何帮助您探索平台数据？",
+      "thinking": "思考中...",
+      "placeholder": "询问资金、项目、国家..."
+    },
+    "actions": {
+      "send": "发送"
+    },
+    "placeholder": {
+      "response": "我收到了您的消息：\"{{message}}\"。作为占位符，我还无法访问实时数据，但我被设计为基于可用数据库回答有关人道主义活动、资金和影响的问题。"
+    }
+  },
+  "globalOverview": {
+    "title": "全球概览",
+    "meta": {
+      "description": "探索NGO Databank 的全球人道主义数据和指标。"
+    },
+    "hero": {
+      "title": "全球概览",
+      "description": "探索来自红十字与红新月会国际联合会的综合人道主义数据、指标和见解。"
+    },
+    "indicators": {
+      "volunteers": "志愿者",
+      "staff": "工作人员",
+      "branches": "分支机构",
+      "localUnits": "地方单位",
+      "bloodDonors": "献血者",
+      "firstAid": "急救",
+      "peopleReached": "受益人群",
+      "income": "收入",
+      "expenditure": "支出"
+    },
+    "peopleReached": {
+      "crossCutting": "跨领域",
+      "crossCuttingDesc": "跨领域人道主义活动和干预措施",
+      "climateEnvironmental": "气候和环境危机",
+      "climateEnvironmentalDesc": "通过气候和环境危机响应受益的人群",
+      "evolvingCrises": "演变中的危机和灾害",
+      "evolvingCrisesDesc": "通过演变中的危机和灾害响应受益的人群",
+      "healthWellbeing": "健康和福祉方面的差距扩大",
+      "healthWellbeingDesc": "通过健康和福祉项目受益的人群",
+      "migrationIdentity": "移民和身份",
+      "migrationIdentityDesc": "通过移民和身份支持项目受益的人群",
+      "valuesPowerInclusion": "价值观、权力和包容",
+      "valuesPowerInclusionDesc": "通过价值观、权力和包容倡议受益的人群",
+      "subIndicators": {
+        "longTermServices": "通过长期服务和项目受益的人数",
+        "emergencyResponse": "通过应急响应和早期恢复项目受益的人数",
+        "climateAdaptation": "气候适应",
+        "environmentalProtection": "环境保护",
+        "disasterRiskReduction": "减少灾害风险",
+        "sustainableDevelopment": "可持续发展",
+        "emergencyResponseRecovery": "应急响应",
+        "recoveryRehabilitation": "恢复和康复",
+        "earlyWarningSystems": "早期预警系统",
+        "crisisPreparedness": "危机准备",
+        "primaryHealthcare": "初级医疗保健",
+        "mentalHealthSupport": "心理健康支持",
+        "nutritionPrograms": "营养项目",
+        "healthEducation": "健康教育",
+        "migrantAssistance": "移民援助",
+        "refugeeSupport": "难民支持",
+        "communityIntegration": "社区融合",
+        "identityProtection": "身份保护",
+        "genderEquality": "性别平等",
+        "youthEmpowerment": "青年赋权",
+        "socialInclusion": "社会包容",
+        "humanitarianValues": "人道主义价值观"
+      }
+    },
+    "regions": {
+      "global": "全球概览",
+      "globalDesc": "查看所有地区的数据",
+      "africa": "非洲",
+      "africaDesc": "非洲国家",
+      "americas": "美洲",
+      "americasDesc": "北美和南美",
+      "asiaPacific": "亚太地区",
+      "asiaPacificDesc": "亚太地区国家",
+      "europeCentralAsia": "欧洲和中亚",
+      "europeCentralAsiaDesc": "欧洲和中亚国家",
+      "mena": "中东和北非",
+      "menaDesc": "中东和北非国家"
+    },
+    "map": {
+      "title": "{{region}}人道主义概览",
+      "description": "显示{{organization}}活动、指标和影响的交互式地图{{location}} {{year}}。{{indicatorInstruction}}",
+      "globalLocation": "全球",
+      "regionalLocation": "在{{region}}",
+      "nationalLocation": "在{{country}}",
+      "yearFilter": "{{year}}年",
+      "peopleReachedInstruction": "选择上面的子类别查看特定数据。",
+      "indicatorInstruction": "选择上面的指标过滤数据。",
+      "regionSelector": "地区：",
+      "countriesInRegion": "{{region}}中的{{count}}个国家",
+      "allRegions": "所有地区",
+      "total": "总计：{{value}}",
+      "globalTotal": "全球总计",
+      "selectedCountry": "选定的国家",
+      "downloadCSV": "将数据下载为CSV文件",
+      "downloadPNG": "将地图下载为PNG图像",
+      "cacheStatus": {
+        "cached": "📦 已缓存",
+        "live": "🔄 实时",
+        "clearCache": "🗑️ 清除",
+        "clearCacheTitle": "清除缓存"
+      },
+      "dataRange": "数据范围",
+      "bubbleSize": "气泡大小",
+      "choroplethMap": "等值区域地图",
+      "bubbleMap": "气泡地图",
+      "barChart": "条形图",
+      "showAbbreviated": "显示缩写值 (K, M, B)",
+      "showFull": "显示完整值 (1,234,567)",
+      "stopAnimation": "停止动画",
+      "startBarChartRace": "开始条形图竞赛",
+      "startTimeAnimation": "开始时间动画",
+      "scrollToTop": "滚动到顶部",
+      "admin": "管理",
+      "showAdmin": "显示 {{level}}",
+      "countries": "国家",
+      "areas": "区域",
+      "areasEstimated": "区域（估计）"
+    },
+    "quickPrompts": {
+      "afghanVolunteers": "告诉我关于阿富汗红新月会志愿者的情况",
+      "disasterResponse": "向我展示全球灾害响应数据",
+      "humanitarianIndicators": "主要的人道主义指标是什么？"
+    },
+    "aiResponses": {
+      "afghanRedCrescent": "在过去几年中，阿富汗红新月会（ARCS）在很大程度上依赖其志愿者网络来应对阿富汗各地的自然灾害、健康危机和冲突相关的紧急情况。2013年，ARCS报告了约23,440名活跃志愿者（<a href=\"https://arcs.af/sites/default/files/2021-05/English%20Booklet%20size%209%20x%2014%20cm.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">来源</a>），在几乎所有省份的活动中做出贡献。ARCS志愿者参与努力的纵向审查，由瑞典红十字会和ICRC支持，在案例研究中详细说明（<a href=\"https://ifrc.org/sites/default/files/2024-10/Longitudunal%20Review%20Case%20study_Afghan%20Red%20Crescent.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">来源</a>）。志愿者在重大紧急情况中发挥了关键作用，如2015年的雪崩、2022年的帕克蒂卡地震和2023年的赫拉特地震。根据NGO Databank 的<a href=\"/resources\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline inline-flex items-center\"><svg class=\"w-4 h-4 mr-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1\" /></svg>Everyone Counts 2022报告</a>，ARCS报告了393,077名志愿者贡献了超过210万小时的服务，包括健康相关活动中的257,437小时，培训了56,456人，31,600人接受了急救。这些数字突出了ARCS运营中志愿服务的规模和影响，尽管其他来源表明志愿者数量随时间波动。",
+      "disasterResponse": "全球人道主义网络每年应对数百起灾害和紧急情况，在全球提供关键援助。2023年，该网络支持了1,000多起灾害响应行动，覆盖了受气候相关灾害、冲突和健康紧急情况影响的超过1.6亿人。主要响应领域包括紧急避难所、粮食安全、水和卫生、医疗服务以及心理社会支持。响应行动通常通过灾害应急基金（DREF）和紧急呼吁进行协调，以便为受影响社区提供快速有效的援助。",
+      "humanitarianIndicators": "NGO 数据库跟踪几个关键的人道主义指标，包括志愿者、工作人员、地方单位、献血者、急救接受者、受益人群、收入和支出。这些指标提供了关于网络在不同地区和背景下能力、覆盖范围和影响的全面见解。数据有助于衡量实现人道主义目标的进展，并为未来行动的战略决策提供信息。",
+      "regionalComparison": "志愿者数量的区域比较显示了世界不同地区参与的不同水平。非洲和亚洲通常拥有最多的志愿者，反映了这些地区广泛的社区项目。欧洲和美洲在特定领域如灾害响应和医疗服务方面显示出强大的志愿者参与。中东特别在应急响应和社区健康倡议方面表现出不断增长的志愿者参与。"
+    },
+    "chartTitles": {
+      "arcsVolunteers": "ARCS志愿者（2019-2023）",
+      "disasterResponse": "灾害响应行动（2019-2023）",
+      "humanitarianIndicators": "关键人道主义指标（2023）",
+      "regionalComparison": "按地区划分的志愿者（2023）",
+      "afghanistanVolunteers": "阿富汗志愿者（{{year}}）"
+    },
+    "copyButton": {
+      "copy": "将文本复制到剪贴板",
+      "copied": "✓ 已复制！"
+    }
+  },
+  "countries": {
+    "title": "国家概况",
+    "meta": {
+      "description": "按国家探索人道主义活动与数据。"
+    },
+    "hero": {
+      "title": "国家概况",
+      "description": "选择一个国家查看详细信息、数据和影响故事。"
+    },
+    "loading": {
+      "title": "正在加载国家",
+      "description": "请稍候，我们正在获取国家概况..."
+    },
+    "error": {
+      "title": "国家错误",
+      "loadFailed": "无法加载国家列表。"
+    },
+    "search": {
+      "label": "搜索国家",
+      "placeholder": "按国家、国家红会或ISO代码搜索...",
+      "noResults": "未找到匹配您搜索的国家。"
+    },
+    "noCountries": "目前没有要显示的国家。",
+    "regions": "地区",
+    "countries": "国家",
+    "selectRegion": "选择地区",
+    "card": {
+      "viewProfile": "查看概况",
+      "comingSoon": "即将推出",
+      "profileDataComingSoon": "{{name}} - 概况数据即将推出",
+      "viewProfileFor": "查看{{name}}的概况"
+    },
+    "detail": {
+      "title": "国家概况",
+      "notFound": "未找到国家概况",
+      "error": "请求的国家概况未找到或尚不可用。",
+      "backToList": "返回国家列表",
+      "atAGlance": "概览",
+      "nationalSociety": "国家红会"
+    }
+  },
+  "sectorIndicators": {
+    "title": "部门指标",
+    "loading": {
+      "title": "正在加载指标",
+      "description": "请稍候，我们正在获取指标..."
+    },
+    "error": {
+      "title": "错误",
+      "loadFailed": "无法加载指标。请稍后再试。",
+      "invalidFilter": "无效的筛选器类型"
+    },
+    "search": {
+      "placeholder": "搜索指标...",
+      "button": "搜索"
+    },
+    "backToBank": "返回指标库"
+  },
+  "footer": {
+    "copyright": "© 2024 {orgName}。保留所有权利。",
+    "privacy": "隐私政策",
+    "terms": "服务条款",
+    "contact": "联系我们",
+    "mobileApps": {
+      "title": "移动应用",
+      "description": "下载我们的移动应用，适用于Android和iOS设备",
+      "downloadAndroid": "下载 Android 应用",
+      "downloadIOS": "下载 iOS 应用"
+    },
+    "api": {
+      "readDocs": "阅读 API 文档"
+    },
+    "orgLogoAlt": "组织标志",
+    "organizationName": "红十字与红新月会国际联合会",
+    "developerTools": {
+      "title": "开发者工具",
+      "description": "构建和测试API端点以编程方式访问平台数据",
+      "moreInfo": "有关完整说明，请阅读 API 文档，涵盖端点、参数、分页以及分类选项。",
+      "readDocs": "阅读 API 文档"
+    },
+    "developedBy": "由叙利亚阿拉伯红新月会志愿者海瑟姆·阿尔苏菲开发"
+  },
+  "downloadApps": {
+    "title": "下载移动应用",
+    "meta": {
+      "description": "下载NGO 数据库移动应用，适用于Android和iOS设备。"
+    },
+    "hero": {
+      "title": "下载移动应用",
+      "description": "获取NGO 数据库移动应用，适用于Android和iOS设备。"
+    },
+    "android": {
+      "title": "Android应用",
+      "description": "下载适用于Android设备的APK文件",
+      "downloadButton": "下载APK",
+      "version": "版本 1.0.0"
+    },
+    "ios": {
+      "title": "iOS应用",
+      "description": "下载适用于iOS设备的IPA文件",
+      "downloadButton": "下载IPA",
+      "version": "版本 1.0.0"
+    },
+    "instructions": {
+      "title": "安装说明",
+      "android": {
+        "title": "Android",
+        "step1": "使用上面的按钮下载APK文件",
+        "step2": "在设备设置中启用\"允许安装未知来源的应用\"",
+        "step3": "打开下载的APK文件并按照安装提示操作"
+      },
+      "ios": {
+        "title": "iOS",
+        "step1": "使用上面的按钮下载IPA文件",
+        "step2": "将您的iOS设备连接到计算机",
+        "step3": "使用iTunes或Finder在您的设备上安装IPA文件",
+        "step4": "在设置 > 通用 > 设备管理中信任开发者证书"
+      }
+    }
+  },
+  "apiBuilder": {
+    "title": "API端点构建器",
+    "meta": {
+      "description": "构建和测试用于访问平台数据的API端点。"
+    },
+    "hero": {
+      "title": "API端点构建器",
+      "description": "构建和测试API端点以编程方式访问平台数据。"
+    },
+    "navigation": {
+      "overview": "概述",
+      "documentation": "文档",
+      "builder": "构建器"
+    },
+    "description": {
+      "title": "数据访问API",
+      "text": "使用此工具构建API端点以访问平台数据。数据端点允许您使用各种过滤器和参数检索表单提交、指标和其他数据。",
+      "note": "注意：此工具仅适用于公共数据端点。如需完整API访问，请联系管理员。"
+    },
+    "endpoint": {
+      "title": "端点",
+      "method": "GET",
+      "path": "http://localhost:5000/api/v1/data",
+      "description": "从表单和提交中检索数据（API密钥自动包含）"
+    },
+    "parameters": {
+      "title": "查询参数",
+      "description": "选择并配置您要在API请求中包含的参数：",
+      "clearAll": "清除全部",
+      "loadingOptions": "正在加载参数选项...",
+      "template_id": {
+        "label": "模板",
+        "description": "按特定表单模板筛选",
+        "placeholder": "选择模板"
+      },
+      "submission_id": {
+        "label": "提交ID",
+        "description": "按特定提交ID筛选",
+        "placeholder": "输入提交ID（数字）"
+      },
+      "item_type": {
+        "label": "项目类型",
+        "description": "按项目类型筛选",
+        "placeholder": "选择项目类型",
+        "options": {
+          "indicator": "指标",
+          "question": "问题",
+          "document_field": "文档字段"
+        }
+      },
+      "item_id": {
+        "label": "项目ID",
+        "description": "按表单项目ID筛选",
+        "placeholder": "输入项目ID（数字）"
+      },
+      "period_name": {
+        "label": "期间名称",
+        "description": "按期间名称筛选",
+        "placeholder": "输入期间名称"
+      },
+      "country_id": {
+        "label": "国家",
+        "description": "按特定国家筛选",
+        "placeholder": "选择国家"
+      },
+      "submission_type": {
+        "label": "提交类型",
+        "description": "按提交类型过滤",
+        "placeholder": "选择提交类型",
+        "options": {
+          "assigned": "已分配",
+          "public": "公开"
+        }
+      },
+      "disagg": {
+        "label": "包含分类数据",
+        "description": "在结果中包含分类数据（如果可用）",
+        "placeholder": "选择是或否"
+      },
+      "page": {
+        "label": "页面",
+        "description": "分页的页码（默认：1）",
+        "placeholder": "输入页码"
+      },
+      "per_page": {
+        "label": "每页项目数",
+        "description": "每页项目数（默认：20）",
+        "placeholder": "输入每页项目数"
+      }
+    },
+    "generatedUrl": {
+      "title": "生成的URL",
+      "description": "您的API端点URL，包含所选参数：",
+      "copy": "复制URL",
+      "copied": "已复制！",
+      "test": "测试端点",
+      "testing": "测试中...",
+      "error": "测试端点时出错"
+    },
+    "response": {
+      "title": "响应预览",
+      "loading": "正在加载响应...",
+      "error": "加载响应时出错",
+      "noData": "没有返回数据",
+      "status": "状态：{{code}}",
+      "showRaw": "显示原始响应"
+    },
+    "examples": {
+      "title": "示例查询",
+      "description": "尝试这些示例查询开始：",
+      "allData": "所有数据",
+      "assignedSubmissions": "仅限已分配的提交",
+      "publicSubmissions": "仅限公开提交",
+      "indicatorsOnly": "仅限指标",
+      "first10Results": "前10个结果",
+      "dataFromTemplate": "来自{{templateName}}的数据",
+      "dataFromCountry": "来自{{countryName}}的数据"
+    },
+    "docs": {
+      "title": "API文档",
+      "intro": "构建请求并学习如何有效使用数据库API。以下是认证、过滤、分页和分类的基本要素。",
+      "authentication": "认证",
+      "authInstruction": "通过查询参数{{param}}传递您的API密钥。",
+      "queryParameters": "查询参数",
+      "examplesTitle": "示例",
+      "exampleBasic": "基本请求（无分类）",
+      "exampleDisagg": "包含分类数据",
+      "exampleFilterPaginate": "按模板、期间过滤和分页",
+      "exampleCurlTitle": "cURL示例",
+      "errorsTitle": "错误",
+      "errors": {
+        "400": "400：无效参数或值",
+        "401": "401：缺少或无效的api_key",
+        "404": "404：找不到资源",
+        "500": "500：服务器错误"
+      }
+    },
+    "labels": {
+      "baseUrl": "基础URL",
+      "endpoint": "端点"
+    },
+    "builder": {
+      "title": "构建端点"
+    },
+    "fieldType": {
+      "select": "选择",
+      "number": "数字",
+      "text": "文本"
+    },
+    "quickStart": {
+      "title": "快速开始指南",
+      "step1": "使用复选框选择要过滤的参数",
+      "step2": "为选定的参数输入值",
+      "step3": "复制生成的URL或直接测试",
+      "step4": "在您的应用程序或脚本中使用URL"
+    },
+    "activeParams": {
+      "title": "活动参数",
+      "none": "没有选择参数"
+    },
+    "download": {
+      "excel": "下载为Excel",
+      "preparingExcel": "正在准备Excel…"
+    }
+  },
+  "indicatorDetail": {
+    "title": "指标详情",
+    "error": {
+      "title": "指标错误",
+      "notFound": "未找到指标。",
+      "loadFailed": "无法加载指标详情。请稍后再试。"
+    },
+    "loading": {
+      "title": "正在加载指标",
+      "message": "请稍候，我们正在获取指标详情..."
+    },
+    "sidebar": {
+      "title": "所有指标",
+      "of": "共",
+      "searchPlaceholder": "搜索指标...",
+      "noResults": "未找到匹配 \"{{searchTerm}}\" 的指标"
+    },
+    "header": {
+      "id": "指标ID",
+      "suggestUpdates": "建议更新",
+      "archived": "已归档"
+    },
+    "content": {
+      "definition": "定义",
+      "keyProperties": "关键属性",
+      "type": "类型",
+      "unit": "测量单位",
+      "sector": "部门",
+      "subSector": "子部门",
+      "emergencyContext": "紧急情况背景",
+      "status": "状态",
+      "active": "活跃",
+      "archived": "已归档",
+      "relatedPrograms": "相关项目",
+      "unknownProgram": "未知项目",
+      "metadata": "元数据",
+      "created": "创建时间",
+      "lastUpdated": "最后更新"
+    },
+    "footer": {
+      "backToBank": "返回指标库",
+      "goBack": "返回"
+    },
+    "suggestModal": {
+      "suggestionTypes": {
+        "correction": "对现有指标的更正",
+        "improvement": "对现有指标的改进",
+        "newIndicator": "提出新指标",
+        "other": "其他"
+      }
+    }
+  },
+  "disaggregationAnalysis": {
+    "title": "分类分析",
+    "meta": {
+      "description": "对所有平台指标的分类数据进行全面分析，包括志愿者、工作人员、领导层以及按性别和年龄组分类的受益人群"
+    },
+    "hero": {
+      "title": "分类分析",
+      "description": "对所有平台指标的分类数据进行全面分析，包括志愿者、工作人员、理事会成员和受益人群，特别关注领导层和志愿服务中的性别代表性"
+    },
+    "stats": {
+      "avgDisaggregation": "平均分类",
+      "ageDisaggregation": "按年龄分类",
+      "womenLeadership": "女性领导力",
+      "womenVolunteering": "女性志愿服务",
+      "womenStaff": "女性工作人员"
+    },
+    "tooltip": {
+      "trendData": "趋势数据",
+      "fiveYearTrends": "5年趋势",
+      "historicalTrendNotAvailable": "此指标的历史趋势数据不可用",
+      "historicalTrendsDescription": "此指标随时间的历史趋势",
+      "noHistoricalData": "无历史数据可用",
+      "onlyCurrentPeriod": "仅显示当前期间的数据",
+      "average": "平均值："
+    },
+    "error": {
+      "title": "加载数据错误",
+      "retry": "重试"
+    },
+    "filters": {
+      "title": "筛选器和分析选项",
+      "countries": "国家",
+      "period": "期间",
+      "indicator": "指标",
+      "chartType": "图表类型",
+      "allPeriods": "所有期间",
+      "allIndicators": "所有指标",
+      "barChart": "柱状图",
+      "pieChart": "饼图",
+      "lineChart": "折线图",
+      "clearFilters": "清除筛选器",
+      "refreshData": "刷新数据",
+      "loading": "加载中...",
+      "selectMultiple": "按住 Ctrl/Cmd 选择多个",
+      "disaggregatedRecords": "{{count}} 分类 / {{total}} 总记录"
+    },
+    "tabs": {
+      "overview": "概览",
+      "byIndicator": "按指标",
+      "womenLeadership": "女性领导力",
+      "bySex": "按性别",
+      "byAge": "按年龄",
+      "bySexAge": "性别和年龄",
+      "byCountry": "国家",
+      "countryDisaggregation": "覆盖率",
+      "trends": "趋势"
+    },
+    "overview": {
+      "topCountries": "按受益人数排名前几的国家（平均值）",
+      "overallDistribution": "按性别总体分布",
+      "noData": "无可用数据"
+    },
+    "byIndicator": {
+      "title": "按指标类型分析（含年龄/性别分类）",
+      "description": "按指标分布（含年龄/性别分类）",
+      "noData": "没有可用的年龄/性别分类数据指标",
+      "noDataDescription": "此视图仅显示具有人口统计细分的指标"
+    },
+    "womenLeadership": {
+      "comparison": "女性领导力 vs 工作人员 vs 志愿服务",
+      "representationPercentage": "女性代表百分比",
+      "leadershipRoles": "领导角色",
+      "volunteering": "志愿服务",
+      "staff": "工作人员",
+      "womenOutOf": "{{value}} 名女性，共 {{total}} 名",
+      "byCountry": "按国家分列的女性领导力",
+      "percentageTitle": "领导职位中女性百分比",
+      "trends": "女性参与趋势",
+      "leadershipOverTime": "女性领导力随时间变化",
+      "volunteeringOverTime": "女性志愿服务随时间变化",
+      "noData": "没有可用的按性别分类的领导力数据"
+    },
+    "bySex": {
+      "title": "按性别分析",
+      "description": "按性别分布（所有指标）",
+      "noData": "没有可用的按性别分类数据"
+    },
+    "byAge": {
+      "title": "按年龄组分析",
+      "description": "按年龄组分布（所有指标）",
+      "noData": "没有可用的按年龄分类数据"
+    },
+    "bySexAge": {
+      "title": "按性别和年龄分析",
+      "description": "按性别和年龄组分布（所有指标）",
+      "noData": "没有可用的按性别-年龄分类数据"
+    },
+    "byCountry": {
+      "title": "按国家分析（平均值）",
+      "description": "按国家分布（所有指标）",
+      "noData": "没有可用的国家数据"
+    },
+    "coverage": {
+      "title": "按国家分列的分类覆盖率（按地区分组）",
+      "regionalSummary": "区域摘要",
+      "detailedBreakdown": "按地区详细分类",
+      "country": "国家",
+      "totalRecords": "总记录数",
+      "sexPercentage": "性别 %",
+      "agePercentage": "年龄 %",
+      "sexAgePercentage": "性别+年龄 %",
+      "overallPercentage": "总体 %",
+      "barChart": "柱状图",
+      "countries": "国家",
+      "average": "平均值",
+      "noData": "没有可用的分类数据",
+      "downloadCSV": "下载 CSV",
+      "downloadPNG": "下载 PNG",
+      "downloadRegionalSummary": "下载区域摘要为 PNG",
+      "downloadRegion": "下载 {{region}} 为 PNG"
+    },
+    "trends": {
+      "governingBoard": "理事会中的女性 - 随时间趋势",
+      "governingBoardTitle": "理事会中女性百分比随时间变化",
+      "staff": "工作人员中的女性 - 随时间趋势",
+      "staffTitle": "工作人员职位中女性百分比随时间变化",
+      "volunteers": "志愿者中的女性 - 随时间趋势",
+      "volunteersTitle": "志愿服务中女性百分比随时间变化",
+      "comparison": "女性参与比较 - 所有类别",
+      "comparisonTitle": "理事会 vs 工作人员 vs 志愿者",
+      "comparisonDescription": "所有类别中的女性参与",
+      "latestPeriodSummary": "最新期间摘要",
+      "noGoverningBoardData": "没有可用的理事会趋势数据",
+      "noStaffData": "没有可用的工作人员趋势数据",
+      "noVolunteersData": "没有可用的志愿服务趋势数据",
+      "noComparisonData": "没有可用的比较数据",
+      "noDisaggregationData": "没有可用的分类数据",
+      "governingBoardChartTitle": "理事会中女性百分比随时间变化",
+      "staffChartTitle": "工作人员职位中女性百分比随时间变化",
+      "volunteeringChartTitle": "志愿服务中女性百分比随时间变化",
+      "leadershipOverTime": "女性领导力随时间变化",
+      "volunteeringOverTime": "女性志愿服务随时间变化",
+      "participationAllCategories": "所有类别中的女性参与",
+      "noTrendData": "没有可用的趋势数据"
+    },
+    "loading": {
+      "message": "正在加载分类数据..."
+    }
+  },
+  "nsStructure": {
+    "loading": {
+      "title": "正在加载组织结构..."
+    },
+    "branches": "分支机构",
+    "subbranches": "子分支机构",
+    "selectBranch": "选择一个分支机构",
+    "selectBranchToView": "选择一个分支机构以查看子分支机构",
+    "noBranches": "未找到分支机构",
+    "noSubbranches": "未找到子分支机构"
+  },
+  "countryProfile": {
+    "map": {
+      "adminLevels": {
+        "ADM0": "国家",
+        "ADM1": "省",
+        "ADM2": "区",
+        "ADM3": "子区",
+        "label": "级别"
+      }
+    }
+  },
+  "data": {
+    "noData": "无数据",
+    "noTrendData": "无趋势数据",
+    "allPeriods": "所有期间",
+    "allRegions": "所有区域",
+    "regionalSummary": "区域摘要",
+    "noDataAvailable": "无可用数据"
+  }
+}

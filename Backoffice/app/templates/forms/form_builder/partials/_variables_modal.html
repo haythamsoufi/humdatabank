@@ -1,0 +1,33 @@
+{# Template Variables Modal - uses shared modal_shell for consistent structure #}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% call modal_shell('template-variables-modal', _('Template Variables'), max_width='max-w-6xl') %}
+<p class="text-sm text-gray-600 mb-4" id="variables-modal-description">
+            {{ _('Variables allow you to reference values from other form submissions. Use [variable_name] syntax in field labels, descriptions, or to prefill number fields.') }}
+        </p>
+
+<div class="overflow-x-auto border rounded-md">
+            <table class="min-w-full divide-y divide-gray-200" role="table" aria-label="{{ _('Template Variables') }}">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Variable Name') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Display Name') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Source Template') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Assignment Period') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Entity Scope') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody id="variables-list-container" class="bg-white divide-y divide-gray-200">
+                    {# Variables will be loaded here via JavaScript #}
+                </tbody>
+            </table>
+</div>
+
+<div class="flex justify-end space-x-3 mt-4">
+            <button type="button" id="add-variable-btn" class="btn btn-primary" aria-label="{{ _('Add Variable') }}">
+                <i class="fas fa-plus w-4 h-4 mr-2"></i>
+                {{ _('Add Variable') }}
+            </button>
+            <button type="button" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg shadow-sm text-sm close-modal">{{ _('Close') }}</button>
+        </div>
+{% endcall %}

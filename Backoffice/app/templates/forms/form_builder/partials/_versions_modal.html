@@ -1,0 +1,122 @@
+{# Versions Management Modal - uses shared modal_shell for consistent structure #}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% set versions_title = '<i class="fas fa-code-branch w-6 h-6 mr-2 text-blue-600"></i> ' ~ _('Template Versions') %}
+{% call modal_shell('versions-modal', versions_title, aria_label=_('Template Versions'), max_width='max-w-4xl', title_safe=true) %}
+{# Versions Table #}
+        <div class="overflow-x-auto border rounded-md mb-4">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Version') }}</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Last Edited') }}</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Last Edited By') }}</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Note') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for v in versions_for_ui %}
+                    {% set is_active = v.id == active_version_id %}
+                    {% set is_published = v.is_published %}
+                    <tr class="{% if is_active %}bg-blue-50{% endif %} hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                            <div class="font-semibold text-gray-800 inline-flex items-center gap-2">
+                                <span class="leading-none">V{{ v.version_number or 'N/A' }}</span>
+                                {% if is_active %}
+                                <i class="fas fa-check-circle w-4 h-4 text-blue-600 flex-shrink-0" title="{{ _('Currently viewing/editing this version') }}" aria-label="{{ _('Currently viewing/editing this version') }}"></i>
+                                {% else %}
+                                <form method="GET" action="{{ url_for('form_builder.edit_template', template_id=template.id) }}" class="inline-flex items-center">
+                                    <input type="hidden" name="version_id" value="{{ v.id }}">
+                                    <button type="submit" class="inline-flex items-center text-blue-600 hover:text-blue-800 p-0" title="{{ _('Switch to this version') }}" aria-label="{{ _('Switch to this version') }}">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {# Preview this version #}
+                                <a href="{{ url_for('forms.preview_template', template_id=template.id) }}?version_id={{ v.id }}" target="_blank" class="inline-flex items-center text-gray-600 hover:text-gray-800 p-0 ml-1" title="{{ _('Preview') }}" aria-label="{{ _('Preview version') }}">
+                                    <i class="fas fa-eye w-4 h-4"></i>
+                                </a>
+                                {% if not is_published and is_active %}
+                                <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-flex items-center deploy-version-form-{{ v.id }}">
+                                    <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
+                                    <input type="hidden" name="version_id" value="{{ v.id }}">
+                                    <button type="button" class="deploy-version-btn-{{ v.id }} inline-flex items-center text-green-600 hover:text-green-800 p-0" title="{{ _('Deploy Version') }}" aria-label="{{ _('Deploy Version') }}">
+                                        <i class="fas fa-rocket w-4 h-4 flex-shrink-0"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% if not is_published %}
+                                <form method="POST" action="{{ url_for('form_builder.delete_template_version', template_id=template.id, version_id=v.id) }}" class="inline-flex items-center delete-version-form-{{ v.id }}">
+                                    <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
+                                    <button type="button" class="delete-version-btn-{{ v.id }} inline-flex items-center text-red-600 hover:text-red-800 p-0" title="{{ _('Delete Version') }}" aria-label="{{ _('Delete Version') }}">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if v.status|lower == 'published' %}bg-green-100 text-green-800
+                                {% elif v.status|lower == 'draft' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-800
+                                {% endif %}">
+                                {{ v.status|title }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                            {% set dt = v.updated_at if v.updated_at else v.created_at %}
+                            <div class="font-medium version-datetime" data-datetime="{{ dt|datetime_iso }}">
+                                {{ dt|datetime_local('datetime') }}
+                            </div>
+                        </td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                            {% if v.updated_by %}
+                                {{ profile_icon(v.updated_by, 'sm', true, true, false) }}
+                            {% else %}
+                                <span class="text-gray-400 italic">{{ _('N/A') }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-sm text-gray-700">
+                            {# Editable note for all versions #}
+                            <form id="version-note-form-{{ v.id }}" method="POST" action="{% if v.status|lower == 'draft' %}{{ url_for('form_builder.update_draft_comment', template_id=template.id) }}{% else %}{{ url_for('form_builder.update_version_comment', template_id=template.id, version_id=v.id) }}{% endif %}" class="flex items-start gap-2">
+                                <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
+                                <textarea
+                                       id="version-note-input-{{ v.id }}"
+                                       name="comment"
+                                       rows="1"
+                                       placeholder="{{ _('Version note (optional)') }}"
+                                       class="version-note-input shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md resize-y overflow-y-auto max-h-32"
+                                       data-version-id="{{ v.id }}"
+                                       data-original-value="{{ v.comment or '' }}"
+                                       aria-label="{{ _('Version note') }}">{{ v.comment or '' }}</textarea>
+                                <button type="submit"
+                                        id="version-note-save-btn-{{ v.id }}"
+                                        class="version-note-save-btn hidden inline-flex items-start text-gray-600 hover:text-gray-800 p-1 mt-1"
+                                        title="{{ _('Save Note') }}"
+                                        aria-label="{{ _('Save Note') }}">
+                                    <i class="fas fa-save w-4 h-4"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex justify-end space-x-3">
+            <form id="create-version-form" method="POST" action="{{ url_for('form_builder.create_draft_version', template_id=template.id) }}" class="inline-block">
+                <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
+                <input type="hidden" name="source_version_id" id="create-version-source-id" value="{{ active_version_id }}">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-plus w-4 h-4 mr-2"></i>{{ _('Add New Version') }}
+                </button>
+            </form>
+            <button type="button" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg shadow-sm text-sm close-modal">{{ _('Close') }}</button>
+        </div>
+{% endcall %}

@@ -1,0 +1,35 @@
+{
+  "organization": {
+    "name": "NGO Databank",
+    "fullName": "NGO Databank",
+    "shortName": "NGO Databank",
+    "description": "Generic NGO Databank Mobile Application",
+    "website": "https://example.org",
+    "supportEmail": "support@example.org",
+    "contactEmail": "contact@example.org"
+  },
+  "branding": {
+    "primaryColor": "#3B82F6",
+    "secondaryColor": "#1E40AF",
+    "accentColor": "#EF4444",
+    "navyColor": "#011E41",
+    "redColor": "#C8102E",
+    "darkRedColor": "#A50D25",
+    "logoPath": "assets/images/app_icon.png"
+  },
+  "app": {
+    "name": "NGO Databank",
+    "packageName": "com.ngo.databank",
+    "displayName": "NGO Databank",
+    "description": "NGO Databank Mobile Application for humanitarian data management"
+  },
+  "azure": {
+    "b2cTenant": "",
+    "b2cPolicy": "",
+    "redirectScheme": "ngodatabank"
+  },
+  "features": {
+    "showOrganizationName": true,
+    "customBranding": false
+  }
+}

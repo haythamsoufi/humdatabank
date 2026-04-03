@@ -1,0 +1,1332 @@
+/* RTL (Right-to-Left) Support Styles */
+
+/* Apply Tajawal font for Arabic text */
+html[dir="rtl"] {
+    font-family: 'Tajawal', sans-serif;
+}
+
+/* Preserve Font Awesome icons */
+html[dir="rtl"] .fas,
+html[dir="rtl"] .fa,
+html[dir="rtl"] .fab,
+html[dir="rtl"] .far,
+html[dir="rtl"] .fal {
+    font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 6 Brands" !important;
+}
+
+/* RTL positioning for Self-Reported label */
+html[dir="rtl"] .self-reported-label {
+    right: auto !important;
+    left: 0.5rem !important;
+}
+
+/* Ensure Tajawal is applied to all text elements in RTL */
+html[dir="rtl"] * {
+    font-family: 'Tajawal', sans-serif;
+}
+
+/* But preserve Font Awesome icons */
+html[dir="rtl"] .fas,
+html[dir="rtl"] .fa,
+html[dir="rtl"] .fab,
+html[dir="rtl"] .far,
+html[dir="rtl"] .fal,
+html[dir="rtl"] i[class*="fa"] {
+    font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 6 Brands" !important;
+}
+
+/* RTL Support for Arabic Sidebar */
+html[dir="rtl"] .admin-sidebar {
+    right: 0;
+    left: auto;
+    position: fixed;
+}
+
+html[dir="rtl"] #mainContent.content-with-sidebar {
+    margin-right: 270px;
+    margin-left: 0;
+}
+
+html[dir="rtl"] #mainContent.content-with-collapsed-sidebar {
+    margin-right: 80px;
+    margin-left: 0;
+}
+
+html[dir="rtl"] .admin-sidebar.collapsed {
+    width: 80px;
+}
+
+html[dir="rtl"] .admin-sidebar .sidebar-item-container.active {
+    border-right: 4px solid #f56565;
+    border-left: none;
+    padding-right: calc(1rem - 4px);
+    padding-left: 1rem;
+}
+
+html[dir="rtl"] .admin-sidebar.collapsed .sidebar-item-container.active {
+    padding-right: 1rem;
+    border-right: none;
+}
+
+/* RTL support for initial collapsed margin */
+html[dir="rtl"].sidebar-initially-collapsed .admin-sidebar + #mainContent {
+    margin-left: 0;
+    margin-right: 80px;
+}
+
+/* RTL Main Content Margins */
+html[dir="rtl"] #mainContent.content-with-sidebar {
+    margin-right: 270px;
+    margin-left: 0;
+    transition: margin-right 0.3s ease-in-out;
+}
+
+html[dir="rtl"] #mainContent.content-with-collapsed-sidebar {
+    margin-right: 80px;
+    margin-left: 0;
+    transition: margin-right 0.3s ease-in-out;
+}
+
+/* RTL support for enhanced content spacing */
+html[dir="rtl"] #mainContent.content-with-sidebar #pageContentContainer {
+    padding-left: 1.5rem !important;
+    padding-right: 2rem !important;
+}
+
+html[dir="rtl"] #mainContent.content-with-collapsed-sidebar #pageContentContainer {
+    padding-left: 1.5rem !important;
+    padding-right: 2rem !important;
+}
+
+/* RTL mobile responsive adjustments */
+@media (max-width: 1024px) {
+    html[dir="rtl"] #mainContent.content-with-sidebar #pageContentContainer,
+    html[dir="rtl"] #mainContent.content-with-collapsed-sidebar #pageContentContainer {
+        padding-right: 1.5rem !important;
+    }
+}
+
+/* RTL Mobile Styles */
+@media (max-width: 768px) {
+    html[dir="rtl"] .admin-sidebar {
+        transform: translateX(100%);
+    }
+
+    html[dir="rtl"] #mainContent,
+    html[dir="rtl"] #mainContent.content-with-sidebar,
+    html[dir="rtl"] #mainContent.content-with-collapsed-sidebar {
+        margin-right: 0 !important;
+    }
+}
+
+/* RTL Tooltip Positioning */
+html[dir="rtl"] #sidebar-tooltip {
+    right: 85px;
+    left: auto;
+    transform: translateY(-50%) translateX(5px);
+}
+
+html[dir="rtl"] #sidebar-tooltip.visible {
+    transform: translateY(-50%) translateX(0);
+}
+
+/* RTL Chatbot Positioning */
+html[dir="rtl"] #aiChatbotFAB {
+    left: 1.5rem !important;
+    right: auto !important;
+}
+
+/* RTL Chat Widget Positioning */
+html[dir="rtl"] #aiChatWidget {
+    left: 2rem !important;
+    right: auto !important;
+}
+
+/* RTL Mobile FAB positioning */
+@media (max-width: 768px) {
+    html[dir="rtl"] #aiChatbotFAB {
+        left: 1.5rem !important;
+        right: auto !important;
+    }
+
+    /* RTL Mobile Chat Widget positioning */
+    html[dir="rtl"] #aiChatWidget {
+        left: 1rem !important;
+        right: 1rem !important;
+    }
+}
+
+/* RTL Support for Language Selector */
+html[dir="rtl"] .language-selector-button {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .language-option {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+html[dir="rtl"] .language-option.active::before {
+    right: auto;
+    left: 1rem;
+}
+
+/* RTL Support for Select Dropdowns - Move arrow to left side */
+html[dir="rtl"] .form-select,
+html[dir="rtl"] select.form-select,
+html[dir="rtl"] select {
+    padding-right: 0.75rem !important;
+    padding-left: 2.5rem !important;
+    text-align: right !important;
+    direction: rtl !important;
+}
+
+/* Remove default arrow and add custom arrow on left for RTL */
+html[dir="rtl"] .form-select,
+html[dir="rtl"] select.form-select,
+html[dir="rtl"] select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23374151'%3e%3cpath d='M4 6l4 4 4-4'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: left 0.5rem center !important;
+    background-size: 1rem !important;
+}
+
+/* RTL Support for Select2 dropdowns */
+html[dir="rtl"] .select2-container--default .select2-selection--single .select2-selection__arrow {
+    right: auto !important;
+    left: 1px !important;
+}
+
+html[dir="rtl"] .select2-container--default .select2-selection--single {
+    padding-right: 8px !important;
+    padding-left: 20px !important;
+}
+
+/* RTL Icon Spacing - Fix spacing between icons and text */
+/* Convert margin-right to margin-left for icons in RTL mode */
+html[dir="rtl"] i[class*="fa"][class*="mr-"] {
+    margin-right: 0 !important;
+}
+
+/* Convert common mr-* classes to ml-* in RTL */
+html[dir="rtl"] i[class*="fa"].mr-1 { margin-left: 0.25rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-2 { margin-left: 0.5rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-3 { margin-left: 0.75rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-4 { margin-left: 1rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-5 { margin-left: 1.25rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-6 { margin-left: 1.5rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-8 { margin-left: 2rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-10 { margin-left: 2.5rem !important; }
+html[dir="rtl"] i[class*="fa"].mr-12 { margin-left: 3rem !important; }
+
+/* RTL Sidebar Icon Spacing - Fix spacing between SVG icons and text in sidebar */
+/* Convert margin-right to margin-left for sidebar icons in RTL mode */
+html[dir="rtl"] .sidebar-icon[class*="mr-"] {
+    margin-right: 0 !important;
+}
+
+/* Convert common mr-* classes to ml-* for sidebar icons in RTL */
+html[dir="rtl"] .sidebar-icon.mr-1 { margin-left: 0.25rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-2 { margin-left: 0.5rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-3 { margin-left: 0.75rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-4 { margin-left: 1rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-5 { margin-left: 1.25rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-6 { margin-left: 1.5rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-8 { margin-left: 2rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-10 { margin-left: 2.5rem !important; }
+html[dir="rtl"] .sidebar-icon.mr-12 { margin-left: 3rem !important; }
+
+/* RTL Icon Spacing - Convert margin-left to margin-right for icons in RTL mode */
+/* This handles icons that use ml-* classes (like info icons next to titles) */
+html[dir="rtl"] i[class*="fa"][class*="ml-"] {
+    margin-left: 0 !important;
+}
+
+/* Convert common ml-* classes to mr-* in RTL */
+html[dir="rtl"] i[class*="fa"].ml-1 { margin-right: 0.25rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-2 { margin-right: 0.5rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-3 { margin-right: 0.75rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-4 { margin-right: 1rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-5 { margin-right: 1.25rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-6 { margin-right: 1.5rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-8 { margin-right: 2rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-10 { margin-right: 2.5rem !important; }
+html[dir="rtl"] i[class*="fa"].ml-12 { margin-right: 3rem !important; }
+
+/* Also handle SVG icons with ml-* classes */
+html[dir="rtl"] .sidebar-icon[class*="ml-"] {
+    margin-left: 0 !important;
+}
+
+html[dir="rtl"] .sidebar-icon.ml-1 { margin-right: 0.25rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-2 { margin-right: 0.5rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-3 { margin-right: 0.75rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-4 { margin-right: 1rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-5 { margin-right: 1.25rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-6 { margin-right: 1.5rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-8 { margin-right: 2rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-10 { margin-right: 2.5rem !important; }
+html[dir="rtl"] .sidebar-icon.ml-12 { margin-right: 3rem !important; }
+
+/* ========================================
+   RTL Support for Documentation Pages
+   ======================================== */
+
+/* RTL Documentation Content */
+.docs-prose[dir="rtl"] {
+    direction: rtl !important;
+    text-align: right !important;
+    font-family: 'Tajawal', sans-serif;
+}
+
+/* Ensure all text elements in RTL prose are right-aligned */
+.docs-prose[dir="rtl"] * {
+    text-align: inherit;
+    direction: inherit;
+}
+
+/* Force RTL on specific elements that might not inherit */
+.docs-prose[dir="rtl"] p,
+.docs-prose[dir="rtl"] div:not(.mermaid):not(pre):not(code),
+.docs-prose[dir="rtl"] span:not(.mermaid):not(pre):not(code),
+.docs-prose[dir="rtl"] li {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Ensure table cells are RTL */
+.docs-prose[dir="rtl"] td,
+.docs-prose[dir="rtl"] th {
+    direction: rtl;
+    text-align: right;
+}
+
+/* RTL Headings - flip borders from left to right */
+.docs-prose[dir="rtl"] h1 {
+    border-left: none;
+    border-right: 4px solid #3b82f6;
+    text-align: right;
+}
+
+.docs-prose[dir="rtl"] h2 {
+    border-left: none;
+    border-right: 3px solid #6366f1;
+    text-align: right;
+}
+
+.docs-prose[dir="rtl"] h3 {
+    border-left: none;
+    border-right: 2px solid #8b5cf6;
+    text-align: right;
+}
+
+.docs-prose[dir="rtl"] h4 {
+    border-left: none;
+    border-right: 2px solid #a78bfa;
+    padding-left: 0;
+    padding-right: 0.5rem;
+    text-align: right;
+}
+
+/* RTL Lists - flip padding from left to right */
+.docs-prose[dir="rtl"] ul,
+.docs-prose[dir="rtl"] ol {
+    padding-left: 0;
+    padding-right: 1.75rem;
+    text-align: right;
+}
+
+/* RTL Blockquotes - flip border from left to right */
+.docs-prose[dir="rtl"] blockquote {
+    border-left: none;
+    border-right: 4px solid #3b82f6;
+    text-align: right;
+}
+
+/* RTL Tables - flip text alignment */
+.docs-prose[dir="rtl"] table {
+    direction: rtl;
+}
+
+.docs-prose[dir="rtl"] th {
+    text-align: right;
+}
+
+.docs-prose[dir="rtl"] td {
+    text-align: right;
+}
+
+/* RTL HR - adjust positioning */
+.docs-prose[dir="rtl"] hr::after {
+    left: auto;
+    right: 50%;
+    transform: translateX(50%);
+}
+
+/* RTL Links - maintain proper alignment */
+.docs-prose[dir="rtl"] a {
+    text-align: right;
+}
+
+/* RTL Images - maintain centering */
+.docs-prose[dir="rtl"] img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* RTL Mermaid diagrams - keep centered */
+.docs-prose[dir="rtl"] .mermaid {
+    direction: ltr;
+    text-align: center;
+}
+
+/* Preserve Font Awesome icons in RTL */
+.docs-prose[dir="rtl"] .fas,
+.docs-prose[dir="rtl"] .fa,
+.docs-prose[dir="rtl"] .fab,
+.docs-prose[dir="rtl"] .far,
+.docs-prose[dir="rtl"] .fal,
+.docs-prose[dir="rtl"] i[class*="fa"] {
+    font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 6 Brands" !important;
+}
+
+/* RTL Code blocks - keep LTR for code */
+.docs-prose[dir="rtl"] pre,
+.docs-prose[dir="rtl"] code {
+    direction: ltr;
+    text-align: left;
+    unicode-bidi: embed;
+}
+
+/* RTL Documentation Navigation Sidebar */
+.docs-container[dir="rtl"] .docs-sidebar,
+.docs-container.docs-rtl .docs-sidebar {
+    direction: rtl;
+    text-align: right;
+}
+
+.docs-container[dir="rtl"] .docs-sidebar-inner,
+.docs-container.docs-rtl .docs-sidebar-inner {
+    direction: rtl;
+    text-align: right;
+}
+
+.docs-container[dir="rtl"] .nav-category-header,
+.docs-container.docs-rtl .nav-category-header {
+    text-align: right;
+    direction: rtl;
+}
+
+.docs-container[dir="rtl"] .nav-category-items {
+    margin-left: 0;
+    margin-right: 0.5rem;
+    padding-left: 0;
+    padding-right: 0.5rem;
+    border-left: none;
+    border-right: 2px solid #e5e7eb;
+    direction: rtl;
+    text-align: right;
+}
+
+.docs-container[dir="rtl"] .nav-item,
+.docs-container.docs-rtl .nav-item {
+    text-align: right;
+    direction: rtl;
+}
+
+.docs-container[dir="rtl"] .nav-item-active {
+    border-left: none;
+    border-right: 2px solid #3b82f6;
+    margin-left: 0;
+    margin-right: -0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 1rem;
+    text-align: right;
+    direction: rtl;
+}
+
+.docs-container[dir="rtl"] .nav-item-title,
+.docs-container.docs-rtl .nav-item-title {
+    text-align: right;
+    direction: rtl;
+}
+
+.docs-container[dir="rtl"] .nav-subgroup-header,
+.docs-container.docs-rtl .nav-subgroup-header {
+    text-align: right;
+    direction: rtl;
+}
+
+.docs-container[dir="rtl"] .nav-subgroup-title,
+.docs-container.docs-rtl .nav-subgroup-title {
+    text-align: right;
+    direction: rtl;
+}
+
+/* RTL Search input - flip icon positioning and text alignment */
+.docs-container[dir="rtl"] .docs-search-container {
+    direction: rtl;
+}
+
+.docs-container[dir="rtl"] .docs-search-input {
+    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+    direction: rtl;
+    text-align: right;
+}
+
+.docs-container[dir="rtl"] .docs-search-icon {
+    right: auto;
+    left: 0.75rem;
+}
+
+.docs-container[dir="rtl"] .docs-search-clear {
+    right: auto;
+    left: 0.75rem;
+}
+
+/* RTL Navigation header text */
+.docs-container[dir="rtl"] .docs-sidebar-inner > div:first-child,
+.docs-container.docs-rtl .docs-sidebar-inner > div:first-child {
+    direction: rtl;
+    text-align: right;
+}
+
+/* RTL Content Header */
+.docs-container[dir="rtl"] .docs-content-header,
+.docs-container.docs-rtl .docs-content-header {
+    direction: rtl;
+    text-align: right;
+}
+
+.docs-container[dir="rtl"] .docs-content-title,
+.docs-container.docs-rtl .docs-content-title {
+    direction: rtl;
+    text-align: right;
+}
+
+/* RTL Layout - swap sidebar position to the right using CSS Grid */
+.docs-container[dir="rtl"],
+.docs-container.docs-rtl {
+    flex-direction: column !important;
+}
+
+.docs-container[dir="rtl"] .docs-sidebar,
+.docs-container.docs-rtl .docs-sidebar {
+    order: 2 !important;
+}
+
+.docs-container[dir="rtl"] .docs-content,
+.docs-container.docs-rtl .docs-content {
+    order: 1 !important;
+}
+
+@media (min-width: 1024px) {
+    /* Use CSS Grid for RTL to explicitly control positioning */
+    /* Set direction: ltr on container to prevent grid column reversal */
+    .docs-container[dir="rtl"],
+    .docs-container.docs-rtl {
+        display: grid !important;
+        grid-template-columns: 1fr 20rem !important;
+        gap: 1.5rem !important;
+        flex-direction: unset !important; /* Remove flex-direction when using grid */
+        flex-wrap: unset !important;
+        direction: ltr !important; /* Prevent grid column reversal - we control layout manually */
+    }
+
+    /* Content goes on the left (column 1) */
+    .docs-container[dir="rtl"] .docs-content,
+    .docs-container.docs-rtl .docs-content {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        order: unset !important;
+        flex: unset !important; /* Remove flex properties when using grid */
+    }
+
+    /* Sidebar goes on the right (column 2) */
+    .docs-container[dir="rtl"] .docs-sidebar,
+    .docs-container.docs-rtl .docs-sidebar {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        order: unset !important;
+        flex-shrink: unset !important; /* Remove flex properties when using grid */
+    }
+}
+
+/* ========================================
+   RTL Support for Form Builder
+   ======================================== */
+
+/* RTL Form Builder Container */
+html[dir="rtl"] #form-builder-ui {
+    direction: rtl;
+    text-align: right;
+}
+
+/* RTL Form Builder Action Buttons */
+html[dir="rtl"] #add-section-btn,
+html[dir="rtl"] #template-variables-btn,
+html[dir="rtl"] #toggle-archived-items-btn {
+    flex-direction: row-reverse;
+}
+
+/* RTL Toggle Archived Items Button */
+html[dir="rtl"] #toggle-archived-items-btn .flex {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #toggle-archived-icon {
+    margin-right: 0 !important;
+    margin-left: 0.75rem !important;
+}
+
+html[dir="rtl"] #toggle-archived-text {
+    margin-right: 0.75rem !important;
+    margin-left: 0 !important;
+}
+
+html[dir="rtl"] #toggle-archived-indicator {
+    margin-right: 0.75rem !important;
+    margin-left: 0 !important;
+}
+
+html[dir="rtl"] #toggle-archived-slider {
+    left: auto !important;
+    right: 3px !important;
+    transform: translateX(0) !important;
+}
+
+html[dir="rtl"] #toggle-archived-items-btn[data-state="visible"] #toggle-archived-slider {
+    transform: translateX(-100%) !important;
+    right: calc(100% - 1rem - 3px) !important;
+}
+
+/* RTL Page Header Buttons */
+html[dir="rtl"] .professional-action-btn {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .professional-action-btn i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] #versions-modal-btn {
+    margin-left: 0 !important;
+    margin-right: 0.75rem !important;
+}
+
+html[dir="rtl"] #versions-modal-btn i {
+    margin-right: 0 !important;
+    margin-left: 0.375rem !important;
+}
+
+/* RTL Section Containers */
+html[dir="rtl"] .section-item {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .section-header {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .section-actions {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .section-actions button,
+html[dir="rtl"] .section-actions form {
+    margin-right: 0.5rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] .section-actions button:first-child,
+html[dir="rtl"] .section-actions form:first-child {
+    margin-right: 0;
+}
+
+/* RTL Item Cards */
+html[dir="rtl"] .item-card {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .item-header {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .item-actions {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .item-actions button,
+html[dir="rtl"] .item-actions form {
+    margin-right: 0.5rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] .item-actions button:first-child,
+html[dir="rtl"] .item-actions form:first-child {
+    margin-right: 0;
+}
+
+/* RTL Drag Handles */
+html[dir="rtl"] .drag-handle {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+/* RTL Page Headers */
+html[dir="rtl"] .page-sections-container .border-l-4 {
+    border-left: none !important;
+    border-right: 4px solid #f59e0b !important;
+}
+
+html[dir="rtl"] .page-sections-container .flex.items-center i {
+    margin-right: 0 !important;
+    margin-left: 0.75rem !important;
+}
+
+html[dir="rtl"] .page-sections-container .flex.items-center .ml-3 {
+    margin-left: 0 !important;
+    margin-right: 0.75rem !important;
+}
+
+html[dir="rtl"] .page-toggle-btn {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .page-toggle-btn i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] .page-toggle-btn .ml-2 {
+    margin-left: 0 !important;
+    margin-right: 0.5rem !important;
+}
+
+/* ========================================
+   RTL Support for Form Builder Modals
+   ======================================== */
+
+/* RTL Modal Overlay */
+html[dir="rtl"] #section-modal,
+html[dir="rtl"] #item-modal,
+html[dir="rtl"] #edit-question-modal,
+html[dir="rtl"] #excel-options-modal,
+html[dir="rtl"] #versions-modal,
+html[dir="rtl"] #template-variables-modal,
+html[dir="rtl"] [id$="-translation-modal"],
+html[dir="rtl"] [id$="-translation-matrix-modal"] {
+    direction: rtl;
+}
+
+/* RTL Modal Content */
+html[dir="rtl"] #section-modal .relative,
+html[dir="rtl"] #item-modal .relative,
+html[dir="rtl"] #edit-question-modal .relative,
+html[dir="rtl"] #excel-options-modal .relative,
+html[dir="rtl"] #versions-modal .relative,
+html[dir="rtl"] #template-variables-modal .relative {
+    direction: rtl;
+    text-align: right;
+}
+
+/* RTL Modal Close Button - Move to top-left */
+html[dir="rtl"] #section-modal .close-modal,
+html[dir="rtl"] #item-modal .close-modal,
+html[dir="rtl"] #edit-question-modal .close-modal,
+html[dir="rtl"] #excel-options-modal .close-modal,
+html[dir="rtl"] #versions-modal .close-modal,
+html[dir="rtl"] #template-variables-modal .close-modal,
+html[dir="rtl"] [id$="-translation-modal"] .close-modal,
+html[dir="rtl"] [id$="-translation-matrix-modal"] .close-modal {
+    right: auto !important;
+    left: 0.75rem !important;
+}
+
+/* RTL Modal Headers */
+html[dir="rtl"] #section-modal-title,
+html[dir="rtl"] #item-modal .modal-title,
+html[dir="rtl"] #edit-question-modal h3,
+html[dir="rtl"] #excel-options-modal-title,
+html[dir="rtl"] #versions-modal-title,
+html[dir="rtl"] #template-variables-modal-title,
+html[dir="rtl"] #variables-modal-title,
+html[dir="rtl"] #document-upload-modal-title {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+html[dir="rtl"] #section-modal-title i,
+html[dir="rtl"] #item-modal .modal-title i,
+html[dir="rtl"] #edit-question-modal h3 i,
+html[dir="rtl"] #excel-options-modal-title i,
+html[dir="rtl"] #versions-modal-title i,
+html[dir="rtl"] #template-variables-modal-title i,
+html[dir="rtl"] #variables-modal-title i,
+html[dir="rtl"] #document-upload-modal-title i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] #item-modal-section-name.ml-1 {
+    margin-left: 0 !important;
+    margin-right: 0.25rem !important;
+}
+
+/* RTL Modal Form Fields */
+html[dir="rtl"] #section-modal label,
+html[dir="rtl"] #item-modal label,
+html[dir="rtl"] #edit-question-modal label {
+    text-align: right;
+}
+
+html[dir="rtl"] #section-modal input[type="text"],
+html[dir="rtl"] #section-modal input[type="number"],
+html[dir="rtl"] #section-modal textarea,
+html[dir="rtl"] #item-modal input[type="text"],
+html[dir="rtl"] #item-modal input[type="number"],
+html[dir="rtl"] #item-modal textarea,
+html[dir="rtl"] #edit-question-modal input[type="text"],
+html[dir="rtl"] #edit-question-modal input[type="number"],
+html[dir="rtl"] #edit-question-modal textarea {
+    text-align: right;
+    direction: rtl;
+}
+
+/* RTL Modal Buttons Container - Flip to left side */
+html[dir="rtl"] #section-modal .flex.justify-end,
+html[dir="rtl"] #item-modal .flex.justify-end,
+html[dir="rtl"] #edit-question-modal .flex.justify-end,
+html[dir="rtl"] #versions-modal .flex.justify-end {
+    justify-content: flex-start !important;
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #section-modal .flex.justify-end .space-x-3 > *,
+html[dir="rtl"] #item-modal .flex.justify-end .space-x-3 > *,
+html[dir="rtl"] #edit-question-modal .flex.justify-end .space-x-3 > *,
+html[dir="rtl"] #versions-modal .flex.justify-end .space-x-3 > * {
+    margin-right: 0.75rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] #section-modal .flex.justify-end .space-x-3 > *:first-child,
+html[dir="rtl"] #item-modal .flex.justify-end .space-x-3 > *:first-child,
+html[dir="rtl"] #edit-question-modal .flex.justify-end .space-x-3 > *:first-child,
+html[dir="rtl"] #versions-modal .flex.justify-end .space-x-3 > *:first-child {
+    margin-right: 0;
+}
+
+/* RTL Modal Grid Container */
+html[dir="rtl"] .modal-grid-container {
+    direction: rtl;
+}
+
+html[dir="rtl"] .modal-left-half,
+html[dir="rtl"] .modal-right-half {
+    direction: rtl;
+    text-align: right;
+}
+
+/* RTL Translation Buttons in Modals */
+html[dir="rtl"] #section-name-translations-btn,
+html[dir="rtl"] #indicator-translations-btn,
+html[dir="rtl"] [id$="-translations-btn"] {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #section-name-translations-btn i,
+html[dir="rtl"] #indicator-translations-btn i,
+html[dir="rtl"] [id$="-translations-btn"] i {
+    margin-right: 0 !important;
+    margin-left: 0.25rem !important;
+}
+
+/* RTL Radio Buttons and Checkboxes */
+html[dir="rtl"] .inline-flex.items-center input[type="radio"],
+html[dir="rtl"] .inline-flex.items-center input[type="checkbox"] {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] .inline-flex.items-center .ml-2 {
+    margin-left: 0 !important;
+    margin-right: 0.5rem !important;
+}
+
+/* RTL Excel Modal */
+html[dir="rtl"] #excel-options-modal .flex.justify-between {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #excel-options-modal .inline-flex.items-center {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #excel-options-modal .inline-flex.items-center i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] #excel-options-modal .file-upload-wrapper {
+    direction: rtl;
+}
+
+html[dir="rtl"] #excel-options-modal .file-upload-box {
+    direction: rtl;
+    text-align: center;
+}
+
+html[dir="rtl"] #excel-options-modal .flex.items-start {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #excel-options-modal .flex.items-start i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] #excel-options-modal .flex.items-start .mr-2 {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] #excel-options-modal .mt-2 i {
+    margin-right: 0 !important;
+    margin-left: 0.25rem !important;
+}
+
+/* RTL Versions Modal Table */
+html[dir="rtl"] #versions-modal table {
+    direction: rtl;
+}
+
+html[dir="rtl"] #versions-modal th,
+html[dir="rtl"] #versions-modal td {
+    text-align: right;
+}
+
+html[dir="rtl"] #versions-modal .inline-flex.items-center {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #versions-modal .inline-flex.items-center .ml-1 {
+    margin-left: 0 !important;
+    margin-right: 0.25rem !important;
+}
+
+html[dir="rtl"] #versions-modal .gap-2 > * {
+    margin-right: 0.5rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] #versions-modal .gap-2 > *:first-child {
+    margin-right: 0;
+}
+
+/* RTL Variables Modal */
+html[dir="rtl"] #template-variables-modal .flex.justify-between {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #template-variables-modal .inline-flex.items-center {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #template-variables-modal .inline-flex.items-center i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+html[dir="rtl"] #template-variables-modal code {
+    direction: ltr;
+    text-align: left;
+    display: inline-block;
+    unicode-bidi: embed;
+}
+
+/* RTL Translation Modals */
+html[dir="rtl"] [id$="-translation-modal"] .modal-content,
+html[dir="rtl"] [id$="-translation-matrix-modal"] .modal-content {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] [id$="-translation-modal"] .flex.justify-between,
+html[dir="rtl"] [id$="-translation-matrix-modal"] .flex.justify-between {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] [id$="-translation-modal"] table,
+html[dir="rtl"] [id$="-translation-matrix-modal"] table {
+    direction: rtl;
+}
+
+html[dir="rtl"] [id$="-translation-modal"] th,
+html[dir="rtl"] [id$="-translation-modal"] td,
+html[dir="rtl"] [id$="-translation-matrix-modal"] th,
+html[dir="rtl"] [id$="-translation-matrix-modal"] td {
+    text-align: right;
+}
+
+/* RTL Form Builder Tables */
+html[dir="rtl"] #sections-container table th,
+html[dir="rtl"] #sections-container table td {
+    text-align: right !important;
+}
+
+html[dir="rtl"] #sections-container .text-left {
+    text-align: right !important;
+}
+
+/* RTL Form Builder Notices/Banners */
+html[dir="rtl"] .mb-6.rounded-lg.border {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .mb-6.rounded-lg.border .flex.items-start {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .mb-6.rounded-lg.border .flex.items-start i {
+    margin-right: 0 !important;
+    margin-left: 0.75rem !important;
+}
+
+html[dir="rtl"] .mb-6.rounded-lg.border .ml-4 {
+    margin-left: 0 !important;
+    margin-right: 1rem !important;
+}
+
+html[dir="rtl"] .mb-6.rounded-lg.border .inline-flex.items-center {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .mb-6.rounded-lg.border .inline-flex.items-center i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+/* RTL Template Details Section */
+html[dir="rtl"] #edit-template-details-form-container {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] #edit-template-details-form-container label {
+    text-align: right;
+}
+
+html[dir="rtl"] #edit-template-details-form-container input,
+html[dir="rtl"] #edit-template-details-form-container textarea,
+html[dir="rtl"] #edit-template-details-form-container select {
+    text-align: right;
+    direction: rtl;
+}
+
+html[dir="rtl"] #edit-template-details-form-container .flex.justify-end {
+    justify-content: flex-start !important;
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #edit-template-details-form-container .flex.justify-end .space-x-3 > * {
+    margin-right: 0.75rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] #edit-template-details-form-container .flex.justify-end .space-x-3 > *:first-child {
+    margin-right: 0;
+}
+
+/* RTL Loading Spinner */
+html[dir="rtl"] #form-builder-loading {
+    direction: rtl;
+    text-align: center;
+}
+
+/* RTL Rule Builder (Conditions) */
+html[dir="rtl"] .rule-conditions-container {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .rule-item-select {
+    text-align: right;
+    direction: rtl;
+}
+
+html[dir="rtl"] .toggle-rule-builder {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .toggle-rule-builder i {
+    margin-right: 0 !important;
+    margin-left: 0.25rem !important;
+}
+
+/* RTL Select2 in Form Builder Modals */
+html[dir="rtl"] #section-modal .select2-container,
+html[dir="rtl"] #item-modal .select2-container,
+html[dir="rtl"] #edit-question-modal .select2-container {
+    direction: rtl;
+}
+
+html[dir="rtl"] #section-modal .select2-selection,
+html[dir="rtl"] #item-modal .select2-selection,
+html[dir="rtl"] #edit-question-modal .select2-selection {
+    text-align: right;
+    direction: rtl;
+}
+
+/* RTL Grid Layouts in Modals */
+html[dir="rtl"] .grid.grid-cols-2 {
+    direction: rtl;
+}
+
+html[dir="rtl"] .grid.gap-4 > * {
+    direction: rtl;
+}
+
+/* RTL Disaggregation Options Grid */
+html[dir="rtl"] #add_item_indicator_allowed_disaggregation_options_container {
+    direction: rtl;
+}
+
+html[dir="rtl"] #add_item_indicator_allowed_disaggregation_options_container label {
+    text-align: right;
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #add_item_indicator_allowed_disaggregation_options_container input[type="checkbox"] {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+/* RTL Info Icons and Help Text */
+html[dir="rtl"] .text-xs.text-gray-500,
+html[dir="rtl"] .text-xs.text-gray-600 {
+    text-align: right;
+}
+
+html[dir="rtl"] .text-xs.text-gray-500 i,
+html[dir="rtl"] .text-xs.text-gray-600 i {
+    margin-right: 0 !important;
+    margin-left: 0.25rem !important;
+}
+
+/* RTL Border Adjustments */
+html[dir="rtl"] .border-t {
+    border-top: 1px solid;
+}
+
+html[dir="rtl"] .border-l-4 {
+    border-left: none !important;
+    border-right: 4px solid !important;
+}
+
+/* RTL Space Adjustments for Form Builder */
+html[dir="rtl"] .space-x-3 > * + * {
+    margin-right: 0.75rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] .space-x-2 > * + * {
+    margin-right: 0.5rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] .space-x-4 > * + * {
+    margin-right: 1rem;
+    margin-left: 0;
+}
+
+/* RTL Flex Row Reverse for Action Groups */
+html[dir="rtl"] .flex.items-center.space-x-3 {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .flex.items-center.space-x-2 {
+    flex-direction: row-reverse;
+}
+
+/* RTL Alert/Info Boxes in Modals */
+html[dir="rtl"] .bg-yellow-50,
+html[dir="rtl"] .bg-blue-50,
+html[dir="rtl"] .bg-red-50 {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .bg-yellow-50 .flex.items-start,
+html[dir="rtl"] .bg-blue-50 .flex.items-start,
+html[dir="rtl"] .bg-red-50 .flex.items-start {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .bg-yellow-50 .flex.items-start i,
+html[dir="rtl"] .bg-blue-50 .flex.items-start i,
+html[dir="rtl"] .bg-red-50 .flex.items-start i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+/* ========================================
+   RTL Support for Translation Edit Page
+   ======================================== */
+
+/* RTL Action Buttons Container - Flip justify-end to justify-start */
+html[dir="rtl"] .max-w-4xl .flex.justify-end,
+html[dir="rtl"] .max-w-4xl.mb-4 .flex.justify-end {
+    justify-content: flex-start !important;
+    flex-direction: row-reverse;
+}
+
+/* RTL Action Buttons Container spacing */
+html[dir="rtl"] .max-w-4xl .flex.justify-end.space-x-3 > *,
+html[dir="rtl"] .max-w-4xl.mb-4 .flex.justify-end.space-x-3 > * {
+    margin-right: 0.75rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] .max-w-4xl .flex.justify-end.space-x-3 > *:last-child,
+html[dir="rtl"] .max-w-4xl.mb-4 .flex.justify-end.space-x-3 > *:last-child {
+    margin-right: 0;
+}
+
+/* RTL Translation Form Fields */
+html[dir="rtl"] #edit-translation-form textarea[id^="msgstr_"]:not([dir="rtl"]) {
+    text-align: right;
+    direction: ltr; /* Keep LTR for non-RTL languages */
+}
+
+html[dir="rtl"] #edit-translation-form textarea[id^="msgstr_"][dir="rtl"] {
+    text-align: right;
+    direction: rtl;
+}
+
+html[dir="rtl"] #edit-translation-form input[id^="msgstr_"]:not([dir="rtl"]) {
+    text-align: right;
+    direction: ltr; /* Keep LTR for non-RTL languages */
+}
+
+html[dir="rtl"] #edit-translation-form input[id^="msgstr_"][dir="rtl"] {
+    text-align: right;
+    direction: rtl;
+}
+
+/* RTL Message ID Field - Keep LTR for source text */
+html[dir="rtl"] #edit-translation-form input[id*="msgid"] {
+    direction: ltr;
+    text-align: left;
+}
+
+/* RTL Form Labels */
+html[dir="rtl"] #edit-translation-form label {
+    text-align: right;
+}
+
+/* RTL Form Submit Buttons Container */
+html[dir="rtl"] .flex.justify-end.space-x-3.pt-6 {
+    justify-content: flex-start !important;
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .flex.justify-end.space-x-3.pt-6 > * {
+    margin-right: 0.75rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] .flex.justify-end.space-x-3.pt-6 > *:first-child {
+    margin-right: 0;
+}
+
+/* RTL Warning/Info Boxes in Translation Form */
+html[dir="rtl"] .bg-yellow-50.border-yellow-200,
+html[dir="rtl"] .bg-blue-50.border-blue-200 {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .bg-yellow-50.border-yellow-200 .flex.items-start,
+html[dir="rtl"] .bg-blue-50.border-blue-200 .flex.items-start {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .bg-yellow-50.border-yellow-200 .flex.items-start i,
+html[dir="rtl"] .bg-blue-50.border-blue-200 .flex.items-start i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}
+
+/* RTL Placeholder Error Messages */
+html[dir="rtl"] .placeholder-error {
+    text-align: right;
+    direction: rtl;
+}
+
+/* RTL Notification Positioning (for clear translations feedback) */
+html[dir="rtl"] .fixed.top-4.right-4 {
+    right: auto !important;
+    left: 1rem !important;
+}
+
+/* RTL Edit Translation Modal */
+html[dir="rtl"] #edit-translation-modal {
+    direction: rtl;
+}
+
+html[dir="rtl"] #edit-translation-modal .flex.justify-between {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #edit-translation-modal .flex.justify-end {
+    justify-content: flex-start !important;
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #edit-translation-modal .flex.justify-end.space-x-3 > * {
+    margin-right: 0.75rem;
+    margin-left: 0;
+}
+
+html[dir="rtl"] #edit-translation-modal .flex.justify-end.space-x-3 > *:last-child {
+    margin-right: 0;
+}
+
+html[dir="rtl"] #edit-translation-modal .close-edit-translation-modal {
+    right: auto !important;
+    left: 0.75rem !important;
+}
+
+html[dir="rtl"] #edit-translation-modal label {
+    text-align: right;
+}
+
+html[dir="rtl"] #edit-translation-modal textarea:not([dir="rtl"]) {
+    text-align: right;
+    direction: ltr;
+}
+
+html[dir="rtl"] #edit-translation-modal textarea[dir="rtl"] {
+    text-align: right;
+    direction: rtl;
+}
+
+html[dir="rtl"] #edit-translation-modal .bg-yellow-50 .flex.items-start,
+html[dir="rtl"] #edit-translation-modal .bg-blue-50 .flex.items-start {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #edit-translation-modal .bg-yellow-50 .flex.items-start i,
+html[dir="rtl"] #edit-translation-modal .bg-blue-50 .flex.items-start i {
+    margin-right: 0 !important;
+    margin-left: 0.5rem !important;
+}

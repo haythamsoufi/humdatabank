@@ -1,0 +1,368 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_view_analytics = current_is_system_manager or has_permission('admin.analytics.view') %}
+{% set can_view_users = current_is_system_manager or has_permission('admin.users.view') %}
+{% set can_create_user = current_is_system_manager or has_permission('admin.users.create') %}
+{% set can_view_templates = current_is_system_manager or has_permission('admin.templates.view') %}
+{% set can_create_templates = current_is_system_manager or has_permission('admin.templates.create') %}
+{% set can_view_assignments = current_is_system_manager or has_permission('admin.assignments.view') %}
+{% set can_create_assignments = current_is_system_manager or has_permission('admin.assignments.create') %}
+{% set can_view_indicator_bank = current_is_system_manager or has_permission('admin.indicator_bank.view') %}
+{% set can_manage_resources = current_is_system_manager or has_permission('admin.resources.manage') %}
+{% set can_manage_settings = current_is_system_manager or has_permission('admin.settings.manage') %}
+{% set can_manage_public_submissions = current_is_system_manager or has_permission('admin.assignments.public_submissions.manage') %}
+
+{% block content %}
+<div class="sharp-ui">
+{{ page_header(
+    title=_(title),
+    icon='fas fa-tachometer-alt',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')}
+    ]
+) }}
+
+
+
+<!-- Main Statistics Grid -->
+<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-6">
+    {% if can_view_users %}
+    <a href="{{ url_for('user_management.manage_users') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Total Users') }}</h3>
+            <i class="fas fa-users text-blue-500"></i>
+        </div>
+        <p class="text-2xl font-bold text-blue-600">{{ user_count }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('%(active)s active sessions', active=active_sessions) }}</p>
+    </a>
+
+    <a href="{{ url_for('user_management.manage_users') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Admins') }}</h3>
+            <i class="fas fa-user-shield text-red-500"></i>
+        </div>
+        <p class="text-2xl font-bold text-red-600">{{ role_stats.admin or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('System administrators') }}</p>
+    </a>
+
+    <a href="{{ url_for('user_management.manage_users') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Focal Points') }}</h3>
+            <i class="fas fa-user-tie text-purple-500"></i>
+        </div>
+        <p class="text-2xl font-bold text-purple-600">{{ role_stats.focal_point or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Country focal points') }}</p>
+    </a>
+    {% endif %}
+
+    {% if can_view_templates %}
+    <a href="{{ url_for('form_builder.manage_templates') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Templates') }}</h3>
+            <i class="fas fa-file-alt text-green-500"></i>
+        </div>
+        <p class="text-2xl font-bold text-green-600">{{ template_count }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Form templates') }}</p>
+    </a>
+    {% endif %}
+
+    {% if can_view_assignments %}
+    <a href="{{ url_for('assignment_management.manage_assignments') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Assignments') }}</h3>
+            <i class="fas fa-tasks text-orange-500"></i>
+        </div>
+        <p class="text-2xl font-bold text-orange-600">{{ assignment_count }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Active assignments') }}</p>
+    </a>
+    {% endif %}
+
+    {% if can_view_analytics %}
+    <a href="{{ url_for('analytics.login_logs') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _("Today's Logins") }}</h3>
+            <i class="fas fa-sign-in-alt text-indigo-500"></i>
+        </div>
+        <p class="text-2xl font-bold text-indigo-600">{{ today_logins or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Successful logins today') }}</p>
+    </a>
+    {% endif %}
+</div>
+
+<!-- Quick Actions Grid -->
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
+    <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+        <i class="fas fa-bolt text-yellow-500 mr-2"></i>
+        {{ _('Quick Actions') }}
+    </h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        {% if can_create_user %}
+        <a href="{{ url_for('user_management.new_user') }}" class="flex flex-col items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center">
+            <i class="fas fa-user-plus text-blue-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-blue-700">{{ _('Add User') }}</span>
+        </a>
+        {% endif %}
+        {% if can_create_assignments %}
+        <a href="{{ url_for('assignment_management.new_assignment') }}" class="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center">
+            <i class="fas fa-plus-circle text-green-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-green-700">{{ _('New Assignment') }}</span>
+        </a>
+        {% endif %}
+        {% if can_create_templates %}
+        <a href="{{ url_for('form_builder.new_template') }}" class="flex flex-col items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center">
+            <i class="fas fa-file-alt text-purple-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-purple-700">{{ _('New Template') }}</span>
+        </a>
+        {% endif %}
+
+        {% if can_view_indicator_bank %}
+        <a href="{{ url_for('system_admin.manage_indicator_bank') }}" class="flex flex-col items-center p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-center">
+            <i class="fas fa-database text-orange-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-orange-700">{{ _('Indicators') }}</span>
+        </a>
+        {% endif %}
+
+        {% if can_manage_resources %}
+        <a href="{{ url_for('content_management.manage_resources') }}" class="flex flex-col items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center">
+            <i class="fas fa-folder-open text-purple-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-purple-700">{{ _('Resources') }}</span>
+        </a>
+        {% endif %}
+        {% if can_manage_settings %}
+        <a href="{{ url_for('settings.manage_settings') }}" class="flex flex-col items-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-center">
+            <i class="fas fa-cog text-gray-600 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-gray-700">{{ _('Settings') }}</span>
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- System Health: Security & Audit + Translation Coverage -->
+{% if can_view_analytics %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+  {# ── Security & Audit ── #}
+  {% set sa = security_audit_widget | default({}) %}
+  <div class="bg-white p-5 rounded-lg shadow border border-gray-200">
+    <h3 class="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <i class="fas fa-shield-virus text-red-500"></i>Security & Audit
+      <a href="{{ url_for('analytics.security_events') }}" class="ml-auto text-xs text-blue-600 hover:underline font-normal">View all →</a>
+    </h3>
+    <div class="grid grid-cols-2 gap-3">
+      {% macro sa_stat(label, value, bad_if_gt=0, suffix='') %}
+      <div class="rounded border {{ 'border-red-200 bg-red-50' if value > bad_if_gt else 'border-green-200 bg-green-50' }} p-3 text-center">
+        <div class="text-2xl font-bold {{ 'text-red-700' if value > bad_if_gt else 'text-green-700' }}">{{ value }}{{ suffix }}</div>
+        <div class="text-xs text-gray-500 mt-0.5">{{ label }}</div>
+      </div>
+      {% endmacro %}
+      {{ sa_stat('Unresolved Events',        unresolved_security_events | default(0)) }}
+      {{ sa_stat('High-Risk Actions (30d)',  sa.high_risk_actions_30d   | default(0)) }}
+      {{ sa_stat('Suspicious Logins (30d)', sa.suspicious_logins_30d   | default(0)) }}
+      {{ sa_stat('Failed Login Rate',        sa.failed_login_rate_30d   | default(0), bad_if_gt=5, suffix='%') }}
+    </div>
+  </div>
+
+  {# ── Translation Coverage ── #}
+  {% set tw = translation_widget | default({}) %}
+  <div class="bg-white p-5 rounded-lg shadow border border-gray-200">
+    <h3 class="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <i class="fas fa-language text-blue-500"></i>Translation Coverage
+      <a href="{{ url_for('system_admin.manage_indicator_bank') }}" class="ml-auto text-xs text-blue-600 hover:underline font-normal">Indicator Bank →</a>
+    </h3>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      {% set avg_n = tw.avg_name_pct | default(0) %}
+      {% set avg_d = tw.avg_def_pct  | default(0) %}
+      <div class="rounded border {{ 'border-green-200 bg-green-50' if avg_n >= 70 else 'border-yellow-200 bg-yellow-50' }} p-3 text-center">
+        <div class="text-2xl font-bold {{ 'text-green-700' if avg_n >= 70 else 'text-yellow-700' }}">{{ avg_n }}%</div>
+        <div class="text-xs text-gray-500 mt-0.5">Avg Name Coverage</div>
+      </div>
+      <div class="rounded border {{ 'border-green-200 bg-green-50' if avg_d >= 70 else 'border-yellow-200 bg-yellow-50' }} p-3 text-center">
+        <div class="text-2xl font-bold {{ 'text-green-700' if avg_d >= 70 else 'text-yellow-700' }}">{{ avg_d }}%</div>
+        <div class="text-xs text-gray-500 mt-0.5">Avg Definition Coverage</div>
+      </div>
+    </div>
+    {% set by_lang = tw.by_lang | default({}) %}
+    {% if by_lang %}
+    <div class="space-y-1.5">
+      {% for lang, data in by_lang.items() %}
+      {% set np = data.name_pct | default(0) %}
+      <div class="flex items-center gap-2 text-xs">
+        <span class="font-semibold uppercase text-gray-600 w-5 shrink-0">{{ lang }}</span>
+        <div class="flex-1 h-2 rounded-full overflow-hidden bg-gray-100">
+          <div class="h-full rounded-full {{ 'bg-blue-400' if np >= 70 else 'bg-yellow-400' }}" style="width:{{ np }}%"></div>
+        </div>
+        <span class="text-gray-400 w-8 text-right">{{ np }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-400 italic">No indicator bank data.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endif %}
+
+<!-- Items Requiring Attention and Most Active Users Side by Side -->
+<div class="grid grid-cols-1 {% if top_users %}lg:grid-cols-3{% else %}lg:grid-cols-2{% endif %} gap-6 mb-6">
+    <!-- Items Requiring Attention -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+            <i class="fas fa-exclamation-circle text-orange-500 mr-2"></i>
+            {{ _('Items Requiring Attention') }}
+        </h3>
+        <div class="space-y-3">
+            {% if can_manage_public_submissions %}
+            <div class="flex items-center justify-between p-3 {% if pending_public_submissions_count > 0 %}bg-orange-50 border border-orange-200{% else %}bg-gray-50 border border-gray-200{% endif %} rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-clock text-orange-500 mr-3"></i>
+                    <span class="text-sm font-medium">{{ _('Pending Submissions') }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-lg font-bold {% if pending_public_submissions_count > 0 %}text-orange-600{% else %}text-green-600{% endif %}">
+                        {{ pending_public_submissions_count }}
+                    </span>
+                    {% if pending_public_submissions_count > 0 and can_manage_public_submissions %}
+                    <a href="{{ url_for('assignment_management.list_public_submissions') }}" class="text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 px-2 py-1 rounded">{{ _('View') }}</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if can_view_assignments %}
+            <div class="flex items-center justify-between p-3 {% if overdue_assignments > 0 %}bg-red-50 border border-red-200{% else %}bg-gray-50 border border-gray-200{% endif %} rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-calendar-times text-red-500 mr-3"></i>
+                    <span class="text-sm font-medium">{{ _('Overdue Assignments') }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-lg font-bold {% if overdue_assignments > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                        {{ overdue_assignments }}
+                    </span>
+                    {% if overdue_assignments > 0 and can_view_assignments %}
+                    <a href="{{ url_for('assignment_management.manage_assignments') }}" class="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded">{{ _('View') }}</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if can_view_analytics %}
+            <div class="flex items-center justify-between p-3 {% if unresolved_security_events > 0 %}bg-red-50 border border-red-200{% else %}bg-gray-50 border border-gray-200{% endif %} rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-shield-alt text-red-500 mr-3"></i>
+                    <span class="text-sm font-medium">{{ _('Security Alerts') }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-lg font-bold {% if unresolved_security_events > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                        {{ unresolved_security_events }}
+                    </span>
+                    {% if unresolved_security_events > 0 and can_view_analytics %}
+                    <a href="{{ url_for('analytics.security_events') }}" class="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded">{{ _('View') }}</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    {% if can_view_analytics %}
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+            <i class="fas fa-history text-blue-500 mr-2"></i>
+            {{ _('Recent Activity (7 days)') }}
+        </h3>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-sign-in-alt text-green-500 mr-3"></i>
+                    <span class="text-sm font-medium">{{ _('Successful Logins') }}</span>
+                </div>
+                <span class="text-lg font-bold text-green-600">{{ recent_logins }}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-mouse-pointer text-blue-500 mr-3"></i>
+                    <span class="text-sm font-medium">{{ _('User Activities') }}</span>
+                </div>
+                <span class="text-lg font-bold text-blue-600">{{ recent_activities }}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-users text-purple-500 mr-3"></i>
+                    <span class="text-sm font-medium">{{ _('Active Sessions') }}</span>
+                </div>
+                <span class="text-lg font-bold text-purple-600">{{ active_sessions }}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Most Active Users -->
+    {% if top_users and can_view_analytics %}
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+            <i class="fas fa-star text-yellow-500 mr-2"></i>
+            {{ _('Most Active Users (30 days)') }}
+        </h3>
+        <div class="space-y-3">
+            {% for user in top_users[:6] %}
+            <a href="{{ url_for('analytics.user_analytics', user_id=user.id) }}" class="flex items-center p-3 bg-gray-50 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:shadow-md cursor-pointer group">
+                <div class="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-full avatar-circle flex items-center justify-center mr-3 transition-colors">
+                    <span class="text-sm font-semibold text-blue-600 group-hover:text-blue-700">{{ (user.name or user.email)[:1].upper() }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 group-hover:text-blue-900 truncate">{{ user.name or user.email.split('@')[0] }}</p>
+                    <p class="text-xs text-gray-500 group-hover:text-blue-600">
+                        {% set lvl = user_access_level(user) %}
+                        {% if lvl == 'system_manager' %}
+                            {{ _('System Manager') }}
+                        {% elif lvl == 'admin' %}
+                            {{ _('Admin') }}
+                        {% elif lvl == 'focal_point' %}
+                            {{ _('Focal Point') }}
+                        {% else %}
+                            {{ _('User') }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm font-semibold text-gray-600 group-hover:text-blue-700">{{ user.activity_count }}</p>
+                    <p class="text-xs text-gray-400 group-hover:text-blue-500">{{ _('activities') }}</p>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Data Import Tools (System Managers only; link omitted if KoBo import route is not registered) -->
+{% if current_is_system_manager and kobo_data_import_url %}
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
+    <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+        <i class="fas fa-file-import text-amber-500 mr-2"></i>
+        {{ _('Data Import Tools') }}
+    </h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <a href="{{ kobo_data_import_url }}" class="flex flex-col items-center p-4 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors text-center" title="{{ _('Import submission data from a KoBo Toolbox data export') }}">
+            <i class="fas fa-database text-amber-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-amber-700">{{ _('Import KoBo Data') }}</span>
+        </a>
+    </div>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static_url('css/admin-dashboard.css') }}">
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}

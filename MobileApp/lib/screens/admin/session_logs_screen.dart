@@ -107,11 +107,11 @@ class _SessionLogsScreenState extends State<SessionLogsScreen> {
       context: context,
       builder: (sheetContext, setModalState) {
         return AdminFilterPanel(
-          title: loc.sessionLogsFilters,
+          title: loc.adminFilters,
           surfaceCard: false,
           actions: AdminFilterPanelActions(
-            applyLabel: loc.sessionLogsApply,
-            clearLabel: loc.sessionLogsClear,
+            applyLabel: loc.adminFiltersApply,
+            clearLabel: loc.adminFiltersClear,
             onApply: () {
               _applyFilters();
               Navigator.of(sheetContext).pop();
@@ -222,7 +222,7 @@ class _SessionLogsScreenState extends State<SessionLogsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.tune),
-            tooltip: loc.sessionLogsFilters,
+            tooltip: loc.adminFilters,
             onPressed: _openFiltersBottomSheet,
           ),
         ],

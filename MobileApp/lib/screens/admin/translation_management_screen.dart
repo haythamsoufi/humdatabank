@@ -68,11 +68,11 @@ class _TranslationManagementScreenState
       builder: (sheetContext, setModalState) {
         final theme = Theme.of(sheetContext);
         return AdminFilterPanel(
-          title: loc.sessionLogsFilters,
+          title: loc.adminFilters,
           surfaceCard: false,
           actions: AdminFilterPanelActions(
-            applyLabel: loc.sessionLogsApply,
-            clearLabel: loc.sessionLogsClear,
+            applyLabel: loc.adminFiltersApply,
+            clearLabel: loc.adminFiltersClear,
             onApply: () {
               _applyFilters();
               Navigator.of(sheetContext).pop();
@@ -349,7 +349,7 @@ class _TranslationManagementScreenState
         actions: [
           IconButton(
             icon: const Icon(Icons.tune),
-            tooltip: localizations.sessionLogsFilters,
+            tooltip: localizations.adminFilters,
             onPressed: _openFiltersBottomSheet,
           ),
         ],

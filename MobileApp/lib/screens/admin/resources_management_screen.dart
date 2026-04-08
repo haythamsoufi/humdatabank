@@ -67,11 +67,11 @@ class _ResourcesManagementScreenState extends State<ResourcesManagementScreen> {
       context: context,
       builder: (sheetContext, setModalState) {
         return AdminFilterPanel(
-          title: loc.sessionLogsFilters,
+          title: loc.adminFilters,
           surfaceCard: false,
           actions: AdminFilterPanelActions(
-            applyLabel: loc.sessionLogsApply,
-            clearLabel: loc.sessionLogsClear,
+            applyLabel: loc.adminFiltersApply,
+            clearLabel: loc.adminFiltersClear,
             onApply: () {
               _applyFilters();
               Navigator.of(sheetContext).pop();
@@ -257,7 +257,7 @@ class _ResourcesManagementScreenState extends State<ResourcesManagementScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.tune),
-            tooltip: localizations.sessionLogsFilters,
+            tooltip: localizations.adminFilters,
             onPressed: _openFiltersBottomSheet,
           ),
         ],

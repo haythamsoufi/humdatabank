@@ -6,18 +6,26 @@ import 'landing_hero_slideshow_background.dart';
 
 /// Collapsing hero with gradient mesh, title and subtitle.
 ///
-/// Optional [footer] (e.g. AI entry card) and [quickPrompts] are laid out inside
-/// [FlexibleSpaceBar] so they sit on the same gradient with prompts **below** the
-/// footer. Using [SliverAppBar.bottom] for the footer would paint it over
-/// [flexibleSpace] and clip the mesh to a solid [backgroundColor] band.
+/// Optional [footer] (e.g. AI entry card) and [quickPrompts] are laid out
+/// inside [FlexibleSpaceBar] so they sit on the same gradient.
+///
+/// When [chatExpanded] flips to `true` the title + description fade out and
+/// their vertical space collapses (via [SizeTransition]), causing the footer
+/// to slide upward.  The [quickPrompts] widget then expands below the footer
+/// in the freed space.
 class LandingHeroSliver extends StatefulWidget {
   final String title;
   final String description;
   final double expandedHeight;
-  /// Placed on the hero gradient above [quickPrompts] (e.g. AI entry card).
+
+  /// Placed on the hero gradient (e.g. AI entry card).
   final Widget? footer;
-  /// Placed on the hero gradient below [footer] (e.g. quick prompt chips).
+
+  /// Placed below [footer] once [chatExpanded] is `true`.
   final Widget? quickPrompts;
+
+  /// When `true` the title/description collapse and [quickPrompts] appear.
+  final bool chatExpanded;
 
   const LandingHeroSliver({
     super.key,
@@ -26,6 +34,7 @@ class LandingHeroSliver extends StatefulWidget {
     this.expandedHeight = 188,
     this.footer,
     this.quickPrompts,
+    this.chatExpanded = false,
   });
 
   /// Reserved height for [footer] (card + overlap into the hero).
@@ -39,10 +48,23 @@ class LandingHeroSliver extends StatefulWidget {
 }
 
 class _LandingHeroSliverState extends State<LandingHeroSliver>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+    with TickerProviderStateMixin {
+  // Intro: fades/slides the title in on mount.
+  late AnimationController _introCtrl;
   late Animation<double> _fadeIn;
   late Animation<Offset> _slide;
+
+  // Chat expansion: collapses title, reveals quick prompts.
+  late AnimationController _chatCtrl;
+
+  // Title shrinks out (1 → 0) across the first 65 % of _chatCtrl.
+  late Animation<double> _titleShrink;
+  // Title fades faster (1 → 0) across the first 35 %.
+  late Animation<double> _titleFade;
+  // Quick-prompts grow in (0 → 1) during the last 55 %.
+  late Animation<double> _promptsGrow;
+  // Quick-prompts fade in during the last 40 %.
+  late Animation<double> _promptsFade;
 
   static const List<Color> _meshColors = [
     Color(0xFF0F172A),
@@ -54,21 +76,67 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+
+    _introCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _fadeIn = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _fadeIn = CurvedAnimation(parent: _introCtrl, curve: Curves.easeOutCubic);
     _slide = Tween<Offset>(
       begin: const Offset(0, 0.06),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-    _controller.forward();
+    ).animate(CurvedAnimation(parent: _introCtrl, curve: Curves.easeOutCubic));
+    _introCtrl.forward();
+
+    _chatCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+      value: widget.chatExpanded ? 1.0 : 0.0,
+    );
+    _buildChatAnimations();
+  }
+
+  void _buildChatAnimations() {
+    _titleFade = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+        parent: _chatCtrl,
+        curve: const Interval(0.0, 0.35, curve: Curves.easeOut),
+      ),
+    );
+    _titleShrink = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+        parent: _chatCtrl,
+        curve: const Interval(0.0, 0.65, curve: Curves.easeOutCubic),
+      ),
+    );
+    _promptsGrow = CurvedAnimation(
+      parent: _chatCtrl,
+      curve: const Interval(0.45, 1.0, curve: Curves.easeOutCubic),
+    );
+    _promptsFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _chatCtrl,
+        curve: const Interval(0.6, 1.0, curve: Curves.easeIn),
+      ),
+    );
+  }
+
+  @override
+  void didUpdateWidget(LandingHeroSliver old) {
+    super.didUpdateWidget(old);
+    if (widget.chatExpanded != old.chatExpanded) {
+      if (widget.chatExpanded) {
+        _chatCtrl.forward();
+      } else {
+        _chatCtrl.reverse();
+      }
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _introCtrl.dispose();
+    _chatCtrl.dispose();
     super.dispose();
   }
 
@@ -77,10 +145,14 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
     final top = MediaQuery.paddingOf(context).top;
     final footerExtra =
         widget.footer != null ? LandingHeroSliver.footerPreferredHeight : 0.0;
-    final promptsExtra = widget.quickPrompts != null
-        ? LandingHeroSliver.quickPromptsSlotHeight
-        : 0.0;
-    final h = widget.expandedHeight + top + footerExtra + promptsExtra;
+    // Quick-prompt space is NOT added to the expanded height; prompts appear
+    // in the space freed by the collapsing title area (expandedHeight - 12 px).
+    final h = widget.expandedHeight + top + footerExtra;
+
+    // The title area occupies exactly (expandedHeight - 12) px when visible.
+    // The 12 comes from the SizedBox(height: top + 12) offset at the top,
+    // which means: h - (top + 12) - footerExtra = expandedHeight - 12.
+    final titleAreaHeight = widget.expandedHeight - 12.0;
 
     return SliverAppBar(
       pinned: false,
@@ -92,12 +164,11 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
       automaticallyImplyLeading: false,
       backgroundColor: _meshColors.first,
       flexibleSpace: FlexibleSpaceBar(
-        stretchModes: const [
-          StretchMode.zoomBackground,
-        ],
+        stretchModes: const [StretchMode.zoomBackground],
         background: Stack(
           fit: StackFit.expand,
           children: [
+            // ── Background ──────────────────────────────────────────────────
             const LandingHeroSlideshowBackground(
               fallback: _MeshGradient(colors: _meshColors),
             ),
@@ -113,67 +184,109 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
                 ),
               ),
             ),
+
+            // ── Content column ───────────────────────────────────────────────
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(height: top + 12),
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: FadeTransition(
-                        opacity: _fadeIn,
-                        child: SlideTransition(
-                          position: _slide,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                widget.title,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1.2,
-                                      letterSpacing: -0.4,
+
+                // Title + description — collapses when chatExpanded.
+                AnimatedBuilder(
+                  animation: _chatCtrl,
+                  builder: (context, _) {
+                    return ClipRect(
+                      child: SizeTransition(
+                        sizeFactor: _titleShrink,
+                        axisAlignment: -1,
+                        child: SizedBox(
+                          height: titleAreaHeight,
+                          child: FadeTransition(
+                            opacity: _titleFade,
+                            child: Center(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
+                                child: FadeTransition(
+                                  opacity: _fadeIn,
+                                  child: SlideTransition(
+                                    position: _slide,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          widget.title,
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .headlineSmall
+                                              ?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                                height: 1.2,
+                                                letterSpacing: -0.4,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          widget.description,
+                                          textAlign: TextAlign.center,
+                                          maxLines: 4,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.9),
+                                                height: 1.35,
+                                              ),
+                                        ),
+                                      ],
                                     ),
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                widget.description,
-                                textAlign: TextAlign.center,
-                                maxLines: 4,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                      color: Colors.white.withValues(alpha: 0.9),
-                                      height: 1.35,
-                                    ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
+
+                // Footer (AI entry card) — always visible, slides upward as
+                // the title area above it collapses.
                 if (widget.footer != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.only(bottom: 12),
                     child: widget.footer!,
                   ),
+
+                // Quick prompts — expand below the card when chatExpanded.
                 if (widget.quickPrompts != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
-                    child: widget.quickPrompts!,
+                  AnimatedBuilder(
+                    animation: _chatCtrl,
+                    builder: (context, _) {
+                      return ClipRect(
+                        child: SizeTransition(
+                          sizeFactor: _promptsGrow,
+                          axisAlignment: -1,
+                          child: FadeTransition(
+                            opacity: _promptsFade,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(0, 6, 0, 8),
+                              child: widget.quickPrompts!,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
               ],
             ),
@@ -206,12 +319,14 @@ class _MeshGradient extends StatelessWidget {
         Positioned(
           right: -80,
           top: -40,
-          child: _Blob(color: Color(AppConstants.ifrcRed).withValues(alpha: 0.35)),
+          child: _Blob(
+              color: Color(AppConstants.ifrcRed).withValues(alpha: 0.35)),
         ),
         Positioned(
           left: -60,
           bottom: 20,
-          child: _Blob(color: Colors.blue.shade900.withValues(alpha: 0.4)),
+          child: _Blob(
+              color: Colors.blue.shade900.withValues(alpha: 0.4)),
         ),
       ],
     );

@@ -457,9 +457,7 @@ class _SessionTileState extends State<_SessionTile>
         ? loc.sessionLogsMinutes(widget.log.durationMinutes!)
         : '—';
 
-    final cardSurface = Theme.of(context).brightness == Brightness.light
-        ? Colors.white
-        : scheme.surfaceContainerHighest.withValues(alpha: 0.65);
+    final cardSurface = elevatedListCardSurfaceColor(Theme.of(context));
     final borderColor = elevatedListCardBorderColor(scheme, cardSurface);
 
     return Padding(

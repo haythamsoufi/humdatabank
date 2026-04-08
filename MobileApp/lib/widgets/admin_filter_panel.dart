@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'shared/elevated_list_card.dart';
+
 /// Shared filter pane: optional card-style surface, themed inputs, and optional Apply/Clear row.
 /// Use inline, under [AnimatedCrossFade], or inside `showAdminFiltersBottomSheet` from
 /// `admin_filters_bottom_sheet.dart`; wrap fields in [child] and pass the same [title]
@@ -38,7 +40,8 @@ class AdminFilterPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     final inner = Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -80,7 +83,7 @@ class AdminFilterPanel extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.15,
                           ),
@@ -89,7 +92,7 @@ class AdminFilterPanel extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtitle!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: theme.textTheme.bodySmall?.copyWith(
                               color: scheme.onSurfaceVariant,
                               height: 1.25,
                             ),
@@ -126,7 +129,7 @@ class AdminFilterPanel extends StatelessWidget {
         child: surfaceCard
             ? DecoratedBox(
                 decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                  color: elevatedListCardSurfaceColor(theme),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: scheme.outline.withValues(alpha: 0.55),

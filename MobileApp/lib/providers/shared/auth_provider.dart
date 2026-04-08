@@ -97,27 +97,39 @@ class AuthProvider with ChangeNotifier {
   // This will reload the user profile from backend to get latest data including profile color
   Future<void> refreshUser() async {
     try {
-      // Force reload profile from backend to ensure we get latest data including profile color
-      // Using forceRevalidate: true ensures the profile is actually reloaded even if cached
+      DebugLogger.logAuth('refreshUser: calling isLoggedIn(forceRevalidate: true)');
       final isLoggedIn = await _authService.isLoggedIn(forceRevalidate: true);
+      DebugLogger.logAuth(
+          'refreshUser: isLoggedIn=$isLoggedIn, '
+          'currentUser=${_authService.currentUser?.email ?? "null"}');
       if (isLoggedIn) {
-        // Get fresh user data from AuthService (should now have latest profile color)
         _user = _authService.currentUser;
         if (_user != null) {
           await _saveUserToCache(_user!);
           DebugLogger.logAuth(
-              'User refreshed from backend: ${_user!.email}, profile_color: ${_user!.profileColor ?? "null"}');
+              'refreshUser: profile loaded from backend '
+              '(${_user!.email}, role: ${_user!.role ?? "?"})');
+        } else {
+          DebugLogger.logWarn('AUTH',
+              'refreshUser: isLoggedIn=true but currentUser is null');
         }
+      } else {
+        DebugLogger.logWarn('AUTH',
+            'refreshUser: isLoggedIn returned false — '
+            'user profile not available');
       }
       notifyListeners();
     } catch (e) {
-      DebugLogger.logError('Error refreshing user: $e');
-      // On error, still update from current cached value
+      DebugLogger.logError('refreshUser error: $e');
       _user = _authService.currentUser;
       if (_user != null) {
         await _saveUserToCache(_user!);
         DebugLogger.logWarn('AUTH',
-            'User refreshed from cache (error occurred): ${_user!.email}, profile_color: ${_user!.profileColor ?? "null"}');
+            'refreshUser: fell back to cached user '
+            '(${_user!.email}, error: $e)');
+      } else {
+        DebugLogger.logWarn('AUTH',
+            'refreshUser: no cached user available either (error: $e)');
       }
       notifyListeners();
     }

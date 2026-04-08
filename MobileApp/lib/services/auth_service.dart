@@ -895,17 +895,24 @@ class AuthService {
     // IMPROVED: Handle offline scenario - check if session is valid for offline operations
     if (_connectivity.isOffline) {
       DebugLogger.logAuth(
-          'Device is offline (connectivity status: ${_connectivity.currentStatus}) '
+          'Device is offline (connectivity: ${_connectivity.currentStatus}) '
           '— checking offline session validity...');
       final isValidForOffline = await _session.isSessionValidForOffline();
+      final hasJwt = await _jwtService.hasTokens();
+      final jwtExpired = hasJwt ? await _jwtService.isAccessTokenExpired() : null;
       if (isValidForOffline) {
         final hasUser = _currentUser != null;
         DebugLogger.logAuth(
-            'Session is valid for offline operations '
-            '(cachedUser: $hasUser)');
+            'Offline session valid — '
+            'cachedUser: $hasUser${hasUser ? " (${_currentUser!.email})" : ""}, '
+            'hasJwt: $hasJwt, jwtExpired: $jwtExpired, '
+            'returning: $hasUser');
         return hasUser;
       } else {
-        DebugLogger.logWarn('AUTH', 'Session not valid for offline operations');
+        DebugLogger.logWarn('AUTH',
+            'Offline session NOT valid — '
+            'hasJwt: $hasJwt, jwtExpired: $jwtExpired, '
+            'returning: false');
         return false;
       }
     }

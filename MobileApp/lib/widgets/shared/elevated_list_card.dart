@@ -10,6 +10,16 @@ Color elevatedListCardBorderColor(ColorScheme scheme, Color surfaceBlend) {
   );
 }
 
+/// Surface fill for bordered list cards: white in light theme, elevated
+/// container tint in dark. Use with [elevatedListCardBorderColor] when building
+/// custom [Material] / [DecoratedBox] shells that match [ElevatedListCard].
+Color elevatedListCardSurfaceColor(ThemeData theme) {
+  final scheme = theme.colorScheme;
+  return theme.brightness == Brightness.light
+      ? Colors.white
+      : scheme.surfaceContainerHighest.withValues(alpha: 0.65);
+}
+
 /// Bordered, lightly filled list row (grouped-card look).
 class ElevatedListCard extends StatelessWidget {
   const ElevatedListCard({
@@ -27,9 +37,7 @@ class ElevatedListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final surfaceColor = theme.brightness == Brightness.light
-        ? Colors.white
-        : scheme.surfaceContainerHighest.withValues(alpha: 0.65);
+    final surfaceColor = elevatedListCardSurfaceColor(theme);
     final borderColor = elevatedListCardBorderColor(scheme, surfaceColor);
 
     return Padding(

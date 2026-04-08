@@ -9,6 +9,7 @@ import '../../providers/admin/access_requests_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
+import '../../widgets/shared/elevated_list_card.dart';
 
 ButtonStyle _compactFilledButtonStyle() => FilledButton.styleFrom(
       visualDensity: VisualDensity.compact,
@@ -60,20 +61,6 @@ ButtonStyle _accessRequestRejectStyle(ThemeData theme) {
     textStyle: _accessRequestActionLabelStyle(theme).copyWith(color: cs.primary),
     side: BorderSide(color: cs.primary, width: 1),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-  );
-}
-
-/// Subtle card surface + outline used across admin list UIs.
-BoxDecoration _listCardDecoration(ThemeData theme) {
-  final cs = theme.colorScheme;
-  return BoxDecoration(
-    color: cs.surfaceContainerHighest.withValues(
-      alpha: theme.brightness == Brightness.dark ? 0.55 : 0.85,
-    ),
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(
-      color: cs.outlineVariant.withValues(alpha: 0.4),
-    ),
   );
 }
 
@@ -490,15 +477,13 @@ class _RequestCard extends StatelessWidget {
         : (item.country.iso2 ?? '—');
     final chipColors = _statusChipColors(theme, item.status);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: _listCardDecoration(theme),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
+    return ElevatedListCard(
+      marginBottom: 12,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -650,8 +635,7 @@ class _RequestCard extends StatelessWidget {
                 ],
               ),
             ],
-          ],
-        ),
+        ],
       ),
     );
   }

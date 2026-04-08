@@ -72,11 +72,16 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
     // redirect re-launched it, and getInitialLink() fired before we subscribed).
     final pending = DeepLinkService.consumePendingOAuthTokens();
     if (pending != null) {
-      DebugLogger.logInfo('AZURE LOGIN', 'Consuming cold-start OAuth tokens');
+      DebugLogger.logInfo('AZURE LOGIN',
+          'Consuming cold-start OAuth tokens — '
+          'skipping Chrome Custom Tab launch. '
+          'Keys: ${pending.keys.join(", ")}');
       _handleOAuthDeepLink(pending);
       return; // _launchOAuth is skipped — tokens already in hand
     }
 
+    DebugLogger.logInfo('AZURE LOGIN',
+        'No pending cold-start tokens — launching B2C in Chrome Custom Tab');
     _launchOAuth();
   }
 
@@ -157,14 +162,18 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
     final expiresInStr = params['expires_in'];
     final expiresIn = int.tryParse(expiresInStr ?? '') ?? 1800;
 
-    DebugLogger.logInfo(
-      'AZURE LOGIN',
-      'OAuth deep link received — access_token present: ${accessToken != null}',
-    );
+    DebugLogger.logInfo('AZURE LOGIN',
+        'OAuth deep link received — '
+        'access_token present: ${accessToken != null}, '
+        'refresh_token present: ${refreshToken != null}, '
+        'expires_in: ${expiresIn}s');
 
     if (accessToken == null || accessToken.isEmpty ||
         refreshToken == null || refreshToken.isEmpty) {
-      DebugLogger.logWarn('AZURE LOGIN', 'Deep link missing tokens');
+      DebugLogger.logWarn('AZURE LOGIN',
+          'Deep link missing tokens — '
+          'access_token empty: ${accessToken == null || (accessToken?.isEmpty ?? true)}, '
+          'refresh_token empty: ${refreshToken == null || (refreshToken?.isEmpty ?? true)}');
       if (mounted) {
         setState(() {
           _waiting = false;
@@ -201,7 +210,9 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
       // that runs from this point forward will find a valid refresh token.
       AuthService.oauthFlowPending = false;
 
-      DebugLogger.logInfo('AZURE LOGIN', 'JWT tokens saved — refreshing user profile');
+      DebugLogger.logInfo('AZURE LOGIN',
+          'JWT tokens saved (expires_in: ${expiresIn}s) — '
+          'attempting user profile refresh');
 
       if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -209,10 +220,30 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
 
       if (!mounted) return;
 
+      final hasJwt = await _jwtService.hasTokens();
+      final jwtExpired = await _jwtService.isAccessTokenExpired();
+      DebugLogger.logInfo('AZURE LOGIN',
+          'Post-refresh state: '
+          'isAuthenticated=${authProvider.isAuthenticated}, '
+          'user=${authProvider.user?.email ?? "null"}, '
+          'hasJwt=$hasJwt, jwtExpired=$jwtExpired');
+
       if (authProvider.isAuthenticated && authProvider.user != null) {
         DebugLogger.logInfo('AZURE LOGIN',
             'Auth confirmed — navigating to dashboard '
-            '(user: ${authProvider.user?.email ?? "?"})');
+            '(user: ${authProvider.user!.email})');
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.dashboard,
+          (route) => false,
+          arguments: 2,
+        );
+      } else if (hasJwt && !jwtExpired) {
+        // JWT is valid but profile couldn't load (e.g. device offline).
+        // Navigate to dashboard — the profile will load when connectivity returns.
+        DebugLogger.logWarn('AZURE LOGIN',
+            'JWT is valid but user profile not loaded '
+            '(likely offline). Navigating to dashboard — '
+            'profile will sync when online.');
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppRoutes.dashboard,
           (route) => false,
@@ -220,12 +251,9 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
         );
       } else {
         DebugLogger.logWarn('AZURE LOGIN',
-            'Tokens saved but user profile not loaded '
-            '(isAuthenticated: ${authProvider.isAuthenticated}, '
-            'user: ${authProvider.user != null}). '
-            'Falling back to B2C login.');
-        // Tokens were saved but we couldn't verify the session (offline, etc.).
-        // Launch the real B2C flow so the user can authenticate properly.
+            'Tokens invalid or expired after save '
+            '(hasJwt: $hasJwt, jwtExpired: $jwtExpired). '
+            'Launching B2C login.');
         _launchOAuth();
       }
     } catch (e) {

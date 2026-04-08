@@ -387,6 +387,13 @@ def _update_session_activity_explicit(session_id: Optional[str], activity_type: 
         if not session_log:
             return
 
+        # Don't update a session that has already been ended (e.g. by inactivity
+        # cleanup). The refresh_token endpoint will have created a new session
+        # with a fresh session_id; activity for the resumed session will be
+        # tracked under that new row instead.
+        if not session_log.is_active:
+            return
+
         session_log.last_activity = utcnow()
 
         normalized_activity_type = normalize_activity_type(activity_type)

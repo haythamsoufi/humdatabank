@@ -633,7 +633,9 @@ class Config:
     # Session configuration
     SESSION_PERMANENT = True
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
-    SESSION_INACTIVITY_TIMEOUT = timedelta(hours=2)
+    SESSION_INACTIVITY_TIMEOUT = timedelta(
+        minutes=int(os.environ.get('SESSION_INACTIVITY_TIMEOUT_MINUTES', 30))
+    )
 
     # AI Chatbot Configuration
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')

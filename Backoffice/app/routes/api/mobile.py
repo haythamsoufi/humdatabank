@@ -101,9 +101,15 @@ def refresh_token():
     (access + refresh).  Issuing a new refresh token on every refresh
     rolls the 30-day inactivity window forward so active users never
     need to re-login.
+
+    If the session tied to the refresh token was ended by inactivity
+    cleanup while the user was away, a new session is started
+    automatically so the resumed activity appears as a distinct session
+    in the session logs rather than updating the old ended row.
     """
+    import uuid as _uuid
     from app.utils.mobile_jwt import decode_mobile_token, issue_token_pair
-    from app.models import User
+    from app.models import User, UserSessionLog
 
     data = get_json_safe()
     refresh = data.get('refresh_token', '')
@@ -126,8 +132,29 @@ def refresh_token():
     if not user or not user.is_active:
         return json_auth_required('User account not found or deactivated.')
 
-    # Preserve the original session_id so the blacklist check keeps working.
-    tokens = issue_token_pair(user.id, session_id=claims.sid)
+    # If the session that was embedded in the old tokens is no longer active
+    # (e.g. it was ended by the inactivity-cleanup job while the user was
+    # away), start a fresh session so the resumed activity is recorded as a
+    # new entry in session logs instead of updating the already-ended row.
+    session_id = claims.sid
+    if session_id:
+        old_session = UserSessionLog.query.filter_by(session_id=session_id).first()
+        if old_session is None or not old_session.is_active:
+            from app.services.user_analytics_service import start_user_session, log_user_activity
+            session_id = str(_uuid.uuid4())
+            start_user_session(user, session_id)
+            log_user_activity(
+                activity_type='login',
+                description=f'User {user.email} resumed mobile session after inactivity',
+                context_data={
+                    'user_id': user.id,
+                    'auth_method': 'jwt_refresh',
+                    'new_session_id': session_id,
+                    'previous_session_id': claims.sid,
+                },
+            )
+
+    tokens = issue_token_pair(user.id, session_id=session_id)
     return json_ok(**tokens)
 
 

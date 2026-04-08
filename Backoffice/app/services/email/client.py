@@ -165,9 +165,11 @@ def _send_via_ifrc(
         ))
         api_key_in_url = False
 
-    # Prepare request payload - IFRC Email API uses base64-encoded fields
-    # Fixed "To" address (matches other application's EMAIL_TO pattern)
-    fixed_to_address = "no-reply@example.com"
+    # Prepare request payload - IFRC Email API uses base64-encoded fields.
+    # The "To" field is a required dummy address in the API payload; actual
+    # recipients are delivered via To/CC/BCC fields below. Use the configured
+    # noreply sender so the envelope looks coherent rather than example.com.
+    fixed_to_address = current_app.config.get("MAIL_NOREPLY_SENDER") or sender
 
     # Convert recipients to comma-separated strings for encoding
     recipients_string = ",".join(recipients) if recipients else ""

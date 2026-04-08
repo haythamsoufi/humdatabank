@@ -72,7 +72,7 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedTimeRange,
+                initialValue: _selectedTimeRange,
                 decoration: InputDecoration(
                   labelText: loc.timeRange,
                   border: OutlineInputBorder(
@@ -130,7 +130,7 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String?>(
-                value: _selectedMetricFilter,
+                initialValue: _selectedMetricFilter,
                 decoration: InputDecoration(
                   labelText: loc.metric,
                   border: OutlineInputBorder(

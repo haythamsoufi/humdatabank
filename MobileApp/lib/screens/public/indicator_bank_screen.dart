@@ -608,7 +608,8 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
             clearLabel: loc.indicatorBankClearAll,
             onApply: () async {
               await provider.applyFilters();
-              if (mounted) Navigator.of(sheetContext).pop();
+              if (!sheetContext.mounted) return;
+              Navigator.of(sheetContext).pop();
             },
             onClear: () {
               provider.clearFilters();

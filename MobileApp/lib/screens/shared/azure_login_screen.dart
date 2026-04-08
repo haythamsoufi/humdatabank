@@ -172,8 +172,8 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
         refreshToken == null || refreshToken.isEmpty) {
       DebugLogger.logWarn('AZURE LOGIN',
           'Deep link missing tokens — '
-          'access_token empty: ${accessToken == null || (accessToken?.isEmpty ?? true)}, '
-          'refresh_token empty: ${refreshToken == null || (refreshToken?.isEmpty ?? true)}');
+          'access_token empty: ${accessToken == null || accessToken.isEmpty}, '
+          'refresh_token empty: ${refreshToken == null || refreshToken.isEmpty}');
       if (mounted) {
         setState(() {
           _waiting = false;
@@ -222,6 +222,7 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
 
       final hasJwt = await _jwtService.hasTokens();
       final jwtExpired = await _jwtService.isAccessTokenExpired();
+      if (!mounted) return;
       DebugLogger.logInfo('AZURE LOGIN',
           'Post-refresh state: '
           'isAuthenticated=${authProvider.isAuthenticated}, '

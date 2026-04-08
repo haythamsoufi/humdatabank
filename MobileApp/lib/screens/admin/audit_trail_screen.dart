@@ -105,7 +105,7 @@ class _AuditTrailScreenState extends State<AuditTrailScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String>(
-                value: _selectedActionFilter,
+                initialValue: _selectedActionFilter,
                 decoration: InputDecoration(labelText: loc.action),
                 items: [
                   DropdownMenuItem(
@@ -128,7 +128,7 @@ class _AuditTrailScreenState extends State<AuditTrailScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String>(
-                value: _selectedUserFilter,
+                initialValue: _selectedUserFilter,
                 decoration: InputDecoration(labelText: loc.user),
                 items: [
                   DropdownMenuItem(

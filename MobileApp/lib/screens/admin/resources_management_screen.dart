@@ -132,7 +132,7 @@ class _ResourcesManagementScreenState extends State<ResourcesManagementScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String?>(
-                value: _selectedCategoryFilter,
+                initialValue: _selectedCategoryFilter,
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: loc.category,
@@ -182,7 +182,7 @@ class _ResourcesManagementScreenState extends State<ResourcesManagementScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String?>(
-                value: _selectedLanguageFilter,
+                initialValue: _selectedLanguageFilter,
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: loc.language,

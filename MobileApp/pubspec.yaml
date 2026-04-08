@@ -79,6 +79,7 @@ dependencies:
   quick_actions: ^1.1.0
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
+  html: ^0.15.6
 
 dev_dependencies:
   flutter_test:

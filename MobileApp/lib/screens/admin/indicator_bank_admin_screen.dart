@@ -117,7 +117,7 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String>(
-                value: _selectedCategoryFilter,
+                initialValue: _selectedCategoryFilter,
                 decoration: InputDecoration(
                   labelText: loc.category,
                   border: OutlineInputBorder(
@@ -156,7 +156,7 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String>(
-                value: _selectedSectorFilter,
+                initialValue: _selectedSectorFilter,
                 decoration: InputDecoration(
                   labelText: loc.sector,
                   border: OutlineInputBorder(

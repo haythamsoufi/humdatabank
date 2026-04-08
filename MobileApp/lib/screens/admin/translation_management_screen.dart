@@ -132,7 +132,7 @@ class _TranslationManagementScreenState
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String?>(
-                value: _selectedLanguageFilter,
+                initialValue: _selectedLanguageFilter,
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: loc.language,
@@ -189,7 +189,7 @@ class _TranslationManagementScreenState
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String?>(
-                value: _selectedStatusFilter,
+                initialValue: _selectedStatusFilter,
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: loc.status,

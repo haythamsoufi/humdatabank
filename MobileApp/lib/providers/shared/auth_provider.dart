@@ -108,7 +108,7 @@ class AuthProvider with ChangeNotifier {
           await _saveUserToCache(_user!);
           DebugLogger.logAuth(
               'refreshUser: profile loaded from backend '
-              '(${_user!.email}, role: ${_user!.role ?? "?"})');
+              '(${_user!.email}, role: ${_user!.role})');
         } else {
           DebugLogger.logWarn('AUTH',
               'refreshUser: isLoggedIn=true but currentUser is null');

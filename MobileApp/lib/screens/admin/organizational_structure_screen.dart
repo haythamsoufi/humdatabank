@@ -113,7 +113,7 @@ class _OrganizationalStructureScreenState
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String?>(
-                value: _selectedLevelFilter,
+                initialValue: _selectedLevelFilter,
                 decoration: InputDecoration(
                   labelText: loc.entityType,
                   border: OutlineInputBorder(

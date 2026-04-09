@@ -51,12 +51,24 @@ def get_client_info():
     else:
         os_str = os_family
 
+    device_type = get_device_type(user_agent)
+
+    # Flutter mobile clients send explicit platform headers that are far more
+    # reliable than UA-string parsing (Dart's default UA looks like a desktop).
+    x_platform = request.headers.get('X-Platform', '').strip().lower()
+    x_os_version = request.headers.get('X-OS-Version', '').strip()
+    if x_platform in ('ios', 'android'):
+        device_type = 'Mobile'
+        browser_str = 'NGO Databank App'
+        if x_os_version:
+            os_str = x_os_version  # e.g. "iOS 17.2" or "Android 14"
+
     return {
         'ip_address': get_client_ip(),
         'user_agent': user_agent_string,
         'browser': browser_str,
         'operating_system': os_str,
-        'device_type': get_device_type(user_agent)
+        'device_type': device_type,
     }
 
 
@@ -321,6 +333,22 @@ def log_logout(user, session_duration_minutes=None):
         _rollback_transaction("log_logout_error")
 
 
+# Endpoints that should never write UserActivityLog rows (polling / background admin APIs).
+_SKIP_USER_ACTIVITY_LOG_ENDPOINTS = frozenset({
+    'admin_analytics_api.session_logs_list_api',
+    'user_management.api_users_profile_summary',
+})
+
+
+def _should_skip_activity_user_log_endpoint(endpoint: Optional[str]) -> bool:
+    """High-volume or background calls — not useful in the audit trail."""
+    if not endpoint:
+        return False
+    if endpoint in _SKIP_USER_ACTIVITY_LOG_ENDPOINTS:
+        return True
+    return endpoint.rsplit(".", 1)[-1] == "device_heartbeat"
+
+
 def log_user_activity(activity_type, description=None, context_data=None, response_time_ms=None, status_code=None):
     """
     Log a user activity.
@@ -333,6 +361,9 @@ def log_user_activity(activity_type, description=None, context_data=None, respon
         status_code (int): HTTP response status code
     """
     if not current_user.is_authenticated:
+        return
+
+    if _should_skip_activity_user_log_endpoint(request.endpoint):
         return
 
     try:
@@ -435,6 +466,9 @@ def log_user_activity_explicit(
     if not user_id:
         return
 
+    if _should_skip_activity_user_log_endpoint((endpoint or "").strip() or None):
+        return
+
     from app.utils.transactions import atomic
 
     normalized_activity_type = normalize_activity_type(activity_type)
@@ -476,6 +510,8 @@ def log_user_activity_for_user(user_id, activity_type, description=None, context
     Useful for system-triggered events like account creation or password resets.
     """
     if not user_id:
+        return
+    if has_request_context() and _should_skip_activity_user_log_endpoint(request.endpoint):
         return
     try:
         has_ctx = has_request_context()

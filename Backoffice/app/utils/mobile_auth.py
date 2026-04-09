@@ -136,6 +136,13 @@ def mobile_auth_required(f=None, *, permission: str | None = None):
                         pass  # Never let tracking errors break the auth flow
 
             return fn(*args, **kwargs)
+
+        # ── Endpoint-registry metadata ────────────────────────────────────
+        # These attributes are read by scan_flask_routes() in api_management.py
+        # to detect auth policy from live Flask routes without manual registry upkeep.
+        decorated_view._ep_auth = 'rbac' if permission else 'user'
+        if permission:
+            decorated_view._ep_permission = permission
         return decorated_view
 
     if f is not None:

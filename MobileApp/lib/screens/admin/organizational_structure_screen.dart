@@ -372,18 +372,6 @@ class _OrganizationalStructureScreenState
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'org_add_button',
-        onPressed: () {
-          Navigator.of(context).pushNamed(
-            AppRoutes.webview,
-            arguments: '/admin/organization/new',
-          );
-        },
-        backgroundColor: Color(AppConstants.ifrcRed),
-        icon: const Icon(Icons.add),
-        label: Text(localizations.addOrganization),
-      ),
       bottomNavigationBar: AppBottomNavigationBar(
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,

@@ -4,7 +4,6 @@ import '../providers/shared/auth_provider.dart';
 import '../models/shared/user.dart';
 import '../config/routes.dart';
 import '../utils/constants.dart';
-import '../utils/theme_extensions.dart';
 import 'modern_navigation_drawer.dart';
 
 class AdminDrawer extends StatelessWidget {
@@ -25,14 +24,13 @@ class AdminDrawer extends StatelessWidget {
         }
 
         final theme = Theme.of(context);
-        final iconBg = _brandRed.withValues(alpha: theme.isDarkTheme ? 0.22 : 0.12);
 
         return Drawer(
           backgroundColor: theme.colorScheme.surface,
           elevation: 1,
           shadowColor: Colors.black.withValues(alpha: 0.1),
           surfaceTintColor: Colors.transparent,
-          shape: modernDrawerShape(context),
+          shape: modernDrawerShape(),
           child: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -47,7 +45,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.home_rounded,
                         title: 'Dashboard',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(AppRoutes.dashboard);
@@ -57,7 +54,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.dashboard_rounded,
                         title: 'Admin Dashboard',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(
@@ -70,7 +66,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.description_rounded,
                         title: 'Document Management',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(
@@ -83,7 +78,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.translate_rounded,
                         title: 'Translation Management',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(
@@ -97,7 +91,6 @@ class AdminDrawer extends StatelessWidget {
                           icon: Icons.settings_rounded,
                           title: 'System Configuration',
                           iconColor: _brandRed,
-                          iconBackgroundColor: iconBg,
                           onTap: () {
                             Navigator.pop(context);
                             Navigator.of(context).pushNamed(
@@ -112,7 +105,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.article_rounded,
                         title: 'Manage Templates',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(AppRoutes.templates);
@@ -122,7 +114,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.assignment_rounded,
                         title: 'Manage Assignments',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(AppRoutes.assignments);
@@ -134,7 +125,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.folder_open_rounded,
                         title: 'Manage Resources',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(
@@ -149,7 +139,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.account_tree_rounded,
                         title: 'Organizational Structure',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(
@@ -162,7 +151,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.storage_rounded,
                         title: 'Indicator Bank',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(
@@ -177,7 +165,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.bar_chart_rounded,
                         title: 'User Analytics',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(
@@ -190,7 +177,6 @@ class AdminDrawer extends StatelessWidget {
                         icon: Icons.history_rounded,
                         title: 'Audit Trail',
                         iconColor: _brandRed,
-                        iconBackgroundColor: iconBg,
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.of(context).pushNamed(

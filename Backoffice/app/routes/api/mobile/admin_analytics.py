@@ -428,6 +428,15 @@ def audit_trail():
                 except ValueError:
                     pass
 
+            q = q.filter(
+                UserActivityLog.endpoint.notin_((
+                    'mobile_api.device_heartbeat',
+                    'notifications.device_heartbeat',
+                    'admin_analytics_api.session_logs_list_api',
+                    'user_management.api_users_profile_summary',
+                ))
+            )
+
             q = q.order_by(desc(UserActivityLog.timestamp))
             paginated = q.paginate(page=page, per_page=per_page, error_out=False)
 

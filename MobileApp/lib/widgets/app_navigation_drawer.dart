@@ -55,6 +55,14 @@ class AppNavigationDrawer extends StatelessWidget {
     Navigator.of(context).pushNamed(route, arguments: arguments);
   }
 
+  void _openUserSettings(BuildContext context) {
+    Navigator.pop(context);
+    if (_isNested) {
+      Navigator.of(context).pop();
+    }
+    Navigator.of(context).pushNamed(AppRoutes.settings);
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
@@ -72,7 +80,7 @@ class AppNavigationDrawer extends StatelessWidget {
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.1),
       surfaceTintColor: Colors.transparent,
-      shape: modernDrawerShape(context),
+      shape: modernDrawerShape(),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,6 +88,9 @@ class AppNavigationDrawer extends StatelessWidget {
             ModernDrawerHeader(
               title: localizations.navigation,
               user: isAuthenticated ? user : null,
+              onProfileTap:
+                  isAuthenticated ? () => _openUserSettings(context) : null,
+              profileTapSemanticLabel: localizations.settings,
             ),
             Expanded(
               child: ListView(

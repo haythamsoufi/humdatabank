@@ -9,7 +9,7 @@ from flask_babel import _
 logger = logging.getLogger(__name__)
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectMultipleField, SubmitField
-from wtforms.validators import DataRequired, Email, Optional, ValidationError
+from wtforms.validators import DataRequired, Email, Optional, ValidationError, Regexp
 from wtforms.widgets import ListWidget, CheckboxInput
 from app.models import Country, User
 from ..base import BaseForm
@@ -22,6 +22,17 @@ class UserForm(BaseForm):
     password = PasswordField("Password", validators=[Optional()])
     name = StringField('Name', validators=[DataRequired()])
     title = StringField('Title', validators=[Optional()])
+    profile_color = StringField(
+        _('Profile colour'),
+        validators=[
+            Optional(),
+            Regexp(
+                r'^#[0-9A-Fa-f]{6}$',
+                message=_('Profile colour must be a #RRGGBB value.'),
+            ),
+        ],
+        default='#3B82F6',
+    )
 
     # RBAC roles (multi-select). Users can have multiple roles simultaneously.
     rbac_roles = SelectMultipleField(

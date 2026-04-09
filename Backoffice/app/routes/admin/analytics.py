@@ -607,7 +607,13 @@ def audit_trail():
     activity_query = activity_query.filter(
         ~(
             (UserActivityLog.activity_type == 'presence_heartbeat') |
-            (UserActivityLog.endpoint == 'forms_api.api_presence_heartbeat')
+            (UserActivityLog.endpoint == 'forms_api.api_presence_heartbeat') |
+            (UserActivityLog.endpoint.in_((
+                'mobile_api.device_heartbeat',
+                'notifications.device_heartbeat',
+                'admin_analytics_api.session_logs_list_api',
+                'user_management.api_users_profile_summary',
+            )))
         )
     )
 

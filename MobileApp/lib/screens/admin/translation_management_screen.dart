@@ -10,6 +10,7 @@ import '../../config/routes.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
+import 'translation_entry_ui.dart';
 
 class TranslationManagementScreen extends StatefulWidget {
   const TranslationManagementScreen({super.key});
@@ -22,6 +23,8 @@ class TranslationManagementScreen extends StatefulWidget {
 class _TranslationManagementScreenState
     extends State<TranslationManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _sourceFilterController = TextEditingController();
+  final FocusNode _sourceFilterFocusNode = FocusNode();
   String _searchQuery = '';
   String? _selectedLanguageFilter;
   String? _selectedStatusFilter;
@@ -37,16 +40,20 @@ class _TranslationManagementScreenState
   @override
   void dispose() {
     _searchController.dispose();
+    _sourceFilterController.dispose();
+    _sourceFilterFocusNode.dispose();
     super.dispose();
   }
 
   void _applyFilters() {
     final provider =
         Provider.of<TranslationManagementProvider>(context, listen: false);
+    final sourceTrimmed = _sourceFilterController.text.trim();
     provider.loadTranslations(
       search: _searchQuery.isNotEmpty ? _searchQuery : null,
       languageFilter: _selectedLanguageFilter,
       statusFilter: _selectedStatusFilter,
+      sourceFilter: sourceTrimmed.isNotEmpty ? sourceTrimmed : null,
     );
   }
 
@@ -54,6 +61,7 @@ class _TranslationManagementScreenState
     setState(() {
       _searchQuery = '';
       _searchController.clear();
+      _sourceFilterController.clear();
       _selectedLanguageFilter = null;
       _selectedStatusFilter = null;
     });
@@ -62,6 +70,10 @@ class _TranslationManagementScreenState
   }
 
   Future<void> _openFiltersBottomSheet() async {
+    final provider =
+        Provider.of<TranslationManagementProvider>(context, listen: false);
+    await provider.ensureTranslationSourcesLoaded();
+    if (!mounted) return;
     final loc = AppLocalizations.of(context)!;
     await showAdminFiltersBottomSheet<void>(
       context: context,
@@ -128,6 +140,24 @@ class _TranslationManagementScreenState
                 onChanged: (v) {
                   setState(() => _searchQuery = v);
                   setModalState(() {});
+                },
+              ),
+              AdminFilterPanel.fieldGap,
+              Builder(
+                builder: (sheetCtx) {
+                  final paths = Provider.of<TranslationManagementProvider>(
+                    sheetCtx,
+                    listen: false,
+                  ).translationSourceOptions;
+                  return _TranslationSourcePathField(
+                    controller: _sourceFilterController,
+                    focusNode: _sourceFilterFocusNode,
+                    allPaths: paths,
+                    onFieldChanged: () {
+                      setState(() {});
+                      setModalState(() {});
+                    },
+                  );
                 },
               ),
               AdminFilterPanel.fieldGap,
@@ -244,98 +274,6 @@ class _TranslationManagementScreenState
     );
   }
 
-  /// API JSON (`utilities.manage_translations`) uses `msgid`; HTML fallback uses `key`.
-  String _translationMsgid(Map<String, dynamic> t) {
-    final raw = t['msgid'] ?? t['key'];
-    if (raw != null && raw.toString().trim().isNotEmpty) {
-      return raw.toString();
-    }
-    return 'Unknown Key';
-  }
-
-  String? _translationSourceLine(Map<String, dynamic> t) {
-    final s = t['source']?.toString();
-    if (s == null || s.isEmpty || s == 'unknown') return null;
-    return 'Source: $s';
-  }
-
-  List<Widget> _perLanguageTranslationBlocks(
-    BuildContext context,
-    Map<String, dynamic> t,
-  ) {
-    final nested = t['translations'];
-    if (nested is Map) {
-      final out = <Widget>[];
-      final codes = nested.keys.map((k) => k.toString()).toList()..sort();
-      for (final code in codes) {
-        final langEntry = nested[code];
-        if (langEntry is! Map) continue;
-        final text = langEntry['text']?.toString() ?? '';
-        final name =
-            langEntry['language_name']?.toString() ?? code.toUpperCase();
-        out.add(const SizedBox(height: 8));
-        out.add(Text(
-          name,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: context.navyTextColor,
-          ),
-        ));
-        out.add(const SizedBox(height: 4));
-        out.add(Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.subtleSurfaceColor,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            text.isEmpty ? '—' : text,
-            style: TextStyle(
-              fontSize: 14,
-              color: context.textColor,
-            ),
-          ),
-        ));
-      }
-      return out;
-    }
-
-    final legacy = t['value']?.toString();
-    if (legacy != null && legacy.isNotEmpty) {
-      return [
-        if (t['language'] != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Language: ${t['language']}',
-            style: TextStyle(
-              fontSize: 14,
-              color: context.textSecondaryColor,
-            ),
-          ),
-        ],
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.subtleSurfaceColor,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            legacy,
-            style: TextStyle(
-              fontSize: 14,
-              color: context.textColor,
-            ),
-          ),
-        ),
-      ];
-    }
-    return [];
-  }
-
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
@@ -450,9 +388,28 @@ class _TranslationManagementScreenState
             onRefresh: () async => _applyFilters(),
             color: Color(AppConstants.ifrcRed),
             child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
-              itemCount: provider.translations.length,
+              itemCount: provider.translations.length +
+                  (provider.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index >= provider.translations.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Center(
+                      child: provider.isLoadingMore
+                          ? CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(AppConstants.ifrcRed),
+                              ),
+                            )
+                          : TextButton(
+                              onPressed: () => provider.loadMore(),
+                              child: Text(localizations.sessionLogsLoadMore),
+                            ),
+                    ),
+                  );
+                }
                 final translation = provider.translations[index];
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -465,35 +422,41 @@ class _TranslationManagementScreenState
                       width: 1,
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _translationMsgid(translation),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: context.textColor,
-                          ),
-                        ),
-                        if (_translationSourceLine(translation) !=
-                            null) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            _translationSourceLine(translation)!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecondaryColor,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.translationEntryDetail,
+                        arguments:
+                            Map<String, dynamic>.from(translation),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              TranslationEntryUi.msgid(translation),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: context.textColor,
+                              ),
                             ),
                           ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: context.iconColor,
+                          ),
                         ],
-                        ..._perLanguageTranslationBlocks(
-                          context,
-                          translation,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -501,18 +464,6 @@ class _TranslationManagementScreenState
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'translation_management_add_button',
-        onPressed: () {
-          Navigator.of(context).pushNamed(
-            AppRoutes.webview,
-            arguments: '/admin/translations/manage/new',
-          );
-        },
-        backgroundColor: Color(AppConstants.ifrcRed),
-        icon: const Icon(Icons.add),
-        label: const Text('New Translation'),
       ),
       bottomNavigationBar: AppBottomNavigationBar(
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
@@ -525,6 +476,223 @@ class _TranslationManagementScreenState
           });
         },
       ),
+    );
+  }
+}
+
+/// Inline path list under the text field — [RawAutocomplete] uses an [Overlay]
+/// that conflicts with [showModalBottomSheet] + [SingleChildScrollView]
+/// (scroll/tap closes options immediately).
+class _TranslationSourcePathField extends StatefulWidget {
+  const _TranslationSourcePathField({
+    required this.controller,
+    required this.focusNode,
+    required this.allPaths,
+    required this.onFieldChanged,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final List<String> allPaths;
+  final VoidCallback onFieldChanged;
+
+  @override
+  State<_TranslationSourcePathField> createState() =>
+      _TranslationSourcePathFieldState();
+}
+
+class _TranslationSourcePathFieldState extends State<_TranslationSourcePathField> {
+  /// After user scrolls the path list, we unfocus to hide the keyboard but keep
+  /// the list visible (it would otherwise disappear because it was tied to focus).
+  bool _keepListOpenWithoutFocus = false;
+
+  void _repaint() {
+    if (mounted) setState(() {});
+  }
+
+  void _onFocusChanged() {
+    if (widget.focusNode.hasFocus) {
+      _keepListOpenWithoutFocus = false;
+    }
+    _repaint();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocusChanged);
+    widget.controller.addListener(_repaint);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TranslationSourcePathField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_onFocusChanged);
+      widget.focusNode.addListener(_onFocusChanged);
+    }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_repaint);
+      widget.controller.addListener(_repaint);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChanged);
+    widget.controller.removeListener(_repaint);
+    super.dispose();
+  }
+
+  List<String> _filtered() {
+    final q = widget.controller.text.trim().toLowerCase();
+    final all = widget.allPaths;
+    if (q.isEmpty) {
+      if (all.length <= 150) return List<String>.from(all);
+      return all.sublist(0, 150);
+    }
+    return all.where((s) => s.toLowerCase().contains(q)).take(150).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final filtered = _filtered();
+    final showList =
+        widget.focusNode.hasFocus || _keepListOpenWithoutFocus;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: widget.controller,
+          focusNode: widget.focusNode,
+          style: theme.textTheme.bodyLarge,
+          decoration: InputDecoration(
+            labelText: 'Source',
+            hintText: 'Search or select file path',
+            labelStyle: TextStyle(color: context.textSecondaryColor),
+            prefixIcon: Icon(Icons.folder_outlined, color: context.iconColor),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    Icons.arrow_drop_down,
+                    color: context.iconColor.withValues(alpha: 0.75),
+                  ),
+                ),
+                if (widget.controller.text.isNotEmpty)
+                  IconButton(
+                    icon: Icon(Icons.clear, color: context.iconColor),
+                    onPressed: () {
+                      widget.controller.clear();
+                      widget.onFieldChanged();
+                      _repaint();
+                    },
+                  ),
+              ],
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: context.borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: context.borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: Color(AppConstants.ifrcRed),
+                width: 2,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+          onChanged: (_) {
+            widget.onFieldChanged();
+            _repaint();
+          },
+        ),
+        if (showList) ...[
+          const SizedBox(height: 8),
+          Material(
+            elevation: 2,
+            borderRadius: BorderRadius.circular(8),
+            clipBehavior: Clip.antiAlias,
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.65,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (ScrollNotification n) {
+                  if (n is ScrollStartNotification) {
+                    if (widget.focusNode.hasFocus) {
+                      widget.focusNode.unfocus();
+                      _keepListOpenWithoutFocus = true;
+                      widget.onFieldChanged();
+                      _repaint();
+                    }
+                  }
+                  // Keep drags on the list from scrolling the sheet behind it.
+                  return true;
+                },
+                child: filtered.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'No matching paths',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: context.textSecondaryColor,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        primary: false,
+                        physics: const ClampingScrollPhysics(),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: context.borderColor.withValues(alpha: 0.35),
+                        ),
+                        itemBuilder: (context, i) {
+                          final opt = filtered[i];
+                          return ListTile(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 2,
+                            ),
+                            minVerticalPadding: 0,
+                            title: Text(
+                              opt,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () {
+                              widget.controller.text = opt;
+                              _keepListOpenWithoutFocus = false;
+                              widget.focusNode.unfocus();
+                              widget.onFieldChanged();
+                              _repaint();
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_loading %}
 
 {% block title %}{{ _('API Management') }}{% endblock %}
 
@@ -13,6 +14,106 @@
         height: 300px;
         width: 100%;
     }
+    .ep-ag-row-undocumented .ag-cell { background-color: rgb(254 252 232) !important; }
+    .ep-ag-row-stale .ag-cell { background-color: rgb(249 250 251) !important; opacity: 0.92; }
+    .ep-ag-row-flagged .ag-cell { background-color: rgb(254 242 242) !important; }
+    #epRegistryGridWrap .ag-root-wrapper { border-radius: 0; }
+    /*
+     * Hard-stop horizontal scroll desync: in this AG Grid build, suppressHorizontalScroll removes
+     * the scrollbar + header-sync listener but NOT the actual scroll on ag-center-cols-viewport
+     * (wheel events still fire on that viewport and move only the body, not the header).
+     * Forcing overflow-x:hidden on both guarantees they stay locked together at scrollLeft=0.
+     * sizeColumnsToFit (called post-init) sizes all columns to fill the available width, so
+     * no content is lost. If a user manually resizes a column wider than the panel, cells clip
+     * with ellipsis — the same as before; only the scrollbar is removed.
+     */
+    #epRegistryGrid .ag-center-cols-viewport,
+    #epRegistryGrid .ag-header-viewport { overflow-x: hidden !important; }
+    #epRegistryGrid .ag-body-horizontal-scroll { display: none !important; }
+    /* Endpoint registry filter chips — tooltip is a sibling of <button>, not inside it (valid HTML). */
+    #epSurfaceBtns .ep-filter-wrap {
+        position: relative;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    #epSurfaceBtns .ep-filter-wrap:hover {
+        z-index: 5;
+    }
+    #epSurfaceBtns .ep-filter-tip {
+        position: absolute;
+        left: 50%;
+        top: calc(100% + 10px);
+        transform: translateX(-50%);
+        min-width: 11rem;
+        max-width: 20rem;
+        /* Allow moving onto the panel to select/copy (was pointer-events: none). */
+        pointer-events: auto;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.12s ease, visibility 0.12s ease;
+        z-index: 200;
+        cursor: default;
+    }
+    /* Invisible hit target over the gap so the tooltip does not vanish while moving from the chip. */
+    #epSurfaceBtns .ep-filter-tip::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 100%;
+        height: 14px;
+    }
+    /* Hover only — :focus-within kept tooltips stuck open after mouse click (button stays focused). */
+    #epSurfaceBtns .ep-filter-wrap:hover .ep-filter-tip {
+        opacity: 1;
+        visibility: visible;
+    }
+    #epSurfaceBtns .ep-filter-tip-inner {
+        display: block;
+        position: relative;
+        background: rgb(30 41 59);
+        color: rgb(248 250 252);
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.45;
+        padding: 8px 10px;
+        text-align: left;
+        white-space: normal;
+        box-shadow: 0 10px 28px rgb(15 23 42 / 0.22);
+        border: 1px solid rgb(51 65 85);
+        cursor: text;
+        user-select: text;
+        -webkit-user-select: text;
+    }
+    #epSurfaceBtns .ep-filter-tip-inner .ep-filter-tip-line {
+        display: block;
+    }
+    #epSurfaceBtns .ep-filter-tip-inner .ep-filter-tip-line + .ep-filter-tip-line {
+        margin-top: 0.35em;
+        opacity: 0.88;
+    }
+    #epSurfaceBtns .ep-filter-tip-inner::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: 100%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-bottom-color: rgb(30 41 59);
+        margin-bottom: -1px;
+    }
+    /* Override per-chip Tailwind colours when disabled (otherwise e.g. border-yellow-300 stays visible). */
+    #epSurfaceBtns .ep-surface-btn:disabled {
+        opacity: 1;
+        cursor: not-allowed;
+        color: rgb(107 114 128) !important;
+        border-color: rgb(209 213 219) !important;
+        background-color: rgb(249 250 251) !important;
+    }
+    #epSurfaceBtns .ep-surface-btn:disabled .opacity-60 {
+        opacity: 0.55 !important;
+    }
+    /* Path/description clipping + stacking: rules live in the page extra_js block, right after ag_grid_js(), so they load after AG Grid CSS. */
 </style>
 
 {# Helper function to generate API URLs (do not embed secrets in HTML) #}
@@ -26,6 +127,7 @@
 {% endmacro %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {{ page_header(
     title=_('API Management'),
@@ -46,104 +148,316 @@
     ] if (current_user_has_role('system_manager') or has_permission('admin.api.manage')) else None
 ) }}
 
-    <!-- Overview Cards -->
-    <div class="bg-gray-100 p-6 mb-8">
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
-            <div class="bg-blue-100 p-3 rounded-xl">
-                <i class="fas fa-chart-line fa-2x text-blue-500"></i>
+<div class="sharp-ui">
+
+    {% set cov = surface_summary.all.coverage_pct %}
+    {% if cov >= 95 %}
+        {% set cov_value_class = 'text-green-600' %}
+        {% set cov_icon_class = 'text-green-500' %}
+    {% elif cov >= 80 %}
+        {% set cov_value_class = 'text-yellow-600' %}
+        {% set cov_icon_class = 'text-yellow-500' %}
+    {% else %}
+        {% set cov_value_class = 'text-red-600' %}
+        {% set cov_icon_class = 'text-red-500' %}
+    {% endif %}
+
+    {# Same stat-card pattern as admin/dashboard.html #}
+    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
+             title="{{ _('Share of live API paths that appear in the endpoint registry') }}">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Registry coverage') }}</h3>
+                <i class="fas fa-shield-check {{ cov_icon_class }}"></i>
             </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500">{{ _('Total API Requests') }}</p>
-                <p class="text-2xl font-bold text-gray-900">{{ total_requests }}</p>
-            </div>
+            <p class="text-2xl font-bold tabular-nums {{ cov_value_class }}">{{ surface_summary.all.coverage_pct }}%</p>
+            <p class="text-xs text-gray-500 mt-1">{{ surface_summary.all.documented_live_paths }} / {{ surface_summary.all.total_live_paths }} {{ _('live paths documented') }}</p>
         </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
-            <div class="bg-green-100 p-3 rounded-xl">
-                <i class="fas fa-clock fa-2x text-green-500"></i>
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Total API Requests') }}</h3>
+                <i class="fas fa-chart-line text-blue-500"></i>
             </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500">{{ _('Avg. Response Time') }}</p>
-                <p class="text-2xl font-bold text-gray-900">{{ "%.2f"|format(avg_response_time|default(0)) }} ms</p>
-            </div>
+            <p class="text-2xl font-bold text-blue-600 tabular-nums">{{ "{:,}".format((total_requests|default(0))|int) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('All /api traffic in usage log') }}</p>
         </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
-            <div class="bg-indigo-100 p-3 rounded-xl">
-                <i class="fas fa-check-circle fa-2x text-indigo-500"></i>
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Avg. Response Time') }}</h3>
+                <i class="fas fa-clock text-green-500"></i>
             </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500">{{ _('Success Rate') }}</p>
-                <p class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(success_rate|default(0)) }}%</p>
-            </div>
+            <p class="text-2xl font-bold text-green-600 tabular-nums">{{ "%.2f"|format(avg_response_time|default(0)) }} ms</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Mean across logged requests') }}</p>
         </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center space-x-4">
-            <div class="bg-yellow-100 p-3 rounded-xl">
-                <i class="fas fa-users fa-2x text-yellow-500"></i>
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Success Rate') }}</h3>
+                <i class="fas fa-check-circle text-indigo-500"></i>
             </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500">{{ _('Unique Users') }}</p>
-                <p class="text-2xl font-bold text-gray-900">{{ unique_ips }}</p>
-            </div>
+            <p class="text-2xl font-bold text-indigo-600 tabular-nums">{{ "%.1f"|format(success_rate|default(0)) }}%</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('HTTP 2xx / all requests') }}</p>
         </div>
-    </div>
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Unique Users') }}</h3>
+                <i class="fas fa-users text-yellow-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-yellow-600 tabular-nums">{{ unique_ips }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Distinct IP addresses (usage log)') }}</p>
+        </div>
     </div>
 
-    <!-- API Endpoints Table -->
-    <div class="bg-white p-6 shadow-sm mb-8">
-        <div class="flex flex-col gap-2 mb-4">
-            <h2 class="text-xl font-semibold text-gray-800">{{ _('Available API Endpoints') }}</h2>
-            <p class="text-sm text-gray-600">
-                {{ _('Need a denormalized export? Use the new') }}
-                <code class="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700">/api/v1/data/tables</code>
-                {{ _('endpoint to receive data rows together with the related form item and country tables in a single response.') }}
+    {# Main sections: same tab pattern as admin/settings/manage_settings.html #}
+    {# min-w-0: allow flex/grid ancestors to shrink so wide content (tabs, grid) gets a bounded width #}
+    <div class="bg-white shadow-md border border-gray-200 mb-8 min-w-0 max-w-full">
+    {% call scroll_tab_bar(inner_id='api-mgmt-tabs', aria_label=_('API Management sections')) %}
+        <button type="button" role="tab" data-tab="registry" aria-selected="true"
+                class="{{ admin_underline_tab_btn_classes(true) }}">
+            <i class="fas fa-sitemap mr-1.5"></i>{{ _('Endpoint Registry') }}
+        </button>
+        <button type="button" role="tab" data-tab="builder" aria-selected="false"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-link mr-1.5"></i>{{ _('API URL Builder') }}
+        </button>
+        <button type="button" role="tab" data-tab="volume" aria-selected="false"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-chart-area mr-1.5"></i>{{ _('Request Volume') }}
+        </button>
+    {% endcall %}
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         Unified Endpoint Registry
+         ══════════════════════════════════════════════════════════════════════ -->
+    <div class="settings-panel min-w-0 w-full max-w-full" id="panel-registry">
+    <div id="endpointRegistry" class="min-w-0 w-full max-w-full">
+
+        <!-- Header: title + filter toolbar (counts live on the buttons) -->
+        {# overflow-visible: overflow-x-auto here clipped absolutely positioned filter tooltips below the chips. #}
+        <div class="px-6 pt-6 pb-6 border-b border-gray-100 min-w-0 overflow-visible">
+            <div class="mb-4">
+                <div class="flex flex-wrap items-center justify-between gap-3 min-w-0">
+                    <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2 min-w-0">
+                        <i class="fas fa-sitemap text-blue-500 shrink-0"></i>
+                        {{ _('Endpoint Registry') }}
+                    </h2>
+                    <button type="button" id="epExportBtn" class="btn btn-secondary btn-sm flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                            title="{{ _('Export report as Markdown (issues, overlaps, full table)') }}">
+                        <i class="fas fa-file-export"></i>
+                        {{ _('Export Report') }}
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">
+                    {{ _('All API surfaces — auth policy, consumers, usage stats, and known issues in one place.') }}
+                </p>
+            </div>
+
+            <!-- Surface filter buttons (custom tooltips on hover / focus) -->
+            <div class="flex flex-wrap items-center gap-3 min-w-0">
+                <div class="flex flex-wrap gap-1 min-w-0" id="epSurfaceBtns">
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="all" class="ep-surface-btn ep-active px-3 py-1.5 text-xs font-semibold rounded-lg border">
+                            {{ _('All') }} <span class="ml-1 opacity-60">{{ surface_summary.all.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Show every endpoint in the registry: External /v1, Mobile, and AI.') }}</span>
+                                <span class="ep-filter-tip-line">{{ _('No filter — the complete list.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="v1" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border"{% if ep_surface_filter_disabled['v1'] %} disabled{% endif %}>
+                            <i class="fas fa-database mr-1"></i>{{ _('External /v1') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.v1.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Only routes under /api/v1 (public and partner REST API).') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="mobile" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border"{% if ep_surface_filter_disabled['mobile'] %} disabled{% endif %}>
+                            <i class="fas fa-mobile-alt mr-1"></i>{{ _('Mobile') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.mobile.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Only /api/mobile/v1 routes (Flutter app and admin mobile APIs).') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="ai" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border"{% if ep_surface_filter_disabled['ai'] %} disabled{% endif %}>
+                            <i class="fas fa-robot mr-1"></i>{{ _('AI /v2') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.ai.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Only /api/ai/v2 assistants, tools, and related routes.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="flagged" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border text-red-600 border-red-200"{% if ep_surface_filter_disabled['flagged'] %} disabled{% endif %}>
+                            <i class="fas fa-exclamation-triangle mr-1"></i>{{ _('Issues') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.all.flagged }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Endpoints with a registry flag (policy, mismatch, contract issue, etc.).') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="overlap" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border text-indigo-600 border-indigo-200"{% if ep_surface_filter_disabled['overlap'] %} disabled{% endif %}>
+                            <i class="fas fa-copy mr-1"></i>{{ _('Overlaps') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.all.overlapping }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('External /v1 and mobile public-data routes that expose the same resource shape (count = unique pairs). Filtering Overlaps still lists each registry row.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="has_stats" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border text-green-700 border-green-200"{% if ep_surface_filter_disabled['has_stats'] %} disabled{% endif %}>
+                            <i class="fas fa-chart-line mr-1"></i>{{ _('Has usage') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.all.with_stats }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('At least one request recorded in the usage log (mostly External /v1 traffic).') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="undocumented" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border text-yellow-800 border-yellow-300"{% if ep_surface_filter_disabled['undocumented'] %} disabled{% endif %}>
+                            <i class="fas fa-eye-slash mr-1"></i>{{ _('Undocumented') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.all.undocumented }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Live Flask routes in url_map that are not in the static registry yet.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="stale" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border text-gray-700 border-gray-300"{% if ep_surface_filter_disabled['stale'] %} disabled{% endif %}>
+                            <i class="fas fa-ghost mr-1"></i>{{ _('Stale') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.all.stale }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Registry entries whose path no longer exists in the running application.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    {% if surface_summary.all.undocumented or surface_summary.all.stale %}
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="gaps" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-lg border text-yellow-700 border-yellow-300"{% if ep_surface_filter_disabled['gaps'] %} disabled{% endif %}>
+                            <i class="fas fa-exclamation-circle mr-1"></i>{{ _('Gaps') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.all.undocumented + surface_summary.all.stale }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Undocumented or stale: anything that breaks parity between the registry and live routes.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <script type="application/json" id="ep-registry-grid-data">{{ endpoint_registry_grid_rows | tojson }}</script>
+
+        <!-- Endpoint registry: AG Grid (horizontal scroll + column resize built-in) -->
+        <div id="epRegistryGridWrap" class="relative w-full min-w-0 max-w-full border-t border-gray-100" style="min-height: 22rem;">
+            {{ ag_grid_loading('epRegistryGrid', loading_text=_('Loading endpoints…')) }}
+            <div id="epRegistryGrid-container" class="w-full min-w-0" style="display: none;">
+                <div id="epRegistryGrid" class="ag-theme-alpine ag-grid-container"
+                     style="width: 100%; height: min(70vh, 42rem);"
+                     data-placeholder-id="ep-registry-col-vis-placeholder"></div>
+            </div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="epEmpty" class="hidden text-center py-10 text-gray-400">
+            <i class="fas fa-filter text-3xl mb-2"></i>
+            <p class="text-sm">{{ _('No endpoints match the selected filter.') }}</p>
+        </div>
+
+        <!-- Match count: AG Grid column filters stack on top of surface chips; see updateFooterAndEmpty() -->
+        <div id="epRegistryFooter" class="px-6 py-2 border-t border-gray-100 bg-gray-50 text-sm text-gray-600 hidden">
+            <div class="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+                <span id="epMatchCount" class="font-semibold text-gray-800 tabular-nums"></span>
+                <span id="epMatchChipTotal" class="hidden text-gray-500 font-medium tabular-nums"></span>
+                <span class="ml-1">{{ _('endpoints visible') }}</span>
+            </div>
+            <p id="epMatchHint" class="hidden text-xs text-amber-900 mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span id="epMatchHintText"></span>
+                <button type="button" id="epClearColFilters" class="text-xs font-semibold text-teal-700 hover:text-teal-900 underline decoration-teal-600/60">
+                    {{ _('Clear column filters') }}
+                </button>
             </p>
         </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left text-gray-500">
-                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-6 py-3">{{ _('Endpoint') }}</th>
-                        <th scope="col" class="px-6 py-3">{{ _('Method') }}</th>
-                        <th scope="col" class="px-6 py-3">{{ _('Description') }}</th>
-                        <th scope="col" class="px-6 py-3 text-center">{{ _('Requests') }}</th>
-                        <th scope="col" class="px-6 py-3">{{ _('Success Rate') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for endpoint in endpoints %}
-                    <tr class="bg-white border-b hover:bg-gray-50">
-                        <td class="px-6 py-4 font-mono text-gray-700">
-                            <div class="flex items-center gap-2">
-                                {% if endpoint.featured %}
-                                <i class="fas fa-star text-yellow-400" title="{{ _('Featured endpoint') }}"></i>
-                                {% endif %}
-                                <a href="{{ api_url(endpoint.path) }}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline api-endpoint-link" data-endpoint-path="{{ endpoint.path }}">
-                                    <code>{{ endpoint.path }}</code>
-                                </a>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="px-2 py-1 font-semibold leading-tight text-blue-700 bg-blue-100 rounded-full">{{ endpoint.method }}</span>
-                        </td>
-                        <td class="px-6 py-4">{{ endpoint.description }}</td>
-                        <td class="px-6 py-4 text-center font-medium">{{ endpoint.total_requests }}</td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                    <div class="bg-green-500 h-2.5 rounded-full" data-width="{{ endpoint.success_rate }}"></div>
-                                </div>
-                                <span class="font-medium text-gray-700">{{ "%.1f"|format(endpoint.success_rate) }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+
+        <!-- Issues summary -->
+        {% set flagged_eps = all_endpoints | selectattr('flags') | list %}
+        {% if flagged_eps %}
+        <div class="px-6 py-5 bg-red-50 border-t border-red-100 min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain">
+            <h3 class="text-sm font-bold text-red-800 mb-3 flex items-center gap-2">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ _('Known issues') }} ({{ flagged_eps | length }})
+            </h3>
+            <div class="space-y-2">
+            {% for ep in flagged_eps %}{% for flag in ep.flags %}
+            <div class="flex gap-3 items-start text-xs">
+                {% if flag.type in ('bug', 'contract') %}
+                <span class="shrink-0 px-2 py-0.5 rounded font-bold bg-red-500 text-white">{{ flag.type | upper }}</span>
+                {% elif flag.type == 'mismatch' %}
+                <span class="shrink-0 px-2 py-0.5 rounded font-bold bg-red-400 text-white">MISMATCH</span>
+                {% elif flag.type == 'policy' %}
+                <span class="shrink-0 px-2 py-0.5 rounded font-bold bg-yellow-400 text-white">POLICY</span>
+                {% elif flag.type == 'unused' %}
+                <span class="shrink-0 px-2 py-0.5 rounded font-bold bg-gray-500 text-white">UNUSED</span>
+                {% else %}
+                <span class="shrink-0 px-2 py-0.5 rounded font-bold bg-blue-400 text-white">MINOR</span>
+                {% endif %}
+                <span>
+                    <span class="inline-flex items-center gap-1 mr-1">
+                        {% if ep.surface == 'v1' %}<span class="px-1 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-bold">v1</span>
+                        {% elif ep.surface == 'mobile' %}<span class="px-1 py-0.5 rounded bg-teal-100 text-teal-700 text-xs font-bold">mob</span>
+                        {% elif ep.surface == 'ai' %}<span class="px-1 py-0.5 rounded bg-purple-100 text-purple-700 text-xs font-bold">ai</span>
+                        {% endif %}
+                    </span>
+                    <code class="font-mono text-gray-700">{{ ep.path }}</code>
+                    <span class="text-gray-500 ml-2">— {{ flag.note }}</span>
+                </span>
+            </div>
+            {% endfor %}{% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Legend -->
+        <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-400 flex flex-wrap gap-x-5 gap-y-1 min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain">
+            <span><i class="fas fa-globe text-gray-400 mr-1"></i>Public — no auth</span>
+            <span><i class="fas fa-key text-amber-500 mr-1"></i>API Key — Bearer DB-managed key</span>
+            <span><i class="fas fa-key text-indigo-500 mr-1"></i>Key / Session — either works</span>
+            <span><i class="fas fa-user text-blue-500 mr-1"></i>Session — @login_required</span>
+            <span><i class="fas fa-robot text-purple-500 mr-1"></i>AI Session — resolve_ai_identity()</span>
+            <span><i class="fas fa-mobile-alt text-teal-500 mr-1"></i>User JWT — @mobile_auth_required</span>
+            <span><i class="fas fa-shield-alt text-orange-500 mr-1"></i>RBAC — @mobile_auth_required(permission=…)</span>
+            <span><i class="fas fa-tachometer-alt text-yellow-400 mr-1"></i>Rate limited</span>
         </div>
     </div>
+    </div>{# /panel-registry #}
 
     <!-- API URL Builder -->
-    <div class="bg-white p-6 shadow-sm mb-8">
+    <div class="settings-panel hidden" id="panel-builder">
+    <div class="p-6">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold text-gray-800">{{ _('API URL Builder') }}</h2>
             <button id="showDocsBtn" class="btn btn-primary">
@@ -303,9 +617,11 @@
             </div>
         </div>
     </div>
+    </div>{# /panel-builder #}
 
-    <!-- Request Volume Chart - Full Width -->
-    <div class="bg-white p-6 shadow-sm mb-8">
+    <!-- Request Volume Chart -->
+    <div class="settings-panel hidden" id="panel-volume">
+    <div class="p-6">
          <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold text-gray-800">{{ _('Request Volume') }}</h2>
             <div class="flex gap-3">
@@ -327,49 +643,80 @@
          <div class="chart-container">
              <canvas id="requestVolumeChart"></canvas>
          </div>
-     </div>
-
-    <!-- Recent Activity - Full Width -->
-    <div class="bg-white p-6 shadow-sm">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">{{ _('Recent API Activity') }}</h2>
-        <div class="space-y-4">
-            <div class="overflow-x-auto max-h-96">
-                <table class="w-full text-sm text-left text-gray-500">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
-                        <tr>
-                            <th scope="col" class="px-4 py-3">{{ _('Request') }}</th>
-                            <th scope="col" class="px-4 py-3">{{ _('Status') }}</th>
-                            <th scope="col" class="px-4 py-3">{{ _('Time') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for activity in recent_activity %}
-                        <tr class="bg-white border-b hover:bg-gray-50">
-                            <td class="px-4 py-3">
-                                <p class="font-mono text-xs text-gray-700"><code>{{ activity.method }} {{ activity.api_endpoint }}</code></p>
-                                <p class="text-xs text-gray-500">{{ activity.ip_address }}</p>
-                            </td>
-                            <td class="px-4 py-3">
-                                {% if activity.status_code >= 400 %}
-                                <span class="px-2 py-1 font-semibold text-xs leading-tight text-red-700 bg-red-100 rounded-full">{{ activity.status_code }}</span>
-                                {% elif activity.status_code >= 300 %}
-                                <span class="px-2 py-1 font-semibold text-xs leading-tight text-yellow-700 bg-yellow-100 rounded-full">{{ activity.status_code }}</span>
-                                {% else %}
-                                <span class="px-2 py-1 font-semibold text-xs leading-tight text-green-700 bg-green-100 rounded-full">{{ activity.status_code }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ activity.timestamp|datetime_local('time') }}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
-</div>
+    </div>{# /panel-volume #}
+
+    </div>{# /api management tabbed card #}
+
+</div>{# /sharp-ui #}
+
 {% endblock %}
 
 {% block extra_js %}
+{{ ag_grid_js() }}
+<style nonce="{{ csp_style_nonce() }}">
+    /*
+     * Endpoint registry: stop path / description paint bleeding into neighbour columns.
+     * 1) This block is AFTER ag_grid_js() links + AG Grid theme injection so it wins on cascade.
+     * 2) Cells are position:absolute; overflow from early columns draws on top unless later columns
+     *    have higher z-index AND an opaque background (inherit row striping).
+     */
+    /* Opaque paint on cells to the right of clipping columns (methods+ cover path overflow; etc.). */
+    #epRegistryGrid .ag-row .ag-cell[col-id="methodsStr"],
+    #epRegistryGrid .ag-row .ag-cell[col-id="auth"],
+    #epRegistryGrid .ag-row .ag-cell[col-id="consumers"],
+    #epRegistryGrid .ag-row .ag-cell[col-id="total_requests"],
+    #epRegistryGrid .ag-row .ag-cell[col-id="success_rate"],
+    #epRegistryGrid .ag-row .ag-cell[col-id="flags"] {
+        background-color: inherit !important;
+    }
+    #epRegistryGrid .ag-full-width-row .ag-cell,
+    #epRegistryGrid .ag-row-full-width .ag-cell {
+        padding: 0 !important;
+        border-bottom: 1px solid rgb(229 231 235);
+    }
+    #epRegistryGrid .ag-row .ag-cell[col-id="surface"] { z-index: 1 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="path"] { z-index: 2 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="methodsStr"] { z-index: 3 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="auth"] { z-index: 4 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="description"] { z-index: 5 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="consumers"] { z-index: 6 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="total_requests"] { z-index: 7 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="success_rate"] { z-index: 8 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="flags"] { z-index: 9 !important; }
+    #epRegistryGrid .ag-row .ag-cell[col-id="path"],
+    #epRegistryGrid .ag-row .ag-cell[col-id="description"] {
+        overflow: hidden !important;
+        min-width: 0 !important;
+        contain: paint;
+    }
+    #epRegistryGrid .ag-row .ag-cell[col-id="path"] .ag-cell-wrapper,
+    #epRegistryGrid .ag-row .ag-cell[col-id="description"] .ag-cell-wrapper {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        flex: 1 1 0% !important;
+    }
+    #epRegistryGrid .ag-row .ag-cell[col-id="path"] .ag-cell-value,
+    #epRegistryGrid .ag-row .ag-cell[col-id="description"] .ag-cell-value {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        flex: 1 1 0% !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    #epRegistryGrid .ag-row .ag-cell[col-id="path"] .ag-cell-value > *,
+    #epRegistryGrid .ag-row .ag-cell[col-id="description"] .ag-cell-value > * {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        flex: 1 1 auto !important;
+    }
+</style>
 <!-- Make sure Chart.js is loaded first -->
 <script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
 
@@ -537,7 +884,7 @@ try {
             }
         }
 
-        fetchAndRenderVolumeChart('daily', 'all');
+        // Chart loads when the Request Volume tab is first shown (canvas is hidden in other tabs).
 
         // Event listeners for both dropdowns
         const periodSelector = document.getElementById('periodSelector');
@@ -556,6 +903,15 @@ try {
         if (endpointSelector) {
             endpointSelector.addEventListener('change', updateChart);
         }
+
+        document.addEventListener('api-mgmt-tab-activated', function (e) {
+            if (!e.detail || e.detail.tab !== 'volume') return;
+            if (!volumeChart) {
+                fetchAndRenderVolumeChart('daily', 'all');
+            } else {
+                requestAnimationFrame(function () { volumeChart.resize(); });
+            }
+        });
 
         // Initialize progress bars
         document.querySelectorAll('[data-width]').forEach(function(element) {
@@ -793,6 +1149,7 @@ try {
             const v = apiKeyInput ? (apiKeyInput.value || '') : '';
             return String(v || '').trim();
         }
+        window.getApiManagementApiKey = getApiKeyValue;
 
         function updateEndpointLinks() {
             const apiKey = getApiKeyValue();
@@ -809,6 +1166,7 @@ try {
                 a.href = u.toString();
             });
         }
+        window.updateEndpointLinks = updateEndpointLinks;
 
         // Updated URL generation to use dynamic parameters
         function updateGeneratedUrl() {
@@ -928,5 +1286,999 @@ try {
         }
     }
 });
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    function runApiMgmtTabs() {
+        const A = window.AdminUnderlineTabs;
+        const tabs = document.querySelectorAll('#api-mgmt-tabs .settings-tab');
+        if (!tabs.length || !A) return;
+        function activate(tabId) {
+            A.activateStripTab('#api-mgmt-tabs', tabId, { panelSelector: '.settings-panel' });
+            document.dispatchEvent(new CustomEvent('api-mgmt-tab-activated', { detail: { tab: tabId } }));
+        }
+        tabs.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const id = btn.getAttribute('data-tab');
+                if (!id) return;
+                activate(id);
+                history.replaceState(null, '', '#' + id);
+            });
+        });
+        const hash = (location.hash || '').replace('#', '');
+        if (hash && document.getElementById('panel-' + hash)) {
+            activate(hash);
+        } else {
+            activate('registry');
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runApiMgmtTabs);
+    } else {
+        runApiMgmtTabs();
+    }
+})();
+</script>
+
+<script nonce="{{ csp_nonce() }}">
+// ── Endpoint Registry — AG Grid + surface/search filters ────────────────
+(function () {
+    'use strict';
+
+    var EP_L = {
+        unknown: {{ _('Unknown')|tojson }},
+        public: {{ _('Public')|tojson }},
+        apiKey: {{ _('API Key')|tojson }},
+        keySession: {{ _('Key / Session')|tojson }},
+        session: {{ _('Session')|tojson }},
+        aiSession: {{ _('AI Session')|tojson }},
+        userJwt: {{ _('User JWT')|tojson }},
+        rbac: {{ _('RBAC')|tojson }},
+        rateLimited: {{ _('Rate limited')|tojson }},
+        featured: {{ _('Featured endpoint')|tojson }},
+        undocumented: {{ _('undocumented')|tojson }},
+        stale: {{ _('stale')|tojson }},
+    };
+
+    var surfaceBtns = document.querySelectorAll('.ep-surface-btn');
+    var emptyMsg = document.getElementById('epEmpty');
+    var matchFooter = document.getElementById('epRegistryFooter');
+    var matchCountEl = document.getElementById('epMatchCount');
+    var matchChipTotalEl = document.getElementById('epMatchChipTotal');
+    var matchHintEl = document.getElementById('epMatchHint');
+    var matchHintTextEl = document.getElementById('epMatchHintText');
+    var clearColFiltersBtn = document.getElementById('epClearColFilters');
+    var loadingEl = document.getElementById('epRegistryGrid-loading');
+    var containerEl = document.getElementById('epRegistryGrid-container');
+
+    var activeSurface = 'all';
+    var epRegistryGridApi = null;
+    var epRegistryGridSizeFitTimer = null;
+    var epRegistryAllRows = [];
+
+    var AUTH_LABELS = {
+        public: 'Public (no auth)',
+        api_key: 'API Key (Bearer, DB-managed)',
+        api_key_or_session: 'API Key or Session',
+        session: 'Session (@login_required)',
+        ai_session: 'AI Session (resolve_ai_identity)',
+        user: 'User JWT (@mobile_auth_required)',
+        rbac: 'RBAC (@mobile_auth_required + permission)',
+    };
+    var SURFACE_LABELS = {
+        v1: 'External /api/v1',
+        mobile: 'Mobile /api/mobile/v1',
+        ai: 'AI /api/ai/v2',
+    };
+
+    function styleActiveBtn(activeBtn) {
+        var colourMap = {
+            all: ['bg-gray-800', 'text-white', 'border-gray-800'],
+            v1: ['bg-blue-100', 'text-blue-700', 'border-blue-300'],
+            mobile: ['bg-teal-100', 'text-teal-700', 'border-teal-300'],
+            ai: ['bg-purple-100', 'text-purple-700', 'border-purple-300'],
+            flagged: ['bg-red-100', 'text-red-700', 'border-red-200'],
+            has_stats: ['bg-green-100', 'text-green-700', 'border-green-200'],
+            overlap: ['bg-indigo-100', 'text-indigo-700', 'border-indigo-200'],
+            undocumented: ['bg-yellow-100', 'text-yellow-800', 'border-yellow-300'],
+            stale: ['bg-gray-200', 'text-gray-800', 'border-gray-400'],
+            gaps: ['bg-yellow-100', 'text-yellow-700', 'border-yellow-300'],
+        };
+        var allColours = Object.values(colourMap).flat();
+        surfaceBtns.forEach(function (b) {
+            b.classList.remove('ep-active', ...allColours);
+            if (b.disabled) return;
+            b.classList.add('bg-white', 'text-gray-600', 'border-gray-300');
+        });
+        if (activeBtn.disabled) {
+            activeBtn = document.querySelector('.ep-surface-btn[data-surface="all"]') || activeBtn;
+            activeSurface = 'all';
+        }
+        activeBtn.classList.remove('bg-white', 'text-gray-600', 'border-gray-300');
+        activeBtn.classList.add('ep-active', ...(colourMap[activeBtn.dataset.surface] || colourMap.all));
+    }
+
+    /** Whether a data row matches a registry surface chip (not tied to `activeSurface`). */
+    function rowMatchesSurface(d, surface) {
+        if (!d || d.__epGroupHeader) return false;
+        if (surface === 'all') return true;
+        if (surface === 'flagged') return d.has_flags;
+        if (surface === 'overlap') return d.has_overlap;
+        if (surface === 'has_stats') return d.has_stats;
+        if (surface === 'undocumented') return !!d.undocumented;
+        if (surface === 'stale') return !!d.stale;
+        if (surface === 'gaps') return d.gaps;
+        return d.surface === surface;
+    }
+
+    function countRowsForSurface(surface, rows) {
+        if (!rows || !rows.length) return 0;
+        var n = 0;
+        for (var i = 0; i < rows.length; i++) {
+            if (rowMatchesSurface(rows[i], surface)) n += 1;
+        }
+        return n;
+    }
+
+    function updateEpSurfaceBtnStates() {
+        var rows = window.__epRegistryAllRows || epRegistryAllRows || [];
+        var allBtnRef = document.querySelector('.ep-surface-btn[data-surface="all"]');
+        surfaceBtns.forEach(function (b) {
+            var surf = b.dataset.surface || 'all';
+            if (surf === 'all') {
+                b.disabled = false;
+                return;
+            }
+            b.disabled = countRowsForSurface(surf, rows) === 0;
+        });
+        if (activeSurface !== 'all') {
+            var cur = document.querySelector('.ep-surface-btn[data-surface="' + activeSurface + '"]');
+            if (cur && cur.disabled && allBtnRef) {
+                activeSurface = 'all';
+                styleActiveBtn(allBtnRef);
+                refreshExternalFilter();
+                return;
+            }
+        }
+    }
+
+    function rowPassesSurfaceFilter(d) {
+        if (!d) return true;
+        if (d.__epGroupHeader) return false;
+        return rowMatchesSurface(d, activeSurface);
+    }
+
+    /** AG Grid v31+ passes `{ node }` to `doesExternalFilterPass`; older builds pass the node directly. */
+    function epRegistryRowNodeFromFilterParams(params) {
+        if (params && params.node) return params.node;
+        return params;
+    }
+
+    function externalFilterPass(node) {
+        var d = node.data;
+        if (!d) return true;
+        if (d.__epGroupHeader) {
+            var key = d.__epGroupKey;
+            var src = window.__epRegistryAllRows || epRegistryAllRows;
+            for (var i = 0; i < src.length; i++) {
+                var r = src[i];
+                if (r.__epGroupHeader) continue;
+                if (r.registryGroup !== key) continue;
+                if (rowPassesSurfaceFilter(r)) return true;
+            }
+            return false;
+        }
+        return rowPassesSurfaceFilter(d);
+    }
+
+    /** Synthetic full-width header rows; real endpoint rows stay in epRegistryAllRows / __epRegistryAllRows only. */
+    function buildRegistryGroupedRows(rows) {
+        if (!rows || !rows.length) return [];
+        var sorted = rows.slice().sort(function (a, b) {
+            var ga = String(a.registryGroup || '');
+            var gb = String(b.registryGroup || '');
+            if (ga !== gb) return ga < gb ? -1 : ga > gb ? 1 : 0;
+            var pa = String(a.path || '');
+            var pb = String(b.path || '');
+            return pa < pb ? -1 : pa > pb ? 1 : 0;
+        });
+        var out = [];
+        var lastGroup = null;
+        for (var i = 0; i < sorted.length; i++) {
+            var r = sorted[i];
+            var g = r.registryGroup != null ? String(r.registryGroup) : '';
+            if (g !== lastGroup) {
+                lastGroup = g;
+                out.push({
+                    __epGroupHeader: true,
+                    __epGroupKey: g,
+                    registryGroup: g,
+                    surface: '',
+                    path: '',
+                    pathLower: '',
+                    pathSearch: '',
+                    description: '',
+                    methods: [],
+                    methodsStr: '',
+                    auth: '',
+                    permission: '',
+                    consumers: '',
+                    total_requests: 0,
+                    success_rate: 0,
+                    featured: false,
+                    has_flags: false,
+                    has_overlap: false,
+                    has_stats: false,
+                    undocumented: false,
+                    stale: false,
+                    gaps: false,
+                    rate_limited: false,
+                    overlapPaths: [],
+                    flags: [],
+                });
+            }
+            out.push(r);
+        }
+        return out;
+    }
+
+    function EpRegistryGroupFullWidthRenderer() {}
+    EpRegistryGroupFullWidthRenderer.prototype.init = function (params) {
+        var d = params.data;
+        var label = (d && d.__epGroupKey != null) ? String(d.__epGroupKey) : '';
+        var src = window.__epRegistryAllRows || epRegistryAllRows;
+        var n = 0;
+        for (var j = 0; j < src.length; j++) {
+            var row = src[j];
+            if (row.__epGroupHeader) continue;
+            if (String(row.registryGroup || '') !== label) continue;
+            n += 1;
+        }
+        var wrap = document.createElement('div');
+        wrap.className = 'ep-registry-group-header-fw flex items-center w-full px-3 py-1.5 bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-800';
+        var title = document.createElement('span');
+        title.textContent = label;
+        wrap.appendChild(title);
+        if (n > 0) {
+            var c = document.createElement('span');
+            c.className = 'text-xs text-gray-500 font-normal ml-2';
+            c.textContent = '(' + n + ')';
+            wrap.appendChild(c);
+        }
+        this.eGui = wrap;
+    };
+    EpRegistryGroupFullWidthRenderer.prototype.getGui = function () {
+        return this.eGui;
+    };
+    EpRegistryGroupFullWidthRenderer.prototype.refresh = function () {
+        return false;
+    };
+
+    function isExternalFilterPresent() {
+        return activeSurface !== 'all';
+    }
+
+    function refreshExternalFilter() {
+        if (!epRegistryGridApi) {
+            updateFooterAndEmpty();
+            return;
+        }
+        /* External filter changes must notify the grid (v34: onFilterChanged; older: refreshClientSideRowModel). */
+        if (typeof epRegistryGridApi.onFilterChanged === 'function') {
+            epRegistryGridApi.onFilterChanged();
+        } else if (typeof epRegistryGridApi.refreshClientSideRowModel === 'function') {
+            epRegistryGridApi.refreshClientSideRowModel('filter');
+        }
+        updateFooterAndEmpty();
+    }
+
+    function countVisibleDataRows() {
+        if (!epRegistryGridApi) return 0;
+        var n = 0;
+        epRegistryGridApi.forEachNodeAfterFilter(function (node) {
+            if (node.data && !node.data.__epGroupHeader) n += 1;
+        });
+        return n;
+    }
+
+    /** Rows matching the surface chip only (ignores AG Grid column / floating filters). */
+    function countRowsMatchingActiveChip() {
+        if (activeSurface === 'all') return 0;
+        var src = window.__epRegistryAllRows || epRegistryAllRows || [];
+        return countRowsForSurface(activeSurface, src);
+    }
+
+    function clearEpRegistryColumnFilters() {
+        if (!epRegistryGridApi || typeof epRegistryGridApi.setFilterModel !== 'function') return;
+        try {
+            epRegistryGridApi.setFilterModel(null);
+        } catch (e) {}
+        if (typeof epRegistryGridApi.onFilterChanged === 'function') {
+            epRegistryGridApi.onFilterChanged();
+        } else if (typeof epRegistryGridApi.refreshClientSideRowModel === 'function') {
+            epRegistryGridApi.refreshClientSideRowModel('filter');
+        }
+        updateFooterAndEmpty();
+    }
+
+    function updateFooterAndEmpty() {
+        var n = countVisibleDataRows();
+        var chipN = countRowsMatchingActiveChip();
+        if (emptyMsg) emptyMsg.classList.toggle('hidden', n > 0);
+        if (matchFooter && matchCountEl) {
+            if (n > 0) {
+                matchFooter.classList.remove('hidden');
+                matchCountEl.textContent = String(n);
+                if (matchChipTotalEl) {
+                    var showSplit = activeSurface !== 'all' && chipN > 0 && n < chipN;
+                    matchChipTotalEl.classList.toggle('hidden', !showSplit);
+                    matchChipTotalEl.textContent = showSplit ? ' / ' + String(chipN) : '';
+                }
+                if (matchHintEl && matchHintTextEl) {
+                    var showHint = activeSurface !== 'all' && chipN > 0 && n < chipN;
+                    matchHintEl.classList.toggle('hidden', !showHint);
+                    matchHintTextEl.textContent = showHint
+                        ? {{ _('Column filters are hiding some rows that match this chip.')|tojson }}
+                        : '';
+                }
+            } else {
+                matchFooter.classList.add('hidden');
+                matchCountEl.textContent = '';
+                if (matchChipTotalEl) {
+                    matchChipTotalEl.classList.add('hidden');
+                    matchChipTotalEl.textContent = '';
+                }
+                if (matchHintEl && matchHintTextEl) {
+                    matchHintEl.classList.add('hidden');
+                    matchHintTextEl.textContent = '';
+                }
+            }
+        }
+    }
+
+    /** Verbose clip logs: reload after `localStorage.setItem('epRegistryClipDebug','1')` or `window.__EP_REGISTRY_CLIP_DEBUG = true`. */
+    function epRegistryClipDebugEnabled() {
+        try {
+            if (typeof window.__EP_REGISTRY_CLIP_DEBUG !== 'undefined' && window.__EP_REGISTRY_CLIP_DEBUG) return true;
+            return localStorage.getItem('epRegistryClipDebug') === '1';
+        } catch (e) {
+            return !!window.__EP_REGISTRY_CLIP_DEBUG;
+        }
+    }
+
+    var epRegistryClipOverflowWarnCount = 0;
+    var epRegistryClipRunCount = 0;
+
+    /** Force path / description cells to clip (flex min-width:auto + inline styles otherwise spill into next columns). */
+    function applyEpRegistryCellClipping(reason) {
+        reason = reason || 'unknown';
+        var root = document.getElementById('epRegistryGrid');
+        if (!root) {
+            console.warn('[ep-registry-clip] no #epRegistryGrid', { reason: reason });
+            return;
+        }
+        var debug = epRegistryClipDebugEnabled();
+        var cells = root.querySelectorAll('.ag-cell[col-id="path"], .ag-cell[col-id="description"], .ag-cell.ep-registry-path-cell, .ag-cell.ep-registry-desc-cell');
+        var n = cells.length;
+        epRegistryClipRunCount += 1;
+        if (debug) {
+            console.info('[ep-registry-clip] run', { reason: reason, run: epRegistryClipRunCount, matchingCells: n });
+        }
+        var samplePathDone = false;
+        var sampleDescDone = false;
+        cells.forEach(function (cell) {
+            var colId = cell.getAttribute('col-id') || cell.getAttribute('aria-colindex') || '(no-col-id)';
+            cell.style.setProperty('overflow', 'hidden', 'important');
+            cell.style.setProperty('min-width', '0', 'important');
+            var wrap = cell.querySelector('.ag-cell-wrapper');
+            if (wrap) {
+                wrap.style.setProperty('min-width', '0', 'important');
+                wrap.style.setProperty('max-width', '100%', 'important');
+                wrap.style.setProperty('width', '100%', 'important');
+                wrap.style.setProperty('overflow', 'hidden', 'important');
+                wrap.style.setProperty('flex', '1 1 0%', 'important');
+            }
+            var val = cell.querySelector('.ag-cell-value');
+            if (val) {
+                val.style.setProperty('min-width', '0', 'important');
+                val.style.setProperty('max-width', '100%', 'important');
+                val.style.setProperty('width', '100%', 'important');
+                val.style.setProperty('overflow', 'hidden', 'important');
+            }
+            var inner = val && val.firstElementChild;
+            if (inner) {
+                inner.style.setProperty('min-width', '0', 'important');
+                inner.style.setProperty('max-width', '100%', 'important');
+                inner.style.setProperty('width', '100%', 'important');
+                inner.style.setProperty('overflow', 'hidden', 'important');
+            }
+
+            var cs = window.getComputedStyle(cell);
+            var pathSample = colId === 'path' && !samplePathDone;
+            var descSample = colId === 'description' && !sampleDescDone;
+            if (debug && (pathSample || descSample)) {
+                if (pathSample) samplePathDone = true;
+                if (descSample) sampleDescDone = true;
+                console.info('[ep-registry-clip] sample cell layout', {
+                    reason: reason,
+                    colId: colId,
+                    classes: cell.className,
+                    cell: { clientWidth: cell.clientWidth, scrollWidth: cell.scrollWidth, offsetWidth: cell.offsetWidth },
+                    computed: { overflow: cs.overflow, overflowX: cs.overflowX, minWidth: cs.minWidth, maxWidth: cs.maxWidth, display: cs.display, position: cs.position },
+                    inlineOverflow: cell.style.getPropertyValue('overflow'),
+                    dom: { hasWrapper: !!wrap, hasValue: !!val, valueChildCount: val ? val.childNodes.length : 0, innerTag: inner ? inner.tagName : null, innerClass: inner ? inner.className : '' },
+                    innerBox: inner ? { clientWidth: inner.clientWidth, scrollWidth: inner.scrollWidth } : null,
+                    wrapBox: wrap ? { clientWidth: wrap.clientWidth, scrollWidth: wrap.scrollWidth } : null,
+                    valBox: val ? { clientWidth: val.clientWidth, scrollWidth: val.scrollWidth } : null
+                });
+            }
+
+            if (cell.scrollWidth > cell.clientWidth + 1) {
+                if (epRegistryClipOverflowWarnCount < 12) {
+                    epRegistryClipOverflowWarnCount += 1;
+                    console.warn('[ep-registry-clip] cell still wider than client (horizontal overflow)', {
+                        n: epRegistryClipOverflowWarnCount,
+                        reason: reason,
+                        colId: colId,
+                        clientWidth: cell.clientWidth,
+                        scrollWidth: cell.scrollWidth,
+                        innerScroll: inner ? inner.scrollWidth : null,
+                        innerClient: inner ? inner.clientWidth : null
+                    });
+                }
+            }
+        });
+        if (n === 0 && debug) {
+            console.info('[ep-registry-clip] no path/description cells in DOM (hidden tab or not yet rendered?)', { reason: reason });
+        }
+        if (n > 0 && !window.__epRegistryClipHintShown) {
+            window.__epRegistryClipHintShown = true;
+            console.info('[ep-registry-clip] Horizontal overflow (if any) logs as warnings below. Verbose layout samples: localStorage.setItem("epRegistryClipDebug","1") then reload, or set window.__EP_REGISTRY_CLIP_DEBUG = true.');
+        }
+    }
+
+    var epRegistryClipScrollTimer = null;
+    function scheduleEpRegistryCellClipping(reason) {
+        if (epRegistryClipScrollTimer) clearTimeout(epRegistryClipScrollTimer);
+        epRegistryClipScrollTimer = setTimeout(function () {
+            epRegistryClipScrollTimer = null;
+            applyEpRegistryCellClipping(reason || 'debounced');
+        }, 80);
+    }
+
+    function methodBadgeHtml(m) {
+        var esc = AgGridRenderers.escapeHtml(m);
+        var cls = 'px-1.5 py-0.5 text-xs font-bold rounded ';
+        if (m === 'GET') cls += 'bg-blue-100 text-blue-700';
+        else if (m === 'POST') cls += 'bg-green-100 text-green-700';
+        else if (m === 'PUT' || m === 'PATCH') cls += 'bg-yellow-100 text-yellow-700';
+        else if (m === 'DELETE') cls += 'bg-red-100 text-red-700';
+        else cls += 'bg-gray-100 text-gray-700';
+        return '<span class="' + cls + '">' + esc + '</span>';
+    }
+
+    function methodsCellRenderer(params) {
+        var d = params.data;
+        if (!d || d.__epGroupHeader) return '';
+        var methods = d.methods;
+        if (!methods || !methods.length) return '';
+        return '<div class="flex flex-wrap gap-1">' + methods.map(methodBadgeHtml).join('') + '</div>';
+    }
+
+    function authIconOnly(iconClass, iconTextClass, titleText) {
+        return '<span class="inline-flex items-center justify-center" title="' +
+            AgGridRenderers.escapeHtmlAttr(titleText) + '"><i class="fas ' + iconClass + ' ' + iconTextClass + '"></i></span>';
+    }
+
+    function authCellRenderer(params) {
+        var d = params.data;
+        if (!d || d.__epGroupHeader) return '';
+        var a = d.auth;
+        var html = '';
+        var titleExtra = '';
+        if (a === 'rbac' && d.permission) {
+            titleExtra = ' — ' + String(d.permission);
+        }
+        if (a === '?') {
+            html = authIconOnly('fa-question', 'text-yellow-600', EP_L.unknown);
+        } else if (a === 'public') {
+            html = authIconOnly('fa-globe', 'text-gray-500', EP_L.public);
+        } else if (a === 'api_key') {
+            html = authIconOnly('fa-key', 'text-amber-600', EP_L.apiKey);
+        } else if (a === 'api_key_or_session') {
+            html = authIconOnly('fa-user-lock', 'text-indigo-600', EP_L.keySession);
+        } else if (a === 'session') {
+            html = authIconOnly('fa-user', 'text-blue-600', EP_L.session);
+        } else if (a === 'ai_session') {
+            html = authIconOnly('fa-robot', 'text-purple-600', EP_L.aiSession);
+        } else if (a === 'user') {
+            html = authIconOnly('fa-mobile-alt', 'text-teal-600', EP_L.userJwt);
+        } else if (a === 'rbac') {
+            html = authIconOnly('fa-shield-alt', 'text-orange-600', EP_L.rbac + titleExtra);
+        } else {
+            html = authIconOnly('fa-tag', 'text-gray-500', (a != null && String(a) !== '') ? String(a) : EP_L.unknown);
+        }
+        html = '<div class="flex items-center gap-2 flex-nowrap">' + html;
+        if (d.rate_limited) {
+            html += authIconOnly('fa-tachometer-alt', 'text-yellow-500', EP_L.rateLimited);
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function epRegistryV1PathHref(path) {
+        try {
+            var u = new URL(path, window.location.origin);
+            var key = '';
+            if (typeof window.getApiManagementApiKey === 'function') {
+                key = window.getApiManagementApiKey();
+            } else {
+                try {
+                    key = String(localStorage.getItem('ngo_databank_api_management_api_key') || localStorage.getItem('ifrc_api_management_api_key') || '').trim();
+                } catch (e) {}
+            }
+            if (key) {
+                u.searchParams.set('api_key', key);
+            } else {
+                u.searchParams.delete('api_key');
+            }
+            return u.href;
+        } catch (e) {
+            return '#';
+        }
+    }
+
+    function pathCellRenderer(params) {
+        var d = params.data;
+        if (!d || d.__epGroupHeader) return '';
+        var path = d.path || '';
+        var pathEl;
+        var pathTextStyle = 'display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box';
+        if (d.surface === 'v1') {
+            var pathHref = epRegistryV1PathHref(path);
+            pathEl = '<a href="' + AgGridRenderers.escapeHtmlAttr(pathHref) + '" target="_blank" rel="noopener noreferrer" style="' + pathTextStyle + '" class="font-mono text-xs text-blue-600 hover:underline api-endpoint-link" data-endpoint-path="' +
+                AgGridRenderers.escapeHtmlAttr(path) + '">' + AgGridRenderers.escapeHtml(path) + '</a>';
+        } else {
+            pathEl = '<code class="font-mono text-xs text-gray-700" style="' + pathTextStyle + '">' + AgGridRenderers.escapeHtml(path) + '</code>';
+        }
+        var star = d.featured ? '<i class="fas fa-star text-yellow-400 flex-shrink-0 text-xs" title="' + AgGridRenderers.escapeHtmlAttr(EP_L.featured) + '"></i>' : '';
+        var pathRow = '<div class="min-w-0 flex-1 flex items-center gap-1 overflow-hidden" style="min-width:0;flex:1 1 0%;overflow:hidden">' + pathEl + star + '</div>';
+        var badges = '';
+        if (d.undocumented) {
+            badges += '<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-bold rounded bg-yellow-200 text-yellow-800 flex-shrink-0">' + AgGridRenderers.escapeHtml(EP_L.undocumented) + '</span>';
+        }
+        if (d.stale) {
+            badges += '<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-bold rounded bg-gray-300 text-gray-700 flex-shrink-0">' + AgGridRenderers.escapeHtml(EP_L.stale) + '</span>';
+        }
+        var badgeRow = badges ? '<div class="flex flex-shrink-0 flex-wrap items-center gap-1">' + badges + '</div>' : '';
+        var mainRow = '<div class="flex items-start gap-1 min-w-0 w-full" style="min-width:0;width:100%;max-width:100%;overflow:hidden">' + pathRow + badgeRow + '</div>';
+        var sub = '';
+        if (d.overlapPaths && d.overlapPaths.length) {
+            var overlapPlain = '≈ ' + d.overlapPaths.join(', ');
+            sub = '<div class="text-xs text-indigo-400 mt-0.5 min-w-0 truncate font-mono" title="' + AgGridRenderers.escapeHtmlAttr(overlapPlain) + '">' + AgGridRenderers.escapeHtml(overlapPlain) + '</div>';
+        }
+        return '<div class="ep-path-root w-full min-w-0 max-w-full overflow-hidden flex flex-col gap-0.5" style="box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow:hidden">' + mainRow + sub + '</div>';
+    }
+
+    function descriptionCellRenderer(params) {
+        var d = params.data;
+        if (!d || d.__epGroupHeader) return '';
+        var t = d.description != null ? String(d.description) : '';
+        if (!t) return '<span class="text-gray-300 text-xs">—</span>';
+        return '<div class="ep-desc-inner w-full min-w-0 max-w-full overflow-hidden text-sm text-gray-700 leading-snug" style="box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow:hidden">' +
+            '<span class="block min-w-0 truncate" style="display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + AgGridRenderers.escapeHtml(t) + '</span></div>';
+    }
+
+    function successCellRenderer(params) {
+        var d = params.data;
+        if (!d || d.__epGroupHeader || !d.total_requests) return '<span class="text-gray-300 text-xs">—</span>';
+        var pct = Math.min(100, Math.max(0, Math.round(d.success_rate || 0)));
+        return '<div class="flex items-center gap-1.5"><div class="flex-1 bg-gray-200 rounded-full h-1.5 min-w-[3rem]">' +
+            '<div class="bg-green-500 h-1.5 rounded-full" style="width:' + pct + '%"></div></div>' +
+            '<span class="text-xs text-gray-600 whitespace-nowrap">' + pct + '%</span></div>';
+    }
+
+    function flagsCellRenderer(params) {
+        var d = params.data;
+        if (!d || d.__epGroupHeader || !d.flags || !d.flags.length) return '<span class="text-gray-300 text-xs">—</span>';
+        var map = { bug: ['bg-red-500 text-white', 'fa-bug'], contract: ['bg-red-500 text-white', 'fa-bug'], mismatch: ['bg-red-400 text-white', 'fa-exclamation-triangle'], policy: ['bg-yellow-400 text-white', 'fa-balance-scale'], unused: ['bg-gray-400 text-white', 'fa-unlink'] };
+        var parts = d.flags.map(function (f) {
+            var t = (f.type || 'minor');
+            var m = map[t] || ['bg-blue-400 text-white', 'fa-info-circle'];
+            var note = AgGridRenderers.escapeHtmlAttr(f.note || '');
+            return '<span class="ep-flag-badge inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-bold rounded cursor-pointer ' + m[0] + '" data-flag-type="' + AgGridRenderers.escapeHtmlAttr(t) + '" title="' + note + '"><i class="fas ' + m[1] + '"></i> ' + AgGridRenderers.escapeHtml(t) + '</span>';
+        });
+        return '<div class="flex flex-col gap-1 items-center">' + parts.join('') + '</div>';
+    }
+
+    function surfaceCellRenderer(params) {
+        if (params.data && params.data.__epGroupHeader) return '';
+        var s = params.value;
+        if (s === 'v1') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700 font-semibold">v1</span>';
+        if (s === 'mobile') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-teal-100 text-teal-700 font-semibold">mob</span>';
+        if (s === 'ai') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-purple-100 text-purple-700 font-semibold">ai</span>';
+        return AgGridRenderers.escapeHtml(s || '');
+    }
+
+    function buildUniqueOverlapPairs(eps) {
+        var byPath = {};
+        eps.forEach(function (e) { byPath[e.path] = e; });
+        var seen = {};
+        var out = [];
+        eps.forEach(function (e) {
+            if (!e.overlap) return;
+            var targets = e.overlapWith ? e.overlapWith.split(',') : [];
+            targets.forEach(function (raw) {
+                var o = (raw || '').trim();
+                if (!o) return;
+                var k = [e.path, o].sort().join('\0');
+                if (seen[k]) return;
+                seen[k] = true;
+                var ea = byPath[e.path];
+                var eb = byPath[o];
+                var first = ea;
+                var second = eb;
+                if (ea && eb && ea.surface === 'mobile' && eb.surface === 'v1') {
+                    first = eb;
+                    second = ea;
+                }
+                out.push({ first: first, second: second, secondPath: o });
+            });
+        });
+        return out;
+    }
+
+    function buildReport() {
+        var rows = (window.__epRegistryAllRows || epRegistryAllRows).filter(function (r) { return !r.__epGroupHeader; });
+        var now = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        var eps = rows.map(function (d) {
+            return {
+                surface: d.surface,
+                path: d.path,
+                methods: d.methodsStr,
+                auth: d.auth,
+                permission: d.permission || '',
+                description: d.description || '',
+                consumers: d.consumers || '',
+                rateLimited: d.rate_limited,
+                flagged: d.has_flags,
+                overlap: d.has_overlap,
+                overlapWith: (d.overlapPaths || []).join(', '),
+                group: d.registryGroup,
+                requests: d.total_requests,
+                flags: d.flags || [],
+            };
+        });
+        var flagged = eps.filter(function (e) { return e.flagged; });
+        var overlapPairs = buildUniqueOverlapPairs(eps);
+        var bySurface = { v1: eps.filter(function (e) { return e.surface === 'v1'; }), mobile: eps.filter(function (e) { return e.surface === 'mobile'; }), ai: eps.filter(function (e) { return e.surface === 'ai'; }) };
+        function authOf(e) { return AUTH_LABELS[e.auth] || e.auth; }
+        function surfOf(e) { return SURFACE_LABELS[e.surface] || e.surface; }
+        function esc(s) { return (s || '—').replace(/\|/g, '\\|'); }
+        var md = '# API Endpoint Registry — Audit Report\nGenerated: ' + now + '\n\n---\n\n## Summary\n\n| | Count |\n|---|---:|\n';
+        md += '| **Total endpoints** | **' + eps.length + '** |\n';
+        md += '| External `/api/v1` | ' + bySurface.v1.length + ' |\n| Mobile `/api/mobile/v1` | ' + bySurface.mobile.length + ' |\n| AI `/api/ai/v2` | ' + bySurface.ai.length + ' |\n';
+        md += '| ⚠️ Flagged issues | **' + flagged.length + '** |\n| 🔁 Cross-surface overlaps | ' + overlapPairs.length + ' |\n';
+        md += '| 📊 Endpoints with usage stats | ' + eps.filter(function (e) { return e.requests > 0; }).length + ' |\n';
+        md += '| 👻 Undocumented | ' + rows.filter(function (r) { return r.undocumented; }).length + ' |\n';
+        md += '| 🕸️ Stale | ' + rows.filter(function (r) { return r.stale; }).length + ' |\n\n---\n\n';
+        if (flagged.length > 0) {
+            md += '## ⚠️ Flagged Issues (' + flagged.length + ')\n\n';
+            var n = 0;
+            flagged.forEach(function (ep) {
+                ep.flags.forEach(function (flag) {
+                    n += 1;
+                    md += '### ' + n + '. [' + String(flag.type || 'issue').toUpperCase() + '] `' + esc(ep.path) + '`\n\n- **Surface:** ' + surfOf(ep) + '\n- **Auth:** ' + authOf(ep);
+                    if (ep.permission) md += ' — permission: `' + esc(ep.permission) + '`';
+                    md += '\n- **Issue:** ' + (flag.note || '') + '\n\n';
+                });
+            });
+            md += '---\n\n';
+        }
+        if (overlapPairs.length > 0) {
+            md += '## 🔁 Cross-surface Overlaps (' + overlapPairs.length + ' unique pairs)\n\n| Path (A) | Auth (A) | Path (B) | Auth (B) |\n|----------|----------|----------|----------|\n';
+            overlapPairs.forEach(function (pair) {
+                var fa = pair.first;
+                var fb = pair.second;
+                var pb = (fb && fb.path) ? fb.path : pair.secondPath;
+                var authB = fb ? authOf(fb) : '—';
+                md += '| `' + esc(fa.path) + '` | ' + esc(authOf(fa)) + ' | `' + esc(pb) + '` | ' + esc(authB) + ' |\n';
+            });
+            md += '\n---\n\n';
+        }
+        var authCount = {};
+        eps.forEach(function (e) { authCount[e.auth] = (authCount[e.auth] || 0) + 1; });
+        md += '## 🔐 Auth Distribution\n\n| Auth type | Count | % |\n|-----------|------:|--:|\n';
+        Object.keys(authCount).sort().forEach(function (a) {
+            md += '| ' + (AUTH_LABELS[a] || a) + ' | ' + authCount[a] + ' | ' + ((authCount[a] / eps.length) * 100).toFixed(1) + '% |\n';
+        });
+        md += '\n---\n\n## 📋 Full Endpoint List (' + eps.length + ')\n\n| # | Surface | Path | Methods | Auth | Permission | Rate-ltd | Requests | Consumers |\n|---|---------|------|---------|------|-----------|----------|----------|----------|\n';
+        eps.forEach(function (ep, i) {
+            var rl = ep.rateLimited ? '✓' : '—';
+            var req = ep.requests > 0 ? String(ep.requests) : '—';
+            md += '| ' + (i + 1) + ' | ' + ep.surface + ' | `' + esc(ep.path) + '` | ' + esc(ep.methods) + ' | ' + esc(authOf(ep)) + ' | ' + esc(ep.permission || '—') + ' | ' + rl + ' | ' + req + ' | ' + esc(ep.consumers) + ' |\n';
+        });
+        md += '\n---\n*Exported from API Management → Endpoint Registry*\n';
+        return md;
+    }
+
+    function downloadMd(content) {
+        var blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'api-endpoint-report.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function initEpRegistryGrid() {
+        if (window.__epRegistryGridInited) return;
+        var jsonEl = document.getElementById('ep-registry-grid-data');
+        if (!jsonEl || typeof AgGridHelper === 'undefined' || typeof AgGridRenderers === 'undefined') return;
+
+        var rowData;
+        try {
+            rowData = JSON.parse(jsonEl.textContent);
+        } catch (e) {
+            console.error('ep-registry-grid-data parse error', e);
+            rowData = [];
+        }
+        epRegistryAllRows = rowData;
+        window.__epRegistryAllRows = rowData;
+        updateEpSurfaceBtnStates();
+        var gridRowData = buildRegistryGroupedRows(rowData);
+
+        if (!rowData.length) {
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (containerEl) containerEl.style.display = 'none';
+            if (emptyMsg) emptyMsg.classList.remove('hidden');
+            window.__epRegistryGridInited = true;
+            return;
+        }
+
+        /*
+         * Column width budget (~860px visible area):
+         *   surface(75) + methodsStr(110) + auth(80) + total_requests(85) + success_rate(110) + flags(100) = 560px fixed
+         *   path(flex:2) + description(flex:1) share the remaining ~300px
+         *   consumers hidden by default (toggle via column-visibility manager)
+         * minWidth:0 on flex cols lets sizeColumnsToFit compress them freely within the panel.
+         */
+        var columnDefs = [
+            { field: 'surface', headerName: '{{ _("Surface") }}', width: 75, cellRenderer: surfaceCellRenderer, filter: 'customSetFilter' },
+            { field: 'path', headerName: '{{ _("Path") }}', flex: 2, minWidth: 0, cellClass: 'ep-registry-path-cell', cellStyle: { display: 'flex', alignItems: 'center', minWidth: 0, overflow: 'hidden', maxWidth: '100%' }, cellRenderer: pathCellRenderer, filter: 'agTextColumnFilter', tooltipValueGetter: function (p) { return p.data && !p.data.__epGroupHeader && p.data.path ? p.data.path : ''; } },
+            { field: 'methodsStr', headerName: '{{ _("Methods") }}', width: 110, cellRenderer: methodsCellRenderer, filter: 'agTextColumnFilter', valueGetter: function (p) { return p.data && !p.data.__epGroupHeader ? p.data.methodsStr : ''; } },
+            { field: 'auth', headerName: '{{ _("Auth") }}', width: 80, maxWidth: 100, cellRenderer: authCellRenderer, filter: 'customSetFilter' },
+            { field: 'description', headerName: '{{ _("Description") }}', flex: 1, minWidth: 0, cellClass: 'ep-registry-desc-cell', cellStyle: { display: 'flex', alignItems: 'center', minWidth: 0, overflow: 'hidden', maxWidth: '100%' }, cellRenderer: descriptionCellRenderer, filter: 'agTextColumnFilter', tooltipValueGetter: function (p) { return p.data && !p.data.__epGroupHeader && p.data.description != null ? String(p.data.description) : ''; } },
+            { field: 'consumers', headerName: '{{ _("Consumers") }}', width: 140, hide: true, filter: 'agTextColumnFilter', cellClass: 'font-mono text-xs text-gray-600' },
+            {
+                field: 'total_requests',
+                headerName: '{{ _("Requests") }}',
+                width: 85,
+                /* Avoid built-in numericColumn: it applies ag-right-aligned-header in LTR, which moves the filter menu icon to the left of the title. */
+                filter: 'agNumberColumnFilter',
+                cellClass: 'text-right tabular-nums ag-right-aligned-cell',
+                valueFormatter: function (p) {
+                    if (p.data && p.data.__epGroupHeader) return '';
+                    var v = p.value;
+                    if (v == null || v === '') return '';
+                    var n = Number(v);
+                    if (!isFinite(n)) return '';
+                    return n.toLocaleString(undefined, { maximumFractionDigits: 0, useGrouping: true });
+                },
+            },
+            { field: 'success_rate', headerName: '{{ _("Success") }}', width: 110, cellRenderer: successCellRenderer, filter: 'agNumberColumnFilter' },
+            {
+                field: 'flags',
+                headerName: '{{ _("Flags") }}',
+                width: 100,
+                cellDataType: false,
+                cellRenderer: flagsCellRenderer,
+                filter: false,
+                sortable: false,
+                valueFormatter: function (p) {
+                    if (p.data && p.data.__epGroupHeader) return '';
+                    var v = p.value;
+                    if (!Array.isArray(v) || !v.length) return '';
+                    return v.map(function (f) { return f && f.type ? String(f.type) : ''; }).filter(Boolean).join(', ');
+                },
+            },
+        ];
+
+        var gridHelper = new AgGridHelper({
+            containerId: 'epRegistryGrid',
+            templateId: 'api-mgmt-endpoint-registry',
+            columnDefs: columnDefs,
+            rowData: gridRowData,
+            columnVisibilityOptions: { persistOnChange: true, showPanelButton: false, enableExport: false, enableReset: true },
+            heightOptions: { minHeight: 280, maxHeight: 800, maxRowsToShow: 0, viewportOffset: 200 },
+            /* AgGridHelper merges `options` into grid options; `gridOptions` is ignored. */
+            options: {
+                pagination: false,
+                embedFullWidthRows: true,
+                components: {
+                    epRegistryGroupFw: EpRegistryGroupFullWidthRenderer,
+                },
+                isFullWidthRow: function (p) {
+                    var rn = p && (p.rowNode || p.node);
+                    return !!(rn && rn.data && rn.data.__epGroupHeader);
+                },
+                fullWidthCellRenderer: 'epRegistryGroupFw',
+                getRowId: function (p) {
+                    var d = p.data;
+                    if (!d) return 'ep:empty';
+                    if (d.__epGroupHeader) return 'epg:' + String(d.__epGroupKey || '');
+                    return 'ep:' + String(d.surface || '') + ':' + String(d.path || '') + ':' + String(d.methodsStr || '');
+                },
+                getRowHeight: function (p) {
+                    if (p.data && p.data.__epGroupHeader) return 36;
+                    return undefined;
+                },
+                rowSelection: { mode: 'multiRow', checkboxes: false, headerCheckbox: false, enableClickSelection: false },
+                selectionColumnDef: { hide: true },
+                isExternalFilterPresent: function () { return isExternalFilterPresent(); },
+                doesExternalFilterPass: function (params) {
+                    return externalFilterPass(epRegistryRowNodeFromFilterParams(params));
+                },
+                getRowClass: function (p) {
+                    var d = p.data;
+                    if (!d) return '';
+                    if (d.__epGroupHeader) return 'ep-registry-group-header-row';
+                    if (d.undocumented) return 'ep-ag-row-undocumented';
+                    if (d.stale) return 'ep-ag-row-stale';
+                    if (d.has_flags) return 'ep-ag-row-flagged';
+                    return '';
+                },
+                defaultColDef: {
+                    sortable: false,
+                    resizable: true,
+                    filter: true,
+                    wrapText: false,
+                    autoHeight: false,
+                },
+                onFirstDataRendered: function () {
+                    applyEpRegistryCellClipping('onFirstDataRendered');
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(function () {
+                            applyEpRegistryCellClipping('onFirstDataRendered+2rAF');
+                        });
+                    });
+                    if (typeof window.updateEndpointLinks === 'function') window.updateEndpointLinks();
+                    updateFooterAndEmpty();
+                },
+                onGridSizeChanged: function () {
+                    if (epRegistryGridSizeFitTimer) clearTimeout(epRegistryGridSizeFitTimer);
+                    epRegistryGridSizeFitTimer = setTimeout(function () {
+                        epRegistryGridSizeFitTimer = null;
+                        try {
+                            if (epRegistryGridApi && typeof epRegistryGridApi.sizeColumnsToFit === 'function') {
+                                epRegistryGridApi.sizeColumnsToFit();
+                            }
+                        } catch (e) {}
+                    }, 80);
+                },
+                onColumnResized: function () {
+                    scheduleEpRegistryCellClipping('onColumnResized');
+                },
+                onBodyScroll: function (ev) {
+                    if (ev && ev.direction === 'horizontal') return;
+                    scheduleEpRegistryCellClipping('onBodyScroll');
+                },
+                onFilterChanged: function () {
+                    updateFooterAndEmpty();
+                    scheduleEpRegistryCellClipping('onFilterChanged');
+                },
+            },
+        });
+
+        epRegistryGridApi = gridHelper.initialize();
+        window.epRegistryGridApi = epRegistryGridApi;
+        if (!epRegistryGridApi) {
+            console.warn('[ep-registry] AgGridHelper.initialize() returned null (check #epRegistryGrid in DOM)');
+        }
+
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (containerEl) containerEl.style.display = 'block';
+        window.__epRegistryGridInited = true;
+        if (typeof window.updateEndpointLinks === 'function') window.updateEndpointLinks();
+        updateFooterAndEmpty();
+
+        /* sizeColumnsToFit called here (post-init, epRegistryGridApi is guaranteed set) so columns
+           fill the panel. onFirstDataRendered's ev.api is undefined in this AG Grid build so we cannot
+           rely on that timing. AgGridHelper also fires its own sizeColumnsToFit via applyGridHeight. */
+        setTimeout(function () {
+            try {
+                if (epRegistryGridApi && typeof epRegistryGridApi.sizeColumnsToFit === 'function') {
+                    epRegistryGridApi.sizeColumnsToFit();
+                }
+            } catch (e) {}
+        }, 250);
+    }
+
+    function tryInitGrid() {
+        var panel = document.getElementById('panel-registry');
+        if (!panel || panel.classList.contains('hidden')) return;
+        initEpRegistryGrid();
+    }
+
+    if (clearColFiltersBtn) {
+        clearColFiltersBtn.addEventListener('click', function () {
+            clearEpRegistryColumnFilters();
+        });
+    }
+
+    surfaceBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            var surf = btn.dataset.surface || 'all';
+            if (surf !== 'all' && activeSurface === surf) {
+                activeSurface = 'all';
+                var allB = document.querySelector('.ep-surface-btn[data-surface="all"]');
+                if (allB) styleActiveBtn(allB);
+            } else {
+                activeSurface = surf;
+                styleActiveBtn(btn);
+            }
+            refreshExternalFilter();
+        });
+    });
+
+    document.addEventListener('click', function (e) {
+        var badge = e.target.closest && e.target.closest('.ep-flag-badge');
+        if (badge && badge.closest('#epRegistryGrid')) {
+            e.stopPropagation();
+            var flaggedBtn = document.querySelector('.ep-surface-btn[data-surface="flagged"]');
+            if (flaggedBtn && !flaggedBtn.disabled) flaggedBtn.click();
+        }
+    });
+
+    document.addEventListener('api-mgmt-tab-activated', function (e) {
+        if (e.detail && e.detail.tab === 'registry') {
+            requestAnimationFrame(function () {
+                tryInitGrid();
+                if (epRegistryGridApi) {
+                    try {
+                        if (typeof epRegistryGridApi.doLayout === 'function') epRegistryGridApi.doLayout();
+                        if (typeof epRegistryGridApi.sizeColumnsToFit === 'function') epRegistryGridApi.sizeColumnsToFit();
+                    } catch (err) {}
+                }
+            });
+        }
+    });
+
+    var exportBtn = document.getElementById('epExportBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function () {
+            var md = buildReport();
+            var orig = exportBtn.innerHTML;
+            function resetBtn(success) {
+                exportBtn.innerHTML = success ? '<i class="fas fa-check mr-1.5"></i>Copied!' : '<i class="fas fa-download mr-1.5"></i>Downloaded';
+                exportBtn.classList.toggle('btn-success', success);
+                setTimeout(function () {
+                    exportBtn.innerHTML = orig;
+                    exportBtn.classList.remove('btn-success');
+                }, 2500);
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(md).then(function () { resetBtn(true); }).catch(function () { downloadMd(md); resetBtn(false); });
+            } else {
+                downloadMd(md);
+                resetBtn(false);
+            }
+        });
+    }
+
+    var allBtn = document.querySelector('.ep-surface-btn[data-surface="all"]');
+    if (allBtn) styleActiveBtn(allBtn);
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInitGrid);
+    } else {
+        tryInitGrid();
+    }
+})();
 </script>
 {% endblock %}

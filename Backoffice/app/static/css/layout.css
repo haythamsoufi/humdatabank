@@ -149,6 +149,7 @@ html, body {
 #pageContentContainer {
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
+    min-width: 0; /* flex descendants: allow shrink below wide intrinsic content */
 }
 
 /* Additional left padding when sidebar is present to create visual separation */

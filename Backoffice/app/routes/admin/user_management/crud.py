@@ -3,6 +3,7 @@
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow
 from collections import defaultdict
+import re
 
 from flask import render_template, request, flash, redirect, url_for, current_app
 from flask_login import current_user
@@ -18,6 +19,7 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_forbidden, json_ok
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.entity_groups import get_enabled_entity_groups
+from app.utils.profile_utils import PROFILE_COLORS
 from app.models.system import UserDevice
 
 from . import bp
@@ -376,6 +378,8 @@ def new_user():
                 else:
                     # Create new user
                     new_user = User(email=email, name=name, title=title)
+                    pc = (form.profile_color.data or "").strip() if getattr(form, "profile_color", None) else ""
+                    new_user.profile_color = pc if pc else "#3B82F6"
                     # Hash the password before saving (local auth only)
                     if (not azure_sso_enabled) and password:
                         new_user.set_password(password)
@@ -457,6 +461,7 @@ def new_user():
                             'email': new_user.email,
                             'name': new_user.name,
                             'title': new_user.title,
+                            'profile_color': new_user.profile_color,
                             'country_ids': assigned_country_ids or [],
                             'entity_permissions': entity_permissions
                         },
@@ -485,7 +490,8 @@ def new_user():
                            countries_by_region=countries_by_region,
                            get_localized_country_name=get_localized_country_name,
                            enabled_entity_types=enabled_entity_groups,
-                           azure_sso_enabled=azure_sso_enabled)
+                           azure_sso_enabled=azure_sso_enabled,
+                           profile_palette_hexes=PROFILE_COLORS)
 
 @bp.route("/users/edit_user/<int:user_id>", methods=["GET", "POST"])
 @permission_required('admin.users.edit')
@@ -573,7 +579,8 @@ def edit_user(user_id):
                                    countries_by_region=countries_by_region,
                                    get_localized_country_name=get_localized_country_name,
                                    enabled_entity_types=enabled_entity_groups,
-                                   azure_sso_enabled=azure_sso_enabled)
+                                   azure_sso_enabled=azure_sso_enabled,
+                                   profile_palette_hexes=PROFILE_COLORS)
         if sys_role and (sys_role.id in (form.rbac_roles.data or [])) and not current_is_sys_mgr:
             flash("Only a System Manager can assign the System Manager role.", "danger")
             countries_by_region = _get_countries_by_region()
@@ -584,7 +591,8 @@ def edit_user(user_id):
                                    countries_by_region=countries_by_region,
                                    get_localized_country_name=get_localized_country_name,
                                    enabled_entity_types=enabled_entity_groups,
-                                   azure_sso_enabled=azure_sso_enabled)
+                                   azure_sso_enabled=azure_sso_enabled,
+                                   profile_palette_hexes=PROFILE_COLORS)
 
         # Enforce RBAC restrictions around Plugins role
         plugins_role = RbacRole.query.filter_by(code="admin_plugins_manager").first()
@@ -598,7 +606,8 @@ def edit_user(user_id):
                                    countries_by_region=countries_by_region,
                                    get_localized_country_name=get_localized_country_name,
                                    enabled_entity_types=enabled_entity_groups,
-                                   azure_sso_enabled=azure_sso_enabled)
+                                   azure_sso_enabled=azure_sso_enabled,
+                                   profile_palette_hexes=PROFILE_COLORS)
 
         # Store old values for audit logging
         try:
@@ -612,6 +621,7 @@ def edit_user(user_id):
             'email': user.email,
             'name': user.name,
             'title': user.title,
+            'profile_color': user.profile_color,
             'rbac_role_ids': old_rbac_role_ids,
             'country_ids': [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
         }
@@ -620,6 +630,8 @@ def edit_user(user_id):
         user.email = form.email.data
         user.name = form.name.data
         user.title = form.title.data
+        _pc_raw = getattr(form, "profile_color", None) and form.profile_color.data
+        user.profile_color = _pc_raw.strip() if _pc_raw else "#3B82F6"
 
         # Update RBAC roles (best-effort; no-op if RBAC not migrated)
         import logging as _logging
@@ -778,6 +790,7 @@ def edit_user(user_id):
             'email': user.email,
             'name': user.name,
             'title': user.title,
+            'profile_color': user.profile_color,
             'rbac_role_ids': new_rbac_role_ids,
             'country_ids': selected_country_ids or [],
             'entity_permissions': entity_permissions,
@@ -816,6 +829,10 @@ def edit_user(user_id):
         form.email.data = user.email
         form.name.data = user.name
         form.title.data = user.title
+        pc = (user.profile_color or "#3B82F6").strip()
+        if not re.match(r"^#[0-9A-Fa-f]{6}$", pc):
+            pc = "#3B82F6"
+        form.profile_color.data = pc
         form.countries.data = [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
 
         # Pre-populate RBAC roles (best-effort)
@@ -867,7 +884,8 @@ def edit_user(user_id):
                            preferences=preferences,
                            notification_types_info=notification_types_info,
                            registered_devices=registered_devices,
-                           computed_role_type=computed_role_type)
+                           computed_role_type=computed_role_type,
+                           profile_palette_hexes=PROFILE_COLORS)
 
 
 @bp.route("/users/<int:user_id>/devices/<int:device_id>/kickout", methods=["POST"])

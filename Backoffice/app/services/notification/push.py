@@ -1,5 +1,5 @@
 # ========== Push Notification Service ==========
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import utcnow, ensure_utc
 """
 Push notification service for sending notifications via FCM V1 API (Firebase Cloud Messaging).
 
@@ -596,7 +596,10 @@ class PushNotificationService:
                     UserDevice.logged_out_at.is_(None)
                 ).first()
 
-                if device and (device.last_active_at is None or device.last_active_at < throttle_threshold):
+                if device and (
+                    device.last_active_at is None
+                    or ensure_utc(device.last_active_at) < throttle_threshold
+                ):
                     device.last_active_at = now
                     db.session.commit()
                     return True

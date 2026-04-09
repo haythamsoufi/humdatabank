@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:device_info_plus/device_info_plus.dart';
 import '../config/app_config.dart';
 import 'storage_service.dart';
 import 'session_service.dart';
@@ -74,6 +76,39 @@ class ApiService {
   // Legacy secure storage key for CSRF tokens. Mobile uses JWT Bearer auth only;
   // CSRF is not needed when requests are authenticated with JWT (no session-cookie form posts).
   static const String _csrfTokenStorageKey = 'csrf_token_v1';
+
+  // Cached platform identity headers sent on every request so the backend can
+  // correctly classify sessions as Mobile (iOS/Android) instead of Desktop.
+  static Map<String, String> _platformHeaders = {};
+  static bool _platformHeadersInitialized = false;
+
+  /// Populate [_platformHeaders] once per app launch using device_info_plus.
+  static Future<void> _ensurePlatformHeaders() async {
+    if (_platformHeadersInitialized) return;
+    try {
+      final platform =
+          Platform.isIOS ? 'ios' : (Platform.isAndroid ? 'android' : 'unknown');
+      String osVersion = 'unknown';
+      final deviceInfo = DeviceInfoPlugin();
+      if (Platform.isIOS) {
+        final info = await deviceInfo.iosInfo;
+        osVersion = 'iOS ${info.systemVersion}';
+      } else if (Platform.isAndroid) {
+        final info = await deviceInfo.androidInfo;
+        osVersion = 'Android ${info.version.release}';
+      }
+      _platformHeaders = {
+        'X-Platform': platform,
+        'X-OS-Version': osVersion,
+      };
+    } catch (_) {
+      _platformHeaders = {
+        'X-Platform':
+            Platform.isIOS ? 'ios' : (Platform.isAndroid ? 'android' : 'unknown'),
+      };
+    }
+    _platformHeadersInitialized = true;
+  }
 
   Future<String?> _getCachedCsrfToken() async {
     return _storage.getSecure(_csrfTokenStorageKey);
@@ -188,9 +223,12 @@ class ApiService {
     String? httpMethod,
     String? endpoint,
   }) async {
+    await _ensurePlatformHeaders();
+
     final headers = <String, String>{
       'Accept': 'application/json',
       'X-Requested-With': 'XMLHttpRequest', // Helps backend identify API requests
+      ..._platformHeaders,
     };
 
     // Only set Content-Type for requests with a body (POST, PUT, PATCH)

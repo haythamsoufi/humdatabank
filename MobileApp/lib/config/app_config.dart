@@ -290,6 +290,8 @@ class AppConfig {
   static const String mobileResourcesEndpoint = '$mobileApiPrefix/admin/content/resources';
   static const String mobileIndicatorBankEndpoint = '$mobileApiPrefix/admin/content/indicator-bank';
   static const String mobileTranslationsEndpoint = '$mobileApiPrefix/admin/content/translations';
+  static const String mobileTranslationSourcesEndpoint =
+      '$mobileApiPrefix/admin/content/translations/sources';
 
   // Admin -- Notifications (send)
   static const String mobileAdminSendNotificationEndpoint = '$mobileApiPrefix/admin/notifications/send';
@@ -312,6 +314,7 @@ class AppConfig {
   static const String mobileQuizSubmitScoreEndpoint = '$mobileApiPrefix/data/quiz/submit-score';
   static const String mobileFdrsPeriodsEndpoint = '$mobileApiPrefix/data/periods';
   static const String mobileFdrsOverviewEndpoint = '$mobileApiPrefix/data/fdrs-overview';
+  static const String mobileScreenViewEndpoint = '$mobileApiPrefix/analytics/screen-view';
 
   /// Main app dashboard (assignments / entities). Not the admin analytics stats endpoint.
   static const String dashboardApiEndpoint = mobileUserDashboardEndpoint;

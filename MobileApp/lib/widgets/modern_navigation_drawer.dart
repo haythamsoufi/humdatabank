@@ -6,12 +6,9 @@ import '../utils/constants.dart';
 import '../utils/theme_extensions.dart';
 import '../utils/ios_constants.dart';
 
-/// Rounded edge on the side that meets the scaffold (opposite the drawer hinge).
-ShapeBorder modernDrawerShape(BuildContext context) {
-  const r = Radius.circular(AppConstants.radiusXLarge);
-  return Directionality.of(context) == TextDirection.rtl
-      ? const RoundedRectangleBorder(borderRadius: BorderRadius.only(topLeft: r, bottomLeft: r))
-      : const RoundedRectangleBorder(borderRadius: BorderRadius.only(topRight: r, bottomRight: r));
+/// Drawer panel flush with the scaffold edge (no corner rounding).
+ShapeBorder modernDrawerShape() {
+  return const RoundedRectangleBorder();
 }
 
 /// Top block: title + optional signed-in user row.
@@ -20,10 +17,18 @@ class ModernDrawerHeader extends StatelessWidget {
     super.key,
     required this.title,
     this.user,
+    this.onProfileTap,
+    this.profileTapSemanticLabel,
   });
 
   final String title;
   final User? user;
+
+  /// When set (typically with a signed-in [user]), the profile row is tappable.
+  final VoidCallback? onProfileTap;
+
+  /// Accessibility label for [onProfileTap] (e.g. localized "Settings").
+  final String? profileTapSemanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +59,7 @@ class ModernDrawerHeader extends StatelessWidget {
             Builder(
               builder: (context) {
                 final u = user!;
-                return Row(
+                final profileRow = Row(
                   children: [
                     ProfileLeadingAvatar(
                       initials: avatarInitialsForUser(u),
@@ -89,6 +94,31 @@ class ModernDrawerHeader extends StatelessWidget {
                       ),
                     ),
                   ],
+                );
+
+                final tappable = onProfileTap != null;
+                Widget child = profileRow;
+                if (tappable) {
+                  child = Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onProfileTap,
+                      borderRadius:
+                          BorderRadius.circular(AppConstants.radiusLarge),
+                      splashColor: cs.primary.withValues(alpha: 0.12),
+                      highlightColor: cs.primary.withValues(alpha: 0.06),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: profileRow,
+                      ),
+                    ),
+                  );
+                }
+
+                return Semantics(
+                  button: tappable,
+                  label: tappable ? profileTapSemanticLabel : null,
+                  child: child,
                 );
               },
             ),
@@ -134,7 +164,7 @@ class ModernDrawerSectionTitle extends StatelessWidget {
   }
 }
 
-/// One navigation row: soft icon tile, label, chevron.
+/// One navigation row: icon, label, chevron.
 class ModernDrawerTile extends StatelessWidget {
   const ModernDrawerTile({
     super.key,
@@ -142,7 +172,6 @@ class ModernDrawerTile extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.showChevron = true,
-    this.iconBackgroundColor,
     this.iconColor,
   });
 
@@ -150,20 +179,18 @@ class ModernDrawerTile extends StatelessWidget {
   final String title;
   final VoidCallback onTap;
   final bool showChevron;
-  final Color? iconBackgroundColor;
   final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final bg = iconBackgroundColor ?? cs.primary.withValues(alpha: theme.isDarkTheme ? 0.22 : 0.12);
     // Use [ThemeColors.navyIconColor]: in dark mode [ColorScheme.primary] stays brand navy and
     // reads as muddy on drawer surfaces; light mode matches primary (IFRC navy).
     final fg = iconColor ?? context.navyIconColor;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -172,17 +199,12 @@ class ModernDrawerTile extends StatelessWidget {
           splashColor: cs.primary.withValues(alpha: 0.12),
           highlightColor: cs.primary.withValues(alpha: 0.06),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Row(
               children: [
-                Container(
+                SizedBox(
                   width: 40,
                   height: 40,
-                  decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  alignment: Alignment.center,
                   child: Icon(icon, color: fg, size: 22),
                 ),
                 const SizedBox(width: 14),

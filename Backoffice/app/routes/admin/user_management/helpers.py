@@ -508,3 +508,219 @@ def _cascade_delete_user_related(user: User) -> None:
     # 6) Finally delete the user
     db.session.delete(user)
     db.session.flush()
+
+
+def build_admin_user_list_rows(users: list) -> list[dict]:
+    """
+    Directory rows aligned with GET /admin/api/users (Flutter / mobile admin list).
+
+    Bulk-loads RBAC + entity permissions for the given User ORM objects only.
+    """
+    if not users:
+        return []
+
+    user_ids = [u.id for u in users]
+
+    roles_by_user_id: dict = {}
+    try:
+        from app.models.rbac import RbacUserRole, RbacRole
+
+        user_roles = RbacUserRole.query.filter(RbacUserRole.user_id.in_(user_ids)).all()
+        role_ids = list({ur.role_id for ur in user_roles})
+        roles = RbacRole.query.filter(RbacRole.id.in_(role_ids)).all() if role_ids else []
+        roles_by_id = {r.id: r for r in roles}
+        for ur in user_roles:
+            roles_by_user_id.setdefault(ur.user_id, []).append(roles_by_id.get(ur.role_id))
+    except Exception as e:
+        current_app.logger.debug("build_admin_user_list_rows roles: %s", e)
+        roles_by_user_id = {}
+
+    all_permissions = UserEntityPermission.query.filter(
+        UserEntityPermission.user_id.in_(user_ids)
+    ).all()
+
+    permissions_by_user: dict = {}
+    for perm in all_permissions:
+        if perm.user_id not in permissions_by_user:
+            permissions_by_user[perm.user_id] = {}
+        if perm.entity_type not in permissions_by_user[perm.user_id]:
+            permissions_by_user[perm.user_id][perm.entity_type] = 0
+        permissions_by_user[perm.user_id][perm.entity_type] += 1
+
+    country_ids: set = set()
+    for perm in all_permissions:
+        if perm.entity_type == "country":
+            country_ids.add(perm.entity_id)
+
+    countries_by_id: dict = {}
+    if country_ids:
+        for c in Country.query.filter(Country.id.in_(country_ids)).all():
+            countries_by_id[c.id] = c
+
+    user_countries_map: dict = {}
+    for perm in all_permissions:
+        if perm.entity_type == "country" and perm.entity_id in countries_by_id:
+            user_countries_map.setdefault(perm.user_id, []).append(countries_by_id[perm.entity_id])
+
+    users_data: list[dict] = []
+    for user in users:
+        user_countries = []
+        for country in user_countries_map.get(user.id, []):
+            user_countries.append(
+                {
+                    "id": country.id,
+                    "name": country.name,
+                    "code": country.iso3,
+                }
+            )
+
+        entity_counts: dict = {}
+        user_perms = permissions_by_user.get(user.id, {})
+
+        if user_perms.get("ns_branch", 0) > 0:
+            entity_counts["branches"] = user_perms["ns_branch"]
+        if user_perms.get("ns_subbranch", 0) > 0:
+            entity_counts["sub_branches"] = user_perms["ns_subbranch"]
+        if user_perms.get("ns_localunit", 0) > 0:
+            entity_counts["local_units"] = user_perms["ns_localunit"]
+        if user_perms.get("division", 0) > 0:
+            entity_counts["divisions"] = user_perms["division"]
+        if user_perms.get("department", 0) > 0:
+            entity_counts["departments"] = user_perms["department"]
+        if user_perms.get("regional_office", 0) > 0:
+            entity_counts["regional_offices"] = user_perms["regional_office"]
+
+        cluster_perms = user_perms.get("cluster_office", 0)
+        if cluster_perms > 0:
+            entity_counts["cluster_offices"] = cluster_perms
+
+        rbac_roles = []
+        for r in roles_by_user_id.get(user.id) or []:
+            if not r:
+                continue
+            rbac_roles.append({"id": r.id, "code": r.code, "name": r.name})
+
+        users_data.append(
+            {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "title": user.title,
+                "rbac_roles": rbac_roles,
+                "active": user.active,
+                "chatbot_enabled": user.chatbot_enabled,
+                "profile_color": user.profile_color,
+                "country_ids": [c.id for c in user_countries_map.get(user.id, [])],
+                "countries": user_countries,
+                "entity_counts": entity_counts if entity_counts else None,
+                "computed_role_type": _compute_role_type_for_user_id(user.id),
+            }
+        )
+
+    return users_data
+
+
+def build_admin_user_detail_dict(user_id: int) -> dict | None:
+    """
+    User detail payload aligned with GET /admin/api/users/<id> (mobile admin detail).
+    """
+    from sqlalchemy.orm import selectinload
+
+    from app.models.enums import EntityType
+    from app.models.rbac import RbacRole, RbacUserRole
+    from app.services.entity_service import EntityService
+
+    user = User.query.get(user_id)
+    if not user:
+        return None
+
+    user_roles = RbacUserRole.query.filter_by(user_id=user_id).all()
+    role_ids = list({ur.role_id for ur in user_roles})
+    roles = (
+        RbacRole.query.options(selectinload(RbacRole.permissions))
+        .filter(RbacRole.id.in_(role_ids))
+        .all()
+        if role_ids
+        else []
+    )
+    roles_by_id = {r.id: r for r in roles}
+
+    rbac_roles = []
+    perm_agg: dict = {}
+    for ur in user_roles:
+        r = roles_by_id.get(ur.role_id)
+        if not r:
+            continue
+        perms = [{"code": p.code, "name": p.name} for p in sorted(r.permissions, key=lambda x: x.code)]
+        for p in r.permissions:
+            perm_agg.setdefault(p.code, p.name)
+        rbac_roles.append(
+            {
+                "id": r.id,
+                "code": r.code,
+                "name": r.name,
+                "description": r.description,
+                "permissions": perms,
+            }
+        )
+
+    effective_permissions = [{"code": c, "name": perm_agg[c]} for c in sorted(perm_agg.keys())]
+
+    entity_permissions = UserEntityPermission.query.filter_by(user_id=user_id).all()
+    _country_type = EntityType.country.value
+
+    def _perm_is_country(p) -> bool:
+        return (p.entity_type or "").strip().lower() == _country_type
+
+    country_ids = list({p.entity_id for p in entity_permissions if _perm_is_country(p)})
+    countries_by_id: dict = {}
+    if country_ids:
+        for c in Country.query.filter(Country.id.in_(country_ids)).all():
+            countries_by_id[c.id] = c
+
+    entities_data = []
+    for perm in entity_permissions:
+        name = EntityService.get_entity_name(perm.entity_type, perm.entity_id, include_hierarchy=True)
+        if not isinstance(name, str) or not name.strip():
+            et = (perm.entity_type or "entity").replace("_", " ")
+            name = f"Unavailable ({et})"
+        else:
+            name = name.replace("_", " ")
+        row = {
+            "permission_id": perm.id,
+            "entity_type": perm.entity_type,
+            "entity_id": perm.entity_id,
+            "entity_name": name,
+        }
+        if _perm_is_country(perm):
+            co = countries_by_id.get(perm.entity_id)
+            if co:
+                reg = (co.region or "").strip()
+                row["entity_region"] = reg if reg else "Unassigned Region"
+        entities_data.append(row)
+    entities_data.sort(
+        key=lambda x: (
+            x["entity_type"] or "",
+            (x.get("entity_region") or "\uffff").lower(),
+            (x["entity_name"] or "").lower(),
+            x["entity_id"],
+        )
+    )
+
+    computed_role_type = _compute_role_type_for_user_id(user_id)
+    is_system_manager = any((r.get("code") == "system_manager") for r in rbac_roles)
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "title": user.title,
+        "active": user.active,
+        "chatbot_enabled": user.chatbot_enabled,
+        "profile_color": user.profile_color,
+        "rbac_roles": rbac_roles,
+        "effective_permissions": effective_permissions,
+        "entity_permissions": entities_data,
+        "computed_role_type": computed_role_type,
+        "is_system_manager": is_system_manager,
+    }

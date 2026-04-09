@@ -79,9 +79,12 @@ button.ag-column-visibility-button i {
     color: #6b7280 !important;
 }
 
-/* Grid Container Styling */
+/* Grid Container Styling
+   Do not use overflow-x: auto on the root: AG Grid manages horizontal sync between
+   .ag-header-viewport and .ag-body-viewport. A second scrollable layer here causes
+   body rows to move while headers stay fixed and “infinite” sideways scroll. */
 .ag-grid-container {
-    overflow-x: auto;
+    overflow-x: hidden;
     position: relative;
 }
 

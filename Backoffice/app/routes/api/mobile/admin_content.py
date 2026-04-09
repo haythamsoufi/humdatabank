@@ -14,6 +14,7 @@ from app.utils.mobile_responses import (
     mobile_server_error, mobile_paginated,
 )
 from app.utils.sql_utils import safe_ilike_pattern
+from app.extensions import resolve_translations_directory
 from app.routes.api.mobile import mobile_bp
 
 
@@ -240,7 +241,7 @@ def list_documents():
 
     query = SubmittedDocument.query.order_by(SubmittedDocument.uploaded_at.desc().nullslast())
     if search:
-        query = query.filter(SubmittedDocument.file_name.ilike(safe_ilike_pattern(search)))
+        query = query.filter(SubmittedDocument.filename.ilike(safe_ilike_pattern(search)))
 
     paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -248,7 +249,7 @@ def list_documents():
     for doc in paginated.items:
         items.append({
             'id': doc.id,
-            'file_name': doc.file_name,
+            'file_name': doc.filename,
             'document_type': getattr(doc, 'document_type', None),
             'language': getattr(doc, 'language', None),
             'status': getattr(doc, 'status', None),
@@ -269,7 +270,7 @@ def delete_document(document_id):
         return mobile_not_found('Document not found')
 
     try:
-        file_name = doc.file_name
+        file_name = doc.filename
         db.session.delete(doc)
         db.session.flush()
 
@@ -542,18 +543,28 @@ def list_translations():
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
     search = request.args.get('search', '').strip().lower()
+    source_filter = request.args.get('source', '').strip().lower()
 
     try:
         import polib
     except ImportError:
         return mobile_ok(data={'translations': []}, message='polib not available')
 
-    languages = app.config.get('LANGUAGES', ['en', 'fr', 'es', 'ar', 'ru', 'zh', 'hi'])
-    translations_dir = app.config.get('TRANSLATIONS_DIR', 'app/translations')
+    # Must match system settings (manage_settings supported languages), not a static default.
+    # app.config['LANGUAGES'] is not set at runtime; SUPPORTED_LANGUAGES is loaded from DB in create_app.
+    languages = app.config.get('SUPPORTED_LANGUAGES')
+    if not isinstance(languages, list) or not languages:
+        from config.config import Config
+
+        languages = list(getattr(Config, 'LANGUAGES', ['en']))
+    # Catalogs live in Backoffice/translations (BACKOFFICE_TRANSLATIONS_DIR), not app/translations.
+    translations_dir = app.config.get('BACKOFFICE_TRANSLATIONS_DIR') or resolve_translations_directory(app)
 
     import os
     all_msgids = set()
     translation_data = {}
+    # First #: file reference per msgid (from gettext catalogs), for filtering / detail.
+    msgid_source = {}
 
     for lang in languages:
         po_path = os.path.join(translations_dir, lang, 'LC_MESSAGES', 'messages.po')
@@ -566,6 +577,19 @@ def list_translations():
                 if entry.msgid:
                     all_msgids.add(entry.msgid)
                     lang_translations[entry.msgid] = entry.msgstr or ''
+                    if entry.msgid not in msgid_source:
+                        occ = getattr(entry, 'occurrences', None) or []
+                        paths = []
+                        seen = set()
+                        for tup in occ:
+                            if not tup or not tup[0]:
+                                continue
+                            p = str(tup[0]).strip()
+                            if p and p not in seen:
+                                seen.add(p)
+                                paths.append(p)
+                        if paths:
+                            msgid_source[entry.msgid] = paths[0] if len(paths) == 1 else ', '.join(paths[:3])
             translation_data[lang] = lang_translations
         except Exception:
             continue
@@ -573,6 +597,11 @@ def list_translations():
     sorted_msgids = sorted(all_msgids)
     if search:
         sorted_msgids = [m for m in sorted_msgids if search in m.lower()]
+    if source_filter:
+        sorted_msgids = [
+            m for m in sorted_msgids
+            if source_filter in (msgid_source.get(m) or '').lower()
+        ]
 
     total = len(sorted_msgids)
     start = (page - 1) * per_page
@@ -583,9 +612,65 @@ def list_translations():
         entry = {'msgid': msgid, 'translations': {}}
         for lang in languages:
             entry['translations'][lang] = translation_data.get(lang, {}).get(msgid, '')
+        src = msgid_source.get(msgid)
+        if src:
+            entry['source'] = src
         items.append(entry)
 
-    return mobile_paginated(items=items, total=total, page=page, per_page=per_page)
+    total_pages = -(-total // per_page) if per_page else 0
+    return mobile_ok(
+        data=items,
+        meta={
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+            # Exact locale codes used for each item['translations']; clients should filter UI to this list.
+            'languages': list(languages),
+        },
+    )
+
+
+@mobile_bp.route('/admin/content/translations/sources', methods=['GET'])
+@mobile_auth_required(permission='admin.translations.manage')
+def list_translation_sources():
+    """Distinct gettext #: file paths from PO catalogs (for mobile source filter UI)."""
+    from flask import current_app as app
+
+    try:
+        import polib
+    except ImportError:
+        return mobile_ok(data={'sources': []})
+
+    languages = app.config.get('SUPPORTED_LANGUAGES')
+    if not isinstance(languages, list) or not languages:
+        from config.config import Config
+
+        languages = list(getattr(Config, 'LANGUAGES', ['en']))
+    translations_dir = app.config.get('BACKOFFICE_TRANSLATIONS_DIR') or resolve_translations_directory(app)
+
+    import os
+
+    sources = set()
+    for lang in languages:
+        po_path = os.path.join(translations_dir, lang, 'LC_MESSAGES', 'messages.po')
+        if not os.path.exists(po_path):
+            continue
+        try:
+            po = polib.pofile(po_path)
+            for entry in po:
+                if not entry.msgid:
+                    continue
+                for tup in getattr(entry, 'occurrences', None) or []:
+                    if not tup or not tup[0]:
+                        continue
+                    p = str(tup[0]).strip()
+                    if p:
+                        sources.add(p)
+        except Exception:
+            continue
+
+    return mobile_ok(data={'sources': sorted(sources)})
 
 
 @mobile_bp.route('/admin/content/translations/<int:translation_id>', methods=['POST'])

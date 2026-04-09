@@ -281,9 +281,14 @@ class ManageUsersProvider with ChangeNotifier {
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) return null;
       final raw = decoded['data'];
-      if (raw is! List) return null;
+      final List<dynamic>? list = raw is List<dynamic>
+          ? raw
+          : (raw is Map<String, dynamic> && raw['roles'] is List
+              ? raw['roles'] as List<dynamic>
+              : null);
+      if (list == null) return null;
       final map = <String, int>{};
-      for (final e in raw) {
+      for (final e in list) {
         if (e is! Map) continue;
         final m = Map<String, dynamic>.from(e);
         final code = m['code']?.toString() ?? '';

@@ -444,7 +444,7 @@ class _DisaggregationAnalysisScreenState
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.1),
       surfaceTintColor: Colors.transparent,
-      shape: modernDrawerShape(context),
+      shape: modernDrawerShape(),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -452,6 +452,14 @@ class _DisaggregationAnalysisScreenState
             ModernDrawerHeader(
               title: localizations.navigation,
               user: isAuthenticated ? user : null,
+              onProfileTap: isAuthenticated
+                  ? () {
+                      Navigator.pop(context);
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pushNamed(AppRoutes.settings);
+                    }
+                  : null,
+              profileTapSemanticLabel: localizations.settings,
             ),
             Expanded(
               child: ListView(

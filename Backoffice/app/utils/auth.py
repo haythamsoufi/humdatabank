@@ -37,6 +37,9 @@ def require_api_key(f):
             )
 
         return f(*args, **kwargs)
+
+    # Endpoint-registry metadata — read by scan_flask_routes()
+    decorated_function._ep_auth = 'api_key'
     return decorated_function
 
 
@@ -63,4 +66,7 @@ def require_api_key_or_session(f):
 
         g.skip_auth = True
         return f(*args, **kwargs)
+
+    # Endpoint-registry metadata — read by scan_flask_routes()
+    decorated_function._ep_auth = 'api_key_or_session'
     return decorated_function

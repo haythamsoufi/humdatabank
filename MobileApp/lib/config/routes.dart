@@ -16,6 +16,7 @@ class AppRoutes {
   static const String accessRequests = '/admin/access-requests';
   static const String documentManagement = '/admin/documents';
   static const String translationManagement = '/admin/translations/manage';
+  static const String translationEntryDetail = '/admin/translations/entry';
   static const String pluginManagement = '/admin/plugins';
   static const String systemConfiguration = '/admin/settings';
   static const String resourcesManagement = '/admin/resources';
@@ -67,6 +68,7 @@ class AppRoutes {
       '/admin/access-requests',
       '/admin/documents',
       '/admin/translations/manage',
+      '/admin/translations/entry',
       '/admin/resources',
       '/admin/organization',
       '/admin/indicator_bank',

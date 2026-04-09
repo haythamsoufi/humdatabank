@@ -559,7 +559,8 @@
         </aside>
         {% endif %}
 
-        <div id="mainContent" class="flex-1 flex flex-col {% if is_admin_user %}content-with-sidebar{% endif %}">
+        {# min-w-0: flex item may otherwise refuse to shrink below wide page content (e.g. wide tables), forcing horizontal overflow of the shell #}
+        <div id="mainContent" class="flex-1 flex flex-col min-w-0 {% if is_admin_user %}content-with-sidebar{% endif %}">
             <nav class="{% if is_system_manager %}nav-system-manager{% elif is_focal_point %}nav-focal-point{% else %}bg-red-700{% endif %} px-4 text-white shadow-md sticky top-0 z-30 h-16 flex items-center">
                 <div id="navContainer" class="container mx-auto h-full flex justify-between items-center">
                     <div class="flex nav-menu-wrapper space-x-8 h-full items-center">
@@ -710,7 +711,7 @@
                 </div>
             </nav>
 
-            <main class="admin-scroll-main flex-1 overflow-x-hidden bg-gray-100" style="max-height: calc(100vh - 4rem); overflow-y: auto;">
+            <main class="admin-scroll-main flex-1 min-w-0 overflow-x-hidden bg-gray-100" style="max-height: calc(100vh - 4rem); overflow-y: auto;">
                 <div id="flashMessagesContainer" class="container mx-auto px-4 mt-4">
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
@@ -738,7 +739,7 @@
                         {% endif %}
                     {% endwith %}
                 </div>
-                <div id="pageContentContainer" class="container mx-auto px-6 py-6 max-w-full">
+                <div id="pageContentContainer" class="container mx-auto px-6 py-6 max-w-full min-w-0">
                     {# Before page inline scripts: AdminUnderlineTabs (class tokens match components/_scroll_tab_bar.html macros) #}
                     <script src="{{ static_url('js/admin/underline-tabs.js') }}"></script>
                     {% block content %}{% endblock %}

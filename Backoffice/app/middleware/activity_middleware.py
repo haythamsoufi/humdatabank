@@ -64,8 +64,12 @@ _SKIP_ENDPOINTS = frozenset([
     'ai_v2.list_conversations',
     # High-frequency mobile push heartbeat — noise for audit trail
     'notifications.device_heartbeat',
+    'mobile_api.device_heartbeat',
     # Mobile screen-view endpoint logs activity itself; skip the automatic path
     'mobile_api.screen_view',
+    # Admin UI polling / JSON helpers — noise for audit trail
+    'admin_analytics_api.session_logs_list_api',
+    'user_management.api_users_profile_summary',
 ])
 
 # Endpoint *prefixes* that produce only background noise
@@ -83,6 +87,7 @@ _SKIP_ENDPOINT_SUFFIXES = frozenset([
     'api_get_notification_count',
     'api_get_notification_preferences',
     'service_worker',
+    'device_heartbeat',
 ])
 
 

@@ -1,3 +1,4 @@
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 import '../services/jwt_token_service.dart';
@@ -61,6 +62,7 @@ class ScreenViewTracker {
     '/admin/access-requests': 'Access Requests',
     '/admin/documents': 'Document Management',
     '/admin/translations/manage': 'Translation Management',
+    '/admin/translations/entry': 'Translation Entry Detail',
     '/admin/resources': 'Resources Management',
     '/admin/organization': 'Organizational Structure',
     '/admin/indicator_bank': 'Indicator Bank Admin',
@@ -132,7 +134,7 @@ class ScreenViewTracker {
         'screen_class': screenClass,
       };
       await _api.post(
-        '/api/mobile/v1/analytics/screen-view',
+        AppConfig.mobileScreenViewEndpoint,
         body: body,
         queueOnOffline: false,
       );

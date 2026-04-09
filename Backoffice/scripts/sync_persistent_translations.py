@@ -236,8 +236,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Use stdout so Azure Log Stream does not color INFO as errors (stderr is red).
     logging.basicConfig(
         level=logging.INFO,
         format="[translations] %(message)s",
+        stream=sys.stdout,
     )
     main()

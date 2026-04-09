@@ -27,6 +27,7 @@ import '../screens/admin/admin_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/admin/document_management_screen.dart';
 import '../screens/admin/translation_management_screen.dart';
+import '../screens/admin/translation_entry_detail_screen.dart';
 import '../screens/admin/resources_management_screen.dart';
 import '../screens/admin/organizational_structure_screen.dart';
 import '../screens/admin/indicator_bank_admin_screen.dart';
@@ -228,6 +229,25 @@ class AppGoRouter {
               path: 'translations/manage',
               name: 'translationManagement',
               builder: (context, state) => const TranslationManagementScreen(),
+            ),
+            GoRoute(
+              path: 'translations/entry',
+              name: 'translationEntryDetail',
+              builder: (context, state) {
+                final extra = state.extra;
+                Map<String, dynamic>? map;
+                if (extra is Map<String, dynamic>) {
+                  map = extra;
+                } else if (extra is Map) {
+                  map = Map<String, dynamic>.from(extra);
+                }
+                if (map == null) {
+                  return const Scaffold(
+                    body: Center(child: Text('Missing translation data.')),
+                  );
+                }
+                return TranslationEntryDetailScreen(entry: map);
+              },
             ),
             GoRoute(
               path: 'resources',

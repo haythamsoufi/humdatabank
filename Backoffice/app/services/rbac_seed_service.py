@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 from app.extensions import db
 from app.models import User
 from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission, RbacUserRole
-from app.utils.transactions import atomic
+from app.utils.transactions import atomic, safe_remove
 
 
 def _permission_catalog() -> List[Tuple[str, str, str]]:
@@ -446,7 +446,9 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
         created_links = 0
         deleted_links = 0
 
-        with atomic(remove_session=True):
+        # Unlock must run on the same session that took the lock; atomic(remove_session=True)
+        # disposed the session before the outer finally could unlock (wrong connection).
+        with atomic(remove_session=False):
             # 1) Upsert permissions
             existing_perms = {
                 str(p.code): p
@@ -583,3 +585,4 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
                 db.session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": int(lock_key)})
             except Exception as e:
                 logger.debug("RBAC seed: pg_advisory_unlock failed: %s", e)
+        safe_remove(reason="rbac_seed")

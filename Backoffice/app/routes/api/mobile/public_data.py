@@ -2,15 +2,16 @@
 """Public data routes: country map, sectors, indicator bank, FDRS overview, quiz.
 
 Auth policy:
-  - Truly public (no login required): sectors-subsectors, indicator-bank,
-    indicator-suggestions, data/periods, data/fdrs-overview.
+  - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
+    indicator-suggestions, quiz/leaderboard, data/periods, data/fdrs-overview.
     Rate-limited to prevent abuse.
-  - Auth-required: countrymap (used by admin flows), quiz leaderboard/submit.
+  - Auth-required: quiz/submit-score (score is tied to the authenticated user).
 """
 
 from contextlib import suppress
 
 from flask import request, current_app
+from flask_login import current_user
 
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.mobile_auth import mobile_auth_required
@@ -18,13 +19,14 @@ from app.utils.rate_limiting import mobile_rate_limit
 from app import db
 from app.utils.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_server_error, mobile_paginated,
+    mobile_not_found,
 )
 from app.utils.sql_utils import safe_ilike_pattern
 from app.routes.api.mobile import mobile_bp
 
 
 @mobile_bp.route('/data/countrymap', methods=['GET'])
-@mobile_auth_required
+@mobile_rate_limit(requests_per_minute=60)
 def countrymap():
     """Country map data (mirrors /api/v1/countrymap)."""
     from app.models import Country
@@ -338,7 +340,7 @@ def submit_indicator_suggestion():
 
 
 @mobile_bp.route('/data/quiz/leaderboard', methods=['GET'])
-@mobile_auth_required
+@mobile_rate_limit(requests_per_minute=60)
 def quiz_leaderboard():
     """Quiz leaderboard (mirrors /api/v1/quiz/leaderboard)."""
     from app.models import QuizScore
@@ -527,16 +529,27 @@ def mobile_fdrs_overview():
 @mobile_bp.route('/data/quiz/submit-score', methods=['POST'])
 @mobile_auth_required
 def submit_quiz_score():
-    """Submit a quiz score (mirrors /api/v1/quiz/submit-score)."""
+    """Submit a quiz score (mirrors /api/v1/quiz/submit-score).
+
+    user_name is derived from the authenticated user so the client never
+    needs to send it — avoids the payload mismatch that caused all
+    submissions to return 400 when the client sent only {score}.
+    """
     from app.utils.api_helpers import get_json_safe
     from app.models import QuizScore
 
     data = get_json_safe()
-    user_name = (data.get('user_name') or '').strip()
     score = data.get('score')
+    if score is None:
+        return mobile_bad_request('score is required')
 
-    if not user_name or score is None:
-        return mobile_bad_request('user_name and score are required')
+    # Derive display name from the authenticated user; never trust a
+    # client-provided name for score attribution.
+    user_name = (
+        getattr(current_user, 'name', None)
+        or getattr(current_user, 'email', None)
+        or f'User {current_user.id}'
+    ).strip()
 
     try:
         quiz_score = QuizScore(

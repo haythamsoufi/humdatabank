@@ -9,9 +9,9 @@ from app.routes.api.mobile import mobile_bp
 
 
 @mobile_bp.route('/admin/org/branches/<int:country_id>', methods=['GET'])
-@mobile_auth_required
+@mobile_auth_required(permission='admin.organization.manage')
 def list_branches(country_id):
-    """List NS branches for a country."""
+    """List NS branches for a country (admin only — consistent with /admin/org/structure)."""
     from app.models import NSBranch
 
     branches = NSBranch.query.filter_by(country_id=country_id).order_by(NSBranch.name.asc()).all()
@@ -24,9 +24,9 @@ def list_branches(country_id):
 
 
 @mobile_bp.route('/admin/org/subbranches/<int:branch_id>', methods=['GET'])
-@mobile_auth_required
+@mobile_auth_required(permission='admin.organization.manage')
 def list_subbranches(branch_id):
-    """List NS sub-branches for a branch."""
+    """List NS sub-branches for a branch (admin only — consistent with /admin/org/structure)."""
     from app.models import NSSubBranch
 
     subbranches = NSSubBranch.query.filter_by(branch_id=branch_id).order_by(NSSubBranch.name.asc()).all()

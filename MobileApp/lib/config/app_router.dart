@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'routes.dart';
 import '../utils/constants.dart';
+import '../widgets/app_bar.dart';
 // Shared screens
 import '../screens/shared/splash_screen.dart';
 import '../screens/shared/login_screen.dart';
@@ -25,6 +26,7 @@ import '../screens/admin/admin_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/admin/document_management_screen.dart';
 import '../screens/admin/translation_management_screen.dart';
+import '../screens/admin/translation_entry_detail_screen.dart';
 import '../screens/admin/resources_management_screen.dart';
 import '../screens/admin/organizational_structure_screen.dart';
 import '../screens/admin/indicator_bank_admin_screen.dart';
@@ -119,6 +121,30 @@ class AppRouter {
       return MaterialPageRoute(
         settings: settings,
         builder: (context) => WebViewScreen(initialUrl: url),
+      );
+    }
+
+    if (settings.name == AppRoutes.translationEntryDetail) {
+      final args = settings.arguments;
+      Map<String, dynamic>? map;
+      if (args is Map<String, dynamic>) {
+        map = args;
+      } else if (args is Map) {
+        map = Map<String, dynamic>.from(args);
+      }
+      if (map != null) {
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (context) =>
+              TranslationEntryDetailScreen(entry: map!),
+        );
+      }
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (context) => Scaffold(
+          appBar: AppAppBar(title: 'Error'),
+          body: const Center(child: Text('Missing translation data.')),
+        ),
       );
     }
 

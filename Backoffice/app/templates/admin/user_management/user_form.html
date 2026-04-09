@@ -180,10 +180,57 @@
 
                     <div class="mb-4">
                         {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-                        {% if read_only %}
-                            {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Full Name", readonly=True, disabled=True) }}
+                        {% if form.profile_color is defined %}
+                        {% set _pc_init = (form.profile_color.data or '#3B82F6') %}
+                        <div class="flex items-center gap-2">
+                            {% if read_only %}
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center text-white text-xs font-semibold overflow-hidden" id="user-profile-color-preview" style="background-color: {{ _pc_init }};" aria-hidden="true">
+                                {% if user and user.name %}
+                                    {{ user.name.split() | map('first') | join('') | upper | truncate(2, true, '') }}
+                                {% elif user and user.email %}
+                                    {{ user.email.split('@')[0] | upper | truncate(2, true, '') }}
+                                {% else %}
+                                    ?
+                                {% endif %}
+                            </div>
+                            {{ form.profile_color(type="hidden") }}
+                            {% else %}
+                            <button type="button"
+                                    id="user-profile-color-open"
+                                    class="flex-shrink-0 p-0 border-0 bg-transparent rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                    title="{{ _('Choose profile colour') }}"
+                                    aria-haspopup="dialog"
+                                    aria-expanded="false"
+                                    aria-controls="user-profile-color-modal">
+                                <span id="user-profile-color-preview" class="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center text-white text-xs font-semibold overflow-hidden pointer-events-none" style="background-color: {{ _pc_init }};">
+                                    {% if user and user.name %}
+                                        {{ user.name.split() | map('first') | join('') | upper | truncate(2, true, '') }}
+                                    {% elif user and user.email %}
+                                        {{ user.email.split('@')[0] | upper | truncate(2, true, '') }}
+                                    {% else %}
+                                        ?
+                                    {% endif %}
+                                </span>
+                            </button>
+                            {{ form.profile_color(type="hidden", id="user_profile_color_input") }}
+                            {% endif %}
+                            <div class="flex-1 min-w-0">
+                                {% if read_only %}
+                                    {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", id="user_form_name", placeholder="Full Name", readonly=True, disabled=True) }}
+                                {% else %}
+                                    {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", id="user_form_name", placeholder="Full Name") }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% for error in form.profile_color.errors %}
+                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
                         {% else %}
-                            {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Full Name") }}
+                        {% if read_only %}
+                            {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", id="user_form_name", placeholder="Full Name", readonly=True, disabled=True) }}
+                        {% else %}
+                            {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", id="user_form_name", placeholder="Full Name") }}
+                        {% endif %}
                         {% endif %}
                         {% for error in form.name.errors %}
                             <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
@@ -3086,4 +3133,110 @@
     });
 </script>
 <script src="{{ static_url('js/hierarchical-entity-selector.js') }}"></script>
+
+{% if not read_only and form.profile_color is defined %}
+{# Profile colour picker modal — rendered at body level so fixed positioning is never clipped #}
+<div id="user-profile-color-modal"
+     role="dialog" aria-modal="true" aria-labelledby="user-profile-color-modal-title"
+     style="display:none; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; padding:1rem;">
+    <div data-user-profile-color-dismiss="1"
+         aria-hidden="true"
+         style="position:absolute; inset:0; background:rgba(0,0,0,0.45); cursor:default;"></div>
+    <div style="position:relative; background:#fff; border-radius:0.5rem; box-shadow:0 20px 60px rgba(0,0,0,0.25); border:1px solid #e5e7eb; width:100%; max-width:320px; padding:1.25rem; z-index:1;">
+        <h3 id="user-profile-color-modal-title"
+            style="margin:0 0 1rem 0; font-size:0.9375rem; font-weight:600; color:#111827;">
+            {{ _('Choose profile colour') }}
+        </h3>
+        <div id="user-profile-color-grid"
+             style="display:grid; grid-template-columns:repeat(6,1fr); gap:0.5rem; margin-bottom:1rem;">
+            {% for hex in profile_palette_hexes|default([], true) %}
+            <button type="button"
+                    class="user-profile-color-swatch"
+                    data-hex="{{ hex }}"
+                    title="{{ hex }}"
+                    aria-label="{{ _('Select colour') }} {{ hex }}"
+                    style="background-color:{{ hex }}; width:100%; padding-bottom:100%; border-radius:0.375rem; border:2px solid #e5e7eb; cursor:pointer; position:relative; display:block;"></button>
+            {% endfor %}
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" data-user-profile-color-dismiss="1">{{ _('Close') }}</button>
+    </div>
+</div>
+<style nonce="{{ csp_nonce() }}">
+.user-profile-color-swatch:hover { border-color: #6b7280 !important; }
+.user-profile-color-swatch:focus { outline: none; border-color: #3b82f6 !important; box-shadow: 0 0 0 2px #bfdbfe; }
+.user-profile-color-swatch.is-selected { border-color: #1d4ed8 !important; box-shadow: 0 0 0 2px #93c5fd; }
+</style>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var modal   = document.getElementById('user-profile-color-modal');
+    var openBtn = document.getElementById('user-profile-color-open');
+    var hidden  = document.getElementById('user_profile_color_input');
+    var preview = document.getElementById('user-profile-color-preview');
+    var nameInput = document.getElementById('user_form_name');
+    if (!modal || !openBtn || !hidden || !preview) return;
+
+    function initialsFromName(name) {
+        name = (name || '').trim();
+        if (!name) return '?';
+        var parts = name.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+            return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase().slice(0, 2);
+        }
+        return name.slice(0, 2).toUpperCase();
+    }
+
+    function syncPreview() {
+        var v = (hidden.value || '#3B82F6').trim();
+        preview.style.backgroundColor = v;
+        modal.querySelectorAll('.user-profile-color-swatch').forEach(function (btn) {
+            var active = (btn.getAttribute('data-hex') || '').toLowerCase() === v.toLowerCase();
+            btn.classList.toggle('is-selected', active);
+        });
+    }
+
+    function openModal() {
+        modal.style.display = 'flex';
+        openBtn.setAttribute('aria-expanded', 'true');
+        syncPreview();
+        var sel = modal.querySelector('.user-profile-color-swatch.is-selected') ||
+                  modal.querySelector('.user-profile-color-swatch');
+        if (sel) sel.focus();
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+        openBtn.setAttribute('aria-expanded', 'false');
+        openBtn.focus();
+    }
+
+    openBtn.addEventListener('click', openModal);
+
+    modal.querySelectorAll('[data-user-profile-color-dismiss="1"]').forEach(function (el) {
+        el.addEventListener('click', closeModal);
+    });
+
+    modal.querySelectorAll('.user-profile-color-swatch').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var hex = (btn.getAttribute('data-hex') || '').trim();
+            if (!hex) return;
+            hidden.value = hex;
+            syncPreview();
+            closeModal();
+        });
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+    });
+
+    if (nameInput) {
+        nameInput.addEventListener('input', function () {
+            preview.textContent = initialsFromName(nameInput.value);
+        });
+    }
+
+    syncPreview();
+})();
+</script>
+{% endif %}
 {% endblock %}

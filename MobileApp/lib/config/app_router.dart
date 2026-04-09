@@ -141,9 +141,9 @@ class AppRouter {
       }
       return MaterialPageRoute<void>(
         settings: settings,
-        builder: (context) => Scaffold(
+        builder: (context) => const Scaffold(
           appBar: AppAppBar(title: 'Error'),
-          body: const Center(child: Text('Missing translation data.')),
+          body: Center(child: Text('Missing translation data.')),
         ),
       );
     }

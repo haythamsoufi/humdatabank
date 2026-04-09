@@ -658,7 +658,7 @@ class _TranslationSourcePathFieldState extends State<_TranslationSourcePathField
                         primary: false,
                         physics: const ClampingScrollPhysics(),
                         itemCount: filtered.length,
-                        separatorBuilder: (_, __) => Divider(
+                        separatorBuilder: (_, _) => Divider(
                           height: 1,
                           thickness: 1,
                           color: context.borderColor.withValues(alpha: 0.35),

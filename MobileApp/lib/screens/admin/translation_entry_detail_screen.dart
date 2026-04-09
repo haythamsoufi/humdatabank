@@ -79,7 +79,7 @@ class TranslationEntryDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               SelectableText(
-                rawSource!,
+                rawSource,
                 style: TextStyle(
                   fontSize: 13,
                   color: context.textSecondaryColor,

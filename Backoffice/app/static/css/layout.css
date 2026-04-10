@@ -16,7 +16,7 @@ html, body {
 
 /* Desktop Sidebar Styles */
 .admin-sidebar {
-    width: 270px;
+    width: 240px;
     transition: width 0.3s ease-in-out, transform 0.3s ease-in-out;
     z-index: 40;
     overflow-x: hidden;
@@ -26,7 +26,7 @@ html, body {
 }
 
 .admin-sidebar.collapsed {
-    width: 80px;
+    width: 72px;
 }
 
 .admin-sidebar.collapsed #sidebarToggle {
@@ -74,14 +74,20 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem !important;
+    height: 1.75rem !important;
 }
 
 .admin-sidebar.collapsed .sidebar-icon svg {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.35rem !important;
+    height: 1.35rem !important;
     color: currentColor;
+}
+
+.admin-sidebar.collapsed .sidebar-item-container > i.sidebar-icon,
+.admin-sidebar.collapsed .sidebar-item-container i.fas.sidebar-icon {
+    font-size: 1.1rem;
+    width: 1.35rem !important;
 }
 
 .admin-sidebar.collapsed .sidebar-item-container {
@@ -93,7 +99,7 @@ html, body {
 .admin-sidebar .sidebar-item-container {
     display: flex;
     align-items: center;
-    font-size: 0.95rem;
+    font-size: 0.875rem;
 }
 
 .admin-sidebar .sidebar-item-container .sidebar-text {
@@ -105,10 +111,24 @@ html, body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    margin-right: 0.625rem;
 }
 
 .admin-sidebar .sidebar-icon svg {
     color: currentColor;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+}
+
+/* FontAwesome icon sizing in sidebar (fa-* icons via <i> tags) */
+.admin-sidebar .sidebar-item-container > i.sidebar-icon,
+.admin-sidebar .sidebar-item-container i.fas.sidebar-icon {
+    font-size: 1.1rem;
+    width: 1.25rem !important;
+    height: auto !important;
+    text-align: center;
 }
 
 .admin-sidebar .sidebar-item-container.active {
@@ -136,12 +156,12 @@ html, body {
 
 /* Main Content Margins for Desktop Sidebar */
 #mainContent.content-with-sidebar {
-    margin-left: 270px;
+    margin-left: 240px;
     transition: margin-left 0.3s ease-in-out;
 }
 
 #mainContent.content-with-collapsed-sidebar {
-    margin-left: 80px;
+    margin-left: 72px;
     transition: margin-left 0.3s ease-in-out;
 }
 
@@ -364,15 +384,15 @@ html, body {
     align-items: center;
     justify-content: space-between;
     cursor: pointer;
-    padding: 0.625rem 1rem;
+    padding: 0.5rem 0.75rem;
     border-radius: 0.375rem;
     transition: background-color 0.2s ease-in-out;
     color: #a0aec0;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
 }
 
 .collapsable-category-title:hover {
@@ -601,9 +621,9 @@ nav[class*="nav-"] {
 
 /* Organization Logo */
 .org-logo-img {
-    height: 3rem;
+    height: 2.25rem;
     width: auto;
-    margin-right: 1rem;
+    margin-right: 0.75rem;
 }
 
 /* Organization logo placeholder (shown when no logo image is configured or fails to load) */
@@ -867,23 +887,23 @@ nav .relative {
 
 /* Prevent sidebar flicker by applying collapsed state immediately */
 .sidebar-initially-collapsed .admin-sidebar {
-    width: 80px;
+    width: 72px;
 }
 
 /* Apply initial collapsed margin only when an admin sidebar exists */
 .sidebar-initially-collapsed .admin-sidebar + #mainContent {
-    margin-left: 80px;
+    margin-left: 72px;
 }
 
 /* Ensure floating buttons don't overlap collapsed admin sidebar */
 /* This applies to all screen sizes where admin sidebar is visible */
 .content-with-collapsed-sidebar #mobile-nav-toggle-button,
 .content-with-collapsed-sidebar #sidebar-expand-button {
-    left: 104px !important; /* 80px (collapsed sidebar) + 24px spacing */
+    left: 96px !important; /* 72px (collapsed sidebar) + 24px spacing */
 }
 
 .content-with-collapsed-sidebar #fab-menu {
-    left: 104px !important; /* 80px (collapsed sidebar) + 24px spacing */
+    left: 96px !important; /* 72px (collapsed sidebar) + 24px spacing */
 }
 
 .sidebar-initially-collapsed .sidebar-text,
@@ -902,13 +922,13 @@ nav .relative {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem !important;
+    height: 1.75rem !important;
 }
 
 .sidebar-initially-collapsed .sidebar-icon svg {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.35rem !important;
+    height: 1.35rem !important;
     color: currentColor;
 }
 

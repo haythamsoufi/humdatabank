@@ -291,7 +291,7 @@ jobs:
           EXPECTED_APP_NAME: ${{ steps.config.outputs.app_name }}
         run: |
           python3 << 'EOF'
-          import os, sys, xml.etree.ElementTree as ET, urllib.request, urllib.error, base64
+          import os, sys, time, xml.etree.ElementTree as ET, urllib.request, urllib.error, base64
 
           profile_xml = os.environ["PUBLISH_PROFILE"]
           expected_app = os.environ["EXPECTED_APP_NAME"]
@@ -323,27 +323,67 @@ jobs:
               print(f"ERROR: SCM host '{scm_host}' does not match expected app '{expected_app}'.")
               sys.exit(1)
 
-          url = f"https://{scm_host}/api/app/restart"
+          restart_url = f"https://{scm_host}/api/app/restart"
           token = base64.b64encode(f"{username}:{password}".encode()).decode()
           req = urllib.request.Request(
-              url,
+              restart_url,
               data=b"",
               method="POST",
               headers={"Authorization": f"Basic {token}"},
           )
           try:
               with urllib.request.urlopen(req, timeout=120) as resp:
-                  print(f"Kudu restart returned HTTP {resp.status}")
+                  code = resp.status
           except urllib.error.HTTPError as e:
-              print(f"ERROR: HTTP {e.code} from {url} — {e.reason}")
+              print(f"ERROR: HTTP {e.code} from {restart_url} — {e.reason}")
               if e.fp:
                   body = e.fp.read().decode(errors="replace")[:2000]
                   if body.strip():
                       print(body)
               sys.exit(1)
           except urllib.error.URLError as e:
-              print(f"ERROR: Could not reach {url}: {e.reason}")
+              print(f"ERROR: Could not reach {restart_url}: {e.reason}")
               sys.exit(1)
 
-          print("OK: Restart requested via Kudu /api/app/restart")
+          # 202 Accepted = restart queued (async). 200 also possible. Neither proves the app is up yet.
+          if code == 202:
+              print(
+                  "Kudu returned HTTP 202 Accepted: restart was queued (asynchronous). "
+                  "Verifying the public site responds next."
+              )
+          else:
+              print(f"Kudu returned HTTP {code}. Verifying the public site responds.")
+
+          health_url = f"https://{expected_app}.azurewebsites.net/health"
+          max_attempts = 36
+          interval_sec = 5
+          user_agent = "NGO-Databank-deploy-verify/1.0"
+
+          for attempt in range(1, max_attempts + 1):
+              try:
+                  hreq = urllib.request.Request(
+                      health_url,
+                      method="GET",
+                      headers={"User-Agent": user_agent, "Cache-Control": "no-cache"},
+                  )
+                  with urllib.request.urlopen(hreq, timeout=30) as hresp:
+                      if hresp.status == 200:
+                          print(
+                              f"OK: App is reachable after restart (GET {health_url} -> HTTP 200, "
+                              f"attempt {attempt}/{max_attempts})."
+                          )
+                          sys.exit(0)
+              except urllib.error.HTTPError as e:
+                  print(f"  Health check attempt {attempt}/{max_attempts}: HTTP {e.code} (container may still be starting)")
+              except urllib.error.URLError as e:
+                  print(f"  Health check attempt {attempt}/{max_attempts}: not reachable ({e.reason})")
+
+              if attempt < max_attempts:
+                  time.sleep(interval_sec)
+
+          print(
+              f"ERROR: Timed out after {max_attempts * interval_sec}s waiting for {health_url} to return HTTP 200. "
+              "The restart may still be in progress; check Azure Portal / app logs."
+          )
+          sys.exit(1)
           EOF

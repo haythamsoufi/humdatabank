@@ -561,7 +561,7 @@
 
         {# min-w-0: flex item may otherwise refuse to shrink below wide page content (e.g. wide tables), forcing horizontal overflow of the shell #}
         <div id="mainContent" class="flex-1 flex flex-col min-w-0 {% if is_admin_user %}content-with-sidebar{% endif %}">
-            <nav class="{% if is_system_manager %}nav-system-manager{% elif is_focal_point %}nav-focal-point{% else %}bg-red-700{% endif %} px-4 text-white shadow-md sticky top-0 z-30 h-16 flex items-center">
+            <nav class="{% if is_system_manager %}nav-system-manager{% elif is_focal_point %}nav-focal-point{% else %}bg-red-700{% endif %} px-4 text-white shadow-md sticky top-0 z-30 h-14 flex items-center">
                 <div id="navContainer" class="container mx-auto h-full flex justify-between items-center">
                     <div class="flex nav-menu-wrapper space-x-8 h-full items-center">
                         <div class="flex items-center min-w-0 flex-1 nav-brand-cluster">
@@ -570,7 +570,7 @@
                             <img src="{{ static_url(_nav_logo) }}" alt="{{ ORG_NAME }} Logo" class="org-logo-img" data-hide-on-error="true" data-show-next-on-error="flex">
                             {% endif %}
                             <span class="org-logo-placeholder" {% if _nav_logo %}style="display:none"{% endif %} aria-hidden="true">{{ (ORG_SHORT_NAME or ORG_NAME or 'DB')[:2] | upper }}</span>
-                            <a href="{{ url_for('admin.admin_dashboard') if is_admin_user else url_for('main.dashboard') }}" class="nav-brand-title min-w-0 text-2xl font-semibold text-white font-sans tracking-tight">{{ ORG_NAME }}</a>
+                            <a href="{{ url_for('admin.admin_dashboard') if is_admin_user else url_for('main.dashboard') }}" class="nav-brand-title min-w-0 text-xl font-semibold text-white font-sans tracking-tight">{{ ORG_NAME }}</a>
                             {% if is_system_manager %}
                             <span class="system-manager-badge ml-3 px-2.5 py-1 text-xs font-medium rounded-md text-blue-300" title="{{ _('System Manager') }}" aria-label="{{ _('System Manager') }}">
                                 <i class="fas fa-shield-alt system-manager-icon" aria-hidden="true"></i>
@@ -711,7 +711,7 @@
                 </div>
             </nav>
 
-            <main class="admin-scroll-main flex-1 min-w-0 overflow-x-hidden bg-gray-100" style="max-height: calc(100vh - 4rem); overflow-y: auto;">
+            <main class="admin-scroll-main flex-1 min-w-0 overflow-x-hidden bg-gray-100" style="max-height: calc(100vh - 3.5rem); overflow-y: auto;">
                 <div id="flashMessagesContainer" class="container mx-auto px-4 mt-4">
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}

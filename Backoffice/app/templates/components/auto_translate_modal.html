@@ -28,6 +28,14 @@ Usage:
         color: #9ca3af;
         font-style: italic;
     }
+    /* .btn forces 13px font-size and shrinks the ×; use btn-close-icon only + explicit size */
+    #close-auto-translate-modal-btn {
+        font-size: 1.5rem;
+        font-weight: 300;
+        padding: 0.5rem;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
 </style>
 <div id="auto-translate-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform transition-all">
@@ -49,7 +57,7 @@ Usage:
                     {% endif %}
                 </p>
             </div>
-            <button type="button" id="close-auto-translate-modal-btn" class="btn btn-close-icon text-2xl leading-none" aria-label="{{ _('Close') }}">&times;</button>
+            <button type="button" id="close-auto-translate-modal-btn" class="btn-close-icon" aria-label="{{ _('Close') }}">&times;</button>
         </div>
 
         <!-- Confirmation Section -->

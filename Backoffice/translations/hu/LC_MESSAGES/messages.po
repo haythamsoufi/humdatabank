@@ -955,3 +955,1083 @@ msgstr "itt jelenik meg"
 
 msgid "yet."
 msgstr "Még nem."
+
+msgid "Action"
+msgstr "Akció"
+
+msgid "Activate"
+msgstr "Aktiválás"
+
+msgid "Active"
+msgstr "Aktív"
+
+msgid "Active Keys"
+msgstr "Aktív kulcsok"
+
+msgid "Active Only"
+msgstr "Csak aktív"
+
+msgid "Active Plugins"
+msgstr "Aktív pluginek"
+
+msgid "Active Public"
+msgstr "Aktív közönség"
+
+msgid "Active Threads"
+msgstr "Aktív szálak"
+
+msgid "Activities"
+msgstr "Tevékenységek"
+
+msgid "Activity"
+msgstr "Tevékenység"
+
+msgid "Activity Type"
+msgstr "Tevékenység típusa"
+
+msgid "Add"
+msgstr "Add"
+
+msgid "Add All"
+msgstr "Add össze"
+
+msgid "Add Another Document"
+msgstr "Hozzáadj egy másik dokumentumot"
+
+msgid "Add Category"
+msgstr "Kategória hozzáadása"
+
+msgid "Add Entry"
+msgstr "Bejegyzés hozzáadása"
+
+msgid "Add Filter"
+msgstr "Szűrő hozzáadása"
+
+msgid "Add Group"
+msgstr "Add Group"
+
+msgid "Add Indicator"
+msgstr "Add Indicator"
+
+msgid "Add Item"
+msgstr "Tétel hozzáadása"
+
+msgid "Add Item to Sub-section"
+msgstr "Tétel hozzáadása az alszakaszhoz"
+
+msgid "Add New Branch"
+msgstr "Új fiók hozzáadása"
+
+msgid "Add New Cluster Office"
+msgstr "Új klaszter iroda hozzáadása"
+
+msgid "Add New Country"
+msgstr "Add hozzá az új country"
+
+msgid "Add New Department"
+msgstr "Új osztály hozzáadása"
+
+msgid "Add New Division"
+msgstr "Új divízió hozzáadása"
+
+msgid "Add New Indicator"
+msgstr "Új jelző hozzáadása"
+
+msgid "Add New Local Unit"
+msgstr "Új helyi egység hozzáadása"
+
+msgid "Add New Regional Office"
+msgstr "Új regionális iroda hozzáadása"
+
+msgid "Add New Sector"
+msgstr "Új szektor hozzáadása"
+
+msgid "Add New Sub-Branch"
+msgstr "Új alágazat hozzáadása"
+
+msgid "Add New Sub-Sector"
+msgstr "Új alszektor hozzáadása"
+
+msgid "Add New User"
+msgstr "Új felhasználó hozzáadása"
+
+msgid "Add New Version"
+msgstr "Új verzió hozzáadása"
+
+msgid "Add Option"
+msgstr "Hozzáadási lehetőség"
+
+msgid "Add Page"
+msgstr "Oldal hozzáadása"
+
+msgid "Add Relevance Rule"
+msgstr "Relevancia hozzáadása szabály"
+
+msgid "Add Section"
+msgstr "Add Section"
+
+msgid "Add Sector"
+msgstr "Add szektor"
+
+msgid "Add Selected"
+msgstr "Kiválasztottak hozzáadása"
+
+msgid "Add Subsection"
+msgstr "Alszakasz hozzáadása"
+
+msgid "Add Subsector"
+msgstr "Alszektor hozzáadása"
+
+msgid "Add Type"
+msgstr "Add hozzá a típus"
+
+msgid "Add Validation Rule"
+msgstr "Validációs szabály hozzáadása"
+
+msgid "Add Variable"
+msgstr "Változó hozzáadása"
+
+msgid "Add entities by"
+msgstr "Entitások hozzáadása"
+
+msgid "Add item to"
+msgstr "Tétel hozzáadása"
+
+msgid "Add translations"
+msgstr "Fordítások hozzáadása"
+
+msgid ""
+"Add translations for organization name and short name in different "
+"languages. The English values can be edited in the main fields above."
+msgstr ""
+"Különböző nyelveken adj hozzá fordításokat a szervezet nevéhez és a rövid "
+"névhez. Az angol értékek a fent említett fő mezőkben szerkeszthetők."
+
+msgid ""
+"Add translations for this section name in different languages. You can also "
+"override the English text here if needed."
+msgstr ""
+"Különböző nyelveken adj fordításokat ennek a szakasznévnek. Szükség esetén "
+"az angol szöveget is felülírhatod itt."
+
+msgid ""
+"Add translations for this template name in different languages. You can also"
+" override the English text here if needed."
+msgstr ""
+"Különböző nyelveken adj hozzá fordításokat ehhez a sablonnévhez. Szükség "
+"esetén az angol szöveget is felülírhatod itt."
+
+msgid "Added"
+msgstr "Hozzáadva"
+
+msgid "Added %(count)d field in %(template)s"
+msgstr "Hozzáadva az %(count)d mezőt az %(template)s-be"
+
+msgid "Added to country team"
+msgstr "Hozzáadva az országos csapathoz"
+
+msgid "Adding drag highlight"
+msgstr "Drag kiemelés hozzáadása"
+
+msgid "Additional Warnings:"
+msgstr "További figyelmeztetések:"
+
+msgid "Additional actions"
+msgstr "További intézkedések"
+
+msgid "Add…"
+msgstr "Add hozzá..."
+
+msgid "Admin"
+msgstr "Admin"
+
+msgid "Admin %(action)s %(target)s"
+msgstr "Admin %(action)s %(target)s"
+
+msgid "Admin (Multiple)"
+msgstr "Admin (többszörös)"
+
+msgid "Admin +"
+msgstr "Admin +"
+
+msgid "Admin Dashboard"
+msgstr "Admin Dashboard"
+
+msgid "Admin Message"
+msgstr "Admin üzenet"
+
+msgid "Admin Notification (New Suggestion)"
+msgstr "Admin értesítés (új javaslat)"
+
+msgid "Admin Panel"
+msgstr "Admin Panel"
+
+msgid "Admin Screens"
+msgstr "Admin képernyők"
+
+msgid ""
+"Admin sidebar groups can be expanded or collapsed, and the state persists "
+"across visits. You have access to user management, form templates, "
+"assignments, and more."
+msgstr ""
+"Az adminisztratív oldalsáv csoportok bővíthetők vagy összeomlhatók, és az "
+"állapot a látogatások során is fennmarad. Hozzáférsz a "
+"felhasználókezeléshez, űrlapsablonokhoz, feladatokhoz és még sok máshoz."
+
+msgid "Adult Literacy"
+msgstr "Felnőtt írástudás"
+
+msgid "Advanced Options"
+msgstr "Fejlett opciók"
+
+msgid "After"
+msgstr "Utána"
+
+msgid "After importing, click \"Compile Translations\" to apply changes."
+msgstr ""
+"Az importálás után kattintson a \"Fordítások fordítása\" gombra a "
+"változtatások alkalmazásához."
+
+msgid ""
+"After this date the assignment will be treated as Closed. Leave empty for no"
+" automatic closure."
+msgstr ""
+"Ezután a beosztást lezártként kezelik. Hagyj üresen, hogy ne zárj "
+"automatikusan."
+
+msgid "Age"
+msgstr "Életkor"
+
+msgid "Age Groups"
+msgstr "Korcsoportok"
+
+msgid "Age Groups (comma-separated)"
+msgstr "Korcsoportok (vesszővel elválasztva)"
+
+msgid "Alert"
+msgstr "Riasztás"
+
+msgid "Alerts"
+msgstr "Riasztások"
+
+msgid "All"
+msgstr "Mind"
+
+msgid "All AI chats deleted"
+msgstr "Minden AI csevegés törölve"
+
+msgid "All Categories"
+msgstr "Minden kategória"
+
+msgid "All Countries"
+msgstr "Minden ország"
+
+msgid "All Divisions"
+msgstr "Minden osztály"
+
+msgid "All Endpoints"
+msgstr "Minden végpont"
+
+msgid "All Entity Types"
+msgstr "Minden entitástípus"
+
+msgid "All Form Items"
+msgstr "Minden űrlap tárgy"
+
+msgid "All Indicators"
+msgstr "Minden jelző"
+
+msgid "All Keys"
+msgstr "Minden kulcs"
+
+msgid "All Levels"
+msgstr "Minden szint"
+
+msgid "All Months"
+msgstr "Minden hónap"
+
+msgid "All Notifications"
+msgstr "Minden értesítés"
+
+msgid "All Periods"
+msgstr "Minden időszak"
+
+msgid "All Public Submissions"
+msgstr "Minden nyilvános beküldés"
+
+msgid "All Sources"
+msgstr "Minden forrás"
+
+msgid "All Status"
+msgstr "Minden állapot"
+
+msgid "All Statuses"
+msgstr "Minden státusz"
+
+msgid "All Templates"
+msgstr "Minden sablon"
+
+msgid "All Types"
+msgstr "Minden típus"
+
+msgid "All Units"
+msgstr "Minden egység"
+
+msgid "All Years"
+msgstr "Minden évek"
+
+msgid "All Years View"
+msgstr "Minden évfolyam nézete"
+
+msgid "All categories"
+msgstr "Minden kategória"
+
+msgid "All languages"
+msgstr "Minden nyelv"
+
+msgid "All monitoring logs cleared successfully."
+msgstr "Minden megfigyelő napló sikeresen törölődött."
+
+msgid ""
+"All new country access requests are being automatically approved without "
+"admin review. Contact a system administrator to change this setting."
+msgstr ""
+"Minden új országos hozzáférési kérelmet automatikusan jóváhagynak "
+"adminisztrátor ellenőrzés nélkül. Vegye fel a kapcsolatot egy "
+"rendszergazdál, hogy megváltoztasd ezt a beállítást."
+
+msgid "All of the following will be permanently deleted:"
+msgstr "Az alábbiakat véglegesen töröljük:"
+
+msgid "All placeholders from the original text must be preserved."
+msgstr "Az eredeti szövegből származó összes helyjelzőt meg kell őrizni."
+
+msgid "All plugins reloaded successfully"
+msgstr "Minden plugin sikeresen újratöltődött"
+
+msgid "All rights reserved."
+msgstr "Minden jog fenntartva."
+
+msgid "All statuses"
+msgstr "Minden státusz"
+
+msgid "All time"
+msgstr "Minden idők"
+
+msgid "All types"
+msgstr "Minden típus"
+
+msgid "Allow \"Data not available\" option"
+msgstr "Engedélyezd a \"Data nem elérhető\" opciót"
+
+msgid "Allow \"Not applicable\" option"
+msgstr "Engedélyezd a \"Nem alkalmazható\" opciót"
+
+msgid "Allow Self-Reporting"
+msgstr "Engedélyezd az önbejelentést"
+
+msgid "Allow Self-Reporting (Add to Dashboard Dropdown)"
+msgstr ""
+"Engedélyezd az önjelentést (Add hozzá a dashboard legördülő menüjéhez)"
+
+msgid "Allow clearing existing translations (dangerous)"
+msgstr "Engedélyezd a meglévő fordítások törlését (veszélyes)"
+
+msgid "Allow users to upload documents (e.g. PDFs). Optional type and period."
+msgstr ""
+"Lehetővé teszi a felhasználók számára, hogy dokumentumokat (pl. PDF-eket) "
+"töltsenek fel. Opcionális típus és időszak."
+
+msgid "Allowed"
+msgstr "Engedélyezett"
+
+msgid "Allowed Users"
+msgstr "Engedélyezett felhasználók"
+
+msgid "Allowed period types:"
+msgstr "Engedélyezett menstruációs típusok:"
+
+msgid "Allowed types: PDF, Word, Excel, PowerPoint, Text"
+msgstr "Engedélyezett típusok: PDF, Word, Excel, PowerPoint, Text"
+
+msgid "Already have an account?"
+msgstr "Már van fiókod?"
+
+msgid "Already imported"
+msgstr "Már behozott"
+
+msgid "Also:"
+msgstr "Továbbá:"
+
+msgid "An account with this email already exists."
+msgstr "Már létezik egy fiók ezzel az e-mail címmel."
+
+msgid ""
+"An assignment already exists for this template and period (ID %(id)s). "
+"Confirm to create a duplicate, or edit/reactivate the existing one instead."
+msgstr ""
+"Már létezik egy hozzárendelés erre a sablonra és időszakra (azonosító: "
+"%(id)s). Erősítsd meg, hogy létrehozz egy másolatot, vagy inkább "
+"szerkeszted/aktiváld újra a meglévőt."
+
+msgid "An error occurred while loading compliance data"
+msgstr "Hiba történt megfelelőségi adatok betöltése közben"
+
+msgid "An error occurred while loading data"
+msgstr "Hiba történt adatbetöltéskor"
+
+msgid ""
+"An error occurred while updating your account settings. Please try again."
+msgstr ""
+"Hiba történt a fiókbeállítások frissítése közben. Kérlek, próbáld meg újra."
+
+msgid "An error occurred. Please try again."
+msgstr "Hiba történt. Kérlek, próbáld meg újra."
+
+msgid "Analysis"
+msgstr "Elemzés"
+
+msgid "Analysis Mode"
+msgstr "Elemzési mód"
+
+msgid "Analytics"
+msgstr "Elemzés"
+
+msgid "Analytics & Monitoring"
+msgstr "Elemzés és monitoring"
+
+msgid "Analyzer Runtime"
+msgstr "Analyzer Runtime"
+
+msgid "Analyzing data..."
+msgstr "Adatok elemzése..."
+
+msgid "Analyzing your question step by step."
+msgstr "Lépésről lépésre elemezem a kérdésedet."
+
+msgid "Annotation"
+msgstr "Megjegyzések"
+
+msgid "Annual Report"
+msgstr "Éves jelentés"
+
+msgid "Answer"
+msgstr "Válasz"
+
+msgid "Answer Value"
+msgstr "Válaszérték"
+
+msgid "Any file up to 10MB"
+msgstr "Bármilyen fájl legfeljebb 10MB-ig"
+
+msgid "Any value is allowed (suggestions come from existing assignments)."
+msgstr ""
+"Bármilyen érték megengedett (a javaslatok meglévő feladatokból származnak)."
+
+msgid "App Screen"
+msgstr "App Screen"
+
+msgid "Applicable but data not available"
+msgstr "Alkalmazható, de nem elérhető adatok"
+
+msgid "Application"
+msgstr "Alkalmazás"
+
+msgid "Application Log"
+msgstr "Alkalmazásnapló"
+
+msgid "Apply"
+msgstr "Jelentkezz"
+
+msgid "Apply Filter"
+msgstr "Apply Filter"
+
+msgid "Apply Filters"
+msgstr "Szűrők alkalmazása"
+
+msgid "Apply as imputed value"
+msgstr "Alkalmazzunk befektetett értékként"
+
+msgid "Approve"
+msgstr "Jóváhagyás"
+
+msgid "Approve All"
+msgstr "Mindet jóváhagyom"
+
+msgid "Approve Document"
+msgstr "Dokumentum jóváhagyása"
+
+msgid "Approved"
+msgstr "Jóváhagyva"
+
+msgid "Approver"
+msgstr "Jóváhagyó"
+
+msgid "Apr"
+msgstr "Apr"
+
+msgid "Archive"
+msgstr "Archívum"
+
+msgid "Archived"
+msgstr "Archiválva"
+
+msgid "Archived Hidden"
+msgstr "Archiválva Rejtett"
+
+msgid "Archived version: all edits and additions are disabled"
+msgstr "Archivált változat: minden szerkesztés és kiegészítés le van tiltva"
+
+msgid "Are you sure you want to activate the plugin \"%(plugin)s\"?"
+msgstr "Biztos vagy benne, hogy aktiválni akarod az \"%(plugin)s\" plugint?"
+
+msgid "Are you sure you want to approve all pending requests?"
+msgstr "Biztos vagy benne, hogy minden függőben lévő kérést jóváhagynál?"
+
+msgid "Are you sure you want to archive this indicator?"
+msgstr "Biztos vagy benne, hogy ezt a jelzőt archiválni akarod?"
+
+msgid ""
+"Are you sure you want to clear all monitoring logs? This action cannot be "
+"undone."
+msgstr ""
+"Biztos vagy benne, hogy minden megfigyelési naplót törölni akarsz? Ezt a "
+"lépést nem lehet visszavonni."
+
+msgid ""
+"Are you sure you want to clear all translation fields except English? This "
+"action cannot be undone."
+msgstr ""
+"Biztos vagy benne, hogy minden fordítási területet szeretnél áttörni, kivéve"
+" az angolt? Ezt a lépést nem lehet visszavonni."
+
+msgid ""
+"Are you sure you want to clear the entire conversation? This action cannot "
+"be undone."
+msgstr ""
+"Biztos vagy benne, hogy az egész beszélgetést tisztázni akarod? Ezt a lépést"
+" nem lehet visszavonni."
+
+msgid ""
+"Are you sure you want to deactivate the plugin \"%(plugin)s\"? This will "
+"temporarily disable it but keep all data intact."
+msgstr ""
+"Biztos vagy benne, hogy ki akarod deaktiválni az \"%(plugin)s\" plugint? Ez "
+"ideiglenesen letiltja, de minden adatot érintetlenül tart."
+
+msgid ""
+"Are you sure you want to deactivate this user? They will not be able to log "
+"in."
+msgstr ""
+"Biztos vagy benne, hogy ki akarod deaktiválni ezt a felhasználót? Nem tudnak"
+" bejelentkezni."
+
+msgid "Are you sure you want to delete"
+msgstr "Biztos vagy benne, hogy törölni akarod"
+
+msgid ""
+"Are you sure you want to delete \"%(filename)s\"? The document will be "
+"deleted when you save the form."
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod az \"%(filename)s\"-t? A dokumentum "
+"törlésre kerül, amikor elmented az űrlapot."
+
+msgid ""
+"Are you sure you want to delete the thumbnail? This action cannot be undone."
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod a thumbnail-t? Ezt a lépést nem lehet"
+" visszavonni."
+
+msgid "Are you sure you want to delete this"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt."
+
+msgid "Are you sure you want to delete this National Society?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a Nemzeti Társaságot?"
+
+msgid ""
+"Are you sure you want to delete this assignment and all its associated "
+"country statuses and data?"
+msgstr ""
+"Biztos vagy benne, hogy törölni szeretnéd ezt a feladatot és az összes hozzá"
+" kapcsolódó országos státuszt és adatot?"
+
+msgid "Are you sure you want to delete this branch?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt az ágat?"
+
+msgid "Are you sure you want to delete this cluster office?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a klaszterirodát?"
+
+msgid "Are you sure you want to delete this country?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt az országot?"
+
+msgid ""
+"Are you sure you want to delete this country? This action cannot be undone "
+"and may fail if the country is in use."
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod ezt az országot? Ezt a lépést nem "
+"lehet visszavonni, és kudarcot vallhat, ha az ország használatban van."
+
+msgid "Are you sure you want to delete this department?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt az osztályt?"
+
+msgid "Are you sure you want to delete this division?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a részleget?"
+
+msgid ""
+"Are you sure you want to delete this division? All departments in this "
+"division will also be deleted."
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod ezt a részleget? Ezen az osztály "
+"minden osztályát is törölni fogják."
+
+msgid ""
+"Are you sure you want to delete this document field and any associated "
+"uploaded documents?"
+msgstr ""
+"Biztos vagy benne, hogy törölni szeretnéd ezt a dokumentummezőt és a hozzá "
+"kapcsolódó dokumentumokat?"
+
+msgid ""
+"Are you sure you want to delete this document? This action cannot be undone."
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod ezt a dokumentumot? Ezt a lépést nem "
+"lehet visszavonni."
+
+msgid "Are you sure you want to delete this entry?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a bejegyzést?"
+
+msgid "Are you sure you want to delete this indicator instance?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a jelző példányt?"
+
+msgid "Are you sure you want to delete this indicator?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a jelzőt?"
+
+msgid "Are you sure you want to delete this local unit?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a helyi egységet?"
+
+msgid "Are you sure you want to delete this matrix table?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a mátrixtáblát?"
+
+msgid "Are you sure you want to delete this plugin item?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a plugin elemet?"
+
+msgid ""
+"Are you sure you want to delete this public form link? This will also delete"
+" all submissions received through this link."
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod ezt a nyilvános űrlap linket? Ez "
+"törli az összes ezen a linken keresztül érkezett beküldést is."
+
+msgid "Are you sure you want to delete this question?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a kérdést?"
+
+msgid "Are you sure you want to delete this regional office?"
+msgstr "Biztos, hogy törölni akarod ezt a regionális irodát?"
+
+msgid ""
+"Are you sure you want to delete this regional office? All cluster offices "
+"under it will also be deleted."
+msgstr ""
+"Biztos, hogy törölni akarod ezt a regionális irodát? Az összes "
+"klaszterirodát is törölni fogják."
+
+msgid "Are you sure you want to delete this section and all its contents?"
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod ezt a részt és az összes tartalmát?"
+
+msgid "Are you sure you want to delete this sector?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a szektort?"
+
+msgid "Are you sure you want to delete this sub-branch?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt az alágazatot?"
+
+msgid "Are you sure you want to delete this sub-section and all its contents?"
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod ezt az alrészt és az összes "
+"tartalmát?"
+
+msgid "Are you sure you want to delete this sub-sector?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt az alszektort?"
+
+msgid "Are you sure you want to delete this submission?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a beküldést?"
+
+msgid "Are you sure you want to delete this template?"
+msgstr "Biztos vagy benne, hogy törölni akarod ezt a sablont?"
+
+msgid "Are you sure you want to delete this? This action cannot be undone."
+msgstr ""
+"Biztos vagy benne, hogy törölni akarod ezt? Ezt a lépést nem lehet "
+"visszavonni."
+
+msgid "Are you sure you want to reactivate this user?"
+msgstr "Biztos vagy benne, hogy újra akarod aktiválni ezt a felhasználót?"
+
+msgid ""
+"Are you sure you want to reload all plugins? This may temporarily affect "
+"functionality."
+msgstr ""
+"Biztos vagy benne, hogy minden plugint újra akarsz tölteni? Ez ideiglenesen "
+"befolyásolhatja a funkcionalit."
+
+msgid "Are you sure you want to reload the plugin \"%(plugin)s\"?"
+msgstr "Biztos vagy benne, hogy újratöltöd az \"%(plugin)s\" plugint?"
+
+msgid "Are you sure you want to stop the translation?"
+msgstr "Biztos vagy benne, hogy meg akarod állítani a fordítást?"
+
+msgid ""
+"Are you sure you want to submit this form? You will not be able to edit it "
+"after submission."
+msgstr ""
+"Biztos vagy benne, hogy be akarod adni ezt az űrlapot? A beküldés után nem "
+"tudod szerkeszteni."
+
+msgid "Are you sure you want to unarchive this indicator?"
+msgstr "Biztos vagy benne, hogy ezt a jelzőt szeretnéd visszavonni?"
+
+msgid ""
+"Are you sure you want to uninstall the plugin \"%(plugin)s\"? This action "
+"cannot be undone."
+msgstr ""
+"Biztos vagy benne, hogy el akarod távolítani az \"%(plugin)s\" plugint? Ezt "
+"a lépést nem lehet visszavonni."
+
+msgid "Are you sure you want to update the status?"
+msgstr "Biztos vagy benne, hogy frissíteni szeretnéd az állapotot?"
+
+msgid "Are you sure you want to validate this assignment?"
+msgstr "Biztos vagy benne, hogy ezt a feladatot akarod érvényesíteni?"
+
+msgid "Are you sure?"
+msgstr "Biztos vagy benne?"
+
+msgid "As of Year:"
+msgstr "Év szerint:"
+
+msgid "Ask a question (AI will answer using the document library)..."
+msgstr ""
+"Tegyél fel egy kérdést (az AI a dokumentumkönyvtár segítségével "
+"válaszol......"
+
+msgid "Ask anything"
+msgstr "Kérdezz bármit"
+
+msgid "Ask questions about platform data, indicators, and documents."
+msgstr ""
+"Tegyél fel kérdéseket a platform adatairól, mutatóiról és dokumentumairól."
+
+msgid "Ask questions about your document library"
+msgstr "Tegyél fel kérdéseket a dokumentumkönyvtáradról"
+
+msgid "Assessment"
+msgstr "Értékelés"
+
+msgid ""
+"Assign this user to specific organizational entities. Users will have access"
+" to data at the level they are assigned."
+msgstr ""
+"Rendeld ezt a felhasználót konkrét szervezeti entitásokhoz. A felhasználók "
+"hozzáférhetnek az adatokhoz azon a szinten, amelyet hozzárendelnek."
+
+msgid ""
+"Assigned entities (focal points) will be notified about this new assignment."
+" Do you want to continue?"
+msgstr ""
+"A kijelölt entitások (fókuszpontok) értesítést kapnak erről az új "
+"beosztásról. Folytatni akarod?"
+
+msgid "Assignment"
+msgstr "Beosztás"
+
+msgid "Assignment '%(name)s' has been closed."
+msgstr "Az '%(name)s' beosztás lezárult."
+
+msgid "Assignment '%(template)s' has been reopened."
+msgstr "Az '%(template)s' beosztás újra megnyitásra került."
+
+msgid "Assignment '%(template)s' is due on %(due_date)s."
+msgstr "Az '%(template)s' jelölés esedékes az %(due_date)s-n."
+
+msgid "Assignment (data entry)"
+msgstr "Kiosztás (adatbevitel)"
+
+msgid "Assignment Approved"
+msgstr "A beosztás jóváhagyva"
+
+msgid "Assignment Created"
+msgstr "Megbízás létrehozása"
+
+msgid "Assignment Filters"
+msgstr "Hozzárendelési szűrők"
+
+msgid "Assignment Management"
+msgstr "Feladatkezelés"
+
+msgid "Assignment Period"
+msgstr "Kiosztási időszak"
+
+msgid "Assignment Reopened"
+msgstr "A megbízás újranyitása"
+
+msgid "Assignment Roles"
+msgstr "Feladatok"
+
+msgid "Assignment Status"
+msgstr "Kiosztási státusz"
+
+msgid "Assignment Submitted"
+msgstr "Feladat beküldése"
+
+msgid "Assignment approved"
+msgstr "A beosztás jóváhagyása"
+
+msgid "Assignment approved: %(template)s"
+msgstr "Átruházás jóváhagyva: %(template)s"
+
+msgid "Assignment created: %(template)s"
+msgstr "Létrehozva feladat: %(template)s"
+
+msgid "Assignment period"
+msgstr "Beosztási időszak"
+
+msgid ""
+"Assignment period is not available. Set a period for this assignment or "
+"choose a fixed period in the form template."
+msgstr ""
+"A beosztási időszak nem elérhető. Állíts be egy időszakot ehhez a "
+"feladathoz, vagy válassz egy fix időszakot a nyomtatványsablonban."
+
+msgid ""
+"Assignment period is not set yet. Set the assignment period in the header, "
+"or ask an administrator."
+msgstr ""
+"A kijelölési időszak még nincs meghatározva. Állítsd be a kiosztási "
+"időszakot a fejlécben, vagy kérdezd meg az adminisztrátort."
+
+msgid "Assignment reopened"
+msgstr "A beosztás újranyitása"
+
+msgid "Assignment reopened: %(template)s"
+msgstr "Újranyitva a feladat: %(template)s"
+
+msgid "Assignment status ID:"
+msgstr "Kinevezési státusz azonosító:"
+
+msgid ""
+"Assignment status for this country not found (ID: %(id)d). Please check the "
+"URL or contact support."
+msgstr ""
+"Az országra vonatkozó beosztási státusz nem található meg (azonosító: "
+"%(id)d). Kérjük, nézze meg az URL-t vagy vegye fel a kapcsolatot a "
+"támogatással."
+
+msgid "Assignment status for this country not found."
+msgstr "Az országban nem talált beosztási státuszt."
+
+msgid "Assignment submitted: %(template)s"
+msgstr "Feladat beküldése: %(template)s"
+
+msgid "Assignment:"
+msgstr "Feladat:"
+
+msgid "Assignments Timeline"
+msgstr "Kinevezések idővonala"
+
+msgid "Assistant"
+msgstr "Asszisztens"
+
+msgid "Assistant is typing"
+msgstr "Az asszisztens gépel"
+
+msgid "At least 8 characters"
+msgstr "Legalább 8 karakter"
+
+msgid ""
+"At least one entity type must remain enabled. Changes update the UI "
+"immediately; restart only needed if background workers cache the setting."
+msgstr ""
+"Legalább egy entitástípusnak engedélyezve kell maradnia. Változások azonnal "
+"frissítik a felhasználói felületet; Újraindítás csak akkor szükséges, ha "
+"háttérmunkások gyorsabőrbe kerülnek a beállítást."
+
+msgid "Attach"
+msgstr "Csatolás"
+
+msgid ""
+"Attach the assignment form PDF for each selected entity. One PDF per entity "
+"will be generated from the chosen assignment."
+msgstr ""
+"Csatolja a feladati űrlap PDF-jét minden kiválasztott egységhez. Minden "
+"entitásból egy PDF generálódik a kiválasztott feladatból."
+
+msgid "Audit Trail"
+msgstr "Audit Trail"
+
+msgid "Audit entries"
+msgstr "Audit bejegyzések"
+
+msgid ""
+"Audit logging for security events (without storing your message content)."
+msgstr ""
+"Audit naplózás biztonsági események esetén (anélkül, hogy tárolnád az üzenet"
+" tartalmát)."
+
+msgid "Audit trail pages"
+msgstr "Audit nyomkövetési oldalak"
+
+msgid "Audited Financial Statement"
+msgstr "Auditált pénzügyi kimutatás"
+
+msgid "Aug"
+msgstr "Augusztus"
+
+msgid "Authentication"
+msgstr "Hitelesítés"
+
+msgid "Author"
+msgstr "Szerző"
+
+msgid "Auto Translate"
+msgstr "Automatikus fordítás"
+
+msgid "Auto Translate All"
+msgstr "Auto Translate All"
+
+msgid "Auto translate"
+msgstr "Automatikus fordítás"
+
+msgid "Auto-Approve is Enabled"
+msgstr "Az automatikus jóváhagyás engedélyezve van"
+
+msgid "Auto-Queue Low-Quality"
+msgstr "Automatikus sorba állítás alacsony minőség"
+
+msgid "Auto-Translate All Indicators"
+msgstr "Minden jelző automatikus fordítása"
+
+msgid "Auto-Translate All Items"
+msgstr "Minden elem automatikus fordítása"
+
+msgid "Auto-Translate All Organization Entities"
+msgstr "Automatikus fordítás minden szervezeti entitásnak"
+
+msgid "Auto-Translate All Template Items"
+msgstr "Automatikus fordítás minden sablonelem"
+
+msgid "Auto-Translate All Translation Fields"
+msgstr "Automatikus fordítás minden fordítási mezőt"
+
+msgid "Auto-closes the assignment after this date."
+msgstr "Automatikusan lezárja a feladatot ezen a dátum után."
+
+msgid "Auto-generated attachment"
+msgstr "Automatikusan generált csatolás"
+
+msgid "Auto-rotate (3D)"
+msgstr "Automatikus forgatás (3D)"
+
+msgid "Auto-translate all blank indicator names to all languages"
+msgstr ""
+"Automatikusan fordítsd le az összes üres indikátornevet minden nyelvre"
+
+msgid ""
+"Auto-translate all blank template names, section names, questions, document "
+"fields, and page names to all languages"
+msgstr ""
+"Automatikusan fordítsd le az összes üres sablonnevet, szekciónevet, kérdést,"
+" dokumentummezőt és oldalnevet minden nyelvre"
+
+msgid "Auto-translate all blank translation fields to all languages"
+msgstr ""
+"Automatikusan fordítsd le az összes üres fordítási mezőt minden nyelvre"
+
+msgid "Auto-translate config"
+msgstr "Automatikus fordítás konfiguráció"
+
+msgid "Auto-translate config endpoint"
+msgstr "Automatikus fordítás konfigurációs végpont"
+
+msgid "Auto-translate config itemType"
+msgstr "Automatikus fordítás konfiguráció itemType"
+
+msgid "Auto-translate endpoint not configured"
+msgstr "Automatikus fordítási végpont nincs konfigurálva"
+
+msgid "Auto-translate failed."
+msgstr "Az automatikus fordítás sikertelen volt."
+
+msgid "Automatic compression for responses > 512 bytes"
+msgstr "Automatikus tömörítés válaszok esetén > 512 bájttal"
+
+msgid "Automatically translate blank fields using AI"
+msgstr "Automatikusan fordítsd le az üres mezőket AI segítségével"
+
+msgid "Available API Endpoints"
+msgstr "Elérhető API végpontok"
+
+msgid "Available User Types"
+msgstr "Elérhető felhasználói típusok"
+
+msgid "Average Response Time"
+msgstr "Átlagos válaszidő"
+
+msgid "Avg Cost"
+msgstr "Átlagos költség"
+
+msgid "Avg Time"
+msgstr "Átlagidő"
+
+msgid "Avg. Response Time"
+msgstr "Átlagos válaszidő"
+
+msgid "Avg. age disaggregation"
+msgstr "Átlagos életkor-szétosztás"
+
+msgid "Avg. disaggregation"
+msgstr "Átlagos szétválasztás"
+
+msgid "Azure sign-in failed."
+msgstr "Azure bejelentkezés failed ."
+
+msgid "Back"
+msgstr "Hátra"
+
+msgid "Back to API Keys"
+msgstr "Vissza az API kulcsokhoz"
+
+msgid "Back to Assignments"
+msgstr "Vissza a beosztásokhoz"
+
+msgid "Back to Indicator Bank"
+msgstr "Vissza az Indicator Bankhoz"
+
+msgid "Back to List"
+msgstr "Vissza a listához"
+
+msgid "Back to Lists"
+msgstr "Vissza a listákhoz"
+
+msgid "Back to Suggestions"
+msgstr "Vissza a javaslatokhoz"
+
+msgid "Back to Traces"
+msgstr "Vissza a Traces-hez"
+
+msgid "Back to Users"
+msgstr "Vissza a felhasználókhoz"
+
+msgid "Back to app"
+msgstr "Vissza az alkalmazáshoz"
+
+msgid "Back to login"
+msgstr "Vissza a bejelentkezéshez"
+
+msgid "Back to top"
+msgstr "Vissza a tetejére"
+
+msgid "Based on"
+msgstr "A következő"
+
+msgid "Based on:"
+msgstr "Az alapon:"

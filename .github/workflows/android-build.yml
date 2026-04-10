@@ -6,25 +6,17 @@ on:
       - 'mobile/v*'
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Build environment (controls app behavior, e.g., test login buttons)'
-        required: true
-        type: choice
-        options:
-          - production
-          - staging
-          - development
-        default: 'production'
       backend_url:
-        description: 'Backend URL'
+        description: 'Backend URL (also sets build profile: databank.ifrc.org → production, fly.dev / IFRC staging → staging, localhost / emulator → development)'
         required: true
         type: choice
         options:
           - http://localhost:5000
           - http://10.0.2.2:5000
           - https://backoffice-databank.fly.dev
-          - https://your-backoffice.example.org
-        default: 'https://backoffice-databank.fly.dev'
+          - https://databank-stage.ifrc.org
+          - https://databank.ifrc.org
+        default: 'https://databank.ifrc.org'
       frontend_url:
         description: 'Frontend/Website URL'
         required: true
@@ -39,9 +31,9 @@ on:
         required: true
         type: choice
         options:
-          - ''
           - ifrc
-        default: ''
+          - ''
+        default: 'ifrc'
 
 jobs:
   build-android:
@@ -78,15 +70,40 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve build profile from backend URL
+        id: resolve_env
+        run: |
+          BACKEND="${{ inputs.backend_url }}"
+          # Local / emulator → development (quick login, WebView localhost rules)
+          if [[ "$BACKEND" == *"localhost"* ]] || [[ "$BACKEND" == *"127.0.0.1"* ]] || [[ "$BACKEND" == *"10.0.2.2"* ]]; then
+            PROFILE=development
+          # Fly preview or IFRC staging host → staging
+          elif [[ "$BACKEND" == *"fly.dev"* ]] || [[ "$BACKEND" == *"-stage.ifrc.org"* ]]; then
+            PROFILE=staging
+          # Production IFRC backoffice
+          elif [[ "$BACKEND" == *"databank.ifrc.org"* ]]; then
+            PROFILE=production
+          else
+            echo "Unknown BACKEND_URL, defaulting profile to production: $BACKEND" >&2
+            PROFILE=production
+          fi
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          echo "Resolved build profile: $PROFILE"
+
       - name: Create .env file with configuration
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
-          # Create .env file with backend and frontend URLs (independent of environment flag)
           echo "BACKEND_URL=${{ inputs.backend_url }}" > .env
           echo "FRONTEND_URL=${{ inputs.frontend_url }}" >> .env
-          echo "Created .env file with:"
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) echo "PRODUCTION=true" >> .env ;;
+            staging)    echo "STAGING=true" >> .env ;;
+            *)          echo "DEVELOPMENT=true" >> .env ;;
+          esac
+          echo "Created .env (profile=${{ steps.resolve_env.outputs.profile }}):"
           echo "  BACKEND_URL=${{ inputs.backend_url }}"
           echo "  FRONTEND_URL=${{ inputs.frontend_url }}"
+          cat .env
 
       - name: Prepare Firebase Android config (CI placeholder)
         working-directory: ${{ steps.flutter_path.outputs.path }}
@@ -111,30 +128,36 @@ jobs:
             sed -i 's/applicationId "com\.ifrc\.ifrcDatabankApp"/applicationId "com.ifrc.ifrcDatabankApp.ci"/g' android/app/build.gradle
           fi
 
-          # Change app display name to distinguish from other version
-          # This allows users to identify which version is which on their device
+          # Change app display name based on environment / organization
+          # IFRC profile → home screen name "IFRC Databank"; otherwise CI-style NGO Databank label
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ORG="${{ inputs.organization_config }}"
+          else
+            # push (e.g. mobile/v* tags) has no workflow_dispatch inputs — default org matches workflow default (ifrc)
+            ORG=ifrc
+          fi
+          if [ "$ORG" = "ifrc" ]; then
+            ENV_DISPLAY_NAME="IFRC Databank"
+          else
+            ENV_DISPLAY_NAME="NGO Databank (CI - ${{ steps.resolve_env.outputs.profile }})"
+          fi
+
           if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-            # Update app label if android:label exists
-            sed -i 's/android:label="[^"]*"/android:label="IFRC Data (CI)"/g' android/app/src/main/AndroidManifest.xml || true
-            # If android:label doesn't exist, we'll add it to the application tag
+            sed -i "s/android:label=\"[^\"]*\"/android:label=\"$ENV_DISPLAY_NAME\"/g" android/app/src/main/AndroidManifest.xml || true
             if ! grep -q 'android:label' android/app/src/main/AndroidManifest.xml; then
-              sed -i 's/<application\([^>]*\)>/<application android:label="NGO Databank (CI)"\1>/g' android/app/src/main/AndroidManifest.xml
+              sed -i "s/<application\([^>]*\)>/<application android:label=\"$ENV_DISPLAY_NAME\"\1>/g" android/app/src/main/AndroidManifest.xml
             fi
           fi
 
       - name: Build APK (release)
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
-          # Build with environment flag and API keys passed via --dart-define flags from GitHub secrets
-          # Backend and frontend URLs are configured via .env file (created in previous step)
-          # Environment flag controls app behavior (e.g., test login buttons)
-          if [ "${{ inputs.environment }}" == "production" ]; then
-            ENV_FLAG="PRODUCTION=true"
-          elif [ "${{ inputs.environment }}" == "staging" ]; then
-            ENV_FLAG="STAGING=true"
-          else
-            ENV_FLAG="DEVELOPMENT=true"
-          fi
+          # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step)
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) ENV_FLAG="PRODUCTION=true" ;;
+            staging)    ENV_FLAG="STAGING=true" ;;
+            *)          ENV_FLAG="DEVELOPMENT=true" ;;
+          esac
 
           # Build with organization config if specified
           ORG_CONFIG=""
@@ -151,16 +174,12 @@ jobs:
       - name: Build App Bundle (optional, for Play Store)
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
-          # Build with environment flag and API keys passed via --dart-define flags from GitHub secrets
-          # Backend and frontend URLs are configured via .env file (created in previous step)
-          # Environment flag controls app behavior (e.g., test login buttons)
-          if [ "${{ inputs.environment }}" == "production" ]; then
-            ENV_FLAG="PRODUCTION=true"
-          elif [ "${{ inputs.environment }}" == "staging" ]; then
-            ENV_FLAG="STAGING=true"
-          else
-            ENV_FLAG="DEVELOPMENT=true"
-          fi
+          # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step)
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) ENV_FLAG="PRODUCTION=true" ;;
+            staging)    ENV_FLAG="STAGING=true" ;;
+            *)          ENV_FLAG="DEVELOPMENT=true" ;;
+          esac
 
           # Build with organization config if specified
           ORG_CONFIG=""
@@ -186,12 +205,6 @@ jobs:
 
       # Optional: Build signed APK (requires keystore)
       # Uncomment and configure the following steps if you have signing keys
-      # - name: Setup Java
-      #   uses: actions/setup-java@v4
-      #   with:
-      #     distribution: 'temurin'
-      #     java-version: '17'
-      #
       # - name: Create keystore properties
       #   run: |
       #     echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > ${{ steps.flutter_path.outputs.path }}/android/key.properties

@@ -152,8 +152,10 @@ void main() async {
     try {
       await Firebase.initializeApp();
       DebugLogger.logInfo('INIT', 'Firebase initialized successfully');
+      // Analytics must be initialized after Firebase.initializeApp() completes
+      await sl<AnalyticsService>().initialize();
     } catch (e, stackTrace) {
-      // Firebase initialization failed - push notifications won't work
+      // Firebase initialization failed - push notifications and analytics won't work
       // Log the error but don't crash the app
       DebugLogger.logError('Failed to initialize Firebase: $e');
       DebugLogger.logError('Stack trace: $stackTrace');
@@ -164,9 +166,6 @@ void main() async {
     DebugLogger.logError('Firebase initialization error: $e');
     performanceService.endInit('firebase_init');
   });
-
-  // Initialize analytics after Firebase
-  sl<AnalyticsService>().initialize();
 
   // Note: Push notifications will be initialized after user login
   // (Device registration requires authentication)

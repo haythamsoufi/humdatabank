@@ -282,3 +282,68 @@ jobs:
           app-name: ${{ steps.config.outputs.app_name }}
           images: 'ifrcimage.azurecr.io/databank_backend:${{ inputs.version }}'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+
+      # Ask the platform to restart the main site via Kudu (same Basic auth as the publish profile).
+      # SCM Basic Auth must remain enabled on the app (required for Web Deploy / this profile anyway).
+      - name: Restart web app (Kudu)
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          EXPECTED_APP_NAME: ${{ steps.config.outputs.app_name }}
+        run: |
+          python3 << 'EOF'
+          import os, sys, xml.etree.ElementTree as ET, urllib.request, urllib.error, base64
+
+          profile_xml = os.environ["PUBLISH_PROFILE"]
+          expected_app = os.environ["EXPECTED_APP_NAME"]
+
+          try:
+              root = ET.fromstring(profile_xml)
+          except ET.ParseError as e:
+              print(f"ERROR: Could not parse publish profile XML: {e}")
+              sys.exit(1)
+
+          entry = next(
+              (p for p in root.findall("publishProfile") if p.get("publishMethod") == "MSDeploy"),
+              None,
+          )
+          if entry is None:
+              print("ERROR: No MSDeploy entry found in publish profile.")
+              sys.exit(1)
+
+          scm_host = entry.get("publishUrl", "").split(":")[0]
+          msdeploy = entry.get("msdeploySite", "")
+          username = entry.get("userName", "")
+          password = entry.get("userPWD", "")
+
+          if msdeploy != expected_app:
+              print(f"ERROR: Publish profile is for '{msdeploy}', expected app '{expected_app}'.")
+              sys.exit(1)
+
+          if not scm_host.startswith(expected_app):
+              print(f"ERROR: SCM host '{scm_host}' does not match expected app '{expected_app}'.")
+              sys.exit(1)
+
+          url = f"https://{scm_host}/api/app/restart"
+          token = base64.b64encode(f"{username}:{password}".encode()).decode()
+          req = urllib.request.Request(
+              url,
+              data=b"",
+              method="POST",
+              headers={"Authorization": f"Basic {token}"},
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=120) as resp:
+                  print(f"Kudu restart returned HTTP {resp.status}")
+          except urllib.error.HTTPError as e:
+              print(f"ERROR: HTTP {e.code} from {url} — {e.reason}")
+              if e.fp:
+                  body = e.fp.read().decode(errors="replace")[:2000]
+                  if body.strip():
+                      print(body)
+              sys.exit(1)
+          except urllib.error.URLError as e:
+              print(f"ERROR: Could not reach {url}: {e.reason}")
+              sys.exit(1)
+
+          print("OK: Restart requested via Kudu /api/app/restart")
+          EOF

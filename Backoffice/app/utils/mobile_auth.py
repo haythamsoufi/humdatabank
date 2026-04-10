@@ -130,8 +130,10 @@ def mobile_auth_required(f=None, *, permission: str | None = None):
                 if sid:
                     try:
                         from app.services.user_analytics_service import _update_session_activity_explicit
-                        activity_type = 'page_view' if request.method == 'GET' else 'action'
-                        _update_session_activity_explicit(sid, activity_type)
+                        # Always use 'action' here — actual screen navigations are
+                        # tracked explicitly via POST /analytics/screen-view, so counting
+                        # every background GET as a page_view inflates the counter.
+                        _update_session_activity_explicit(sid, 'action')
                     except Exception:
                         pass  # Never let tracking errors break the auth flow
 

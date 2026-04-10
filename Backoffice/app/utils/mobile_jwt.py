@@ -129,6 +129,37 @@ def decode_mobile_token(token: str, *, expected_type: str = "access") -> MobileT
     )
 
 
+def decode_mobile_token_ignoring_expiry(token: str) -> MobileTokenClaims:
+    """Decode a mobile JWT without verifying the expiry time.
+
+    Used exclusively for the logout endpoint: we need the ``sid`` claim to
+    blacklist the session even when the access token has just expired.
+    The token signature (HS256) is still verified so the endpoint cannot
+    be abused to blacklist arbitrary sessions with a forged token.
+    """
+    payload = jwt.decode(
+        token,
+        _jwt_secret(),
+        algorithms=[MOBILE_TOKEN_ALGORITHM],
+        audience=MOBILE_TOKEN_AUDIENCE,
+        issuer=MOBILE_TOKEN_ISSUER,
+        options={
+            "require": ["exp", "iat", "sub", "type"],
+            "verify_exp": False,
+        },
+    )
+    return MobileTokenClaims(
+        user_id=int(payload["sub"]),
+        token_type=payload["type"],
+        exp=int(payload["exp"]),
+        iat=int(payload["iat"]),
+        aud=payload.get("aud", MOBILE_TOKEN_AUDIENCE),
+        iss=payload.get("iss", MOBILE_TOKEN_ISSUER),
+        ver=int(payload.get("ver", 1)),
+        sid=payload.get("sid"),
+    )
+
+
 def issue_token_pair(user_id: int, session_id: Optional[str] = None) -> dict:
     """Issue both access and refresh tokens for a user.
 

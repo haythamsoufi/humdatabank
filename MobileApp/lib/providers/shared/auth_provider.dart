@@ -275,14 +275,9 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Unregister device for push notifications
-      try {
-        await PushNotificationService().unregisterDevice();
-      } catch (e) {
-        // Don't fail logout if push notification unregistration fails
-        DebugLogger.logWarn('AUTH', 'Error unregistering device on logout: $e');
-      }
-
+      // AuthService.logout() unregisters the device before blacklisting the
+      // JWT, then clears all local state.  Do not call unregisterDevice here
+      // to avoid a duplicate API call with an already-invalidated token.
       await _authService.logout();
       _user = null;
       _error = null;

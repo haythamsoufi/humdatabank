@@ -661,11 +661,12 @@ class ApiService {
     String endpoint, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
+    bool skipExpiredGuard = false,
     String contentType = contentTypeJson,
     Map<String, String>? additionalHeaders,
     bool queueOnOffline = true,
   }) async {
-    if (includeAuth) await _guardSessionExpiry();
+    if (includeAuth && !skipExpiredGuard) await _guardSessionExpiry();
 
     final isOnline = _connectivity.isOnline;
 

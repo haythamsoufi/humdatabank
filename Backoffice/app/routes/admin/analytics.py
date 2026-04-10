@@ -8,9 +8,12 @@ Provides routes for viewing user activity analytics, login logs,
 session analytics, and security events.
 """
 
-from urllib.parse import urlencode
+
+import logging
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for
+
+logger = logging.getLogger(__name__)
 from flask_login import current_user
 from app import db
 from app.routes.admin.shared import admin_permission_required, permission_required
@@ -559,9 +562,14 @@ def audit_trail():
     """View unified audit trail combining activity logs and admin actions."""
     # Higher limits than typical admin lists: merged audit data is already capped in DB queries;
     # the HTML grid had no client pagination, so users were stuck at the first page only.
+    logger.info(
+        "[audit_trail] raw args — page=%r per_page=%r",
+        request.args.get('page'), request.args.get('per_page'),
+    )
     page, per_page = validate_pagination_params(
         request.args, default_per_page=100, max_per_page=500
     )
+    logger.info("[audit_trail] resolved page=%d per_page=%d", page, per_page)
 
     # Filters
     user_filter = request.args.getlist('user')  # Changed to getlist for multi-select
@@ -860,34 +868,8 @@ def audit_trail():
     # Sort all entries by timestamp (most recent first)
     entries.sort(key=lambda x: x['timestamp'], reverse=True)
 
-    # Manual pagination
     total_entries = len(entries)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    paginated_entries = entries[start_idx:end_idx]
-
-    # Create pagination object
-    class PaginationObject:
-        def __init__(self, items, page, per_page, total):
-            self.items = items
-            self.page = page
-            self.per_page = per_page
-            self.total = total
-            self.pages = (total + per_page - 1) // per_page
-            self.has_prev = page > 1
-            self.has_next = page < self.pages
-            self.prev_num = page - 1 if self.has_prev else None
-            self.next_num = page + 1 if self.has_next else None
-
-        def iter_pages(self, left_edge=2, right_edge=2, left_current=2, right_current=3):
-            last = self.pages
-            for num in range(1, last + 1):
-                if num <= left_edge or \
-                   (num > self.page - left_current - 1 and num < self.page + right_current) or \
-                   num > last - right_edge:
-                    yield num
-
-    audit_entries = PaginationObject(paginated_entries, page, per_page, total_entries)
+    logger.info("[audit_trail] total=%d entries passed to AG-Grid", total_entries)
 
     # Get filter options - create consolidated activity types directly
     activity_types_query = UserActivityLog.query.with_entities(
@@ -914,9 +896,12 @@ def audit_trail():
     # Get all countries for dropdown
     countries = Country.query.order_by(Country.name).all()
 
-    # Get all users for dropdown (though we're now using text input)
-    # Return JSON for API requests (mobile app)
+    # Return JSON for API requests (mobile app) — paginated server-side
     if is_json_request():
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_entries = entries[start_idx:end_idx]
+        total_pages = (total_entries + per_page - 1) // per_page if per_page else 1
         entries_data = []
         for entry in paginated_entries:
             entries_data.append({
@@ -942,28 +927,19 @@ def audit_trail():
             count=len(entries_data),
             total=total_entries,
             page=page,
-            pages=audit_entries.pages,
+            pages=total_pages,
             activity_types=activity_types,
         )
 
     users = User.query.order_by(User.email).all()
 
-    audit_trail_qs_pairs = [
-        (k, v)
-        for k in request.args
-        if k != 'page'
-        for v in request.args.getlist(k)
-    ]
-    audit_trail_qs_base = urlencode(audit_trail_qs_pairs, doseq=True)
-
     return render_template(
         'admin/analytics/audit_trail.html',
-        entries=audit_entries,
+        entries=entries,
         activity_types=activity_types,
         action_types=action_types,
         countries=countries,
         users=users,
-        audit_trail_qs_base=audit_trail_qs_base,
         filters={
             'user': user_filter,
             'activity_type': activity_type,

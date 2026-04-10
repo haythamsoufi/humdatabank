@@ -266,59 +266,13 @@
         </div>
 
         <div class="p-4 sm:p-6 relative">
-        {% if entries.items %}
+        {% if entries %}
             {{ ag_grid_container('auditTrailGrid', loading_text=_('Loading audit entries...'), grid_height='600px', include_card=false, show_placeholder=false, placeholder_id='auditTrailColumnVisibilityPlaceholder') }}
         {% else %}
             {{ empty_state(icon="fas fa-search", title=_('No audit entries found matching your criteria.')) }}
         {% endif %}
         </div>
 
-        {# Server-side pagination (filters use multiselect query params; preserve via audit_trail_qs_base) #}
-        {% if entries.items %}
-        <div class="px-4 sm:px-6 py-3 border-t border-gray-200 bg-gray-50 text-sm text-gray-700 flex flex-wrap items-center justify-between gap-3">
-            <p class="m-0">
-                {{ _('Showing') }}
-                <span class="font-medium">{{ ((entries.page - 1) * entries.per_page) + 1 }}</span>
-                {{ _('to') }}
-                <span class="font-medium">{{ [entries.page * entries.per_page, entries.total] | min }}</span>
-                {{ _('of') }}
-                <span class="font-medium">{{ entries.total }}</span>
-                {{ _('entries') }}
-                {% if entries.pages > 1 %}
-                <span class="text-gray-500">({{ _('page') }} {{ entries.page }} / {{ entries.pages }})</span>
-                {% endif %}
-            </p>
-            {% if entries.pages > 1 %}
-            <nav class="flex flex-wrap items-center gap-1" aria-label="{{ _('Audit trail pages') }}">
-                {% if entries.has_prev %}
-                <a href="{{ url_for('analytics.audit_trail') }}?{% if audit_trail_qs_base %}{{ audit_trail_qs_base }}&{% endif %}page={{ entries.prev_num }}"
-                   class="btn btn-secondary btn-sm">{{ _('Previous') }}</a>
-                {% else %}
-                <span class="btn btn-secondary btn-sm opacity-50 pointer-events-none" aria-disabled="true">{{ _('Previous') }}</span>
-                {% endif %}
-                {% for page_num in entries.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                    {% if page_num %}
-                        {% if page_num != entries.page %}
-                        <a href="{{ url_for('analytics.audit_trail') }}?{% if audit_trail_qs_base %}{{ audit_trail_qs_base }}&{% endif %}page={{ page_num }}"
-                           class="inline-flex items-center justify-center min-w-[2.25rem] px-2 py-1 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">{{ page_num }}</a>
-                        {% else %}
-                        <span class="inline-flex items-center justify-center min-w-[2.25rem] px-2 py-1 text-xs font-semibold border border-blue-600 bg-blue-600 text-white z-10"
-                              aria-current="page">{{ page_num }}</span>
-                        {% endif %}
-                    {% else %}
-                        <span class="inline-flex items-center px-2 py-1 text-xs text-gray-500">…</span>
-                    {% endif %}
-                {% endfor %}
-                {% if entries.has_next %}
-                <a href="{{ url_for('analytics.audit_trail') }}?{% if audit_trail_qs_base %}{{ audit_trail_qs_base }}&{% endif %}page={{ entries.next_num }}"
-                   class="btn btn-secondary btn-sm">{{ _('Next') }}</a>
-                {% else %}
-                <span class="btn btn-secondary btn-sm opacity-50 pointer-events-none" aria-disabled="true">{{ _('Next') }}</span>
-                {% endif %}
-            </nav>
-            {% endif %}
-        </div>
-        {% endif %}
     </div>
 
 <script src="{{ static_url('js/components/multiselect-dropdown.js') }}"></script>
@@ -1184,7 +1138,7 @@ $(document).ready(function() {
 
     // Transform audit trail data for ag-grid
     const auditTrailData = [
-        {% for entry in entries.items %}
+        {% for entry in entries %}
         {
             id: {{ entry.get('id')|tojson|safe }},
             timestamp: {{ entry.get('timestamp')|datetime_iso|tojson|safe }},

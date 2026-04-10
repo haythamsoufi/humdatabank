@@ -178,35 +178,94 @@ def session_check():
 
 
 @mobile_bp.route('/auth/logout', methods=['POST'])
-@mobile_auth_required
 def mobile_logout():
-    """Logout and blacklist the JWT session."""
-    from flask import g
-    from app.utils.datetime_helpers import utcnow
-    from app.services.user_analytics_service import log_user_activity, log_logout
+    """Logout: blacklist the JWT session and clear the Flask session.
 
-    session_start = session.get('session_start')
-    session_duration = None
-    with suppress(Exception):
-        if session_start:
-            from datetime import datetime
-            start_dt = datetime.fromisoformat(session_start)
-            session_duration = int((utcnow() - start_dt).total_seconds() / 60)
-
-    log_user_activity(
-        activity_type='logout',
-        description=f'User {current_user.email} logged out via mobile API',
-        context_data={
-            'user_id': current_user.id,
-            'session_duration_minutes': session_duration,
-        },
+    Intentionally does not use @mobile_auth_required so that logout succeeds
+    even when the access token has just expired.  The Bearer token *signature*
+    is still verified — only the expiry check is relaxed — so the endpoint
+    cannot be abused to blacklist arbitrary sessions with a forged token.
+    """
+    from app.services.user_analytics_service import (
+        log_user_activity_for_user, end_user_session,
+        add_session_to_blacklist, get_client_info,
     )
-    log_logout(current_user, session_duration_minutes=session_duration)
+    from app.models.core import UserLoginLog, UserSessionLog
 
-    jwt_sid = getattr(g, '_mobile_jwt_sid', None)
+    jwt_sid = None
+    _user = current_user if current_user.is_authenticated else None
+
+    # Extract the session ID from the Bearer token.
+    # Accept a non-expired token first; fall back to an expired-but-signed token
+    # so logout always propagates to the server even if the access token just aged out.
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        if token:
+            from app.utils.mobile_jwt import decode_mobile_token, decode_mobile_token_ignoring_expiry
+            try:
+                claims = decode_mobile_token(token, expected_type="access")
+                jwt_sid = claims.sid
+                if _user is None or not _user.is_authenticated:
+                    from app.models import User
+                    u = User.query.get(claims.user_id)
+                    if u and u.is_active:
+                        login_user(u, remember=False)
+                        _user = u
+            except Exception:
+                with suppress(Exception):
+                    claims = decode_mobile_token_ignoring_expiry(token)
+                    if claims.token_type == "access":
+                        jwt_sid = claims.sid
+                        if _user is None:
+                            from app.models import User
+                            _user = User.query.get(claims.user_id)
+
+    # Blacklist the JWT session so any outstanding tokens for this session are rejected.
     if jwt_sid:
-        from app.services.user_analytics_service import add_session_to_blacklist
-        add_session_to_blacklist(jwt_sid)
+        with suppress(Exception):
+            add_session_to_blacklist(jwt_sid)
+
+    # End the UserSessionLog record.
+    # log_logout() reads the session ID from the Flask session, which is empty
+    # for JWT-only mobile requests.  Call end_user_session() directly with the
+    # JWT sid so the session row is properly marked as inactive.
+    if jwt_sid:
+        with suppress(Exception):
+            end_user_session(jwt_sid, 'logout')
+
+    # Log the logout event (best-effort).
+    with suppress(Exception):
+        if _user:
+            session_duration = None
+            with suppress(Exception):
+                sess_log = UserSessionLog.query.filter_by(session_id=jwt_sid).first() if jwt_sid else None
+                if sess_log and sess_log.duration_minutes is not None:
+                    session_duration = sess_log.duration_minutes
+
+            client_info = get_client_info()
+            logout_log = UserLoginLog(
+                user_id=_user.id,
+                email_attempted=_user.email,
+                event_type='logout',
+                ip_address=client_info['ip_address'],
+                user_agent=client_info['user_agent'],
+                browser=client_info['browser'],
+                operating_system=client_info['operating_system'],
+                device_type=client_info['device_type'],
+                session_duration_minutes=session_duration,
+            )
+            db.session.add(logout_log)
+
+            log_user_activity_for_user(
+                _user.id,
+                'logout',
+                f'User {_user.email} logged out via mobile API',
+                {'user_id': _user.id, 'session_duration_minutes': session_duration},
+            )
+
+    with suppress(Exception):
+        db.session.flush()
 
     logout_user()
     session.clear()

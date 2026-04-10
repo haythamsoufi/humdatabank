@@ -401,7 +401,17 @@ class AuthService {
         data: {'email': _currentUser?.email ?? 'unknown'},
       );
 
-      await _api.post(AppConfig.logoutEndpoint);
+      // skipExpiredGuard: bypass _guardSessionExpiry so the HTTP request is
+      // always sent even when the access token has just expired.  The backend
+      // logout endpoint accepts expired-but-signed tokens and blacklists the
+      // session using the sid claim.
+      // queueOnOffline: false — do not queue logout for replay; by the time it
+      // would run the tokens will already have been wiped locally.
+      await _api.post(
+        AppConfig.logoutEndpoint,
+        skipExpiredGuard: true,
+        queueOnOffline: false,
+      );
     } catch (e) {
       DebugLogger.logError('Error during logout API call: $e');
     } finally {

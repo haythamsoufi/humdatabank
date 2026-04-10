@@ -89,6 +89,16 @@ jobs:
           echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
           echo "Resolved build profile: $PROFILE"
 
+      - name: Resolve environment-specific API key
+        id: env_secrets
+        run: |
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) API_KEY="${{ secrets.MOBILE_APP_API_KEY_PRODUCTION }}" ;;
+            staging)    API_KEY="${{ secrets.MOBILE_APP_API_KEY_STAGING }}" ;;
+            *)          API_KEY="${{ secrets.MOBILE_APP_API_KEY_DEVELOPMENT }}" ;;
+          esac
+          echo "api_key=${API_KEY:-${{ secrets.MOBILE_APP_API_KEY }}}" >> "$GITHUB_OUTPUT"
+
       - name: Create .env file with configuration
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
@@ -127,23 +137,30 @@ jobs:
       - name: Configure alternate bundle identifier and app name
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
-          # Change bundle identifier to allow side-by-side installation
-          # Original: com.ifrc.ifrcDatabankApp
-          # New: com.ifrc.ifrcDatabankApp.ci
-          sed -i '' 's/com\.ifrc\.ifrcDatabankApp/com.ifrc.ifrcDatabankApp.ci/g' ios/Runner.xcodeproj/project.pbxproj
+          PROFILE="${{ steps.resolve_env.outputs.profile }}"
 
-          # Change app display name based on environment / organization
-          # IFRC profile → home screen name "IFRC Databank"; otherwise CI-style NGO Databank label
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ORG="${{ inputs.organization_config }}"
-          else
-            # push (e.g. mobile/v* tags) has no workflow_dispatch inputs — default org matches workflow default (ifrc)
-            ORG=ifrc
+          # Non-production profiles get a distinct bundle ID so they can be installed alongside production
+          # Base ID matches MobileApp (com.ngo.databank; RunnerTests / AuditTrailWidget pick up the same prefix)
+          if [ "$PROFILE" = "staging" ]; then
+            sed -i '' 's/com\.ngo\.databank/com.ngo.databank.staging/g' ios/Runner.xcodeproj/project.pbxproj
+          elif [ "$PROFILE" = "development" ]; then
+            sed -i '' 's/com\.ngo\.databank/com.ngo.databank.dev/g' ios/Runner.xcodeproj/project.pbxproj
           fi
-          if [ "$ORG" = "ifrc" ]; then
-            ENV_DISPLAY_NAME="IFRC Databank"
+
+          # Resolve display name: staging always gets a suffix; prod/dev use org branding
+          if [ "$PROFILE" = "staging" ]; then
+            ENV_DISPLAY_NAME="IFRC Databank (Staging)"
           else
-            ENV_DISPLAY_NAME="NGO Databank (CI - ${{ steps.resolve_env.outputs.profile }})"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              ORG="${{ inputs.organization_config }}"
+            else
+              ORG=ifrc
+            fi
+            if [ "$ORG" = "ifrc" ]; then
+              ENV_DISPLAY_NAME="IFRC Databank"
+            else
+              ENV_DISPLAY_NAME="NGO Databank (CI - $PROFILE)"
+            fi
           fi
           /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" ios/Runner/Info.plist > /dev/null 2>&1 && \
             /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName '$ENV_DISPLAY_NAME'" ios/Runner/Info.plist || \
@@ -171,7 +188,7 @@ jobs:
           flutter build ios --release --no-codesign \
             --dart-define=$ENV_FLAG \
             $ORG_CONFIG \
-            --dart-define=MOBILE_APP_API_KEY="${{ secrets.MOBILE_APP_API_KEY }}" \
+            --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
             --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
 
       - name: Create unsigned IPA

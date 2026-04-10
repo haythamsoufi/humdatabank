@@ -90,6 +90,16 @@ jobs:
           echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
           echo "Resolved build profile: $PROFILE"
 
+      - name: Resolve environment-specific API key
+        id: env_secrets
+        run: |
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) API_KEY="${{ secrets.MOBILE_APP_API_KEY_PRODUCTION }}" ;;
+            staging)    API_KEY="${{ secrets.MOBILE_APP_API_KEY_STAGING }}" ;;
+            *)          API_KEY="${{ secrets.MOBILE_APP_API_KEY_DEVELOPMENT }}" ;;
+          esac
+          echo "api_key=${API_KEY:-${{ secrets.MOBILE_APP_API_KEY }}}" >> "$GITHUB_OUTPUT"
+
       - name: Create .env file with configuration
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
@@ -121,25 +131,32 @@ jobs:
       - name: Configure alternate package name and app name
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
-          # Change package name to allow side-by-side installation
-          # Original: com.ifrc.ifrcDatabankApp
-          # New: com.ifrc.ifrcDatabankApp.ci
+          PROFILE="${{ steps.resolve_env.outputs.profile }}"
+
+          # Non-production profiles get a distinct package name so they can be installed alongside production
+          # Base applicationId matches MobileApp android/app/build.gradle
           if [ -f "android/app/build.gradle" ]; then
-            sed -i 's/applicationId "com\.ifrc\.ifrcDatabankApp"/applicationId "com.ifrc.ifrcDatabankApp.ci"/g' android/app/build.gradle
+            if [ "$PROFILE" = "staging" ]; then
+              sed -i 's/applicationId "com\.ngo\.databank"/applicationId "com.ngo.databank.staging"/g' android/app/build.gradle
+            elif [ "$PROFILE" = "development" ]; then
+              sed -i 's/applicationId "com\.ngo\.databank"/applicationId "com.ngo.databank.dev"/g' android/app/build.gradle
+            fi
           fi
 
-          # Change app display name based on environment / organization
-          # IFRC profile → home screen name "IFRC Databank"; otherwise CI-style NGO Databank label
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ORG="${{ inputs.organization_config }}"
+          # Resolve display name: staging always gets a suffix; prod/dev use org branding
+          if [ "$PROFILE" = "staging" ]; then
+            ENV_DISPLAY_NAME="IFRC Databank (Staging)"
           else
-            # push (e.g. mobile/v* tags) has no workflow_dispatch inputs — default org matches workflow default (ifrc)
-            ORG=ifrc
-          fi
-          if [ "$ORG" = "ifrc" ]; then
-            ENV_DISPLAY_NAME="IFRC Databank"
-          else
-            ENV_DISPLAY_NAME="NGO Databank (CI - ${{ steps.resolve_env.outputs.profile }})"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              ORG="${{ inputs.organization_config }}"
+            else
+              ORG=ifrc
+            fi
+            if [ "$ORG" = "ifrc" ]; then
+              ENV_DISPLAY_NAME="IFRC Databank"
+            else
+              ENV_DISPLAY_NAME="NGO Databank (CI - $PROFILE)"
+            fi
           fi
 
           if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
@@ -168,7 +185,7 @@ jobs:
           flutter build apk --release \
             --dart-define=$ENV_FLAG \
             $ORG_CONFIG \
-            --dart-define=MOBILE_APP_API_KEY="${{ secrets.MOBILE_APP_API_KEY }}" \
+            --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
             --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
 
       - name: Build App Bundle (optional, for Play Store)
@@ -190,7 +207,7 @@ jobs:
           flutter build appbundle --release \
             --dart-define=$ENV_FLAG \
             $ORG_CONFIG \
-            --dart-define=MOBILE_APP_API_KEY="${{ secrets.MOBILE_APP_API_KEY }}" \
+            --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
             --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
         continue-on-error: true  # Don't fail if bundle build fails
 

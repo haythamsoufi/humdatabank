@@ -137,57 +137,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     return copy;
   }
 
-  Widget _buildStatsCard({
-    required String title,
-    required String value,
-    required Color color,
-    required Color backgroundColor,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.isDarkTheme;
-
-    return Expanded(
-      child: Container(
-        margin: EdgeInsets.symmetric(horizontal: IOSSpacing.xsOf(context)),
-        padding: EdgeInsets.symmetric(
-          horizontal: IOSSpacing.mdOf(context),
-          vertical: IOSSpacing.mdOf(context),
-        ),
-        decoration: BoxDecoration(
-          color: isDark
-              ? IOSColors.secondarySystemBackgroundDark
-              : IOSColors.secondarySystemBackground,
-          borderRadius: BorderRadius.circular(IOSDimensions.borderRadiusMediumOf(context)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              value,
-              style: IOSTextStyle.title3(context).copyWith(
-                color: color,
-                height: 1.0,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(width: IOSSpacing.xsOf(context)),
-            Flexible(
-              child: Text(
-                title,
-                style: IOSTextStyle.caption1(context).copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  fontWeight: FontWeight.w500,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // Past section: filters + single list (same structure as dashboard.html table, not status sub-groups)
   Widget _buildPastAssignmentsSection(DashboardProvider provider) {
     final localizations = AppLocalizations.of(context)!;
@@ -852,37 +801,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                                 );
                               },
-                            ),
-                          // Stats Overview Cards
-                          if (provider.currentAssignments.isNotEmpty ||
-                              provider.pastAssignments.isNotEmpty)
-                            Container(
-                              margin: EdgeInsets.fromLTRB(
-                                IOSSpacing.lgOf(context),
-                                0,
-                                IOSSpacing.lgOf(context),
-                                IOSSpacing.xlOf(context) + 4,
-                              ),
-                              child: Row(
-                                children: [
-                                  _buildStatsCard(
-                                    title: localizations.active,
-                                    value: '${provider.currentAssignments.length}',
-                                    color: context.isDarkTheme
-                                        ? Theme.of(context)
-                                            .colorScheme.tertiary
-                                        : context.navyTextColor,
-                                    backgroundColor: Colors.transparent,
-                                  ),
-                                  _buildStatsCard(
-                                    title: localizations.pastAssignments,
-                                    value: '${provider.pastAssignments.length}',
-                                    color: const Color(
-                                        AppConstants.successColor),
-                                    backgroundColor: Colors.transparent,
-                                  ),
-                                ],
-                              ),
                             ),
 
                           // Current assignments (same bucket as dashboard.html current_assignments)

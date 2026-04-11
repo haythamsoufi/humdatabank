@@ -66,6 +66,7 @@ Requires auto_translate_config to be set with endpoint URL
         totalItems: 0,
         processedItems: 0,
         successCount: 0,
+        skippedCount: 0,
         errorCount: 0,
         errors: []
     };
@@ -226,6 +227,7 @@ Requires auto_translate_config to be set with endpoint URL
             translationState.totalItems = 0;
             translationState.processedItems = 0;
             translationState.successCount = 0;
+            translationState.skippedCount = 0;
             translationState.errorCount = 0;
             translationState.errors = [];
 
@@ -281,7 +283,6 @@ Requires auto_translate_config to be set with endpoint URL
             Object.keys(counts).forEach(lang => {
                 // Skip if language key itself is metadata
                 if (isMetadataString(lang)) {
-                    window.__clientWarn && window.__clientWarn('Skipping metadata string as language key:', lang);
                     delete counts[lang];
                     return;
                 }
@@ -291,13 +292,11 @@ Requires auto_translate_config to be set with endpoint URL
 
                 // Check if count value is a metadata string
                 if (typeof count === 'string' && isMetadataString(count)) {
-                    window.__clientWarn && window.__clientWarn('Count value is metadata string for language', lang, ':', count.substring(0, 50));
                     count = 0;
                 } else if (typeof count !== 'number') {
                     // Try to parse as number
                     const parsed = parseInt(count);
                     if (isNaN(parsed) || isMetadataString(String(count))) {
-                        window.__clientWarn && window.__clientWarn('Invalid count for language', lang, ':', count, '-> setting to 0');
                         count = 0;
                     } else {
                         count = parsed;
@@ -399,6 +398,7 @@ Requires auto_translate_config to be set with endpoint URL
                     body: JSON.stringify({
                         total: state.processedItems || 0,
                         success_count: state.successCount || 0,
+                        skipped_count: state.skippedCount || 0,
                         error_count: state.errorCount || 0,
                         languages: selectedLanguages,
                         context: autoTranslateConfig.permission_context || '',
@@ -427,7 +427,10 @@ Requires auto_translate_config to be set with endpoint URL
             const timestamp = (typeof DateTimeUtils !== 'undefined')
                 ? DateTimeUtils.format(new Date(), 'time')
                 : new Date().toLocaleTimeString();
-            const logClass = type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-gray-600';
+            const logClass = type === 'error' ? 'text-red-600'
+                : type === 'success' ? 'text-green-600'
+                : type === 'warning' ? 'text-amber-600'
+                : 'text-gray-600';
             const logEntry = `<div class="${logClass}">[${timestamp}] ${message}</div>`;
 
             const logContainer = jQuery('#translation-log');
@@ -447,6 +450,7 @@ Requires auto_translate_config to be set with endpoint URL
             jQuery('#progress-bar').css('width', percentage + '%');
             jQuery('#progress-text').text(`${state.processedItems}/${state.totalItems}`);
             jQuery('#success-count').text(state.successCount);
+            jQuery('#skipped-count').text(state.skippedCount || 0);
             jQuery('#error-count').text(state.errorCount);
 
             // Show error details if there are errors
@@ -512,7 +516,6 @@ Requires auto_translate_config to be set with endpoint URL
             if (selectedLanguages.length === 0) {
                 const selectLanguageMsg = {{ _("Please select at least one language to translate.") | tojson }};
                 if (window.showAlert) window.showAlert(selectLanguageMsg, 'warning');
-                else window.__clientWarn && window.__clientWarn(selectLanguageMsg);
                 return;
             }
 
@@ -542,6 +545,7 @@ Requires auto_translate_config to be set with endpoint URL
             // Reset progress
             translationState.processedItems = 0;
             translationState.successCount = 0;
+            translationState.skippedCount = 0;
             translationState.errorCount = 0;
             translationState.errors = [];
 

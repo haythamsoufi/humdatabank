@@ -7,9 +7,17 @@
 name: Deploy to Webapp
 
 # Shown in the Actions run list instead of the default "Manually run by …" title.
-run-name: Deploy to Webapp — ${{ inputs.environment }} (${{ inputs.version }})
+run-name: >-
+  ${{ github.event_name == 'release'
+    && format('Auto-deploy to Staging — {0}', github.event.release.tag_name)
+    || format('Deploy to Webapp — {0} ({1})', inputs.environment, inputs.version) }}
 
 on:
+  # Automatically deploy to Staging whenever a new release is published.
+  # Does NOT deploy to Production — that always requires a manual workflow_dispatch.
+  release:
+    types: [published]
+
   workflow_dispatch:
     inputs:
       environment:
@@ -25,17 +33,23 @@ on:
         default: 'v1.7'
         type: string
 
+env:
+  # When triggered by a release event, always deploy to Staging using the release tag.
+  # When triggered manually, use the caller-supplied inputs.
+  EFFECTIVE_ENV: ${{ github.event_name == 'release' && 'Staging' || inputs.environment }}
+  EFFECTIVE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
+
 jobs:
   validate:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment == 'Production' && 'production' || 'staging' }}
+    environment: ${{ (github.event_name == 'release' || inputs.environment != 'Production') && 'staging' || 'production' }}
     permissions:
       contents: read
     steps:
       - name: Set deployment target
         id: config
         run: |
-          if [ "${{ inputs.environment }}" = "Production" ]; then
+          if [ "${{ env.EFFECTIVE_ENV }}" = "Production" ]; then
             echo "app_name=ifrc-databank-app" >> "$GITHUB_OUTPUT"
           else
             echo "app_name=ifrc-databank-staging-2" >> "$GITHUB_OUTPUT"
@@ -94,7 +108,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: validate
-    environment: ${{ inputs.environment == 'Production' && 'production' || 'staging' }}
+    environment: ${{ (github.event_name == 'release' || inputs.environment != 'Production') && 'staging' || 'production' }}
     permissions:
       contents: read #This is required for actions/checkout
 
@@ -204,7 +218,7 @@ jobs:
           file: ./Backoffice/Dockerfile
           push: true
           tags: |
-            ifrcimage.azurecr.io/databank_backend:${{ inputs.version }}
+            ifrcimage.azurecr.io/databank_backend:${{ env.EFFECTIVE_VERSION }}
             ifrcimage.azurecr.io/databank_backend:${{ github.sha }}
           cache-from: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache
           platforms: linux/amd64
@@ -212,12 +226,12 @@ jobs:
           # `Backoffice/.dockerignore` keeps the build context small.
           # Used by Backoffice/app/__init__.py to generate static_url(...)?v=...
           # Make this change every deployment so clients always fetch updated JS/CSS.
-          # RELEASE_VERSION = registry/deploy image tag (inputs.version). APP_VERSION = latest GitHub release tag.
+          # RELEASE_VERSION = registry/deploy image tag. APP_VERSION = latest GitHub release tag.
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             ASSET_VERSION=${{ github.sha }}
             GIT_SHA=${{ github.sha }}
-            RELEASE_VERSION=${{ inputs.version }}
+            RELEASE_VERSION=${{ env.EFFECTIVE_VERSION }}
             LATEST_RELEASE_TAG=${{ steps.gh_release.outputs.tag_name }}
 
       - name: Build and push container image (update registry build cache)
@@ -228,19 +242,19 @@ jobs:
           file: ./Backoffice/Dockerfile
           push: true
           tags: |
-            ifrcimage.azurecr.io/databank_backend:${{ inputs.version }}
+            ifrcimage.azurecr.io/databank_backend:${{ env.EFFECTIVE_VERSION }}
             ifrcimage.azurecr.io/databank_backend:${{ github.sha }}
           cache-from: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache
           # Full cache export is expensive (~2 minutes), so only do it when deps change.
           cache-to: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache,mode=max
           platforms: linux/amd64
           provenance: false
-          # RELEASE_VERSION = registry/deploy image tag (inputs.version). APP_VERSION = latest GitHub release tag.
+          # RELEASE_VERSION = registry/deploy image tag. APP_VERSION = latest GitHub release tag.
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             ASSET_VERSION=${{ github.sha }}
             GIT_SHA=${{ github.sha }}
-            RELEASE_VERSION=${{ inputs.version }}
+            RELEASE_VERSION=${{ env.EFFECTIVE_VERSION }}
             LATEST_RELEASE_TAG=${{ steps.gh_release.outputs.tag_name }}
 
       - name: Clean up Docker resources
@@ -263,7 +277,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: build
-    environment: ${{ inputs.environment == 'Production' && 'production' || 'staging' }}
+    environment: ${{ (github.event_name == 'release' || inputs.environment != 'Production') && 'staging' || 'production' }}
     permissions:
       contents: read
     env:
@@ -273,7 +287,7 @@ jobs:
       - name: Set deployment target
         id: config
         run: |
-          if [ "${{ inputs.environment }}" = "Production" ]; then
+          if [ "${{ env.EFFECTIVE_ENV }}" = "Production" ]; then
             echo "app_name=ifrc-databank-app" >> "$GITHUB_OUTPUT"
           else
             echo "app_name=ifrc-databank-staging-2" >> "$GITHUB_OUTPUT"
@@ -283,7 +297,7 @@ jobs:
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ steps.config.outputs.app_name }}
-          images: 'ifrcimage.azurecr.io/databank_backend:${{ inputs.version }}'
+          images: 'ifrcimage.azurecr.io/databank_backend:${{ env.EFFECTIVE_VERSION }}'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
 
       # Ask the platform to restart the main site via Kudu (same Basic auth as the publish profile).

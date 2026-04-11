@@ -398,6 +398,10 @@ class AIReasoningTrace(db.Model):
     llm_quality_reasoning = Column(Text, nullable=True)      # LLM's explanation of its assessment
     llm_needs_review = Column(Boolean, nullable=True)        # True when LLM flags the response for human review
 
+    # User-visible progress steps emitted during the run (ordered list of labels shown in the chat UI)
+    progress_steps = Column(JSON, nullable=True)
+    # Format: [{"message": "Preparing query…", "detail_lines": ["rewritten: …"]}, ...]
+
     # Timestamps
     created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
 

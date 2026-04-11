@@ -44,6 +44,10 @@ class AiChatProvider with ChangeNotifier {
   bool _wsUserCancelled = false;
 
   bool _policyAcknowledged = false;
+  /// True once [loadChatUiPrefs] has completed at least once.
+  /// Guards the policy banner and the send gate so we never incorrectly
+  /// block a user who already acknowledged while prefs are still loading.
+  bool _prefsLoaded = false;
   List<String> _sourcesSelected = ['historical', 'system_documents', 'upr_documents'];
   String _preferredLanguageCode = 'en';
   String? _streamStatusHint;
@@ -114,6 +118,7 @@ class AiChatProvider with ChangeNotifier {
 
   List<AiChatAgentStep> get agentSteps => List.unmodifiable(_agentSteps);
   bool get policyAcknowledged => _policyAcknowledged;
+  bool get prefsLoaded => _prefsLoaded;
   List<String> get selectedSources => List.unmodifiable(_sourcesSelected);
   String? get streamStatusHint => _streamStatusHint;
   bool get inflightRestoreActive => _inflightRestoreActive;
@@ -155,6 +160,7 @@ class AiChatProvider with ChangeNotifier {
         _pinnedConversationIds = {};
       }
     }
+    _prefsLoaded = true;
     notifyListeners();
   }
 

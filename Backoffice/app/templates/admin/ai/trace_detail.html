@@ -712,6 +712,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (meta.tools_used && meta.tools_used.length) { lines.push('Tools used: ' + meta.tools_used.join(', ')); }
                 lines.push('');
 
+                // User-visible progress steps (Planning → Drafting pipeline)
+                var progressSteps = Array.isArray(meta.progress_steps) ? meta.progress_steps : [];
+                if (progressSteps.length) {
+                    lines.push('=== Progress Pipeline ===');
+                    progressSteps.forEach(function (ps, idx) {
+                        var label = (ps && typeof ps === 'object') ? (ps.message || ps) : String(ps || '');
+                        var detailLines = (ps && Array.isArray(ps.detail_lines)) ? ps.detail_lines : [];
+                        lines.push((idx + 1) + '. ' + label);
+                        detailLines.forEach(function (dl) {
+                            if (dl && String(dl).trim()) { lines.push('   ' + String(dl).trim()); }
+                        });
+                    });
+                    lines.push('');
+                }
+
                 if (steps.length) {
                     lines.push(formatStepsForCopy(steps, AI_REVIEW_MAX_OBS_LINES, true));
                 } else {

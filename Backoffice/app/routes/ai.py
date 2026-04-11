@@ -1403,6 +1403,9 @@ def chat_stream():
     inflight_last_persist = 0.0
     inflight_last_steps_json = None  # debug / change detection (optional)
 
+    # Accumulate user-visible progress steps so they can be persisted on the trace after the run.
+    _collected_progress_steps: list = []
+
     def _persist_inflight_update(*, kind: str, step_message: Optional[str] = None, detail: Optional[str] = None, force: bool = False) -> None:
         """
         Update conversation.meta['inflight'] with the newest step/detail.
@@ -1528,10 +1531,32 @@ def chat_stream():
         if step_message is None and detail is not None:
             logger.info("AI SSE[%s] emitting step_detail: %s", request_id, detail)
             _persist_inflight_update(kind="detail", detail=detail)
+            # Attach detail to the last collected progress step
+            if _collected_progress_steps:
+                dl = _collected_progress_steps[-1].get("detail_lines")
+                if not isinstance(dl, list):
+                    dl = []
+                if detail and str(detail).strip():
+                    dl.append(str(detail).strip())
+                _collected_progress_steps[-1]["detail_lines"] = dl
             _emit({"type": "step_detail", "detail": detail})
             return
         if step_message:
             logger.info("AI SSE[%s] emitting step event: %s", request_id, step_message)
+        # Record this step for trace persistence
+        msg = (step_message or "").strip()
+        if msg:
+            if _collected_progress_steps and _collected_progress_steps[-1].get("message") == msg:
+                # Same step label again (e.g. duplicate emit) — append detail to existing entry
+                if detail and str(detail).strip():
+                    dl = _collected_progress_steps[-1].get("detail_lines", [])
+                    dl.append(str(detail).strip())
+                    _collected_progress_steps[-1]["detail_lines"] = dl
+            else:
+                entry: dict = {"message": msg, "detail_lines": []}
+                if detail and str(detail).strip():
+                    entry["detail_lines"] = [str(detail).strip()]
+                _collected_progress_steps.append(entry)
         payload = {"type": "step", "message": step_message or ""}
         if detail is not None:
             payload["detail"] = detail
@@ -1647,6 +1672,18 @@ def chat_stream():
                         )
 
                     trace_id_for_feedback = getattr(result, "trace_id", None) or getattr(g, "ai_trace_id", None)
+
+                    # Persist user-visible progress steps on the trace (best-effort)
+                    if trace_id_for_feedback and _collected_progress_steps:
+                        try:
+                            from app.services.ai_reasoning_trace import AIReasoningTraceService
+                            AIReasoningTraceService().update_progress_steps(
+                                trace_id_for_feedback, list(_collected_progress_steps)
+                            )
+                        except Exception as _ps_err:
+                            current_app.logger.debug(
+                                "AI SSE[%s] progress_steps persist failed: %s", request_id, _ps_err
+                            )
 
                     # Emit _final BEFORE persistence so the UI can show the answer ASAP.
                     _emit(

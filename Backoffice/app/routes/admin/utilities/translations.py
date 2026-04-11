@@ -189,7 +189,12 @@ def manage_translations():
                         first_plural = entry.msgstr_plural.get(0, '') or (list(entry.msgstr_plural.values())[0] if entry.msgstr_plural else '')
                         translations[entry.msgid] = first_plural
                     else:
-                        translations[entry.msgid] = ""
+                        # Guard: a duplicate empty entry (e.g. the original plural entry from
+                        # pybabel extraction appearing after an auto-translate non-plural entry)
+                        # must never overwrite a translation already found earlier in this file.
+                        existing = translations.get(entry.msgid, '')
+                        if not existing:
+                            translations[entry.msgid] = ""
 
                     # Fallback: capture source from PO if POT didn't have it
                     if entry.occurrences and entry.msgid not in msgid_sources:
@@ -1454,7 +1459,16 @@ def api_auto_translate():
             except Exception:
                 return ""
 
-        text = (_decode_b64_field('text_b64') or data.get('text') or '').strip()
+        _raw_text = _decode_b64_field('text_b64') or data.get('text') or ''
+        _ttype = str(translation_type or '').strip()
+        # PO gettext msgids are matched exactly; leading/trailing spaces are significant.
+        # Stripping would break po.find() and append duplicate entries while the UI still shows the original empty row.
+        if _ttype == 'translation':
+            text = _raw_text if isinstance(_raw_text, str) else str(_raw_text)
+            if not text.strip():
+                return json_bad_request('Text is required')
+        else:
+            text = _raw_text.strip()
         definition = (_decode_b64_field('definition_b64') or data.get('definition') or '').strip()
         # Get target languages from config (normalize to ISO codes)
         try:
@@ -1606,9 +1620,12 @@ def api_auto_translate():
                 current_app.logger.warning("polib not available - translation file updates will be skipped")
                 polib = None
 
-            # Get message ID for the translation
-            message_id = data.get('id', '').strip()
-            if not message_id:
+            # Get message ID for the translation (exact string; do not strip — gettext msgids are exact)
+            _mid = data.get('id')
+            if _mid is None:
+                return json_bad_request('Message ID is required for translation type')
+            message_id = _mid if isinstance(_mid, str) else str(_mid)
+            if not message_id.strip():
                 return json_bad_request('Message ID is required for translation type')
 
             # Check if polib is available for file updates
@@ -1618,6 +1635,7 @@ def api_auto_translate():
             # Translate the text to the target languages
             translations = {}
             success_count = 0
+            skipped_untranslatable = 0
 
             for lang in target_languages:
                 try:
@@ -1635,6 +1653,13 @@ def api_auto_translate():
                         target_language=target_locale,
                         service_name=service_name
                     )
+
+                    if not translated_text or not translated_text.strip():
+                        # Service responded but returned no usable translation (e.g. proper
+                        # noun / acronym / technical term that the API left unchanged and the
+                        # untranslated-output heuristic rejected). This is not a server error.
+                        skipped_untranslatable += 1
+                        continue
 
                     if translated_text and translated_text.strip():
                         translations[target_locale] = translated_text
@@ -1674,14 +1699,8 @@ def api_auto_translate():
                                     # If plural forms exist, mirror into second form as a simple fallback
                                     if len(entry.msgstr_plural) > 1:
                                         entry.msgstr_plural[1] = translated_text
-                                    current_app.logger.debug(
-                                        f"Updated existing plural translation for {message_id} in {target_locale}: {translated_text}"
-                                    )
                                 else:
                                     entry.msgstr = translated_text
-                                    current_app.logger.debug(
-                                        f"Updated existing translation for {message_id} in {target_locale}: {translated_text}"
-                                    )
                             else:
                                 en_po_path = _translations_po_path('en')
                                 is_plural = False
@@ -1700,9 +1719,6 @@ def api_auto_translate():
                                 else:
                                     entry = polib.POEntry(msgid=message_id, msgstr=translated_text)
                                 po.append(entry)
-                                current_app.logger.debug(
-                                    f"Created new translation for {message_id} in {target_locale}: {translated_text}"
-                                )
 
                             po.save(po_file_path)
                             success_count += 1
@@ -1714,15 +1730,23 @@ def api_auto_translate():
                     continue
 
             if success_count > 0:
-                current_app.logger.debug(
-                    "Auto-translate updated %d entries via %s",
-                    success_count,
-                    service_name,
-                )
                 return json_ok(
-                    translations=translations,
+                    translations={'label_translations': translations},
                     updated_count=success_count,
                     service_used=service_name,
+                )
+            elif skipped_untranslatable > 0:
+                # The translation API responded successfully but the text could not be
+                # translated (e.g. proper noun, technical term, or acronym returned
+                # unchanged). This is not an error — return a soft 200 so
+                # the UI can show an informational message rather than "Network error".
+                return json_ok(
+                    translations={},
+                    updated_count=0,
+                    skipped_untranslatable=skipped_untranslatable,
+                    service_used=service_name,
+                    untranslated=True,
+                    message='No translation available: the text may be a proper noun or technical term that does not require translation.',
                 )
             else:
                 return json_server_error('Failed to translate or update translation files')
@@ -1815,9 +1839,6 @@ def api_bulk_update_translations():
         if not items:
             return json_bad_request('No items provided')
 
-        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Bulk update request received with {len(items)} items")
-        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Request data: {data}")
-
         success_count = 0
         error_count = 0
         errors = []
@@ -1835,13 +1856,9 @@ def api_bulk_update_translations():
                     item_type = item.get('type')  # 'question', 'document_field', 'section', or 'page'
                     translations = item.get('translations', {})
 
-                    current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Processing item {item_id} of type {item_type}")
-                    current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Translations: {translations}")
-
                     if not item_id or not item_type:
                         error_count += 1
                         errors.append(f"Missing ID or type for item")
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Missing ID or type for item: {item}")
                         continue
 
                     # Handle different item types (including plugin_* types)
@@ -1863,17 +1880,11 @@ def api_bulk_update_translations():
                             form_item_type = item_type  # e.g. plugin_interactive_map
 
                         # Find the form item
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Looking for form item with item_id={item_id}, item_type={form_item_type}")
                         form_item = FormItem.query.filter_by(id=item_id, item_type=form_item_type).first()
                         if not form_item:
                             error_count += 1
                             errors.append(f"Form item not found: {item_id}")
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Form item not found: {item_id}")
                             continue
-
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Found form item: {form_item.id}, label: {form_item.label}")
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Current label_translations: {form_item.label_translations}")
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Current definition_translations: {form_item.definition_translations}")
 
                         # Update form item translations
                         # Handle both nested format and individual language format
@@ -1885,23 +1896,18 @@ def api_bulk_update_translations():
                             new_translations = translations['label_translations']
                             existing_translations.update(new_translations)
                             form_item.label_translations = existing_translations
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Merged label translations: {form_item.label_translations}")
                         else:
                             # Handle individual language fields (e.g., label_french, label_spanish)
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Processing individual label translations")
                             if not form_item.label_translations:
                                 form_item.label_translations = {}
                             label_translations = form_item.label_translations.copy()
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Current label translations: {label_translations}")
                             for key, value in translations.items():
                                 if key.startswith('label_') and len(key) > 6:
                                     lang = key[6:]  # Remove 'label_' prefix
                                     if value and value.strip():
                                         label_translations[lang] = value.strip()
-                                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Added label translation {lang}: {value.strip()}")
                             if label_translations:
                                 form_item.label_translations = label_translations
-                                current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Updated form item label translations: {form_item.label_translations}")
 
                         if 'definition_translations' in translations:
                             # Merge with existing translations instead of replacing
@@ -1911,7 +1917,6 @@ def api_bulk_update_translations():
                             new_translations = translations['definition_translations']
                             existing_translations.update(new_translations)
                             form_item.definition_translations = existing_translations
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Merged definition translations: {form_item.definition_translations}")
                         elif 'description_translations' in translations:
                             # Merge with existing translations instead of replacing
                             if not form_item.description_translations:
@@ -1920,7 +1925,6 @@ def api_bulk_update_translations():
                             new_translations = translations['description_translations']
                             existing_translations.update(new_translations)
                             form_item.description_translations = existing_translations
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Merged description translations: {form_item.description_translations}")
                         else:
                             # Handle individual description language fields
                             if form_item.is_indicator or form_item.is_question:
@@ -1949,11 +1953,6 @@ def api_bulk_update_translations():
                         if 'options_translations' in translations:
                             form_item.options_translations = translations['options_translations']
 
-                        # Debug: Print what the translations look like after update
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: AFTER UPDATE - label_translations: {form_item.label_translations}")
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: AFTER UPDATE - definition_translations: {form_item.definition_translations}")
-                        current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: AFTER UPDATE - description_translations: {form_item.description_translations}")
-
                     elif item_type == 'section':
                         # Find the section
                         section = FormSection.query.filter_by(id=item_id).first()
@@ -1971,7 +1970,6 @@ def api_bulk_update_translations():
                             new_translations = translations['name_translations']
                             existing_translations.update(new_translations)
                             section.name_translations = existing_translations
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Merged section name translations: {section.name_translations}")
 
                     elif item_type == 'page':
                         # Find the page
@@ -1990,7 +1988,6 @@ def api_bulk_update_translations():
                             new_translations = translations['name_translations']
                             existing_translations.update(new_translations)
                             page.name_translations = existing_translations
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Merged page name translations: {page.name_translations}")
 
                     elif item_type == 'template_name':
                         # Find the template; name_translations live on FormTemplateVersion, not FormTemplate
@@ -2014,7 +2011,6 @@ def api_bulk_update_translations():
                             new_translations = translations['name_translations']
                             existing_translations.update(new_translations)
                             version.name_translations = existing_translations
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Merged template name translations on version {version.id}: {version.name_translations}")
 
                     else:
                         error_count += 1
@@ -2022,46 +2018,14 @@ def api_bulk_update_translations():
                         continue
 
                     success_count += 1
-                    current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Successfully processed item {item_id}")
 
                 except Exception as e:
                     error_count += 1
                     errors.append(f"Error updating item {item.get('id', 'unknown')}.")
-                    current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Error updating item {item.get('id', 'unknown')}: {str(e)}")
                     current_app.logger.error(f"Error updating translations for item {item.get('id', 'unknown')}: {e}")
 
             # Commit all changes at once
-            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: Committing {success_count} successful updates")
             db.session.flush()
-            current_app.logger.debug("AUTO-TRANSLATE DEBUG: Database commit successful")
-
-            # Verify the data was actually saved by re-querying one of the updated items
-            if success_count > 0:
-                current_app.logger.debug("AUTO-TRANSLATE DEBUG: Verifying data persistence...")
-                for item in items:
-                    item_type = item.get('type')
-                    is_form_item = (
-                        item_type in ['indicator', 'question', 'document_field', 'matrix']
-                        or (isinstance(item_type, str) and item_type.startswith('plugin_'))
-                    )
-                    if is_form_item:
-                        item_id = item.get('id')
-                        if item_type == 'indicator':
-                            form_item_type = 'indicator'
-                        elif item_type == 'question':
-                            form_item_type = 'question'
-                        elif item_type == 'document_field':
-                            form_item_type = 'document_field'
-                        elif item_type == 'matrix':
-                            form_item_type = 'matrix'
-                        else:
-                            form_item_type = item_type
-
-                        verify_item = FormItem.query.filter_by(id=item_id, item_type=form_item_type).first()
-                        if verify_item:
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: VERIFICATION - Item {item_id} label_translations: {verify_item.label_translations}")
-                            current_app.logger.debug(f"AUTO-TRANSLATE DEBUG: VERIFICATION - Item {item_id} definition_translations: {verify_item.definition_translations}")
-                            break  # Just verify one item
 
         except Exception as e:
             return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

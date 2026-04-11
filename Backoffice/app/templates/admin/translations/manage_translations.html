@@ -502,11 +502,11 @@
                             </button>
                         </div>
                         <div class="flex gap-2">
-                            <button type="button" class="btn btn-secondary close-edit-translation-modal">
+                            <button type="button" class="btn btn-secondary close-edit-translation-modal" id="edit-translation-cancel-btn">
                                 {{ _('Cancel') }}
                             </button>
-                            <button type="submit" class="btn btn-success">
-                                {{ _('Save Translation') }}
+                            <button type="submit" id="edit-translation-save-btn" class="btn btn-success" aria-busy="false">
+                                <span id="edit-translation-save-btn-text">{{ _('Save Translation') }}</span>
                             </button>
                         </div>
                     </div>
@@ -1081,7 +1081,6 @@
             // Use server-side calculated counts for more reliability
             const etcEl = document.getElementById('empty-translation-counts-json');
             const serverCounts = etcEl ? JSON.parse(etcEl.textContent) : {};
-            window.__clientLog && window.__clientLog('Server-side empty translation counts:', serverCounts);
 
             // Get all msgids count if overwrite is enabled
             const allMsgidsEl = document.getElementById('all-translation-msgids-json');
@@ -1105,7 +1104,6 @@
             Object.entries(langMap).forEach(([locale, key]) => {
                 // Skip if locale or key is a metadata string
                 if (isMetadataString(locale) || isMetadataString(key)) {
-                    window.__clientWarn && window.__clientWarn('Skipping metadata string in langMap:', {locale, key});
                     counts[key] = 0;
                     return;
                 }
@@ -1132,7 +1130,6 @@
                         // Ensure serverCounts[locale] is a number
                         const serverCount = serverCounts[locale];
                         if (isMetadataString(serverCount)) {
-                            window.__clientWarn && window.__clientWarn('Server count is metadata string for locale:', locale);
                             count = 0;
                         } else {
                             count = typeof serverCount === 'number' ? serverCount : (parseInt(serverCount) || 0);
@@ -1143,14 +1140,12 @@
                 // Ensure count is always a number (defensive programming)
                 const finalCount = typeof count === 'number' ? count : (parseInt(count) || 0);
                 if (isNaN(finalCount) || finalCount < 0) {
-                    window.__clientWarn && window.__clientWarn('Invalid count for', key, ':', count, '-> setting to 0');
                     counts[key] = 0;
                 } else {
                     counts[key] = finalCount;
                 }
             });
 
-            window.__clientLog && window.__clientLog('Mapped translation counts for auto-translate (overwrite:', overwriteExisting, ', selected:', actualSelectedMsgids ? actualSelectedMsgids.size : 'all', '):', counts);
             return counts;
         };
 
@@ -1204,13 +1199,10 @@
 
         // Override the generic translation function with translation-specific logic
         window.performPageSpecificTranslation = function(selectedLanguages, selectedService) {
-            window.__clientLog && window.__clientLog('Using server-side data for translation collection');
-
             const translationsToTranslate = [];
 
             // Check if overwrite existing translations is enabled
             const overwriteExisting = jQuery('#overwrite-existing-translations').is(':checked');
-            window.__clientLog && window.__clientLog('Overwrite existing translations:', overwriteExisting);
 
             // Helper function to check if a string is PO file metadata (local to this function)
             function isMetadataStringLocal(str) {
@@ -1233,7 +1225,6 @@
                 if (selectedRows && selectedRows.length > 0) {
                     const msgids = selectedRows.map(row => row.msgid).filter(msgid => msgid && !isMetadataStringLocal(msgid));
                     selectedMsgids = new Set(msgids);
-                    window.__clientLog && window.__clientLog(`Found ${selectedMsgids.size} selected rows in ag-grid (after metadata filter)`);
                 }
             } else if (window.gridApi) {
                 // Fallback: filter selected nodes to only include displayed ones
@@ -1252,7 +1243,6 @@
                 if (selectedRows && selectedRows.length > 0) {
                     const msgids = selectedRows.map(row => row.msgid).filter(msgid => msgid && !isMetadataStringLocal(msgid));
                     selectedMsgids = new Set(msgids);
-                    window.__clientLog && window.__clientLog(`Found ${selectedMsgids.size} selected rows in ag-grid (via gridApi fallback, after metadata filter)`);
                 }
             }
 
@@ -1264,7 +1254,6 @@
             Object.keys(emptyTranslationMsgidsRaw).forEach(locale => {
                 emptyTranslationMsgids[locale] = (emptyTranslationMsgidsRaw[locale] || []).filter(msgid => !isMetadataStringLocal(msgid));
             });
-            window.__clientLog && window.__clientLog('Server-side empty translation msgids (after filtering):', emptyTranslationMsgids);
 
             // Get all msgids if overwrite is enabled
             const allMsgidsEl = document.getElementById('all-translation-msgids-json');
@@ -1282,15 +1271,12 @@
                 const metadataKeyCount = metadataKeys.filter(key => strLower.includes(key)).length;
                 return metadataKeyCount < 3; // Keep if less than 3 metadata keys (not a header block)
             });
-            window.__clientLog && window.__clientLog('Server-side all msgids (after filtering):', allMsgids.length);
 
             // First, get the actual counts to know which languages need translation
             const selectedCounts = window.getPageSpecificTranslationCounts(overwriteExisting, selectedMsgids);
             const languagesNeedingTranslation = overwriteExisting
                 ? selectedLanguages  // If overwriting, translate all selected languages
                 : selectedLanguages.filter(lang => selectedCounts[lang] > 0);
-
-            // Intentionally no per-run debug logging here; translation runs can be large and spam the console.
 
             // Derive mapping of language key -> locale from server-provided map
             const langToLocaleMap = Object.fromEntries(
@@ -1301,7 +1287,6 @@
             languagesNeedingTranslation.forEach(lang => {
                 const localeCode = langToLocaleMap[lang];
                 if (!localeCode) {
-                    window.__clientLog && window.__clientLog(`No locale code found for language: ${lang}`);
                     return;
                 }
 
@@ -1316,10 +1301,7 @@
                 // Filter to selected rows if any are selected
                 if (selectedMsgids && selectedMsgids.size > 0) {
                     msgidsForLang = msgidsForLang.filter(msgid => selectedMsgids.has(msgid));
-                    window.__clientLog && window.__clientLog(`Filtered to ${msgidsForLang.length} msgids from selected rows for ${lang} (${localeCode})`);
                 }
-
-                window.__clientLog && window.__clientLog(`Found ${msgidsForLang.length} translations for ${lang} (${localeCode}) - overwrite: ${overwriteExisting}, selected: ${selectedMsgids ? selectedMsgids.size : 'all'}`);
 
                 msgidsForLang.forEach(msgid => {
                     // Double-check it's not metadata before adding
@@ -1334,8 +1316,6 @@
                     }
                 });
             });
-
-            // Intentionally no per-run debug logging here; translation runs can be large and spam the console.
 
             if (translationsToTranslate.length === 0) {
                 window.autoTranslateModal.logProgress('{{ _("No translation fields found that need translation") }}', 'info');
@@ -1416,7 +1396,16 @@
             .then(data => {
                 window.autoTranslateModal.translationState.processedItems++;
 
-                if (data.success && data.translations) {
+                if (data.success && data.untranslated) {
+                    // The service responded but returned the text unchanged — it is a proper
+                    // noun or technical term that cannot be auto-translated. Count as skipped.
+                    window.autoTranslateModal.translationState.skippedCount =
+                        (window.autoTranslateModal.translationState.skippedCount || 0) + 1;
+                    window.autoTranslateModal.logProgress(
+                        `{{ _("Skipped") }} ${translation.language} {{ _("translation for") }} ${translation.id} — {{ _("proper noun or technical term, no translation available") }}`,
+                        'warning'
+                    );
+                } else if (data.success && data.translations && data.updated_count > 0) {
                     // Update the grid cell with the new translation
                     if (window.gridApi && data.translations && data.translations.label_translations && data.translations.label_translations[translation.language]) {
                         window.gridApi.forEachNode(function(node) {
@@ -1487,23 +1476,19 @@
             };
 
             const displayName = langDisplayMap[lang.toLowerCase()] || lang;
-            window.__clientLog && window.__clientLog(`Looking for column for ${lang} (display: ${displayName})`);
 
             // Look for exact match first
             if (headerMap[displayName] !== undefined) {
-                window.__clientLog && window.__clientLog(`Found exact match for ${displayName} at column ${headerMap[displayName]}`);
                 return headerMap[displayName];
             }
 
             // Look for partial match
             for (const [headerText, index] of Object.entries(headerMap)) {
                 if (headerText.toLowerCase().includes(displayName.toLowerCase())) {
-                    window.__clientLog && window.__clientLog(`Found partial match for ${displayName} in "${headerText}" at column ${index}`);
                     return index;
                 }
             }
 
-            window.__clientLog && window.__clientLog(`No column found for ${lang}`);
             return -1;
         }
 
@@ -1554,6 +1539,8 @@
         const modal = document.getElementById('edit-translation-modal');
         const closeBtns = document.querySelectorAll('.close-edit-translation-modal');
         const form = document.getElementById('edit-translation-form');
+        const saveBtn = document.getElementById('edit-translation-save-btn');
+        const saveBtnText = document.getElementById('edit-translation-save-btn-text');
         const languages = {{ (languages or []) | tojson | safe }};
         const languageNames = {{ (language_names or {}) | tojson | safe }};
         const allLanguageNames = {{ (ALL_LANGUAGES_DISPLAY_NAMES or {}) | tojson | safe }};
@@ -1661,8 +1648,35 @@
             });
         }
 
+        function setEditModalSaving(isSaving) {
+            if (!saveBtn) return;
+            saveBtn.disabled = isSaving;
+            saveBtn.classList.toggle('btn-loading', isSaving);
+            saveBtn.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+            if (saveBtnText) {
+                if (isSaving) {
+                    if (!saveBtnText.dataset.originalSaveLabel) {
+                        saveBtnText.dataset.originalSaveLabel = saveBtnText.textContent;
+                    }
+                    saveBtnText.textContent = {{ _('Saving...') | tojson }};
+                } else if (saveBtnText.dataset.originalSaveLabel) {
+                    saveBtnText.textContent = saveBtnText.dataset.originalSaveLabel;
+                    delete saveBtnText.dataset.originalSaveLabel;
+                }
+            }
+            modal.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+            document.querySelectorAll('#edit-translation-modal .close-edit-translation-modal').forEach(function(b) {
+                b.disabled = isSaving;
+            });
+            var autoB = document.getElementById('modal-auto-translate-btn');
+            var clearB = document.getElementById('modal-clear-translations-btn');
+            if (autoB) autoB.disabled = isSaving;
+            if (clearB) clearB.disabled = isSaving;
+        }
+
         // Close modal
         function closeEditModal() {
+            if (modal.getAttribute('aria-busy') === 'true') return;
             modal.classList.add('hidden');
             form.reset();
             document.getElementById('edit-translation-fields-container').innerHTML = '';
@@ -1674,11 +1688,11 @@
         });
 
         modal.addEventListener('click', function(e) {
-            if (e.target === modal) closeEditModal();
+            if (e.target === modal && modal.getAttribute('aria-busy') !== 'true') closeEditModal();
         });
 
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden') && modal.getAttribute('aria-busy') !== 'true') {
                 closeEditModal();
             }
         });
@@ -1802,7 +1816,9 @@
             var csrfToken = (payloadObj && payloadObj.csrf_token) ? String(payloadObj.csrf_token) : '';
             var payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
             var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+            var willReloadPage = false;
 
+            setEditModalSaving(true);
             fetchFn('{{ url_for("utilities.edit_translation") }}', {
                 method: 'POST',
                 body: JSON.stringify({ payload: payloadB64 }),
@@ -1819,12 +1835,12 @@
                 if (data.success) {
                     // Refresh grid data
                     if (window.gridApi) {
-                        // Reload the page to get fresh data
+                        willReloadPage = true;
                         window.location.reload();
                     } else {
+                        setEditModalSaving(false);
                         closeEditModal();
                         if (window.showAlert) window.showAlert(data.message || '{{ _("Translation saved successfully") }}', 'success');
-                        else window.__clientLog && window.__clientLog(data.message || 'Translation saved');
                     }
                 } else {
                     throw new Error(data.message || '{{ _("Failed to save translation") }}');
@@ -1835,6 +1851,9 @@
                 var m = '{{ _("Failed to save translation") }}: ' + error.message;
                 if (window.showAlert) window.showAlert(m, 'error');
                 else console.error(m);
+            })
+            .finally(function() {
+                if (!willReloadPage) setEditModalSaving(false);
             });
         });
 
@@ -1862,7 +1881,6 @@
 
                     if (!baseText) {
                         if (window.showAlert) window.showAlert('{{ _("Please ensure English or Message ID has text to translate from.") }}', 'warning');
-                        else window.__clientWarn && window.__clientWarn('Please ensure English or Message ID has text');
                         return;
                     }
 
@@ -1877,7 +1895,6 @@
 
                     if (!targetLanguages.length) {
                         if (window.showAlert) window.showAlert('{{ _("Nothing to translate — all enabled language fields already have values.") }}', 'info');
-                        else window.__clientLog && window.__clientLog('Nothing to translate');
                         return;
                     }
 
@@ -1946,10 +1963,8 @@
                             ? '{{ _("Cleared 1 translation field.") }}'
                             : '{{ _("Cleared") }} ' + clearedCount + ' {{ _("translation fields.") }}';
                         if (window.showAlert) window.showAlert(m, 'success');
-                        else window.__clientLog && window.__clientLog(m);
                     } else {
                         if (window.showAlert) window.showAlert('{{ _("No translation fields to clear.") }}', 'info');
-                        else window.__clientLog && window.__clientLog('No translation fields to clear');
                     }
                 }
                 if (window.showDangerConfirmation) {

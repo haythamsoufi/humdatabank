@@ -259,6 +259,36 @@ class AIReasoningTraceService:
         except Exception as e:
             logger.error(f"Failed to save reasoning trace: {e}", exc_info=True)
 
+    def update_progress_steps(
+        self,
+        trace_id: Optional[int],
+        progress_steps: List[Dict[str, Any]],
+    ) -> None:
+        """Persist the user-visible progress steps collected during a run.
+
+        Called after engine.run() completes and trace_id is known.
+        Each entry: {"message": str, "detail_lines": [str, ...]}.
+        """
+        if not trace_id or not _has_app_context():
+            return
+        try:
+            from app.models import AIReasoningTrace
+            from app.extensions import db
+
+            trace = db.session.get(AIReasoningTrace, trace_id)
+            if trace is None:
+                return
+            trace.progress_steps = progress_steps or []
+            db.session.commit()
+            logger.debug("Saved %d progress steps to trace id=%s", len(progress_steps or []), trace_id)
+        except Exception as e:
+            logger.error("update_progress_steps failed for trace_id=%s: %s", trace_id, e, exc_info=True)
+            try:
+                from app.extensions import db
+                db.session.rollback()
+            except Exception:
+                pass
+
     def get_trace(self, trace_id: int) -> Optional[Dict[str, Any]]:
         """Retrieve a reasoning trace."""
         try:

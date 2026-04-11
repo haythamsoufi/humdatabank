@@ -337,19 +337,28 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    style: _chatGptDark(t)
-                        ? FilledButton.styleFrom(
-                            backgroundColor: ChatImmersivePalette.darkBubble,
-                            foregroundColor: ChatImmersivePalette.darkText,
-                          )
-                        : null,
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: _chatOutline(t).withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    "Confirm you've read the information above to use the assistant.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: _chatMuted(t),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _policyAcknowledgeButton(
+                    theme: t,
                     onPressed: () async {
                       Navigator.pop(ctx);
                       await context.read<AiChatProvider>().acknowledgeAiPolicy();
                     },
-                    child: const Text('I understand'),
                   ),
                 ],
               ),
@@ -357,6 +366,50 @@ class _AiChatScreenState extends State<AiChatScreen> {
           },
         );
       },
+    );
+  }
+
+  /// Primary CTA for accepting the AI use policy (aligned with send / retry accent).
+  Widget _policyAcknowledgeButton({
+    required ThemeData theme,
+    required VoidCallback? onPressed,
+    String label = 'I understand',
+  }) {
+    final onGreen = AccessibilityHelper.getAccessibleTextColor(ChatImmersivePalette.sendGreen);
+    return Semantics(
+      button: true,
+      label: 'Acknowledge AI use policy',
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: ChatImmersivePalette.sendGreen,
+            foregroundColor: onGreen,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ),
+          onPressed: onPressed,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_outline_rounded, size: 22, color: onGreen),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  letterSpacing: 0.15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -685,6 +738,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final ai = context.watch<AiChatProvider>();
     final isAuthed = auth.isAuthenticated;
     final theme = Theme.of(context);
+    // When prefs are loaded and policy not accepted, block messaging (same gate as [_send]).
+    final policyBlocksInput = ai.prefsLoaded && !ai.policyAcknowledged;
 
     _maybeScrollToBottom(ai);
 
@@ -694,12 +749,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     final localizations = AppLocalizations.of(context)!;
 
+    // Capture the outer body height BEFORE the inner Scaffold/AppBar consumes any
+    // vertical space. This lets the composer compute exactly how much of the
+    // keyboard overlaps the inner body — without needing to know kToolbarHeight or
+    // whether an ancestor primary Scaffold already consumed the status-bar inset.
+    return LayoutBuilder(
+      builder: (_, outerConstraints) {
+        final outerBodyH = outerConstraints.maxHeight;
     return MediaQuery(
       data: MediaQuery.of(context).copyWith(
         textScaler: TextScaler.linear(MediaQuery.textScalerOf(context).scale(1) * _kUiScale),
       ),
       child: Scaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       backgroundColor: _chatSurface(theme),
       onDrawerChanged: (isOpened) {
         if (isOpened != true) return;
@@ -867,10 +929,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
-                                      if (!ai.policyAcknowledged) ...[
+                                      if (ai.prefsLoaded && !ai.policyAcknowledged) ...[
                                         const SizedBox(height: 20),
                                         Container(
-                                          padding: const EdgeInsets.all(16),
+                                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                                           decoration: BoxDecoration(
                                             color: _chatComposer(theme),
                                             borderRadius: BorderRadius.circular(16),
@@ -879,56 +941,88 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                             ),
                                           ),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment: CrossAxisAlignment.stretch,
                                             children: [
+                                              Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  DecoratedBox(
+                                                    decoration: BoxDecoration(
+                                                      color: _chatBannerSurface(theme),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      border: Border.all(
+                                                        color: _chatOutline(theme).withValues(alpha: 0.6),
+                                                      ),
+                                                    ),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.all(10),
+                                                      child: Icon(
+                                                        Icons.shield_outlined,
+                                                        size: 22,
+                                                        color: _chatLink(theme),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          'AI use policy',
+                                                          style: TextStyle(
+                                                            fontSize: 16,
+                                                            fontWeight: FontWeight.w700,
+                                                            height: 1.2,
+                                                            color: _chatBody(theme),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 4),
+                                                        Text(
+                                                          'Short summary — open the sheet for full details.',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            height: 1.3,
+                                                            color: _chatMuted(theme),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 14),
                                               Text(
-                                                "Don't share sensitive information. We use system traces/telemetry to improve the assistant.",
+                                                "Don't share sensitive information. We use system traces and telemetry to improve the assistant; messages may be processed by external AI providers.",
                                                 style: TextStyle(
                                                   fontSize: 13,
-                                                  height: 1.35,
+                                                  height: 1.4,
                                                   color: _chatBody(theme),
                                                 ),
                                               ),
                                               const SizedBox(height: 12),
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                crossAxisAlignment: WrapCrossAlignment.center,
-                                                children: [
-                                                  TextButton(
-                                                    style: TextButton.styleFrom(
-                                                      foregroundColor: _chatLink(theme),
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 8,
-                                                      ),
-                                                    ),
-                                                    onPressed: () =>
-                                                        _showAiPolicyModal(context),
-                                                    child: const Text('View AI policy'),
-                                                  ),
-                                                  FilledButton(
-                                                    style: _chatGptDark(theme)
-                                                        ? FilledButton.styleFrom(
-                                                            backgroundColor: ChatImmersivePalette.darkBubble,
-                                                            foregroundColor: ChatImmersivePalette.darkText,
-                                                            padding: const EdgeInsets.symmetric(
-                                                              horizontal: 16,
-                                                              vertical: 10,
-                                                            ),
-                                                          )
-                                                        : FilledButton.styleFrom(
-                                                            padding: const EdgeInsets.symmetric(
-                                                              horizontal: 16,
-                                                              vertical: 10,
-                                                            ),
-                                                          ),
-                                                    onPressed: () async {
-                                                      await context.read<AiChatProvider>().acknowledgeAiPolicy();
-                                                    },
-                                                    child: const Text('I understand'),
-                                                  ),
-                                                ],
+                                              TextButton.icon(
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor: _chatLink(theme),
+                                                  alignment: Alignment.centerLeft,
+                                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                                ),
+                                                onPressed: () => _showAiPolicyModal(context),
+                                                icon: Icon(
+                                                  Icons.article_outlined,
+                                                  size: 18,
+                                                  color: _chatLink(theme),
+                                                ),
+                                                label: const Text('Read full policy'),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              _policyAcknowledgeButton(
+                                                theme: theme,
+                                                onPressed: () async {
+                                                  await context
+                                                      .read<AiChatProvider>()
+                                                      .acknowledgeAiPolicy();
+                                                },
                                               ),
                                             ],
                                           ),
@@ -936,31 +1030,33 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                         const SizedBox(height: 24),
                                       ] else
                                         const SizedBox(height: 8),
-                                      Text(
-                                        'Try asking',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                          color: _chatMuted(theme),
+                                      if (!policyBlocksInput) ...[
+                                        Text(
+                                          'Try asking',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: _chatMuted(theme),
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 14),
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        alignment: WrapAlignment.center,
-                                        children: _quickPrompts.map((prompt) {
-                                          return _buildPromptChip(
-                                            theme: theme,
-                                            prompt: prompt,
-                                            onTap: () {
-                                              _controller.text = prompt;
-                                              _send(context, isAuthed);
-                                            },
-                                          );
-                                        }).toList(),
-                                      ),
+                                        const SizedBox(height: 14),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          alignment: WrapAlignment.center,
+                                          children: _quickPrompts.map((prompt) {
+                                            return _buildPromptChip(
+                                              theme: theme,
+                                              prompt: prompt,
+                                              onTap: () {
+                                                _controller.text = prompt;
+                                                _send(context, isAuthed);
+                                              },
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -1330,12 +1426,32 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           ),
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(_chatPagePaddingH, 6, _chatPagePaddingH, 8),
+                Builder(
+                    builder: (context) {
+                      final mq = MediaQuery.of(context);
+                      // AiChatScreen is hosted inside an outer Scaffold that has a
+                      // bottomNavigationBar (AiChatScreenWithBottomNav / MainNavigationScreen).
+                      // viewInsets.bottom measures keyboard height from the SCREEN bottom, but
+                      // the inner body's bottom sits ABOVE the outer nav bar.
+                      //
+                      // outerBottomNavH = screenH − viewPadding.top − outerBodyH
+                      //
+                      // outerBodyH is captured by the top-level LayoutBuilder in build()
+                      // BEFORE the inner Scaffold/AppBar consumes any space, so we do not
+                      // need to know kToolbarHeight or whether a parent Scaffold already
+                      // consumed the status-bar inset.
+                      //
+                      // When there is no outer nav bar, outerBottomNavH ≤ 0 → clamped to 0
+                      // → composerBottom = viewInsets.bottom (full keyboard height).
+                      final outerBottomNavH = (mq.size.height
+                              - mq.viewPadding.top
+                              - outerBodyH)
+                          .clamp(0.0, double.infinity);
+                      final composerBottom =
+                          (mq.viewInsets.bottom - outerBottomNavH)
+                              .clamp(0.0, mq.viewInsets.bottom);
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(_chatPagePaddingH, 6, _chatPagePaddingH, 8 + composerBottom),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1378,7 +1494,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                     color: _chatMuted(theme),
                                   ),
                                   tooltip: 'Configure data sources',
-                                  onPressed: ai.isStreaming
+                                  onPressed: (ai.isStreaming || policyBlocksInput)
                                       ? null
                                       : () => _showSourcesSheet(context, ai),
                                 ),
@@ -1386,6 +1502,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                   child: TextField(
                                     controller: _controller,
                                     focusNode: _inputFocusNode,
+                                    enabled: !policyBlocksInput,
                                     minLines: 1,
                                     maxLines: 6,
                                     maxLength: 4000,
@@ -1405,7 +1522,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                       ),
                                     ],
                                     decoration: InputDecoration(
-                                      hintText: _editingMessageIndex != null ? 'Edit message…' : 'Message',
+                                      hintText: policyBlocksInput
+                                          ? 'Acknowledge the AI policy above to send messages'
+                                          : (_editingMessageIndex != null ? 'Edit message…' : 'Message'),
                                       hintStyle: TextStyle(
                                         color: _chatMuted(theme),
                                         fontSize: 16,
@@ -1491,21 +1610,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                     valueListenable: _controller,
                                     builder: (context, value, _) {
                                       final hasText = value.text.trim().isNotEmpty;
+                                      final canSend = hasText && !policyBlocksInput;
                                       return SizedBox(
                                         width: 40,
                                         height: 40,
                                         child: Material(
-                                          color: ChatImmersivePalette.sendButtonWhite,
+                                          color: canSend
+                                              ? ChatImmersivePalette.sendButtonWhite
+                                              : _chatSendDisabled(theme),
                                           shape: const CircleBorder(),
                                           clipBehavior: Clip.antiAlias,
                                           child: InkWell(
                                             customBorder: const CircleBorder(),
-                                            onTap: hasText ? () => _send(context, isAuthed) : null,
-                                            child: const Center(
+                                            onTap: canSend ? () => _send(context, isAuthed) : null,
+                                            child: Center(
                                               child: Icon(
                                                 Icons.arrow_upward_rounded,
                                                 size: 20,
-                                                color: ChatImmersivePalette.sendArrowBlack,
+                                                color: canSend
+                                                    ? ChatImmersivePalette.sendArrowBlack
+                                                    : _chatMuted(theme),
                                               ),
                                             ),
                                           ),
@@ -1518,9 +1642,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           ),
                         ],
                       ),
-                    ),
+                    );
+                    },
                   ),
-                ),
               ],
             );
           },
@@ -1528,6 +1652,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
       ),
     ),
     );
+      }, // LayoutBuilder builder
+    ); // LayoutBuilder
   }
 
   Future<void> _send(BuildContext context, bool isAuthenticated) async {
@@ -1535,7 +1661,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (msg.isEmpty) return;
 
     final provider = context.read<AiChatProvider>();
-    if (!provider.policyAcknowledged) {
+    // Only enforce the policy gate once prefs have been read from storage.
+    // During the brief async load window, treat the user as acknowledged so
+    // a returning user is never incorrectly blocked.
+    if (provider.prefsLoaded && !provider.policyAcknowledged) {
       _showPolicyRequiredSnack(context);
       return;
     }

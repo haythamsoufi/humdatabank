@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       backend_url:
-        description: 'Backend URL (profile: databank.ifrc.org → production; *.fly.dev → NGO Databank demo; IFRC *-stage.ifrc.org → staging; localhost → development). Demo uses MOBILE_APP_API_KEY_LOCAL_DEV and bundle NGO Databank (Demo).'
+        description: 'Backend URL (profile: databank.ifrc.org → production; *.fly.dev → Humanitarian Databank demo; IFRC *-stage.ifrc.org → staging; localhost → development). Demo uses MOBILE_APP_API_KEY_LOCAL_DEV and bundle Humanitarian Databank (Demo).'
         required: true
         type: choice
         options:
@@ -97,7 +97,7 @@ jobs:
           # Local / emulator → development (quick login, WebView localhost rules)
           if [[ "$BACKEND" == *"localhost"* ]] || [[ "$BACKEND" == *"127.0.0.1"* ]] || [[ "$BACKEND" == *"10.0.2.2"* ]]; then
             PROFILE=development
-          # Fly.io NGO Databank preview (not IFRC staging)
+          # Fly.io Humanitarian Databank preview (not IFRC staging)
           elif [[ "$BACKEND" == *"fly.dev"* ]]; then
             PROFILE=demo
           # IFRC staging backoffice
@@ -178,24 +178,24 @@ jobs:
 
           if [ -n "$SUFFIX" ]; then
             # iOS bundle ID — RunnerTests / AuditTrailWidget pick up the same prefix via the glob pattern.
-            sed -i '' "s/com\.ngo\.databank/com.ngo.databank${SUFFIX}/g" ios/Runner.xcodeproj/project.pbxproj
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" ios/Runner.xcodeproj/project.pbxproj
 
             # iOS App Group in entitlements — must be updated alongside the bundle ID so that prod and
             # non-prod builds use SEPARATE Keychain partitions and shared-container NSUserDefaults.
-            # Without this patch both apps share group.com.ngo.databank, which causes cross-app token
+            # Without this patch both apps share group.com.hum.databank, which causes cross-app token
             # overwrite (login on one app logs out the other).
-            sed -i '' "s/group\.com\.ngo\.databank/group.com.ngo.databank${SUFFIX}/g" ios/Runner/Runner.entitlements
+            sed -i '' "s/group\.com\.hum\.databank/group.com.hum.databank${SUFFIX}/g" ios/Runner/Runner.entitlements
 
             # Android application ID + namespace — without this Android prevents dual-install because
             # two apps with the same package name cannot coexist on the same device.
-            sed -i '' "s/com\.ngo\.databank/com.ngo.databank${SUFFIX}/g" android/app/build.gradle
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" android/app/build.gradle
           fi
 
-          # Resolve display name: IFRC staging / NGO demo get explicit labels; prod/dev use org branding
+          # Resolve display name: IFRC staging / demo get explicit labels; prod/dev use org branding
           if [ "$PROFILE" = "staging" ]; then
             ENV_DISPLAY_NAME="IFRC Databank (Staging)"
           elif [ "$PROFILE" = "demo" ]; then
-            ENV_DISPLAY_NAME="NGO Databank (Demo)"
+            ENV_DISPLAY_NAME="Humanitarian Databank (Demo)"
           else
             if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
               ORG="${{ inputs.organization_config }}"
@@ -205,7 +205,7 @@ jobs:
             if [ "$ORG" = "ifrc" ]; then
               ENV_DISPLAY_NAME="IFRC Databank"
             else
-              ENV_DISPLAY_NAME="NGO Databank (CI - $PROFILE)"
+              ENV_DISPLAY_NAME="Humanitarian Databank (CI - $PROFILE)"
             fi
           fi
           /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" ios/Runner/Info.plist > /dev/null 2>&1 && \

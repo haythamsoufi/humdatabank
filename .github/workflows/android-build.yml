@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       backend_url:
-        description: 'Backend URL (databank.ifrc.org → production; *.fly.dev → NGO demo; IFRC *-stage.ifrc.org → staging; localhost → development)'
+        description: 'Backend URL (databank.ifrc.org → production; *.fly.dev → Humanitarian Databank demo; IFRC *-stage.ifrc.org → staging; localhost → development)'
         required: true
         type: choice
         options:
@@ -140,18 +140,18 @@ jobs:
           # Base applicationId matches MobileApp android/app/build.gradle
           if [ -f "android/app/build.gradle" ]; then
             if [ "$PROFILE" = "staging" ]; then
-              sed -i 's/applicationId "com\.ngo\.databank"/applicationId "com.ngo.databank.staging"/g' android/app/build.gradle
+              sed -i 's/applicationId "com\.hum\.databank"/applicationId "com.hum.databank.staging"/g' android/app/build.gradle
             elif [ "$PROFILE" = "demo" ]; then
-              sed -i 's/applicationId "com\.ngo\.databank"/applicationId "com.ngo.databank.demo"/g' android/app/build.gradle
+              sed -i 's/applicationId "com\.hum\.databank"/applicationId "com.hum.databank.demo"/g' android/app/build.gradle
             elif [ "$PROFILE" = "development" ]; then
-              sed -i 's/applicationId "com\.ngo\.databank"/applicationId "com.ngo.databank.dev"/g' android/app/build.gradle
+              sed -i 's/applicationId "com\.hum\.databank"/applicationId "com.hum.databank.dev"/g' android/app/build.gradle
             fi
           fi
 
           if [ "$PROFILE" = "staging" ]; then
             ENV_DISPLAY_NAME="IFRC Databank (Staging)"
           elif [ "$PROFILE" = "demo" ]; then
-            ENV_DISPLAY_NAME="NGO Databank (Demo)"
+            ENV_DISPLAY_NAME="Humanitarian Databank (Demo)"
           else
             if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
               ORG="${{ inputs.organization_config }}"
@@ -161,7 +161,7 @@ jobs:
             if [ "$ORG" = "ifrc" ]; then
               ENV_DISPLAY_NAME="IFRC Databank"
             else
-              ENV_DISPLAY_NAME="NGO Databank (CI - $PROFILE)"
+              ENV_DISPLAY_NAME="Humanitarian Databank (CI - $PROFILE)"
             fi
           fi
 

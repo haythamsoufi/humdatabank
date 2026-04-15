@@ -112,7 +112,7 @@ List<Widget> fdrsWorldMapTiles(ThemeData theme) {
           ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
           : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
       subdomains: const ['a', 'b', 'c', 'd'],
-      userAgentPackageName: 'ngo_databank_app',
+      userAgentPackageName: 'hum_databank_app',
     ),
   ];
 }

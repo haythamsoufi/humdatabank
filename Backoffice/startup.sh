@@ -2,7 +2,7 @@
 set -e
 
 echo "=========================================="
-echo "Starting NGO Databank on Azure"
+echo "Starting Humanitarian Databank on Azure"
 echo "=========================================="
 
 # Print environment info

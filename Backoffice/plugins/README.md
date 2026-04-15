@@ -2,7 +2,7 @@
 
 ## Overview
 
-The NGO Databank supports a plugin system that allows developers to extend the application with custom field types, functionality, and integrations.
+The Humanitarian Databank supports a plugin system that allows developers to extend the application with custom field types, functionality, and integrations.
 
 > **Security notice:** Plugins execute in the host process with full application privileges (database, file system, network, secrets). There is no OS-level sandbox. Only install plugins from trusted sources.
 

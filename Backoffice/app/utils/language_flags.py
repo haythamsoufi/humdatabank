@@ -226,7 +226,7 @@ def prefetch_language_flags_to_local_cache(
             continue
 
         try:
-            req = Request(url, headers={"User-Agent": "NGO-Databank/flags-cache"})
+            req = Request(url, headers={"User-Agent": "hum-databank/flags-cache"})
             with urlopen(req, timeout=timeout_seconds) as r:
                 data = r.read()
             # Basic sanity check to avoid writing HTML error pages as .svg

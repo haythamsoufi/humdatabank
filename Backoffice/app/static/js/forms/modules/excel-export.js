@@ -198,7 +198,7 @@ export class ExcelExportManager {
                 signal: controller.signal
             });
 
-            const exportSignal = response.headers.get('X-NGO-Databank-Export-Completed');
+            const exportSignal = response.headers.get('X-hum-databank-Export-Completed');
             this.log('fetch response', { status: response.status, exportSignal });
             if (!response.ok || exportSignal !== '1') {
                 const contentType = response.headers.get('content-type') || '';
@@ -215,7 +215,7 @@ export class ExcelExportManager {
             }
 
             const blob = await response.blob();
-            const filename = response.headers.get('X-NGO-Databank-Export-Filename') || 'export.xlsx';
+            const filename = response.headers.get('X-hum-databank-Export-Filename') || 'export.xlsx';
             this.log('download ready', { filename, size: blob.size });
 
             const blobUrl = URL.createObjectURL(blob);

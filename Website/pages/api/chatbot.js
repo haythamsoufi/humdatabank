@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         ...(authHeader ? { Authorization: authHeader } : {}),
-        ...(proxySecret ? { 'X-NGO-Databank-AI-Proxy': proxySecret } : {}),
+        ...(proxySecret ? { 'X-hum-databank-AI-Proxy': proxySecret } : {}),
         ...(xForwardedFor ? { 'X-Forwarded-For': xForwardedFor } : {}),
         ...(xRealIp ? { 'X-Real-IP': xRealIp } : {}),
       },

@@ -12,13 +12,13 @@ export default function UnifiedPlanningReportingPage() {
   return (
     <>
       <Head>
-        <title>Unified Planning and Reporting - NGO Databank</title>
+        <title>Unified Planning and Reporting - Humanitarian Databank</title>
         <meta name="description" content="Unified Planning and Reporting (UPR) data and dashboards." />
       </Head>
 
-      <div className="min-h-screen bg-ngodb-gray-50">
+      <div className="min-h-screen bg-humdb-gray-50">
         {/* Hero */}
-        <section className="bg-gradient-to-br from-ngodb-navy to-ngodb-navy/90 text-white py-12 sm:py-16 px-4 sm:px-6 lg:px-12">
+        <section className="bg-gradient-to-br from-humdb-navy to-humdb-navy/90 text-white py-12 sm:py-16 px-4 sm:px-6 lg:px-12">
           <div className="max-w-4xl mx-auto text-center">
             <motion.h1
               className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4"
@@ -47,23 +47,23 @@ export default function UnifiedPlanningReportingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
           >
-            <div className="bg-white rounded-xl shadow-md border border-ngodb-gray-200 overflow-hidden">
-              <div className="px-6 sm:px-8 py-5 border-b border-ngodb-gray-200 bg-ngodb-gray-50/80">
-                <h2 className="text-xl sm:text-2xl font-bold text-ngodb-navy">
+            <div className="bg-white rounded-xl shadow-md border border-humdb-gray-200 overflow-hidden">
+              <div className="px-6 sm:px-8 py-5 border-b border-humdb-gray-200 bg-humdb-gray-50/80">
+                <h2 className="text-xl sm:text-2xl font-bold text-humdb-navy">
                   UPR Data
                 </h2>
                 {UPR_TEMPLATE_ID != null && (
-                  <p className="text-sm text-ngodb-gray-500 mt-1">
+                  <p className="text-sm text-humdb-gray-500 mt-1">
                     Template ID: {UPR_TEMPLATE_ID}
                   </p>
                 )}
               </div>
-              <div className="px-6 sm:px-8 py-6 text-ngodb-gray-700">
+              <div className="px-6 sm:px-8 py-6 text-humdb-gray-700">
                 <p className="mb-4">
                   Unified Planning and Reporting brings planning and reporting data into a single view. This section will display data from the UPR form template once the template ID is configured.
                 </p>
                 <div
-                  className="min-h-[200px] rounded-lg bg-ngodb-gray-100 border border-dashed border-ngodb-gray-300 flex items-center justify-center text-ngodb-gray-500 text-sm"
+                  className="min-h-[200px] rounded-lg bg-humdb-gray-100 border border-dashed border-humdb-gray-300 flex items-center justify-center text-humdb-gray-500 text-sm"
                   data-template-id={UPR_TEMPLATE_ID}
                   data-section="upr"
                 >

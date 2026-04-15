@@ -78,16 +78,16 @@ export default function SectorIndicatorsPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8">
         <Head>
-          <title>{`${t('sectorIndicators.loading.title')} - NGO Databank`}</title>
+          <title>{`${t('sectorIndicators.loading.title')} - Humanitarian Databank`}</title>
         </Head>
         <div className="text-center py-20">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mb-4"></div>
-          <h1 className="text-3xl font-bold text-ngodb-navy mb-2">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mb-4"></div>
+          <h1 className="text-3xl font-bold text-humdb-navy mb-2">
             <TranslationSafe fallback="Loading Sector Indicators">
               {t('sectorIndicators.loading.title')}
             </TranslationSafe>
           </h1>
-          <p className="text-ngodb-gray-600">
+          <p className="text-humdb-gray-600">
             <TranslationSafe fallback="Please wait while we fetch the sector data...">
               {t('sectorIndicators.loading.description')}
             </TranslationSafe>
@@ -101,11 +101,11 @@ export default function SectorIndicatorsPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8 text-center">
         <Head>
-          <title>{`${t('sectorIndicators.error.title')} - NGO Databank`}</title>
+          <title>{`${t('sectorIndicators.error.title')} - Humanitarian Databank`}</title>
         </Head>
-        <h1 className="text-3xl font-bold text-ngodb-red mb-6">{t('sectorIndicators.error.title')}</h1>
+        <h1 className="text-3xl font-bold text-humdb-red mb-6">{t('sectorIndicators.error.title')}</h1>
         <p className="text-red-600 bg-red-100 p-4 rounded-md">{error}</p>
-        <Link href="/indicator-bank" className="mt-4 inline-block text-ngodb-red hover:underline">
+        <Link href="/indicator-bank" className="mt-4 inline-block text-humdb-red hover:underline">
           &larr; {t('sectorIndicators.backToBank')}
         </Link>
       </div>
@@ -116,12 +116,12 @@ export default function SectorIndicatorsPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8">
         <Head>
-          <title>{`${t('sectorIndicators.loading.title')} - NGO Databank`}</title>
+          <title>{`${t('sectorIndicators.loading.title')} - Humanitarian Databank`}</title>
         </Head>
         <div className="text-center py-20">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mb-4"></div>
-          <h1 className="text-3xl font-bold text-ngodb-navy mb-2">{t('sectorIndicators.loading.title')}</h1>
-          <p className="text-ngodb-gray-600">{t('sectorIndicators.loading.description')}</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mb-4"></div>
+          <h1 className="text-3xl font-bold text-humdb-navy mb-2">{t('sectorIndicators.loading.title')}</h1>
+          <p className="text-humdb-gray-600">{t('sectorIndicators.loading.description')}</p>
         </div>
       </div>
     );
@@ -132,30 +132,30 @@ export default function SectorIndicatorsPage() {
   return (
     <>
       <Head>
-        <title>{`${t('sectorIndicators.hero.title', { displayValue })} - NGO Databank`}</title>
+        <title>{`${t('sectorIndicators.hero.title', { displayValue })} - Humanitarian Databank`}</title>
         <meta name="description" content={`Browse ${displayValue} indicators from the indicator bank.`} />
       </Head>
 
-      <div className="bg-ngodb-gray-100 min-h-screen">
+      <div className="bg-humdb-gray-100 min-h-screen">
         <div className="w-full px-6 sm:px-8 lg:px-12 py-10">
           {/* Breadcrumb */}
           <nav className="mb-8">
-            <div className="flex items-center space-x-2 text-sm text-ngodb-gray-600">
-              <Link href="/indicator-bank" className="hover:text-ngodb-red">
+            <div className="flex items-center space-x-2 text-sm text-humdb-gray-600">
+              <Link href="/indicator-bank" className="hover:text-humdb-red">
                 {t('sectorIndicators.breadcrumb.indicatorBank')}
               </Link>
               <span>&gt;</span>
               <span className="capitalize">{t(`sectorIndicators.breadcrumb.${filterType}`)}</span>
               <span>&gt;</span>
-              <span className="text-ngodb-navy font-medium">{displayValue}</span>
+              <span className="text-humdb-navy font-medium">{displayValue}</span>
             </div>
           </nav>
 
           <div className="text-center mb-12">
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-ngodb-navy mb-4">
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-humdb-navy mb-4">
               {t('sectorIndicators.hero.title', { displayValue })}
             </h1>
-            <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
               {t('sectorIndicators.hero.description', { displayValue, filterType })}
             </p>
           </div>
@@ -168,11 +168,11 @@ export default function SectorIndicatorsPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={t('sectorIndicators.search.placeholder')}
-                className="flex-1 px-4 py-3 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                className="flex-1 px-4 py-3 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
               />
               <button
                 type="submit"
-                className="bg-ngodb-red hover:bg-ngodb-red-dark text-white font-semibold px-6 py-2 rounded-md transition-colors duration-150"
+                className="bg-humdb-red hover:bg-humdb-red-dark text-white font-semibold px-6 py-2 rounded-md transition-colors duration-150"
               >
                 {t('sectorIndicators.search.button')}
               </button>
@@ -183,7 +183,7 @@ export default function SectorIndicatorsPage() {
                     setSearchTerm('');
                     router.push(`/indicator-bank/sector/${router.query.slug}`);
                   }}
-                  className="bg-ngodb-gray-300 hover:bg-ngodb-gray-400 text-ngodb-gray-700 font-semibold px-6 py-2 rounded-md transition-colors duration-150"
+                  className="bg-humdb-gray-300 hover:bg-humdb-gray-400 text-humdb-gray-700 font-semibold px-6 py-2 rounded-md transition-colors duration-150"
                 >
                   {t('sectorIndicators.search.clear')}
                 </button>
@@ -193,7 +193,7 @@ export default function SectorIndicatorsPage() {
 
           {/* Results Count */}
           <div className="mb-6">
-            <p className="text-ngodb-gray-600">
+            <p className="text-humdb-gray-600">
               {filteredIndicators.length === 1
                 ? t('sectorIndicators.results.showing', { count: filteredIndicators.length })
                 : t('sectorIndicators.results.showingPlural', { count: filteredIndicators.length })
@@ -204,7 +204,7 @@ export default function SectorIndicatorsPage() {
 
           {/* Indicators List */}
           {filteredIndicators.length === 0 ? (
-            <p className="text-center text-ngodb-gray-600 text-lg py-10">
+            <p className="text-center text-humdb-gray-600 text-lg py-10">
               {searchTerm ?
                 t('sectorIndicators.results.noResults') :
                 t('sectorIndicators.results.noIndicators', { displayValue, filterType })
@@ -214,9 +214,9 @@ export default function SectorIndicatorsPage() {
             <div className="grid gap-6">
               {filteredIndicators.map((indicator) => (
                 <Link key={indicator.id} href={`/indicator-bank/${indicator.id}`}>
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-ngodb-gray-200 hover:shadow-lg hover:border-ngodb-red transition-all duration-150 cursor-pointer">
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-humdb-gray-200 hover:shadow-lg hover:border-humdb-red transition-all duration-150 cursor-pointer">
                     <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-xl font-semibold text-ngodb-navy mb-2">
+                      <h3 className="text-xl font-semibold text-humdb-navy mb-2">
                         {String(indicator.name || '')}
                       </h3>
                       {indicator.archived && (
@@ -227,7 +227,7 @@ export default function SectorIndicatorsPage() {
                     </div>
 
                     {indicator.definition && (
-                      <p className="text-ngodb-gray-600 mb-4">
+                      <p className="text-humdb-gray-600 mb-4">
                         {String(indicator.definition)}
                       </p>
                     )}
@@ -235,20 +235,20 @@ export default function SectorIndicatorsPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       {indicator.type && (
                         <div>
-                          <span className="font-medium text-ngodb-gray-700">{t('sectorIndicators.indicator.type')}:</span>
-                          <p className="text-ngodb-gray-600">{String(indicator.type)}</p>
+                          <span className="font-medium text-humdb-gray-700">{t('sectorIndicators.indicator.type')}:</span>
+                          <p className="text-humdb-gray-600">{String(indicator.type)}</p>
                         </div>
                       )}
                       {indicator.unit && (
                         <div>
-                          <span className="font-medium text-ngodb-gray-700">{t('sectorIndicators.indicator.unit')}:</span>
-                          <p className="text-ngodb-gray-600">{String(indicator.unit)}</p>
+                          <span className="font-medium text-humdb-gray-700">{t('sectorIndicators.indicator.unit')}:</span>
+                          <p className="text-humdb-gray-600">{String(indicator.unit)}</p>
                         </div>
                       )}
                       {indicator.sector && (
                         <div>
-                          <span className="font-medium text-ngodb-gray-700">{t('sectorIndicators.indicator.sector')}:</span>
-                          <p className="text-ngodb-gray-600">
+                          <span className="font-medium text-humdb-gray-700">{t('sectorIndicators.indicator.sector')}:</span>
+                          <p className="text-humdb-gray-600">
                             {typeof indicator.sector === 'object' && indicator.sector !== null
                               ? String(indicator.sector.primary || indicator.sector.name || indicator.sector)
                               : String(indicator.sector)}
@@ -257,18 +257,18 @@ export default function SectorIndicatorsPage() {
                       )}
                       {indicator.emergency !== null && indicator.emergency !== undefined && (
                         <div>
-                          <span className="font-medium text-ngodb-gray-700">{t('sectorIndicators.indicator.emergency')}:</span>
-                          <p className="text-ngodb-gray-600">{indicator.emergency ? t('common.yes') : t('common.no')}</p>
+                          <span className="font-medium text-humdb-gray-700">{t('sectorIndicators.indicator.emergency')}:</span>
+                          <p className="text-humdb-gray-600">{indicator.emergency ? t('common.yes') : t('common.no')}</p>
                         </div>
                       )}
                     </div>
 
                     {indicator.related_programs && Array.isArray(indicator.related_programs) && indicator.related_programs.length > 0 && (
                       <div className="mt-4">
-                        <span className="font-medium text-ngodb-gray-700 text-sm">{t('sectorIndicators.indicator.relatedPrograms')}:</span>
+                        <span className="font-medium text-humdb-gray-700 text-sm">{t('sectorIndicators.indicator.relatedPrograms')}:</span>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {indicator.related_programs.map((program, index) => (
-                            <span key={index} className="bg-ngodb-gray-100 text-ngodb-gray-700 text-xs px-2 py-1 rounded">
+                            <span key={index} className="bg-humdb-gray-100 text-humdb-gray-700 text-xs px-2 py-1 rounded">
                               {typeof program === 'string' ? program :
                                typeof program === 'object' && program !== null ?
                                  (String(program.primary || program.name || t('fallbacks.unknownProgram'))) :

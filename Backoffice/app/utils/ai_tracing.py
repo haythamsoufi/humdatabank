@@ -47,9 +47,9 @@ def _get_tracer():
         from opentelemetry.trace import TracerProvider
         try:
             from flask import current_app
-            name = current_app.config.get("OTEL_SERVICE_NAME", "ngo-databank-backoffice-ai")
+            name = current_app.config.get("OTEL_SERVICE_NAME", "hum-databank-backoffice-ai")
         except RuntimeError:
-            name = "ngo-databank-backoffice-ai"
+            name = "hum-databank-backoffice-ai"
         provider = trace.get_tracer_provider()
         if isinstance(provider, TracerProvider):
             _TRACER = trace.get_tracer(name, "1.0.0")

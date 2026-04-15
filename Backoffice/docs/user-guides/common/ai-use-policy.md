@@ -1,6 +1,6 @@
 # AI Use Policy
 
-This document describes the acceptable use, data handling, and responsibilities that apply when using the AI assistant in the NGO Databank Backoffice. Users must acknowledge this policy before using the chatbot (floating widget or immersive view).
+This document describes the acceptable use, data handling, and responsibilities that apply when using the AI assistant in the Humanitarian Databank Backoffice. Users must acknowledge this policy before using the chatbot (floating widget or immersive view).
 
 ## Important notice
 

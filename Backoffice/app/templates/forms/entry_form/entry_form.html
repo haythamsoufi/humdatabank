@@ -3677,9 +3677,9 @@
             const DEBUG_MODULES = (function() {
                 try {
                     const url = new URL(window.location.href);
-                    // Back-compat: ngodb:debugModules=1 (and legacy ifrc: keys)
-                    const legacy = localStorage.getItem('ngodb:debugModules') === '1' || localStorage.getItem('ifrc:debugModules') === '1';
-                    const persisted = localStorage.getItem('ngodb:debug:module:forms-loader') === '1' || localStorage.getItem('ifrc:debug:module:forms-loader') === '1';
+                    // Back-compat: humdb:debugModules=1 (and legacy ifrc: keys)
+                    const legacy = localStorage.getItem('humdb:debugModules') === '1' || localStorage.getItem('ifrc:debugModules') === '1';
+                    const persisted = localStorage.getItem('humdb:debug:module:forms-loader') === '1' || localStorage.getItem('ifrc:debug:module:forms-loader') === '1';
                     return url.searchParams.get('debugModules') === '1' || legacy || persisted;
                 } catch (e) { return false; }
             })();

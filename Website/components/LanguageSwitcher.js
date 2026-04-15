@@ -63,7 +63,7 @@ const LanguageSwitcher = () => {
 
   return (
     <div className="relative group">
-      <button className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-ngodb-white hover:text-ngodb-blue-200 transition-colors duration-200">
+      <button className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-humdb-white hover:text-humdb-blue-200 transition-colors duration-200">
         {renderLanguageFlag(currentLanguage)}
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -77,8 +77,8 @@ const LanguageSwitcher = () => {
               key={language.code}
               href={getLocalizedHref()}
               locale={language.code}
-              className={`flex items-center space-x-3 px-4 py-2 text-sm hover:bg-ngodb-gray-100 transition-colors duration-200 ${
-                locale === language.code ? 'bg-ngodb-blue-50 text-ngodb-blue-600' : 'text-ngodb-gray-700'
+              className={`flex items-center space-x-3 px-4 py-2 text-sm hover:bg-humdb-gray-100 transition-colors duration-200 ${
+                locale === language.code ? 'bg-humdb-blue-50 text-humdb-blue-600' : 'text-humdb-gray-700'
               }`}
             >
               <span className={`flag-icon flag-icon-${language.flagCode}`} title={language.name}></span>

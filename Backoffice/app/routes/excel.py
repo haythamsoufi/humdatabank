@@ -86,15 +86,15 @@ def export_assignment_excel(aes_id):
     )
     # Frontend "signal" to reliably end loading state after download is ready.
     # (This is used by the entry form Excel export UI, which downloads via fetch.)
-    resp.headers["X-NGO-Databank-Export-Completed"] = "1"
-    resp.headers["X-NGO-Databank-Export-Filename"] = filename
+    resp.headers["X-hum-databank-Export-Completed"] = "1"
+    resp.headers["X-hum-databank-Export-Filename"] = filename
     current_app.logger.info(
         "EXCEL_EXPORT: completion signal headers set",
         extra={
             "aes_id": aes_id,
             "user_id": getattr(current_user, "id", None),
             "export_filename": filename,
-            "signal_header": "X-NGO-Databank-Export-Completed",
+            "signal_header": "X-hum-databank-Export-Completed",
         },
     )
     return resp

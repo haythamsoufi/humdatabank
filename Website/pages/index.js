@@ -1386,10 +1386,10 @@ export default function GlobalOverviewPage() {
   // Show loading state until translations are loaded
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-ngodb-white">
+      <div className="min-h-screen flex items-center justify-center bg-humdb-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mx-auto mb-4"></div>
-          <p className="text-ngodb-gray-600">{t('common.loading')}</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mx-auto mb-4"></div>
+          <p className="text-humdb-gray-600">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -1405,7 +1405,7 @@ export default function GlobalOverviewPage() {
 
       {/* Hero Section with Dynamic Background Image & Crossfade */}
       <section
-        className="relative bg-ngodb-gray-900 text-ngodb-white py-16 md:py-20 overflow-hidden -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36" // Added overflow-hidden, extends behind navbar
+        className="relative bg-humdb-gray-900 text-humdb-white py-16 md:py-20 overflow-hidden -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36" // Added overflow-hidden, extends behind navbar
         role="banner"
         aria-label="Global overview slideshow"
       >
@@ -1414,7 +1414,7 @@ export default function GlobalOverviewPage() {
           <motion.div
             key={currentImageIndex}
             className="absolute inset-0 bg-cover bg-center z-0"
-            style={{ backgroundImage: slideshowImages.length > 0 ? `url('${slideshowImages[currentImageIndex]}')` : 'url("https://placehold.co/1920x800/011E41/FFFFFF?text=NGO+Databank")' }}
+            style={{ backgroundImage: slideshowImages.length > 0 ? `url('${slideshowImages[currentImageIndex]}')` : 'url("https://placehold.co/1920x800/011E41/FFFFFF?text=Humanitarian+Databank")' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1423,7 +1423,7 @@ export default function GlobalOverviewPage() {
         </AnimatePresence>
 
         {/* Overlay */}
-        <div className="absolute inset-0 bg-ngodb-black bg-opacity-60 z-10"></div>
+        <div className="absolute inset-0 bg-humdb-black bg-opacity-60 z-10"></div>
 
         {/* Content */}
         <motion.div
@@ -1465,10 +1465,10 @@ export default function GlobalOverviewPage() {
                 }}
                 style={{ overflow: 'hidden' }}
               >
-                <h3 className="text-lg font-semibold text-ngodb-white mb-1">
+                <h3 className="text-lg font-semibold text-humdb-white mb-1">
                   {t('chat.hero.title')}
                 </h3>
-                <p className="text-sm text-ngodb-gray-200">
+                <p className="text-sm text-humdb-gray-200">
                   {t('chat.hero.description')}
                 </p>
             </motion.div>
@@ -1489,7 +1489,7 @@ export default function GlobalOverviewPage() {
                             loadConversations(aiToken);
                           }
                         }}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-ngodb-white bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition-all"
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-humdb-white bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition-all"
                         title="View conversation history"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1506,12 +1506,12 @@ export default function GlobalOverviewPage() {
 
                       {/* Conversation List Dropdown */}
                       {showConversationList && (
-                        <div className="absolute top-full left-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-lg shadow-xl border border-ngodb-gray-200 z-50">
-                          <div className="p-3 border-b border-ngodb-gray-200 flex items-center justify-between">
-                            <h4 className="font-semibold text-ngodb-gray-800">Conversations</h4>
+                        <div className="absolute top-full left-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-lg shadow-xl border border-humdb-gray-200 z-50">
+                          <div className="p-3 border-b border-humdb-gray-200 flex items-center justify-between">
+                            <h4 className="font-semibold text-humdb-gray-800">Conversations</h4>
                             <button
                               onClick={() => setShowConversationList(false)}
-                              className="text-ngodb-gray-500 hover:text-ngodb-gray-700"
+                              className="text-humdb-gray-500 hover:text-humdb-gray-700"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1519,22 +1519,22 @@ export default function GlobalOverviewPage() {
                             </button>
                           </div>
                           {conversations.length === 0 ? (
-                            <div className="p-4 text-center text-ngodb-gray-500 text-sm">
+                            <div className="p-4 text-center text-humdb-gray-500 text-sm">
                               {isLoadingConversations ? t('common.loading') : t('chat.conversations.none')}
                             </div>
                           ) : (
-                            <div className="divide-y divide-ngodb-gray-100">
+                            <div className="divide-y divide-humdb-gray-100">
                               {conversations.map((conv) => (
                                 <button
                                   key={conv.id}
                                   onClick={() => loadConversation(conv.id)}
-                                  className="w-full text-left p-3 hover:bg-ngodb-gray-50 transition-colors"
+                                  className="w-full text-left p-3 hover:bg-humdb-gray-50 transition-colors"
                                 >
-                                  <div className="font-medium text-ngodb-gray-800 text-sm truncate">
+                                  <div className="font-medium text-humdb-gray-800 text-sm truncate">
                                     {conv.title || t('chat.conversations.untitled')}
                                   </div>
                                   {conv.last_message_at && (
-                                    <div className="text-xs text-ngodb-gray-500 mt-1">
+                                    <div className="text-xs text-humdb-gray-500 mt-1">
                                       {new Date(conv.last_message_at).toLocaleDateString()}
                                     </div>
                                   )}
@@ -1558,13 +1558,13 @@ export default function GlobalOverviewPage() {
                     onFocus={() => setIsInputFocused(true)}
                     onBlur={() => setIsInputFocused(false)}
                     placeholder={t('chat.messages.placeholder')}
-                    className="w-full px-4 py-3 pr-16 border border-ngodb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent text-base bg-white bg-opacity-95 backdrop-blur-sm text-ngodb-gray-800 placeholder-ngodb-gray-500"
+                    className="w-full px-4 py-3 pr-16 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent text-base bg-white bg-opacity-95 backdrop-blur-sm text-humdb-gray-800 placeholder-humdb-gray-500"
                     disabled={isLoading}
                   />
                   <button
                     type="submit"
                     className={`absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full text-white transition-colors duration-150 ${
-                      isLoading ? 'bg-ngodb-gray-400 cursor-not-allowed' : 'bg-ngodb-red hover:bg-ngodb-red-dark'
+                      isLoading ? 'bg-humdb-gray-400 cursor-not-allowed' : 'bg-humdb-red hover:bg-humdb-red-dark'
                     }`}
                     disabled={isLoading}
                     aria-label={isLoading ? t('chat.messages.thinking') : t('chat.actions.send')}
@@ -1637,7 +1637,7 @@ export default function GlobalOverviewPage() {
                         }
                       }, 100);
                     }}
-                    className="px-4 py-2 bg-white bg-opacity-20 backdrop-blur-sm border border-white border-opacity-30 rounded-lg text-sm text-ngodb-white hover:bg-white hover:bg-opacity-30 transition-all duration-200 font-medium"
+                    className="px-4 py-2 bg-white bg-opacity-20 backdrop-blur-sm border border-white border-opacity-30 rounded-lg text-sm text-humdb-white hover:bg-white hover:bg-opacity-30 transition-all duration-200 font-medium"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
@@ -1655,10 +1655,10 @@ export default function GlobalOverviewPage() {
       {/* Chat Response Section */}
       <HydrationSafe
         fallback={
-          <section className="py-8 bg-ngodb-white" style={{ minHeight: '80px' }}>
+          <section className="py-8 bg-humdb-white" style={{ minHeight: '80px' }}>
             <div className="w-full px-6 sm:px-8 lg:px-12">
               <div style={{ opacity: 0 }}>
-                <div className="bg-ngodb-gray-100 text-ngodb-gray-800 px-4 py-3 rounded-xl shadow">
+                <div className="bg-humdb-gray-100 text-humdb-gray-800 px-4 py-3 rounded-xl shadow">
                   {t('common.loading')}
                 </div>
               </div>
@@ -1667,7 +1667,7 @@ export default function GlobalOverviewPage() {
         }
       >
         {(currentResponse || isLoading) && (
-          <section className="py-8 bg-ngodb-white">
+          <section className="py-8 bg-humdb-white">
             <div className="w-full px-6 sm:px-8 lg:px-12">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -1677,7 +1677,7 @@ export default function GlobalOverviewPage() {
                   {/* Loading indicator */}
                   {isLoading && (
                     <div className="flex justify-start mb-4">
-                      <div className="bg-ngodb-gray-100 text-ngodb-gray-800 px-4 py-3 rounded-xl shadow animate-pulse">
+                      <div className="bg-humdb-gray-100 text-humdb-gray-800 px-4 py-3 rounded-xl shadow animate-pulse">
                         {t('chat.messages.thinking')}
                       </div>
                     </div>
@@ -1686,7 +1686,7 @@ export default function GlobalOverviewPage() {
                   {/* Response display */}
                   {currentResponse && !isLoading && (
                   <>
-                    <div className="bg-ngodb-gray-50 rounded-xl shadow-lg border border-ngodb-gray-200 p-6 w-full">
+                    <div className="bg-humdb-gray-50 rounded-xl shadow-lg border border-humdb-gray-200 p-6 w-full">
                       <div className="flex flex-col lg:flex-row gap-6">
                                               {/* Text response */}
                       <div className="lg:w-1/2 relative">
@@ -1720,12 +1720,12 @@ export default function GlobalOverviewPage() {
                                 button.className = 'absolute top-2 right-2 px-3 py-1 bg-green-500 text-white rounded-md text-xs font-medium transition-all duration-200 z-30';
                                 setTimeout(() => {
                                   button.innerHTML = originalText;
-                                  button.className = 'absolute top-2 right-2 px-3 py-1 bg-ngodb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-ngodb-red-dark copy-text-btn';
+                                  button.className = 'absolute top-2 right-2 px-3 py-1 bg-humdb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-humdb-red-dark copy-text-btn';
                                 }, 2000);
                               }
                             });
                           }}
-                          className="absolute top-2 right-2 px-3 py-1 bg-ngodb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-ngodb-red-dark copy-text-btn"
+                          className="absolute top-2 right-2 px-3 py-1 bg-humdb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-humdb-red-dark copy-text-btn"
                           title={t('globalOverview.copyButton.copy')}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1733,7 +1733,7 @@ export default function GlobalOverviewPage() {
                           </svg>
                         </button>
                         <div
-                          className="prose prose-sm max-w-none text-ngodb-gray-800 pt-8"
+                          className="prose prose-sm max-w-none text-humdb-gray-800 pt-8"
                           dangerouslySetInnerHTML={{ __html: currentResponse }}
                           suppressHydrationWarning={true}
                         />
@@ -1753,7 +1753,7 @@ export default function GlobalOverviewPage() {
                       </div>
                     </div>
 
-                    <div className="mt-8 border-b border-ngodb-gray-200"></div>
+                    <div className="mt-8 border-b border-humdb-gray-200"></div>
                   </>
                 )}
               </motion.div>
@@ -1763,20 +1763,20 @@ export default function GlobalOverviewPage() {
       </HydrationSafe>
 
       {/* Global Map Section */}
-      <section className="py-16 bg-ngodb-gray-50">
+      <section className="py-16 bg-humdb-gray-50">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           <div className="max-w-7xl mx-auto">
             {hasActivityTabs && (
               <div className="flex justify-center mb-8">
-                <div className="inline-flex bg-white border border-ngodb-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="inline-flex bg-white border border-humdb-gray-200 rounded-lg shadow-sm overflow-hidden">
                   {ENABLE_DOMESTIC && (
                     <button
                       type="button"
                       onClick={() => handleActivityViewChange('domestic')}
                       className={`px-5 py-2.5 text-sm font-semibold transition-colors ${
                         activityView === 'domestic'
-                          ? 'bg-ngodb-red text-white'
-                          : 'bg-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                          ? 'bg-humdb-red text-white'
+                          : 'bg-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                       }`}
                       aria-pressed={activityView === 'domestic'}
                     >
@@ -1789,8 +1789,8 @@ export default function GlobalOverviewPage() {
                       onClick={() => handleActivityViewChange('international')}
                       className={`px-5 py-2.5 text-sm font-semibold transition-colors ${
                         activityView === 'international'
-                          ? 'bg-ngodb-red text-white'
-                          : 'bg-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                          ? 'bg-humdb-red text-white'
+                          : 'bg-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                       }`}
                       aria-pressed={activityView === 'international'}
                     >
@@ -1802,48 +1802,48 @@ export default function GlobalOverviewPage() {
             )}
 
             {activityView === 'international' ? (
-              <div className="bg-white rounded-xl shadow-lg border border-ngodb-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-ngodb-gray-100">
+              <div className="bg-white rounded-xl shadow-lg border border-humdb-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-humdb-gray-100">
                   {!hasActivityTabs && (
-                    <div className="text-sm font-semibold text-ngodb-gray-600 uppercase tracking-wide mb-2">
+                    <div className="text-sm font-semibold text-humdb-gray-600 uppercase tracking-wide mb-2">
                       International
                     </div>
                   )}
                   {!hasActivityTabs && (
-                    <h2 className="text-3xl font-bold text-ngodb-navy mb-3">
+                    <h2 className="text-3xl font-bold text-humdb-navy mb-3">
                       {internationalMapModel.title}
                       {selectedYear && (
-                        <span className="text-xl font-normal text-ngodb-gray-600 ml-2">
+                        <span className="text-xl font-normal text-humdb-gray-600 ml-2">
                           ({selectedYear})
                         </span>
                       )}
-                      <span className="text-xl font-normal text-ngodb-gray-600 ml-2">
+                      <span className="text-xl font-normal text-humdb-gray-600 ml-2">
                         - {internationalMapModel.indicatorName}
                       </span>
                     </h2>
                   )}
                   {!hasActivityTabs && (
-                    <p className="text-lg text-ngodb-gray-600 max-w-3xl mx-auto">
+                    <p className="text-lg text-humdb-gray-600 max-w-3xl mx-auto">
                       {internationalMapModel.description}
                     </p>
                   )}
                 </div>
 
                 {/* International Indicator Selector */}
-                <div className="bg-ngodb-white border-b border-ngodb-gray-100 overflow-hidden">
+                <div className="bg-humdb-white border-b border-humdb-gray-100 overflow-hidden">
                   <div className="flex h-16 overflow-x-auto md:overflow-visible space-x-2 md:space-x-0 px-2 md:px-0">
                     <button
                       onClick={() => setSelectedInternationalIndicator('total-funding')}
                       className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                         selectedInternationalIndicator === 'total-funding'
-                          ? 'bg-ngodb-red text-white'
-                          : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                          ? 'bg-humdb-red text-white'
+                          : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                       }`}
                     >
                       <span className="text-sm">Total Funding</span>
                       {selectedInternationalIndicator === 'total-funding' && (
                         <motion.div
-                          className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                          className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                           initial={{ scaleX: 0 }}
                           animate={{ scaleX: 1 }}
                           transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -1854,14 +1854,14 @@ export default function GlobalOverviewPage() {
                       onClick={() => setSelectedInternationalIndicator('people-reached')}
                       className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                         selectedInternationalIndicator === 'people-reached'
-                          ? 'bg-ngodb-red text-white'
-                          : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                          ? 'bg-humdb-red text-white'
+                          : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                       }`}
                     >
                       <span className="text-sm">People Reached</span>
                       {selectedInternationalIndicator === 'people-reached' && (
                         <motion.div
-                          className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                          className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                           initial={{ scaleX: 0 }}
                           animate={{ scaleX: 1 }}
                           transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -1872,14 +1872,14 @@ export default function GlobalOverviewPage() {
                       onClick={() => setSelectedInternationalIndicator('services')}
                       className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                         selectedInternationalIndicator === 'services'
-                          ? 'bg-ngodb-red text-white'
-                          : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                          ? 'bg-humdb-red text-white'
+                          : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                       }`}
                     >
                       <span className="text-sm">Services</span>
                       {selectedInternationalIndicator === 'services' && (
                         <motion.div
-                          className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                          className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                           initial={{ scaleX: 0 }}
                           animate={{ scaleX: 1 }}
                           transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -1920,7 +1920,7 @@ export default function GlobalOverviewPage() {
                       if (isLoadingYears) {
                         return (
                           <div className="flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-ngodb-red"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-humdb-red"></div>
                           </div>
                         );
                       }
@@ -1942,20 +1942,20 @@ export default function GlobalOverviewPage() {
                               {/* Timeline dot */}
                               <div className={`relative w-4 h-4 rounded-full border-2 transition-all duration-200 ${
                                 selectedYear === year
-                                  ? 'bg-ngodb-red border-ngodb-red shadow-lg'
-                                  : 'bg-white border-ngodb-gray-300 group-hover:border-ngodb-red group-hover:bg-ngodb-red'
+                                  ? 'bg-humdb-red border-humdb-red shadow-lg'
+                                  : 'bg-white border-humdb-gray-300 group-hover:border-humdb-red group-hover:bg-humdb-red'
                               }`}>
                                 {/* Timeline line (except for last item) */}
                                 {index < availableYears.length - 1 && (
-                                  <div className="absolute left-1/2 top-4 w-0.5 h-8 bg-ngodb-gray-300 transition-all duration-200" style={{ transform: 'translateX(-50%)' }}></div>
+                                  <div className="absolute left-1/2 top-4 w-0.5 h-8 bg-humdb-gray-300 transition-all duration-200" style={{ transform: 'translateX(-50%)' }}></div>
                                 )}
                               </div>
 
                               {/* Year label */}
                               <span className={`text-xs font-medium transition-all duration-200 ${
                                 selectedYear === year
-                                  ? 'text-ngodb-red font-bold'
-                                  : 'text-ngodb-gray-600 group-hover:text-ngodb-red'
+                                  ? 'text-humdb-red font-bold'
+                                  : 'text-humdb-gray-600 group-hover:text-humdb-red'
                               }`}>
                                 {year}
                               </span>
@@ -1977,11 +1977,11 @@ export default function GlobalOverviewPage() {
               transition={{ duration: 0.6 }}
             >
               {!hasActivityTabs && (
-                <div className="text-sm font-semibold text-ngodb-gray-600 uppercase tracking-wide mb-2">
+                <div className="text-sm font-semibold text-humdb-gray-600 uppercase tracking-wide mb-2">
                   Domestic
                 </div>
               )}
-              <h2 className="text-3xl font-bold text-ngodb-navy mb-4">
+              <h2 className="text-3xl font-bold text-humdb-navy mb-4">
                 {(() => {
                   // Use NS name in demo mode with country scope, otherwise use region name
                   const regionName = (isDemoMode && isNationalScope && nationalSocietyName)
@@ -1990,17 +1990,17 @@ export default function GlobalOverviewPage() {
                   return t('globalOverview.map.title', { region: regionName });
                 })()}
                 {selectedYear && (
-                  <span className="text-xl font-normal text-ngodb-gray-600 ml-2">
+                  <span className="text-xl font-normal text-humdb-gray-600 ml-2">
                     ({selectedYear})
                   </span>
                 )}
                 {activeIndicator !== 'people-reached' && (
-                  <span className="text-xl font-normal text-ngodb-gray-600 ml-2">
+                  <span className="text-xl font-normal text-humdb-gray-600 ml-2">
                     - {getCurrentIndicatorName()}
                   </span>
                 )}
               </h2>
-              <p className="text-lg text-ngodb-gray-600 max-w-3xl mx-auto">
+              <p className="text-lg text-humdb-gray-600 max-w-3xl mx-auto">
                 {(() => {
                   // Determine location text - use country name when NS is selected, otherwise use region
                   let locationText;
@@ -2038,7 +2038,7 @@ export default function GlobalOverviewPage() {
             </motion.div>
 
             {/* Enhanced Indicator Selector */}
-            <div className={`bg-ngodb-white shadow-lg border border-ngodb-gray-100 overflow-hidden ${selectedIndicator === 'people-reached' ? 'mb-0' : 'mb-8'}`}>
+            <div className={`bg-humdb-white shadow-lg border border-humdb-gray-100 overflow-hidden ${selectedIndicator === 'people-reached' ? 'mb-0' : 'mb-8'}`}>
               <div className="flex h-16 overflow-x-auto md:overflow-visible space-x-2 md:space-x-0 px-2 md:px-0">
                 <button
                   onClick={() => {
@@ -2050,14 +2050,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'volunteers'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.volunteers')}</span>
                   {selectedIndicator === 'volunteers' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2074,14 +2074,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'staff'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.staff')}</span>
                   {selectedIndicator === 'staff' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2098,14 +2098,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'branches'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.branches')}</span>
                   {selectedIndicator === 'branches' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2122,14 +2122,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'local-units'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.localUnits')}</span>
                   {selectedIndicator === 'local-units' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2146,14 +2146,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'blood-donors'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.bloodDonors')}</span>
                   {selectedIndicator === 'blood-donors' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2170,14 +2170,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'first-aid'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.firstAid')}</span>
                   {selectedIndicator === 'first-aid' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2195,8 +2195,8 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'people-reached'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <div className="flex items-center justify-center">
@@ -2212,7 +2212,7 @@ export default function GlobalOverviewPage() {
                   </div>
                   {selectedIndicator === 'people-reached' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2229,14 +2229,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'income'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.income')}</span>
                   {selectedIndicator === 'income' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2253,14 +2253,14 @@ export default function GlobalOverviewPage() {
                   }}
                   className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                     selectedIndicator === 'expenditure'
-                      ? 'bg-ngodb-red text-white'
-                      : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                      ? 'bg-humdb-red text-white'
+                      : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                   }`}
                 >
                   <span className="text-sm">{t('globalOverview.indicators.expenditure')}</span>
                   {selectedIndicator === 'expenditure' && (
                     <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -2277,7 +2277,7 @@ export default function GlobalOverviewPage() {
             {/* Secondary Indicator Bar for People Reached */}
             {isPeopleReachedExpanded && (
               <motion.div
-                className="bg-ngodb-white shadow-lg mb-8 border border-ngodb-gray-100"
+                className="bg-humdb-white shadow-lg mb-8 border border-humdb-gray-100"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -2287,9 +2287,9 @@ export default function GlobalOverviewPage() {
                   {Object.entries(peopleReachedSubIndicators).map(([key, indicator], index) => (
                     <div
                       key={key}
-                      className={`dropdown-container group relative flex-shrink-0 w-52 md:w-auto md:flex-1 font-semibold transition-all duration-300 border-r border-ngodb-gray-200 last:border-r-0 hover:bg-ngodb-gray-50 hover:border-ngodb-red cursor-pointer ${
+                      className={`dropdown-container group relative flex-shrink-0 w-52 md:w-auto md:flex-1 font-semibold transition-all duration-300 border-r border-humdb-gray-200 last:border-r-0 hover:bg-humdb-gray-50 hover:border-humdb-red cursor-pointer ${
                         selectedSubIndicator && indicator.indicators.some(sub => sub.id === selectedSubIndicator.id)
-                          ? 'bg-ngodb-red bg-opacity-10 border-ngodb-red'
+                          ? 'bg-humdb-red bg-opacity-10 border-humdb-red'
                           : ''
                       }`}
                     >
@@ -2316,7 +2316,7 @@ export default function GlobalOverviewPage() {
                               className="absolute inset-0 bg-black bg-opacity-40"
                               onClick={() => setOpenDropdown(null)}
                             />
-                            <div className="absolute left-0 right-0 bottom-0 bg-white border-t border-ngodb-gray-200 rounded-t-xl shadow-2xl max-h-[60vh] overflow-y-auto">
+                            <div className="absolute left-0 right-0 bottom-0 bg-white border-t border-humdb-gray-200 rounded-t-xl shadow-2xl max-h-[60vh] overflow-y-auto">
                               {indicator.indicators.map((subIndicator) => (
                                 <button
                                   key={subIndicator.id}
@@ -2335,7 +2335,7 @@ export default function GlobalOverviewPage() {
                                     fetchIndicatorData(`people-reached-${subIndicator.id}`);
                                     setOpenDropdown(null);
                                   }}
-                                  className="w-full text-left px-4 py-3 text-sm text-ngodb-gray-700 hover:bg-ngodb-red hover:text-white transition-colors duration-150 border-b border-ngodb-gray-100 last:border-b-0 whitespace-normal"
+                                  className="w-full text-left px-4 py-3 text-sm text-humdb-gray-700 hover:bg-humdb-red hover:text-white transition-colors duration-150 border-b border-humdb-gray-100 last:border-b-0 whitespace-normal"
                                 >
                                   {subIndicator.name}
                                 </button>
@@ -2347,7 +2347,7 @@ export default function GlobalOverviewPage() {
                         <div className={`absolute top-full left-0 transition-all duration-200 pointer-events-auto z-[9999] mt-1 ${
                           openDropdown === key ? 'opacity-100 visible' : 'opacity-0 invisible'
                         }`}>
-                          <div className="bg-white border border-ngodb-gray-200 shadow-xl rounded-md overflow-hidden min-w-[300px] max-w-[500px] max-h-72 overflow-y-auto">
+                          <div className="bg-white border border-humdb-gray-200 shadow-xl rounded-md overflow-hidden min-w-[300px] max-w-[500px] max-h-72 overflow-y-auto">
                             {indicator.indicators.map((subIndicator) => (
                               <button
                                 key={subIndicator.id}
@@ -2370,7 +2370,7 @@ export default function GlobalOverviewPage() {
                                   // Close the dropdown
                                   setOpenDropdown(null);
                                 }}
-                                className="w-full text-left px-4 py-3 text-sm text-ngodb-gray-700 hover:bg-ngodb-red hover:text-white transition-colors duration-150 border-b border-ngodb-gray-100 last:border-b-0 whitespace-normal"
+                                className="w-full text-left px-4 py-3 text-sm text-humdb-gray-700 hover:bg-humdb-red hover:text-white transition-colors duration-150 border-b border-humdb-gray-100 last:border-b-0 whitespace-normal"
                               >
                                 {subIndicator.name}
                               </button>
@@ -2464,7 +2464,7 @@ export default function GlobalOverviewPage() {
                       if (isLoadingYears) {
                         return (
                           <div className="flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-ngodb-red"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-humdb-red"></div>
                           </div>
                         );
                       }
@@ -2482,20 +2482,20 @@ export default function GlobalOverviewPage() {
                 {/* Timeline dot */}
                 <div className={`relative w-4 h-4 rounded-full border-2 transition-all duration-200 ${
                   selectedYear === year
-                    ? 'bg-ngodb-red border-ngodb-red shadow-lg'
-                    : 'bg-white border-ngodb-gray-300 group-hover:border-ngodb-red group-hover:bg-ngodb-red'
+                    ? 'bg-humdb-red border-humdb-red shadow-lg'
+                    : 'bg-white border-humdb-gray-300 group-hover:border-humdb-red group-hover:bg-humdb-red'
                 }`}>
                   {/* Timeline line (except for last item) */}
                   {index < availableYears.length - 1 && (
-                    <div className="absolute left-1/2 top-4 w-0.5 h-8 bg-ngodb-gray-300 transition-all duration-200" style={{ transform: 'translateX(-50%)' }}></div>
+                    <div className="absolute left-1/2 top-4 w-0.5 h-8 bg-humdb-gray-300 transition-all duration-200" style={{ transform: 'translateX(-50%)' }}></div>
                   )}
                 </div>
 
                 {/* Year label */}
                 <span className={`text-xs font-medium transition-all duration-200 ${
                   selectedYear === year
-                    ? 'text-ngodb-red font-bold'
-                    : 'text-ngodb-gray-600 group-hover:text-ngodb-red'
+                    ? 'text-humdb-red font-bold'
+                    : 'text-humdb-gray-600 group-hover:text-humdb-red'
                 }`}>
                   {year}
                 </span>
@@ -2514,7 +2514,7 @@ export default function GlobalOverviewPage() {
             {/* Region Selector - Below Map (global scope only) */}
             {!isNationalScope && (
             <motion.div
-              className="mt-6 bg-ngodb-white shadow-lg border border-ngodb-gray-100 rounded-lg"
+              className="mt-6 bg-humdb-white shadow-lg border border-humdb-gray-100 rounded-lg"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -2523,10 +2523,10 @@ export default function GlobalOverviewPage() {
               <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-ngodb-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-humdb-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <label className="text-sm font-semibold text-ngodb-gray-700">
+                    <label className="text-sm font-semibold text-humdb-gray-700">
                       {t('globalOverview.map.regionSelector')}
                     </label>
                   </div>
@@ -2534,7 +2534,7 @@ export default function GlobalOverviewPage() {
                     <select
                       value={selectedRegion}
                       onChange={(e) => setSelectedRegion(e.target.value)}
-                      className="appearance-none bg-white border border-ngodb-gray-300 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-ngodb-gray-700 focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent cursor-pointer hover:border-ngodb-gray-400 transition-colors"
+                      className="appearance-none bg-white border border-humdb-gray-300 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-humdb-gray-700 focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent cursor-pointer hover:border-humdb-gray-400 transition-colors"
                     >
                       {Object.entries(regions).map(([key, region]) => (
                         <option key={key} value={key}>
@@ -2543,7 +2543,7 @@ export default function GlobalOverviewPage() {
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                      <svg className="w-4 h-4 text-ngodb-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-humdb-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -2552,8 +2552,8 @@ export default function GlobalOverviewPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   {selectedRegion !== 'global' && (
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-ngodb-red rounded-full"></div>
-                      <span className="text-sm text-ngodb-gray-600">
+                      <div className="w-2 h-2 bg-humdb-red rounded-full"></div>
+                      <span className="text-sm text-humdb-gray-600">
                         {t('globalOverview.map.countriesInRegion', {
                           count: regions[selectedRegion]?.countries?.length || 0,
                           region: regions[selectedRegion]?.name
@@ -2563,15 +2563,15 @@ export default function GlobalOverviewPage() {
                   )}
                   {selectedRegion === 'global' && (
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-ngodb-gray-400 rounded-full"></div>
-                      <span className="text-sm text-ngodb-gray-600">
+                      <div className="w-2 h-2 bg-humdb-gray-400 rounded-full"></div>
+                      <span className="text-sm text-humdb-gray-600">
                         {t('globalOverview.map.allRegions')}
                       </span>
                     </div>
                   )}
                   {!isLoadingData && (
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-ngodb-gray-800">
+                      <span className="text-sm font-medium text-humdb-gray-800">
                         {t('globalOverview.map.total', { value: formatNumber(selectedRegion === 'global' ? globalTotal : getRegionalTotal()) })}
                       </span>
                     </div>

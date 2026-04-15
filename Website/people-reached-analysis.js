@@ -169,13 +169,13 @@ export default function PeopleReachedAnalysisPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8 text-center">
         <Head>
-          <title>Error - People Reached Analysis - NGO Databank</title>
+          <title>Error - People Reached Analysis - Humanitarian Databank</title>
         </Head>
-        <h1 className="text-3xl font-bold text-ngodb-red mb-6">Error Loading Data</h1>
-        <p className="text-ngodb-gray-700 mb-6">{error}</p>
+        <h1 className="text-3xl font-bold text-humdb-red mb-6">Error Loading Data</h1>
+        <p className="text-humdb-gray-700 mb-6">{error}</p>
         <button
           onClick={fetchData}
-          className="bg-ngodb-red text-white px-6 py-2 rounded-lg hover:bg-ngodb-red-dark transition-colors"
+          className="bg-humdb-red text-white px-6 py-2 rounded-lg hover:bg-humdb-red-dark transition-colors"
         >
           Retry
         </button>
@@ -186,12 +186,12 @@ export default function PeopleReachedAnalysisPage() {
   return (
     <>
       <Head>
-        <title>People Reached Analysis - NGO Databank</title>
+        <title>People Reached Analysis - Humanitarian Databank</title>
         <meta name="description" content="Analyze people reached data by sex and age groups across humanitarian operations" />
       </Head>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-ngodb-navy via-ngodb-navy to-ngodb-red text-white py-16">
+      <section className="bg-gradient-to-br from-humdb-navy via-humdb-navy to-humdb-red text-white py-16">
         <motion.div
           className="w-full px-6 sm:px-8 lg:px-12 text-center"
           variants={staggerContainer}
@@ -214,31 +214,31 @@ export default function PeopleReachedAnalysisPage() {
                 <div className="text-2xl font-bold text-white">
                   {formatNumber(processedData.totalReached)}
                 </div>
-                <div className="text-sm text-ngodb-gray-200">Total People Reached</div>
+                <div className="text-sm text-humdb-gray-200">Total People Reached</div>
               </motion.div>
               <motion.div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 min-w-[120px]" variants={slideUp}>
                 <div className="text-2xl font-bold text-white">
                   {stats.totalCountries}
                 </div>
-                <div className="text-sm text-ngodb-gray-200">Countries</div>
+                <div className="text-sm text-humdb-gray-200">Countries</div>
               </motion.div>
               <motion.div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 min-w-[120px]" variants={slideUp}>
                 <div className="text-2xl font-bold text-white">
                   {stats.totalDataPoints}
                 </div>
-                <div className="text-sm text-ngodb-gray-200">Data Points</div>
+                <div className="text-sm text-humdb-gray-200">Data Points</div>
               </motion.div>
               <motion.div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 min-w-[120px]" variants={slideUp}>
                 <div className="text-2xl font-bold text-white">
                   {stats.totalSexCategories}
                 </div>
-                <div className="text-sm text-ngodb-gray-200">Sex Categories</div>
+                <div className="text-sm text-humdb-gray-200">Sex Categories</div>
               </motion.div>
               <motion.div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 min-w-[120px]" variants={slideUp}>
                 <div className="text-2xl font-bold text-white">
                   {stats.totalAgeGroups}
                 </div>
-                <div className="text-sm text-ngodb-gray-200">Age Groups</div>
+                <div className="text-sm text-humdb-gray-200">Age Groups</div>
               </motion.div>
             </motion.div>
           )}
@@ -246,7 +246,7 @@ export default function PeopleReachedAnalysisPage() {
       </section>
 
       {/* Filters Section */}
-      <section className="bg-ngodb-gray-50 py-8">
+      <section className="bg-humdb-gray-50 py-8">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           <motion.div
             className="bg-white rounded-xl shadow-lg overflow-hidden"
@@ -254,17 +254,17 @@ export default function PeopleReachedAnalysisPage() {
             initial="hidden"
             animate="visible"
           >
-            <div className="px-6 py-4 border-b border-ngodb-gray-200">
+            <div className="px-6 py-4 border-b border-humdb-gray-200">
               <button
                 onClick={() => setExpandedFilters(!expandedFilters)}
                 className="flex items-center justify-between w-full text-left"
               >
-                <h2 className="text-xl font-bold text-ngodb-navy">Filters & Analysis Options</h2>
+                <h2 className="text-xl font-bold text-humdb-navy">Filters & Analysis Options</h2>
                 <motion.div
                   animate={{ rotate: expandedFilters ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <svg className="w-5 h-5 text-ngodb-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-humdb-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </motion.div>
@@ -284,13 +284,13 @@ export default function PeopleReachedAnalysisPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       {/* Country Filter */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           Countries
                         </label>
                         <select
                           multiple
                           size="4"
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedCountries}
                           onChange={(e) => {
                             const values = Array.from(e.target.selectedOptions, option => option.value);
@@ -301,16 +301,16 @@ export default function PeopleReachedAnalysisPage() {
                             <option key={country} value={country}>{country}</option>
                           ))}
                         </select>
-                        <p className="text-xs text-ngodb-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                        <p className="text-xs text-humdb-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
                       </div>
 
                       {/* Period Filter */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           Period
                         </label>
                         <select
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedPeriod}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedPeriod: e.target.value }))}
                         >
@@ -323,11 +323,11 @@ export default function PeopleReachedAnalysisPage() {
 
                       {/* Indicator Filter */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           Indicator
                         </label>
                         <select
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedIndicator}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedIndicator: e.target.value }))}
                         >
@@ -340,11 +340,11 @@ export default function PeopleReachedAnalysisPage() {
 
                       {/* Chart Type */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           Chart Type
                         </label>
                         <select
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={chartType}
                           onChange={(e) => setChartType(e.target.value)}
                         >
@@ -363,19 +363,19 @@ export default function PeopleReachedAnalysisPage() {
                           selectedPeriod: '',
                           selectedIndicator: ''
                         }))}
-                        className="px-4 py-2 bg-ngodb-gray-200 text-ngodb-gray-700 rounded-lg hover:bg-ngodb-gray-300 transition-colors font-medium"
+                        className="px-4 py-2 bg-humdb-gray-200 text-humdb-gray-700 rounded-lg hover:bg-humdb-gray-300 transition-colors font-medium"
                       >
                         Clear Filters
                       </button>
                       <button
                         onClick={fetchData}
-                        className="px-4 py-2 bg-ngodb-red text-white rounded-lg hover:bg-ngodb-red-dark transition-colors font-medium"
+                        className="px-4 py-2 bg-humdb-red text-white rounded-lg hover:bg-humdb-red-dark transition-colors font-medium"
                         disabled={isLoading}
                       >
                         {isLoading ? 'Loading...' : 'Refresh Data'}
                       </button>
                       <div className="flex-1"></div>
-                      <div className="text-sm text-ngodb-gray-600 flex items-center">
+                      <div className="text-sm text-humdb-gray-600 flex items-center">
                         <span className="inline-block w-2 h-2 bg-green-400 rounded-full mr-2"></span>
                         {rawData.filter(item => item.disaggregation_data).length} disaggregated records found
                       </div>
@@ -389,7 +389,7 @@ export default function PeopleReachedAnalysisPage() {
       </section>
 
       {/* Tab Navigation */}
-      <section className="bg-white border-b border-ngodb-gray-200 sticky top-20 z-40">
+      <section className="bg-white border-b border-humdb-gray-200 sticky top-20 z-40">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           <div className="flex space-x-1 overflow-x-auto">
             {[
@@ -405,8 +405,8 @@ export default function PeopleReachedAnalysisPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`py-4 px-4 font-semibold border-b-2 transition-all duration-200 whitespace-nowrap flex items-center space-x-2 ${
                   activeTab === tab.id
-                    ? 'text-ngodb-red border-ngodb-red bg-ngodb-red bg-opacity-5'
-                    : 'text-ngodb-gray-600 border-transparent hover:text-ngodb-red hover:border-ngodb-red hover:border-opacity-50'
+                    ? 'text-humdb-red border-humdb-red bg-humdb-red bg-opacity-5'
+                    : 'text-humdb-gray-600 border-transparent hover:text-humdb-red hover:border-humdb-red hover:border-opacity-50'
                 }`}
               >
                 <span>{tab.icon}</span>
@@ -418,16 +418,16 @@ export default function PeopleReachedAnalysisPage() {
       </section>
 
       {/* Content Section */}
-      <section className="py-16 bg-ngodb-gray-50 min-h-screen">
+      <section className="py-16 bg-humdb-gray-50 min-h-screen">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           {isLoading ? (
             <div className="text-center py-20">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="w-16 h-16 border-4 border-ngodb-red border-t-transparent rounded-full mx-auto mb-4"
+                className="w-16 h-16 border-4 border-humdb-red border-t-transparent rounded-full mx-auto mb-4"
               ></motion.div>
-              <p className="text-ngodb-gray-600 text-lg">Loading disaggregated data...</p>
+              <p className="text-humdb-gray-600 text-lg">Loading disaggregated data...</p>
             </div>
           ) : (
             <AnimatePresence mode="wait">
@@ -443,7 +443,7 @@ export default function PeopleReachedAnalysisPage() {
                 {activeTab === 'overview' && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div className="bg-white rounded-xl shadow-lg p-6">
-                      <h3 className="text-xl font-bold text-ngodb-navy mb-6 flex items-center">
+                      <h3 className="text-xl font-bold text-humdb-navy mb-6 flex items-center">
                         <span className="mr-2">🏆</span>
                         Top Countries by People Reached
                       </h3>
@@ -457,13 +457,13 @@ export default function PeopleReachedAnalysisPage() {
                       ) : (
                         <div className="text-center py-12">
                           <div className="text-6xl mb-4">📊</div>
-                          <p className="text-ngodb-gray-500">No data available</p>
+                          <p className="text-humdb-gray-500">No data available</p>
                         </div>
                       )}
                     </div>
 
                     <div className="bg-white rounded-xl shadow-lg p-6">
-                      <h3 className="text-xl font-bold text-ngodb-navy mb-6 flex items-center">
+                      <h3 className="text-xl font-bold text-humdb-navy mb-6 flex items-center">
                         <span className="mr-2">⚖️</span>
                         Distribution by Sex
                       </h3>
@@ -477,7 +477,7 @@ export default function PeopleReachedAnalysisPage() {
                       ) : (
                         <div className="text-center py-12">
                           <div className="text-6xl mb-4">📊</div>
-                          <p className="text-ngodb-gray-500">No data available</p>
+                          <p className="text-humdb-gray-500">No data available</p>
                         </div>
                       )}
                     </div>
@@ -487,7 +487,7 @@ export default function PeopleReachedAnalysisPage() {
                 {/* By Sex Tab */}
                 {activeTab === 'by-sex' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <span className="mr-3">👥</span>
                       People Reached by Sex
                     </h3>
@@ -501,7 +501,7 @@ export default function PeopleReachedAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <div className="text-8xl mb-6">👥</div>
-                        <p className="text-ngodb-gray-500 text-lg">No sex-disaggregated data available</p>
+                        <p className="text-humdb-gray-500 text-lg">No sex-disaggregated data available</p>
                       </div>
                     )}
                   </div>
@@ -510,7 +510,7 @@ export default function PeopleReachedAnalysisPage() {
                 {/* By Age Tab */}
                 {activeTab === 'by-age' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <span className="mr-3">👶👴</span>
                       People Reached by Age Group
                     </h3>
@@ -524,7 +524,7 @@ export default function PeopleReachedAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <div className="text-8xl mb-6">👶👴</div>
-                        <p className="text-ngodb-gray-500 text-lg">No age-disaggregated data available</p>
+                        <p className="text-humdb-gray-500 text-lg">No age-disaggregated data available</p>
                       </div>
                     )}
                   </div>
@@ -533,7 +533,7 @@ export default function PeopleReachedAnalysisPage() {
                 {/* By Sex & Age Tab */}
                 {activeTab === 'by-sex-age' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <span className="mr-3">📈</span>
                       People Reached by Sex and Age
                     </h3>
@@ -547,7 +547,7 @@ export default function PeopleReachedAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <div className="text-8xl mb-6">📈</div>
-                        <p className="text-ngodb-gray-500 text-lg">No sex-age disaggregated data available</p>
+                        <p className="text-humdb-gray-500 text-lg">No sex-age disaggregated data available</p>
                       </div>
                     )}
                   </div>
@@ -556,7 +556,7 @@ export default function PeopleReachedAnalysisPage() {
                 {/* By Country Tab */}
                 {activeTab === 'by-country' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <span className="mr-3">🌍</span>
                       People Reached by Country
                     </h3>
@@ -570,7 +570,7 @@ export default function PeopleReachedAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <div className="text-8xl mb-6">🌍</div>
-                        <p className="text-ngodb-gray-500 text-lg">No country data available</p>
+                        <p className="text-humdb-gray-500 text-lg">No country data available</p>
                       </div>
                     )}
                   </div>
@@ -579,7 +579,7 @@ export default function PeopleReachedAnalysisPage() {
                 {/* Trends Tab */}
                 {activeTab === 'trends' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <span className="mr-3">📅</span>
                       Trends Over Time
                     </h3>
@@ -593,7 +593,7 @@ export default function PeopleReachedAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <div className="text-8xl mb-6">📅</div>
-                        <p className="text-ngodb-gray-500 text-lg">No trend data available</p>
+                        <p className="text-humdb-gray-500 text-lg">No trend data available</p>
                       </div>
                     )}
                   </div>
@@ -605,11 +605,11 @@ export default function PeopleReachedAnalysisPage() {
       </section>
 
       {/* Data Summary Section */}
-      <section className="bg-white py-16 border-t border-ngodb-gray-200">
+      <section className="bg-white py-16 border-t border-humdb-gray-200">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-ngodb-navy mb-4">Data Summary</h2>
-            <p className="text-ngodb-gray-600 max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold text-humdb-navy mb-4">Data Summary</h2>
+            <p className="text-humdb-gray-600 max-w-2xl mx-auto">
               Comprehensive overview of people reached across all disaggregated categories and regions
             </p>
           </div>
@@ -619,7 +619,7 @@ export default function PeopleReachedAnalysisPage() {
             initial="hidden"
             animate="visible"
           >
-            <motion.div className="bg-gradient-to-br from-ngodb-red to-ngodb-red-dark rounded-xl p-6 text-white text-center" variants={slideUp}>
+            <motion.div className="bg-gradient-to-br from-humdb-red to-humdb-red-dark rounded-xl p-6 text-white text-center" variants={slideUp}>
               <div className="text-3xl font-bold mb-2">
                 {formatNumber(processedData.totalReached)}
               </div>

@@ -1,4 +1,4 @@
-"""Minimal sample plugin for the NGO Databank.
+"""Minimal sample plugin for the Humanitarian Databank.
 
 This package is a starter template. After downloading, extract it to the
 Backoffice/plugins/ directory as plugins/sample-package/ and upload or
@@ -25,11 +25,11 @@ class SamplePackagePlugin(BasePlugin):
 
     @property
     def description(self) -> str:
-        return "Starter plugin package for the NGO Databank plugin system."
+        return "Starter plugin package for the Humanitarian Databank plugin system."
 
     @property
     def author(self) -> str:
-        return "NGO"
+        return "Humanitarian Databank"
 
     @property
     def license(self) -> str:

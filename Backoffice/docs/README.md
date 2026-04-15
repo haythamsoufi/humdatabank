@@ -1,6 +1,6 @@
 # Documentation
 
-This section helps you use the NGO Databank Backoffice.
+This section helps you use the Humanitarian Databank Backoffice.
 
 ## Getting started
 

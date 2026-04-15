@@ -695,10 +695,10 @@ def get_organization_branding(default: Optional[Dict] = None) -> Dict:
     """Return organization branding settings from database.
 
     Returns a dictionary with keys:
-    - organization_name: Full organization name (string or dict with language keys like {'en': 'NGO Databank', 'fr': 'Banque de Données ONG'})
+    - organization_name: Full organization name (string or dict with language keys like {'en': 'Humanitarian Databank', 'fr': 'Banque de Données ONG'})
     - organization_short_name: Short name for UI (string or dict with language keys)
-    - organization_domain: Primary domain (e.g., "ngodatabank.org") - not localized
-    - organization_email_domain: Email domain for user detection (e.g., "ngodatabank.org") - not localized
+    - organization_domain: Primary domain (e.g., "humdatabank.org") - not localized
+    - organization_email_domain: Email domain for user detection (e.g., "humdatabank.org") - not localized
     - organization_logo_path: Path to logo file (e.g., "logo.svg") - not localized
     - organization_favicon_path: Path to favicon file (e.g., "favicon.svg") - not localized
     - organization_copyright_year: Copyright year (e.g., 2024) - not localized
@@ -737,10 +737,10 @@ def get_organization_branding(default: Optional[Dict] = None) -> Dict:
 
     # System default
     return {
-        "organization_name": "NGO Databank",
-        "organization_short_name": "NGO Databank",
-        "organization_domain": "ngodatabank.org",
-        "organization_email_domain": "ngodatabank.org",
+        "organization_name": "Humanitarian Databank",
+        "organization_short_name": "Humanitarian Databank",
+        "organization_domain": "humdatabank.org",
+        "organization_email_domain": "humdatabank.org",
         "organization_logo_path": "logo.svg",
         "organization_favicon_path": "favicon.svg",
         "organization_copyright_year": str(datetime.now().year),
@@ -829,7 +829,7 @@ def set_organization_branding(branding: Dict, user_id: Optional[int] = None) -> 
     return write_settings(data, user_id=user_id)
 
 
-def get_organization_name(default: str = "NGO Databank", locale: Optional[str] = None) -> str:
+def get_organization_name(default: str = "Humanitarian Databank", locale: Optional[str] = None) -> str:
     """Get organization name from settings with localization support."""
     branding = get_organization_branding()
     resolved_locale = _resolve_locale(locale)
@@ -837,7 +837,7 @@ def get_organization_name(default: str = "NGO Databank", locale: Optional[str] =
     return _extract_localized_value(value, default, resolved_locale)
 
 
-def get_organization_short_name(default: str = "NGO Databank", locale: Optional[str] = None) -> str:
+def get_organization_short_name(default: str = "Humanitarian Databank", locale: Optional[str] = None) -> str:
     """Get organization short name from settings with localization support."""
     branding = get_organization_branding()
     resolved_locale = _resolve_locale(locale)
@@ -845,13 +845,13 @@ def get_organization_short_name(default: str = "NGO Databank", locale: Optional[
     return _extract_localized_value(value, default, resolved_locale)
 
 
-def get_organization_domain(default: str = "ngodatabank.org") -> str:
+def get_organization_domain(default: str = "humdatabank.org") -> str:
     """Get organization domain from settings."""
     branding = get_organization_branding()
     return branding.get("organization_domain", default)
 
 
-def get_organization_email_domain(default: str = "ngodatabank.org") -> str:
+def get_organization_email_domain(default: str = "humdatabank.org") -> str:
     """Get organization email domain from settings."""
     branding = get_organization_branding()
     return branding.get("organization_email_domain", branding.get("organization_domain", default))

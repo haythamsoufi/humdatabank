@@ -51,13 +51,13 @@ export default function GlobalInitiativePage({ initialEmbeds }) {
   return (
     <>
       <Head>
-        <title>Global Initiatives - NGO Databank</title>
+        <title>Global Initiatives - Humanitarian Databank</title>
         <meta name="description" content="Global Initiatives: ECHO Programmatic Partnership, Global Route-based Migration Programme, Professional health services mapping." />
       </Head>
 
-      <div className="min-h-screen bg-ngodb-gray-50">
+      <div className="min-h-screen bg-humdb-gray-50">
         {/* Hero */}
-        <section className="bg-gradient-to-br from-ngodb-navy to-ngodb-navy/90 text-white py-12 sm:py-16 px-4 sm:px-6 lg:px-12">
+        <section className="bg-gradient-to-br from-humdb-navy to-humdb-navy/90 text-white py-12 sm:py-16 px-4 sm:px-6 lg:px-12">
           <div className="max-w-4xl mx-auto text-center">
             <motion.h1
               className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4"

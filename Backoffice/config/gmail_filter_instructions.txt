@@ -1,7 +1,7 @@
 Gmail Filter Setup Instructions
 ==============================
 
-To prevent NGO Databank emails from going to spam:
+To prevent Humanitarian Databank emails from going to spam:
 
 1. Open Gmail in your browser
 2. Click the gear icon (Settings) in the top right

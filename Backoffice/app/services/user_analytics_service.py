@@ -59,7 +59,7 @@ def get_client_info():
     x_os_version = request.headers.get('X-OS-Version', '').strip()
     if x_platform in ('ios', 'android'):
         device_type = 'Mobile'
-        browser_str = 'NGO Databank App'
+        browser_str = 'Humanitarian Databank App'
         if x_os_version:
             os_str = x_os_version  # e.g. "iOS 17.2" or "Android 14"
 

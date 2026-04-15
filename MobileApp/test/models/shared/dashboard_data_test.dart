@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/models/shared/assignment.dart';
-import 'package:ngo_databank_app/models/shared/dashboard_data.dart';
-import 'package:ngo_databank_app/models/shared/entity.dart';
+import 'package:hum_databank_app/models/shared/assignment.dart';
+import 'package:hum_databank_app/models/shared/dashboard_data.dart';
+import 'package:hum_databank_app/models/shared/entity.dart';
 
 void main() {
   group('DashboardData constructor', () {

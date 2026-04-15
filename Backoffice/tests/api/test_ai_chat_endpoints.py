@@ -287,5 +287,5 @@ def test_ai_table_export_validation_and_headers(client, app, db_session):
     resp = client.post("/api/ai/v2/table/export", headers=headers, json={"rows": [["H1", "H2"], ["a", "b"]]})
     resp.close()
     assert resp.status_code == 200
-    assert resp.headers.get("X-NGO-Databank-Export-Completed") == "1"
-    assert resp.headers.get("X-NGO-Databank-Export-Filename") == "table-data.xlsx"
+    assert resp.headers.get("X-hum-databank-Export-Completed") == "1"
+    assert resp.headers.get("X-hum-databank-Export-Filename") == "table-data.xlsx"

@@ -145,9 +145,9 @@ def main():
                     sys_role_id = _ensure_role("system_manager", "System Manager")
 
                     # Create admin user
-                    admin_exists = User.query.filter_by(email='test_admin@ngodatabank.org').first()
+                    admin_exists = User.query.filter_by(email='test_admin@humdatabank.org').first()
                     if not admin_exists:
-                        admin = User(email='test_admin@ngodatabank.org', name='Test Admin')
+                        admin = User(email='test_admin@humdatabank.org', name='Test Admin')
                         admin.set_password('test123')
                         try:
                             with atomic(remove_session=True):
@@ -164,9 +164,9 @@ def main():
                             logger.info('Default admin user already exists (skipped)')
 
                     # Create second admin user
-                    second_admin_exists = User.query.filter_by(email='test_admin2@ngodatabank.org').first()
+                    second_admin_exists = User.query.filter_by(email='test_admin2@humdatabank.org').first()
                     if not second_admin_exists:
-                        admin2 = User(email='test_admin2@ngodatabank.org', name='Test Admin 2')
+                        admin2 = User(email='test_admin2@humdatabank.org', name='Test Admin 2')
                         admin2.set_password('test123')
                         try:
                             with atomic(remove_session=True):
@@ -182,9 +182,9 @@ def main():
                             logger.info('Second default admin user already exists (skipped)')
 
                     # Create focal point user
-                    focal_point_exists = User.query.filter_by(email='test_focal@ngodatabank.org').first()
+                    focal_point_exists = User.query.filter_by(email='test_focal@humdatabank.org').first()
                     if not focal_point_exists:
-                        focal_point = User(email='test_focal@ngodatabank.org', name='Test Focal Point')
+                        focal_point = User(email='test_focal@humdatabank.org', name='Test Focal Point')
                         focal_point.set_password('test123')
                         try:
                             with atomic(remove_session=True):
@@ -200,9 +200,9 @@ def main():
                             logger.info('Default focal point user already exists (skipped)')
 
                     # Create second focal point user
-                    second_focal_exists = User.query.filter_by(email='test_focal2@ngodatabank.org').first()
+                    second_focal_exists = User.query.filter_by(email='test_focal2@humdatabank.org').first()
                     if not second_focal_exists:
-                        focal_point2 = User(email='test_focal2@ngodatabank.org', name='Test Focal Point 2')
+                        focal_point2 = User(email='test_focal2@humdatabank.org', name='Test Focal Point 2')
                         focal_point2.set_password('test123')
                         try:
                             with atomic(remove_session=True):
@@ -218,9 +218,9 @@ def main():
                             logger.info('Second default focal point user already exists (skipped)')
 
                     # Create system manager user
-                    sys_manager_exists = User.query.filter_by(email='test_sys@ngodatabank.org').first()
+                    sys_manager_exists = User.query.filter_by(email='test_sys@humdatabank.org').first()
                     if not sys_manager_exists:
-                        sys_manager = User(email='test_sys@ngodatabank.org', name='Test System Manager')
+                        sys_manager = User(email='test_sys@humdatabank.org', name='Test System Manager')
                         sys_manager.set_password('test123')
                         try:
                             with atomic(remove_session=True):

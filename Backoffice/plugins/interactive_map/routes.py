@@ -182,7 +182,7 @@ def create_blueprint():
                         'limit': 1,
                         'addressdetails': 1
                     },
-                    headers={'User-Agent': 'NGO-Databank/1.0'},
+                    headers={'User-Agent': 'hum-databank/1.0'},
                     timeout=10
                 )
 

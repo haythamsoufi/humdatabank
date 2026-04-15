@@ -20,8 +20,8 @@ from app.utils.datetime_helpers import utcnow
 
 # Default to a shorter TTL; can be overridden by AI_TOKEN_TTL_MINUTES in config/env.
 DEFAULT_AI_TOKEN_TTL_MINUTES = 120  # 2 hours
-AI_TOKEN_AUDIENCE = "ngo-databank-ai"
-AI_TOKEN_ISSUER = "ngo-databank-backoffice"
+AI_TOKEN_AUDIENCE = "hum-databank-ai"
+AI_TOKEN_ISSUER = "hum-databank-backoffice"
 AI_TOKEN_ALGORITHM = "HS256"
 AI_TOKEN_VERSION = 1
 

@@ -33,10 +33,10 @@ const TrendTooltip = ({ data, isVisible, position, t }) => {
         pointerEvents: 'none' // Prevent tooltip from interfering with mouse events
       }}
     >
-      <div className="text-sm font-semibold text-ngodb-navy mb-2">
+      <div className="text-sm font-semibold text-humdb-navy mb-2">
         {hasPlaceholderData ? t('disaggregationAnalysis.tooltip.trendData') : t('disaggregationAnalysis.tooltip.fiveYearTrends')}
       </div>
-      <div className="text-xs text-ngodb-gray-500 mb-3">
+      <div className="text-xs text-humdb-gray-500 mb-3">
         {hasPlaceholderData
           ? t('disaggregationAnalysis.tooltip.historicalTrendNotAvailable')
           : t('disaggregationAnalysis.tooltip.historicalTrendsDescription')
@@ -45,7 +45,7 @@ const TrendTooltip = ({ data, isVisible, position, t }) => {
 
       {hasPlaceholderData ? (
         <div className="text-center py-4">
-          <div className="text-ngodb-gray-400 text-sm">
+          <div className="text-humdb-gray-400 text-sm">
             <svg className="w-8 h-8 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
@@ -58,9 +58,9 @@ const TrendTooltip = ({ data, isVisible, position, t }) => {
           <div className="space-y-2">
             {data.map((item, index) => (
               <div key={index} className="flex justify-between items-center">
-                <span className="text-xs text-ngodb-gray-600 font-medium">{item.year}</span>
-                <span className="text-xs font-bold text-ngodb-navy">{item.value}%</span>
-                <div className="w-16 bg-ngodb-gray-200 rounded-full h-1.5">
+                <span className="text-xs text-humdb-gray-600 font-medium">{item.year}</span>
+                <span className="text-xs font-bold text-humdb-navy">{item.value}%</span>
+                <div className="w-16 bg-humdb-gray-200 rounded-full h-1.5">
                   <div
                     className="h-1.5 rounded-full transition-all duration-300"
                     style={{
@@ -74,8 +74,8 @@ const TrendTooltip = ({ data, isVisible, position, t }) => {
           </div>
           <div className="mt-3 pt-2 border-t border-gray-200">
             <div className="flex justify-between text-xs">
-              <span className="text-ngodb-gray-600">{t('disaggregationAnalysis.tooltip.average')}</span>
-              <span className="font-medium text-ngodb-navy">
+              <span className="text-humdb-gray-600">{t('disaggregationAnalysis.tooltip.average')}</span>
+              <span className="font-medium text-humdb-navy">
                 {Math.round(data.reduce((sum, item) => sum + item.value, 0) / data.length)}%
               </span>
             </div>
@@ -2081,13 +2081,13 @@ export default function DisaggregationAnalysisPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8 text-center">
         <Head>
-          <title>{t('disaggregationAnalysis.error.title')} - {t('disaggregationAnalysis.title')} - NGO Databank</title>
+          <title>{t('disaggregationAnalysis.error.title')} - {t('disaggregationAnalysis.title')} - Humanitarian Databank</title>
         </Head>
-        <h1 className="text-3xl font-bold text-ngodb-red mb-6">{t('disaggregationAnalysis.error.title')}</h1>
-        <p className="text-ngodb-gray-700 mb-6">{error}</p>
+        <h1 className="text-3xl font-bold text-humdb-red mb-6">{t('disaggregationAnalysis.error.title')}</h1>
+        <p className="text-humdb-gray-700 mb-6">{error}</p>
         <button
           onClick={fetchData}
-          className="bg-ngodb-red text-white px-6 py-2 rounded-lg hover:bg-ngodb-red-dark transition-colors"
+          className="bg-humdb-red text-white px-6 py-2 rounded-lg hover:bg-humdb-red-dark transition-colors"
         >
           {t('disaggregationAnalysis.error.retry')}
         </button>
@@ -2098,7 +2098,7 @@ export default function DisaggregationAnalysisPage() {
   return (
     <>
       <Head>
-        <title>{t('disaggregationAnalysis.title')} - NGO Databank</title>
+        <title>{t('disaggregationAnalysis.title')} - Humanitarian Databank</title>
         <meta name="description" content={t('disaggregationAnalysis.meta.description')} />
       </Head>
 
@@ -2113,7 +2113,7 @@ export default function DisaggregationAnalysisPage() {
       </AnimatePresence>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-ngodb-navy via-ngodb-navy to-ngodb-red text-white py-16 -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36">
+      <section className="bg-gradient-to-br from-humdb-navy via-humdb-navy to-humdb-red text-white py-16 -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36">
         <motion.div
           className="w-full px-6 sm:px-8 lg:px-12 text-center"
           variants={staggerContainer}
@@ -2141,8 +2141,8 @@ export default function DisaggregationAnalysisPage() {
                 <div className="text-2xl font-bold text-white">
                   {stats.avgDisaggregation}%
                 </div>
-                <div className="text-sm text-ngodb-gray-200">{t('disaggregationAnalysis.stats.avgDisaggregation')}</div>
-                <div className="absolute top-2 right-2 text-ngodb-gray-200 opacity-60">
+                <div className="text-sm text-humdb-gray-200">{t('disaggregationAnalysis.stats.avgDisaggregation')}</div>
+                <div className="absolute top-2 right-2 text-humdb-gray-200 opacity-60">
                   <InfoIcon className="w-4 h-4" />
                 </div>
               </motion.div>
@@ -2155,8 +2155,8 @@ export default function DisaggregationAnalysisPage() {
                 <div className="text-2xl font-bold text-white">
                   {stats.avgAgeDisaggregation}%
                 </div>
-                <div className="text-sm text-ngodb-gray-200">{t('disaggregationAnalysis.stats.ageDisaggregation')}</div>
-                <div className="absolute top-2 right-2 text-ngodb-gray-200 opacity-60">
+                <div className="text-sm text-humdb-gray-200">{t('disaggregationAnalysis.stats.ageDisaggregation')}</div>
+                <div className="absolute top-2 right-2 text-humdb-gray-200 opacity-60">
                   <InfoIcon className="w-4 h-4" />
                 </div>
               </motion.div>
@@ -2169,8 +2169,8 @@ export default function DisaggregationAnalysisPage() {
                 <div className="text-2xl font-bold text-white">
                   {stats.avgWomenLeadership}%
                 </div>
-                <div className="text-sm text-ngodb-gray-200">{t('disaggregationAnalysis.stats.womenLeadership')}</div>
-                <div className="absolute top-2 right-2 text-ngodb-gray-200 opacity-60">
+                <div className="text-sm text-humdb-gray-200">{t('disaggregationAnalysis.stats.womenLeadership')}</div>
+                <div className="absolute top-2 right-2 text-humdb-gray-200 opacity-60">
                   <InfoIcon className="w-4 h-4" />
                 </div>
               </motion.div>
@@ -2183,8 +2183,8 @@ export default function DisaggregationAnalysisPage() {
                 <div className="text-2xl font-bold text-white">
                   {stats.avgWomenVolunteering}%
                 </div>
-                <div className="text-sm text-ngodb-gray-200">{t('disaggregationAnalysis.stats.womenVolunteering')}</div>
-                <div className="absolute top-2 right-2 text-ngodb-gray-200 opacity-60">
+                <div className="text-sm text-humdb-gray-200">{t('disaggregationAnalysis.stats.womenVolunteering')}</div>
+                <div className="absolute top-2 right-2 text-humdb-gray-200 opacity-60">
                   <InfoIcon className="w-4 h-4" />
                 </div>
               </motion.div>
@@ -2197,8 +2197,8 @@ export default function DisaggregationAnalysisPage() {
                 <div className="text-2xl font-bold text-white">
                   {stats.avgWomenStaff}%
                 </div>
-                <div className="text-sm text-ngodb-gray-200">{t('disaggregationAnalysis.stats.womenStaff')}</div>
-                <div className="absolute top-2 right-2 text-ngodb-gray-200 opacity-60">
+                <div className="text-sm text-humdb-gray-200">{t('disaggregationAnalysis.stats.womenStaff')}</div>
+                <div className="absolute top-2 right-2 text-humdb-gray-200 opacity-60">
                   <InfoIcon className="w-4 h-4" />
                 </div>
               </motion.div>
@@ -2208,7 +2208,7 @@ export default function DisaggregationAnalysisPage() {
       </section>
 
       {/* Filters Section */}
-      <section className="bg-ngodb-gray-50 py-8">
+      <section className="bg-humdb-gray-50 py-8">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           <motion.div
             className="bg-white rounded-xl shadow-lg overflow-hidden"
@@ -2216,20 +2216,20 @@ export default function DisaggregationAnalysisPage() {
             initial="hidden"
             animate="visible"
           >
-            <div className="px-6 py-4 border-b border-ngodb-gray-200">
+            <div className="px-6 py-4 border-b border-humdb-gray-200">
               <button
                 onClick={() => setExpandedFilters(!expandedFilters)}
                 className="flex items-center justify-between w-full text-left"
               >
                 <div className="flex items-center space-x-3">
-                  <Image src="/icons/funnel.svg" alt="Filters" width={24} height={24} className="text-ngodb-red" />
-                  <h2 className="text-xl font-bold text-ngodb-navy">{t('disaggregationAnalysis.filters.title')}</h2>
+                  <Image src="/icons/funnel.svg" alt="Filters" width={24} height={24} className="text-humdb-red" />
+                  <h2 className="text-xl font-bold text-humdb-navy">{t('disaggregationAnalysis.filters.title')}</h2>
                 </div>
                 <motion.div
                   animate={{ rotate: expandedFilters ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <svg className="w-5 h-5 text-ngodb-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-humdb-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </motion.div>
@@ -2249,13 +2249,13 @@ export default function DisaggregationAnalysisPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       {/* Country Filter */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           {t('disaggregationAnalysis.filters.countries')}
                         </label>
                         <select
                           multiple
                           size="4"
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedCountries}
                           onChange={(e) => {
                             const values = Array.from(e.target.selectedOptions, option => option.value);
@@ -2266,16 +2266,16 @@ export default function DisaggregationAnalysisPage() {
                             <option key={country} value={country}>{country}</option>
                           ))}
                         </select>
-                        <p className="text-xs text-ngodb-gray-500 mt-1">{t('disaggregationAnalysis.filters.selectMultiple')}</p>
+                        <p className="text-xs text-humdb-gray-500 mt-1">{t('disaggregationAnalysis.filters.selectMultiple')}</p>
                       </div>
 
                       {/* Period Filter */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           {t('disaggregationAnalysis.filters.period')}
                         </label>
                         <select
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedPeriod}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedPeriod: e.target.value }))}
                         >
@@ -2288,11 +2288,11 @@ export default function DisaggregationAnalysisPage() {
 
                       {/* Indicator Filter */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           {t('disaggregationAnalysis.filters.indicator')}
                         </label>
                         <select
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedIndicator}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedIndicator: e.target.value }))}
                         >
@@ -2305,11 +2305,11 @@ export default function DisaggregationAnalysisPage() {
 
                       {/* Chart Type */}
                       <div>
-                        <label className="block text-sm font-semibold text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-semibold text-humdb-gray-700 mb-3">
                           {t('disaggregationAnalysis.filters.chartType')}
                         </label>
                         <select
-                          className="w-full p-3 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={chartType}
                           onChange={(e) => setChartType(e.target.value)}
                         >
@@ -2328,19 +2328,19 @@ export default function DisaggregationAnalysisPage() {
                           selectedPeriod: '',
                           selectedIndicator: ''
                         }))}
-                        className="px-4 py-2 bg-ngodb-gray-200 text-ngodb-gray-700 rounded-lg hover:bg-ngodb-gray-300 transition-colors font-medium"
+                        className="px-4 py-2 bg-humdb-gray-200 text-humdb-gray-700 rounded-lg hover:bg-humdb-gray-300 transition-colors font-medium"
                       >
                         {t('disaggregationAnalysis.filters.clearFilters')}
                       </button>
                       <button
                         onClick={fetchData}
-                        className="px-4 py-2 bg-ngodb-red text-white rounded-lg hover:bg-ngodb-red-dark transition-colors font-medium"
+                        className="px-4 py-2 bg-humdb-red text-white rounded-lg hover:bg-humdb-red-dark transition-colors font-medium"
                         disabled={isLoading}
                       >
                         {isLoading ? t('disaggregationAnalysis.filters.loading') : t('disaggregationAnalysis.filters.refreshData')}
                       </button>
                       <div className="flex-1"></div>
-                      <div className="text-sm text-ngodb-gray-600 flex items-center">
+                      <div className="text-sm text-humdb-gray-600 flex items-center">
                         <span className="inline-block w-2 h-2 bg-green-400 rounded-full mr-2"></span>
                         {t('disaggregationAnalysis.filters.disaggregatedRecords', {
                           count: rawData.filter(item => item.disaggregation_data && item.disaggregation_data.values).length,
@@ -2357,7 +2357,7 @@ export default function DisaggregationAnalysisPage() {
       </section>
 
       {/* Tab Navigation */}
-      <section className="bg-white border-b border-ngodb-gray-200 sticky top-20 md:top-[136px] xl:top-20 z-40">
+      <section className="bg-white border-b border-humdb-gray-200 sticky top-20 md:top-[136px] xl:top-20 z-40">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           <div className="flex space-x-1 overflow-x-auto">
             {[
@@ -2376,8 +2376,8 @@ export default function DisaggregationAnalysisPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`py-4 px-4 font-semibold border-b-2 transition-all duration-200 whitespace-nowrap flex items-center space-x-2 ${
                   activeTab === tab.id
-                    ? 'text-ngodb-red border-ngodb-red bg-ngodb-red bg-opacity-5'
-                    : 'text-ngodb-gray-600 border-transparent hover:text-ngodb-red hover:border-ngodb-red hover:border-opacity-50'
+                    ? 'text-humdb-red border-humdb-red bg-humdb-red bg-opacity-5'
+                    : 'text-humdb-gray-600 border-transparent hover:text-humdb-red hover:border-humdb-red hover:border-opacity-50'
                 }`}
               >
                 <Image src={tab.icon} alt={tab.label} width={20} height={20} />
@@ -2389,16 +2389,16 @@ export default function DisaggregationAnalysisPage() {
       </section>
 
       {/* Content Section */}
-      <section className="py-16 bg-ngodb-gray-50 min-h-screen">
+      <section className="py-16 bg-humdb-gray-50 min-h-screen">
         <div className="w-full px-6 sm:px-8 lg:px-12">
           {isLoading ? (
             <div className="text-center py-20">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="w-16 h-16 border-4 border-ngodb-red border-t-transparent rounded-full mx-auto mb-4"
+                className="w-16 h-16 border-4 border-humdb-red border-t-transparent rounded-full mx-auto mb-4"
               ></motion.div>
-              <p className="text-ngodb-gray-600 text-lg">{t('disaggregationAnalysis.loading.message')}</p>
+              <p className="text-humdb-gray-600 text-lg">{t('disaggregationAnalysis.loading.message')}</p>
             </div>
           ) : (
             <AnimatePresence mode="wait">
@@ -2415,13 +2415,13 @@ export default function DisaggregationAnalysisPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div className="bg-white rounded-xl shadow-lg p-6">
                       <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-bold text-ngodb-navy flex items-center">
+                        <h3 className="text-xl font-bold text-humdb-navy flex items-center">
                           <Image src="/icons/globe.svg" alt="Countries" width={24} height={24} className="mr-2" />
                           {t('disaggregationAnalysis.overview.topCountries')}
                         </h3>
                         {processedData.availableYears && processedData.availableYears.length > 0 && (
                           <select
-                            className="px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent text-sm"
+                            className="px-3 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent text-sm"
                             value={selectedYear || ''}
                             onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
                           >
@@ -2441,7 +2441,7 @@ export default function DisaggregationAnalysisPage() {
                             height={350}
                           />
                           {selectedYear && (
-                            <p className="text-xs text-ngodb-gray-500 mt-2 text-center">
+                            <p className="text-xs text-humdb-gray-500 mt-2 text-center">
                               Showing top indicator per country for {selectedYear}
                             </p>
                           )}
@@ -2449,13 +2449,13 @@ export default function DisaggregationAnalysisPage() {
                       ) : (
                         <div className="text-center py-12">
                           <Image src="/icons/analytics.svg" alt={t('data.noData')} width={64} height={64} className="mx-auto mb-4 opacity-50" />
-                          <p className="text-ngodb-gray-500">{t('disaggregationAnalysis.overview.noData')}</p>
+                          <p className="text-humdb-gray-500">{t('disaggregationAnalysis.overview.noData')}</p>
                         </div>
                       )}
                     </div>
 
                     <div className="bg-white rounded-xl shadow-lg p-6">
-                      <h3 className="text-xl font-bold text-ngodb-navy mb-6 flex items-center">
+                      <h3 className="text-xl font-bold text-humdb-navy mb-6 flex items-center">
                         <Image src="/icons/users-group.svg" alt="Sex Distribution" width={24} height={24} className="mr-2" />
                         {t('disaggregationAnalysis.overview.overallDistribution')}
                       </h3>
@@ -2469,7 +2469,7 @@ export default function DisaggregationAnalysisPage() {
                       ) : (
                         <div className="text-center py-12">
                           <Image src="/icons/users-group.svg" alt={t('data.noData')} width={64} height={64} className="mx-auto mb-4 opacity-50" />
-                          <p className="text-ngodb-gray-500">{t('disaggregationAnalysis.overview.noData')}</p>
+                          <p className="text-humdb-gray-500">{t('disaggregationAnalysis.overview.noData')}</p>
                         </div>
                       )}
                     </div>
@@ -2479,7 +2479,7 @@ export default function DisaggregationAnalysisPage() {
                 {/* By Indicator Tab */}
                 {activeTab === 'by-indicator' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <Image src="/icons/chart.svg" alt="Indicators" width={28} height={28} className="mr-3" />
                       {t('disaggregationAnalysis.byIndicator.title')}
                     </h3>
@@ -2494,8 +2494,8 @@ export default function DisaggregationAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <Image src="/icons/chart.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                        <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.byIndicator.noData')}</p>
-                        <p className="text-ngodb-gray-400 text-sm mt-2">{t('disaggregationAnalysis.byIndicator.noDataDescription')}</p>
+                        <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.byIndicator.noData')}</p>
+                        <p className="text-humdb-gray-400 text-sm mt-2">{t('disaggregationAnalysis.byIndicator.noDataDescription')}</p>
                       </div>
                     )}
                   </div>
@@ -2506,7 +2506,7 @@ export default function DisaggregationAnalysisPage() {
                   <div className="space-y-8">
                     {/* Leadership vs Staff vs Volunteering Comparison */}
                     <div className="bg-white rounded-xl shadow-lg p-8">
-                      <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                      <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                         <Image src="/icons/woman-leader.svg" alt="Women in Leadership" width={28} height={28} className="mr-3" />
                         {t('disaggregationAnalysis.womenLeadership.comparison')}
                       </h3>
@@ -2523,9 +2523,9 @@ export default function DisaggregationAnalysisPage() {
                           />
                           <div className="space-y-4">
                             {processedData.womenInLeadership.comparison.map((item, index) => (
-                              <div key={index} className="bg-ngodb-gray-50 rounded-lg p-4">
+                              <div key={index} className="bg-humdb-gray-50 rounded-lg p-4">
                                 <div className="flex justify-between items-center mb-2">
-                                  <h4 className="font-semibold text-ngodb-navy">{item.label}</h4>
+                                  <h4 className="font-semibold text-humdb-navy">{item.label}</h4>
                                   <span className={`px-2 py-1 rounded text-sm font-bold ${
                                     item.percentage >= 50 ? 'bg-green-100 text-green-800' :
                                     item.percentage >= 30 ? 'bg-yellow-100 text-yellow-800' :
@@ -2534,15 +2534,15 @@ export default function DisaggregationAnalysisPage() {
                                     {item.percentage}%
                                   </span>
                                 </div>
-                                <div className="text-sm text-ngodb-gray-600">
+                                <div className="text-sm text-humdb-gray-600">
                                   {t('disaggregationAnalysis.womenLeadership.womenOutOf', {
                                     value: formatNumber(item.value),
                                     total: formatNumber(item.total)
                                   })}
                                 </div>
-                                <div className="w-full bg-ngodb-gray-200 rounded-full h-2 mt-2">
+                                <div className="w-full bg-humdb-gray-200 rounded-full h-2 mt-2">
                                   <div
-                                    className="bg-ngodb-red h-2 rounded-full transition-all duration-500"
+                                    className="bg-humdb-red h-2 rounded-full transition-all duration-500"
                                     style={{ width: `${item.percentage}%` }}
                                   ></div>
                                 </div>
@@ -2553,7 +2553,7 @@ export default function DisaggregationAnalysisPage() {
                       ) : (
                         <div className="text-center py-16">
                           <Image src="/icons/woman-leader.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                          <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.womenLeadership.noData')}</p>
+                          <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.womenLeadership.noData')}</p>
                         </div>
                       )}
                     </div>
@@ -2561,7 +2561,7 @@ export default function DisaggregationAnalysisPage() {
                     {/* Country Leadership Analysis */}
                     {processedData.womenInLeadership.leadership.length > 0 && (
                       <div className="bg-white rounded-xl shadow-lg p-8">
-                        <h3 className="text-xl font-bold text-ngodb-navy mb-6 flex items-center">
+                        <h3 className="text-xl font-bold text-humdb-navy mb-6 flex items-center">
                           <Image src="/icons/globe.svg" alt="Countries" width={24} height={24} className="mr-2" />
                           {t('disaggregationAnalysis.womenLeadership.byCountry')}
                         </h3>
@@ -2580,7 +2580,7 @@ export default function DisaggregationAnalysisPage() {
                     {/* Trends Over Time */}
                     {processedData.womenInLeadership.trends.length > 0 && (
                       <div className="bg-white rounded-xl shadow-lg p-8">
-                        <h3 className="text-xl font-bold text-ngodb-navy mb-6 flex items-center">
+                        <h3 className="text-xl font-bold text-humdb-navy mb-6 flex items-center">
                           <Image src="/icons/trending-up.svg" alt="Trends" width={24} height={24} className="mr-2" />
                           Women's Participation Trends
                         </h3>
@@ -2612,7 +2612,7 @@ export default function DisaggregationAnalysisPage() {
                 {/* By Sex Tab */}
                 {activeTab === 'by-sex' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <Image src="/icons/users-group.svg" alt="Sex Analysis" width={28} height={28} className="mr-3" />
                       {t('disaggregationAnalysis.bySex.title')}
                     </h3>
@@ -2626,7 +2626,7 @@ export default function DisaggregationAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <Image src="/icons/users-group.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                        <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.bySex.noData')}</p>
+                        <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.bySex.noData')}</p>
                       </div>
                     )}
                   </div>
@@ -2635,7 +2635,7 @@ export default function DisaggregationAnalysisPage() {
                 {/* By Age Tab */}
                 {activeTab === 'by-age' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <Image src="/icons/age-groups.svg" alt="Age Groups" width={28} height={28} className="mr-3" />
                       {t('disaggregationAnalysis.byAge.title')}
                     </h3>
@@ -2649,7 +2649,7 @@ export default function DisaggregationAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <Image src="/icons/age-groups.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                        <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.byAge.noData')}</p>
+                        <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.byAge.noData')}</p>
                       </div>
                     )}
                   </div>
@@ -2658,7 +2658,7 @@ export default function DisaggregationAnalysisPage() {
                 {/* By Sex & Age Tab */}
                 {activeTab === 'by-sex-age' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <Image src="/icons/trending-up.svg" alt="Sex and Age" width={28} height={28} className="mr-3" />
                       {t('disaggregationAnalysis.bySexAge.title')}
                     </h3>
@@ -2672,7 +2672,7 @@ export default function DisaggregationAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <Image src="/icons/trending-up.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                        <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.bySexAge.noData')}</p>
+                        <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.bySexAge.noData')}</p>
                       </div>
                     )}
                   </div>
@@ -2681,7 +2681,7 @@ export default function DisaggregationAnalysisPage() {
                 {/* By Country Tab */}
                 {activeTab === 'by-country' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
-                    <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                    <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                       <Image src="/icons/globe.svg" alt="Countries" width={28} height={28} className="mr-3" />
                       {t('disaggregationAnalysis.byCountry.title')}
                     </h3>
@@ -2695,7 +2695,7 @@ export default function DisaggregationAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <Image src="/icons/globe.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                        <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.byCountry.noData')}</p>
+                        <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.byCountry.noData')}</p>
                       </div>
                     )}
                   </div>
@@ -2705,7 +2705,7 @@ export default function DisaggregationAnalysisPage() {
                 {activeTab === 'country-disaggregation' && (
                   <div className="bg-white rounded-xl shadow-lg p-8">
                     <div className="flex items-center justify-between mb-8">
-                      <h3 className="text-2xl font-bold text-ngodb-navy flex items-center">
+                      <h3 className="text-2xl font-bold text-humdb-navy flex items-center">
                         <Image src="/icons/coverage.svg" alt="Coverage" width={28} height={28} className="mr-3" />
                         {t('disaggregationAnalysis.coverage.title')}
                       </h3>
@@ -2739,9 +2739,9 @@ export default function DisaggregationAnalysisPage() {
                     {processedData.countryDisaggregation.length > 0 ? (
                       <div className="space-y-8" id="coverage-container">
                         {/* Regional Summary */}
-                        <div className="bg-ngodb-gray-50 rounded-lg p-6" id="regional-summary">
+                        <div className="bg-humdb-gray-50 rounded-lg p-6" id="regional-summary">
                           <div className="flex items-center justify-between mb-4">
-                            <h5 className="text-md font-semibold text-ngodb-navy">Regional Summary</h5>
+                            <h5 className="text-md font-semibold text-humdb-navy">Regional Summary</h5>
                             <button
                               onClick={() => handleDownloadPNG('regional-summary', t('data.regionalSummary'))}
                               disabled={isDownloadingPNG || isLoading}
@@ -2776,7 +2776,7 @@ export default function DisaggregationAnalysisPage() {
                                 return (
                                   <div key={region} className="bg-white rounded-lg p-4 border-l-4" style={{ borderLeftColor: getRegionColor(region) }}>
                                     <div className="flex items-center justify-between mb-2">
-                                      <h6 className="font-semibold text-ngodb-navy">{region}</h6>
+                                      <h6 className="font-semibold text-humdb-navy">{region}</h6>
                                       <span className={`px-2 py-1 text-xs font-bold rounded-full ${
                                         avgDisaggregation >= 75 ? 'bg-green-100 text-green-800' :
                                         avgDisaggregation >= 50 ? 'bg-yellow-100 text-yellow-800' :
@@ -2785,10 +2785,10 @@ export default function DisaggregationAnalysisPage() {
                                         {avgDisaggregation}%
                                       </span>
                                     </div>
-                                    <div className="text-sm text-ngodb-gray-600">
+                                    <div className="text-sm text-humdb-gray-600">
                                       {totalCountries} countries
                                     </div>
-                                    <div className="w-full bg-ngodb-gray-200 rounded-full h-2 mt-2">
+                                    <div className="w-full bg-humdb-gray-200 rounded-full h-2 mt-2">
                                       <div
                                         className="h-2 rounded-full transition-all duration-500"
                                         style={{
@@ -2806,7 +2806,7 @@ export default function DisaggregationAnalysisPage() {
 
                         {/* Regional Breakdown */}
                         <div>
-                          <h4 className="text-lg font-semibold text-ngodb-navy mb-6">Detailed Breakdown by Region</h4>
+                          <h4 className="text-lg font-semibold text-humdb-navy mb-6">Detailed Breakdown by Region</h4>
                           {(() => {
                             const regionGroups = groupCountriesByRegion(processedData.countryDisaggregation);
                             const sortedRegions = Object.keys(regionGroups).sort();
@@ -2820,7 +2820,7 @@ export default function DisaggregationAnalysisPage() {
                                   );
 
                                   return (
-                                    <div key={region} className="border border-ngodb-gray-200 rounded-lg overflow-hidden" id={`region-${region.toLowerCase().replace(/\s+/g, '-')}`}>
+                                    <div key={region} className="border border-humdb-gray-200 rounded-lg overflow-hidden" id={`region-${region.toLowerCase().replace(/\s+/g, '-')}`}>
                                       {/* Region Header */}
                                       <div
                                         className="px-6 py-4 font-bold text-white flex items-center justify-between"
@@ -2859,25 +2859,25 @@ export default function DisaggregationAnalysisPage() {
                                       {/* Countries Table */}
                                       <div className="overflow-x-auto">
                                         <table className="min-w-full bg-white">
-                                          <thead className="bg-ngodb-gray-50">
+                                          <thead className="bg-humdb-gray-50">
                                             <tr>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider">Country</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider">Total Records</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider">Sex %</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider">Age %</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider">Sex+Age %</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider">Overall %</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider">Bar Chart</th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-humdb-gray-500 uppercase tracking-wider">Country</th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-humdb-gray-500 uppercase tracking-wider">Total Records</th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-humdb-gray-500 uppercase tracking-wider">Sex %</th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-humdb-gray-500 uppercase tracking-wider">Age %</th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-humdb-gray-500 uppercase tracking-wider">Sex+Age %</th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-humdb-gray-500 uppercase tracking-wider">Overall %</th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-humdb-gray-500 uppercase tracking-wider">Bar Chart</th>
                                             </tr>
                                           </thead>
-                                          <tbody className="bg-white divide-y divide-ngodb-gray-200">
+                                          <tbody className="bg-white divide-y divide-humdb-gray-200">
                                             {countries.map((item, index) => (
-                                              <tr key={index} className="hover:bg-ngodb-gray-50">
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-ngodb-gray-900">{item.label}</td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-ngodb-gray-500">{item.totalItems}</td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-ngodb-gray-500">{item.sexPercentage}%</td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-ngodb-gray-500">{item.agePercentage}%</td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-ngodb-gray-500">{item.sexAgePercentage}%</td>
+                                              <tr key={index} className="hover:bg-humdb-gray-50">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-humdb-gray-900">{item.label}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-humdb-gray-500">{item.totalItems}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-humdb-gray-500">{item.sexPercentage}%</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-humdb-gray-500">{item.agePercentage}%</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-humdb-gray-500">{item.sexAgePercentage}%</td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
                                                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                                     item.overallDisaggregation >= 75 ? 'bg-green-100 text-green-800' :
@@ -2889,7 +2889,7 @@ export default function DisaggregationAnalysisPage() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
                                                   <div className="flex items-center space-x-2">
-                                                    <div className="w-24 bg-ngodb-gray-200 rounded-full h-3">
+                                                    <div className="w-24 bg-humdb-gray-200 rounded-full h-3">
                                                       <div
                                                         className="h-3 rounded-full transition-all duration-300"
                                                         style={{
@@ -2898,7 +2898,7 @@ export default function DisaggregationAnalysisPage() {
                                                         }}
                                                       ></div>
                                                     </div>
-                                                    <span className="text-xs text-ngodb-gray-500 w-8 text-right">
+                                                    <span className="text-xs text-humdb-gray-500 w-8 text-right">
                                                       {item.overallDisaggregation}%
                                                     </span>
                                                   </div>
@@ -2919,7 +2919,7 @@ export default function DisaggregationAnalysisPage() {
                     ) : (
                       <div className="text-center py-16">
                         <Image src="/icons/coverage.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                        <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noDisaggregationData')}</p>
+                        <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noDisaggregationData')}</p>
                       </div>
                     )}
                   </div>
@@ -2930,7 +2930,7 @@ export default function DisaggregationAnalysisPage() {
                   <div className="space-y-8">
                     {/* Women in Governing Board Trends */}
                     <div className="bg-white rounded-xl shadow-lg p-8">
-                      <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                      <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                         <Image src="/icons/woman-leader.svg" alt="Women in Leadership" width={28} height={28} className="mr-3" />
                         Women in Governing Board - Trends Over Time
                       </h3>
@@ -2947,14 +2947,14 @@ export default function DisaggregationAnalysisPage() {
                       ) : (
                         <div className="text-center py-16">
                           <Image src="/icons/woman-leader.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                          <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noGoverningBoardData')}</p>
+                          <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noGoverningBoardData')}</p>
                         </div>
                       )}
                     </div>
 
                     {/* Women in Staff Trends */}
                     <div className="bg-white rounded-xl shadow-lg p-8">
-                      <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                      <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                         <Image src="/icons/users-group.svg" alt="Staff" width={28} height={28} className="mr-3" />
                         {t('disaggregationAnalysis.trends.staff')}
                       </h3>
@@ -2971,14 +2971,14 @@ export default function DisaggregationAnalysisPage() {
                       ) : (
                         <div className="text-center py-16">
                           <Image src="/icons/users-group.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                          <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noStaffData')}</p>
+                          <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noStaffData')}</p>
                         </div>
                       )}
                     </div>
 
                     {/* Women in Volunteers Trends */}
                     <div className="bg-white rounded-xl shadow-lg p-8">
-                      <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                      <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                         <Image src="/icons/trending-up.svg" alt="Volunteers" width={28} height={28} className="mr-3" />
                         {t('disaggregationAnalysis.trends.volunteers')}
                       </h3>
@@ -2995,21 +2995,21 @@ export default function DisaggregationAnalysisPage() {
                       ) : (
                         <div className="text-center py-16">
                           <Image src="/icons/trending-up.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                          <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noVolunteersData')}</p>
+                          <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noVolunteersData')}</p>
                         </div>
                       )}
                     </div>
 
                     {/* Combined Trends Comparison */}
                     <div className="bg-white rounded-xl shadow-lg p-8">
-                      <h3 className="text-2xl font-bold text-ngodb-navy mb-8 flex items-center">
+                      <h3 className="text-2xl font-bold text-humdb-navy mb-8 flex items-center">
                         <Image src="/icons/chart.svg" alt="Comparison" width={28} height={28} className="mr-3" />
                         Women's Participation Comparison - All Categories
                       </h3>
                       {processedData.womenInLeadership.trends.length > 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                           <div>
-                            <h4 className="text-lg font-semibold text-ngodb-navy mb-4">Governing Board vs Staff vs Volunteers</h4>
+                            <h4 className="text-lg font-semibold text-humdb-navy mb-4">Governing Board vs Staff vs Volunteers</h4>
                             <MultiChart
                               data={processedData.womenInLeadership.trends.map(item => ({
                                 label: item.label,
@@ -3023,15 +3023,15 @@ export default function DisaggregationAnalysisPage() {
                             />
                           </div>
                           <div className="space-y-4">
-                            <h4 className="text-lg font-semibold text-ngodb-navy mb-4">Latest Period Summary</h4>
+                            <h4 className="text-lg font-semibold text-humdb-navy mb-4">Latest Period Summary</h4>
                             {(() => {
                               const latestTrend = processedData.womenInLeadership.trends[processedData.womenInLeadership.trends.length - 1];
                               if (latestTrend) {
                                 return (
                                   <div className="space-y-4">
-                                    <div className="bg-ngodb-gray-50 rounded-lg p-4">
+                                    <div className="bg-humdb-gray-50 rounded-lg p-4">
                                       <div className="flex justify-between items-center mb-2">
-                                        <h5 className="font-semibold text-ngodb-navy">Governing Board</h5>
+                                        <h5 className="font-semibold text-humdb-navy">Governing Board</h5>
                                         <span className={`px-2 py-1 rounded text-sm font-bold ${
                                           latestTrend.leadershipPercentage >= 50 ? 'bg-green-100 text-green-800' :
                                           latestTrend.leadershipPercentage >= 30 ? 'bg-yellow-100 text-yellow-800' :
@@ -3040,17 +3040,17 @@ export default function DisaggregationAnalysisPage() {
                                           {latestTrend.leadershipPercentage}%
                                         </span>
                                       </div>
-                                      <div className="w-full bg-ngodb-gray-200 rounded-full h-2">
+                                      <div className="w-full bg-humdb-gray-200 rounded-full h-2">
                                         <div
-                                          className="bg-ngodb-red h-2 rounded-full transition-all duration-500"
+                                          className="bg-humdb-red h-2 rounded-full transition-all duration-500"
                                           style={{ width: `${latestTrend.leadershipPercentage}%` }}
                                         ></div>
                                       </div>
                                     </div>
 
-                                    <div className="bg-ngodb-gray-50 rounded-lg p-4">
+                                    <div className="bg-humdb-gray-50 rounded-lg p-4">
                                       <div className="flex justify-between items-center mb-2">
-                                        <h5 className="font-semibold text-ngodb-navy">Staff</h5>
+                                        <h5 className="font-semibold text-humdb-navy">Staff</h5>
                                         <span className={`px-2 py-1 rounded text-sm font-bold ${
                                           (latestTrend.staffPercentage || 0) >= 50 ? 'bg-green-100 text-green-800' :
                                           (latestTrend.staffPercentage || 0) >= 30 ? 'bg-yellow-100 text-yellow-800' :
@@ -3059,17 +3059,17 @@ export default function DisaggregationAnalysisPage() {
                                           {latestTrend.staffPercentage || 0}%
                                         </span>
                                       </div>
-                                      <div className="w-full bg-ngodb-gray-200 rounded-full h-2">
+                                      <div className="w-full bg-humdb-gray-200 rounded-full h-2">
                                         <div
-                                          className="bg-ngodb-blue h-2 rounded-full transition-all duration-500"
+                                          className="bg-humdb-blue h-2 rounded-full transition-all duration-500"
                                           style={{ width: `${latestTrend.staffPercentage || 0}%` }}
                                         ></div>
                                       </div>
                                     </div>
 
-                                    <div className="bg-ngodb-gray-50 rounded-lg p-4">
+                                    <div className="bg-humdb-gray-50 rounded-lg p-4">
                                       <div className="flex justify-between items-center mb-2">
-                                        <h5 className="font-semibold text-ngodb-navy">Volunteers</h5>
+                                        <h5 className="font-semibold text-humdb-navy">Volunteers</h5>
                                         <span className={`px-2 py-1 rounded text-sm font-bold ${
                                           latestTrend.volunteeringPercentage >= 50 ? 'bg-green-100 text-green-800' :
                                           latestTrend.volunteeringPercentage >= 30 ? 'bg-yellow-100 text-yellow-800' :
@@ -3078,9 +3078,9 @@ export default function DisaggregationAnalysisPage() {
                                           {latestTrend.volunteeringPercentage}%
                                         </span>
                                       </div>
-                                      <div className="w-full bg-ngodb-gray-200 rounded-full h-2">
+                                      <div className="w-full bg-humdb-gray-200 rounded-full h-2">
                                         <div
-                                          className="bg-ngodb-green h-2 rounded-full transition-all duration-500"
+                                          className="bg-humdb-green h-2 rounded-full transition-all duration-500"
                                           style={{ width: `${latestTrend.volunteeringPercentage}%` }}
                                         ></div>
                                       </div>
@@ -3088,14 +3088,14 @@ export default function DisaggregationAnalysisPage() {
                                   </div>
                                 );
                               }
-                              return <p className="text-ngodb-gray-500">No trend data available</p>;
+                              return <p className="text-humdb-gray-500">No trend data available</p>;
                             })()}
                           </div>
                         </div>
                       ) : (
                         <div className="text-center py-16">
                           <Image src="/icons/chart.svg" alt={t('data.noData')} width={80} height={80} className="mx-auto mb-6 opacity-50" />
-                          <p className="text-ngodb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noComparisonData')}</p>
+                          <p className="text-humdb-gray-500 text-lg">{t('disaggregationAnalysis.trends.noComparisonData')}</p>
                         </div>
                       )}
                     </div>

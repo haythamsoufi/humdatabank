@@ -272,7 +272,7 @@ def _download_ifrc_document(url: str):
     Caller must delete temp_path and set doc.storage_path = None after processing.
     Raises requests.exceptions.RequestException on download failure.
     """
-    headers = {'User-Agent': 'NGO-Databank/1.0'}
+    headers = {'User-Agent': 'hum-databank/1.0'}
     ok, reason = _validate_ifrc_fetch_url(url)
     if not ok:
         raise ValueError(f"Blocked URL: {reason}")

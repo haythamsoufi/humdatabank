@@ -21,12 +21,12 @@ depends_on = None
 def upgrade():
     """
     Add organization branding settings to system_settings table.
-    Sets default values from environment variables or uses 'NGO Databank' as default.
+    Sets default values from environment variables or uses 'Humanitarian Databank' as default.
     """
     # Get default values from environment or use defaults
-    org_name = os.environ.get('ORGANIZATION_NAME', 'NGO Databank')
+    org_name = os.environ.get('ORGANIZATION_NAME', 'Humanitarian Databank')
     org_short_name = os.environ.get('ORGANIZATION_SHORT_NAME', org_name)
-    org_domain = os.environ.get('ORGANIZATION_DOMAIN', 'ngodatabank.org')
+    org_domain = os.environ.get('ORGANIZATION_DOMAIN', 'humdatabank.org')
     org_email_domain = os.environ.get('ORGANIZATION_EMAIL_DOMAIN', org_domain)
     org_logo_path = os.environ.get('ORGANIZATION_LOGO_PATH', 'logo.svg')
     copyright_year = os.environ.get('ORGANIZATION_COPYRIGHT_YEAR', str(datetime.now().year))

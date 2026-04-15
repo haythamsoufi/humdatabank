@@ -1,6 +1,6 @@
 # Data Governance: How the System Supports It
 
-This document describes how the NGO Databank supports **data governance**: the policies and controls that ensure collected data is accessible only to authorized parties, consistent and reliable, traceable, and handled securely. It is intended for administrators, focal points, and others who need to understand how the platform supports governance over the data it collects.
+This document describes how the Humanitarian Databank supports **data governance**: the policies and controls that ensure collected data is accessible only to authorized parties, consistent and reliable, traceable, and handled securely. It is intended for administrators, focal points, and others who need to understand how the platform supports governance over the data it collects.
 
 ## Scope of This Document
 
@@ -452,7 +452,7 @@ The following fields were added to support governance accountability:
 
 For organizations using or evaluating **Microsoft Purview**, the following mapping shows how this document's structure and language align with Purview's data governance framework.
 
-| Purview concept | NGO Databank equivalent |
+| Purview concept | Humanitarian Databank equivalent |
 |-----------------|----------------------------------|
 | **Data owner** (individual or group responsible for managing a data asset) | **Template Owner** (template level); **Data Owner** (assignment level); **FDS** (organization data) |
 | **Data steward** (maintaining nomenclature, data quality standards, and rules) | **Indicator Bank managers**; administrators who define validation and required fields |

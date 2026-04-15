@@ -1,4 +1,4 @@
-# Azure Deployment Script for NGO Databank
+# Azure Deployment Script for Humanitarian Databank
 # PowerShell script to automate Azure resource creation and deployment
 #
 # USAGE: Run this script from the Backoffice/azure directory
@@ -21,7 +21,7 @@ function Write-Warning { Write-Host $args -ForegroundColor Yellow }
 function Write-Error { Write-Host $args -ForegroundColor Red }
 
 Write-Info "=========================================="
-Write-Info "NGO Databank - Azure Deployment"
+Write-Info "Humanitarian Databank - Azure Deployment"
 Write-Info "=========================================="
 Write-Info ""
 

@@ -9,7 +9,7 @@
 
 ## Reporting a vulnerability
 
-**Preferred:** use [GitHub Security advisories](https://github.com/haythamsoufi/ngodatabank/security/advisories/new) to report issues **privately** (recommended for public repositories).
+**Preferred:** use [GitHub Security advisories](https://github.com/haythamsoufi/humdatabank/security/advisories/new) to report issues **privately** (recommended for public repositories).
 
 You may also contact: **haythamsoufi@outlook.com**.
 

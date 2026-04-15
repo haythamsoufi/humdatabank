@@ -1,6 +1,6 @@
 # User Guides
 
-Step-by-step workflows and tutorials for using the NGO Databank Backoffice system.
+Step-by-step workflows and tutorials for using the Humanitarian Databank Backoffice system.
 
 ## Available guides
 

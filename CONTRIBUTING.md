@@ -1,6 +1,6 @@
-# Contributing to NGO Databank
+# Contributing to Humanitarian Databank
 
-NGO Databank exists to help humanitarian actors collect, steward, and share **indicator and form data** responsibly—across languages, countries, and teams. Contributions should make that easier for **focal points, analysts, and the public**, not only for other developers.
+Humanitarian Databank exists to help humanitarian actors collect, steward, and share **indicator and form data** responsibly—across languages, countries, and teams. Contributions should make that easier for **focal points, analysts, and the public**, not only for other developers.
 
 This repo is a **monorepo**: **Backoffice** (Flask), **Website** (Next.js), and **MobileApp** (Flutter). Day-to-day setup, conventions, and “where to change things” live in [`CLAUDE.md`](CLAUDE.md) and each app’s README.
 
@@ -55,23 +55,23 @@ Automation detail (for reference): CodeQL in [`.github/workflows/codeql.yml`](.g
 
 ### Appendix: maintainer snippets (`gh`)
 
-Replace `OWNER/ngodatabank` with your org/user and repo name.
+Replace `OWNER/humdatabank` with your org/user and repo name.
 
 ```bash
-gh repo edit OWNER/ngodatabank --delete-branch-on-merge --allow-update-branch
-gh repo edit OWNER/ngodatabank --enable-auto-merge
+gh repo edit OWNER/humdatabank --delete-branch-on-merge --allow-update-branch
+gh repo edit OWNER/humdatabank --enable-auto-merge
 ```
 
 Update an existing ruleset (ruleset id appears in the GitHub UI URL):
 
 ```bash
-gh api repos/OWNER/ngodatabank/rulesets/RULESET_ID -X PUT --input .github/ruleset-protect-main.json
+gh api repos/OWNER/humdatabank/rulesets/RULESET_ID -X PUT --input .github/ruleset-protect-main.json
 ```
 
 Create the ruleset on a new repo:
 
 ```bash
-gh api repos/OWNER/ngodatabank/rulesets --method POST --input .github/ruleset-protect-main.json
+gh api repos/OWNER/humdatabank/rulesets --method POST --input .github/ruleset-protect-main.json
 ```
 
 On some GitHub plans, ruleset REST calls can return **403** for private repos; use the web UI under **Settings → Rules** in that case.

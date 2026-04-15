@@ -101,7 +101,7 @@ class DeepLinkService {
   void _handleDeepLink(Uri uri, {bool isInitialLink = false}) {
     // Handle Azure OAuth mobile callback — delivers JWT tokens to the waiting
     // AzureLoginScreen without going through the Navigator.
-    if (uri.scheme == 'ngodatabank' && uri.host == 'oauth-success') {
+    if (uri.scheme == 'humdatabank' && uri.host == 'oauth-success') {
       final params = Map<String, String>.from(uri.queryParameters);
       final hasAccess = params.containsKey('access_token') &&
           (params['access_token']?.isNotEmpty ?? false);

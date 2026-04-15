@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/config/routes.dart';
+import 'package:hum_databank_app/config/routes.dart';
 
 void main() {
   group('AppRoutes static constants', () {

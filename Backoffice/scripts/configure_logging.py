@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Logging Configuration Script for NGO Databank
+Logging Configuration Script for Humanitarian Databank
 
 This script helps configure logging levels for the application.
 """

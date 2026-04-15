@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/models/admin/admin_assignment.dart';
+import 'package:hum_databank_app/models/admin/admin_assignment.dart';
 
 void main() {
   group('AdminAssignment.fromJson', () {

@@ -99,7 +99,7 @@ class AiChatProvider with ChangeNotifier {
 
   Future<void> _persistPinnedIds() async {
     await _storage.init();
-    await _storage.setString('ngodb_chatbot_pinned_conversation_ids', jsonEncode(_pinnedConversationIds.toList()));
+    await _storage.setString('humdb_chatbot_pinned_conversation_ids', jsonEncode(_pinnedConversationIds.toList()));
   }
 
   void _pruneStalePinnedIds() {
@@ -128,12 +128,12 @@ class AiChatProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load policy ack + source toggles (keys aligned with Backoffice `ngodb_chatbot_*`).
+  /// Load policy ack + source toggles (keys aligned with Backoffice `humdb_chatbot_*`).
   Future<void> loadChatUiPrefs() async {
     await _storage.init();
-    final ack = await _storage.getString('ngodb_chatbot_ai_policy_acknowledged');
+    final ack = await _storage.getString('humdb_chatbot_ai_policy_acknowledged');
     _policyAcknowledged = ack == '1';
-    final raw = await _storage.getString('ngodb_chatbot_sources');
+    final raw = await _storage.getString('humdb_chatbot_sources');
     if (raw != null && raw.isNotEmpty) {
       try {
         final decoded = jsonDecode(raw);
@@ -149,7 +149,7 @@ class AiChatProvider with ChangeNotifier {
       }
     }
     _pinnedConversationIds = {};
-    final pinsRaw = await _storage.getString('ngodb_chatbot_pinned_conversation_ids');
+    final pinsRaw = await _storage.getString('humdb_chatbot_pinned_conversation_ids');
     if (pinsRaw != null && pinsRaw.isNotEmpty) {
       try {
         final decoded = jsonDecode(pinsRaw);
@@ -166,7 +166,7 @@ class AiChatProvider with ChangeNotifier {
 
   Future<void> acknowledgeAiPolicy() async {
     await _storage.init();
-    await _storage.setString('ngodb_chatbot_ai_policy_acknowledged', '1');
+    await _storage.setString('humdb_chatbot_ai_policy_acknowledged', '1');
     _policyAcknowledged = true;
     notifyListeners();
   }
@@ -185,7 +185,7 @@ class AiChatProvider with ChangeNotifier {
       _sourcesSelected = ['historical', 'system_documents', 'upr_documents'];
     }
     await _storage.init();
-    await _storage.setString('ngodb_chatbot_sources', jsonEncode(_sourcesSelected));
+    await _storage.setString('humdb_chatbot_sources', jsonEncode(_sourcesSelected));
     notifyListeners();
   }
 

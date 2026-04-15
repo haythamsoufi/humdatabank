@@ -202,16 +202,16 @@ export default function IndicatorBankPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8">
         <Head>
-          <title>Indicator Bank - NGO Databank</title>
+          <title>Indicator Bank - Humanitarian Databank</title>
         </Head>
         <div className="text-center py-20">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mb-4"></div>
-          <h1 className="text-3xl font-bold text-ngodb-navy mb-2">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mb-4"></div>
+          <h1 className="text-3xl font-bold text-humdb-navy mb-2">
             <TranslationSafe fallback="Loading Indicator Bank">
               {t('indicatorBank.loading.title')}
             </TranslationSafe>
           </h1>
-          <p className="text-ngodb-gray-600">
+          <p className="text-humdb-gray-600">
             <TranslationSafe fallback="Please wait while we fetch the indicator data...">
               {t('indicatorBank.loading.description')}
             </TranslationSafe>
@@ -518,11 +518,11 @@ export default function IndicatorBankPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8 text-center">
         <Head>
-          <title>{`${t('indicatorBank.error.title')} - NGO Databank`}</title>
+          <title>{`${t('indicatorBank.error.title')} - Humanitarian Databank`}</title>
         </Head>
-        <h1 className="text-3xl font-bold text-ngodb-red mb-6">{t('indicatorBank.title')}</h1>
+        <h1 className="text-3xl font-bold text-humdb-red mb-6">{t('indicatorBank.title')}</h1>
         <p className="text-red-600 bg-red-100 p-4 rounded-md">{error}</p>
-        <Link href="/indicator-bank" className="mt-4 inline-block text-ngodb-red hover:underline">
+        <Link href="/indicator-bank" className="mt-4 inline-block text-humdb-red hover:underline">
           &larr; {t('common.tryAgain')}
         </Link>
       </div>
@@ -533,16 +533,16 @@ export default function IndicatorBankPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8">
         <Head>
-          <title>{`Indicator Bank - NGO Databank`}</title>
+          <title>{`Indicator Bank - Humanitarian Databank`}</title>
         </Head>
         <div className="text-center py-20">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mb-4"></div>
-          <h1 className="text-3xl font-bold text-ngodb-navy mb-2">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mb-4"></div>
+          <h1 className="text-3xl font-bold text-humdb-navy mb-2">
             <TranslationSafe fallback="Loading Indicator Bank">
               {t('indicatorBank.loading.title')}
             </TranslationSafe>
           </h1>
-          <p className="text-ngodb-gray-600">
+          <p className="text-humdb-gray-600">
             <TranslationSafe fallback="Please wait while we fetch the indicator data...">
               {t('indicatorBank.loading.description')}
             </TranslationSafe>
@@ -555,13 +555,13 @@ export default function IndicatorBankPage() {
   return (
     <>
       <Head>
-        <title>{`${t('indicatorBank.title')} - NGO Databank`}</title>
+        <title>{`${t('indicatorBank.title')} - Humanitarian Databank`}</title>
         <meta name="description" content={t('indicatorBank.meta.description')} />
       </Head>
 
-      <div className={`bg-ngodb-gray-100 min-h-screen ${isRTL ? 'rtl font-tajawal' : ''}`}>
+      <div className={`bg-humdb-gray-100 min-h-screen ${isRTL ? 'rtl font-tajawal' : ''}`}>
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-ngodb-navy via-ngodb-navy to-ngodb-red text-white py-16 -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36">
+        <section className="bg-gradient-to-br from-humdb-navy via-humdb-navy to-humdb-red text-white py-16 -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36">
           <motion.div
             className="w-full px-6 sm:px-8 lg:px-12 text-center"
             initial={{ opacity: 0, y: 20 }}
@@ -608,7 +608,7 @@ export default function IndicatorBankPage() {
                       }
                     }}
                     placeholder={t('indicatorBank.search.placeholder')}
-                    className={`w-full px-4 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                    className={`w-full px-4 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                   />
                 </div>
 
@@ -617,22 +617,22 @@ export default function IndicatorBankPage() {
                   {/* Propose New Indicator Button */}
                   <button
                     onClick={openProposeModal}
-                    className="bg-white hover:bg-ngodb-gray-50 text-ngodb-navy border border-ngodb-gray-300 hover:border-ngodb-gray-400 font-medium px-4 py-2 rounded-md transition-all duration-150 flex items-center gap-2 shadow-sm hover:shadow-md"
+                    className="bg-white hover:bg-humdb-gray-50 text-humdb-navy border border-humdb-gray-300 hover:border-humdb-gray-400 font-medium px-4 py-2 rounded-md transition-all duration-150 flex items-center gap-2 shadow-sm hover:shadow-md"
                   >
-                    <svg className="w-4 h-4 text-ngodb-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-humdb-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     {t('indicatorBank.proposeNewIndicator')}
                   </button>
 
                   {/* View Mode Toggle */}
-                  <div className="bg-white rounded-lg p-1 shadow-sm border border-ngodb-gray-200">
+                  <div className="bg-white rounded-lg p-1 shadow-sm border border-humdb-gray-200">
                     <button
                       onClick={() => setViewMode('grid')}
                       className={`p-2 rounded-md transition-colors duration-150 ${
                         viewMode === 'grid'
-                          ? 'bg-ngodb-red text-white'
-                          : 'text-ngodb-gray-600 hover:text-ngodb-red'
+                          ? 'bg-humdb-red text-white'
+                          : 'text-humdb-gray-600 hover:text-humdb-red'
                       }`}
                       title={t('indicatorBank.viewMode.grid')}
                     >
@@ -648,8 +648,8 @@ export default function IndicatorBankPage() {
                       }}
                       className={`p-2 rounded-md transition-colors duration-150 ${
                         viewMode === 'table'
-                          ? 'bg-ngodb-red text-white'
-                          : 'text-ngodb-gray-600 hover:text-ngodb-red'
+                          ? 'bg-humdb-red text-white'
+                          : 'text-humdb-gray-600 hover:text-humdb-red'
                       }`}
                       title={t('indicatorBank.viewMode.table')}
                     >
@@ -666,7 +666,7 @@ export default function IndicatorBankPage() {
 
                   return (
                     <div key={sector.id} className="relative">
-                      <div className="bg-white rounded-lg shadow-sm border border-ngodb-gray-200 hover:shadow-lg hover:border-ngodb-red transition-all duration-150 overflow-hidden h-full flex flex-col">
+                      <div className="bg-white rounded-lg shadow-sm border border-humdb-gray-200 hover:shadow-lg hover:border-humdb-red transition-all duration-150 overflow-hidden h-full flex flex-col">
                         {/* Main clickable area for sector */}
                         <div
                           onClick={() => handleSectorClick(sector.name)}
@@ -692,7 +692,7 @@ export default function IndicatorBankPage() {
                               {getSectorIcon(sector.name)}
                             </div>
                           </div>
-                          <h3 className="text-lg font-semibold text-ngodb-navy mb-2">
+                          <h3 className="text-lg font-semibold text-humdb-navy mb-2">
                             {(() => {
                               // Safely extract string from localized_name or name
                               const localizedName = typeof sector.localized_name === 'string'
@@ -707,7 +707,7 @@ export default function IndicatorBankPage() {
                             })()}
                           </h3>
                           {sector.localized_description && (
-                            <p className="text-sm text-ngodb-gray-600 line-clamp-2">
+                            <p className="text-sm text-humdb-gray-600 line-clamp-2">
                               {sector.localized_description}
                             </p>
                           )}
@@ -723,14 +723,14 @@ export default function IndicatorBankPage() {
                               handleSectorClick(sector.name);
                             }
                           }}
-                          className="border-t border-ngodb-gray-100 bg-gradient-to-r from-ngodb-gray-50 to-ngodb-gray-100 px-6 py-3 cursor-pointer hover:from-ngodb-gray-100 hover:to-ngodb-gray-200 transition-all duration-150 group flex-shrink-0"
+                          className="border-t border-humdb-gray-100 bg-gradient-to-r from-humdb-gray-50 to-humdb-gray-100 px-6 py-3 cursor-pointer hover:from-humdb-gray-100 hover:to-humdb-gray-200 transition-all duration-150 group flex-shrink-0"
                         >
                           <div className="flex items-center justify-center gap-2">
-                            <span className="text-sm text-ngodb-gray-600 group-hover:text-ngodb-gray-700 transition-colors duration-150">
+                            <span className="text-sm text-humdb-gray-600 group-hover:text-humdb-gray-700 transition-colors duration-150">
                               {sector.count} {sector.count === 1 ? t('indicatorBank.indicator') : t('indicatorBank.indicators')}
                             </span>
                             {sector.subsectors.length > 0 && (
-                              <span className={`text-ngodb-gray-300 group-hover:text-ngodb-gray-400 transition-all duration-150 ${
+                              <span className={`text-humdb-gray-300 group-hover:text-humdb-gray-400 transition-all duration-150 ${
                                 isExpanded ? 'rotate-180' : ''
                               }`}>
                                 ▼
@@ -742,15 +742,15 @@ export default function IndicatorBankPage() {
 
                       {/* Subsectors Dropdown */}
                       {isExpanded && sector.subsectors.length > 0 && (
-                        <div className={`absolute top-full z-10 mt-2 bg-white rounded-lg shadow-lg border border-ngodb-gray-200 max-h-60 overflow-y-auto ${isRTL ? 'right-0 left-0' : 'left-0 right-0'}`}>
+                        <div className={`absolute top-full z-10 mt-2 bg-white rounded-lg shadow-lg border border-humdb-gray-200 max-h-60 overflow-y-auto ${isRTL ? 'right-0 left-0' : 'left-0 right-0'}`}>
                           <div className="p-3">
-                            <h4 className={`text-sm font-medium text-ngodb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.filters.subsector.label')}</h4>
+                            <h4 className={`text-sm font-medium text-humdb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.filters.subsector.label')}</h4>
                             <div className="space-y-2">
                               {sector.subsectors.map((subsector) => (
                                 <div
                                   key={subsector.id}
                                   onClick={() => handleSubsectorClick(subsector.name, sector.name)}
-                                  className={`flex items-center justify-between p-2 rounded hover:bg-ngodb-gray-50 cursor-pointer transition-colors duration-150 ${isRTL ? 'flex-row-reverse' : ''}`}
+                                  className={`flex items-center justify-between p-2 rounded hover:bg-humdb-gray-50 cursor-pointer transition-colors duration-150 ${isRTL ? 'flex-row-reverse' : ''}`}
                                 >
                                   <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                     {subsector.logo_url && (
@@ -760,9 +760,9 @@ export default function IndicatorBankPage() {
                                         className="w-4 h-4 object-contain"
                                       />
                                     )}
-                                    <span className="text-sm text-ngodb-navy">{subsector.localized_name || subsector.name}</span>
+                                    <span className="text-sm text-humdb-navy">{subsector.localized_name || subsector.name}</span>
                                   </div>
-                                  <span className="text-xs text-ngodb-gray-500">
+                                  <span className="text-xs text-humdb-gray-500">
                                     {subsector.count} {subsector.count === 1 ? t('indicatorBank.indicator') : t('indicatorBank.indicators')}
                                   </span>
                                 </div>
@@ -790,7 +790,7 @@ export default function IndicatorBankPage() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder={t('indicatorBank.filter.placeholder')}
-                    className={`w-full px-4 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                    className={`w-full px-4 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                   />
                 </div>
 
@@ -799,9 +799,9 @@ export default function IndicatorBankPage() {
                   {/* Propose New Indicator Button */}
                   <button
                     onClick={openProposeModal}
-                    className="bg-white hover:bg-ngodb-gray-50 text-ngodb-navy border border-ngodb-gray-300 hover:border-ngodb-gray-400 font-medium px-4 py-2 rounded-md transition-all duration-150 flex items-center gap-2 shadow-sm hover:shadow-md"
+                    className="bg-white hover:bg-humdb-gray-50 text-humdb-navy border border-humdb-gray-300 hover:border-humdb-gray-400 font-medium px-4 py-2 rounded-md transition-all duration-150 flex items-center gap-2 shadow-sm hover:shadow-md"
                   >
-                    <svg className="w-4 h-4 text-ngodb-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-humdb-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     {t('indicatorBank.proposeNewIndicator')}
@@ -810,7 +810,7 @@ export default function IndicatorBankPage() {
                   {/* Filter Toggle Button */}
                   <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className="bg-white hover:bg-ngodb-gray-50 text-ngodb-navy font-medium px-4 py-2 rounded-lg shadow-sm border border-ngodb-gray-200 transition-colors duration-150 flex items-center gap-2"
+                    className="bg-white hover:bg-humdb-gray-50 text-humdb-navy font-medium px-4 py-2 rounded-lg shadow-sm border border-humdb-gray-200 transition-colors duration-150 flex items-center gap-2"
                   >
                     <span>🔍</span>
                     <span>{t('indicatorBank.filters.title')}</span>
@@ -818,20 +818,20 @@ export default function IndicatorBankPage() {
                       ▼
                     </span>
                     {(searchTerm || selectedType || selectedSector || selectedSubSector || selectedArchived) && (
-                      <span className="bg-ngodb-red text-white text-xs px-2 py-1 rounded-full ml-2">
+                      <span className="bg-humdb-red text-white text-xs px-2 py-1 rounded-full ml-2">
                         {t('indicatorBank.filters.active')}
                       </span>
                     )}
                   </button>
 
                   {/* View Mode Toggle */}
-                  <div className="bg-white rounded-lg p-1 shadow-sm border border-ngodb-gray-200">
+                  <div className="bg-white rounded-lg p-1 shadow-sm border border-humdb-gray-200">
                   <button
                     onClick={() => setViewMode('grid')}
                     className={`p-2 rounded-md transition-colors duration-150 ${
                       viewMode === 'grid'
-                        ? 'bg-ngodb-red text-white'
-                        : 'text-ngodb-gray-600 hover:text-ngodb-red'
+                        ? 'bg-humdb-red text-white'
+                        : 'text-humdb-gray-600 hover:text-humdb-red'
                     }`}
                     title={t('indicatorBank.viewMode.grid')}
                   >
@@ -847,8 +847,8 @@ export default function IndicatorBankPage() {
                     }}
                     className={`p-2 rounded-md transition-colors duration-150 ${
                       viewMode === 'table'
-                        ? 'bg-ngodb-red text-white'
-                        : 'text-ngodb-gray-600 hover:text-ngodb-red'
+                        ? 'bg-humdb-red text-white'
+                        : 'text-humdb-gray-600 hover:text-humdb-red'
                     }`}
                     title={t('indicatorBank.viewMode.table')}
                   >
@@ -860,10 +860,10 @@ export default function IndicatorBankPage() {
 
               {/* Filter Toggle Button */}
               {showFilters && (
-                <form onSubmit={handleFilter} className="mb-10 bg-white p-6 rounded-lg shadow-sm border border-ngodb-gray-200">
+                <form onSubmit={handleFilter} className="mb-10 bg-white p-6 rounded-lg shadow-sm border border-humdb-gray-200">
                   {/* Search Bar */}
                   <div className="mb-6">
-                    <label htmlFor="indicator-search" className="block text-sm font-medium text-ngodb-gray-700 mb-2">
+                    <label htmlFor="indicator-search" className="block text-sm font-medium text-humdb-gray-700 mb-2">
                       {t('indicatorBank.filters.search.title')}
                     </label>
                     <input
@@ -872,21 +872,21 @@ export default function IndicatorBankPage() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder={t('indicatorBank.filters.search.placeholder')}
-                      className={`w-full px-4 py-3 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                      className={`w-full px-4 py-3 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                     />
                   </div>
 
                   {/* Filter Dropdowns */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     <div>
-                      <label htmlFor="type-filter" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="type-filter" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         {t('indicatorBank.filters.type.label')}
                       </label>
                       <select
                         id="type-filter"
                         value={selectedType}
                         onChange={(e) => setSelectedType(e.target.value)}
-                        className={`w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="">{t('indicatorBank.filters.type.all')}</option>
                         {types.map(type => (
@@ -896,7 +896,7 @@ export default function IndicatorBankPage() {
                     </div>
 
                     <div>
-                      <label htmlFor="sector-filter" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="sector-filter" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         {t('indicatorBank.filters.sector.label')}
                       </label>
                       <select
@@ -906,7 +906,7 @@ export default function IndicatorBankPage() {
                           setSelectedSector(e.target.value);
                           if (e.target.value !== selectedSector) setSelectedSubSector(''); // Clear subsector when sector changes
                         }}
-                        className={`w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="">{t('indicatorBank.filters.sector.all')}</option>
                         {sectors.map(sector => (
@@ -916,14 +916,14 @@ export default function IndicatorBankPage() {
                     </div>
 
                     <div>
-                      <label htmlFor="subsector-filter" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="subsector-filter" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         {t('indicatorBank.filters.subsector.label')}
                       </label>
                       <select
                         id="subsector-filter"
                         value={selectedSubSector}
                         onChange={(e) => setSelectedSubSector(e.target.value)}
-                        className={`w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="">{t('indicatorBank.filters.subsector.all')}</option>
                         {subsectors
@@ -935,14 +935,14 @@ export default function IndicatorBankPage() {
                     </div>
 
                     <div>
-                      <label htmlFor="archived-filter" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="archived-filter" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         {t('indicatorBank.filters.status.label')}
                       </label>
                       <select
                         id="archived-filter"
                         value={selectedArchived || 'false'}
                         onChange={(e) => setSelectedArchived(e.target.value === 'false' ? null : e.target.value)}
-                        className={`w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="false">{t('indicatorBank.filters.status.activeOnly')}</option>
                         <option value="">{t('indicatorBank.filters.status.all')}</option>
@@ -955,14 +955,14 @@ export default function IndicatorBankPage() {
                   <div className="flex gap-4">
                     <button
                       type="submit"
-                      className="bg-ngodb-red hover:bg-ngodb-red-dark text-white font-semibold px-6 py-2 rounded-md transition-colors duration-150"
+                      className="bg-humdb-red hover:bg-humdb-red-dark text-white font-semibold px-6 py-2 rounded-md transition-colors duration-150"
                     >
                       {t('indicatorBank.filters.apply')}
                     </button>
                     <button
                       type="button"
                       onClick={clearFilters}
-                      className="bg-ngodb-gray-300 hover:bg-ngodb-gray-400 text-ngodb-gray-700 font-semibold px-6 py-2 rounded-md transition-colors duration-150"
+                      className="bg-humdb-gray-300 hover:bg-humdb-gray-400 text-humdb-gray-700 font-semibold px-6 py-2 rounded-md transition-colors duration-150"
                     >
                       {t('indicatorBank.filters.clearAll')}
                     </button>
@@ -980,7 +980,7 @@ export default function IndicatorBankPage() {
                   ).length;
 
                   return (
-                <p className="text-ngodb-gray-600">
+                <p className="text-humdb-gray-600">
                       {t('indicatorBank.results.showing')} {filteredCount} {filteredCount === 1 ? t('indicatorBank.indicator') : t('indicatorBank.indicators')}
                       {searchTerm && t('indicatorBank.results.matching', { term: searchTerm })}
                 </p>
@@ -990,7 +990,7 @@ export default function IndicatorBankPage() {
 
               {/* Table View */}
               {filteredIndicators.length === 0 ? (
-                <p className="text-center text-ngodb-gray-600 text-lg py-10">
+                <p className="text-center text-humdb-gray-600 text-lg py-10">
                   {searchTerm || selectedType || selectedSector || selectedEmergency ?
                     t('indicatorBank.results.noResults') :
                     t('indicatorBank.results.noIndicators')
@@ -999,27 +999,27 @@ export default function IndicatorBankPage() {
               ) : (
                 <div className={`bg-white rounded-lg shadow-sm overflow-hidden ${isRTL ? 'rtl' : ''}`} dir={isRTL ? 'rtl' : 'ltr'}>
                   <div className="overflow-x-auto" dir={isRTL ? 'rtl' : 'ltr'}>
-                    <table className={`min-w-full divide-y divide-ngodb-gray-200 ${isRTL ? 'rtl' : ''}`} dir={isRTL ? 'rtl' : 'ltr'}>
-                      <thead className="bg-ngodb-gray-50" dir={isRTL ? 'rtl' : 'ltr'}>
+                    <table className={`min-w-full divide-y divide-humdb-gray-200 ${isRTL ? 'rtl' : ''}`} dir={isRTL ? 'rtl' : 'ltr'}>
+                      <thead className="bg-humdb-gray-50" dir={isRTL ? 'rtl' : 'ltr'}>
                         <tr dir={isRTL ? 'rtl' : 'ltr'}>
-                          <th className={`px-6 py-3 text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
+                          <th className={`px-6 py-3 text-xs font-medium text-humdb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
                             {t('indicatorBank.table.name')}
                           </th>
-                          <th className={`px-6 py-3 text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
+                          <th className={`px-6 py-3 text-xs font-medium text-humdb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
                             {t('indicatorBank.table.type')}
                           </th>
-                          <th className={`px-6 py-3 text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
+                          <th className={`px-6 py-3 text-xs font-medium text-humdb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
                             {t('indicatorBank.table.sector')}
                           </th>
-                          <th className={`px-6 py-3 text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
+                          <th className={`px-6 py-3 text-xs font-medium text-humdb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
                             {t('indicatorBank.table.subsector')}
                           </th>
-                          <th className={`px-6 py-3 text-xs font-medium text-ngodb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
+                          <th className={`px-6 py-3 text-xs font-medium text-humdb-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
                             {t('indicatorBank.table.unit')}
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-ngodb-gray-200" dir={isRTL ? 'rtl' : 'ltr'}>
+                      <tbody className="bg-white divide-y divide-humdb-gray-200" dir={isRTL ? 'rtl' : 'ltr'}>
                         {filteredIndicators
                           .filter(indicator =>
                             !searchTerm ||
@@ -1027,9 +1027,9 @@ export default function IndicatorBankPage() {
                             String(indicator.localized_definition || indicator.definition || '').toLowerCase().includes(searchTerm.toLowerCase())
                           )
                           .map((indicator) => (
-                          <tr key={indicator.id} className="hover:bg-ngodb-gray-50" dir={isRTL ? 'rtl' : 'ltr'}>
+                          <tr key={indicator.id} className="hover:bg-humdb-gray-50" dir={isRTL ? 'rtl' : 'ltr'}>
                             <td className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
-                              <Link href={`/indicator-bank/${indicator.id}`} className="text-ngodb-navy hover:text-ngodb-red font-medium" dir={isRTL ? 'rtl' : 'ltr'}>
+                              <Link href={`/indicator-bank/${indicator.id}`} className="text-humdb-navy hover:text-humdb-red font-medium" dir={isRTL ? 'rtl' : 'ltr'}>
                                 {commonWords.length > 0 ? (
                                   <span dangerouslySetInnerHTML={{
                                     __html: processIndicatorName(
@@ -1043,20 +1043,20 @@ export default function IndicatorBankPage() {
                                 )}
                               </Link>
                             </td>
-                            <td className={`px-6 py-4 text-sm text-ngodb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+                            <td className={`px-6 py-4 text-sm text-humdb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
                               {String(indicator.localized_type || indicator.type || '')}
                             </td>
-                            <td className={`px-6 py-4 text-sm text-ngodb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+                            <td className={`px-6 py-4 text-sm text-humdb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
                               {typeof indicator.sector === 'object' && indicator.sector !== null
                                 ? String(indicator.sector.localized_name || indicator.sector.primary || indicator.sector.name || indicator.sector)
                                 : String(indicator.sector || '')}
                             </td>
-                            <td className={`px-6 py-4 text-sm text-ngodb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+                            <td className={`px-6 py-4 text-sm text-humdb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
                               {typeof indicator.sub_sector === 'object' && indicator.sub_sector !== null
                                 ? String(indicator.sub_sector.localized_name || indicator.sub_sector.primary || indicator.sub_sector.name || indicator.sub_sector)
                                 : String(indicator.sub_sector || '')}
                             </td>
-                            <td className={`px-6 py-4 text-sm text-ngodb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+                            <td className={`px-6 py-4 text-sm text-humdb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
                               {String(indicator.localized_unit || indicator.unit || '')}
                             </td>
                           </tr>
@@ -1071,48 +1071,48 @@ export default function IndicatorBankPage() {
 
           {/* Guide to Indicator Selection */}
           <div className={`mt-20 ${isRTL ? 'rtl' : ''}`}>
-            <h2 className={`text-3xl font-bold text-ngodb-navy mb-12 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.title')}</h2>
+            <h2 className={`text-3xl font-bold text-humdb-navy mb-12 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.title')}</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Step 1 */}
               <div className="group bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl shadow-lg border border-blue-200 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300 transform hover:-translate-y-2">
-                <div className="flex items-center justify-center w-16 h-16 bg-ngodb-red text-white rounded-full text-2xl font-bold mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
+                <div className="flex items-center justify-center w-16 h-16 bg-humdb-red text-white rounded-full text-2xl font-bold mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
                   1
                 </div>
-                <h3 className={`text-xl font-bold text-ngodb-navy mb-4 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.step1.title')}</h3>
-                <p className={`text-ngodb-gray-700 leading-relaxed text-center ${isRTL ? 'text-right' : 'text-left'}`}>
+                <h3 className={`text-xl font-bold text-humdb-navy mb-4 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.step1.title')}</h3>
+                <p className={`text-humdb-gray-700 leading-relaxed text-center ${isRTL ? 'text-right' : 'text-left'}`}>
                   {t('indicatorBank.guide.step1.description')}
                 </p>
                 <div className="mt-6 flex justify-center">
-                  <div className="w-8 h-8 bg-ngodb-red rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
+                  <div className="w-8 h-8 bg-humdb-red rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
                 </div>
               </div>
 
               {/* Step 2 */}
               <div className="group bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl shadow-lg border border-green-200 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300 transform hover:-translate-y-2">
-                <div className="flex items-center justify-center w-16 h-16 bg-ngodb-red text-white rounded-full text-2xl font-bold mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
+                <div className="flex items-center justify-center w-16 h-16 bg-humdb-red text-white rounded-full text-2xl font-bold mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
                   2
                 </div>
-                <h3 className={`text-xl font-bold text-ngodb-navy mb-4 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.step2.title')}</h3>
-                <p className={`text-ngodb-gray-700 leading-relaxed text-center ${isRTL ? 'text-right' : 'text-left'}`}>
+                <h3 className={`text-xl font-bold text-humdb-navy mb-4 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.step2.title')}</h3>
+                <p className={`text-humdb-gray-700 leading-relaxed text-center ${isRTL ? 'text-right' : 'text-left'}`}>
                   {t('indicatorBank.guide.step2.description')}
                 </p>
                 <div className="mt-6 flex justify-center">
-                  <div className="w-8 h-8 bg-ngodb-red rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
+                  <div className="w-8 h-8 bg-humdb-red rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
                 </div>
               </div>
 
               {/* Step 3 */}
               <div className="group bg-gradient-to-br from-purple-50 to-violet-100 rounded-xl shadow-lg border border-purple-200 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300 transform hover:-translate-y-2">
-                <div className="flex items-center justify-center w-16 h-16 bg-ngodb-red text-white rounded-full text-2xl font-bold mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
+                <div className="flex items-center justify-center w-16 h-16 bg-humdb-red text-white rounded-full text-2xl font-bold mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
                   3
                 </div>
-                <h3 className={`text-xl font-bold text-ngodb-navy mb-4 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.step3.title')}</h3>
-                <p className={`text-ngodb-gray-700 leading-relaxed text-center ${isRTL ? 'text-right' : 'text-left'}`}>
+                <h3 className={`text-xl font-bold text-humdb-navy mb-4 text-center ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorBank.guide.step3.title')}</h3>
+                <p className={`text-humdb-gray-700 leading-relaxed text-center ${isRTL ? 'text-right' : 'text-left'}`}>
                   {t('indicatorBank.guide.step3.description')}
                 </p>
                 <div className="mt-6 flex justify-center">
-                  <div className="w-8 h-8 bg-ngodb-red rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
+                  <div className="w-8 h-8 bg-humdb-red rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
                 </div>
               </div>
             </div>
@@ -1125,19 +1125,19 @@ export default function IndicatorBankPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-ngodb-gray-200">
+            <div className="px-6 py-4 border-b border-humdb-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-ngodb-navy">Propose New Indicator</h2>
+                <h2 className="text-xl font-semibold text-humdb-navy">Propose New Indicator</h2>
                 <button
                   onClick={closeProposeModal}
-                  className="text-ngodb-gray-400 hover:text-ngodb-gray-600 transition-colors duration-150"
+                  className="text-humdb-gray-400 hover:text-humdb-gray-600 transition-colors duration-150"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-              <p className="text-ngodb-gray-600 mt-1">
+              <p className="text-humdb-gray-600 mt-1">
                 Help us expand our indicator bank by proposing a new indicator for humanitarian response.
               </p>
             </div>
@@ -1151,8 +1151,8 @@ export default function IndicatorBankPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-ngodb-navy mb-2">{t('indicatorBank.proposeModal.thankYou')}</h3>
-                  <p className="text-ngodb-gray-600 mb-6">
+                  <h3 className="text-lg font-semibold text-humdb-navy mb-2">{t('indicatorBank.proposeModal.thankYou')}</h3>
+                  <p className="text-humdb-gray-600 mb-6">
                     {t('indicatorBank.proposeModal.successMessage')}
                   </p>
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
@@ -1170,7 +1170,7 @@ export default function IndicatorBankPage() {
                   </div>
                   <button
                     onClick={closeProposeModal}
-                    className="bg-ngodb-red hover:bg-ngodb-red-dark text-white font-medium px-6 py-2 rounded-md transition-colors duration-150"
+                    className="bg-humdb-red hover:bg-humdb-red-dark text-white font-medium px-6 py-2 rounded-md transition-colors duration-150"
                   >
                     {t('indicatorBank.proposeModal.close')}
                   </button>
@@ -1180,7 +1180,7 @@ export default function IndicatorBankPage() {
                   {/* Contact Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="name" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Your Name *
                       </label>
                       <input
@@ -1190,11 +1190,11 @@ export default function IndicatorBankPage() {
                         value={proposeForm.name}
                         onChange={handleProposeFormChange}
                         required
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="email" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Email Address *
                       </label>
                       <input
@@ -1204,18 +1204,18 @@ export default function IndicatorBankPage() {
                         value={proposeForm.email}
                         onChange={handleProposeFormChange}
                         required
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                   </div>
 
                   {/* Indicator Information */}
-                  <div className="border-t border-ngodb-gray-200 pt-6">
-                    <h3 className="text-lg font-semibold text-ngodb-navy mb-4">Indicator Information</h3>
+                  <div className="border-t border-humdb-gray-200 pt-6">
+                    <h3 className="text-lg font-semibold text-humdb-navy mb-4">Indicator Information</h3>
 
                     {/* Indicator Name */}
                     <div className="mb-4">
-                      <label htmlFor="indicator_name" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="indicator_name" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Indicator Name *
                       </label>
                       <input
@@ -1225,13 +1225,13 @@ export default function IndicatorBankPage() {
                         value={proposeForm.indicator_name}
                         onChange={handleProposeFormChange}
                         required
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
 
                     {/* Definition */}
                     <div className="mb-4">
-                      <label htmlFor="definition" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="definition" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Definition *
                       </label>
                       <textarea
@@ -1241,14 +1241,14 @@ export default function IndicatorBankPage() {
                         onChange={handleProposeFormChange}
                         required
                         rows={4}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
 
                     {/* Type and Unit */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label htmlFor="type" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                        <label htmlFor="type" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                           Type
                         </label>
                         <input
@@ -1257,11 +1257,11 @@ export default function IndicatorBankPage() {
                           name="type"
                           value={proposeForm.type}
                           onChange={handleProposeFormChange}
-                          className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                          className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                         />
                       </div>
                       <div>
-                        <label htmlFor="unit" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                        <label htmlFor="unit" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                           Unit of Measurement
                         </label>
                         <input
@@ -1270,23 +1270,23 @@ export default function IndicatorBankPage() {
                           name="unit"
                           value={proposeForm.unit}
                           onChange={handleProposeFormChange}
-                          className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                          className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                         />
                       </div>
                     </div>
 
                     {/* Sector and Sub-sector */}
                     <div className="mb-4">
-                      <h4 className="text-md text-ngodb-navy mb-3">Sector</h4>
+                      <h4 className="text-md text-humdb-navy mb-3">Sector</h4>
 
                       {/* Sector */}
                       <div className="mb-6">
-                        <label className="block text-sm font-medium text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-medium text-humdb-gray-700 mb-3">
                           Sector
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Primary Sector *
                             </label>
                             <input
@@ -1295,11 +1295,11 @@ export default function IndicatorBankPage() {
                               value={proposeForm.sector.primary}
                               onChange={handleProposeFormChange}
                               placeholder={t('forms.placeholders.sectorPrimary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Secondary Sector
                             </label>
                             <input
@@ -1308,11 +1308,11 @@ export default function IndicatorBankPage() {
                               value={proposeForm.sector.secondary}
                               onChange={handleProposeFormChange}
                               placeholder={t('forms.placeholders.sectorSecondary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Tertiary Sector
                             </label>
                             <input
@@ -1321,7 +1321,7 @@ export default function IndicatorBankPage() {
                               value={proposeForm.sector.tertiary}
                               onChange={handleProposeFormChange}
                               placeholder={t('forms.placeholders.sectorTertiary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                         </div>
@@ -1334,12 +1334,12 @@ export default function IndicatorBankPage() {
 
                       {/* Sub-sector */}
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-medium text-humdb-gray-700 mb-3">
                           Sub-Sector
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Primary Sub-Sector *
                             </label>
                             <input
@@ -1348,11 +1348,11 @@ export default function IndicatorBankPage() {
                               value={proposeForm.sub_sector.primary}
                               onChange={handleProposeFormChange}
                               placeholder={t('forms.placeholders.sectorSecondary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Secondary Sub-Sector
                             </label>
                             <input
@@ -1361,11 +1361,11 @@ export default function IndicatorBankPage() {
                               value={proposeForm.sub_sector.secondary}
                               onChange={handleProposeFormChange}
                               placeholder={t('forms.placeholders.sectorTertiary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Tertiary Sub-Sector
                             </label>
                             <input
@@ -1374,7 +1374,7 @@ export default function IndicatorBankPage() {
                               value={proposeForm.sub_sector.tertiary}
                               onChange={handleProposeFormChange}
                               placeholder={t('forms.placeholders.subsectorTertiary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                         </div>
@@ -1395,9 +1395,9 @@ export default function IndicatorBankPage() {
                           name="emergency"
                           checked={proposeForm.emergency}
                           onChange={handleProposeFormChange}
-                          className="h-4 w-4 text-ngodb-red focus:ring-ngodb-red border-ngodb-gray-300 rounded"
+                          className="h-4 w-4 text-humdb-red focus:ring-humdb-red border-humdb-gray-300 rounded"
                         />
-                        <span className="ml-2 text-sm font-medium text-ngodb-gray-700">
+                        <span className="ml-2 text-sm font-medium text-humdb-gray-700">
                           Emergency Context
                         </span>
                       </label>
@@ -1405,7 +1405,7 @@ export default function IndicatorBankPage() {
 
                     {/* Related Programs */}
                     <div className="mb-4">
-                      <label htmlFor="related_programs" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="related_programs" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Related Programs
                       </label>
                       <input
@@ -1415,15 +1415,15 @@ export default function IndicatorBankPage() {
                         value={proposeForm.related_programs}
                         onChange={handleProposeFormChange}
                         placeholder={t('forms.placeholders.programs')}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                   </div>
 
                   {/* Reason and Additional Notes */}
-                  <div className="border-t border-ngodb-gray-200 pt-6">
+                  <div className="border-t border-humdb-gray-200 pt-6">
                     <div className="mb-4">
-                      <label htmlFor="reason" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="reason" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Reason for Proposal *
                       </label>
                       <textarea
@@ -1434,12 +1434,12 @@ export default function IndicatorBankPage() {
                         required
                         rows={3}
                         placeholder={t('forms.placeholders.indicatorNeeded')}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
 
                     <div className="mb-4">
-                      <label htmlFor="additional_notes" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="additional_notes" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Additional Notes
                       </label>
                       <textarea
@@ -1449,18 +1449,18 @@ export default function IndicatorBankPage() {
                         onChange={handleProposeFormChange}
                         rows={3}
                         placeholder={t('forms.placeholders.additionalNotes')}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                   </div>
 
                   {/* Form Actions */}
-                  <div className="flex justify-between items-center pt-4 border-t border-ngodb-gray-200">
+                  <div className="flex justify-between items-center pt-4 border-t border-humdb-gray-200">
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={clearAllFormFields}
-                        className="px-3 py-2 text-ngodb-gray-600 bg-ngodb-gray-100 hover:bg-ngodb-gray-200 rounded-md transition-colors duration-150 text-sm"
+                        className="px-3 py-2 text-humdb-gray-600 bg-humdb-gray-100 hover:bg-humdb-gray-200 rounded-md transition-colors duration-150 text-sm"
                       >
                         {t('indicatorBank.proposeModal.clearAll')}
                       </button>
@@ -1469,14 +1469,14 @@ export default function IndicatorBankPage() {
                       <button
                         type="button"
                         onClick={closeProposeModal}
-                        className="px-4 py-2 text-ngodb-gray-700 bg-ngodb-gray-200 hover:bg-ngodb-gray-300 rounded-md transition-colors duration-150"
+                        className="px-4 py-2 text-humdb-gray-700 bg-humdb-gray-200 hover:bg-humdb-gray-300 rounded-md transition-colors duration-150"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={submitting || !validateSectorSelection() || !validateSubsectorSelection()}
-                        className="px-6 py-2 bg-ngodb-red hover:bg-ngodb-red-dark text-white font-medium rounded-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-6 py-2 bg-humdb-red hover:bg-humdb-red-dark text-white font-medium rounded-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {submitting ? (
                           <>

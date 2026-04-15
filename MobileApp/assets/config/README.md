@@ -1,12 +1,12 @@
 # Organization Configuration
 
-This directory contains organization-specific configuration files that allow the mobile app to be customized for different NGOs.
+This directory contains organization-specific configuration files that allow the mobile app to be customized for different organizations.
 
 For the consolidated MobileApp documentation index, see [`MobileApp/docs/README.md`](../../docs/README.md).
 
 ## Default Configuration
 
-**`organization_config.json`** - Default generic "NGO Databank" configuration used when no organization-specific config is specified.
+**`organization_config.json`** - Default generic "Humanitarian Databank" configuration used when no organization-specific config is specified.
 
 ## Organization-Specific Configurations
 
@@ -72,7 +72,7 @@ When building the app, specify the organization using the `ORGANIZATION_CONFIG` 
 # Example named profile (ifrc)
 flutter build appbundle --release --dart-define=ORGANIZATION_CONFIG=ifrc --dart-define=PRODUCTION=true
 
-# For generic NGO Databank (default)
+# For generic Humanitarian Databank (default)
 flutter build appbundle --release --dart-define=PRODUCTION=true
 ```
 
@@ -104,7 +104,7 @@ See `organization_config.ifrc.json` for a sample organization-specific configura
 
 If an organization-specific config file is not found, the app will:
 1. Try to load the specified organization config
-2. Fall back to `organization_config.json` (default NGO Databank)
+2. Fall back to `organization_config.json` (default Humanitarian Databank)
 3. If that fails, use hardcoded default values
 
 ## Updating Configuration

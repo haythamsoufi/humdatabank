@@ -23,11 +23,11 @@ import '../../utils/debug_logger.dart';
 /// return HTTP 403 for embedded-browser OAuth flows.
 ///
 /// Flow:
-///   1. This screen launches `/login/azure?mobile_return_scheme=ngodatabank`
+///   1. This screen launches `/login/azure?mobile_return_scheme=humdatabank`
 ///      in a Chrome Custom Tab.
 ///   2. The backend embeds `mobile: true` in the signed OAuth state JWT.
 ///   3. After successful Azure B2C login the backend issues JWT tokens and
-///      redirects to `ngodatabank://oauth-success?access_token=...&refresh_token=...`.
+///      redirects to `humdatabank://oauth-success?access_token=...&refresh_token=...`.
 ///   4. Android delivers that URI to the app as a deep link.
 ///   5. [DeepLinkService] broadcasts it on [DeepLinkService.oauthTokenStream].
 ///   6. This screen receives the tokens, saves them, and navigates to the dashboard.
@@ -53,7 +53,7 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
   /// The URL sent to Chrome Custom Tab — includes the mobile deep-link flag.
   String get _azureLoginUrl =>
       '${AppConfig.baseApiUrl}${AppConfig.azureLoginEndpoint}'
-      '?mobile_return_scheme=ngodatabank';
+      '?mobile_return_scheme=humdatabank';
 
   @override
   void initState() {
@@ -153,7 +153,7 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
     }
   }
 
-  /// Called when the OAuth deep link `ngodatabank://oauth-success?...` arrives.
+  /// Called when the OAuth deep link `humdatabank://oauth-success?...` arrives.
   Future<void> _handleOAuthDeepLink(Map<String, String> params) async {
     _timeoutTimer?.cancel();
 

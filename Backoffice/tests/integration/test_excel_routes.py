@@ -31,8 +31,8 @@ class TestExcelRoutes:
             assert resp.headers.get("Content-Type", "").startswith(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-            assert resp.headers.get("X-NGO-Databank-Export-Completed") == "1"
-            assert resp.headers.get("X-NGO-Databank-Export-Filename") == "export.xlsx"
+            assert resp.headers.get("X-hum-databank-Export-Completed") == "1"
+            assert resp.headers.get("X-hum-databank-Export-Filename") == "export.xlsx"
 
     def test_import_ajax_404_when_aes_missing(self, logged_in_client):
         with patch("app.routes.excel_routes.get_aes_with_joins", return_value=None):

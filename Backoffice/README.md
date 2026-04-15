@@ -1,6 +1,6 @@
-# NGO Databank Backoffice
+# Humanitarian Databank Backoffice
 
-This is the backoffice/admin component of the NGO Databank ecosystem, a comprehensive data management and analytics platform for humanitarian organizations.
+This is the backoffice/admin component of the Humanitarian Databank ecosystem, a comprehensive data management and analytics platform for humanitarian organizations.
 
 ## 📁 Project Structure
 
@@ -30,7 +30,7 @@ Backoffice/
 
 2. **Configure Environment**
    - Copy `env.quickstart.example` to `.env` (minimal local defaults), or `env.example` for the full reference
-   - Set `DATABASE_URL` to a PostgreSQL connection string (e.g. `postgresql+psycopg2://app:app@localhost:5432/ngo_databank`)
+   - Set `DATABASE_URL` to a PostgreSQL connection string (e.g. `postgresql+psycopg2://app:app@localhost:5432/hum_databank`)
 
 3. **Setup Database**
    ```bash
@@ -152,7 +152,7 @@ Set a strong `SECRET_KEY` in production (sessions, CSRF, tokens). Use `Authoriza
 
 **License**
 
-This backoffice component is part of the NGO Databank ecosystem. See [LICENSE](../../LICENSE) for complete license terms.
+This backoffice component is part of the Humanitarian Databank ecosystem. See [LICENSE](../../LICENSE) for complete license terms.
 
 For licensing inquiries, permissions, or questions about authorized use, please contact:
 Haytham ALSOUFI: haythamsoufi@outlook.com 

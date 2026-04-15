@@ -810,9 +810,9 @@ export default function CountryMapboxMap({
             'adm2-fill','adm2-line','adm2-grouping',
             'adm1-fill','adm1-line','adm1-grouping',
             'adm0-fill','adm0-outline',
-            'ngodb-bubbles-circle',
+            'humdb-bubbles-circle',
           ].forEach(removeLayerSafe);
-          ['adm3','adm2','adm1','adm0','ngodb-bubbles'].forEach(removeSourceSafe);
+          ['adm3','adm2','adm1','adm0','humdb-bubbles'].forEach(removeSourceSafe);
 
           const maxVal = getIndicatorMaxValue(indicatorDataRef.current);
           // Decorate admin feature collections with per-feature values/intensity (best-effort join).
@@ -960,7 +960,7 @@ export default function CountryMapboxMap({
 
           // Bubble layer (Mapbox circles) for bubble visualization.
           try {
-            map.addSource('ngodb-bubbles', {
+            map.addSource('humdb-bubbles', {
               type: 'geojson',
               data: { type: 'FeatureCollection', features: [] },
               generateId: true,
@@ -968,9 +968,9 @@ export default function CountryMapboxMap({
           } catch (_e) {}
           try {
             map.addLayer({
-              id: 'ngodb-bubbles-circle',
+              id: 'humdb-bubbles-circle',
               type: 'circle',
-              source: 'ngodb-bubbles',
+              source: 'humdb-bubbles',
               paint: {
                 'circle-color': '#ef4444',
                 'circle-stroke-color': '#dc2626',
@@ -1033,14 +1033,14 @@ export default function CountryMapboxMap({
           try { map.off('click', 'adm2-fill', onClickLayer); } catch (_e) {}
           try { map.off('click', 'adm3-fill', onClickLayer); } catch (_e) {}
 
-          try { map.off('mousemove', 'ngodb-bubbles-circle', onBubbleMove); } catch (_e) {}
-          try { map.off('mouseleave', 'ngodb-bubbles-circle', onBubbleLeave); } catch (_e) {}
-          try { map.off('click', 'ngodb-bubbles-circle', onBubbleClick); } catch (_e) {}
+          try { map.off('mousemove', 'humdb-bubbles-circle', onBubbleMove); } catch (_e) {}
+          try { map.off('mouseleave', 'humdb-bubbles-circle', onBubbleLeave); } catch (_e) {}
+          try { map.off('click', 'humdb-bubbles-circle', onBubbleClick); } catch (_e) {}
 
           if (viz === 'bubble') {
-            map.on('mousemove', 'ngodb-bubbles-circle', onBubbleMove);
-            map.on('mouseleave', 'ngodb-bubbles-circle', onBubbleLeave);
-            map.on('click', 'ngodb-bubbles-circle', onBubbleClick);
+            map.on('mousemove', 'humdb-bubbles-circle', onBubbleMove);
+            map.on('mouseleave', 'humdb-bubbles-circle', onBubbleLeave);
+            map.on('click', 'humdb-bubbles-circle', onBubbleClick);
           } else {
             map.on('mousemove', layer, onMove);
             map.on('mouseleave', layer, onLeaveLayer);
@@ -1061,7 +1061,7 @@ export default function CountryMapboxMap({
           setVis('adm2', (source === 'adm2') ? 'visible' : 'none');
           setVis('adm3', (source === 'adm3') ? 'visible' : 'none');
           // Bubbles are only relevant in bubble mode
-          try { map.setLayoutProperty('ngodb-bubbles-circle', 'visibility', viz === 'bubble' ? 'visible' : 'none'); } catch (_e) {}
+          try { map.setLayoutProperty('humdb-bubbles-circle', 'visibility', viz === 'bubble' ? 'visible' : 'none'); } catch (_e) {}
 
           // Show parent grouping outlines when viewing child levels
           // When viewing ADM2: show ADM1 grouping (thicker outline)
@@ -1275,7 +1275,7 @@ export default function CountryMapboxMap({
             ['adm0-outline', 'adm1-line', 'adm2-line', 'adm3-line'].forEach(setLinePaint);
 
             // Update bubble radius expression
-            try { map.setPaintProperty('ngodb-bubbles-circle', 'circle-radius', bubbleRadiusExpression(maxVal)); } catch (_e) {}
+            try { map.setPaintProperty('humdb-bubbles-circle', 'circle-radius', bubbleRadiusExpression(maxVal)); } catch (_e) {}
 
             // Build bubble points for bubble mode
             if (isBubble) {
@@ -1309,9 +1309,9 @@ export default function CountryMapboxMap({
                 }
               }
 
-              setDataSafe('ngodb-bubbles', { type: 'FeatureCollection', features: bubbleFeatures });
+              setDataSafe('humdb-bubbles', { type: 'FeatureCollection', features: bubbleFeatures });
             } else {
-              setDataSafe('ngodb-bubbles', { type: 'FeatureCollection', features: [] });
+              setDataSafe('humdb-bubbles', { type: 'FeatureCollection', features: [] });
             }
 
             // Rebind interactions + visibilities
@@ -1410,7 +1410,7 @@ export default function CountryMapboxMap({
   if (!normalizedIso2) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-50">
-        <div className="text-sm text-ngodb-gray-600">Select a country to view the map.</div>
+        <div className="text-sm text-humdb-gray-600">Select a country to view the map.</div>
       </div>
     );
   }
@@ -1453,10 +1453,10 @@ export default function CountryMapboxMap({
     if (legendMaxValue <= 0) {
       return (
         <div className="absolute bottom-4 right-4 z-[1000] bg-white/95 rounded-lg shadow-lg p-3 border border-gray-200 min-w-[180px]">
-          <h4 className="font-bold text-ngodb-navy mb-2 text-sm">
+          <h4 className="font-bold text-humdb-navy mb-2 text-sm">
             {t('globalOverview.map.dataRange', { defaultValue: 'Data Range' })}
           </h4>
-          <div className="text-xs text-ngodb-gray-600">
+          <div className="text-xs text-humdb-gray-600">
             {t('data.noDataAvailable', { defaultValue: 'No data available' })}
           </div>
         </div>
@@ -1476,7 +1476,7 @@ export default function CountryMapboxMap({
 
       return (
         <div className="absolute bottom-4 right-4 z-[1000] bg-white/95 rounded-lg shadow-lg p-3 border border-gray-200 min-w-[180px]">
-          <h4 className="font-bold text-ngodb-navy mb-3 text-sm">
+          <h4 className="font-bold text-humdb-navy mb-3 text-sm">
             {t('globalOverview.map.bubbleSize', { defaultValue: 'Bubble Size' })}
           </h4>
           <div className="space-y-2">
@@ -1493,7 +1493,7 @@ export default function CountryMapboxMap({
                       border: '2px solid #dc2626',
                     }}
                   />
-                  <span className="text-xs text-ngodb-gray-700">
+                  <span className="text-xs text-humdb-gray-700">
                     {formatNumber(grade, showFullValues)}
                     {grades[i + 1] ? ` - ${formatNumber(grades[i + 1], showFullValues)}` : '+'}
                   </span>
@@ -1512,7 +1512,7 @@ export default function CountryMapboxMap({
                   border: '1px solid #e5e7eb',
                 }}
               />
-              <span className="text-xs text-ngodb-gray-600">
+              <span className="text-xs text-humdb-gray-600">
                 {t('data.noData', { defaultValue: 'No data' })}
               </span>
             </div>
@@ -1535,7 +1535,7 @@ export default function CountryMapboxMap({
 
       return (
         <div className="absolute bottom-4 right-4 z-[1000] bg-white/95 rounded-lg shadow-lg p-3 border border-gray-200 min-w-[180px]">
-          <h4 className="font-bold text-ngodb-navy mb-3 text-sm">
+          <h4 className="font-bold text-humdb-navy mb-3 text-sm">
             {t('globalOverview.map.dataRange', { defaultValue: 'Data Range' })}
           </h4>
           <div className="space-y-2">
@@ -1553,7 +1553,7 @@ export default function CountryMapboxMap({
                       border: '1px solid #e5e7eb',
                     }}
                   />
-                  <span className="text-xs text-ngodb-gray-700">
+                  <span className="text-xs text-humdb-gray-700">
                     {formatNumber(grade, showFullValues)}
                     {grades[i + 1] ? ` - ${formatNumber(grades[i + 1], showFullValues)}` : '+'}
                   </span>
@@ -1572,7 +1572,7 @@ export default function CountryMapboxMap({
                   border: '1px solid #e5e7eb',
                 }}
               />
-              <span className="text-xs text-ngodb-gray-600">
+              <span className="text-xs text-humdb-gray-600">
                 {t('data.noData', { defaultValue: 'No data' })}
               </span>
             </div>
@@ -1623,7 +1623,7 @@ export default function CountryMapboxMap({
                     }
                   }}
                   className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                    active ? 'bg-ngodb-red text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    active ? 'bg-humdb-red text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                   title={`Show ${label}`}
                 >

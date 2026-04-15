@@ -1,6 +1,6 @@
 # Configuration Files
 
-This directory contains all configuration files, templates, and setup scripts for the NGO Databank Backoffice system.
+This directory contains all configuration files, templates, and setup scripts for the Humanitarian Databank Backoffice system.
 
 ## 📋 Available Files
 

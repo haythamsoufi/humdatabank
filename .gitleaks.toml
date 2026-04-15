@@ -1,5 +1,5 @@
 # Gitleaks configuration (see https://github.com/gitleaks/gitleaks)
-title = "NGO Databank"
+title = "Humanitarian Databank"
 
 [extend]
 useDefault = true

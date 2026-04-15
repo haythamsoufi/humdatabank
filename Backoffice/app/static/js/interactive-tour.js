@@ -48,8 +48,8 @@ class InteractiveTour {
      */
     _isRtlLanguage() {
         // Check chatbot's preferred language first
-        if (window.ngodbChatbot && window.ngodbChatbot.preferredLanguage) {
-            return window.ngodbChatbot.preferredLanguage === 'ar';
+        if (window.humdatabankChatbot && window.humdatabankChatbot.preferredLanguage) {
+            return window.humdatabankChatbot.preferredLanguage === 'ar';
         }
         // Fallback to localStorage
         const storedLang = localStorage.getItem('chatbot_language');

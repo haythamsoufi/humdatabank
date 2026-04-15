@@ -85,7 +85,7 @@ void main() async {
   );
 
   // Initialize organization configuration (default: IFRC profile)
-  // Override with --dart-define=ORGANIZATION_CONFIG=otherorg; use empty define for generic NGO Databank config
+  // Override with --dart-define=ORGANIZATION_CONFIG=otherorg; use empty define for generic Humanitarian Databank config
   const organizationConfig = String.fromEnvironment('ORGANIZATION_CONFIG', defaultValue: 'ifrc');
   await sl<OrganizationConfigService>().loadConfig(
     organization: organizationConfig.isNotEmpty ? organizationConfig : null,

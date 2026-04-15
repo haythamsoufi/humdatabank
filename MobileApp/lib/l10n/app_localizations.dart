@@ -337,7 +337,7 @@ class AppLocalizations {
           'Welcome to the IFRC Network Databank',
       'splash_description':
           'This is the one and only system for reporting data to IFRC. Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and logins — everything is now centralized and streamlined here.',
-      'powered_by_ngo_databank': 'Powered by NGO Databank',
+      'powered_by_hum_databank': 'Powered by Humanitarian Databank',
       'open_on_github': 'Open on GitHub',
 
       // Dashboard
@@ -1335,7 +1335,7 @@ class AppLocalizations {
           'Bienvenido al Banco de Datos de la Red IFRC',
       'splash_description':
           'Este es el único sistema para reportar datos a la FICR. Di adiós a archivos Excel dispersos, formularios KoBo, múltiples plataformas e inicios de sesión: todo está ahora centralizado y optimizado aquí.',
-      'powered_by_ngo_databank': 'Impulsado por NGO Databank',
+      'powered_by_hum_databank': 'Impulsado por Humanitarian Databank',
       'open_on_github': 'Abrir en GitHub',
 
       // Dashboard
@@ -2207,7 +2207,7 @@ class AppLocalizations {
           'Bienvenue dans la Banque de Données du Réseau IFRC',
       'splash_description':
           'C\'est le seul système pour rapporter des données à la FICR. Dites adieu aux fichiers Excel dispersés, aux formulaires KoBo, aux multiples plateformes et connexions — tout est maintenant centralisé et rationalisé ici.',
-      'powered_by_ngo_databank': 'Propulsé par NGO Databank',
+      'powered_by_hum_databank': 'Propulsé par Humanitarian Databank',
       'open_on_github': 'Ouvrir sur GitHub',
 
       // Dashboard
@@ -3080,7 +3080,7 @@ class AppLocalizations {
           'مرحباً بك في بنك بيانات شبكة الاتحاد الدولي',
       'splash_description':
           'هذا هو النظام الوحيد للإبلاغ عن البيانات إلى الاتحاد الدولي. وداعاً لملفات Excel المتناثرة ونماذج KoBo والمنصات المتعددة وتسجيلات الدخول — كل شيء الآن مركزي ومبسط هنا.',
-      'powered_by_ngo_databank': 'مدعوم بواسطة NGO Databank',
+      'powered_by_hum_databank': 'مدعوم بواسطة Humanitarian Databank',
       'open_on_github': 'فتح على GitHub',
 
       // Dashboard
@@ -3928,7 +3928,7 @@ class AppLocalizations {
           'IFRC नेटवर्क डेटाबैंक में आपका स्वागत है',
       'splash_description':
           'यह IFRC को डेटा रिपोर्ट करने के लिए एकमात्र प्रणाली है। बिखरे हुए Excel फ़ाइलों, KoBo फ़ॉर्म, कई प्लेटफ़ॉर्म और लॉगिन को अलविदा कहें — सब कुछ अब यहाँ केंद्रीकृत और सुव्यवस्थित है।',
-      'powered_by_ngo_databank': 'NGO डेटाबैंक द्वारा संचालित',
+      'powered_by_hum_databank': 'मानवीय डेटाबैंक द्वारा संचालित',
       'open_on_github': 'GitHub पर खोलें',
 
       // Dashboard
@@ -4791,7 +4791,7 @@ class AppLocalizations {
           'Добро пожаловать в Банк Данных Сети МФОКК',
       'splash_description':
           'Это единственная система для отчетности данных в МФОКК. Попрощайтесь с разбросанными файлами Excel, формами KoBo, множественными платформами и входами — все теперь централизовано и оптимизировано здесь.',
-      'powered_by_ngo_databank': 'На платформе NGO Databank',
+      'powered_by_hum_databank': 'На платформе Humanitarian Databank',
       'open_on_github': 'Открыть на GitHub',
 
       // Dashboard
@@ -5651,7 +5651,7 @@ class AppLocalizations {
       'welcome_to_ifrc_network_databank': '欢迎使用IFRC网络数据库',
       'splash_description':
           '这是向IFRC报告数据的唯一系统。告别分散的Excel文件、KoBo表单、多个平台和登录 — 现在一切都集中并简化在这里。',
-      'powered_by_ngo_databank': '由 NGO Databank 提供支持',
+      'powered_by_hum_databank': '由 Humanitarian Databank 提供支持',
       'open_on_github': '在 GitHub 上打开',
 
       // Dashboard
@@ -7095,7 +7095,7 @@ class AppLocalizations {
   String get welcomeToIfrcNetworkDatabank =>
       translate('welcome_to_ifrc_network_databank');
   String get splashDescription => translate('splash_description');
-  String get poweredByNgoDatabank => translate('powered_by_ngo_databank');
+  String get poweredByHumDatabank => translate('powered_by_hum_databank');
   String get openOnGithub => translate('open_on_github');
 
   // Indicator Detail getters

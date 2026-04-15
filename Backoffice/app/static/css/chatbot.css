@@ -1940,7 +1940,7 @@ html[dir="rtl"] .chat-message-edit-actions {
 /* ==========================
    DLP confirmation modal
    ========================== */
-.ngodb-dlp-modal-overlay {
+.humdb-dlp-modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
@@ -1950,7 +1950,7 @@ html[dir="rtl"] .chat-message-edit-actions {
     justify-content: center;
     padding: 16px;
 }
-.ngodb-dlp-modal {
+.humdb-dlp-modal {
     width: 100%;
     max-width: 560px;
     background: #ffffff;
@@ -1959,21 +1959,21 @@ html[dir="rtl"] .chat-message-edit-actions {
     overflow: hidden;
     border: 1px solid rgba(0, 0, 0, 0.08);
 }
-.ngodb-dlp-modal-header {
+.humdb-dlp-modal-header {
     padding: 14px 16px;
     font-weight: 700;
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
-.ngodb-dlp-modal-body {
+.humdb-dlp-modal-body {
     padding: 14px 16px;
     font-size: 13px;
     color: rgba(0, 0, 0, 0.8);
     line-height: 1.45;
 }
-.ngodb-dlp-modal-body ul {
+.humdb-dlp-modal-body ul {
     margin: 8px 0 0 18px;
 }
-.ngodb-dlp-modal-actions {
+.humdb-dlp-modal-actions {
     padding: 12px 16px;
     display: flex;
     gap: 10px;
@@ -1981,7 +1981,7 @@ html[dir="rtl"] .chat-message-edit-actions {
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     flex-wrap: wrap;
 }
-.ngodb-dlp-btn {
+.humdb-dlp-btn {
     padding: 8px 12px;
     border-radius: 10px;
     border: 1px solid rgba(0, 0, 0, 0.12);
@@ -1989,24 +1989,24 @@ html[dir="rtl"] .chat-message-edit-actions {
     cursor: pointer;
     font-size: 13px;
 }
-.ngodb-dlp-btn:hover {
+.humdb-dlp-btn:hover {
     background: rgba(0, 0, 0, 0.03);
 }
-.ngodb-dlp-btn-primary {
+.humdb-dlp-btn-primary {
     background: #0ea5e9;
     border-color: #0ea5e9;
     color: #ffffff;
 }
-.ngodb-dlp-btn-primary:hover {
+.humdb-dlp-btn-primary:hover {
     background: #0284c7;
     border-color: #0284c7;
 }
-.ngodb-dlp-btn-danger {
+.humdb-dlp-btn-danger {
     background: #ef4444;
     border-color: #ef4444;
     color: #ffffff;
 }
-.ngodb-dlp-btn-danger:hover {
+.humdb-dlp-btn-danger:hover {
     background: #dc2626;
     border-color: #dc2626;
 }

@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo.
-echo  NGO Databank Mobile — choose Backoffice URL
+echo  Humanitarian Databank Mobile — choose Backoffice URL
 echo  (writes BACKEND_URL + FRONTEND_URL + MOBILE_APP_API_KEY into MobileApp\.env)
 echo.
 echo  API keys: add these once in MobileApp\.env — this script sets MOBILE_APP_API_KEY from them:

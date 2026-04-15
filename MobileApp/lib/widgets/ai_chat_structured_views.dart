@@ -691,8 +691,8 @@ function colorFor(v){
   return 'rgb('+r+','+g+','+b+')';
 }
 const map = L.map('map', { scrollWheelZoom: false, zoomControl: true, worldCopyJump: true }).setView([20, 0], 2);
-window.__ngodbMap = map;
-window.__ngodbInvalidateMap = function(){
+window.__humdbMap = map;
+window.__humdbInvalidateMap = function(){
   try { map.invalidateSize(true); } catch (e) {}
 };
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -726,8 +726,8 @@ function loadWorldGeoJson(){
         };
       }
     }).addTo(map);
-    setTimeout(function(){ window.__ngodbInvalidateMap(); }, 100);
-    setTimeout(function(){ window.__ngodbInvalidateMap(); }, 400);
+    setTimeout(function(){ window.__humdbInvalidateMap(); }, 100);
+    setTimeout(function(){ window.__humdbInvalidateMap(); }, 400);
     }).catch(function(){ tryFetch(i + 1); });
   }
   tryFetch(0);
@@ -767,7 +767,7 @@ loadWorldGeoJson();
         ),
         onLoadStop: (controller, url) async {
           await controller.evaluateJavascript(
-            source: 'try{window.__ngodbInvalidateMap&&window.__ngodbInvalidateMap();}catch(e){}',
+            source: 'try{window.__humdbInvalidateMap&&window.__humdbInvalidateMap();}catch(e){}',
           );
         },
       ),

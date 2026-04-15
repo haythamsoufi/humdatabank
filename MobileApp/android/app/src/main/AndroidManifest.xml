@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
-        android:label="NGO Databank"
+        android:label="Humanitarian Databank"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
@@ -28,7 +28,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="ngodatabank" />
+                <data android:scheme="humdatabank" />
             </intent-filter>
             <!-- App Links (deep linking from web) -->
             <intent-filter android:autoVerify="true">

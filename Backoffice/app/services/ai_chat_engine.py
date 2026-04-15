@@ -508,7 +508,7 @@ def _generate_greeting_reply_llm(
 
     client = OpenAI(api_key=api_key, timeout=timeout_sec, max_retries=0)
     system = (
-        "You are a concise assistant for the NGO Databank platform.\n"
+        "You are a concise assistant for the Humanitarian Databank platform.\n"
         f"The user sent a brief greeting or social message with no specific question. Respond in {lang}.\n"
         "Reply with a short, warm acknowledgement (1–3 sentences). "
         "Do NOT list admin URLs, features, menu paths, or /admin/ links. "

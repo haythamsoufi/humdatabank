@@ -60,10 +60,10 @@ class OrganizationInfo {
 
   factory OrganizationInfo.fromJson(Map<String, dynamic> json) {
     return OrganizationInfo(
-      name: json['name'] ?? 'NGO Databank',
-      fullName: json['fullName'] ?? 'NGO Databank',
-      shortName: json['shortName'] ?? 'NGO Databank',
-      description: json['description'] ?? 'NGO Databank Mobile Application',
+      name: json['name'] ?? 'Humanitarian Databank',
+      fullName: json['fullName'] ?? 'Humanitarian Databank',
+      shortName: json['shortName'] ?? 'Humanitarian Databank',
+      description: json['description'] ?? 'Humanitarian Databank Mobile Application',
       website: json['website'] ?? 'https://example.org',
       supportEmail: json['supportEmail'] ?? 'support@example.org',
       contactEmail: json['contactEmail'] ?? 'contact@example.org',
@@ -176,10 +176,10 @@ class AppInfo {
 
   factory AppInfo.fromJson(Map<String, dynamic> json) {
     return AppInfo(
-      name: json['name'] ?? 'NGO Databank',
-      packageName: json['packageName'] ?? 'com.ngo.databank',
-      displayName: json['displayName'] ?? 'NGO Databank',
-      description: json['description'] ?? 'NGO Databank Mobile Application',
+      name: json['name'] ?? 'Humanitarian Databank',
+      packageName: json['packageName'] ?? 'com.hum.databank',
+      displayName: json['displayName'] ?? 'Humanitarian Databank',
+      description: json['description'] ?? 'Humanitarian Databank Mobile Application',
     );
   }
 
@@ -208,7 +208,7 @@ class AzureInfo {
     return AzureInfo(
       b2cTenant: json['b2cTenant'] ?? '',
       b2cPolicy: json['b2cPolicy'] ?? '',
-      redirectScheme: json['redirectScheme'] ?? 'ngodatabank',
+      redirectScheme: json['redirectScheme'] ?? 'humdatabank',
     );
   }
 
@@ -295,7 +295,7 @@ class OrganizationConfigService {
           configPath = 'assets/config/organization_config.$envOrg.json';
           DebugLogger.logInfo('CONFIG', 'Loading config from environment: $configPath');
         } else {
-          // Explicit empty ORGANIZATION_CONFIG → generic NGO Databank config
+          // Explicit empty ORGANIZATION_CONFIG → generic Humanitarian Databank config
           configPath = 'assets/config/organization_config.json';
           DebugLogger.logInfo('CONFIG', 'Loading default config: $configPath');
         }
@@ -340,10 +340,10 @@ class OrganizationConfigService {
   OrganizationConfig _getDefaultConfig() {
     return OrganizationConfig(
       organization: OrganizationInfo(
-        name: 'NGO Databank',
-        fullName: 'NGO Databank',
-        shortName: 'NGO Databank',
-        description: 'NGO Databank Mobile Application',
+        name: 'Humanitarian Databank',
+        fullName: 'Humanitarian Databank',
+        shortName: 'Humanitarian Databank',
+        description: 'Humanitarian Databank Mobile Application',
         website: 'https://example.org',
         supportEmail: 'support@example.org',
         contactEmail: 'contact@example.org',
@@ -358,15 +358,15 @@ class OrganizationConfigService {
         logoPath: 'assets/images/app_icon.png',
       ),
       app: AppInfo(
-        name: 'NGO Databank',
-        packageName: 'com.ngo.databank',
-        displayName: 'NGO Databank',
-        description: 'NGO Databank Mobile Application',
+        name: 'Humanitarian Databank',
+        packageName: 'com.hum.databank',
+        displayName: 'Humanitarian Databank',
+        description: 'Humanitarian Databank Mobile Application',
       ),
       azure: AzureInfo(
         b2cTenant: '',
         b2cPolicy: '',
-        redirectScheme: 'ngodatabank',
+        redirectScheme: 'humdatabank',
       ),
       features: FeaturesInfo(
         showOrganizationName: true,

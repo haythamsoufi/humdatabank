@@ -129,8 +129,8 @@ export function MapSafe({
       style={{ height, minHeight, ...style }}
     >
       <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-4 border-ngodb-red border-t-transparent mx-auto mb-6"></div>
-        <p className="text-ngodb-gray-600 text-lg font-medium">{t('common.loading')}</p>
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-humdb-red border-t-transparent mx-auto mb-6"></div>
+        <p className="text-humdb-gray-600 text-lg font-medium">{t('common.loading')}</p>
       </div>
     </div>
   );

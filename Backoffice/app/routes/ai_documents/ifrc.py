@@ -70,7 +70,7 @@ def _fetch_ifrc_public_site_types():
     try:
         response = requests.get(
             "https://go-api.ifrc.org/Api/PublicSiteTypes",
-            headers={"User-Agent": "NGO-Databank/1.0", "Accept": "application/json"},
+            headers={"User-Agent": "hum-databank/1.0", "Accept": "application/json"},
             auth=auth,
             timeout=15,
         )
@@ -113,7 +113,7 @@ def _fetch_ifrc_appeals_filter_options(*, appeals_type_ids: Optional[str] = None
     try:
         response = requests.get(
             api_url,
-            headers={"User-Agent": "NGO-Databank/1.0", "Accept": "application/json"},
+            headers={"User-Agent": "hum-databank/1.0", "Accept": "application/json"},
             auth=auth,
             timeout=30,
         )
@@ -588,7 +588,7 @@ def list_ifrc_api_documents():
             api_url = base_api
 
         headers = {
-            'User-Agent': 'NGO-Databank/1.0',
+            'User-Agent': 'hum-databank/1.0',
             'Accept': 'application/json',
         }
 

@@ -1,6 +1,6 @@
 # Admin Action Risk Levels
 
-This document describes the risk level classification system used for administrative actions in the NGO Databank. All admin actions are logged in the audit trail with an assigned risk level that determines how they are monitored and reviewed.
+This document describes the risk level classification system used for administrative actions in the Humanitarian Databank. All admin actions are logged in the audit trail with an assigned risk level that determines how they are monitored and reviewed.
 
 ## Risk Level Categories
 

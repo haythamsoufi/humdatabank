@@ -180,7 +180,7 @@ After building, verify the app shows your organization's:
 ## Multiple Organizations
 
 You can maintain multiple organization configs:
-- `organization_config.json` - Default (NGO Databank)
+- `organization_config.json` - Default (Humanitarian Databank)
 - `organization_config.ifrc.json` - IFRC
 - `organization_config.oxfam.json` - Oxfam
 - `organization_config.unicef.json` - UNICEF

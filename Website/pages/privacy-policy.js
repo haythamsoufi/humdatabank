@@ -9,8 +9,8 @@ export default function PrivacyPolicyPage() {
   return (
     <TranslationSafe>
       <Head>
-        <title>Privacy Policy - NGO Databank</title>
-        <meta name="description" content="Privacy Policy for the NGO Databank mobile application" />
+        <title>Privacy Policy - Humanitarian Databank</title>
+        <meta name="description" content="Privacy Policy for the Humanitarian Databank mobile application" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Introduction</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                The NGO Databank mobile application ("the App") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our mobile application.
+                The Humanitarian Databank mobile application ("the App") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our mobile application.
               </p>
               <p className="text-gray-700 leading-relaxed">
                 By using the App, you agree to the collection and use of information in accordance with this policy. If you do not agree with our policies and practices, please do not use the App.
@@ -257,7 +257,7 @@ export default function PrivacyPolicyPage() {
               </p>
               <div className="bg-gray-50 p-4 rounded-lg mb-4">
                 <p className="text-gray-700 mb-2">
-                  <strong>NGO Databank</strong>
+                  <strong>Humanitarian Databank</strong>
                 </p>
                 <p className="text-gray-700 mb-2">
                   Email: <a href="mailto:haythamsoufi@outlook.com" className="text-blue-600 hover:text-blue-800 underline">haythamsoufi@outlook.com</a>

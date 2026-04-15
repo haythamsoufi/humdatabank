@@ -15,7 +15,7 @@ class AppConfig {
   // Environment Configuration (see productionBackendUrl / productionFrontendUrl below).
   // PRODUCTION=true → Backoffice: IFRC (databank.ifrc.org); public website: Fly.io.
   // STAGING=true → Backoffice: databank-stage.ifrc.org (IFRC staging); public website: Fly.io when flags set.
-  // DEMO=true → NGO Databank Fly preview (*.fly.dev backoffice); not IFRC staging.
+  // DEMO=true → Humanitarian Databank Fly preview (*.fly.dev backoffice); not IFRC staging.
   // DEVELOPMENT=true → localhost / emulator hosts. Omit all four for ad-hoc defaults in _backendUrlRaw.
   static final bool isProduction =
       _envFlag('PRODUCTION', defaultValue: false);
@@ -75,7 +75,7 @@ class AppConfig {
   // Staging — IFRC-hosted backoffice only (website URL still resolved via flags / .env)
   static const String stagingBackendUrl = 'https://databank-stage.ifrc.org';
 
-  /// Fly.io NGO Databank preview backoffice (CI `demo` profile when BACKEND_URL is unset).
+  /// Fly.io Humanitarian Databank preview backoffice (CI `demo` profile when BACKEND_URL is unset).
   static const String demoBackendUrl = 'https://backoffice-databank.fly.dev';
 
   // Development URLs (localhost)
@@ -99,7 +99,7 @@ class AppConfig {
   //   BACKEND_URL=http://localhost:5000                 (local Flask)
   //   BACKEND_URL=https://databank.ifrc.org             (IFRC production backoffice)
   //   BACKEND_URL=https://databank-stage.ifrc.org       (IFRC staging)
-  //   BACKEND_URL=https://backoffice-databank.fly.dev   (Fly NGO demo preview — not IFRC staging)
+  //   BACKEND_URL=https://backoffice-databank.fly.dev   (Fly Humanitarian Databank demo preview — not IFRC staging)
   //
   // If BACKEND_URL is not set, flag-based defaults apply:
   //   STAGING=true → databank-stage.ifrc.org
@@ -256,7 +256,7 @@ class AppConfig {
     } catch (e) {
       // Fallback if config not loaded
     }
-    return 'ngodatabank'; // Default fallback
+    return 'humdatabank'; // Default fallback
   }
 
   // API Endpoints
@@ -380,7 +380,7 @@ class AppConfig {
     } catch (e) {
       // Fallback if config not loaded
     }
-    return 'NGO Databank'; // Default fallback
+    return 'Humanitarian Databank'; // Default fallback
   }
   static const Duration cacheExpiration = Duration(hours: 1);
   // Must match the server's PERMANENT_SESSION_LIFETIME (7 days).
@@ -440,7 +440,7 @@ class AppConfig {
         'https://*.fly.dev',
         'https://*.databank.fly.dev',
       ],
-      // Demo: Fly preview backoffice + public site (NGO Databank, not IFRC staging).
+      // Demo: Fly preview backoffice + public site (Humanitarian Databank, not IFRC staging).
       if (isDemo) ...[
         'https://*.fly.dev',
         'https://*.databank.fly.dev',

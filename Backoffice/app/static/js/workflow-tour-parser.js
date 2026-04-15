@@ -11,7 +11,7 @@
  * - By default, debug logging is disabled
  * - To enable: window.WorkflowTourParser.setDebug(true)
  * - To disable: window.WorkflowTourParser.setDebug(false)
- * - Or set localStorage: localStorage.setItem('ngodb:debug:workflow-tour', '1')
+ * - Or set localStorage: localStorage.setItem('humdb:debug:workflow-tour', '1')
  * - Or set global: window.WORKFLOW_TOUR_DEBUG = true (before script loads)
  */
 
@@ -32,7 +32,7 @@ class WorkflowTourParser {
     _getDebugFlag() {
         try {
             // Check localStorage first
-            const stored = localStorage.getItem('ngodb:debug:workflow-tour');
+            const stored = localStorage.getItem('humdb:debug:workflow-tour');
             if (stored !== null) {
                 return stored === '1' || stored === 'true';
             }
@@ -55,7 +55,7 @@ class WorkflowTourParser {
     setDebug(enabled) {
         this._debugEnabled = Boolean(enabled);
         try {
-            localStorage.setItem('ngodb:debug:workflow-tour', enabled ? '1' : '0');
+            localStorage.setItem('humdb:debug:workflow-tour', enabled ? '1' : '0');
         } catch (e) {
             // localStorage might not be available
         }
@@ -101,8 +101,8 @@ class WorkflowTourParser {
      */
     getUserLanguage() {
         // Try to get language from chatbot instance
-        if (window.ngodbChatbot && window.ngodbChatbot.preferredLanguage) {
-            return window.ngodbChatbot.preferredLanguage;
+        if (window.humdatabankChatbot && window.humdatabankChatbot.preferredLanguage) {
+            return window.humdatabankChatbot.preferredLanguage;
         }
         // Fallback to localStorage
         const stored = localStorage.getItem('chatbot_language');
@@ -365,8 +365,8 @@ class WorkflowTourParser {
      */
     async handleTourTrigger(workflowId, targetPage) {
         // Close chatbot before starting tour
-        if (window.ngodbChatbot && typeof window.ngodbChatbot.toggleChat === 'function') {
-            window.ngodbChatbot.toggleChat(false);
+        if (window.humdatabankChatbot && typeof window.humdatabankChatbot.toggleChat === 'function') {
+            window.humdatabankChatbot.toggleChat(false);
         } else {
             // Fallback: try to close by hiding widget directly
             const chatWidget = document.getElementById('aiChatWidget');

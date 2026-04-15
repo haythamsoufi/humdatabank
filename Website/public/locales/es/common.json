@@ -13,7 +13,7 @@
     "organizationalStructure": "Estructura Organizacional",
     "apiBuilder": "Constructor de API",
     "language": "Idioma",
-    "siteTitle": "Banco de datos NGO Databank",
+    "siteTitle": "Banco de datos Humanitarian Databank",
     "databank": "Banco de Datos",
     "login": "Iniciar Sesión",
     "openMainMenu": "Abrir menú principal"
@@ -25,7 +25,7 @@
   },
   "homepage": {
     "hero": {
-      "title": "El Banco de datos NGO Databank",
+      "title": "El Banco de datos Humanitarian Databank",
       "subtitle": "Acceso a datos, visualizaciones e información",
       "description": "Explora datos humanitarios integrales, indicadores y publicaciones de la Federación Internacional de Sociedades de la Cruz Roja y de la Media Luna Roja.",
       "exploreButton": "Explorar Datos",
@@ -123,11 +123,11 @@
   "indicatorBank": {
     "title": "Banco de Indicadores",
     "meta": {
-      "description": "Explora indicadores del banco de indicadores de la NGO Databank."
+      "description": "Explora indicadores del banco de indicadores de la Humanitarian Databank."
     },
     "hero": {
-      "title": "Banco de indicadores NGO Databank",
-      "description": "Explora nuestra colección integral de indicadores utilizados en las operaciones de la NGO Databank."
+      "title": "Banco de indicadores Humanitarian Databank",
+      "description": "Explora nuestra colección integral de indicadores utilizados en las operaciones de la Humanitarian Databank."
     },
     "loading": {
       "title": "Cargando Banco de Indicadores",
@@ -221,11 +221,11 @@
   "resources": {
     "title": "Recursos",
     "meta": {
-      "description": "Explora informes de investigación, publicaciones y recursos de la NGO Databank."
+      "description": "Explora informes de investigación, publicaciones y recursos de la Humanitarian Databank."
     },
     "hero": {
       "title": "Recursos",
-      "description": "Informes de investigación, publicaciones y recursos de la NGO Databank"
+      "description": "Informes de investigación, publicaciones y recursos de la Humanitarian Databank"
     },
     "loading": {
       "title": "Cargando Recursos",
@@ -282,7 +282,7 @@
   "dataVisualization": {
     "title": "Visualización de Datos",
     "meta": {
-      "description": "Explora visualizaciones de datos interactivas de la NGO Databank."
+      "description": "Explora visualizaciones de datos interactivas de la Humanitarian Databank."
     },
     "hero": {
       "title": "Visualización de Datos",
@@ -307,7 +307,7 @@
   "exploreData": {
     "title": "Explorar Datos",
     "meta": {
-      "description": "Crea visualizaciones de datos personalizadas y explora datos de la NGO Databank seleccionando indicadores, países y tipos de gráficos."
+      "description": "Crea visualizaciones de datos personalizadas y explora datos de la Humanitarian Databank seleccionando indicadores, países y tipos de gráficos."
     },
     "hero": {
       "title": "Explorar Datos",
@@ -433,13 +433,13 @@
       "send": "Enviar"
     },
     "placeholder": {
-      "response": "Recibí tu mensaje: \"{{message}}\". Como marcador de posición, no puedo acceder a datos en tiempo real aún, pero estoy diseñado para responder preguntas sobre actividades de NGO Databank, financiamiento e impacto basado en el banco de datos disponible."
+      "response": "Recibí tu mensaje: \"{{message}}\". Como marcador de posición, no puedo acceder a datos en tiempo real aún, pero estoy diseñado para responder preguntas sobre actividades de Humanitarian Databank, financiamiento e impacto basado en el banco de datos disponible."
     }
   },
   "globalOverview": {
     "title": "Vista General Global",
     "meta": {
-      "description": "Explora datos humanitarios globales e indicadores de la NGO Databank."
+      "description": "Explora datos humanitarios globales e indicadores de la Humanitarian Databank."
     },
     "hero": {
       "title": "Vista General Global",
@@ -554,14 +554,14 @@
       "humanitarianIndicators": "¿Cuáles son los indicadores humanitarios clave?"
     },
     "aiResponses": {
-      "afghanRedCrescent": "En los últimos años, la Sociedad del Creciente Rojo Afgano (ARCS) se ha basado en gran medida en su red de voluntarios para responder a desastres naturales, crisis de salud y emergencias relacionadas con conflictos en todo Afganistán. En 2013, la ARCS reportó tener alrededor de 23,440 voluntarios activos (<a href=\"https://arcs.af/sites/default/files/2021-05/English%20Booklet%20size%209%20x%2014%20cm.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">fuente</a>), contribuyendo a actividades en casi todas las provincias. Una revisión longitudinal de los esfuerzos de participación de voluntarios de la ARCS, apoyada por la Cruz Roja Sueca y el CICR, se detalla en un estudio de caso (<a href=\"https://ifrc.org/sites/default/files/2024-10/Longitudunal%20Review%20Case%20study_Afghan%20Red%20Crescent.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">fuente</a>). Los voluntarios jugaron roles cruciales en emergencias importantes como las avalanchas de 2015, el terremoto de Paktika en 2022 y los terremotos de Herat en 2023. Según el <a href=\"/resources\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline inline-flex items-center\"><svg class=\"w-4 h-4 mr-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1\" /></svg>Informe Everyone Counts 2022</a> de la NGO Databank, la ARCS reportó 393,077 voluntarios contribuyendo más de 2.1 millones de horas de servicio, incluyendo 257,437 horas en actividades relacionadas con la salud, con 56,456 personas capacitadas y 31,600 recibiendo primeros auxilios. Estas cifras destacan la escala e impacto del voluntariado en las operaciones de la ARCS, aunque otras fuentes sugieren fluctuaciones en el número de voluntarios a lo largo del tiempo.",
-      "disasterResponse": "La NGO Databank responde a cientos de desastres y emergencias anualmente, proporcionando asistencia humanitaria crítica en todo el mundo. En 2023, la plataforma apoyó más de 1,000 operaciones de respuesta a desastres, alcanzando a más de 160 millones de personas afectadas por desastres relacionados con el clima, conflictos y emergencias de salud. Las áreas de respuesta clave incluyen refugio de emergencia, seguridad alimentaria, agua y saneamiento, servicios de salud y apoyo psicosocial. La respuesta a desastres de la red está coordinada a través del Fondo de Emergencia para Respuesta a Desastres (DREF) de la plataforma y Llamamientos de Emergencia, asegurando asistencia rápida y efectiva a las comunidades afectadas.",
-      "humanitarianIndicators": "La Base de Datos de la Red NGO Databank rastrea varios indicadores humanitarios clave incluyendo voluntarios, personal, unidades locales, donantes de sangre, beneficiarios de primeros auxilios, personas alcanzadas, ingresos y gastos. Estos indicadores proporcionan insights integrales sobre la capacidad, alcance e impacto de la red en diferentes regiones y contextos. Los datos ayudan a medir el progreso hacia los objetivos humanitarios e informan la toma de decisiones estratégicas para operaciones futuras.",
+      "afghanRedCrescent": "En los últimos años, la Sociedad del Creciente Rojo Afgano (ARCS) se ha basado en gran medida en su red de voluntarios para responder a desastres naturales, crisis de salud y emergencias relacionadas con conflictos en todo Afganistán. En 2013, la ARCS reportó tener alrededor de 23,440 voluntarios activos (<a href=\"https://arcs.af/sites/default/files/2021-05/English%20Booklet%20size%209%20x%2014%20cm.pdf\" target=\"_blank\" class=\"text-humdb-red hover:text-humdb-red-dark underline\">fuente</a>), contribuyendo a actividades en casi todas las provincias. Una revisión longitudinal de los esfuerzos de participación de voluntarios de la ARCS, apoyada por la Cruz Roja Sueca y el CICR, se detalla en un estudio de caso (<a href=\"https://ifrc.org/sites/default/files/2024-10/Longitudunal%20Review%20Case%20study_Afghan%20Red%20Crescent.pdf\" target=\"_blank\" class=\"text-humdb-red hover:text-humdb-red-dark underline\">fuente</a>). Los voluntarios jugaron roles cruciales en emergencias importantes como las avalanchas de 2015, el terremoto de Paktika en 2022 y los terremotos de Herat en 2023. Según el <a href=\"/resources\" class=\"text-humdb-red hover:text-humdb-red-dark underline inline-flex items-center\"><svg class=\"w-4 h-4 mr-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1\" /></svg>Informe Everyone Counts 2022</a> de la Humanitarian Databank, la ARCS reportó 393,077 voluntarios contribuyendo más de 2.1 millones de horas de servicio, incluyendo 257,437 horas en actividades relacionadas con la salud, con 56,456 personas capacitadas y 31,600 recibiendo primeros auxilios. Estas cifras destacan la escala e impacto del voluntariado en las operaciones de la ARCS, aunque otras fuentes sugieren fluctuaciones en el número de voluntarios a lo largo del tiempo.",
+      "disasterResponse": "La Humanitarian Databank responde a cientos de desastres y emergencias anualmente, proporcionando asistencia humanitaria crítica en todo el mundo. En 2023, la plataforma apoyó más de 1,000 operaciones de respuesta a desastres, alcanzando a más de 160 millones de personas afectadas por desastres relacionados con el clima, conflictos y emergencias de salud. Las áreas de respuesta clave incluyen refugio de emergencia, seguridad alimentaria, agua y saneamiento, servicios de salud y apoyo psicosocial. La respuesta a desastres de la red está coordinada a través del Fondo de Emergencia para Respuesta a Desastres (DREF) de la plataforma y Llamamientos de Emergencia, asegurando asistencia rápida y efectiva a las comunidades afectadas.",
+      "humanitarianIndicators": "La Base de Datos de la Red Humanitarian Databank rastrea varios indicadores humanitarios clave incluyendo voluntarios, personal, unidades locales, donantes de sangre, beneficiarios de primeros auxilios, personas alcanzadas, ingresos y gastos. Estos indicadores proporcionan insights integrales sobre la capacidad, alcance e impacto de la red en diferentes regiones y contextos. Los datos ayudan a medir el progreso hacia los objetivos humanitarios e informan la toma de decisiones estratégicas para operaciones futuras.",
       "regionalComparison": "La comparación regional del número de voluntarios muestra niveles variables de participación en diferentes partes del mundo. África y Asia típicamente tienen el mayor número de voluntarios, reflejando los extensos programas basados en la comunidad en estas regiones. Europa y las Américas muestran fuerte participación de voluntarios en áreas específicas como respuesta a desastres y servicios de salud. El Medio Oriente demuestra participación creciente de voluntarios, particularmente en respuesta de emergencia e iniciativas de salud comunitaria."
     },
     "chartTitles": {
       "arcsVolunteers": "Voluntarios ARCS (2019-2023)",
-      "disasterResponse": "Operaciones de Respuesta a Desastres NGO Databank (2019-2023)",
+      "disasterResponse": "Operaciones de Respuesta a Desastres Humanitarian Databank (2019-2023)",
       "humanitarianIndicators": "Indicadores Humanitarios Clave (2023)",
       "regionalComparison": "Voluntarios por Región (2023)",
       "afghanistanVolunteers": "Voluntarios en Afganistán ({{year}})"
@@ -679,7 +679,7 @@
     "api": {
       "readDocs": "Leer la documentación de la API"
     },
-    "orgLogoAlt": "Logotipo de NGO Databank",
+    "orgLogoAlt": "Logotipo de Humanitarian Databank",
     "organizationName": "Federación Internacional de Sociedades de la Cruz Roja y de la Media Luna Roja",
     "developerTools": {
       "title": "Herramientas de Desarrollo",
@@ -692,11 +692,11 @@
   "downloadApps": {
     "title": "Descargar Aplicaciones Móviles",
     "meta": {
-      "description": "Descarga la aplicación móvil del Banco de datos NGO Databank para dispositivos Android e iOS."
+      "description": "Descarga la aplicación móvil del Banco de datos Humanitarian Databank para dispositivos Android e iOS."
     },
     "hero": {
       "title": "Descargar Aplicaciones Móviles",
-      "description": "Obtén la aplicación móvil del Banco de datos NGO Databank para dispositivos Android e iOS."
+      "description": "Obtén la aplicación móvil del Banco de datos Humanitarian Databank para dispositivos Android e iOS."
     },
     "android": {
       "title": "Aplicación Android",
@@ -712,6 +712,8 @@
     },
     "instructions": {
       "title": "Instrucciones de Instalación",
+      "revealTitle": "Cómo instalar",
+      "dismiss": "Entendido",
       "android": {
         "title": "Android",
         "step1": "Descarga el archivo APK usando el botón de arriba",
@@ -721,9 +723,9 @@
       "ios": {
         "title": "iOS",
         "step1": "Descarga el archivo IPA usando el botón de arriba",
-        "step2": "Conecta tu dispositivo iOS a tu computadora",
-        "step3": "Usa iTunes o Finder para instalar el archivo IPA en tu dispositivo",
-        "step4": "Confía en el certificado del desarrollador en Configuración > General > Gestión de Dispositivos"
+        "step2": "Instala Sideloadly en tu Mac o PC con Windows (sideloadly.io) y conecta tu iPhone o iPad por USB",
+        "step3": "En Sideloadly, selecciona el dispositivo, añade el IPA e inicia la instalación; inicia sesión con tu Apple ID si te lo piden",
+        "step4": "En el dispositivo, confía en el desarrollador en Configuración > General > VPN y gestión de dispositivos (o Gestión de dispositivos en iOS antiguas)"
       }
     }
   },

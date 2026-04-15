@@ -279,7 +279,7 @@
                  maxlength="200"
                  required
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., NGO Databank') }}" />
+                 placeholder="{{ _('e.g., Humanitarian Databank') }}" />
           <input type="hidden"
                  id="organization-name-translations-input"
                  name="organization_name_translations"
@@ -293,7 +293,7 @@
                  value="{{ org_short_name_en_value or '' }}"
                  maxlength="100"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., NGO') }}" />
+                 placeholder="{{ _('e.g., IFRC') }}" />
           <input type="hidden"
                  id="organization-short-name-translations-input"
                  name="organization_short_name_translations"
@@ -323,7 +323,7 @@
                  maxlength="200"
                  required
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., ngodatabank.org') }}" />
+                 placeholder="{{ _('e.g., humdatabank.org') }}" />
         </div>
         <div>
           <label class="block text-xs text-gray-500 mb-1">{{ _('Email Domain') }}</label>
@@ -332,7 +332,7 @@
                  value="{{ current_branding.get('organization_email_domain', '') }}"
                  maxlength="200"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., ngodatabank.org') }}" />
+                 placeholder="{{ _('e.g., humdatabank.org') }}" />
           <p class="text-xs text-gray-400 mt-1">{{ _('Falls back to organization domain if empty.') }}</p>
         </div>
       </div>
@@ -400,7 +400,7 @@
                  value="{{ current_branding.get('indicator_details_url_template', '') }}"
                  maxlength="500"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., https://ngo.org/{id}') }}" />
+                 placeholder="{{ _('e.g., https://example.org/{id}') }}" />
           <p class="text-xs text-gray-400 mt-1">{{ _('Use {id} as placeholder for indicator bank id.') }}</p>
         </div>
         <div>
@@ -410,7 +410,7 @@
                  value="{{ current_branding.get('propose_new_indicator_url', '') }}"
                  maxlength="500"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., https://ngo.org/indicator-bank') }}" />
+                 placeholder="{{ _('e.g., https://example.org/indicator-bank') }}" />
         </div>
       </div>
     </div>

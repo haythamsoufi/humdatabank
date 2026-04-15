@@ -1222,7 +1222,7 @@ try {
 
         // Load API key from local storage (client-side only)
         const apiKeyInput = document.getElementById('apiKeyInput');
-        const API_KEY_STORAGE = 'ngo_databank_api_management_api_key';
+        const API_KEY_STORAGE = 'hum_databank_api_management_api_key';
         const LEGACY_API_KEY_STORAGE = 'ifrc_api_management_api_key';
         if (apiKeyInput) {
             try {
@@ -2125,7 +2125,7 @@ try {
                 key = window.getApiManagementApiKey();
             } else {
                 try {
-                    key = String(localStorage.getItem('ngo_databank_api_management_api_key') || localStorage.getItem('ifrc_api_management_api_key') || '').trim();
+                    key = String(localStorage.getItem('hum_databank_api_management_api_key') || localStorage.getItem('ifrc_api_management_api_key') || '').trim();
                 } catch (e) {}
             }
             if (key) {

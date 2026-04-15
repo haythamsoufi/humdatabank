@@ -193,7 +193,7 @@ def check_files():
 def main():
     """Run all security audits."""
     logger.info("\n" + "=" * 80)
-    logger.info("SECURITY AUDIT - NGO Databank")
+    logger.info("SECURITY AUDIT - Humanitarian Databank")
     logger.info("=" * 80)
 
     all_passed = True

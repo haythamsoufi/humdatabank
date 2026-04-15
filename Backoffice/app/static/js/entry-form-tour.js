@@ -185,7 +185,7 @@
 	}
 
 	function startEntryFormTour(force, startAtStep) {
-		const tourKey = 'ngodb_entry_form_tour_status';
+		const tourKey = 'humdb_entry_form_tour_status';
 		const isRTL = document.documentElement.getAttribute('dir') === 'rtl';
 		const status = localStorage.getItem(tourKey);
 		const i18n = window.TOUR_I18N || {};
@@ -256,8 +256,8 @@
 					doneLabel: i18n.gotIt || i18n.done || 'Got it!',
 					rtl: isRTL,
 					overlayOpacity: 0.4,
-					tooltipClass: isSingleStepMode ? 'ngodb-intro single-step-mode' : 'ngodb-intro',
-					highlightClass: 'ngodb-intro-highlight',
+					tooltipClass: isSingleStepMode ? 'humdb-intro single-step-mode' : 'humdb-intro',
+					highlightClass: 'humdb-intro-highlight',
 					scrollTo: 'tooltip',
 					scrollToElement: true,
 					showButtons: true,
@@ -335,7 +335,7 @@
 
 				if (typeof instance.onafterchange === 'function') {
 					instance.onafterchange(function(targetElement) {
-						const tooltip = document.querySelector('.ngodb-intro');
+						const tooltip = document.querySelector('.humdb-intro');
 						if (tooltip) {
 							tooltip.classList.add('tour-adjusting');
 
@@ -411,7 +411,7 @@
 
 						// Add chatbot badge if triggered by chatbot
 						if (isChatbotTriggered) {
-							const tooltip = document.querySelector('.ngodb-intro');
+							const tooltip = document.querySelector('.humdb-intro');
 							if (tooltip && !tooltip.querySelector('.chatbot-tour-badge')) {
 								const badge = document.createElement('div');
 								badge.className = 'chatbot-tour-badge';

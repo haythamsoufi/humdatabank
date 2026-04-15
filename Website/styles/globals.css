@@ -115,7 +115,7 @@
 }
 
 /* Leaflet popup styling for flow tooltips */
-.leaflet-popup.ngodb-flow-tooltip .leaflet-popup-content-wrapper {
+.leaflet-popup.humdb-flow-tooltip .leaflet-popup-content-wrapper {
   background: rgba(255, 255, 255, 0.95) !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: 12px !important;
@@ -123,7 +123,7 @@
   backdrop-filter: blur(10px) !important;
 }
 
-.leaflet-popup.ngodb-flow-tooltip .leaflet-popup-content {
+.leaflet-popup.humdb-flow-tooltip .leaflet-popup-content {
   margin: 12px !important;
   font-family: inherit !important;
   font-size: 14px !important;
@@ -131,17 +131,17 @@
   min-width: 150px !important;
 }
 
-.leaflet-popup.ngodb-flow-tooltip .leaflet-popup-tip {
+.leaflet-popup.humdb-flow-tooltip .leaflet-popup-tip {
   background: rgba(255, 255, 255, 0.95) !important;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18) !important;
 }
 
 /* Flow line classes (color only; width is controlled by JS for zoom scaling) */
-path.ngodb-flow-line {
+path.humdb-flow-line {
   stroke: #ff0000 !important;
 }
 
-path.ngodb-flow-hover {
+path.humdb-flow-hover {
   stroke: #ff0000 !important;
 }
 
@@ -188,7 +188,7 @@ path.ngodb-flow-hover {
 
 /* Basic body styling */
 body {
-  @apply font-sans text-ngodb-gray-800 bg-ngodb-white antialiased; /* Changed default text color, bg to white */
+  @apply font-sans text-humdb-gray-800 bg-humdb-white antialiased; /* Changed default text color, bg to white */
   line-height: 1.6;
 }
 
@@ -202,11 +202,11 @@ body {
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #A0AEC0; /* ngodb-gray-500 */
+  background: #A0AEC0; /* humdb-gray-500 */
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #718096; /* ngodb-gray-600 */
+  background: #718096; /* humdb-gray-600 */
 }
 
 /* Container utility */
@@ -216,21 +216,21 @@ body {
 
 /* Ensure links have a default style */
 a {
-  @apply text-ngodb-red hover:text-ngodb-red-dark transition-colors duration-150;
+  @apply text-humdb-red hover:text-humdb-red-dark transition-colors duration-150;
 }
 
 /* Prose adjustments for dark text on light background */
 .prose {
-    @apply text-ngodb-gray-700;
+    @apply text-humdb-gray-700;
 }
 .prose h1, .prose h2, .prose h3, .prose h4 {
-    @apply text-ngodb-navy;
+    @apply text-humdb-navy;
 }
 .prose a {
-    @apply text-ngodb-red;
+    @apply text-humdb-red;
 }
 .prose strong {
-    @apply text-ngodb-gray-900;
+    @apply text-humdb-gray-900;
 }
 /* Add other prose overrides if needed */
 
@@ -405,11 +405,11 @@ a {
 }
 
 /* Override any conflicting Tailwind classes */
-.rtl .px-6.py-3.text-xs.font-medium.text-ngodb-gray-500.uppercase.tracking-wider {
+.rtl .px-6.py-3.text-xs.font-medium.text-humdb-gray-500.uppercase.tracking-wider {
   text-align: right !important;
 }
 
-.rtl .px-6.py-4.text-sm.text-ngodb-gray-600 {
+.rtl .px-6.py-4.text-sm.text-humdb-gray-600 {
   text-align: right !important;
 }
 

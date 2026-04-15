@@ -47,8 +47,8 @@ chmod +x azure-deploy.sh
 Follow `Backoffice/azure/DEPLOYMENT_GUIDE.md`
 
 After completion, note down:
-- ✅ Resource Group name (e.g., `rg-ngo-databank-prod`)
-- ✅ Web App name (e.g., `ngo-databank-prod-abc123`)
+- ✅ Resource Group name (e.g., `rg-hum-databank-prod`)
+- ✅ Web App name (e.g., `hum-databank-prod-abc123`)
 
 ---
 
@@ -58,8 +58,8 @@ Get your Web App's deployment credentials:
 
 ```powershell
 # Set your actual values
-$RESOURCE_GROUP = "rg-ngo-databank-prod"
-$WEBAPP_NAME = "ngo-databank-prod-abc123"
+$RESOURCE_GROUP = "rg-hum-databank-prod"
+$WEBAPP_NAME = "hum-databank-prod-abc123"
 
 # Download publish profile
 az webapp deployment list-publishing-profiles `
@@ -82,7 +82,7 @@ This creates `publish-profile.xml` in your current directory.
 2. **Copy ALL contents** (entire XML file)
 
 3. **Go to GitHub repository settings:**
-   - Navigate to: https://github.com/haythamsoufi/databank/settings/secrets/actions
+   - Navigate to: https://github.com/haythamsoufi/humdatabank/settings/secrets/actions
    - Or: Repository → Settings → Secrets and variables → Actions
 
 4. **Create new secret:**
@@ -113,7 +113,7 @@ env:
 Change to:
 ```yaml
 env:
-  AZURE_WEBAPP_NAME: ngo-databank-prod-abc123  # Your actual Web App name
+  AZURE_WEBAPP_NAME: hum-databank-prod-abc123  # Your actual Web App name
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '18'
 ```
@@ -132,14 +132,14 @@ git push origin main
 Check that everything is configured:
 
 1. **Verify secret exists:**
-   - Go to: https://github.com/haythamsoufi/databank/settings/secrets/actions
+   - Go to: https://github.com/haythamsoufi/humdatabank/settings/secrets/actions
    - You should see: `AZURE_WEBAPP_PUBLISH_PROFILE` with green checkmark
 
 2. **Verify workflow is updated:**
    - Check `.github/workflows/azure-deploy.yml` has your actual Web App name
 
 3. **Test the workflow:**
-   - Go to: https://github.com/haythamsoufi/databank/actions
+   - Go to: https://github.com/haythamsoufi/humdatabank/actions
    - Click "Deploy Backoffice to Azure App Service"
    - Click "Run workflow" → Select `main` branch → "Run workflow"
    - Watch it deploy! 🚀
@@ -151,7 +151,7 @@ Check that everything is configured:
 Once configured, you can deploy in two ways:
 
 ### 1. **Manual Deployment** (Current Mode)
-- Go to: https://github.com/haythamsoufi/databank/actions
+- Go to: https://github.com/haythamsoufi/humdatabank/actions
 - Click "Deploy Backoffice to Azure App Service"
 - Click "Run workflow"
 - Select branch and click "Run workflow"
@@ -215,7 +215,7 @@ on:
 ### View Deployment Logs
 
 1. **Go to GitHub Actions:**
-   - https://github.com/haythamsoufi/databank/actions
+   - https://github.com/haythamsoufi/humdatabank/actions
 
 2. **Click on a workflow run** to see:
    - ✅ Build logs
@@ -250,7 +250,7 @@ After each deployment, check the summary for:
 **Problem:** `AZURE_WEBAPP_PUBLISH_PROFILE` secret is missing
 
 **Solution:**
-1. Verify secret exists: https://github.com/haythamsoufi/databank/settings/secrets/actions
+1. Verify secret exists: https://github.com/haythamsoufi/humdatabank/settings/secrets/actions
 2. If missing, follow Step 3 above to add it
 3. Make sure you named it exactly: `AZURE_WEBAPP_PUBLISH_PROFILE` (no typos)
 
@@ -450,7 +450,7 @@ git commit -m "Configure workflow"
 git push origin main
 
 # 5. Watch it deploy!
-# Go to: https://github.com/haythamsoufi/databank/actions
+# Go to: https://github.com/haythamsoufi/humdatabank/actions
 ```
 
 ---
@@ -472,7 +472,7 @@ git push origin main
 **Need help?** Check:
 - Azure deployment: `Backoffice/azure/DEPLOYMENT_GUIDE.md`
 - Workflow troubleshooting: See "Troubleshooting" section above
-- GitHub Actions: https://github.com/haythamsoufi/databank/actions
+- GitHub Actions: https://github.com/haythamsoufi/humdatabank/actions
 
 **Last Updated:** October 2025
 
@@ -492,7 +492,7 @@ The iOS and Android build workflows require API keys to be configured as GitHub 
 ### Setting Up Mobile App Secrets
 
 1. **Go to GitHub repository settings:**
-   - Navigate to: https://github.com/haythamsoufi/databank/settings/secrets/actions
+   - Navigate to: https://github.com/haythamsoufi/humdatabank/settings/secrets/actions
    - Or: Repository → Settings → Secrets and variables → Actions
 
 2. **Add each secret:**
@@ -531,7 +531,7 @@ SENTRY_DSN=your_sentry_dsn_here
 
 **❌ Build fails: "MOBILE_APP_API_KEY not found"**
 
-- Verify the secret exists in GitHub: https://github.com/haythamsoufi/databank/settings/secrets/actions
+- Verify the secret exists in GitHub: https://github.com/haythamsoufi/humdatabank/settings/secrets/actions
 - Check that the secret name is exactly `MOBILE_APP_API_KEY` (case-sensitive)
 - Ensure the workflow is using `${{ secrets.MOBILE_APP_API_KEY }}` syntax
 

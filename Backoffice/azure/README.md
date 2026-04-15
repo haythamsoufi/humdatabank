@@ -1,6 +1,6 @@
-# Azure Deployment - NGO Databank
+# Azure Deployment - Humanitarian Databank
 
-Complete guide for deploying the NGO Databank Backoffice to Microsoft Azure.
+Complete guide for deploying the Humanitarian Databank Backoffice to Microsoft Azure.
 
 ---
 

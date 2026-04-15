@@ -103,10 +103,10 @@ def register_template_context(app, config_class):
         except Exception as e:
             current_app.logger.debug("get_organization_branding failed, using defaults: %s", e)
             return {
-                'organization_name': {'en': 'NGO Databank'},
-                'organization_short_name': {'en': 'NGO Databank'},
-                'organization_domain': 'ngodatabank.org',
-                'organization_email_domain': 'ngodatabank.org',
+                'organization_name': {'en': 'Humanitarian Databank'},
+                'organization_short_name': {'en': 'Humanitarian Databank'},
+                'organization_domain': 'humdatabank.org',
+                'organization_email_domain': 'humdatabank.org',
                 'organization_copyright_year': str(datetime.now().year),
             }
 
@@ -146,15 +146,15 @@ def register_template_context(app, config_class):
         except Exception as e:
             current_app.logger.debug("inject_org_branding failed, using defaults: %s", e)
             return {
-                'ORG_NAME': 'NGO Databank',
-                'ORG_SHORT_NAME': 'NGO Databank',
+                'ORG_NAME': 'Humanitarian Databank',
+                'ORG_SHORT_NAME': 'Humanitarian Databank',
                 'CHATBOT_NAME': '',
                 'CHATBOT_ORG_ONLY': False,
                 'is_organization_email': lambda email: False,
                 'user_has_ai_beta_access': lambda user: True,
                 'user_is_explicit_beta_tester': lambda user: False,
-                'get_organization_domain': lambda default='ngodatabank.org': default,
-                'get_organization_email_domain': lambda default='ngodatabank.org': default,
+                'get_organization_domain': lambda default='humdatabank.org': default,
+                'get_organization_email_domain': lambda default='humdatabank.org': default,
                 'ORGANIZATION_BRANDING': {},
                 'ORG_LOGO_PATH': 'logo.svg',
                 'INDICATOR_BANK_PUBLIC_BASE': '',

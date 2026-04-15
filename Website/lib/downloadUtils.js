@@ -138,7 +138,7 @@ export const generateFilename = (indicatorName, selectedYear, regionName, fileTy
   const yearSlug = selectedYear || 'all-years';
   const regionSlug = regionName ? regionName.toLowerCase().replace(/\s+/g, '-') : 'global';
 
-  return `ngodb-${indicatorSlug}-${regionSlug}-${yearSlug}-${timestamp}.${fileType}`;
+  return `humdb-${indicatorSlug}-${regionSlug}-${yearSlug}-${timestamp}.${fileType}`;
 };
 
 /**
@@ -146,9 +146,9 @@ export const generateFilename = (indicatorName, selectedYear, regionName, fileTy
  * - Dynamically imports exceljs to avoid SSR issues
  * - Flattens nested objects for a clean tabular sheet
  * @param {Array|Object} jsonData - Array of records or object containing an array
- * @param {string} filename - e.g. 'ngodb-api-data.xlsx'
+ * @param {string} filename - e.g. 'humdb-api-data.xlsx'
  */
-export const downloadExcelFromJson = async (jsonData, filename = 'ngodb-api-data.xlsx') => {
+export const downloadExcelFromJson = async (jsonData, filename = 'humdb-api-data.xlsx') => {
   try {
     const ExcelJS = (await import('exceljs')).default;
 

@@ -95,7 +95,7 @@ const ChatbotMessages = {
         help: {
             keywords: ['help', 'how', 'what', 'guide'],
             get response() {
-                const orgName = window.ORG_NAME || 'NGO Databank';
+                const orgName = window.ORG_NAME || 'Humanitarian Databank';
                 return `I'm here to help you navigate the ${orgName}! 🤖<br><br><strong>Popular topics:</strong><br>• "How do I create a template?" - Form building<br>• "Where is the dashboard?" - Navigation<br>• "What are assignments?" - Task management<br>• "How do I submit data?" - Data collection<br>• "Where are the analytics?" - Reports and insights<br><br>Just ask me anything specific about the platform!`;
             }
         }
@@ -212,7 +212,7 @@ const ChatbotMessages = {
             title: 'Platform Page',
             emoji: '🎯',
             get description() {
-                const orgName = window.ORG_NAME || 'NGO Databank';
+                const orgName = window.ORG_NAME || 'Humanitarian Databank';
                 return `You're currently viewing a page within the ${orgName} platform.<br><br>
                 <strong>💡 General Help:</strong><br>
                 • Use the navigation menu to move between sections<br>
@@ -226,7 +226,7 @@ const ChatbotMessages = {
     // Thank you responses
     thankYouResponses: {
         get en() {
-            const orgName = window.ORG_NAME || 'NGO Databank';
+            const orgName = window.ORG_NAME || 'Humanitarian Databank';
             return `You're very welcome! 😊 I'm always here to help you make the most of the ${orgName}. Don't hesitate to ask if you need anything else!`;
         },
         es: '¡De nada! 😊 Siempre estoy aquí para ayudarte a aprovechar al máximo el Banco de Datos de IFRC. ¡No dudes en preguntar si necesitas algo más!',

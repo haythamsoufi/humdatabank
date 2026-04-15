@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/models/shared/template.dart';
+import 'package:hum_databank_app/models/shared/template.dart';
 
 void main() {
   group('Template.fromJson', () {

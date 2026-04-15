@@ -1,7 +1,7 @@
 {
   "name": "ifrc-network-databank",
   "version": "1.0.0",
-  "description": "NGO Databank Backoffice",
+  "description": "Humanitarian Databank Backoffice",
   "scripts": {
     "build:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --minify -c ./assets/tailwind.config.js",
     "watch:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch -c ./assets/tailwind.config.js"

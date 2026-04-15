@@ -108,7 +108,7 @@ const NSStructureDropdown = forwardRef(({ countryId, onClose }, ref) => {
       >
         <div className="p-4">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-ngodb-red"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-humdb-red"></div>
             <span className="ml-2 text-gray-600">
               <TranslationSafe fallback="Loading organizational structure...">
                 {t('nsStructure.loading.title')}
@@ -151,7 +151,7 @@ const NSStructureDropdown = forwardRef(({ countryId, onClose }, ref) => {
               placeholder="Search branches..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+              className="w-full px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
             />
           </div>
 
@@ -165,7 +165,7 @@ const NSStructureDropdown = forwardRef(({ countryId, onClose }, ref) => {
                   className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ease-in-out
                     ${
                       selectedBranch === branch.id
-                        ? 'bg-ngodb-red text-white'
+                        ? 'bg-humdb-red text-white'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                 >
@@ -206,7 +206,7 @@ const NSStructureDropdown = forwardRef(({ countryId, onClose }, ref) => {
               placeholder="Search sub-branches..."
               value={subbranchSearchQuery}
               onChange={(e) => setSubbranchSearchQuery(e.target.value)}
-              className="w-full px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+              className="w-full px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
             />
           </div>
 

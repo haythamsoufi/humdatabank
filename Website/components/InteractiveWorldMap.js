@@ -586,7 +586,7 @@ const InteractiveWorldMap = ({
               bubble.bindPopup(`
                 <div class="text-center">
                   <h3 class="font-bold text-lg mb-2">${countryName}</h3>
-                  <p class="text-2xl font-bold text-ngodb-red">${formatNumber(value, showFullValues)}</p>
+                  <p class="text-2xl font-bold text-humdb-red">${formatNumber(value, showFullValues)}</p>
                   <p class="text-sm text-gray-600">${selectedIndicator.replace('-', ' ')}</p>
                 </div>
               `);
@@ -966,7 +966,7 @@ const InteractiveWorldMap = ({
             lineJoin: 'round',
             smoothFactor: 1,
             interactive: false, // Not interactive, hover handled by hoverLine
-            className: 'ngodb-flow-line',
+            className: 'humdb-flow-line',
           });
           line.__ifrcBaseWeight = baseWeight;
           line.__ifrcBaseOpacity = tierProfile.opacity;
@@ -984,7 +984,7 @@ const InteractiveWorldMap = ({
             lineJoin: 'round',
             smoothFactor: 1,
             interactive: true,
-            className: 'ngodb-flow-hover',
+            className: 'humdb-flow-hover',
           });
           hoverLine.__ifrcBaseWeight = baseWeight;
           hoverLine.__ifrcIsFlowHover = true;
@@ -1002,7 +1002,7 @@ const InteractiveWorldMap = ({
             formattedValue,
           };
           hoverLine.bindPopup(popupContent, {
-            className: 'ngodb-flow-tooltip',
+            className: 'humdb-flow-tooltip',
             closeButton: false,
             offset: [0, -10],
             autoPan: false,
@@ -1053,7 +1053,7 @@ const InteractiveWorldMap = ({
               lineCap: 'butt',
               lineJoin: 'miter',
               interactive: false,
-              className: 'ngodb-flow-arrow',
+              className: 'humdb-flow-arrow',
               }
             );
             arrow.__ifrcArrowMeta = {
@@ -1250,8 +1250,8 @@ const InteractiveWorldMap = ({
 
       if (maxValue <= 0) {
         legendContainer.innerHTML = `
-          <h4 class="font-bold text-ngodb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
-          <div class="text-sm text-ngodb-gray-600">${t('data.noDataAvailable')}</div>
+          <h4 class="font-bold text-humdb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
+          <div class="text-sm text-humdb-gray-600">${t('data.noDataAvailable')}</div>
         `;
         return;
       }
@@ -1261,7 +1261,7 @@ const InteractiveWorldMap = ({
         const grades = [0, maxValue * 0.2, maxValue * 0.4, maxValue * 0.6, maxValue * 0.8, maxValue];
 
         legendContainer.innerHTML = `
-          <h4 class="font-bold text-ngodb-navy mb-3 text-base">${t('globalOverview.map.bubbleSize')}</h4>
+          <h4 class="font-bold text-humdb-navy mb-3 text-base">${t('globalOverview.map.bubbleSize')}</h4>
           <div class="space-y-2">
         `;
 
@@ -1270,7 +1270,7 @@ const InteractiveWorldMap = ({
           legendContainer.innerHTML += `
             <div class="flex items-center space-x-3">
               <div style="width: ${size}px; height: ${size}px; background: #ef4444; border-radius: 50%; border: 2px solid #dc2626;"></div>
-              <span class="text-sm text-ngodb-gray-700">
+              <span class="text-sm text-humdb-gray-700">
                 ${formatNumber(grades[i], showFullValues)}${grades[i + 1] ? ' - ' + formatNumber(grades[i + 1], showFullValues) : '+'}
               </span>
             </div>
@@ -1282,7 +1282,7 @@ const InteractiveWorldMap = ({
           <div class="mt-3 pt-3 border-t border-gray-200">
             <div class="flex items-center space-x-2">
               <div style="width: 3px; height: 3px; background: #f8fafc; border-radius: 50%; border: 1px solid #e5e7eb;"></div>
-              <span class="text-sm text-ngodb-gray-600">${t('data.noData')}</span>
+              <span class="text-sm text-humdb-gray-600">${t('data.noData')}</span>
             </div>
           </div>
         `;
@@ -1293,7 +1293,7 @@ const InteractiveWorldMap = ({
         const grades = rawGrades.map(g => Math.round(g * 100) / 100);
 
         legendContainer.innerHTML = `
-          <h4 class="font-bold text-ngodb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
+          <h4 class="font-bold text-humdb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
           <div class="space-y-2">
         `;
 
@@ -1301,7 +1301,7 @@ const InteractiveWorldMap = ({
           legendContainer.innerHTML += `
             <div class="flex items-center space-x-3">
               <div style="background: ${getColor(grades[i + 1], maxValue)}; width: 20px; height: 20px; border-radius: 4px; border: 1px solid #e5e7eb;"></div>
-              <span class="text-sm text-ngodb-gray-700">
+              <span class="text-sm text-humdb-gray-700">
                 ${formatNumber(grades[i], showFullValues)}${grades[i + 1] ? ' - ' + formatNumber(grades[i + 1], showFullValues) : '+'}
               </span>
             </div>
@@ -1313,7 +1313,7 @@ const InteractiveWorldMap = ({
           <div class="mt-3 pt-3 border-t border-gray-200">
             <div class="flex items-center space-x-2">
               <div style="background: #f8fafc; width: 20px; height: 20px; border-radius: 4px; border: 1px solid #e5e7eb;"></div>
-              <span class="text-sm text-ngodb-gray-600">${t('data.noData')}</span>
+              <span class="text-sm text-humdb-gray-600">${t('data.noData')}</span>
             </div>
           </div>
         `;
@@ -1333,7 +1333,7 @@ const InteractiveWorldMap = ({
 
     if (maxValue <= 0) {
       return (
-        <div className="text-xs text-ngodb-gray-600">{t('data.noDataAvailable')}</div>
+        <div className="text-xs text-humdb-gray-600">{t('data.noDataAvailable')}</div>
       );
     }
 
@@ -1343,7 +1343,7 @@ const InteractiveWorldMap = ({
       const grades = rawGrades.map(g => Math.round(g * 100) / 100);
       return (
         <div className="space-y-1.5">
-          <h4 className="font-semibold text-ngodb-navy mb-2 text-xs">{t('globalOverview.map.bubbleSize')}</h4>
+          <h4 className="font-semibold text-humdb-navy mb-2 text-xs">{t('globalOverview.map.bubbleSize')}</h4>
           {grades.slice(0, -1).map((grade, i) => {
             const size = getBubbleSize(grades[i + 1], maxValue);
             return (
@@ -1356,7 +1356,7 @@ const InteractiveWorldMap = ({
                     backgroundColor: '#ef4444'
                   }}
                 />
-                <span className="text-xs text-ngodb-gray-700">
+                <span className="text-xs text-humdb-gray-700">
                   {formatNumber(grade, showFullValues)}{grades[i + 1] ? ' - ' + formatNumber(grades[i + 1], showFullValues) : '+'}
                 </span>
               </div>
@@ -1370,7 +1370,7 @@ const InteractiveWorldMap = ({
       const grades = rawGrades.map(g => Math.round(g * 100) / 100);
       return (
         <div className="space-y-1.5">
-          <h4 className="font-semibold text-ngodb-navy mb-2 text-xs">{t('globalOverview.map.dataRange')}</h4>
+          <h4 className="font-semibold text-humdb-navy mb-2 text-xs">{t('globalOverview.map.dataRange')}</h4>
           {grades.slice(0, -1).map((grade, i) => (
             <div key={i} className="flex items-center space-x-2">
               <div
@@ -1382,7 +1382,7 @@ const InteractiveWorldMap = ({
                   borderColor: '#e5e7eb'
                 }}
               />
-              <span className="text-xs text-ngodb-gray-700">
+              <span className="text-xs text-humdb-gray-700">
                 {formatNumber(grade, showFullValues)}{grades[i + 1] ? ' - ' + formatNumber(grades[i + 1], showFullValues) : '+'}
               </span>
             </div>
@@ -1874,8 +1874,8 @@ const InteractiveWorldMap = ({
 
             // Initial legend content will be set by updateLegend function
             div.innerHTML = `
-              <h4 class="font-bold text-ngodb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
-              <div class="text-sm text-ngodb-gray-600">${t('common.loading')}</div>
+              <h4 class="font-bold text-humdb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
+              <div class="text-sm text-humdb-gray-600">${t('common.loading')}</div>
             `;
 
             return div;
@@ -2287,8 +2287,8 @@ const InteractiveWorldMap = ({
                 div.style.minWidth = '200px';
 
                 div.innerHTML = `
-                  <h4 class="font-bold text-ngodb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
-                  <div class="text-sm text-ngodb-gray-600">${t('common.loading')}</div>
+                  <h4 class="font-bold text-humdb-navy mb-3 text-base">${t('globalOverview.map.dataRange')}</h4>
+                  <div class="text-sm text-humdb-gray-600">${t('common.loading')}</div>
                 `;
 
                 return div;
@@ -2759,7 +2759,7 @@ const InteractiveWorldMap = ({
         `;
 
         // Add custom scrollbar styles for webkit browsers
-        const styleId = 'ngodb-barchart-scrollbar-style';
+        const styleId = 'humdb-barchart-scrollbar-style';
         if (!document.getElementById(styleId)) {
           const style = document.createElement('style');
           style.id = styleId;
@@ -3049,19 +3049,19 @@ const InteractiveWorldMap = ({
           <div className="mb-3">
             <div className="bg-white rounded-lg shadow-md p-3 border border-gray-200">
               <div className="text-center">
-                <h3 className="text-xs font-semibold text-ngodb-gray-600 mb-1">
+                <h3 className="text-xs font-semibold text-humdb-gray-600 mb-1">
                   {hoveredCountry ? hoveredCountry : (regionName || t('globalOverview.map.globalTotal'))}
                 </h3>
                 {isLoadingData ? (
-                  <div className="text-base font-bold text-ngodb-navy animate-pulse">
+                  <div className="text-base font-bold text-humdb-navy animate-pulse">
                     {t('common.loading')}
                   </div>
                 ) : (
                   <>
-                    <div className="text-xl font-bold text-ngodb-red mb-1">
+                    <div className="text-xl font-bold text-humdb-red mb-1">
                       {hoveredCountry ? formatNumber(hoveredValue, showFullValues) : formatNumber(globalTotal, showFullValues)}
                     </div>
-                    <div className="text-xs text-ngodb-gray-500 break-words leading-relaxed">
+                    <div className="text-xs text-humdb-gray-500 break-words leading-relaxed">
                       {indicatorName || selectedIndicator.replace('-', ' ')}
                     </div>
                   </>
@@ -3075,19 +3075,19 @@ const InteractiveWorldMap = ({
         {!isMobile && (
           <div className={`absolute left-6 top-8 z-30 bg-white rounded-xl shadow-xl p-6 w-[220px] border border-gray-200 backdrop-blur-sm transition-opacity duration-200 ${isTooltipVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             <div className="text-center">
-              <h3 className="text-sm font-semibold text-ngodb-gray-600 mb-2">
+              <h3 className="text-sm font-semibold text-humdb-gray-600 mb-2">
                 {hoveredCountry ? hoveredCountry : (regionName || t('globalOverview.map.globalTotal'))}
               </h3>
               {isLoadingData ? (
-                <div className="text-lg font-bold text-ngodb-navy animate-pulse">
+                <div className="text-lg font-bold text-humdb-navy animate-pulse">
                   {t('common.loading')}
                 </div>
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-ngodb-red mb-2">
+                  <div className="text-3xl font-bold text-humdb-red mb-2">
                     {hoveredCountry ? formatNumber(hoveredValue, showFullValues) : formatNumber(globalTotal, showFullValues)}
                   </div>
-                  <div className="text-xs text-ngodb-gray-500 break-words leading-relaxed">
+                  <div className="text-xs text-humdb-gray-500 break-words leading-relaxed">
                     {indicatorName || selectedIndicator.replace('-', ' ')}
                   </div>
                 </>
@@ -3109,7 +3109,7 @@ const InteractiveWorldMap = ({
                         key={lvl}
                         onClick={() => setCountryAdmLevel(String(lvl || '').toUpperCase())}
                         className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                          active ? 'bg-ngodb-red text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          active ? 'bg-humdb-red text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                         title={t('globalOverview.map.showAdmin', { level: lvl })}
                       >
@@ -3128,7 +3128,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('choropleth')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'choropleth'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.choroplethMap')}
@@ -3141,7 +3141,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('bubble')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'bubble'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.bubbleMap')}
@@ -3156,7 +3156,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('barchart')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'barchart'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.barChart')}
@@ -3238,18 +3238,18 @@ const InteractiveWorldMap = ({
     <div className="relative">
       <div className="absolute left-4 top-4 z-30 bg-white rounded-xl shadow-xl p-6 min-w-[220px] border border-gray-200 backdrop-blur-sm">
         <div className="text-center">
-          <h3 className="text-sm font-semibold text-ngodb-gray-600 mb-2">
+          <h3 className="text-sm font-semibold text-humdb-gray-600 mb-2">
             {hoveredCountry ? hoveredCountry : (regionName || t('globalOverview.map.globalTotal'))}
           </h3>
-          <div className="text-lg font-bold text-ngodb-navy animate-pulse">
+          <div className="text-lg font-bold text-humdb-navy animate-pulse">
             Loading...
           </div>
         </div>
       </div>
       <div className="w-full h-96 md:h-[600px] rounded-xl overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-ngodb-red border-t-transparent mx-auto mb-6"></div>
-          <p className="text-ngodb-gray-600 text-lg font-medium">{t('common.loading')}</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-humdb-red border-t-transparent mx-auto mb-6"></div>
+          <p className="text-humdb-gray-600 text-lg font-medium">{t('common.loading')}</p>
         </div>
       </div>
       {/* Year Timeline Overlay - Bottom Left */}
@@ -3305,17 +3305,17 @@ const InteractiveWorldMap = ({
           <div className="mb-3">
             <div className="bg-white rounded-lg shadow-md p-3 border border-gray-200">
               <div className="text-center">
-                <h3 className="text-xs font-semibold text-ngodb-gray-600 mb-1">
+                <h3 className="text-xs font-semibold text-humdb-gray-600 mb-1">
                   {hoveredCountry ? hoveredCountry : (countryName || t('globalOverview.map.selectedCountry'))}
                 </h3>
                 {isLoadingData ? (
-                  <div className="text-base font-bold text-ngodb-navy animate-pulse">Loading...</div>
+                  <div className="text-base font-bold text-humdb-navy animate-pulse">Loading...</div>
                 ) : (
                   <>
-                    <div className="text-xl font-bold text-ngodb-red mb-1">
+                    <div className="text-xl font-bold text-humdb-red mb-1">
                       {hoveredCountry ? formatNumber(hoveredValue, showFullValues) : formatNumber(globalTotal, showFullValues)}
                     </div>
-                    <div className="text-xs text-ngodb-gray-500 break-words leading-relaxed">
+                    <div className="text-xs text-humdb-gray-500 break-words leading-relaxed">
                       {indicatorName || selectedIndicator.replace('-', ' ')}
                     </div>
                   </>
@@ -3329,17 +3329,17 @@ const InteractiveWorldMap = ({
         {!isMobile && (
           <div className={`absolute left-6 top-8 z-30 bg-white rounded-xl shadow-xl p-6 w-[220px] border border-gray-200 backdrop-blur-sm transition-opacity duration-200 ${isTooltipVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             <div className="text-center">
-              <h3 className="text-sm font-semibold text-ngodb-gray-600 mb-2">
+              <h3 className="text-sm font-semibold text-humdb-gray-600 mb-2">
                 {hoveredCountry ? hoveredCountry : (countryName || t('globalOverview.map.selectedCountry'))}
               </h3>
               {isLoadingData ? (
-                <div className="text-lg font-bold text-ngodb-navy animate-pulse">Loading...</div>
+                <div className="text-lg font-bold text-humdb-navy animate-pulse">Loading...</div>
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-ngodb-red mb-2">
+                  <div className="text-3xl font-bold text-humdb-red mb-2">
                     {hoveredCountry ? formatNumber(hoveredValue, showFullValues) : formatNumber(globalTotal, showFullValues)}
                   </div>
-                  <div className="text-xs text-ngodb-gray-500 break-words leading-relaxed">
+                  <div className="text-xs text-humdb-gray-500 break-words leading-relaxed">
                     {indicatorName || selectedIndicator.replace('-', ' ')}
                   </div>
                 </>
@@ -3356,7 +3356,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('choropleth')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'choropleth'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.choroplethMap')}
@@ -3369,7 +3369,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('bubble')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'bubble'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.bubbleMap')}
@@ -3384,7 +3384,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('barchart')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'barchart'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.barChart')}
@@ -3458,19 +3458,19 @@ const InteractiveWorldMap = ({
           <div className="mb-3">
             <div className="bg-white rounded-lg shadow-md p-3 border border-gray-200">
               <div className="text-center">
-                <h3 className="text-xs font-semibold text-ngodb-gray-600 mb-1">
+                <h3 className="text-xs font-semibold text-humdb-gray-600 mb-1">
                   {hoveredCountry ? hoveredCountry : (regionName || t('globalOverview.map.globalTotal'))}
                 </h3>
                 {isLoadingData ? (
-                  <div className="text-base font-bold text-ngodb-navy animate-pulse">
+                  <div className="text-base font-bold text-humdb-navy animate-pulse">
                     {t('common.loading')}
                   </div>
                 ) : (
                   <>
-                    <div className="text-xl font-bold text-ngodb-red mb-1">
+                    <div className="text-xl font-bold text-humdb-red mb-1">
                       {hoveredCountry ? formatNumber(hoveredValue, showFullValues) : formatNumber(globalTotal, showFullValues)}
                     </div>
-                    <div className="text-xs text-ngodb-gray-500 break-words leading-relaxed">
+                    <div className="text-xs text-humdb-gray-500 break-words leading-relaxed">
                       {indicatorName || selectedIndicator.replace('-', ' ')}
                     </div>
                   </>
@@ -3484,19 +3484,19 @@ const InteractiveWorldMap = ({
         {!isMobile && (
           <div className={`absolute left-6 top-8 z-30 bg-white rounded-xl shadow-xl p-6 w-[220px] border border-gray-200 backdrop-blur-sm transition-opacity duration-200 ${isTooltipVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             <div className="text-center">
-              <h3 className="text-sm font-semibold text-ngodb-gray-600 mb-2">
+              <h3 className="text-sm font-semibold text-humdb-gray-600 mb-2">
                 {hoveredCountry ? hoveredCountry : (regionName || t('globalOverview.map.globalTotal'))}
               </h3>
               {isLoadingData ? (
-                <div className="text-lg font-bold text-ngodb-navy animate-pulse">
+                <div className="text-lg font-bold text-humdb-navy animate-pulse">
                   Loading...
                 </div>
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-ngodb-red mb-2">
+                  <div className="text-3xl font-bold text-humdb-red mb-2">
                     {hoveredCountry ? formatNumber(hoveredValue, showFullValues) : formatNumber(globalTotal, showFullValues)}
                   </div>
-                  <div className="text-xs text-ngodb-gray-500 break-words leading-relaxed">
+                  <div className="text-xs text-humdb-gray-500 break-words leading-relaxed">
                     {indicatorName || selectedIndicator.replace('-', ' ')}
                   </div>
                 </>
@@ -3517,7 +3517,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('choropleth')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'choropleth'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.choroplethMap')}
@@ -3530,7 +3530,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('bubble')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'bubble'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title="Bubble Map"
@@ -3545,7 +3545,7 @@ const InteractiveWorldMap = ({
                 onClick={() => onVisualizationTypeChange('barchart')}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                   visualizationType === 'barchart'
-                    ? 'bg-ngodb-red text-white'
+                    ? 'bg-humdb-red text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 title={t('globalOverview.map.barChart')}

@@ -27,8 +27,8 @@
 
   var REPORTABLE_CODES = [403, 502, 503];
   var ENDPOINT = '/api/v1/platform-error';
-  var WRAP_FLAG = '__ngodbPlatformErrorFetchWrapped';
-  var JQ_FLAG   = '__ngodbPlatformErrorJqBound';
+  var WRAP_FLAG = '__humdbPlatformErrorFetchWrapped';
+  var JQ_FLAG   = '__humdbPlatformErrorJqBound';
 
   var nativeFetch =
     typeof window !== 'undefined' && typeof window.fetch === 'function'

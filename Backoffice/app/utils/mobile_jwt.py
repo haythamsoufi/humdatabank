@@ -50,8 +50,8 @@ def is_refresh_jti_used(jti: str) -> bool:
         return jti in _used_refresh_jtis
 
 
-MOBILE_TOKEN_AUDIENCE = "ngo-databank-mobile"
-MOBILE_TOKEN_ISSUER = "ngo-databank-backoffice"
+MOBILE_TOKEN_AUDIENCE = "hum-databank-mobile"
+MOBILE_TOKEN_ISSUER = "hum-databank-backoffice"
 MOBILE_TOKEN_ALGORITHM = "HS256"
 MOBILE_TOKEN_VERSION = 1
 

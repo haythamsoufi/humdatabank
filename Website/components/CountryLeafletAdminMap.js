@@ -292,9 +292,9 @@ export default function CountryLeafletAdminMap({
             }
             const v = matched ? matched.value : Number(value || 0);
             const safeV = Number.isFinite(v) ? v : 0;
-            p.__ngodbValue = safeV;
-            p.__ngodbIntensity = maxVal > 0 ? Math.min(safeV / maxVal, 1) : 0;
-            if (matched?.name) p.__ngodbName = matched.name;
+            p.__humdbValue = safeV;
+            p.__humdbIntensity = maxVal > 0 ? Math.min(safeV / maxVal, 1) : 0;
+            if (matched?.name) p.__humdbName = matched.name;
             if (matched) anyMatched = true;
           }
           return { fc, anyMatched };
@@ -313,7 +313,7 @@ export default function CountryLeafletAdminMap({
           const layer = L.geoJSON(fc, {
             style: (feature) => {
               const p = feature?.properties || {};
-              const v = Number(p.__ngodbValue || 0);
+              const v = Number(p.__humdbValue || 0);
               return {
                 color: '#d1d5db',
                 weight: 1,
@@ -327,7 +327,7 @@ export default function CountryLeafletAdminMap({
               layer.on('mouseover', () => {
                 const props = feature?.properties || {};
                 const name = getAdminNameFromProps(props) || iso3;
-                const v = Number(props.__ngodbValue != null ? props.__ngodbValue : (value || 0));
+                const v = Number(props.__humdbValue != null ? props.__humdbValue : (value || 0));
                 try {
                   layer.setStyle({
                     fillOpacity: 0.95,
@@ -341,7 +341,7 @@ export default function CountryLeafletAdminMap({
               layer.on('mouseout', () => {
                 try {
                   const p = feature?.properties || {};
-                  const v = Number(p.__ngodbValue || 0);
+                  const v = Number(p.__humdbValue || 0);
                   const viz = String(visualizationType || 'choropleth').toLowerCase();
                   const isBubble = viz === 'bubble';
                   layer.setStyle({
@@ -485,7 +485,7 @@ export default function CountryLeafletAdminMap({
               const f = featLayer?.feature;
               if (!f) return;
               const p = f.properties || {};
-              const v = Number(p.__ngodbValue || 0);
+              const v = Number(p.__humdbValue || 0);
               if (!v || v <= 0) return;
               let center = null;
               try {
@@ -597,7 +597,7 @@ export default function CountryLeafletAdminMap({
   if (!iso3) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-50">
-        <div className="text-sm text-ngodb-gray-600">{t('common.loading')}</div>
+        <div className="text-sm text-humdb-gray-600">{t('common.loading')}</div>
       </div>
     );
   }
@@ -608,8 +608,8 @@ export default function CountryLeafletAdminMap({
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm">
           <div className="max-w-md w-full mx-6 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
-            <div className="text-sm font-semibold text-ngodb-gray-800 mb-1">Leaflet fallback failed</div>
-            <div className="text-xs text-ngodb-gray-600">{String(error)}</div>
+            <div className="text-sm font-semibold text-humdb-gray-800 mb-1">Leaflet fallback failed</div>
+            <div className="text-xs text-humdb-gray-600">{String(error)}</div>
           </div>
         </div>
       )}

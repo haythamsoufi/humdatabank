@@ -235,22 +235,22 @@ export default function Navbar() {
   const renderNavigationItems = (isSecondaryBar = false) => {
     // Determine text colors based on whether secondary bar is over white background
     const textColorClass = isSecondaryBar && isOverWhiteBackground
-      ? 'text-ngodb-white' // White text when over white background (navy bar)
-      : 'text-ngodb-gray-300'; // Light gray text when over hero section (transparent bar)
+      ? 'text-humdb-white' // White text when over white background (navy bar)
+      : 'text-humdb-gray-300'; // Light gray text when over hero section (transparent bar)
 
     const hoverBgClass = isSecondaryBar && isOverWhiteBackground
-      ? 'hover:bg-ngodb-navy-dark'
-      : 'hover:bg-ngodb-gray-700';
+      ? 'hover:bg-humdb-navy-dark'
+      : 'hover:bg-humdb-gray-700';
 
     const hoverTextClass = isSecondaryBar && isOverWhiteBackground
-      ? 'hover:text-ngodb-white'
-      : 'hover:text-ngodb-white';
+      ? 'hover:text-humdb-white'
+      : 'hover:text-humdb-white';
 
     return (
     <>
       {/* Home */}
       {router.pathname === '/' ? (
-        <span className="px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium bg-ngodb-red text-white cursor-default">
+        <span className="px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium bg-humdb-red text-white cursor-default">
           <TranslationSafe fallback="Global Overview">
             {t('navigation.home')}
           </TranslationSafe>
@@ -281,7 +281,7 @@ export default function Navbar() {
           className={`px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors duration-150 ease-in-out flex items-center space-x-1
             ${
               isCountriesActive
-                ? 'bg-ngodb-red text-white' // Active link style
+                ? 'bg-humdb-red text-white' // Active link style
                 : `${textColorClass} ${hoverBgClass} ${hoverTextClass}`
             }`}
         >
@@ -360,7 +360,7 @@ export default function Navbar() {
           className={`px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors duration-150 ease-in-out flex items-center space-x-1
             ${
               isAnalysisActive
-                ? 'bg-ngodb-red text-white' // Active link style
+                ? 'bg-humdb-red text-white' // Active link style
                 : `${textColorClass} ${hoverBgClass} ${hoverTextClass}`
             }`}
         >
@@ -381,14 +381,14 @@ export default function Navbar() {
 
         {/* Dropdown Menu */}
         {analysisDropdownOpen && (
-          <div className="absolute top-full left-0 mt-1 w-48 bg-ngodb-navy border border-ngodb-gray-700 rounded-md shadow-lg z-50" data-analysis-dropdown>
+          <div className="absolute top-full left-0 mt-1 w-48 bg-humdb-navy border border-humdb-gray-700 rounded-md shadow-lg z-50" data-analysis-dropdown>
             <div className="py-1">
               {analysisItems.map((item) => {
                 const isItemActive = router.pathname === item.href || (item.href !== '/' && router.pathname.startsWith(item.href));
                 return isItemActive ? (
                   <span
                     key={item.label}
-                    className="block px-4 py-2 text-sm bg-ngodb-red text-white cursor-default"
+                    className="block px-4 py-2 text-sm bg-humdb-red text-white cursor-default"
                   >
                     <TranslationSafe fallback={item.label.replace('navigation.', '').replace(/([A-Z])/g, ' $1').trim()}>
                       {t(item.label)}
@@ -398,7 +398,7 @@ export default function Navbar() {
                   <Link
                     key={item.label}
                     href={item.href}
-                    className="block px-4 py-2 text-sm transition-colors duration-150 ease-in-out text-ngodb-gray-300 hover:bg-ngodb-gray-700 hover:text-ngodb-white"
+                    className="block px-4 py-2 text-sm transition-colors duration-150 ease-in-out text-humdb-gray-300 hover:bg-humdb-gray-700 hover:text-humdb-white"
                     onClick={() => setAnalysisDropdownOpen(false)}
                   >
                     <TranslationSafe fallback={item.label.replace('navigation.', '').replace(/([A-Z])/g, ' $1').trim()}>
@@ -414,7 +414,7 @@ export default function Navbar() {
 
       {/* Indicator Bank */}
       {router.pathname === '/indicator-bank' || router.pathname.startsWith('/indicator-bank') ? (
-        <span className="px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium bg-ngodb-red text-white cursor-default">
+        <span className="px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium bg-humdb-red text-white cursor-default">
           <TranslationSafe fallback="Indicator Bank">
             {t('navigation.indicatorBank')}
           </TranslationSafe>
@@ -432,7 +432,7 @@ export default function Navbar() {
 
       {/* Resources */}
       {router.pathname === '/resources' || router.pathname.startsWith('/resources') ? (
-        <span className="px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium bg-ngodb-red text-white cursor-default">
+        <span className="px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium bg-humdb-red text-white cursor-default">
           <TranslationSafe fallback="Resources">
             {t('navigation.publications')}
           </TranslationSafe>
@@ -452,7 +452,7 @@ export default function Navbar() {
       {!isSecondaryBar && (
         <a
           href={backendLoginUrl}
-          className="px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium bg-ngodb-gray-600 text-ngodb-white hover:bg-ngodb-gray-500 transition-colors duration-150 ease-in-out border border-ngodb-gray-500 hover:border-ngodb-gray-400"
+          className="px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium bg-humdb-gray-600 text-humdb-white hover:bg-humdb-gray-500 transition-colors duration-150 ease-in-out border border-humdb-gray-500 hover:border-humdb-gray-400"
         >
           <TranslationSafe fallback="Login">
             {t('navigation.login')}
@@ -464,11 +464,11 @@ export default function Navbar() {
   };
 
   return (
-    <header className="text-ngodb-white shadow-lg sticky top-0 z-[9999]"> {/* Default text color for header is white */}
+    <header className="text-humdb-white shadow-lg sticky top-0 z-[9999]"> {/* Default text color for header is white */}
       <DemoBanner />
       <div className="w-full"> {/* Reduced padding on small screens */}
         {/* Primary Bar - Logo, Title, Language Switcher, Login, Mobile Menu */}
-        <div className="flex items-center justify-between h-20 bg-ngodb-navy px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20 bg-humdb-navy px-4 sm:px-6 lg:px-8">
           {/* Logo and Site Title - Allow wrapping and reduce gap */}
           <div className="flex-shrink-0 min-w-0 flex-1"> {/* Allow flex-1 to take available space */}
             <Link href="/" className="flex items-center space-x-2 rtl:space-x-reverse"> {/* Reduced space-x from 3 to 2 */}
@@ -477,8 +477,8 @@ export default function Navbar() {
                 className="block md:hidden lg:block"
                 size="default"
               />
-              <span className="self-center text-sm sm:text-lg lg:text-xl font-semibold text-ngodb-white break-words"> {/* Allow text wrapping and responsive sizing */}
-                <TranslationSafe fallback="NGO Databank">
+              <span className="self-center text-sm sm:text-lg lg:text-xl font-semibold text-humdb-white break-words"> {/* Allow text wrapping and responsive sizing */}
+                <TranslationSafe fallback="Humanitarian Databank">
                   {siteTitle}
                 </TranslationSafe>
               </span>
@@ -499,7 +499,7 @@ export default function Navbar() {
             <div className="flex items-center flex-shrink-0 md:hidden">
               <button
                 type="button"
-                className="text-ngodb-gray-300 hover:text-ngodb-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ngodb-white p-1"
+                className="text-humdb-gray-300 hover:text-humdb-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-humdb-white p-1"
                 aria-controls="mobile-menu"
                 aria-expanded={mobileMenuOpen}
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)} // Toggle state
@@ -522,7 +522,7 @@ export default function Navbar() {
           ref={secondaryBarRef}
           className={`hidden lg:flex xl:hidden items-center justify-center space-x-3 lg:space-x-6 py-3 px-4 sm:px-6 lg:px-8 border-t relative z-50 transition-all duration-300 backdrop-blur-xl ${
             isOverWhiteBackground
-              ? 'border-ngodb-gray-300'
+              ? 'border-humdb-gray-300'
               : 'border-white/10'
           }`}
           style={{
@@ -536,11 +536,11 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Menu */}
-      <div className={`${mobileMenuOpen ? 'block' : 'hidden'} md:hidden absolute top-full left-0 w-full bg-ngodb-navy shadow-lg`} id="mobile-menu">
+      <div className={`${mobileMenuOpen ? 'block' : 'hidden'} md:hidden absolute top-full left-0 w-full bg-humdb-navy shadow-lg`} id="mobile-menu">
         <div className="px-2 pt-2 pb-3 sm:px-3 flex flex-wrap gap-2">
           {/* Home */}
           {router.pathname === '/' ? (
-            <span className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-ngodb-red text-white cursor-default">
+            <span className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-humdb-red text-white cursor-default">
               <TranslationSafe fallback="Global Overview">
                 {t('navigation.home')}
               </TranslationSafe>
@@ -549,7 +549,7 @@ export default function Navbar() {
             <Link
               href="/"
               onClick={() => setMobileMenuOpen(false)} // Close menu on click
-              className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-ngodb-gray-300 hover:bg-ngodb-gray-700 hover:text-ngodb-white"
+              className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-humdb-gray-300 hover:bg-humdb-gray-700 hover:text-humdb-white"
             >
               <TranslationSafe fallback="Global Overview">
                 {t('navigation.home')}
@@ -572,8 +572,8 @@ export default function Navbar() {
               className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium w-full justify-between
                 ${
                   isCountriesActive
-                    ? 'bg-ngodb-red text-white'
-                    : 'text-ngodb-gray-300 hover:bg-ngodb-gray-700 hover:text-ngodb-white'
+                    ? 'bg-humdb-red text-white'
+                    : 'text-humdb-gray-300 hover:bg-humdb-gray-700 hover:text-humdb-white'
                 }`}
             >
               <span>
@@ -629,8 +629,8 @@ export default function Navbar() {
           </div>
 
           {/* Analysis Section in Mobile Menu */}
-          <div className="border-t border-ngodb-gray-700 pt-2 mt-2 flex flex-wrap gap-2 items-start">
-            <div className="basis-full px-1 py-1 text-xs font-medium text-ngodb-gray-400">
+          <div className="border-t border-humdb-gray-700 pt-2 mt-2 flex flex-wrap gap-2 items-start">
+            <div className="basis-full px-1 py-1 text-xs font-medium text-humdb-gray-400">
               <TranslationSafe fallback="Analysis">
                 {t('navigation.analysis')}
               </TranslationSafe>
@@ -640,7 +640,7 @@ export default function Navbar() {
               return isItemActive ? (
                 <span
                   key={item.label}
-                  className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-ngodb-red text-white cursor-default"
+                  className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-humdb-red text-white cursor-default"
                 >
                   <TranslationSafe fallback={item.label.replace('navigation.', '').replace(/([A-Z])/g, ' $1').trim()}>
                     {t(item.label)}
@@ -651,7 +651,7 @@ export default function Navbar() {
                   key={item.label}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)} // Close menu on click
-                  className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-ngodb-gray-300 hover:bg-ngodb-gray-700 hover:text-ngodb-white"
+                  className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-humdb-gray-300 hover:bg-humdb-gray-700 hover:text-humdb-white"
                 >
                   <TranslationSafe fallback={item.label.replace('navigation.', '').replace(/([A-Z])/g, ' $1').trim()}>
                     {t(item.label)}
@@ -663,7 +663,7 @@ export default function Navbar() {
 
           {/* Indicator Bank */}
           {router.pathname === '/indicator-bank' || router.pathname.startsWith('/indicator-bank') ? (
-            <span className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-ngodb-red text-white cursor-default">
+            <span className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-humdb-red text-white cursor-default">
               <TranslationSafe fallback="Indicator Bank">
                 {t('navigation.indicatorBank')}
               </TranslationSafe>
@@ -672,7 +672,7 @@ export default function Navbar() {
             <Link
               href="/indicator-bank"
               onClick={() => setMobileMenuOpen(false)} // Close menu on click
-              className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-ngodb-gray-300 hover:bg-ngodb-gray-700 hover:text-ngodb-white"
+              className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-humdb-gray-300 hover:bg-humdb-gray-700 hover:text-humdb-white"
             >
               <TranslationSafe fallback="Indicator Bank">
                 {t('navigation.indicatorBank')}
@@ -682,7 +682,7 @@ export default function Navbar() {
 
           {/* Resources */}
           {router.pathname === '/resources' || router.pathname.startsWith('/resources') ? (
-            <span className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-ngodb-red text-white cursor-default">
+            <span className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-humdb-red text-white cursor-default">
               <TranslationSafe fallback="Resources">
                 {t('navigation.publications')}
               </TranslationSafe>
@@ -691,7 +691,7 @@ export default function Navbar() {
             <Link
               href="/resources"
               onClick={() => setMobileMenuOpen(false)} // Close menu on click
-              className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-ngodb-gray-300 hover:bg-ngodb-gray-700 hover:text-ngodb-white"
+              className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-humdb-gray-300 hover:bg-humdb-gray-700 hover:text-humdb-white"
             >
               <TranslationSafe fallback="Resources">
                 {t('navigation.publications')}
@@ -703,7 +703,7 @@ export default function Navbar() {
           <a
             href={backendLoginUrl}
             onClick={() => setMobileMenuOpen(false)} // Close menu on click
-            className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-ngodb-gray-600 text-ngodb-white hover:bg-ngodb-gray-500 border border-ngodb-gray-500 hover:border-ngodb-gray-400 transition-colors duration-150 ease-in-out" // Updated styling to match desktop
+            className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-humdb-gray-600 text-humdb-white hover:bg-humdb-gray-500 border border-humdb-gray-500 hover:border-humdb-gray-400 transition-colors duration-150 ease-in-out" // Updated styling to match desktop
           >
             <TranslationSafe fallback="Login">
               {t('navigation.login')}

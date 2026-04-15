@@ -185,7 +185,7 @@ class Config:
     # Application version (shown in System Configuration page header); see _resolve_app_version()
     APP_VERSION = _resolve_app_version()
     # GitHub repository for update checks (owner/repo)
-    GITHUB_REPO = os.environ.get("GITHUB_REPO", "haythamsoufi/ngodatabank")
+    GITHUB_REPO = os.environ.get("GITHUB_REPO", "haythamsoufi/humdatabank")
     # Optional GitHub personal access token for private repos (fine-grained token with Contents:read)
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
@@ -741,7 +741,7 @@ class Config:
 
     # Optional OpenTelemetry tracing for AI (agent, chat, embeddings). No-op if opentelemetry not installed.
     AI_OPENTELEMETRY_ENABLED = _parse_bool(os.environ.get('AI_OPENTELEMETRY_ENABLED'), default=False)
-    OTEL_SERVICE_NAME = os.environ.get('OTEL_SERVICE_NAME', 'ngo-databank-backoffice-ai')
+    OTEL_SERVICE_NAME = os.environ.get('OTEL_SERVICE_NAME', 'hum-databank-backoffice-ai')
 
     # Tool Configuration
     AI_TOOL_CACHE_ENABLED = _parse_bool(os.environ.get('AI_TOOL_CACHE_ENABLED'), default=True)

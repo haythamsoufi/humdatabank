@@ -1,6 +1,6 @@
 # Testing Guide
 
-This directory contains all tests for the NGO Databank Backoffice, consolidated into a unified pytest-based testing system.
+This directory contains all tests for the Humanitarian Databank Backoffice, consolidated into a unified pytest-based testing system.
 
 ## Test Structure
 

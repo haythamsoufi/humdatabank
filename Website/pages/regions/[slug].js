@@ -146,7 +146,7 @@ export default function RegionOverview({ regionName: initialRegionName, initialC
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ngodb-red"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-humdb-red"></div>
             <span className="ml-2 text-gray-600">{t('common.loading')}</span>
           </div>
         </div>
@@ -273,7 +273,7 @@ export default function RegionOverview({ regionName: initialRegionName, initialC
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <div className="flex-shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-ngodb-red flex items-center justify-center">
+                          <div className="h-10 w-10 rounded-full bg-humdb-red flex items-center justify-center">
                             <span className="text-white font-semibold text-sm">
                               {country.iso3 || country.name?.charAt(0)}
                             </span>

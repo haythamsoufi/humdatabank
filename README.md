@@ -1,4 +1,4 @@
-## NGO Databank ✨
+## Humanitarian Databank ✨
 
 A modern, multilingual, full‑stack ecosystem for humanitarian data management, analytics, and public reporting.
 
@@ -56,7 +56,7 @@ https://website-databank.fly.dev/
 ### Monorepo structure
 
 ```text
-NGO Databank/
+Humanitarian Databank/
 ├─ Backoffice/
 │  ├─ docs/                 # Documentation (API, features, setup, migration, translation, indicators)
 │  ├─ config/               # Configuration files and setup scripts
@@ -284,7 +284,7 @@ The fastest way to get started is using Docker Compose:
 ```bash
 # 1. Clone the repository
 git clone <repository-url>
-cd "NGO Databank"
+cd "Humanitarian Databank"
 
 # 2. Start all services with automatic database initialization
 docker-compose up -d
@@ -331,9 +331,9 @@ cp env.quickstart.example .env
 
 # Database setup (REQUIRED)
 # Make sure PostgreSQL is running and create the database:
-# psql -U postgres -c "CREATE DATABASE ngo_databank;"
+# psql -U postgres -c "CREATE DATABASE hum_databank;"
 # psql -U postgres -c "CREATE USER app WITH PASSWORD 'app';"
-# psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE ngo_databank TO app;"
+# psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE hum_databank TO app;"
 
 # Run database migrations
 # Windows: $env:FLASK_APP = "run.py"
@@ -352,9 +352,9 @@ python run.py
 After starting the server, open http://127.0.0.1:5000 and use the quick-login buttons to sign in as System Manager, Admin, or Focal Point (no typing required).
 
 Default test credentials (set in `.env` via `env.quickstart.example`):
-- **System Manager**: `test_sys@ngodatabank.org` / `test123`
-- **Admin**: `test_admin@ngodatabank.org` / `test123`
-- **Focal Point**: `test_focal@ngodatabank.org` / `test123`
+- **System Manager**: `test_sys@humdatabank.org` / `test123`
+- **Admin**: `test_admin@humdatabank.org` / `test123`
+- **Focal Point**: `test_focal@humdatabank.org` / `test123`
 
 Helpful npm scripts in `Backoffice/package.json` (for CSS):
 
@@ -470,7 +470,7 @@ The easiest way to get started is using Docker Compose, which sets up the comple
 
 ```bash
 # Clone and navigate to the project
-cd "NGO Databank"
+cd "Humanitarian Databank"
 
 # Start all services (database, migrations, backoffice, translation service)
 docker-compose up -d
@@ -487,13 +487,13 @@ docker-compose build --no-cache backoffice
 
 ### What Docker Compose Sets Up
 
-Default Postgres database and container names are generic (`ngo_databank`, `ngo-databank-postgres`). Override `POSTGRES_DB` in compose or your `.env` if you must keep a legacy database name (e.g. after an existing volume migration).
+Default Postgres database and container names are generic (`hum_databank`, `hum-databank-postgres`). Override `POSTGRES_DB` in compose or your `.env` if you must keep a legacy database name (e.g. after an existing volume migration).
 
 The `docker-compose.yml` includes:
 
-1. **PostgreSQL Database** (`ngo-databank-postgres`)
+1. **PostgreSQL Database** (`hum-databank-postgres`)
    - Port: 5432
-   - Database: `ngo_databank` (override with `POSTGRES_DB`)
+   - Database: `hum_databank` (override with `POSTGRES_DB`)
    - User: `app` / Password: `app`
    - Persistent data storage
 
@@ -521,9 +521,9 @@ docker-compose logs backoffice
 On first startup, the ecosystem automatically creates:
 
 - **Test Country**: "Testland" (TST) in Europe region
-- **System Manager User**: `test_sys@ngodatabank.org` (password: `test123`)
-- **Admin User**: `test_admin@ngodatabank.org` (password: `test123`)
-- **Focal Point User**: `test_focal@ngodatabank.org` (password: `test123`)
+- **System Manager User**: `test_sys@humdatabank.org` (password: `test123`)
+- **Admin User**: `test_admin@humdatabank.org` (password: `test123`)
+- **Focal Point User**: `test_focal@humdatabank.org` (password: `test123`)
 
 Quick-login buttons appear on the login page in development mode when `TEST_ADMIN_PASSWORD`, `TEST_FOCAL_PASSWORD`, and `TEST_SYS_MANAGER_PASSWORD` are set (Docker Compose sets these to `test123` by default).
 
@@ -537,7 +537,7 @@ Create a `.env` file in the Backoffice directory to customize:
 # Database
 POSTGRES_USER=app
 POSTGRES_PASSWORD=app
-POSTGRES_DB=ngo_databank
+POSTGRES_DB=hum_databank
 
 # Flask
 FLASK_CONFIG=production
@@ -575,7 +575,7 @@ docker-compose exec backoffice flask db upgrade
 docker-compose exec backoffice flask db current
 
 # Access database directly
-docker-compose exec db psql -U app -d ngo_databank
+docker-compose exec db psql -U app -d hum_databank
 ```
 
 ## API overview
@@ -590,7 +590,7 @@ Base URL: `http://localhost:5000` (Docker) or `http://127.0.0.1:5000` (Manual se
 
 ## Mobile App (Flutter)
 
-The NGO Databank mobile app provides native iOS and Android access to the ecosystem with comprehensive offline support, real-time notifications, and seamless integration with the backend.
+The Humanitarian Databank mobile app provides native iOS and Android access to the ecosystem with comprehensive offline support, real-time notifications, and seamless integration with the backend.
 
 ### Key Features
 
@@ -693,9 +693,9 @@ flutter run --dart-define=PRODUCTION=true      # Production (fly.dev)
 ```
 
 **Test Credentials:**
-- System Manager: `test_sys@ngodatabank.org` / `test123`
-- Admin: `test_admin@ngodatabank.org` / `test123`
-- Focal Point: `test_focal@ngodatabank.org` / `test123`
+- System Manager: `test_sys@humdatabank.org` / `test123`
+- Admin: `test_admin@humdatabank.org` / `test123`
+- Focal Point: `test_focal@humdatabank.org` / `test123`
 
 For detailed setup instructions, architecture documentation, and troubleshooting, see [`MobileApp/README.md`](MobileApp/README.md).
 

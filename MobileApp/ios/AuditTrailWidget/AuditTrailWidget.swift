@@ -3,7 +3,7 @@ import UIKit
 import WidgetKit
 
 // Must match Flutter [audit_trail_home_widget_sync.dart] and App Group entitlements.
-private let kAppGroupId = "group.com.ngo.databank"
+private let kAppGroupId = "group.com.hum.databank"
 private let kDataKey = "audit_trail_json"
 
 struct AuditLine: Codable {
@@ -144,6 +144,6 @@ struct AuditTrailEntryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(URL(string: "ngodatabank://"))
+        .widgetURL(URL(string: "humdatabank://"))
     }
 }

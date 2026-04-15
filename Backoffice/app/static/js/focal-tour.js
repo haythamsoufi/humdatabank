@@ -200,7 +200,7 @@
 				'.introjs-fixedPosition',
 				'.introjs-highlighted',
 				'[data-intro-group]',
-				'.ngodb-intro-highlight'
+				'.humdb-intro-highlight'
 			];
 
 			let highlightedElement = null;
@@ -340,7 +340,7 @@
 	function startSiteTour(force) {
 		const isFocalPoint = document.body.classList.contains('focal-point');
 		const role = isFocalPoint ? 'focal_point' : 'admin';
-		const tourKey = `ngodb_tour_status_${role}`;
+		const tourKey = `humdb_tour_status_${role}`;
 		const isRTL = document.documentElement.getAttribute('dir') === 'rtl';
 		const status = localStorage.getItem(tourKey);
 		const i18n = window.TOUR_I18N || {};
@@ -407,8 +407,8 @@
 					doneLabel: i18n.done || 'Done',
 					rtl: isRTL,
 					overlayOpacity: 0.4,
-					tooltipClass: 'ngodb-intro',
-					highlightClass: 'ngodb-intro-highlight',
+					tooltipClass: 'humdb-intro',
+					highlightClass: 'humdb-intro-highlight',
 					scrollTo: 'tooltip',
 					scrollToElement: false, // Disable auto-scrolling to element
 					showButtons: true,
@@ -497,7 +497,7 @@
 				if (typeof instance.onafterchange === 'function') {
 					instance.onafterchange(function(targetElement) {
 						// Add dynamic adjustment class to tooltip
-						const tooltip = document.querySelector('.ngodb-intro');
+						const tooltip = document.querySelector('.humdb-intro');
 						if (tooltip) {
 							tooltip.classList.add('tour-adjusting');
 						}
@@ -513,7 +513,7 @@
 							setTimeout(openLanguageDropdownForTour, 50);
 							// Position language step tooltip to the left with gap
 							setTimeout(() => {
-								const tooltip = document.querySelector('.introjs-tooltip.ngodb-intro');
+								const tooltip = document.querySelector('.introjs-tooltip.humdb-intro');
 								if (tooltip) {
 									tooltip.classList.add('language-step-tooltip');
 									tooltip.style.position = 'fixed';
@@ -538,7 +538,7 @@
 
 							// Position tooltip with multiple attempts to ensure it works
 							setTimeout(() => {
-								const tooltip = document.querySelector('.introjs-tooltip.ngodb-intro');
+								const tooltip = document.querySelector('.introjs-tooltip.humdb-intro');
 								if (tooltip) {
 									tooltip.classList.add('chatbot-step-tooltip');
 									tooltip.style.cssText = 'position: fixed !important; right: 6rem !important; bottom: 2rem !important; left: auto !important; top: auto !important; transform: none !important; margin: 0 !important; z-index: 2147483647 !important;';
@@ -555,7 +555,7 @@
 
 						// Remove step-specific positioning for other steps
 						if (!isCurrentStep(languageStepIndex, targetElement) && !isCurrentStep(chatbotStepIndex, targetElement)) {
-							const tooltip = document.querySelector('.introjs-tooltip.ngodb-intro');
+							const tooltip = document.querySelector('.introjs-tooltip.humdb-intro');
 							if (tooltip) {
 								if (tooltip.classList.contains('language-step-tooltip')) {
 									tooltip.classList.remove('language-step-tooltip');
@@ -783,7 +783,7 @@
 		// Pre-tour modal logic
 		const isFocalPoint = document.body.classList.contains('focal-point');
 		const role = isFocalPoint ? 'focal_point' : 'admin';
-		const tourKey = `ngodb_tour_status_${role}`;
+		const tourKey = `humdb_tour_status_${role}`;
 		const status = localStorage.getItem(tourKey);
 		const modal = document.getElementById('tourPreModal');
 		const modalScrim = document.getElementById('tourPreModalScrim');

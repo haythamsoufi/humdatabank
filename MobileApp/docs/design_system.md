@@ -2,7 +2,7 @@
 
 ## Overview
 
-The NGO Databank mobile app uses a layered design system:
+The Humanitarian Databank mobile app uses a layered design system:
 
 1. **Design Tokens** — Colors, spacing, typography defined in `lib/theme/`
 2. **Core Widgets** — Reusable components in `lib/widgets/`

@@ -28,11 +28,11 @@ def test_email_sending():
     recipient = os.environ.get("TEST_EMAIL_RECIPIENT", "test@example.com")
 
     # Test email content
-    subject = "Test Email - NGO Databank"
+    subject = "Test Email - Humanitarian Databank"
     html_content = """<html>
 <body>
 <h2>Email Test</h2>
-<p>This is a test email from the NGO Databank backend system.</p>
+<p>This is a test email from the Humanitarian Databank backend system.</p>
 <p>If you received this email, the email sending functionality is working correctly.</p>
 <hr>
 <p><small>This is an automated test message.</small></p>
@@ -40,7 +40,7 @@ def test_email_sending():
 </html>"""
     text_content = """Email Test
 
-This is a test email from the NGO Databank backend system.
+This is a test email from the Humanitarian Databank backend system.
 If you received this email, the email sending functionality is working correctly.
 
 This is an automated test message."""

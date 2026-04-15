@@ -19,9 +19,9 @@ import MultiChart from '../../components/MultiChart';
 
 // Enhanced loading skeleton with modern animations
 const CountryProfileSkeleton = () => (
-  <div className="bg-gradient-to-br from-ngodb-gray-50 to-ngodb-gray-100 min-h-screen">
+  <div className="bg-gradient-to-br from-humdb-gray-50 to-humdb-gray-100 min-h-screen">
     {/* Hero Section Skeleton */}
-    <div className="relative h-96 bg-gradient-to-r from-ngodb-navy to-ngodb-red animate-pulse">
+    <div className="relative h-96 bg-gradient-to-r from-humdb-navy to-humdb-red animate-pulse">
       <div className="absolute inset-0 bg-black bg-opacity-30"></div>
       <div className="relative z-10 flex items-center justify-center h-full px-6 sm:px-8 lg:px-12">
         <div className="text-center">
@@ -34,13 +34,13 @@ const CountryProfileSkeleton = () => (
     <div className="w-full px-6 sm:px-8 lg:px-12 py-12">
       {/* Top Indicators Skeleton */}
       <section className="mb-16">
-        <div className="h-10 bg-ngodb-gray-200 rounded mb-8 w-64"></div>
+        <div className="h-10 bg-humdb-gray-200 rounded mb-8 w-64"></div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white p-8 rounded-xl shadow-lg border-l-4 border-ngodb-red animate-pulse">
-              <div className="h-6 bg-ngodb-gray-200 rounded mb-4 w-48"></div>
-              <div className="h-12 bg-ngodb-gray-200 rounded mb-4 w-32"></div>
-              <div className="h-4 bg-ngodb-gray-200 rounded w-24"></div>
+            <div key={i} className="bg-white p-8 rounded-xl shadow-lg border-l-4 border-humdb-red animate-pulse">
+              <div className="h-6 bg-humdb-gray-200 rounded mb-4 w-48"></div>
+              <div className="h-12 bg-humdb-gray-200 rounded mb-4 w-32"></div>
+              <div className="h-4 bg-humdb-gray-200 rounded w-24"></div>
             </div>
           ))}
         </div>
@@ -48,12 +48,12 @@ const CountryProfileSkeleton = () => (
 
       {/* All Indicators Skeleton */}
       <section className="mb-16">
-        <div className="h-10 bg-ngodb-gray-200 rounded mb-8 w-56"></div>
+        <div className="h-10 bg-humdb-gray-200 rounded mb-8 w-56"></div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="bg-white p-6 rounded-lg shadow-md animate-pulse">
-              <div className="h-5 bg-ngodb-gray-200 rounded mb-3 w-40"></div>
-              <div className="h-8 bg-ngodb-gray-200 rounded w-24"></div>
+              <div className="h-5 bg-humdb-gray-200 rounded mb-3 w-40"></div>
+              <div className="h-8 bg-humdb-gray-200 rounded w-24"></div>
             </div>
           ))}
         </div>
@@ -61,13 +61,13 @@ const CountryProfileSkeleton = () => (
 
       {/* Documents Skeleton */}
       <section className="mb-16">
-        <div className="h-10 bg-ngodb-gray-200 rounded mb-8 w-48"></div>
+        <div className="h-10 bg-humdb-gray-200 rounded mb-8 w-48"></div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="bg-white p-6 rounded-lg shadow-md animate-pulse">
-              <div className="h-6 bg-ngodb-gray-200 rounded mb-4 w-full"></div>
-              <div className="h-4 bg-ngodb-gray-200 rounded mb-2 w-3/4"></div>
-              <div className="h-4 bg-ngodb-gray-200 rounded w-1/2"></div>
+              <div className="h-6 bg-humdb-gray-200 rounded mb-4 w-full"></div>
+              <div className="h-4 bg-humdb-gray-200 rounded mb-2 w-3/4"></div>
+              <div className="h-4 bg-humdb-gray-200 rounded w-1/2"></div>
             </div>
           ))}
         </div>
@@ -219,8 +219,8 @@ const FloatingNav = ({ sections, activeSection, onSectionClick }) => {
                 onClick={() => onSectionClick(item.id)}
                 className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-medium transition-all duration-200 relative group/item ${
                   activeSection === item.id
-                    ? 'bg-ngodb-red text-white shadow-md'
-                    : 'text-white hover:bg-gray-700 hover:text-ngodb-red'
+                    ? 'bg-humdb-red text-white shadow-md'
+                    : 'text-white hover:bg-gray-700 hover:text-humdb-red'
                 }`}
                 title={t(item.labelKey)}
               >
@@ -286,7 +286,7 @@ const HeroSection = ({ country, nationalSociety, coverImages = [], keyFigures, i
             ))
           ) : (
             // Show gradient fallback when no cover images
-            <div className="absolute inset-0 bg-gradient-to-br from-ngodb-navy via-ngodb-navy to-ngodb-red" />
+            <div className="absolute inset-0 bg-gradient-to-br from-humdb-navy via-humdb-navy to-humdb-red" />
           )}
         </div>
 
@@ -319,10 +319,10 @@ const HeroSection = ({ country, nationalSociety, coverImages = [], keyFigures, i
                       };
                       return (
                         <div key={key} className="text-center">
-                          <span className="text-sm text-ngodb-gray-200 block capitalize">
+                          <span className="text-sm text-humdb-gray-200 block capitalize">
                             {figure.name}
                           </span>
-                          <span className="text-2xl font-bold text-ngodb-red block">
+                          <span className="text-2xl font-bold text-humdb-red block">
                             {figure.value ? figure.value.toLocaleString() : 'N/A'}
                           </span>
                         </div>
@@ -337,7 +337,7 @@ const HeroSection = ({ country, nationalSociety, coverImages = [], keyFigures, i
                     const uniqueYears = [...new Set(years)];
                     return uniqueYears.length > 0 && (
                       <div className="text-center mt-1">
-                        <span className="text-xs text-ngodb-gray-300">
+                        <span className="text-xs text-humdb-gray-300">
                           ({uniqueYears.join(', ')})
                         </span>
                       </div>
@@ -354,7 +354,7 @@ const HeroSection = ({ country, nationalSociety, coverImages = [], keyFigures, i
               {country.name}
             </h1>
             {nationalSociety && (
-              <p className="text-xl sm:text-2xl lg:text-3xl text-ngodb-gray-200 mb-6 drop-shadow-md">
+              <p className="text-xl sm:text-2xl lg:text-3xl text-humdb-gray-200 mb-6 drop-shadow-md">
                 {nationalSociety}
               </p>
             )}
@@ -370,15 +370,15 @@ const HeroSection = ({ country, nationalSociety, coverImages = [], keyFigures, i
       </div>
 
       {/* Key Figures Bar - Mobile (Below cover) */}
-      <div className="lg:hidden bg-ngodb-navy border-b border-ngodb-navy shadow-sm text-white">
+      <div className="lg:hidden bg-humdb-navy border-b border-humdb-navy shadow-sm text-white">
         <div className="px-4 py-4">
           {isLoadingKeyFigures ? (
             <div className="grid grid-cols-4 gap-2">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="animate-pulse text-center">
-                  <div className="h-3 bg-ngodb-gray-200 rounded w-12 mx-auto mb-1"></div>
-                  <div className="h-4 bg-ngodb-gray-200 rounded w-8 mx-auto mb-1"></div>
-                  <div className="h-2 bg-ngodb-gray-200 rounded w-6 mx-auto"></div>
+                  <div className="h-3 bg-humdb-gray-200 rounded w-12 mx-auto mb-1"></div>
+                  <div className="h-4 bg-humdb-gray-200 rounded w-8 mx-auto mb-1"></div>
+                  <div className="h-2 bg-humdb-gray-200 rounded w-6 mx-auto"></div>
                 </div>
               ))}
             </div>
@@ -396,7 +396,7 @@ const HeroSection = ({ country, nationalSociety, coverImages = [], keyFigures, i
                       <span className="text-xs text-white/80 block capitalize leading-tight">
                         {figure.name}
                       </span>
-                      <span className="text-sm font-bold text-ngodb-red block leading-tight">
+                      <span className="text-sm font-bold text-humdb-red block leading-tight">
                         {figure.value ? figure.value.toLocaleString() : 'N/A'}
                       </span>
                     </div>
@@ -431,19 +431,19 @@ const TopSectorsSection = ({ sectors, t, isLoading }) => {
     return (
       <section className="mb-16">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-ngodb-navy mb-4">
+          <h2 className="text-3xl font-bold text-humdb-navy mb-4">
             {t('countryProfile.topSectors')}
           </h2>
-          <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
             {t('countryProfile.topSectorsDescription')}
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white p-8 rounded-xl shadow-lg border-l-4 border-ngodb-red animate-pulse">
-              <div className="h-6 bg-ngodb-gray-200 rounded mb-4 w-48"></div>
-              <div className="h-12 bg-ngodb-gray-200 rounded mb-4 w-32"></div>
-              <div className="h-4 bg-ngodb-gray-200 rounded w-24"></div>
+            <div key={i} className="bg-white p-8 rounded-xl shadow-lg border-l-4 border-humdb-red animate-pulse">
+              <div className="h-6 bg-humdb-gray-200 rounded mb-4 w-48"></div>
+              <div className="h-12 bg-humdb-gray-200 rounded mb-4 w-32"></div>
+              <div className="h-4 bg-humdb-gray-200 rounded w-24"></div>
             </div>
           ))}
         </div>
@@ -455,14 +455,14 @@ const TopSectorsSection = ({ sectors, t, isLoading }) => {
     return (
       <section className="mb-16">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-ngodb-navy mb-4">
+          <h2 className="text-3xl font-bold text-humdb-navy mb-4">
             {t('countryProfile.topSectors')}
           </h2>
-          <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
             {t('countryProfile.topSectorsDescription')}
           </p>
         </div>
-        <div className="text-center text-ngodb-gray-600 py-12">
+        <div className="text-center text-humdb-gray-600 py-12">
           <p>{t('countryProfile.noTopSectors')}</p>
         </div>
       </section>
@@ -472,10 +472,10 @@ const TopSectorsSection = ({ sectors, t, isLoading }) => {
   return (
     <section className="mb-16">
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-ngodb-navy mb-4">
+        <h2 className="text-3xl font-bold text-humdb-navy mb-4">
           {t('countryProfile.topSectors')}
         </h2>
-        <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+        <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
           {t('countryProfile.topSectorsDescription')}
         </p>
       </div>
@@ -484,33 +484,33 @@ const TopSectorsSection = ({ sectors, t, isLoading }) => {
         {sectors.slice(0, 3).map((sector, index) => (
           <div
             key={sector.name}
-            className="group bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-ngodb-red hover:scale-105"
+            className="group bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-humdb-red hover:scale-105"
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-ngodb-red text-white rounded-full flex items-center justify-center text-xl font-bold">
+                <div className="w-12 h-12 bg-humdb-red text-white rounded-full flex items-center justify-center text-xl font-bold">
                   {index + 1}
                 </div>
-                <h3 className="text-xl font-bold text-ngodb-navy group-hover:text-ngodb-red transition-colors">
+                <h3 className="text-xl font-bold text-humdb-navy group-hover:text-humdb-red transition-colors">
                   {sector.name}
                 </h3>
               </div>
             </div>
 
-            <div className="text-3xl font-bold text-ngodb-red mb-2">
+            <div className="text-3xl font-bold text-humdb-red mb-2">
               {sector.maxValue?.toLocaleString() || 'N/A'}
             </div>
 
-            <div className="text-sm text-ngodb-gray-500 mb-4">
+            <div className="text-sm text-humdb-gray-500 mb-4">
               {t('countryProfile.maxValue')}
             </div>
 
-            <div className="mt-4 pt-4 border-t border-ngodb-gray-200">
+            <div className="mt-4 pt-4 border-t border-humdb-gray-200">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-ngodb-gray-500">
+                <span className="text-humdb-gray-500">
                   {t('countryProfile.indicatorsCount')}: {sector.count}
                 </span>
-                <span className="text-ngodb-red font-medium">
+                <span className="text-humdb-red font-medium">
                   {t('countryProfile.topSector')}
                 </span>
               </div>
@@ -518,17 +518,17 @@ const TopSectorsSection = ({ sectors, t, isLoading }) => {
               {/* Show top indicators in this sector */}
               {sector.indicators && sector.indicators.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-xs text-ngodb-gray-500 mb-2">
+                  <p className="text-xs text-humdb-gray-500 mb-2">
                     {t('countryProfile.topIndicatorsInSector')}:
                   </p>
                   <div className="space-y-1">
                     {sector.indicators.slice(0, 2).map((indicator, idx) => (
-                      <div key={idx} className="text-xs text-ngodb-gray-600 truncate">
+                      <div key={idx} className="text-xs text-humdb-gray-600 truncate">
                         • {indicator.indicator_label}: {indicator.value?.toLocaleString() || 'N/A'}
                       </div>
                     ))}
                     {sector.indicators.length > 2 && (
-                      <div className="text-xs text-ngodb-gray-500">
+                      <div className="text-xs text-humdb-gray-500">
                         +{sector.indicators.length - 2} {t('countryProfile.more')}
                       </div>
                     )}
@@ -561,10 +561,10 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
   if (!allIndicators || allIndicators.length === 0) {
     return (
       <section className="mb-16">
-        <h2 className="text-3xl font-bold text-ngodb-navy mb-8 text-center">
+        <h2 className="text-3xl font-bold text-humdb-navy mb-8 text-center">
           {t('countryProfile.allIndicators')}
         </h2>
-        <div className="text-center text-ngodb-gray-600 py-12">
+        <div className="text-center text-humdb-gray-600 py-12">
           <p>{t('countryProfile.noIndicators')}</p>
         </div>
       </section>
@@ -574,10 +574,10 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
   return (
     <section className="mb-16">
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-ngodb-navy mb-4">
+        <h2 className="text-3xl font-bold text-humdb-navy mb-4">
           {t('countryProfile.allIndicators')}
         </h2>
-        <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+        <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
           {t('countryProfile.allIndicatorsDescription')}
         </p>
       </div>
@@ -591,9 +591,9 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
               placeholder={t('countryProfile.searchIndicators')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+              className="pl-10 pr-4 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
             />
-            <svg className="absolute left-3 top-2.5 w-4 h-4 text-ngodb-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-3 top-2.5 w-4 h-4 text-humdb-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
@@ -602,7 +602,7 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
             <select
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="px-4 py-2 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+              className="px-4 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
             >
               <option value="all">{t('countryProfile.allPeriods')}</option>
               {periods.map(period => (
@@ -612,7 +612,7 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
           )}
         </div>
 
-        <div className="text-sm text-ngodb-gray-600">
+        <div className="text-sm text-humdb-gray-600">
           {t('countryProfile.showing')} {filteredIndicators.length} {t('countryProfile.of')} {allIndicators.length} {t('countryProfile.indicatorsLabel')}
         </div>
       </div>
@@ -624,31 +624,31 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
           return filteredIndicators.map((indicator, index) => (
           <div
             key={`${indicator.indicator_label}-${index}`}
-            className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 border border-ngodb-gray-200"
+            className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 border border-humdb-gray-200"
           >
-            <h3 className="text-lg font-semibold text-ngodb-navy mb-2 line-clamp-2">
+            <h3 className="text-lg font-semibold text-humdb-navy mb-2 line-clamp-2">
               {indicator.indicator_label}
             </h3>
 
-            <div className="text-2xl font-bold text-ngodb-red mb-2">
+            <div className="text-2xl font-bold text-humdb-red mb-2">
               {indicator.value?.toLocaleString() || 'N/A'}
               {indicator.unit && (
-                <span className="text-sm text-ngodb-gray-500 ml-1">
+                <span className="text-sm text-humdb-gray-500 ml-1">
                   {indicator.unit}
                 </span>
               )}
             </div>
 
             {indicator.period && (
-              <p className="text-xs text-ngodb-gray-500 mb-3">
+              <p className="text-xs text-humdb-gray-500 mb-3">
                 {t('countryProfile.period')}: {indicator.period}
               </p>
             )}
 
             {/* Progress bar for visual appeal */}
-            <div className="w-full bg-ngodb-gray-200 rounded-full h-2 mb-2">
+            <div className="w-full bg-humdb-gray-200 rounded-full h-2 mb-2">
               <div
-                className="bg-gradient-to-r from-ngodb-red to-ngodb-navy h-2 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-humdb-red to-humdb-navy h-2 rounded-full transition-all duration-500"
                 style={{
                   width: `${Math.min(100, (indicator.value || 0) / maxValue * 100)}%`
                 }}
@@ -661,7 +661,7 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
 
       {filteredIndicators.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-ngodb-gray-600">{t('countryProfile.noIndicatorsFound')}</p>
+          <p className="text-humdb-gray-600">{t('countryProfile.noIndicatorsFound')}</p>
         </div>
       )}
     </section>
@@ -689,10 +689,10 @@ const DocumentsSection = ({ documents, t }) => {
   if (!documents || documents.length === 0) {
     return (
       <section className="mb-16">
-        <h2 className="text-3xl font-bold text-ngodb-navy mb-8 text-center">
+        <h2 className="text-3xl font-bold text-humdb-navy mb-8 text-center">
           {t('countryProfile.documents')}
         </h2>
-        <div className="text-center text-ngodb-gray-600 py-12">
+        <div className="text-center text-humdb-gray-600 py-12">
           <p>{t('countryProfile.noDocuments')}</p>
         </div>
       </section>
@@ -702,10 +702,10 @@ const DocumentsSection = ({ documents, t }) => {
   return (
     <section className="mb-16">
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-ngodb-navy mb-4">
+        <h2 className="text-3xl font-bold text-humdb-navy mb-4">
           {t('countryProfile.documents')}
         </h2>
-        <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+        <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
           {t('countryProfile.documentsDescription')}
         </p>
       </div>
@@ -719,8 +719,8 @@ const DocumentsSection = ({ documents, t }) => {
             onClick={() => setSelectedType('all')}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               selectedType === 'all'
-                ? 'bg-ngodb-red text-white'
-                : 'bg-ngodb-gray-200 text-ngodb-gray-700 hover:bg-ngodb-gray-300'
+                ? 'bg-humdb-red text-white'
+                : 'bg-humdb-gray-200 text-humdb-gray-700 hover:bg-humdb-gray-300'
             }`}
           >
             {t('countryProfile.allDocuments')}
@@ -731,8 +731,8 @@ const DocumentsSection = ({ documents, t }) => {
               onClick={() => setSelectedType(type)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 selectedType === type
-                  ? 'bg-ngodb-red text-white'
-                  : 'bg-ngodb-gray-200 text-ngodb-gray-700 hover:bg-ngodb-gray-300'
+                  ? 'bg-humdb-red text-white'
+                  : 'bg-humdb-gray-200 text-humdb-gray-700 hover:bg-humdb-gray-300'
               }`}
             >
               {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -744,14 +744,14 @@ const DocumentsSection = ({ documents, t }) => {
         {/* Period Filter */}
         {periods.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-ngodb-gray-700">
+            <label className="text-sm font-medium text-humdb-gray-700">
               {t('countryProfile.period')}:
             </label>
             <div className="relative">
               <select
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-3 py-2 pr-8 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent text-sm appearance-none bg-white w-full"
+                className="px-3 py-2 pr-8 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent text-sm appearance-none bg-white w-full"
               >
                 <option value="all">{t('countryProfile.allPeriods')}</option>
                 {periods.map(period => (
@@ -759,7 +759,7 @@ const DocumentsSection = ({ documents, t }) => {
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <svg className="w-4 h-4 text-ngodb-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-humdb-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
@@ -770,7 +770,7 @@ const DocumentsSection = ({ documents, t }) => {
 
       {/* Results count */}
       <div className="text-center mb-6">
-        <p className="text-sm text-ngodb-gray-600">
+        <p className="text-sm text-humdb-gray-600">
           {t('countryProfile.showing')} {filteredDocuments.length} {t('countryProfile.of')} {documents.length} {t('countryProfile.documents')}
         </p>
       </div>
@@ -799,7 +799,7 @@ const DocumentsSection = ({ documents, t }) => {
 
             {/* Document Type Badge */}
             <div className="absolute top-4 left-4 right-4 z-10">
-              <span className="px-3 py-1 bg-ngodb-red text-white text-xs font-medium rounded-full backdrop-blur-sm bg-opacity-90">
+              <span className="px-3 py-1 bg-humdb-red text-white text-xs font-medium rounded-full backdrop-blur-sm bg-opacity-90">
                 {document.document_type?.charAt(0).toUpperCase() + document.document_type?.slice(1) || 'Document'}
               </span>
             </div>
@@ -816,10 +816,10 @@ const DocumentsSection = ({ documents, t }) => {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-white line-clamp-2 group-hover:text-ngodb-red transition-colors drop-shadow-lg flex-1">
+                    <h3 className="text-lg font-bold text-white line-clamp-2 group-hover:text-humdb-red transition-colors drop-shadow-lg flex-1">
                       {document.filename}
                     </h3>
-                    <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center flex-shrink-0 group-hover/title:bg-ngodb-red transition-colors">
+                    <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center flex-shrink-0 group-hover/title:bg-humdb-red transition-colors">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
@@ -860,14 +860,14 @@ const DocumentsSection = ({ documents, t }) => {
             </div>
 
             {/* Hover overlay effect */}
-            <div className="absolute inset-0 bg-ngodb-red/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="absolute inset-0 bg-humdb-red/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </div>
         ))}
       </div>
 
       {filteredDocuments.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-ngodb-gray-600">{t('countryProfile.noDocumentsFound')}</p>
+          <p className="text-humdb-gray-600">{t('countryProfile.noDocumentsFound')}</p>
         </div>
       )}
     </section>
@@ -1353,22 +1353,22 @@ export default function CountryProfilePage({ profileData, documents, coverImages
   if (error || !profileData || !profileData.country_info) {
     console.error('[CountryProfilePage] Error state:', { error, hasProfileData: !!profileData, hasCountryInfo: !!profileData?.country_info });
     return (
-      <div className="min-h-screen bg-gradient-to-br from-ngodb-gray-50 to-ngodb-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-humdb-gray-50 to-humdb-gray-100 flex items-center justify-center">
         <div className="text-center px-6">
         <Head>
-          <title>{`${t('countryProfile.error.title')} - NGO Databank`}</title>
+          <title>{`${t('countryProfile.error.title')} - Humanitarian Databank`}</title>
         </Head>
           <div className="mb-8">
-            <svg className="w-24 h-24 text-ngodb-red mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-24 h-24 text-humdb-red mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-        <h1 className="text-3xl font-bold text-ngodb-red mb-6">{t('countryProfile.error.title')}</h1>
-          <p className="text-ngodb-gray-700 mb-8 text-lg">{error || t('countryProfile.error.loadFailed')}</p>
+        <h1 className="text-3xl font-bold text-humdb-red mb-6">{t('countryProfile.error.title')}</h1>
+          <p className="text-humdb-gray-700 mb-8 text-lg">{error || t('countryProfile.error.loadFailed')}</p>
         <div className="space-x-4">
             <Link
               href="/countries"
-              className="inline-flex items-center px-6 py-3 bg-ngodb-red text-white font-medium rounded-lg hover:bg-ngodb-red-dark transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-humdb-red text-white font-medium rounded-lg hover:bg-humdb-red-dark transition-colors"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -1395,7 +1395,7 @@ export default function CountryProfilePage({ profileData, documents, coverImages
   return (
     <>
       <Head>
-        <title>{`${country_info.name} - ${t('countryProfile.title')} - NGO Databank`}</title>
+        <title>{`${country_info.name} - ${t('countryProfile.title')} - Humanitarian Databank`}</title>
         <meta name="description" content={`Humanitarian data, visualizations, and impact in ${country_info.name}. Explore indicators and country context.`} />
         <meta name="keywords" content={`${country_info.name}, humanitarian data, indicators, ${country_info.national_society_name || ''}`} />
       </Head>
@@ -1412,7 +1412,7 @@ export default function CountryProfilePage({ profileData, documents, coverImages
         onSectionClick={handleSectionClick}
       />
 
-      <div className="bg-gradient-to-br from-ngodb-gray-50 to-ngodb-gray-100 min-h-screen">
+      <div className="bg-gradient-to-br from-humdb-gray-50 to-humdb-gray-100 min-h-screen">
         {/* Hero Section */}
         <HeroSection
           country={country_info}
@@ -1426,7 +1426,7 @@ export default function CountryProfilePage({ profileData, documents, coverImages
           {/* Overview - Combined At a Glance and National Society Strengths */}
           <section id="overview" className="mb-16">
               <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-3xl font-bold text-ngodb-navy mb-8 text-center">
+              <h2 className="text-3xl font-bold text-humdb-navy mb-8 text-center">
                 {t('countryProfile.sections.overview')}
                 </h2>
 
@@ -1443,16 +1443,16 @@ export default function CountryProfilePage({ profileData, documents, coverImages
           {/* Key Indicators Bar and Timeseries Chart */}
           <section id="indicators" className="mb-16">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-ngodb-navy mb-4">
+              <h2 className="text-3xl font-bold text-humdb-navy mb-4">
                 {t('countryProfile.keyIndicators')}
               </h2>
-              <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+              <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
                 {t('countryProfile.keyIndicatorsDescription')}
               </p>
             </div>
 
             {/* Key Indicators Selector */}
-            <div className="bg-ngodb-white shadow-lg border border-ngodb-gray-100 overflow-hidden">
+            <div className="bg-humdb-white shadow-lg border border-humdb-gray-100 overflow-hidden">
               <div className="flex h-16 overflow-x-auto md:overflow-visible space-x-2 md:space-x-0 px-2 md:px-0">
                 {Object.entries(keyIndicatorsMapping).map(([key, indicator]) => (
                   <button
@@ -1463,14 +1463,14 @@ export default function CountryProfilePage({ profileData, documents, coverImages
                     }}
                     className={`group relative md:flex-1 flex-shrink-0 px-3 font-semibold transition-all duration-300 md:border-r md:last:border-r-0 ${
                       selectedIndicator === key
-                        ? 'bg-ngodb-red text-white'
-                        : 'bg-ngodb-white text-ngodb-gray-700 hover:bg-ngodb-gray-50'
+                        ? 'bg-humdb-red text-white'
+                        : 'bg-humdb-white text-humdb-gray-700 hover:bg-humdb-gray-50'
                     }`}
                   >
                     <span className="text-sm">{indicator.name}</span>
                     {selectedIndicator === key && (
                       <motion.div
-                        className="absolute bottom-0 left-0 right-0 h-1 bg-ngodb-red"
+                        className="absolute bottom-0 left-0 right-0 h-1 bg-humdb-red"
                         initial={{ scaleX: 0 }}
                         animate={{ scaleX: 1 }}
                         transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -1486,8 +1486,8 @@ export default function CountryProfilePage({ profileData, documents, coverImages
 
               {isLoadingTimeseries ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ngodb-red"></div>
-                  <span className="ml-3 text-ngodb-gray-600">{t('common.loading')}</span>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-humdb-red"></div>
+                  <span className="ml-3 text-humdb-gray-600">{t('common.loading')}</span>
                 </div>
               ) : timeseriesData.length > 0 ? (
                 <div>
@@ -1505,27 +1505,27 @@ export default function CountryProfilePage({ profileData, documents, coverImages
                   {/* Chart Summary Stats */}
                   {chartSummaryStats && (
                     <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-ngodb-gray-50 rounded-lg">
-                        <div className="text-2xl font-bold text-ngodb-red">
+                      <div className="text-center p-4 bg-humdb-gray-50 rounded-lg">
+                        <div className="text-2xl font-bold text-humdb-red">
                           {chartSummaryStats.currentTotal}
                         </div>
-                        <div className="text-sm text-ngodb-gray-600">
+                        <div className="text-sm text-humdb-gray-600">
                           {t('countryProfile.currentValue')}
                         </div>
                       </div>
-                      <div className="text-center p-4 bg-ngodb-gray-50 rounded-lg">
-                        <div className="text-2xl font-bold text-ngodb-navy">
+                      <div className="text-center p-4 bg-humdb-gray-50 rounded-lg">
+                        <div className="text-2xl font-bold text-humdb-navy">
                           {chartSummaryStats.totalGrowth}%
                         </div>
-                        <div className="text-sm text-ngodb-gray-600">
+                        <div className="text-sm text-humdb-gray-600">
                           {t('countryProfile.totalGrowth')}
                         </div>
                       </div>
-                      <div className="text-center p-4 bg-ngodb-gray-50 rounded-lg">
-                        <div className="text-2xl font-bold text-ngodb-navy">
+                      <div className="text-center p-4 bg-humdb-gray-50 rounded-lg">
+                        <div className="text-2xl font-bold text-humdb-navy">
                           {chartSummaryStats.avgAnnualGrowth}%
                         </div>
-                        <div className="text-sm text-ngodb-gray-600">
+                        <div className="text-sm text-humdb-gray-600">
                           {t('countryProfile.avgAnnualGrowth')}
                         </div>
                       </div>
@@ -1534,15 +1534,15 @@ export default function CountryProfilePage({ profileData, documents, coverImages
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="text-ngodb-gray-500 mb-4">
+                  <div className="text-humdb-gray-500 mb-4">
                     <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </div>
-                  <p className="text-ngodb-gray-600 text-lg mb-2">
+                  <p className="text-humdb-gray-600 text-lg mb-2">
                     {t('countryProfile.noTimeseriesData')}
                   </p>
-                  <p className="text-ngodb-gray-500 text-sm">
+                  <p className="text-humdb-gray-500 text-sm">
                     {t('countryProfile.noTimeseriesDataDescription')}
                   </p>
                 </div>
@@ -1553,10 +1553,10 @@ export default function CountryProfilePage({ profileData, documents, coverImages
             {allIndicators && allIndicators.length > 0 && (
               <div className="mt-12">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-ngodb-navy mb-4">
+                  <h3 className="text-2xl font-bold text-humdb-navy mb-4">
                     {t('countryProfile.allIndicators')}
                   </h3>
-                  <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+                  <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
                     {t('countryProfile.allIndicatorsDescription')}
                   </p>
                 </div>
@@ -1565,31 +1565,31 @@ export default function CountryProfilePage({ profileData, documents, coverImages
                   {allIndicators.slice(3).map((indicator, index) => (
                     <div
                       key={`${indicator.indicator_label}-${index}`}
-                      className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 border border-ngodb-gray-200"
+                      className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 border border-humdb-gray-200"
                     >
-                      <h4 className="text-lg font-semibold text-ngodb-navy mb-2 line-clamp-2">
+                      <h4 className="text-lg font-semibold text-humdb-navy mb-2 line-clamp-2">
                         {indicator.indicator_label}
                       </h4>
 
-                      <div className="text-2xl font-bold text-ngodb-red mb-2">
+                      <div className="text-2xl font-bold text-humdb-red mb-2">
                         {indicator.value?.toLocaleString() || 'N/A'}
                         {indicator.unit && (
-                          <span className="text-sm text-ngodb-gray-500 ml-1">
+                          <span className="text-sm text-humdb-gray-500 ml-1">
                             {indicator.unit}
                           </span>
                         )}
                       </div>
 
                       {indicator.period && (
-                        <p className="text-xs text-ngodb-gray-500 mb-3">
+                        <p className="text-xs text-humdb-gray-500 mb-3">
                           {t('countryProfile.period')}: {indicator.period}
                         </p>
                       )}
 
                       {/* Progress bar for visual appeal */}
-                      <div className="w-full bg-ngodb-gray-200 rounded-full h-2 mb-2">
+                      <div className="w-full bg-humdb-gray-200 rounded-full h-2 mb-2">
                         <div
-                          className="bg-gradient-to-r from-ngodb-red to-ngodb-navy h-2 rounded-full transition-all duration-500"
+                          className="bg-gradient-to-r from-humdb-red to-humdb-navy h-2 rounded-full transition-all duration-500"
                           style={{
                             width: `${Math.min(100, (indicator.value || 0) / Math.max(...allIndicators.map(i => i.value || 0)) * 100)}%`
                           }}
@@ -1611,7 +1611,7 @@ export default function CountryProfilePage({ profileData, documents, coverImages
           <div className="text-center mt-16">
             <Link
               href="/countries"
-              className="inline-flex items-center px-8 py-4 bg-ngodb-navy text-white font-medium rounded-lg hover:bg-ngodb-navy-dark transition-colors shadow-lg hover:shadow-xl"
+              className="inline-flex items-center px-8 py-4 bg-humdb-navy text-white font-medium rounded-lg hover:bg-humdb-navy-dark transition-colors shadow-lg hover:shadow-xl"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

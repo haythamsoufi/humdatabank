@@ -1069,7 +1069,7 @@ function setupQuickLogin(buttonId, email, password) {
 // Test passwords must be explicitly configured - never use hardcoded defaults in production.
 {% if flask_config is defined and (flask_config == 'development' or flask_config == 'default') and config.DEBUG %}
 {% if test_passwords is defined and test_passwords and test_passwords.get('admin') and test_passwords.get('focal') %}
-{% set test_domain = get_organization_email_domain() or get_organization_domain() or 'ngo.org' %}
+{% set test_domain = get_organization_email_domain() or get_organization_domain() or 'example.org' %}
 {% set test_admin_password = test_passwords['admin'] %}
 {% set test_focal_password = test_passwords['focal'] %}
 setupQuickLogin('quickAdminLogin', 'test_admin@{{ test_domain }}', '{{ test_admin_password }}');

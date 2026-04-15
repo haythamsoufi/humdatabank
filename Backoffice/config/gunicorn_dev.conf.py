@@ -38,7 +38,7 @@ loglevel = 'debug'
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
 
 # Process naming
-proc_name = 'ngo-databank-backoffice-dev'
+proc_name = 'hum-databank-backoffice-dev'
 
 # Development settings
 daemon = False

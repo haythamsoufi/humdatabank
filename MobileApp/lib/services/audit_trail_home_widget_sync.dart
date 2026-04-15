@@ -9,12 +9,12 @@ import 'audit_trail_widget_prefs.dart';
 /// iOS: must match [ios/Runner/Runner.entitlements] and the widget extension.
 /// Create the group in Apple Developer → Identifiers → App Groups if it does not exist.
 /// Android: [HomeWidget.setAppGroupId] is a no-op; data is stored in app SharedPreferences.
-const String auditTrailHomeWidgetAppGroupId = 'group.com.ngo.databank';
+const String auditTrailHomeWidgetAppGroupId = 'group.com.hum.databank';
 
 const String _auditTrailWidgetDataKey = 'audit_trail_json';
 const String _auditTrailWidgetIOSKind = 'AuditTrailWidget';
 
-/// Short class name; full class is `com.ngo.databank.AuditTrailWidgetProvider`.
+/// Short class name; full class is `com.hum.databank.AuditTrailWidgetProvider`.
 const String _auditTrailAndroidProviderClass = 'AuditTrailWidgetProvider';
 
 /// Pushes the latest audit rows into the home screen widget (iOS + Android, best-effort).

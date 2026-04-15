@@ -5,7 +5,7 @@
  * Settings → Organization branding (deploy-time sync). When unset, callers
  * should pass the i18n default (e.g. navigation.siteTitle).
  */
-export function getPublicOrganizationName(i18nFallback = 'NGO Databank') {
+export function getPublicOrganizationName(i18nFallback = 'Humanitarian Databank') {
   if (typeof process === 'undefined' || !process.env) {
     return i18nFallback;
   }

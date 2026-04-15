@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/models/shared/ai_chat_launch_args.dart';
+import 'package:hum_databank_app/models/shared/ai_chat_launch_args.dart';
 
 void main() {
   group('AiChatLaunchArgs.parse', () {

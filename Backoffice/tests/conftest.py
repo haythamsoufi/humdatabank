@@ -1,5 +1,5 @@
 """
-Pytest configuration and fixtures for NGO Databank Backoffice tests.
+Pytest configuration and fixtures for Humanitarian Databank Backoffice tests.
 
 This module provides shared fixtures and utilities for all tests.
 """

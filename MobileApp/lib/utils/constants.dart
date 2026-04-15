@@ -100,8 +100,8 @@ class AppConstants {
   static const int semanticDefaultProfileAccent = 0xFF3B82F6;
 
   /// Public source repo (matches Backoffice admin sidebar “Powered by” link).
-  static const String ngoDatabankGithubRepoUrl =
-      'https://github.com/haythamsoufi/ngodatabank';
+  static const String humdatabankGithubRepoUrl =
+      'https://github.com/haythamsoufi/humdatabank';
 
   // Spacing — aliases to [AppSpacing]. Prefer [AppSpacing] or [IOSSpacing] directly.
   @Deprecated('Use AppSpacing.sm or IOSSpacing.sm instead')

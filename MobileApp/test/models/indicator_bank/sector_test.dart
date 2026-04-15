@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/models/indicator_bank/sector.dart';
+import 'package:hum_databank_app/models/indicator_bank/sector.dart';
 
 void main() {
   group('SubSector', () {

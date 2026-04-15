@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/models/public/leaderboard_entry.dart';
+import 'package:hum_databank_app/models/public/leaderboard_entry.dart';
 
 void main() {
   group('LeaderboardEntry.fromJson', () {

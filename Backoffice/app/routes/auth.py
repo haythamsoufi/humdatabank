@@ -335,7 +335,7 @@ def _verify_and_decode_id_token(id_token: str, meta: dict, audience: str, expect
         return None
 
 def _mobile_deep_link_for_user(user, existing_session_id=None):
-    """Issue a JWT token pair and return a ``ngodatabank://oauth-success`` redirect.
+    """Issue a JWT token pair and return a ``humdatabank://oauth-success`` redirect.
 
     Used when a mobile Chrome Custom Tab OAuth flow hits an endpoint where the
     user is *already* authenticated via the web session cookie, so the normal
@@ -347,7 +347,7 @@ def _mobile_deep_link_for_user(user, existing_session_id=None):
     session_id = existing_session_id or session.get('session_id') or secrets.token_urlsafe(16)
     tokens = issue_token_pair(user.id, session_id=session_id)
     deep_link = (
-        "ngodatabank://oauth-success?"
+        "humdatabank://oauth-success?"
         + _urlencode({
             "access_token": tokens["access_token"],
             "refresh_token": tokens["refresh_token"],
@@ -363,7 +363,7 @@ def _mobile_deep_link_for_user(user, existing_session_id=None):
 @bp.route("/login/azure")
 def azure_login():
     if current_user.is_authenticated:
-        if request.args.get("mobile_return_scheme") == "ngodatabank":
+        if request.args.get("mobile_return_scheme") == "humdatabank":
             # Mobile Chrome Custom Tab OAuth flow.
             #
             # Do NOT short-circuit to _mobile_deep_link_for_user here.
@@ -412,7 +412,7 @@ def azure_login():
 
     # Mobile app (Chrome Custom Tabs) passes this to request JWT token delivery
     # via a deep link instead of relying on the session cookie.
-    is_mobile_oauth = request.args.get("mobile_return_scheme") == "ngodatabank"
+    is_mobile_oauth = request.args.get("mobile_return_scheme") == "humdatabank"
 
     import time as _time
 
@@ -786,7 +786,7 @@ def azure_callback():
             from urllib.parse import urlencode as _urlencode
             tokens = issue_token_pair(user.id, session_id=session_id)
             deep_link = (
-                "ngodatabank://oauth-success?"
+                "humdatabank://oauth-success?"
                 + _urlencode({
                     "access_token": tokens["access_token"],
                     "refresh_token": tokens["refresh_token"],

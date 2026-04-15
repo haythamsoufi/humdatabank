@@ -72,7 +72,7 @@ const CountriesDropdown = forwardRef(({ countries, loading, onClose }, ref) => {
       >
         <div className="p-4">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-ngodb-red"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-humdb-red"></div>
             <span className="ml-2 text-gray-600">
               <TranslationSafe fallback="Loading countries...">
                 {t('countries.loading.title')}
@@ -117,7 +117,7 @@ const CountriesDropdown = forwardRef(({ countries, loading, onClose }, ref) => {
                   className={`px-2 py-1 text-xs font-medium rounded transition-colors duration-150 ease-in-out
                     ${
                       selectedRegion === region
-                        ? 'bg-ngodb-red text-white'
+                        ? 'bg-humdb-red text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
@@ -135,7 +135,7 @@ const CountriesDropdown = forwardRef(({ countries, loading, onClose }, ref) => {
                 className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ease-in-out
                   ${
                     selectedRegion === region
-                      ? 'bg-ngodb-red text-white'
+                      ? 'bg-humdb-red text-white'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
               >
@@ -160,7 +160,7 @@ const CountriesDropdown = forwardRef(({ countries, loading, onClose }, ref) => {
                   <Link
                     href={`/regions/${regionToSlug(selectedRegion)}`}
                     onClick={onClose}
-                    className="text-ngodb-red hover:text-ngodb-red-dark transition-colors duration-150 ease-in-out cursor-pointer underline hover:no-underline"
+                    className="text-humdb-red hover:text-humdb-red-dark transition-colors duration-150 ease-in-out cursor-pointer underline hover:no-underline"
                     title={t('regions.clickToViewOverview', { region: getRegionLabel(selectedRegion), defaultValue: 'Click to view overview' })}
                   >
                     <TranslationSafe fallback={`See ${getRegionLabel(selectedRegion)} Region Overview`}>
@@ -179,7 +179,7 @@ const CountriesDropdown = forwardRef(({ countries, loading, onClose }, ref) => {
               placeholder={t('countries.search.placeholder', { defaultValue: 'Search countries...' })}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+              className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
             />
           </div>
 

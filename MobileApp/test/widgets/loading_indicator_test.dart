@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/l10n/app_localizations.dart';
-import 'package:ngo_databank_app/widgets/loading_indicator.dart';
+import 'package:hum_databank_app/l10n/app_localizations.dart';
+import 'package:hum_databank_app/widgets/loading_indicator.dart';
 
 Widget _wrapWithMaterialApp(Widget child) {
   return MaterialApp(

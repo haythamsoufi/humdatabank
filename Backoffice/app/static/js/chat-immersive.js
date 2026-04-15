@@ -1,7 +1,7 @@
 /**
  * Immersive chat page – sidebar chat list and New chat.
  * Runs only on the immersive chat page (body.chat-immersive).
- * Depends on chatbot.js (window.ngodbChatbot) being initialized first.
+ * Depends on chatbot.js (window.humdatabankChatbot) being initialized first.
  */
 (function () {
     'use strict';
@@ -78,7 +78,7 @@
     }
 
     function getChatbot() {
-        return window.ngodbChatbot || null;
+        return window.humdatabankChatbot || null;
     }
 
     function normalizeMapPayload(payload) {
@@ -87,7 +87,7 @@
         if (!root || typeof root !== 'object') return null;
         var rows = Array.isArray(root.countries) ? root.countries : (Array.isArray(root.locations) ? root.locations : (Array.isArray(root.data) ? root.data : []));
         if (!rows.length) return null;
-        if (window.ngodbChatImmersiveMapDebug) {
+        if (window.humdbChatImmersiveMapDebug) {
             try {
                 var sample = rows.slice(0, 3);
                 console.log('[Immersive map] normalizeMapPayload: rows count', rows.length, 'sample[0] keys', sample[0] ? Object.keys(sample[0]) : [], 'sample', JSON.stringify(sample));
@@ -1417,7 +1417,7 @@
         }
         var MAP_LOG = function () {
             try {
-                if (window.CHATBOT_DEBUG || window.ngodbChatImmersiveMapDebug) {
+                if (window.CHATBOT_DEBUG || window.humdbChatImmersiveMapDebug) {
                     console.log.apply(console, ['[Immersive map]'].concat(Array.prototype.slice.call(arguments)));
                 }
             } catch (e) { /* ignore */ }
@@ -1559,11 +1559,11 @@
 
                 // If we already created a map in this container (e.g. retry), remove it first.
                 try {
-                    if (mapEl.__ngodbLeafletMap && typeof mapEl.__ngodbLeafletMap.remove === 'function') {
-                        mapEl.__ngodbLeafletMap.remove();
+                    if (mapEl.__humdbLeafletMap && typeof mapEl.__humdbLeafletMap.remove === 'function') {
+                        mapEl.__humdbLeafletMap.remove();
                     }
                 } catch (e) { /* ignore */ }
-                mapEl.__ngodbLeafletMap = null;
+                mapEl.__humdbLeafletMap = null;
 
                 var attempts = 0;
                 function initWhenReady() {
@@ -1583,7 +1583,7 @@
                         maxZoom: 6,
                         worldCopyJump: true
                     }).setView([20, 0], 1.4);
-                    mapEl.__ngodbLeafletMap = map;
+                    mapEl.__humdbLeafletMap = map;
                     addCompactZoomControl(L, map);
                     // Ensure Leaflet recalculates size after insertion/layout.
                     try { setTimeout(function () { try { map.invalidateSize(true); } catch (_) { /* ignore */ } }, 0); } catch (_) { /* ignore */ }
@@ -1699,11 +1699,11 @@
                 MAP_LOG('map render failed', err && (err.message || err));
                 // If Leaflet partially initialized, remove it to avoid dangling handlers and offsetWidth null crashes.
                 try {
-                    if (mapEl && mapEl.__ngodbLeafletMap && typeof mapEl.__ngodbLeafletMap.remove === 'function') {
-                        mapEl.__ngodbLeafletMap.remove();
+                    if (mapEl && mapEl.__humdbLeafletMap && typeof mapEl.__humdbLeafletMap.remove === 'function') {
+                        mapEl.__humdbLeafletMap.remove();
                     }
                 } catch (e) { /* ignore */ }
-                try { if (mapEl) mapEl.__ngodbLeafletMap = null; } catch (e) { /* ignore */ }
+                try { if (mapEl) mapEl.__humdbLeafletMap = null; } catch (e) { /* ignore */ }
                 mapEl.innerHTML = '';
                 var fallback = document.createElement('div');
                 fallback.style.fontSize = '0.82rem';
@@ -2189,9 +2189,9 @@
             return discrete;
         }
 
-        var lineGradientId = 'ngodb-line-grad-' + (Date.now().toString(36) + Math.random().toString(36).slice(2));
+        var lineGradientId = 'humdb-line-grad-' + (Date.now().toString(36) + Math.random().toString(36).slice(2));
         var LOG = function () {
-            if (window.ngodbChartGradientDebug) {
+            if (window.humdbChartGradientDebug) {
                 console.log.apply(console, ['[Chart gradient]'].concat(Array.prototype.slice.call(arguments)));
             }
         };
@@ -2277,7 +2277,7 @@
                 var gradientUrl = 'url(#' + lineGradientId + ')';
                 linePath.setAttribute('stroke', gradientUrl);
                 linePath.style.stroke = gradientUrl;
-                linePath.setAttribute('data-ngodb-line-path', '1');
+                linePath.setAttribute('data-humdb-line-path', '1');
                 LOG('gradient applied id=', lineGradientId, 'path.stroke=', linePath.getAttribute('stroke'), 'path.style.stroke=', linePath.style.stroke);
             } catch (e) {
                 LOG('error:', e && e.message, e);
@@ -2288,7 +2288,7 @@
             try {
                 var svg = chartEl && chartEl.querySelector ? chartEl.querySelector('svg') : null;
                 if (!svg) return null;
-                var marked = svg.querySelector('path[data-ngodb-line-path="1"]');
+                var marked = svg.querySelector('path[data-humdb-line-path="1"]');
                 if (marked) return marked;
                 var paths = svg.querySelectorAll('path[d]');
                 var linePath = null;
@@ -2404,20 +2404,20 @@
                     if (!xKey && viewSeries && viewSeries[i] && viewSeries[i].x != null) xKey = asKey(viewSeries[i].x);
 
                     // Store baseline transform from ApexCharts so offsets stack on top.
-                    var base = g.getAttribute('data-ngodb-label-base-transform');
+                    var base = g.getAttribute('data-humdb-label-base-transform');
                     if (base == null) {
                         base = g.getAttribute('transform') || '';
-                        g.setAttribute('data-ngodb-label-base-transform', base);
+                        g.setAttribute('data-humdb-label-base-transform', base);
                     }
-                    g.setAttribute('data-ngodb-label-xkey', xKey);
+                    g.setAttribute('data-humdb-label-xkey', xKey);
 
                     // Apply stored offset (if any).
                     var off = labelDragOffsets[xKey] || { dx: 0, dy: 0 };
                     setTransformWithOffset(g, base, off);
 
                     // Install handlers once per element instance.
-                    if (g.getAttribute('data-ngodb-label-draggable') === '1') continue;
-                    g.setAttribute('data-ngodb-label-draggable', '1');
+                    if (g.getAttribute('data-humdb-label-draggable') === '1') continue;
+                    g.setAttribute('data-humdb-label-draggable', '1');
 
                     try { g.style.cursor = 'grab'; } catch (e) { /* ignore */ }
                     try { g.style.pointerEvents = 'all'; } catch (e) { /* ignore */ }
@@ -2433,8 +2433,8 @@
 
                             var targetG = ev.currentTarget;
                             if (!targetG) return;
-                            var key = targetG.getAttribute('data-ngodb-label-xkey') || '';
-                            var baseTr = targetG.getAttribute('data-ngodb-label-base-transform') || (targetG.getAttribute('transform') || '');
+                            var key = targetG.getAttribute('data-humdb-label-xkey') || '';
+                            var baseTr = targetG.getAttribute('data-humdb-label-base-transform') || (targetG.getAttribute('transform') || '');
                             var startX = ev.clientX;
                             var startY = ev.clientY;
                             var startOff = labelDragOffsets[key] || { dx: 0, dy: 0 };
@@ -2951,7 +2951,7 @@
         }
 
         // Auto-scroll: scroll to bottom on send and while receiving; stop when user scrolls up; re-enable on new send
-        window.ngodbChatImmersiveAutoScroll = true;
+        window.humdbChatImmersiveAutoScroll = true;
         var scrollContainer = document.querySelector('.chat-immersive-messages-scroll');
         var messagesEl = document.getElementById('chatMessages');
         var autoScrollThreshold = 80;
@@ -2959,7 +2959,7 @@
             scrollContainer.addEventListener('scroll', function () {
                 var el = scrollContainer;
                 var atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= autoScrollThreshold;
-                if (!atBottom) window.ngodbChatImmersiveAutoScroll = false;
+                if (!atBottom) window.humdbChatImmersiveAutoScroll = false;
             }, { passive: true });
         }
         if (scrollContainer && messagesEl) {
@@ -2971,7 +2971,7 @@
                         if (node.nodeType !== 1) continue;
                         var wrapper = node.classList && node.classList.contains('chat-message-wrapper') && node.classList.contains('is-user') ? node : node.querySelector && node.querySelector('.chat-message-wrapper.is-user');
                         if (wrapper) {
-                            window.ngodbChatImmersiveAutoScroll = true;
+                            window.humdbChatImmersiveAutoScroll = true;
                             scrollContainer.scrollTop = scrollContainer.scrollHeight;
                             break;
                         }
@@ -3297,19 +3297,19 @@
 
             var card = document.createElement('div');
             card.className = 'chat-immersive-table-card';
-            card.style.cssText = 'margin:12px 0;border:1px solid var(--ngodb-border,#e2e8f0);border-radius:10px;overflow:hidden;background:var(--ngodb-card-bg,#fff);';
+            card.style.cssText = 'margin:12px 0;border:1px solid var(--humdb-border,#e2e8f0);border-radius:10px;overflow:hidden;background:var(--humdb-card-bg,#fff);';
 
             var header = document.createElement('div');
-            header.style.cssText = 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ngodb-border,#e2e8f0);background:var(--ngodb-card-header-bg,#f8fafc);';
+            header.style.cssText = 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--humdb-border,#e2e8f0);background:var(--humdb-card-header-bg,#f8fafc);';
             var titleEl = document.createElement('span');
-            titleEl.style.cssText = 'font-weight:600;font-size:14px;color:var(--ngodb-text,#1e293b);';
+            titleEl.style.cssText = 'font-weight:600;font-size:14px;color:var(--humdb-text,#1e293b);';
             titleEl.textContent = (payload.title || 'Data Table') + ' (' + allRows.length + ' rows)';
             header.appendChild(titleEl);
 
             var searchInput = document.createElement('input');
             searchInput.type = 'search';
             searchInput.placeholder = 'Filter\u2026';
-            searchInput.style.cssText = 'padding:4px 8px;border:1px solid var(--ngodb-border,#cbd5e1);border-radius:6px;font-size:12px;width:160px;outline:none;';
+            searchInput.style.cssText = 'padding:4px 8px;border:1px solid var(--humdb-border,#cbd5e1);border-radius:6px;font-size:12px;width:160px;outline:none;';
             var controls = document.createElement('div');
             controls.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0;';
             controls.appendChild(searchInput);
@@ -3327,12 +3327,12 @@
 
             var thead = document.createElement('thead');
             var headRow = document.createElement('tr');
-            headRow.style.cssText = 'position:sticky;top:0;background:var(--ngodb-card-header-bg,#f1f5f9);z-index:1;';
+            headRow.style.cssText = 'position:sticky;top:0;background:var(--humdb-card-header-bg,#f1f5f9);z-index:1;';
             columns.forEach(function (col) {
                 var th = document.createElement('th');
                 th.dataset.key = col.key;
                 var w = columnWidthByKey[col.key] || { min: 130, max: 360 };
-                var thStyle = 'padding:8px 10px;text-align:left;font-weight:600;font-size:12px;color:var(--ngodb-text-muted,#64748b);border-bottom:2px solid var(--ngodb-border,#e2e8f0);cursor:pointer;user-select:none;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
+                var thStyle = 'padding:8px 10px;text-align:left;font-weight:600;font-size:12px;color:var(--humdb-text-muted,#64748b);border-bottom:2px solid var(--humdb-border,#e2e8f0);cursor:pointer;user-select:none;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
                 th.style.cssText = thStyle;
                 th.textContent = col.label || col.key;
                 if (col.sortable !== false) {
@@ -3408,12 +3408,12 @@
                 var even = false;
                 filtered.forEach(function (row) {
                     var tr = document.createElement('tr');
-                    tr.style.cssText = even ? 'background:var(--ngodb-row-alt,#f8fafc);' : '';
+                    tr.style.cssText = even ? 'background:var(--humdb-row-alt,#f8fafc);' : '';
                     even = !even;
                     columns.forEach(function (col) {
                         var td = document.createElement('td');
                         var w = columnWidthByKey[col.key] || { min: 130, max: 360 };
-                        td.style.cssText = 'padding:6px 10px;border-bottom:1px solid var(--ngodb-border,#f1f5f9);white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
+                        td.style.cssText = 'padding:6px 10px;border-bottom:1px solid var(--humdb-border,#f1f5f9);white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
                         var val = row[col.key];
                         var isNumeric = (col.type === 'number' || col.type === 'percent') && val != null && Number.isFinite(Number(val));
                         if (col.type === 'link' && val) {
@@ -3425,7 +3425,7 @@
                                 a.target = '_blank';
                                 a.rel = 'noopener';
                                 a.textContent = String(val);
-                                a.style.cssText = 'color:var(--ngodb-link,#2563eb);text-decoration:none;display:inline-block;max-width:100%;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;';
+                                a.style.cssText = 'color:var(--humdb-link,#2563eb);text-decoration:none;display:inline-block;max-width:100%;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;';
                                 a.addEventListener('mouseenter', function () { a.style.textDecoration = 'underline'; });
                                 a.addEventListener('mouseleave', function () { a.style.textDecoration = 'none'; });
                                 td.appendChild(a);
@@ -3500,7 +3500,7 @@
                 if (ttype === 'data_table') {
                     renderDataTableCard(payload, wrapper, messageEl);
                 } else if (ttype === 'worldmap' || ttype === 'world_map' || ttype === 'choropleth') {
-                    if (window.ngodbChatImmersiveMapDebug) {
+                    if (window.humdbChatImmersiveMapDebug) {
                         try {
                             var pCountries = payload && Array.isArray(payload.countries) ? payload.countries : [];
                             var sampleC = pCountries.slice(0, 3);

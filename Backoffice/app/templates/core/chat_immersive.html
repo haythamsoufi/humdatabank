@@ -89,7 +89,7 @@
     <script nonce="{{ csp_nonce() }}">
     (function () {
         try {
-            if (localStorage.getItem('ngodb_beta_banner_dismissed') === '1') {
+            if (localStorage.getItem('humdb_beta_banner_dismissed') === '1') {
                 var b = document.getElementById('chatImmersiveBetaBanner');
                 if (b) b.style.display = 'none';
             }
@@ -100,7 +100,7 @@
             if (btn && banner) {
                 btn.addEventListener('click', function () {
                     banner.style.display = 'none';
-                    try { localStorage.setItem('ngodb_beta_banner_dismissed', '1'); } catch (_) {}
+                    try { localStorage.setItem('humdb_beta_banner_dismissed', '1'); } catch (_) {}
                 });
             }
         });
@@ -196,7 +196,7 @@
                                     </p>
                                     <button type="button" id="chatAiPolicyLinkBtn" class="chat-ai-policy-link-btn">{{ _('View AI policy') }}</button>
                                     <button type="button" id="chatAiPolicyAckBtn" class="chat-ai-policy-ack-btn">{{ _('I understand') }}</button>
-                                    <script nonce="{{ csp_nonce() }}">try{if(localStorage.getItem('ngodb_chatbot_ai_policy_acknowledged')==='1'){var b=document.getElementById('chatAiPolicyAckBtn');if(b)b.style.display='none';}}catch(_){}</script>
+                                    <script nonce="{{ csp_nonce() }}">try{if(localStorage.getItem('humdb_chatbot_ai_policy_acknowledged')==='1'){var b=document.getElementById('chatAiPolicyAckBtn');if(b)b.style.display='none';}}catch(_){}</script>
                                 </div>
                             </div>
                         </div>

@@ -71,7 +71,7 @@ def _get_ai_chat_integration():
 ai_bp = Blueprint("ai_v2", __name__, url_prefix="/api/ai/v2")
 
 
-PUBLIC_AI_PROXY_HEADER = "X-NGO-Databank-AI-Proxy"
+PUBLIC_AI_PROXY_HEADER = "X-hum-databank-AI-Proxy"
 
 
 def _is_development_mode() -> bool:
@@ -2349,8 +2349,8 @@ def export_table_as_excel():
         download_name=filename,
     )
     # Reuse existing frontend conventions
-    resp.headers["X-NGO-Databank-Export-Completed"] = "1"
-    resp.headers["X-NGO-Databank-Export-Filename"] = filename
+    resp.headers["X-hum-databank-Export-Completed"] = "1"
+    resp.headers["X-hum-databank-Export-Filename"] = filename
     return resp
 
 

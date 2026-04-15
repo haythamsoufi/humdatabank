@@ -1,6 +1,6 @@
 {
-  "name": "NGO Databank",
-  "short_name": "NGO DB",
+  "name": "Humanitarian Databank",
+  "short_name": "Hum DB",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

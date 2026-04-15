@@ -3,20 +3,20 @@
  * Provides contextual help and guidance to platform users
  */
 
-class NGODatabankChatbot {
+class HumDatabankChatbot {
     constructor() {
         this.apiEndpoint = '/api/ai/v2/chat';
         this.isInitialized = false;
         this.conversationHistory = [];
         this.isTyping = false;
         this.isExpanded = true; /* Chat is always maximized; no minimize/expand */
-        this.storageKey = 'ngodb_chatbot_conversation';
-        this.immersiveStorageKey = 'ngodb_chatbot_immersive_data';
-        this.immersiveActiveIdKey = 'ngodb_chatbot_immersive_active_id';
-        this.sourcesStorageKey = 'ngodb_chatbot_sources';
-        this.floatingConversationIdKey = 'ngodb_chatbot_floating_conversation_id';
-        this.expandStorageKey = 'ngodb_chatbot_expanded';
-        this.aiPolicyAckStorageKey = 'ngodb_chatbot_ai_policy_acknowledged';
+        this.storageKey = 'humdb_chatbot_conversation';
+        this.immersiveStorageKey = 'humdb_chatbot_immersive_data';
+        this.immersiveActiveIdKey = 'humdb_chatbot_immersive_active_id';
+        this.sourcesStorageKey = 'humdb_chatbot_sources';
+        this.floatingConversationIdKey = 'humdb_chatbot_floating_conversation_id';
+        this.expandStorageKey = 'humdb_chatbot_expanded';
+        this.aiPolicyAckStorageKey = 'humdb_chatbot_ai_policy_acknowledged';
         this.activeConversationId = null;
         this.preferredLanguage = this._normalizeLanguage(localStorage.getItem('chatbot_language'));
         this._currentAbort = null;
@@ -550,11 +550,11 @@ class NGODatabankChatbot {
         // without pulling in rendered UI chrome (maps/charts/controls).
         try {
             if (wrapperElement) {
-                if (!wrapperElement.__ngodbStructuredPayloads) wrapperElement.__ngodbStructuredPayloads = [];
+                if (!wrapperElement.__humdbStructuredPayloads) wrapperElement.__humdbStructuredPayloads = [];
                 // Keep only a small bounded history (defensive)
-                wrapperElement.__ngodbStructuredPayloads.push(structured);
-                if (wrapperElement.__ngodbStructuredPayloads.length > 5) {
-                    wrapperElement.__ngodbStructuredPayloads = wrapperElement.__ngodbStructuredPayloads.slice(-5);
+                wrapperElement.__humdbStructuredPayloads.push(structured);
+                if (wrapperElement.__humdbStructuredPayloads.length > 5) {
+                    wrapperElement.__humdbStructuredPayloads = wrapperElement.__humdbStructuredPayloads.slice(-5);
                 }
             }
         } catch (_) {}
@@ -715,7 +715,7 @@ class NGODatabankChatbot {
         try {
             const contentEl = messageDiv ? messageDiv.querySelector('.chat-message-content') : null;
             let text = this._cleanTextForCopyFromElement(contentEl);
-            const payloads = (wrapper && wrapper.__ngodbStructuredPayloads) ? wrapper.__ngodbStructuredPayloads : [];
+            const payloads = (wrapper && wrapper.__humdbStructuredPayloads) ? wrapper.__humdbStructuredPayloads : [];
             if (Array.isArray(payloads) && payloads.length) {
                 const blocks = payloads
                     .map(p => this._formatStructuredPayloadForCopy(p))
@@ -765,7 +765,7 @@ class NGODatabankChatbot {
         return {
             greetings: {
                 get en() {
-                    const orgName = window.ORG_NAME || 'NGO Databank';
+                    const orgName = window.ORG_NAME || 'Humanitarian Databank';
                     const chatbotName = window.CHATBOT_NAME;
                     if (chatbotName && String(chatbotName).trim()) {
                         return `Hello! I'm ${String(chatbotName).trim()}, your ${orgName} assistant. How can I help you today?`;
@@ -879,24 +879,24 @@ class NGODatabankChatbot {
     _showDlpModal({ title, bodyLines, actions }) {
         // Minimal custom modal (3-button) to avoid relying on global dialog helpers.
         try {
-            const existing = document.querySelector('.ngodb-dlp-modal-overlay');
+            const existing = document.querySelector('.humdb-dlp-modal-overlay');
             if (existing) existing.remove();
         } catch (_) {}
 
         const overlay = document.createElement('div');
-        overlay.className = 'ngodb-dlp-modal-overlay';
+        overlay.className = 'humdb-dlp-modal-overlay';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
 
         const modal = document.createElement('div');
-        modal.className = 'ngodb-dlp-modal';
+        modal.className = 'humdb-dlp-modal';
 
         const header = document.createElement('div');
-        header.className = 'ngodb-dlp-modal-header';
+        header.className = 'humdb-dlp-modal-header';
         header.textContent = title || 'Sensitive information detected';
 
         const body = document.createElement('div');
-        body.className = 'ngodb-dlp-modal-body';
+        body.className = 'humdb-dlp-modal-body';
         const p = document.createElement('p');
         p.textContent = 'Your message appears to include sensitive information. Choose how to proceed:';
         body.appendChild(p);
@@ -911,7 +911,7 @@ class NGODatabankChatbot {
         }
 
         const actionsEl = document.createElement('div');
-        actionsEl.className = 'ngodb-dlp-modal-actions';
+        actionsEl.className = 'humdb-dlp-modal-actions';
 
         function close() {
             try { overlay.remove(); } catch (_) {}
@@ -920,7 +920,7 @@ class NGODatabankChatbot {
         (actions || []).forEach(a => {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'ngodb-dlp-btn ' + (a.variant === 'primary' ? 'ngodb-dlp-btn-primary' : a.variant === 'danger' ? 'ngodb-dlp-btn-danger' : '');
+            btn.className = 'humdb-dlp-btn ' + (a.variant === 'primary' ? 'humdb-dlp-btn-primary' : a.variant === 'danger' ? 'humdb-dlp-btn-danger' : '');
             btn.textContent = a.label || 'OK';
             btn.addEventListener('click', () => {
                 close();
@@ -1548,7 +1548,7 @@ class NGODatabankChatbot {
     scrollToBottom() {
         // Immersive page: scroll the messages scroll container and respect auto-scroll flag
         if (this._isImmersive()) {
-            if (typeof window.ngodbChatImmersiveAutoScroll !== 'undefined' && window.ngodbChatImmersiveAutoScroll === false) return;
+            if (typeof window.humdbChatImmersiveAutoScroll !== 'undefined' && window.humdbChatImmersiveAutoScroll === false) return;
             const scrollEl = this.elements.messages && this.elements.messages.parentElement;
             if (scrollEl && scrollEl.classList && scrollEl.classList.contains('chat-immersive-messages-scroll')) {
                 scrollEl.scrollTop = scrollEl.scrollHeight;
@@ -3362,7 +3362,7 @@ class NGODatabankChatbot {
 
             // Get page explanation from external messages file
             const pageExplanations = this.messages.pageExplanations || {};
-            const orgName = window.ORG_NAME || 'NGO Databank';
+            const orgName = window.ORG_NAME || 'Humanitarian Databank';
             const pageInfo = pageExplanations[pageType] || pageExplanations.unknown || {
                 title: 'Platform Page',
                 emoji: '🎯',
@@ -5125,7 +5125,7 @@ class NGODatabankChatbot {
         if (!sourcesMatch) return text;
         const sourcesBlockRaw = sourcesMatch[2].trim();
         const mainPart = text.slice(0, sourcesMatch.index).trim();
-        const placeholder = '__NGODB_AI_SOURCES__';
+        const placeholder = '__HUMDATABANK_AI_SOURCES__';
         let combined = mainPart + '\n\n' + placeholder;
         // Escape and format sources block: newlines -> <br>, markdown links -> <a>
         let sourcesEsc = this.escapeHtml(sourcesBlockRaw);
@@ -5312,7 +5312,7 @@ class NGODatabankChatbot {
 
         if (!resp || !resp.ok) return;
         const blob = await resp.blob();
-        const filename = resp.headers.get('X-NGO-Databank-Export-Filename') || 'table-data.xlsx';
+        const filename = resp.headers.get('X-hum-databank-Export-Filename') || 'table-data.xlsx';
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -6200,20 +6200,20 @@ class NGODatabankChatbot {
 }
 
 // Initialize the chatbot when the script loads
-const chatbot = new NGODatabankChatbot();
+const chatbot = new HumDatabankChatbot();
 try {
     if (window.debug && window.debug.getConfig && window.debug.getConfig().modules.chatbot) {
-        console.log('[Chatbot tables] chatbot.js loaded; NGODatabankChatbot initialized');
+        console.log('[Chatbot tables] chatbot.js loaded; HumDatabankChatbot initialized');
     }
 } catch (e) { /* debug not loaded */ }
 
 // Make chatbot globally accessible
-window.ngodbChatbot = chatbot;
+window.humdatabankChatbot = chatbot;
 
 // Expose language setter to global scope for debugging/manual control
 window.setChatbotLanguage = function(language) {
-    if (window.ngodbChatbot) {
-        window.ngodbChatbot.setLanguagePreference(language);
+    if (window.humdatabankChatbot) {
+        window.humdatabankChatbot.setLanguagePreference(language);
         return `Language preference set to: ${language}`;
     }
     return 'Chatbot not initialized';
@@ -6221,16 +6221,16 @@ window.setChatbotLanguage = function(language) {
 
 // Expose language getter for debugging
 window.getChatbotLanguage = function() {
-    if (window.ngodbChatbot) {
-        return window.ngodbChatbot.preferredLanguage;
+    if (window.humdatabankChatbot) {
+        return window.humdatabankChatbot.preferredLanguage;
     }
     return 'Chatbot not initialized';
 };
 
 // Expose laptop preference reset for debugging/manual control
 window.resetChatbotLaptopPreference = function() {
-    if (window.ngodbChatbot) {
-        window.ngodbChatbot.resetLaptopPreference();
+    if (window.humdatabankChatbot) {
+        window.humdatabankChatbot.resetLaptopPreference();
         return 'Laptop auto-expansion preference reset.';
     }
     return 'Chatbot not initialized';
@@ -6263,8 +6263,8 @@ window.disableChatbotDebug = function() {
 };
 
 window.getChatbotAPIStatus = function() {
-    if (window.ngodbChatbot) {
-        const status = window.ngodbChatbot.getAPIStatus();
+    if (window.humdatabankChatbot) {
+        const status = window.humdatabankChatbot.getAPIStatus();
         console.table(status);
         return status;
     }
@@ -6274,9 +6274,9 @@ window.getChatbotAPIStatus = function() {
 
 // Helper to check what messages are loaded
 window.getChatbotMessages = function() {
-    if (window.ngodbChatbot) {
-        console.log('Loaded Messages:', window.ngodbChatbot.messages);
-        return window.ngodbChatbot.messages;
+    if (window.humdatabankChatbot) {
+        console.log('Loaded Messages:', window.humdatabankChatbot.messages);
+        return window.humdatabankChatbot.messages;
     }
     console.warn('Chatbot not initialized');
     return null;
@@ -6284,7 +6284,7 @@ window.getChatbotMessages = function() {
 
 // Export for potential external use
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = NGODatabankChatbot;
+    module.exports = HumDatabankChatbot;
 }
 
 // ---------------------------------------------------------------------------
@@ -6325,10 +6325,10 @@ if (typeof module !== 'undefined' && module.exports) {
         card.className = 'chat-floating-payload-card' + (extraClass ? ' ' + extraClass : '');
         card.style.cssText = [
             'margin:10px 0 4px',
-            'border:1px solid var(--ngodb-border,#e2e8f0)',
+            'border:1px solid var(--humdb-border,#e2e8f0)',
             'border-radius:10px',
             'overflow:hidden',
-            'background:var(--ngodb-card-bg,#fff)',
+            'background:var(--humdb-card-bg,#fff)',
             'font-size:13px'
         ].join(';');
         return card;
@@ -6342,11 +6342,11 @@ if (typeof module !== 'undefined' && module.exports) {
             'align-items:center',
             'justify-content:space-between',
             'gap:8px',
-            'border-bottom:1px solid var(--ngodb-border,#e2e8f0)',
-            'background:var(--ngodb-card-header-bg,#f8fafc)'
+            'border-bottom:1px solid var(--humdb-border,#e2e8f0)',
+            'background:var(--humdb-card-header-bg,#f8fafc)'
         ].join(';');
         var titleEl = document.createElement('span');
-        titleEl.style.cssText = 'font-weight:600;font-size:13px;color:var(--ngodb-text,#1e293b);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        titleEl.style.cssText = 'font-weight:600;font-size:13px;color:var(--humdb-text,#1e293b);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         titleEl.textContent = titleText || '';
         header.appendChild(titleEl);
         if (extraContent) header.appendChild(extraContent);
@@ -6452,14 +6452,14 @@ if (typeof module !== 'undefined' && module.exports) {
         var searchInput = document.createElement('input');
         searchInput.type = 'search';
         searchInput.placeholder = 'Filter\u2026';
-        searchInput.style.cssText = 'padding:3px 7px;border:1px solid var(--ngodb-border,#cbd5e1);border-radius:5px;font-size:12px;width:120px;outline:none;flex-shrink:0;';
+        searchInput.style.cssText = 'padding:3px 7px;border:1px solid var(--humdb-border,#cbd5e1);border-radius:5px;font-size:12px;width:120px;outline:none;flex-shrink:0;';
         var downloadBtn = document.createElement('button');
         downloadBtn.type = 'button';
         downloadBtn.className = 'chat-floating-table-export-btn';
         downloadBtn.textContent = 'Excel';
         downloadBtn.setAttribute('aria-label', 'Download table as Excel');
         downloadBtn.title = 'Download table as Excel';
-        downloadBtn.style.cssText = 'padding:3px 8px;border:1px solid var(--ngodb-border,#cbd5e1);border-radius:5px;font-size:12px;background:#fff;color:var(--ngodb-text,#1e293b);cursor:pointer;flex-shrink:0;';
+        downloadBtn.style.cssText = 'padding:3px 8px;border:1px solid var(--humdb-border,#cbd5e1);border-radius:5px;font-size:12px;background:#fff;color:var(--humdb-text,#1e293b);cursor:pointer;flex-shrink:0;';
         var controls = document.createElement('div');
         controls.style.cssText = 'display:flex;align-items:center;gap:6px;';
         controls.appendChild(searchInput);
@@ -6476,12 +6476,12 @@ if (typeof module !== 'undefined' && module.exports) {
 
         var thead = document.createElement('thead');
         var headRow = document.createElement('tr');
-        headRow.style.cssText = 'position:sticky;top:0;background:var(--ngodb-card-header-bg,#f1f5f9);z-index:1;';
+        headRow.style.cssText = 'position:sticky;top:0;background:var(--humdb-card-header-bg,#f1f5f9);z-index:1;';
         columns.forEach(function (col) {
             var th = document.createElement('th');
             th.dataset.key = col.key;
             var w = columnWidthByKey[col.key] || { min: 100, max: 280 };
-            th.style.cssText = 'padding:6px 8px;text-align:left;font-weight:600;font-size:11px;color:var(--ngodb-text-muted,#64748b);border-bottom:2px solid var(--ngodb-border,#e2e8f0);cursor:pointer;user-select:none;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
+            th.style.cssText = 'padding:6px 8px;text-align:left;font-weight:600;font-size:11px;color:var(--humdb-text-muted,#64748b);border-bottom:2px solid var(--humdb-border,#e2e8f0);cursor:pointer;user-select:none;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
             th.textContent = col.label || col.key;
             if (col.sortable !== false) {
                 var arrow = document.createElement('span');
@@ -6543,12 +6543,12 @@ if (typeof module !== 'undefined' && module.exports) {
             var even = false;
             filtered.forEach(function (row) {
                 var tr = document.createElement('tr');
-                tr.style.cssText = even ? 'background:var(--ngodb-row-alt,#f8fafc);' : '';
+                tr.style.cssText = even ? 'background:var(--humdb-row-alt,#f8fafc);' : '';
                 even = !even;
                 columns.forEach(function (col) {
                     var td = document.createElement('td');
                     var w = columnWidthByKey[col.key] || { min: 100, max: 280 };
-                    td.style.cssText = 'padding:5px 8px;border-bottom:1px solid var(--ngodb-border,#f1f5f9);white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
+                    td.style.cssText = 'padding:5px 8px;border-bottom:1px solid var(--humdb-border,#f1f5f9);white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;min-width:' + w.min + 'px;max-width:' + w.max + 'px;';
                     var val = row[col.key];
                     var isNumeric = (col.type === 'number' || col.type === 'percent') && val != null && Number.isFinite(Number(val));
                     if (col.type === 'link' && val) {
@@ -6558,7 +6558,7 @@ if (typeof module !== 'undefined' && module.exports) {
                             var a = document.createElement('a');
                             a.href = href; a.target = '_blank'; a.rel = 'noopener';
                             a.textContent = String(val);
-                            a.style.cssText = 'color:var(--ngodb-link,#2563eb);text-decoration:none;display:inline-block;max-width:100%;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;';
+                            a.style.cssText = 'color:var(--humdb-link,#2563eb);text-decoration:none;display:inline-block;max-width:100%;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;';
                             td.appendChild(a);
                         } else {
                             td.textContent = String(val);
@@ -6629,7 +6629,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
         // Brief metadata line
         var meta = document.createElement('div');
-        meta.style.cssText = 'display:flex;align-items:center;gap:6px;color:var(--ngodb-text-muted,#64748b);font-size:12px;';
+        meta.style.cssText = 'display:flex;align-items:center;gap:6px;color:var(--humdb-text-muted,#64748b);font-size:12px;';
         var iconEl = document.createElement('i');
         iconEl.className = 'fas ' + icon;
         iconEl.setAttribute('aria-hidden', 'true');
@@ -6668,7 +6668,7 @@ if (typeof module !== 'undefined' && module.exports) {
         })();
 
         var hint = document.createElement('div');
-        hint.style.cssText = 'font-size:12px;color:var(--ngodb-text-muted,#64748b);';
+        hint.style.cssText = 'font-size:12px;color:var(--humdb-text-muted,#64748b);';
         if (immersiveUrl) {
             hint.appendChild(document.createTextNode('Interactive visualization available in '));
             var fullViewLink = document.createElement('a');
@@ -6676,7 +6676,7 @@ if (typeof module !== 'undefined' && module.exports) {
             fullViewLink.target = '_blank';
             fullViewLink.rel = 'noopener';
             fullViewLink.textContent = 'full view';
-            fullViewLink.style.cssText = 'color:var(--ngodb-link,#2563eb);text-decoration:underline;';
+            fullViewLink.style.cssText = 'color:var(--humdb-link,#2563eb);text-decoration:underline;';
             hint.appendChild(fullViewLink);
             hint.appendChild(document.createTextNode('.'));
         } else {

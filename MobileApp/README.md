@@ -1,6 +1,6 @@
-# NGO Databank Mobile App
+# Humanitarian Databank Mobile App
 
-Generic Flutter mobile application for NGO Databank ecosystems. Point it at your Backoffice URL and organization profile (`assets/config/organization_config.*.json`).
+Generic Flutter mobile application for Humanitarian Databank ecosystems. Point it at your Backoffice URL and organization profile (`assets/config/organization_config.*.json`).
 
 ## Features
 
@@ -177,8 +177,8 @@ The app supports two authentication methods:
 2. **Azure AD B2C**: Single sign-on with your organization’s identity provider (when configured)
 
 Quick test logins are available for development:
-- Admin: `test_admin@ngo.org` / `test123`
-- Focal Point: `test_focal@ngo.org` / `test123`
+- Admin: `test_admin@humdatabank.org` / `test123`
+- Focal Point: `test_focal@humdatabank.org` / `test123`
 
 ## WebView Integration
 
@@ -231,7 +231,7 @@ Example:
 # Build with a named organization profile (example: ifrc)
 flutter build appbundle --release --dart-define=ORGANIZATION_CONFIG=ifrc --dart-define=PRODUCTION=true
 
-# Build with default NGO Databank configuration
+# Build with default Humanitarian Databank configuration
 flutter build appbundle --release --dart-define=PRODUCTION=true
 ```
 
@@ -378,7 +378,7 @@ All documentation is organized under `docs/`.
 - **Organization config JSON reference**: [`assets/config/README.md`](assets/config/README.md)
 
 ## Privacy Policy
-The NGO Databank mobile app collects and processes user data as described in your deployment’s Privacy Policy.
+The Humanitarian Databank mobile app collects and processes user data as described in your deployment’s Privacy Policy.
 
 **Privacy Policy URL:** https://website-databank.fly.dev/privacy-policy
 
@@ -392,7 +392,7 @@ For detailed information about data collection, usage, and user rights, please v
 
 **Proprietary — see repository LICENSE**
 
-This mobile app component is part of the NGO Databank ecosystem. Licensing and authorized use are defined in [LICENSE](../../LICENSE); do not use or distribute outside the terms that apply to your deployment.
+This mobile app component is part of the Humanitarian Databank ecosystem. Licensing and authorized use are defined in [LICENSE](../../LICENSE); do not use or distribute outside the terms that apply to your deployment.
 This mobile app component is part of the IFRC Network Databank ecosystem, which is proprietary software developed by Haytham ALSOUFI as an individual and is licensed for use by the International Federation of Red Cross and Red Crescent Societies (IFRC) Secretariat and its network of National Societies. Use is restricted to the IFRC network only. See [LICENSE](../../LICENSE) for complete license terms.
 
 For licensing inquiries, permissions, or questions about authorized use, please contact:

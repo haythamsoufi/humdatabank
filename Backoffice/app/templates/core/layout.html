@@ -256,17 +256,17 @@
             // Check for mobile app indicators (including user agent check)
             const userAgent = navigator.userAgent || '';
             const isMobileApp = window.isMobileApp === true ||
-                               window.NGODatabankMobileApp === true ||
+                               window.humdatabankMobileApp === true ||
                                window.IFRCMobileApp === true ||
                                userAgent.includes('wv') || // Android WebView
                                userAgent.includes('Flutter') || // Flutter WebView
-                               userAgent.includes('NGO-Databank') ||
+                               userAgent.includes('hum-databank') ||
                                userAgent.includes('IFRC-Databank'); // legacy custom UA
 
             if (isMobileApp) {
                 // Set flag immediately
                 window.isMobileApp = true;
-                window.NGODatabankMobileApp = true;
+                window.humdatabankMobileApp = true;
                 window.IFRCMobileApp = true;
 
                 // Set attribute on document element as soon as possible
@@ -558,7 +558,7 @@
                 {% endblock %}
             </nav>
             <div class="sidebar-footer">
-                {{ _('Powered by') }} <a href="https://github.com/haythamsoufi/ngodatabank" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:text-blue-200 underline transition-colors duration-150">{{ _('NGO Databank') }} <i class="fas fa-external-link-alt text-xs ml-1" aria-hidden="true"></i></a>
+                {{ _('Powered by') }} <a href="https://github.com/haythamsoufi/humdatabank" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:text-blue-200 underline transition-colors duration-150">{{ _('Humanitarian Databank') }} <i class="fas fa-external-link-alt text-xs ml-1" aria-hidden="true"></i></a>
             </div>
         </aside>
         {% endif %}
@@ -1085,7 +1085,7 @@
             {% endblock %}
         </nav>
         <div class="sidebar-footer">
-             {{ _('Powered by') }} <a href="https://github.com/haythamsoufi/ngodatabank" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:text-blue-200 underline transition-colors duration-150">{{ _('NGO Databank') }} <i class="fas fa-external-link-alt text-xs ml-1" aria-hidden="true"></i></a>
+             {{ _('Powered by') }} <a href="https://github.com/haythamsoufi/humdatabank" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:text-blue-200 underline transition-colors duration-150">{{ _('Humanitarian Databank') }} <i class="fas fa-external-link-alt text-xs ml-1" aria-hidden="true"></i></a>
         </div>
     </div>
     {% endif %}
@@ -1152,7 +1152,7 @@
                         </p>
                         <button type="button" id="chatAiPolicyLinkBtn" class="chat-ai-policy-link-btn">{{ _('View AI policy') }}</button>
                         <button type="button" id="chatAiPolicyAckBtn" class="chat-ai-policy-ack-btn">{{ _('I understand') }}</button>
-                        <script nonce="{{ csp_nonce() }}">try{if(localStorage.getItem('ngodb_chatbot_ai_policy_acknowledged')==='1'){var b=document.getElementById('chatAiPolicyAckBtn');if(b)b.style.display='none';}}catch(_){}</script>
+                        <script nonce="{{ csp_nonce() }}">try{if(localStorage.getItem('humdb_chatbot_ai_policy_acknowledged')==='1'){var b=document.getElementById('chatAiPolicyAckBtn');if(b)b.style.display='none';}}catch(_){}</script>
                     </div>
                 </div>
             </div>

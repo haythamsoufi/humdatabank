@@ -645,7 +645,7 @@ export default function ExploreDataPage() {
     // Footer label on exported chart
     ctx.fillStyle = '#ED1C24';
     ctx.font = '16px Inter';
-    ctx.fillText('NGO Databank', canvas.width / 2, canvas.height - 20);
+    ctx.fillText('Humanitarian Databank', canvas.width / 2, canvas.height - 20);
 
     // Convert to blob and download
     canvas.toBlob((blob) => {
@@ -774,25 +774,25 @@ export default function ExploreDataPage() {
 
     return (
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-ngodb-gray-200">
+        <table className="w-full border-collapse border border-humdb-gray-200">
           <thead>
-            <tr className="bg-ngodb-navy text-white">
-              <th className="border border-ngodb-gray-200 px-4 py-3 text-left">{t('exploreData.chart.tableHeaders.value')}</th>
-              <th className="border border-ngodb-gray-200 px-4 py-3 text-left">{t('exploreData.chart.tableHeaders.year')}</th>
+            <tr className="bg-humdb-navy text-white">
+              <th className="border border-humdb-gray-200 px-4 py-3 text-left">{t('exploreData.chart.tableHeaders.value')}</th>
+              <th className="border border-humdb-gray-200 px-4 py-3 text-left">{t('exploreData.chart.tableHeaders.year')}</th>
               {showCountryColumn && (
-                <th className="border border-ngodb-gray-200 px-4 py-3 text-left">{t('exploreData.chart.tableHeaders.country')}</th>
+                <th className="border border-humdb-gray-200 px-4 py-3 text-left">{t('exploreData.chart.tableHeaders.country')}</th>
               )}
             </tr>
           </thead>
           <tbody>
             {tableData.map((item, index) => (
-              <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-ngodb-gray-50'}>
-                <td className="border border-ngodb-gray-200 px-4 py-3 font-medium text-ngodb-red">
+              <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-humdb-gray-50'}>
+                <td className="border border-humdb-gray-200 px-4 py-3 font-medium text-humdb-red">
                   {item.value.toLocaleString()}
                 </td>
-                <td className="border border-ngodb-gray-200 px-4 py-3">{item.year}</td>
+                <td className="border border-humdb-gray-200 px-4 py-3">{item.year}</td>
                 {showCountryColumn && (
-                  <td className="border border-ngodb-gray-200 px-4 py-3">{item.country}</td>
+                  <td className="border border-humdb-gray-200 px-4 py-3">{item.country}</td>
                 )}
               </tr>
             ))}
@@ -808,13 +808,13 @@ export default function ExploreDataPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="bg-white rounded-xl shadow-lg border border-ngodb-gray-100 overflow-hidden"
+      className="bg-white rounded-xl shadow-lg border border-humdb-gray-100 overflow-hidden"
     >
-      <div className="bg-gradient-to-r from-ngodb-navy to-ngodb-navy-dark px-6 py-4">
+      <div className="bg-gradient-to-r from-humdb-navy to-humdb-navy-dark px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-white mb-1">{t('exploreData.placeholder.title')}</h3>
-            <p className="text-ngodb-gray-200 text-sm">{t('exploreData.placeholder.subtitle')}</p>
+            <p className="text-humdb-gray-200 text-sm">{t('exploreData.placeholder.subtitle')}</p>
           </div>
         </div>
       </div>
@@ -822,25 +822,25 @@ export default function ExploreDataPage() {
       <div className="p-12 text-center">
         <div className="max-w-md mx-auto">
           <div className="mb-6">
-            <svg className="w-24 h-24 mx-auto text-ngodb-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-24 h-24 mx-auto text-humdb-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </div>
-          <h4 className="text-xl font-semibold text-ngodb-navy mb-3">{t('exploreData.placeholder.noChartGenerated')}</h4>
-          <p className="text-ngodb-gray-600 mb-6">
+          <h4 className="text-xl font-semibold text-humdb-navy mb-3">{t('exploreData.placeholder.noChartGenerated')}</h4>
+          <p className="text-humdb-gray-600 mb-6">
             {t('exploreData.placeholder.description')}
           </p>
-          <div className="space-y-3 text-sm text-ngodb-gray-500">
+          <div className="space-y-3 text-sm text-humdb-gray-500">
             <div className="flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 bg-ngodb-red rounded-full"></div>
+              <div className="w-2 h-2 bg-humdb-red rounded-full"></div>
               <span>{t('exploreData.placeholder.feature1')}</span>
             </div>
             <div className="flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 bg-ngodb-red rounded-full"></div>
+              <div className="w-2 h-2 bg-humdb-red rounded-full"></div>
               <span>{t('exploreData.placeholder.feature2')}</span>
             </div>
             <div className="flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 bg-ngodb-red rounded-full"></div>
+              <div className="w-2 h-2 bg-humdb-red rounded-full"></div>
               <span>{t('exploreData.placeholder.feature3')}</span>
             </div>
           </div>
@@ -873,7 +873,7 @@ export default function ExploreDataPage() {
   return (
     <>
       <Head>
-        <title>{t('exploreData.title')} - NGO Databank</title>
+        <title>{t('exploreData.title')} - Humanitarian Databank</title>
         <meta name="description" content={t('exploreData.meta.description')} />
       </Head>
 
@@ -881,7 +881,7 @@ export default function ExploreDataPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <motion.h1
-            className="text-4xl sm:text-5xl font-extrabold text-ngodb-navy mb-4"
+            className="text-4xl sm:text-5xl font-extrabold text-humdb-navy mb-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -889,7 +889,7 @@ export default function ExploreDataPage() {
             {t('exploreData.hero.title')}
           </motion.h1>
           <motion.p
-            className="text-lg text-ngodb-gray-600 max-w-3xl mx-auto"
+            className="text-lg text-humdb-gray-600 max-w-3xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
@@ -910,26 +910,26 @@ export default function ExploreDataPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
               >
-                <h2 className="text-2xl font-bold text-ngodb-navy mb-6">{t('exploreData.configure.title')}</h2>
+                <h2 className="text-2xl font-bold text-humdb-navy mb-6">{t('exploreData.configure.title')}</h2>
 
                 {/* Step 1: Indicator Selection */}
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-ngodb-navy mb-4 flex items-center">
-                    <span className="w-6 h-6 bg-ngodb-red text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">1</span>
+                  <h3 className="text-lg font-semibold text-humdb-navy mb-4 flex items-center">
+                    <span className="w-6 h-6 bg-humdb-red text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">1</span>
                     {t('exploreData.configure.step1')}
                   </h3>
 
                   <div className="space-y-4">
                     {/* Sector Selection */}
                     <div>
-                      <label className="block text-sm font-semibold text-ngodb-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-humdb-gray-700 mb-2">
                         {t('exploreData.configure.filterBySector')}
                       </label>
                       <select
                         value={selectedSector}
                         onChange={(e) => setSelectedSector(e.target.value)}
                         disabled={isLoadingData}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent disabled:bg-ngodb-gray-100"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
                       >
                         <option value="">{t('exploreData.configure.allSectors')}</option>
                         {sectors.map(sector => (
@@ -942,14 +942,14 @@ export default function ExploreDataPage() {
 
                     {/* Indicator Selection */}
                     <div>
-                      <label className="block text-sm font-semibold text-ngodb-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-humdb-gray-700 mb-2">
                         {t('exploreData.configure.selectIndicator')}
                       </label>
                       <select
                         value={selectedIndicator}
                         onChange={(e) => setSelectedIndicator(e.target.value)}
                         disabled={isLoadingData || filteredIndicators.length === 0}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent disabled:bg-ngodb-gray-100"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
                       >
                         <option value="">
                           {isLoadingData ? t('exploreData.configure.loading') : filteredIndicators.length === 0 ? t('exploreData.configure.noIndicatorsAvailable') : t('exploreData.configure.chooseIndicator')}
@@ -968,13 +968,13 @@ export default function ExploreDataPage() {
 
                 {/* Step 2: Country Selection */}
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-ngodb-navy mb-4 flex items-center">
-                    <span className="w-6 h-6 bg-ngodb-red text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">2</span>
+                  <h3 className="text-lg font-semibold text-humdb-navy mb-4 flex items-center">
+                    <span className="w-6 h-6 bg-humdb-red text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">2</span>
                     {t('exploreData.configure.step2')}
                   </h3>
 
                   <div>
-                    <label className="block text-sm font-semibold text-ngodb-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-humdb-gray-700 mb-2">
                       {t('exploreData.configure.selectCountries')}
                     </label>
                     <MultiSelectDropdown
@@ -994,7 +994,7 @@ export default function ExploreDataPage() {
                           const smartDisplay = getSmartCountryDisplay(selectedCountries, countries || []);
                           return (
                             <>
-                              <p className="text-xs text-ngodb-gray-600 mb-2">
+                              <p className="text-xs text-humdb-gray-600 mb-2">
                                 {smartDisplay.type === 'all' ? t('exploreData.configure.allCountriesSelected') :
                                  smartDisplay.type === 'regions' ? t('exploreData.configure.regionsSelected', { count: smartDisplay.completeRegions.length }) :
                                  smartDisplay.type === 'short' ? t('exploreData.configure.selected') :
@@ -1002,13 +1002,13 @@ export default function ExploreDataPage() {
                               </p>
 
                               {smartDisplay.type === 'short' && (
-                                <div className="text-xs text-ngodb-navy font-medium mb-2">
+                                <div className="text-xs text-humdb-navy font-medium mb-2">
                                   {smartDisplay.displayText}
                                 </div>
                               )}
 
                               {smartDisplay.type === 'regions' && (
-                                <div className="text-xs text-ngodb-navy font-medium mb-2">
+                                <div className="text-xs text-humdb-navy font-medium mb-2">
                                   {smartDisplay.completeRegions.join(', ')}
                                 </div>
                               )}
@@ -1018,19 +1018,19 @@ export default function ExploreDataPage() {
                                   {selectedCountries.slice(0, 10).map(country => (
                                     <span
                                       key={country.code}
-                                      className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-ngodb-red text-white"
+                                      className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-humdb-red text-white"
                                     >
                                       {country.name}
                                       <button
                                         onClick={() => toggleCountry(country)}
-                                        className="ml-1 hover:bg-ngodb-red-dark rounded-full w-3 h-3 flex items-center justify-center"
+                                        className="ml-1 hover:bg-humdb-red-dark rounded-full w-3 h-3 flex items-center justify-center"
                                       >
                                         ×
                                       </button>
                                     </span>
                                   ))}
                                   {selectedCountries.length > 10 && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-ngodb-gray-400 text-white">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-humdb-gray-400 text-white">
                                       +{selectedCountries.length - 10} more
                                     </span>
                                   )}
@@ -1046,21 +1046,21 @@ export default function ExploreDataPage() {
 
                 {/* Step 3: Period & Chart Type */}
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-ngodb-navy mb-4 flex items-center">
-                    <span className="w-6 h-6 bg-ngodb-red text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">3</span>
+                  <h3 className="text-lg font-semibold text-humdb-navy mb-4 flex items-center">
+                    <span className="w-6 h-6 bg-humdb-red text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">3</span>
                     {t('exploreData.configure.step3')}
                   </h3>
 
                   <div className="space-y-4">
                     {/* Chart Type Selection */}
                     <div>
-                      <label className="block text-sm font-semibold text-ngodb-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-humdb-gray-700 mb-2">
                         {t('exploreData.configure.chartType')}
                       </label>
                       <select
                         value={selectedChartType}
                         onChange={(e) => setSelectedChartType(e.target.value)}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                       >
                         {chartTypes.map(type => (
                           <option key={type.id} value={type.id}>
@@ -1072,20 +1072,20 @@ export default function ExploreDataPage() {
 
                     {/* Time Period Selection */}
                     <div>
-                      <label className="block text-sm font-semibold text-ngodb-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-humdb-gray-700 mb-2">
                         {t('exploreData.configure.timePeriod')}
                       </label>
 
                       {/* Selection Mode Toggle */}
                       <div className="mb-3">
-                        <div className="flex bg-ngodb-gray-100 rounded-lg p-1">
+                        <div className="flex bg-humdb-gray-100 rounded-lg p-1">
                           <button
                             type="button"
                             onClick={() => setPeriodSelectionMode('single')}
                             className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ${
                               periodSelectionMode === 'single'
-                                ? 'bg-white text-ngodb-red shadow-sm'
-                                : 'text-ngodb-gray-600 hover:text-ngodb-gray-800'
+                                ? 'bg-white text-humdb-red shadow-sm'
+                                : 'text-humdb-gray-600 hover:text-humdb-gray-800'
                             }`}
                           >
                             {t('exploreData.configure.singleYear')}
@@ -1095,8 +1095,8 @@ export default function ExploreDataPage() {
                             onClick={() => setPeriodSelectionMode('range')}
                             className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ${
                               periodSelectionMode === 'range'
-                                ? 'bg-white text-ngodb-red shadow-sm'
-                                : 'text-ngodb-gray-600 hover:text-ngodb-gray-800'
+                                ? 'bg-white text-humdb-red shadow-sm'
+                                : 'text-humdb-gray-600 hover:text-humdb-gray-800'
                             }`}
                           >
                             {t('exploreData.configure.range')}
@@ -1110,7 +1110,7 @@ export default function ExploreDataPage() {
                           value={selectedSingleYear || ''}
                           onChange={(e) => setSelectedSingleYear(parseInt(e.target.value))}
                           disabled={isLoadingData || availablePeriods.length === 0}
-                          className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent disabled:bg-ngodb-gray-100"
+                          className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
                         >
                           <option value="">
                             {isLoadingData ? t('exploreData.configure.loadingPeriods') : t('exploreData.configure.selectYear')}
@@ -1132,14 +1132,14 @@ export default function ExploreDataPage() {
                         <div className="space-y-3">
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium text-ngodb-gray-600 mb-1">
+                              <label className="block text-xs font-medium text-humdb-gray-600 mb-1">
                                 {t('exploreData.configure.fromYear')}
                               </label>
                               <select
                                 value={selectedFromYear || ''}
                                 onChange={(e) => setSelectedFromYear(parseInt(e.target.value))}
                                 disabled={isLoadingData || availablePeriods.length === 0}
-                                className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent disabled:bg-ngodb-gray-100 text-sm"
+                                className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100 text-sm"
                               >
                                 <option value="">
                                   {isLoadingData ? t('exploreData.configure.loading') : t('exploreData.configure.from')}
@@ -1156,14 +1156,14 @@ export default function ExploreDataPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-ngodb-gray-600 mb-1">
+                              <label className="block text-xs font-medium text-humdb-gray-600 mb-1">
                                 {t('exploreData.configure.toYear')}
                               </label>
                               <select
                                 value={selectedToYear || ''}
                                 onChange={(e) => setSelectedToYear(parseInt(e.target.value))}
                                 disabled={isLoadingData || availablePeriods.length === 0}
-                                className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ngodb-red focus:border-transparent disabled:bg-ngodb-gray-100 text-sm"
+                                className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100 text-sm"
                               >
                                 <option value="">
                                   {isLoadingData ? t('exploreData.configure.loading') : t('exploreData.configure.to')}
@@ -1183,13 +1183,13 @@ export default function ExploreDataPage() {
 
                           {/* Range Preview */}
                           {selectedFromYear && selectedToYear && (
-                            <div className="text-xs text-ngodb-gray-600 bg-ngodb-gray-50 px-3 py-2 rounded-lg">
+                            <div className="text-xs text-humdb-gray-600 bg-humdb-gray-50 px-3 py-2 rounded-lg">
                               {t('exploreData.configure.selectedRange', {
                                 from: Math.min(selectedFromYear, selectedToYear),
                                 to: Math.max(selectedFromYear, selectedToYear)
                               })}
                               {selectedYears.length > 0 && (
-                                <span className="ml-2 text-ngodb-red font-medium">
+                                <span className="ml-2 text-humdb-red font-medium">
                                   ({t('exploreData.configure.years', { count: selectedYears.length })})
                                 </span>
                               )}
@@ -1218,8 +1218,8 @@ export default function ExploreDataPage() {
                       isLoading ||
                       (periodSelectionMode === 'single' && !selectedSingleYear) ||
                       (periodSelectionMode === 'range' && (!selectedFromYear || !selectedToYear))
-                        ? 'bg-ngodb-gray-400 cursor-not-allowed'
-                        : 'bg-ngodb-red hover:bg-ngodb-red-dark'
+                        ? 'bg-humdb-gray-400 cursor-not-allowed'
+                        : 'bg-humdb-red hover:bg-humdb-red-dark'
                     }`}
                   >
                     {isLoading ? t('exploreData.configure.generating') : t('exploreData.configure.generateChart')}
@@ -1227,7 +1227,7 @@ export default function ExploreDataPage() {
 
                   <button
                     onClick={handleClearCache}
-                    className="w-full px-6 py-2 rounded-lg font-medium text-ngodb-gray-600 border border-ngodb-gray-300 hover:bg-ngodb-gray-50 transition-colors duration-150"
+                    className="w-full px-6 py-2 rounded-lg font-medium text-humdb-gray-600 border border-humdb-gray-300 hover:bg-humdb-gray-50 transition-colors duration-150"
                   >
                     {t('exploreData.configure.clearSavedConfiguration')}
                   </button>
@@ -1235,15 +1235,15 @@ export default function ExploreDataPage() {
 
                 {/* Summary */}
                 {(selectedIndicator || selectedCountries.length > 0) && (
-                  <div className="mt-6 p-4 bg-ngodb-gray-50 rounded-lg border border-ngodb-gray-200">
-                    <h4 className="font-semibold text-ngodb-navy mb-3 text-sm">{t('exploreData.configure.summary')}</h4>
+                  <div className="mt-6 p-4 bg-humdb-gray-50 rounded-lg border border-humdb-gray-200">
+                    <h4 className="font-semibold text-humdb-navy mb-3 text-sm">{t('exploreData.configure.summary')}</h4>
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-ngodb-gray-600">{t('exploreData.configure.indicator')}</span>
+                        <span className="text-humdb-gray-600">{t('exploreData.configure.indicator')}</span>
                         <span className="font-medium">{filteredIndicators.find(ind => ind.id === selectedIndicator)?.localized_name || filteredIndicators.find(ind => ind.id === selectedIndicator)?.name || t('exploreData.configure.notSelected')}</span>
                       </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.configure.countries')}</span>
+                              <span className="text-humdb-gray-600">{t('exploreData.configure.countries')}</span>
                               <span className="font-medium">
                                 {(() => {
                                   const smartDisplay = getSmartCountryDisplay(selectedCountries, countries || []);
@@ -1254,7 +1254,7 @@ export default function ExploreDataPage() {
                               </span>
                             </div>
                       <div className="flex justify-between">
-                        <span className="text-ngodb-gray-600">{t('exploreData.configure.period')}</span>
+                        <span className="text-humdb-gray-600">{t('exploreData.configure.period')}</span>
                         <span className="font-medium">
                           {periodSelectionMode === 'single' && selectedSingleYear ?
                             selectedSingleYear :
@@ -1278,24 +1278,24 @@ export default function ExploreDataPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6 }}
-                  className="bg-white rounded-xl shadow-lg border border-ngodb-gray-100 mb-12 overflow-hidden"
+                  className="bg-white rounded-xl shadow-lg border border-humdb-gray-100 mb-12 overflow-hidden"
                 >
                   {/* Chart Header */}
-                  <div className="bg-gradient-to-r from-ngodb-navy to-ngodb-navy-dark px-6 py-4">
+                  <div className="bg-gradient-to-r from-humdb-navy to-humdb-navy-dark px-6 py-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-xl font-bold text-white mb-1">{t('exploreData.chart.title')}</h3>
-                        <p className="text-ngodb-gray-200 text-sm">{chartData.title}</p>
+                        <p className="text-humdb-gray-200 text-sm">{chartData.title}</p>
                       </div>
                       <div className="flex items-center space-x-3">
                         {/* View Toggle */}
-                        <div className="flex items-center bg-ngodb-navy-dark rounded-lg p-1">
+                        <div className="flex items-center bg-humdb-navy-dark rounded-lg p-1">
                           <button
                             onClick={() => setViewMode('chart')}
                             className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-150 ${
                               viewMode === 'chart'
-                                ? 'bg-ngodb-red text-white'
-                                : 'text-ngodb-gray-200 hover:text-white'
+                                ? 'bg-humdb-red text-white'
+                                : 'text-humdb-gray-200 hover:text-white'
                             }`}
                           >
                             <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1307,8 +1307,8 @@ export default function ExploreDataPage() {
                             onClick={() => setViewMode('table')}
                             className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-150 ${
                               viewMode === 'table'
-                                ? 'bg-ngodb-red text-white'
-                                : 'text-ngodb-gray-200 hover:text-white'
+                                ? 'bg-humdb-red text-white'
+                                : 'text-humdb-gray-200 hover:text-white'
                             }`}
                           >
                             <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1319,7 +1319,7 @@ export default function ExploreDataPage() {
                         </div>
 
                         <div className="text-right text-white">
-                          <div className="text-xs text-ngodb-gray-200">{t('exploreData.chart.generatedOn')}</div>
+                          <div className="text-xs text-humdb-gray-200">{t('exploreData.chart.generatedOn')}</div>
                           <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
                         </div>
 
@@ -1327,7 +1327,7 @@ export default function ExploreDataPage() {
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={downloadDataAsCSV}
-                            className="px-3 py-2 bg-ngodb-gray-600 text-white rounded-lg hover:bg-ngodb-gray-700 transition-colors duration-150 flex items-center space-x-2 shadow-lg"
+                            className="px-3 py-2 bg-humdb-gray-600 text-white rounded-lg hover:bg-humdb-gray-700 transition-colors duration-150 flex items-center space-x-2 shadow-lg"
                             title={t('exploreData.chart.downloadData')}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1337,7 +1337,7 @@ export default function ExploreDataPage() {
                           </button>
                           <button
                             onClick={downloadChart}
-                            className="px-4 py-2 bg-ngodb-red text-white rounded-lg hover:bg-ngodb-red-dark transition-colors duration-150 flex items-center space-x-2 shadow-lg"
+                            className="px-4 py-2 bg-humdb-red text-white rounded-lg hover:bg-humdb-red-dark transition-colors duration-150 flex items-center space-x-2 shadow-lg"
                             title={t('exploreData.chart.downloadChart')}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1366,10 +1366,10 @@ export default function ExploreDataPage() {
                                 onSummaryStats={setSummaryStats}
                               />
                             ) : (
-                              <div className="flex items-center justify-center h-96 bg-ngodb-gray-50 rounded-lg">
+                              <div className="flex items-center justify-center h-96 bg-humdb-gray-50 rounded-lg">
                                 <div className="text-center">
-                                  <p className="text-ngodb-gray-600 mb-2">{t('exploreData.chart.noChartData')}</p>
-                                  <p className="text-sm text-ngodb-gray-500">{t('exploreData.chart.checkConsole')}</p>
+                                  <p className="text-humdb-gray-600 mb-2">{t('exploreData.chart.noChartData')}</p>
+                                  <p className="text-sm text-humdb-gray-500">{t('exploreData.chart.checkConsole')}</p>
                                 </div>
                               </div>
                             )
@@ -1382,8 +1382,8 @@ export default function ExploreDataPage() {
                       {/* Chart Info Panel */}
                       <div className="space-y-6">
                         {/* Configuration Summary */}
-                        <div className="bg-ngodb-gray-50 rounded-lg p-4 border border-ngodb-gray-200">
-                          <h4 className="font-semibold text-ngodb-navy mb-3 flex items-center">
+                        <div className="bg-humdb-gray-50 rounded-lg p-4 border border-humdb-gray-200">
+                          <h4 className="font-semibold text-humdb-navy mb-3 flex items-center">
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
@@ -1391,26 +1391,26 @@ export default function ExploreDataPage() {
                           </h4>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.chart.sector')}</span>
-                              <span className="font-medium text-ngodb-navy">
+                              <span className="text-humdb-gray-600">{t('exploreData.chart.sector')}</span>
+                              <span className="font-medium text-humdb-navy">
                                 {selectedSector || t('exploreData.configure.allSectors')}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.configure.indicator')}</span>
-                              <span className="font-medium text-ngodb-navy">
+                              <span className="text-humdb-gray-600">{t('exploreData.configure.indicator')}</span>
+                              <span className="font-medium text-humdb-navy">
                                 {filteredIndicators.find(ind => ind.id === selectedIndicator)?.localized_name || filteredIndicators.find(ind => ind.id === selectedIndicator)?.name}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.chart.chartType')}</span>
-                              <span className="font-medium text-ngodb-navy">
+                              <span className="text-humdb-gray-600">{t('exploreData.chart.chartType')}</span>
+                              <span className="font-medium text-humdb-navy">
                                 {t(`exploreData.chartTypes.${selectedChartType}.name`)}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.configure.countries')}</span>
-                              <span className="font-medium text-ngodb-navy">
+                              <span className="text-humdb-gray-600">{t('exploreData.configure.countries')}</span>
+                              <span className="font-medium text-humdb-navy">
                                 {(() => {
                                   const smartDisplay = getSmartCountryDisplay(selectedCountries, countries || []);
                                   return smartDisplay.type === 'all' ? t('exploreData.configure.allCountriesSelected') :
@@ -1420,8 +1420,8 @@ export default function ExploreDataPage() {
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.chart.years')}</span>
-                              <span className="font-medium text-ngodb-navy">
+                              <span className="text-humdb-gray-600">{t('exploreData.chart.years')}</span>
+                              <span className="font-medium text-humdb-navy">
                                 {periodSelectionMode === 'single' && selectedSingleYear ?
                                   selectedSingleYear :
                                   selectedYears.length > 0 ?
@@ -1434,8 +1434,8 @@ export default function ExploreDataPage() {
                         </div>
 
                         {/* Data Summary */}
-                        <div className="bg-ngodb-gray-50 rounded-lg p-4 border border-ngodb-gray-200">
-                          <h4 className="font-semibold text-ngodb-navy mb-3 flex items-center">
+                        <div className="bg-humdb-gray-50 rounded-lg p-4 border border-humdb-gray-200">
+                          <h4 className="font-semibold text-humdb-navy mb-3 flex items-center">
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                             </svg>
@@ -1443,24 +1443,24 @@ export default function ExploreDataPage() {
                           </h4>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.chart.totalDataPoints')}</span>
-                              <span className="font-medium text-ngodb-navy">{chartData.data.length}</span>
+                              <span className="text-humdb-gray-600">{t('exploreData.chart.totalDataPoints')}</span>
+                              <span className="font-medium text-humdb-navy">{chartData.data.length}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.chart.maxValue')}</span>
-                              <span className="font-medium text-ngodb-red">
+                              <span className="text-humdb-gray-600">{t('exploreData.chart.maxValue')}</span>
+                              <span className="font-medium text-humdb-red">
                                 {Math.max(...chartData.data.map(d => d.value)).toLocaleString()}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.chart.minValue')}</span>
-                              <span className="font-medium text-ngodb-red">
+                              <span className="text-humdb-gray-600">{t('exploreData.chart.minValue')}</span>
+                              <span className="font-medium text-humdb-red">
                                 {Math.min(...chartData.data.map(d => d.value)).toLocaleString()}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ngodb-gray-600">{t('exploreData.chart.average')}</span>
-                              <span className="font-medium text-ngodb-red">
+                              <span className="text-humdb-gray-600">{t('exploreData.chart.average')}</span>
+                              <span className="font-medium text-humdb-red">
                                 {Math.round(chartData.data.reduce((sum, d) => sum + d.value, 0) / chartData.data.length).toLocaleString()}
                               </span>
                             </div>
@@ -1468,8 +1468,8 @@ export default function ExploreDataPage() {
                         </div>
 
                         {/* Selected Countries */}
-                        <div className="bg-ngodb-gray-50 rounded-lg p-4 border border-ngodb-gray-200">
-                          <h4 className="font-semibold text-ngodb-navy mb-3 flex items-center">
+                        <div className="bg-humdb-gray-50 rounded-lg p-4 border border-humdb-gray-200">
+                          <h4 className="font-semibold text-humdb-navy mb-3 flex items-center">
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -1486,7 +1486,7 @@ export default function ExploreDataPage() {
 
                               if (smartDisplay.type === 'all') {
                                 return (
-                                  <div className="text-sm text-ngodb-navy font-medium">
+                                  <div className="text-sm text-humdb-navy font-medium">
                                     {t('exploreData.chart.allCountriesSelected')}
                                   </div>
                                 );
@@ -1497,8 +1497,8 @@ export default function ExploreDataPage() {
                                   <div className="space-y-1">
                                     {smartDisplay.completeRegions.map(region => (
                                       <div key={region} className="text-sm">
-                                        <span className="text-ngodb-navy font-medium">{region}</span>
-                                        <span className="text-ngodb-gray-500 text-xs ml-2">{t('exploreData.chart.entireRegion')}</span>
+                                        <span className="text-humdb-navy font-medium">{region}</span>
+                                        <span className="text-humdb-gray-500 text-xs ml-2">{t('exploreData.chart.entireRegion')}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -1511,23 +1511,23 @@ export default function ExploreDataPage() {
                                     <>
                                       {smartDisplay.completeRegions.map(region => (
                                         <div key={region} className="text-sm">
-                                          <span className="text-ngodb-navy font-medium">{region}</span>
-                                          <span className="text-ngodb-gray-500 text-xs ml-2">{t('exploreData.chart.entireRegion')}</span>
+                                          <span className="text-humdb-navy font-medium">{region}</span>
+                                          <span className="text-humdb-gray-500 text-xs ml-2">{t('exploreData.chart.entireRegion')}</span>
                                         </div>
                                       ))}
                                       {smartDisplay.partialCountries.length > 0 && (
-                                        <div className="border-t border-ngodb-gray-200 pt-2 mt-2"></div>
+                                        <div className="border-t border-humdb-gray-200 pt-2 mt-2"></div>
                                       )}
                                     </>
                                   )}
                                   {smartDisplay.partialCountries.slice(0, 8).map(country => (
                                     <div key={country.code} className="flex items-center justify-between text-sm">
-                                      <span className="text-ngodb-gray-700">{country.name}</span>
-                                      <span className="text-ngodb-gray-500 text-xs">{country.region}</span>
+                                      <span className="text-humdb-gray-700">{country.name}</span>
+                                      <span className="text-humdb-gray-500 text-xs">{country.region}</span>
                                     </div>
                                   ))}
                                   {smartDisplay.partialCountries.length > 8 && (
-                                    <div className="text-xs text-ngodb-gray-500 italic">
+                                    <div className="text-xs text-humdb-gray-500 italic">
                                       {t('exploreData.chart.moreCountries', { count: smartDisplay.partialCountries.length - 8 })}
                                     </div>
                                   )}
@@ -1546,26 +1546,26 @@ export default function ExploreDataPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.6, delay: 0.2 }}
-                      className="mt-6 p-4 bg-ngodb-gray-50 rounded-lg border border-ngodb-gray-200"
+                      className="mt-6 p-4 bg-humdb-gray-50 rounded-lg border border-humdb-gray-200"
                     >
-                      <h4 className="font-semibold text-ngodb-navy mb-4 flex items-center">
+                      <h4 className="font-semibold text-humdb-navy mb-4 flex items-center">
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                         {t('exploreData.chart.keyStatistics')}
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-3 bg-white rounded-lg border border-ngodb-gray-200">
-                          <div className="text-sm text-ngodb-gray-600 mb-1">{t('exploreData.chart.totalGrowth')}</div>
-                          <div className="text-2xl font-bold text-ngodb-navy">{summaryStats.totalGrowth}%</div>
+                        <div className="text-center p-3 bg-white rounded-lg border border-humdb-gray-200">
+                          <div className="text-sm text-humdb-gray-600 mb-1">{t('exploreData.chart.totalGrowth')}</div>
+                          <div className="text-2xl font-bold text-humdb-navy">{summaryStats.totalGrowth}%</div>
                         </div>
-                        <div className="text-center p-3 bg-white rounded-lg border border-ngodb-gray-200">
-                          <div className="text-sm text-ngodb-gray-600 mb-1">{t('exploreData.chart.currentTotal')}</div>
-                          <div className="text-2xl font-bold text-ngodb-red">{summaryStats.currentTotal}</div>
+                        <div className="text-center p-3 bg-white rounded-lg border border-humdb-gray-200">
+                          <div className="text-sm text-humdb-gray-600 mb-1">{t('exploreData.chart.currentTotal')}</div>
+                          <div className="text-2xl font-bold text-humdb-red">{summaryStats.currentTotal}</div>
                         </div>
-                        <div className="text-center p-3 bg-white rounded-lg border border-ngodb-gray-200">
-                          <div className="text-sm text-ngodb-gray-600 mb-1">{t('exploreData.chart.averageAnnualGrowth')}</div>
-                          <div className="text-2xl font-bold text-ngodb-navy">{summaryStats.avgAnnualGrowth}%</div>
+                        <div className="text-center p-3 bg-white rounded-lg border border-humdb-gray-200">
+                          <div className="text-sm text-humdb-gray-600 mb-1">{t('exploreData.chart.averageAnnualGrowth')}</div>
+                          <div className="text-2xl font-bold text-humdb-navy">{summaryStats.avgAnnualGrowth}%</div>
                         </div>
                       </div>
                     </motion.div>
@@ -1582,8 +1582,8 @@ export default function ExploreDataPage() {
                   animate={{ opacity: 1 }}
                   className="bg-white rounded-xl shadow-lg p-6 text-center"
                 >
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mx-auto mb-4"></div>
-                  <p className="text-ngodb-gray-600">{t('exploreData.loading.generating')}</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mx-auto mb-4"></div>
+                  <p className="text-humdb-gray-600">{t('exploreData.loading.generating')}</p>
                 </motion.div>
               )}
 
@@ -1594,8 +1594,8 @@ export default function ExploreDataPage() {
                   animate={{ opacity: 1 }}
                   className="bg-white rounded-xl shadow-lg p-6 text-center"
                 >
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mx-auto mb-4"></div>
-                  <p className="text-ngodb-gray-600">{t('exploreData.loading.loadingData')}</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mx-auto mb-4"></div>
+                  <p className="text-humdb-gray-600">{t('exploreData.loading.loadingData')}</p>
                 </motion.div>
               )}
             </div>

@@ -1,7 +1,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: NGO Databank 1.0\n"
+"Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-04-11 01:11+0200\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
@@ -9372,8 +9372,8 @@ msgid "N/A"
 msgstr "Nincs"
 
 #: app/templates/core/layout.html:557 app/templates/core/layout.html:1080
-msgid "NGO Databank"
-msgstr "NGO Databank"
+msgid "Humanitarian Databank"
+msgstr "Humanitarian Databank"
 
 #: app/templates/admin/analytics/audit_trail.html:1222
 #: app/templates/components/entity_dropdown.html:68
@@ -17833,11 +17833,11 @@ msgid "e.g., Monthly Newsletter, System Maintenance"
 msgstr "például havi hírlevél, rendszerkarbantartás"
 
 #: app/templates/admin/settings/manage_settings.html:296
-msgid "e.g., NGO"
+msgid "e.g., IFRC"
 msgstr "például civil szervezetek"
 
 #: app/templates/admin/settings/manage_settings.html:282
-msgid "e.g., NGO Databank"
+msgid "e.g., Humanitarian Databank"
 msgstr "például a Databank nevű civil szervezet"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:136
@@ -17865,13 +17865,13 @@ msgid "e.g., https://example.com or /forms/assignment/123"
 msgstr "például https://example.com vagy /forms/assignment/123"
 
 #: app/templates/admin/settings/manage_settings.html:413
-msgid "e.g., https://ngo.org/indicator-bank"
-msgstr "például, https://ngo.org/indicator-bank"
+msgid "e.g., https://example.org/indicator-bank"
+msgstr "például, https://example.org/indicator-bank"
 
 #: app/templates/admin/settings/manage_settings.html:403
 #, python-brace-format
-msgid "e.g., https://ngo.org/{id}"
-msgstr "például, https://ngo.org/{id}"
+msgid "e.g., https://example.org/{id}"
+msgstr "például, https://example.org/{id}"
 
 #: app/templates/admin/settings/manage_settings.html:352
 msgid "e.g., logo.svg"
@@ -17879,8 +17879,8 @@ msgstr "Például, logo.svg"
 
 #: app/templates/admin/settings/manage_settings.html:326
 #: app/templates/admin/settings/manage_settings.html:335
-msgid "e.g., ngodatabank.org"
-msgstr "például, ngodatabank.org"
+msgid "e.g., humdatabank.org"
+msgstr "például, humdatabank.org"
 
 #: app/templates/admin/notifications/center.html:433
 #: app/templates/notifications/center.html:276

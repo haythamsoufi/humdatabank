@@ -10,7 +10,7 @@ def get_openapi_spec():
     base_url = os.environ.get('API_BASE_URL', 'http://localhost:5000')
     api_version = 'v1'
 
-    org_name = "NGO Databank"
+    org_name = "Humanitarian Databank"
     try:
         from flask import has_app_context
         if has_app_context():

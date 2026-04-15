@@ -135,14 +135,14 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
   }, [tooltipTimeout]);
 
   if (!data || data.length === 0) {
-    return <div className="text-ngodb-gray-500 text-center py-4">No data available</div>;
+    return <div className="text-humdb-gray-500 text-center py-4">No data available</div>;
   }
 
   // Filter out undefined/null values and ensure we have valid numbers
   const validData = data.filter(item => item.value !== undefined && item.value !== null && !isNaN(item.value));
 
   if (validData.length === 0) {
-    return <div className="text-ngodb-gray-500 text-center py-4">No valid data available</div>;
+    return <div className="text-humdb-gray-500 text-center py-4">No valid data available</div>;
   }
 
   const maxValue = Math.max(...validData.map(item => item.value));
@@ -153,7 +153,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
     if (maxValue === minValue) {
       return (
         <div className="text-center py-8">
-          <div className="text-ngodb-gray-500">All values are the same - cannot render bar chart</div>
+          <div className="text-humdb-gray-500">All values are the same - cannot render bar chart</div>
         </div>
       );
     }
@@ -166,15 +166,15 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
 
           return (
             <div key={index} className="flex items-center space-x-3">
-              <div className="w-24 text-sm text-ngodb-gray-600 truncate">{item.label}</div>
-              <div className="flex-1 bg-ngodb-gray-200 rounded-full h-6 relative">
+              <div className="w-24 text-sm text-humdb-gray-600 truncate">{item.label}</div>
+              <div className="flex-1 bg-humdb-gray-200 rounded-full h-6 relative">
                 <div
-                  className="bg-ngodb-red h-6 rounded-full transition-all duration-500"
+                  className="bg-humdb-red h-6 rounded-full transition-all duration-500"
                   style={{
                     width: `${validWidth}%`
                   }}
                 />
-                <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-ngodb-gray-800">
+                <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-humdb-gray-800">
                   {formatNumber(item.value, showFullValues)}
                 </span>
               </div>
@@ -195,7 +195,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
     if (maxValue === minValue) {
       return (
         <div className="text-center py-8">
-          <div className="text-ngodb-gray-500">All values are the same - cannot render line chart</div>
+          <div className="text-humdb-gray-500">All values are the same - cannot render line chart</div>
         </div>
       );
     }
@@ -298,7 +298,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
         {/* Tooltip */}
         {tooltip.show && (
           <div
-            className={`absolute z-50 bg-ngodb-navy text-white px-3 py-2 rounded-lg shadow-lg text-sm max-w-xs ${
+            className={`absolute z-50 bg-humdb-navy text-white px-3 py-2 rounded-lg shadow-lg text-sm max-w-xs ${
               tooltip.position === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
             }`}
             style={{
@@ -307,12 +307,12 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
             }}
           >
             <div className="font-semibold mb-1">{tooltip.content.title}</div>
-            <div className="text-ngodb-gray-200 text-xs">{tooltip.content.explanation}</div>
+            <div className="text-humdb-gray-200 text-xs">{tooltip.content.explanation}</div>
             <div
               className={`absolute w-0 h-0 border-l-4 border-r-4 border-transparent ${
                 tooltip.position === 'above'
-                  ? 'top-full border-t-4 border-t-ngodb-navy'
-                  : 'bottom-full border-b-4 border-b-ngodb-navy'
+                  ? 'top-full border-t-4 border-t-humdb-navy'
+                  : 'bottom-full border-b-4 border-b-humdb-navy'
               }`}
               style={{ left: '50%', transform: 'translateX(-50%)' }}
             ></div>
@@ -356,10 +356,10 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
                   setTooltipTimeout(timeout);
                 }}
               >
-                <div className="font-semibold text-ngodb-navy mb-1 text-xs leading-tight">{item.label}</div>
-                                 <div className="text-ngodb-red font-bold text-xs">{formatNumber(item.value, showFullValues)}</div>
+                <div className="font-semibold text-humdb-navy mb-1 text-xs leading-tight">{item.label}</div>
+                                 <div className="text-humdb-red font-bold text-xs">{formatNumber(item.value, showFullValues)}</div>
                 {index > 0 && (
-                  <div className="text-xs text-ngodb-gray-500 mt-1">
+                  <div className="text-xs text-humdb-gray-500 mt-1">
                     {item.value > validData[index - 1].value ? '↗' : '↘'}
                     {Math.abs(((item.value - validData[index - 1].value) / validData[index - 1].value) * 100).toFixed(1)}%
                   </div>
@@ -379,7 +379,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
     if (total === 0 || isNaN(total)) {
       return (
         <div className="text-center py-8">
-          <div className="text-ngodb-gray-500">No valid data to display</div>
+          <div className="text-humdb-gray-500">No valid data to display</div>
         </div>
       );
     }
@@ -445,8 +445,8 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
                 className="w-3 h-3 rounded"
                 style={{ backgroundColor: `hsl(${(index * 137.5) % 360}, 70%, 50%)` }}
               />
-              <span className="text-sm text-ngodb-gray-700">{item.label}</span>
-              <span className="text-sm text-ngodb-gray-500">
+              <span className="text-sm text-humdb-gray-700">{item.label}</span>
+              <span className="text-sm text-humdb-gray-500">
                 ({((item.value / total) * 100).toFixed(1)}%)
               </span>
             </div>
@@ -457,7 +457,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
   };
 
   return (
-    <div className="bg-white p-8 border border-ngodb-gray-300 relative chart-container" ref={containerRef}>
+    <div className="bg-white p-8 border border-humdb-gray-300 relative chart-container" ref={containerRef}>
       {/* Copy Data Button */}
       <button
         onClick={() => {
@@ -483,7 +483,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
 
               // Push other buttons to the left
               if (saveButton) {
-                saveButton.className = 'absolute top-4 right-24 px-3 py-1 bg-ngodb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-ngodb-red-dark save-chart-btn';
+                saveButton.className = 'absolute top-4 right-24 px-3 py-1 bg-humdb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-humdb-red-dark save-chart-btn';
               }
               if (formatButton) {
                 formatButton.className = 'absolute top-4 right-36 px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 z-30 bg-gray-100 text-gray-700 hover:bg-gray-200 format-toggle-btn';
@@ -496,7 +496,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
 
                 // Restore other buttons to original positions
                 if (saveButton) {
-                  saveButton.className = 'absolute top-4 right-16 px-3 py-1 bg-ngodb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-ngodb-red-dark save-chart-btn';
+                  saveButton.className = 'absolute top-4 right-16 px-3 py-1 bg-humdb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-humdb-red-dark save-chart-btn';
                 }
                 if (formatButton) {
                   formatButton.className = 'absolute top-4 right-28 px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 z-30 bg-gray-100 text-gray-700 hover:bg-gray-200 format-toggle-btn';
@@ -505,7 +505,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
             }
           });
         }}
-        className="absolute top-4 right-4 px-3 py-1 bg-ngodb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-ngodb-red-dark copy-data-btn"
+        className="absolute top-4 right-4 px-3 py-1 bg-humdb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-humdb-red-dark copy-data-btn"
         title="Copy data as CSV"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -527,7 +527,7 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
             });
           }
         }}
-        className="absolute top-4 right-16 px-3 py-1 bg-ngodb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-ngodb-red-dark save-chart-btn"
+        className="absolute top-4 right-16 px-3 py-1 bg-humdb-red text-white rounded-md text-xs font-medium transition-all duration-200 z-30 hover:bg-humdb-red-dark save-chart-btn"
         title="Save chart as PNG"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -550,11 +550,11 @@ const MultiChart = ({ data, type = 'bar', title, height = 200, onSummaryStats })
 
       {title && (
         <div className="mb-6">
-          <h3 className="text-xl font-bold text-ngodb-navy mb-2">{title}</h3>
-          <p className="text-xs text-ngodb-gray-500 mb-2">
-            Data source: NGO Databank
+          <h3 className="text-xl font-bold text-humdb-navy mb-2">{title}</h3>
+          <p className="text-xs text-humdb-gray-500 mb-2">
+            Data source: Humanitarian Databank
           </p>
-          <div className="w-12 h-1 bg-ngodb-red rounded-full"></div>
+          <div className="w-12 h-1 bg-humdb-red rounded-full"></div>
         </div>
       )}
       {type === 'bar' && renderBarChart()}

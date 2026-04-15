@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Optimized build script for the NGO Databank Website
+ * Optimized build script for the Humanitarian Databank Website
  * This script implements better connection management to prevent database
  * connection pool exhaustion during the build process.
  */

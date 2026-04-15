@@ -97,13 +97,13 @@ export default function EmbedSection({ embed, animationDelay = 0 }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: animationDelay }}
     >
-      <div className="bg-white rounded-xl shadow-md border border-ngodb-gray-200 overflow-hidden">
-        <div className="px-6 sm:px-8 py-5 border-b border-ngodb-gray-200 bg-ngodb-gray-50/80">
-          <h2 className="text-xl sm:text-2xl font-bold text-ngodb-navy">
+      <div className="bg-white rounded-xl shadow-md border border-humdb-gray-200 overflow-hidden">
+        <div className="px-6 sm:px-8 py-5 border-b border-humdb-gray-200 bg-humdb-gray-50/80">
+          <h2 className="text-xl sm:text-2xl font-bold text-humdb-navy">
             {embed.title}
           </h2>
           {embed.description && (
-            <p className="text-sm text-ngodb-gray-500 mt-1">{embed.description}</p>
+            <p className="text-sm text-humdb-gray-500 mt-1">{embed.description}</p>
           )}
         </div>
         <div className="w-full overflow-hidden">
@@ -140,7 +140,7 @@ export default function EmbedSection({ embed, animationDelay = 0 }) {
               </div>
             )
           ) : (
-            <div className="px-6 sm:px-8 py-12 text-center text-ngodb-gray-500">
+            <div className="px-6 sm:px-8 py-12 text-center text-humdb-gray-500">
               <p>This embed source is not available.</p>
             </div>
           )}

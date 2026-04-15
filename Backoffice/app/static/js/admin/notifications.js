@@ -1459,7 +1459,7 @@ class AdminNotifications {
         console.log('Applying template:', template);
 
         // Replace {{org_name}} placeholder with actual org name
-        const orgName = window.ORG_NAME || 'NGO Databank';
+        const orgName = window.ORG_NAME || 'Humanitarian Databank';
         const interpolate = (text) => (text || '').replace(/\{\{\s*org_name\s*\}\}/gi, orgName);
 
         titleInput.value = interpolate(template.title);

@@ -38,7 +38,7 @@ export default function Layout({ children }) {
         return {};
       })();
 
-  const i18nSiteTitle = initialTranslations?.navigation?.siteTitle || 'NGO Databank';
+  const i18nSiteTitle = initialTranslations?.navigation?.siteTitle || 'Humanitarian Databank';
   const defaultSiteTitle = getPublicOrganizationName(i18nSiteTitle);
 
   // Ensure consistent JSON stringification with proper escaping
@@ -59,12 +59,12 @@ export default function Layout({ children }) {
       if (typeof window !== 'undefined') {
         // Check for window.isMobileApp flag set by Flutter app
         const isMobile = window.isMobileApp === true ||
-                        window.NGODatabankMobileApp === true ||
+                        window.humdatabankMobileApp === true ||
                         window.IFRCMobileApp === true ||
                         document.documentElement.getAttribute('data-mobile-app') === 'true' ||
                         (typeof navigator !== 'undefined' &&
                          navigator.userAgent &&
-                         (navigator.userAgent.includes('NGO-Databank-Flutter') ||
+                         (navigator.userAgent.includes('hum-databank-Flutter') ||
                           navigator.userAgent.includes('IFRC-Databank-Flutter')));
 
         setIsMobileApp(isMobile);
@@ -123,7 +123,7 @@ export default function Layout({ children }) {
       <ScopeProvider>
         <div className={`flex flex-col min-h-screen ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
           {!isMobileApp && <Navbar />}
-          <main className="flex-grow bg-ngodb-white"> {/* Set a default background */}
+          <main className="flex-grow bg-humdb-white"> {/* Set a default background */}
             <HydrationSafe fallback={<div />}>
               {children}
             </HydrationSafe>

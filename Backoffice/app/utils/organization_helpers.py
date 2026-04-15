@@ -20,22 +20,22 @@ from app.services.app_settings_service import (
 )
 
 
-def get_org_name(default: str = "NGO Databank", locale: Optional[str] = None) -> str:
+def get_org_name(default: str = "Humanitarian Databank", locale: Optional[str] = None) -> str:
     """Get organization name. Alias for get_organization_name."""
     return get_organization_name(default=default, locale=locale)
 
 
-def get_org_short_name(default: str = "NGO Databank", locale: Optional[str] = None) -> str:
+def get_org_short_name(default: str = "Humanitarian Databank", locale: Optional[str] = None) -> str:
     """Get organization short name. Alias for get_organization_short_name."""
     return get_organization_short_name(default=default, locale=locale)
 
 
-def get_org_domain(default: str = "ngodatabank.org") -> str:
+def get_org_domain(default: str = "humdatabank.org") -> str:
     """Get organization domain. Alias for get_organization_domain."""
     return get_organization_domain(default=default)
 
 
-def get_org_email_domain(default: str = "ngodatabank.org") -> str:
+def get_org_email_domain(default: str = "humdatabank.org") -> str:
     """Get organization email domain. Alias for get_organization_email_domain."""
     return get_organization_email_domain(default=default)
 
@@ -87,8 +87,8 @@ def get_branding_context(locale: Optional[str] = None) -> Dict:
     return {
         "org_name": get_org_name(locale=locale),
         "org_short_name": get_org_short_name(locale=locale),
-        "org_domain": branding.get("organization_domain", "ngodatabank.org"),
-        "org_email_domain": branding.get("organization_email_domain", branding.get("organization_domain", "ngodatabank.org")),
+        "org_domain": branding.get("organization_domain", "humdatabank.org"),
+        "org_email_domain": branding.get("organization_email_domain", branding.get("organization_domain", "humdatabank.org")),
         "org_logo": get_organization_logo_path(),
         "org_copyright_year": branding.get("organization_copyright_year", ""),
     }

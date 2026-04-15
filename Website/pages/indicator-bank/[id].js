@@ -527,11 +527,11 @@ export default function IndicatorDetailPage() {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <Head>
-          <title>{`Indicator Error - NGO Databank`}</title>
+          <title>{`Indicator Error - Humanitarian Databank`}</title>
         </Head>
-        <h1 className="text-3xl font-bold text-ngodb-red mb-6">Indicator Details</h1>
+        <h1 className="text-3xl font-bold text-humdb-red mb-6">Indicator Details</h1>
         <p className="text-red-600 bg-red-100 p-4 rounded-md">{error}</p>
-        <Link href="/indicator-bank" className="mt-4 inline-block text-ngodb-red hover:underline">
+        <Link href="/indicator-bank" className="mt-4 inline-block text-humdb-red hover:underline">
           &larr; Back to Indicator Bank
         </Link>
       </div>
@@ -542,16 +542,16 @@ export default function IndicatorDetailPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8">
         <Head>
-          <title>{`${t('indicatorDetail.loading.title')} - NGO Databank`}</title>
+          <title>{`${t('indicatorDetail.loading.title')} - Humanitarian Databank`}</title>
         </Head>
         <div className="text-center py-20">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mb-4"></div>
-          <h1 className="text-3xl font-bold text-ngodb-navy mb-2">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mb-4"></div>
+          <h1 className="text-3xl font-bold text-humdb-navy mb-2">
             <TranslationSafe fallback="Loading Indicator">
               {t('indicatorDetail.loading.title')}
             </TranslationSafe>
           </h1>
-          <p className="text-ngodb-gray-600">
+          <p className="text-humdb-gray-600">
             <TranslationSafe fallback="Please wait while we fetch the indicator details...">
               {t('indicatorDetail.loading.message')}
             </TranslationSafe>
@@ -566,16 +566,16 @@ export default function IndicatorDetailPage() {
     return (
       <div className="w-full px-6 sm:px-8 lg:px-12 py-8">
         <Head>
-          <title>{`${t('indicatorDetail.loading.title')} - NGO Databank`}</title>
+          <title>{`${t('indicatorDetail.loading.title')} - Humanitarian Databank`}</title>
         </Head>
         <div className="text-center py-20">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-ngodb-red mb-4"></div>
-          <h1 className="text-3xl font-bold text-ngodb-navy mb-2">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-humdb-red mb-4"></div>
+          <h1 className="text-3xl font-bold text-humdb-navy mb-2">
             <TranslationSafe fallback="Loading Indicator">
               {t('indicatorDetail.loading.title')}
             </TranslationSafe>
           </h1>
-          <p className="text-ngodb-gray-600">
+          <p className="text-humdb-gray-600">
             <TranslationSafe fallback="Please wait while we fetch the indicator details...">
               {t('indicatorDetail.loading.message')}
             </TranslationSafe>
@@ -588,18 +588,18 @@ export default function IndicatorDetailPage() {
   return (
     <>
               <Head>
-          <title>{`${String(indicator.localized_name || indicator.name || 'Indicator')} - NGO Databank`}</title>
+          <title>{`${String(indicator.localized_name || indicator.name || 'Indicator')} - Humanitarian Databank`}</title>
           <meta name="description" content={`Details for ${indicator.localized_name || indicator.name} from the indicator bank.`} />
         </Head>
 
-      <div className={`bg-ngodb-gray-100 min-h-screen ${isRTL ? 'rtl font-tajawal' : ''}`}>
+      <div className={`bg-humdb-gray-100 min-h-screen ${isRTL ? 'rtl font-tajawal' : ''}`}>
         <div className={`w-full max-w-none px-6 py-10 ${isRTL ? 'rtl' : ''}`}>
 
           {/* Breadcrumb Navigation */}
           <nav className={`mb-8 ${isRTL ? 'rtl' : ''}`} aria-label="Breadcrumb">
-            <ol className={`flex items-center text-sm text-ngodb-gray-600 ${isRTL ? 'flex-row-reverse space-x-reverse' : 'space-x-2'}`}>
+            <ol className={`flex items-center text-sm text-humdb-gray-600 ${isRTL ? 'flex-row-reverse space-x-reverse' : 'space-x-2'}`}>
               <li>
-                <Link href="/" className="hover:text-ngodb-red">
+                <Link href="/" className="hover:text-humdb-red">
                   {t('common.home')}
                 </Link>
               </li>
@@ -607,14 +607,14 @@ export default function IndicatorDetailPage() {
                 <span className={isRTL ? 'mx-2' : 'mx-2'}>/</span>
               </li>
               <li>
-                <Link href="/indicator-bank" className="hover:text-ngodb-red">
+                <Link href="/indicator-bank" className="hover:text-humdb-red">
                   {t('navigation.indicatorBank')}
                 </Link>
               </li>
               <li>
                 <span className={isRTL ? 'mx-2' : 'mx-2'}>/</span>
               </li>
-              <li className="text-ngodb-gray-800 font-medium">
+              <li className="text-humdb-gray-800 font-medium">
                 {String(indicator.localized_name || indicator.name || t('indicatorDetail.title'))}
               </li>
             </ol>
@@ -625,28 +625,28 @@ export default function IndicatorDetailPage() {
 
             {/* Sidebar - Indicator Navigation */}
             <div className="w-96 flex-shrink-0">
-              <div className="bg-white rounded-lg shadow-sm border border-ngodb-gray-200 overflow-hidden sticky top-24 md:top-[144px] xl:top-24 h-screen">
+              <div className="bg-white rounded-lg shadow-sm border border-humdb-gray-200 overflow-hidden sticky top-24 md:top-[144px] xl:top-24 h-screen">
 
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-ngodb-gray-200 bg-ngodb-gray-50">
-                  <h3 className={`text-lg font-semibold text-ngodb-navy ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.sidebar.title')}</h3>
-                  <p className={`text-sm text-ngodb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <div className="px-4 py-3 border-b border-humdb-gray-200 bg-humdb-gray-50">
+                  <h3 className={`text-lg font-semibold text-humdb-navy ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.sidebar.title')}</h3>
+                  <p className={`text-sm text-humdb-gray-600 ${isRTL ? 'text-right' : 'text-left'}`}>
                     {searchTerm ? `${filteredIndicators.length} ${t('indicatorDetail.sidebar.of')} ${allIndicators.length}` : `${allIndicators.length}`} {allIndicators.length === 1 ? t('indicatorBank.indicator') : t('indicatorBank.indicators')}
                   </p>
                 </div>
 
                 {/* Search Bar */}
-                <div className="px-4 py-3 border-b border-ngodb-gray-200">
+                <div className="px-4 py-3 border-b border-humdb-gray-200">
                   <div className="relative">
                     <input
                       type="text"
                       placeholder={t('indicatorDetail.sidebar.searchPlaceholder')}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className={`w-full px-3 py-2 ${isRTL ? 'pr-10' : 'pl-10'} text-sm border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                      className={`w-full px-3 py-2 ${isRTL ? 'pr-10' : 'pl-10'} text-sm border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                     />
                     <svg
-                      className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-2.5 h-4 w-4 text-ngodb-gray-400`}
+                      className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-2.5 h-4 w-4 text-humdb-gray-400`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -659,12 +659,12 @@ export default function IndicatorDetailPage() {
                 {/* Indicator Tree */}
                 <div className={`flex-1 overflow-y-auto ${isRTL ? 'rtl' : ''}`} style={{ height: 'calc(100vh - 200px)' }} data-sidebar-scroll>
                   {sortedSectors.map((sector) => (
-                    <div key={sector} className="border-b border-ngodb-gray-100 last:border-b-0">
+                    <div key={sector} className="border-b border-humdb-gray-100 last:border-b-0">
 
                       {/* Sector Header - Collapsible */}
                       <button
                         onClick={() => toggleSector(sector)}
-                        className={`w-full px-4 py-3 bg-ngodb-navy text-white hover:bg-ngodb-navy/90 transition-colors duration-150 flex items-center justify-between border-b border-ngodb-navy/10 ${isRTL ? 'flex-row-reverse' : ''}`}
+                        className={`w-full px-4 py-3 bg-humdb-navy text-white hover:bg-humdb-navy/90 transition-colors duration-150 flex items-center justify-between border-b border-humdb-navy/10 ${isRTL ? 'flex-row-reverse' : ''}`}
                       >
                         <h4 className={`text-sm font-bold uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
                           {sector}
@@ -717,12 +717,12 @@ export default function IndicatorDetailPage() {
                                   <Link key={ind.id} href={`/indicator-bank/${ind.id}`}>
                                     <div
                                       data-indicator-id={ind.id}
-                                      className={`px-8 py-3 hover:bg-blue-50 transition-colors duration-150 cursor-pointer ${isRTL ? 'border-r border-ngodb-gray-200' : 'border-l border-ngodb-gray-200'} ${
+                                      className={`px-8 py-3 hover:bg-blue-50 transition-colors duration-150 cursor-pointer ${isRTL ? 'border-r border-humdb-gray-200' : 'border-l border-humdb-gray-200'} ${
                                         ind.id === currentId ? `bg-blue-100 ${isRTL ? 'border-r-4 border-r-blue-500' : 'border-l-4 border-l-blue-500'} shadow-sm` : ''
                                       }`}
                                     >
                                       <p className={`text-sm leading-relaxed ${isRTL ? 'text-right' : 'text-left'} ${
-                                        ind.id === currentId ? 'text-blue-700 font-medium' : 'text-ngodb-gray-800'
+                                        ind.id === currentId ? 'text-blue-700 font-medium' : 'text-humdb-gray-800'
                                       }`} style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
                                         {commonWords.length > 0 ? (
                                           <span dangerouslySetInnerHTML={{
@@ -749,7 +749,7 @@ export default function IndicatorDetailPage() {
                   {/* No results message */}
                   {searchTerm && filteredIndicators.length === 0 && (
                     <div className="px-4 py-8 text-center">
-                      <p className="text-sm text-ngodb-gray-500">{t('indicatorDetail.sidebar.noResults', { searchTerm })}</p>
+                      <p className="text-sm text-humdb-gray-500">{t('indicatorDetail.sidebar.noResults', { searchTerm })}</p>
                     </div>
                   )}
                 </div>
@@ -758,13 +758,13 @@ export default function IndicatorDetailPage() {
 
             {/* Main Content */}
             <div className="flex-1">
-              <div className={`bg-white rounded-lg shadow-sm border border-ngodb-gray-200 overflow-hidden ${isRTL ? 'rtl' : ''}`}>
+              <div className={`bg-white rounded-lg shadow-sm border border-humdb-gray-200 overflow-hidden ${isRTL ? 'rtl' : ''}`}>
 
             {/* Header */}
-            <div className="px-8 py-6 border-b border-ngodb-gray-200">
+            <div className="px-8 py-6 border-b border-humdb-gray-200">
               <div className={`flex justify-between items-start ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <div className="flex-1">
-                  <h1 className={`text-3xl font-bold text-ngodb-navy mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                  <h1 className={`text-3xl font-bold text-humdb-navy mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
                     {commonWords.length > 0 ? (
                       processIndicatorNameWithHighlights(String(indicator.localized_name || indicator.name || ''))
                     ) : (
@@ -772,7 +772,7 @@ export default function IndicatorDetailPage() {
                     )}
                   </h1>
                   {indicator.id && (
-                    <p className={`text-ngodb-gray-500 text-sm ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <p className={`text-humdb-gray-500 text-sm ${isRTL ? 'text-right' : 'text-left'}`}>
                       {t('indicatorDetail.header.id')}: {indicator.id}
                     </p>
                   )}
@@ -780,7 +780,7 @@ export default function IndicatorDetailPage() {
                 <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                   <button
                     onClick={openSuggestModal}
-                    className="bg-ngodb-red hover:bg-ngodb-red-dark text-white font-medium px-4 py-2 rounded-md transition-colors duration-150 flex items-center gap-2"
+                    className="bg-humdb-red hover:bg-humdb-red-dark text-white font-medium px-4 py-2 rounded-md transition-colors duration-150 flex items-center gap-2"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -802,8 +802,8 @@ export default function IndicatorDetailPage() {
               {/* Definition */}
               {(indicator.localized_definition || indicator.definition) && (
                 <div className="mb-8">
-                  <h2 className={`text-xl font-semibold text-ngodb-navy mb-3 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.definition')}</h2>
-                  <p className={`text-ngodb-gray-700 leading-relaxed ${isRTL ? 'text-right' : 'text-left'}`}>
+                  <h2 className={`text-xl font-semibold text-humdb-navy mb-3 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.definition')}</h2>
+                  <p className={`text-humdb-gray-700 leading-relaxed ${isRTL ? 'text-right' : 'text-left'}`}>
                     {String(indicator.localized_definition || indicator.definition)}
                   </p>
                 </div>
@@ -811,27 +811,27 @@ export default function IndicatorDetailPage() {
 
               {/* Key Properties Grid */}
               <div className="mb-8">
-                <h2 className={`text-xl font-semibold text-ngodb-navy mb-4 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.keyProperties')}</h2>
+                <h2 className={`text-xl font-semibold text-humdb-navy mb-4 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.keyProperties')}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
                   {indicator.localized_type || indicator.type ? (
-                    <div className="bg-ngodb-gray-50 p-4 rounded-lg">
-                      <h3 className={`font-medium text-ngodb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.type')}</h3>
-                      <p className={`text-ngodb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>{String(indicator.localized_type || indicator.type)}</p>
+                    <div className="bg-humdb-gray-50 p-4 rounded-lg">
+                      <h3 className={`font-medium text-humdb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.type')}</h3>
+                      <p className={`text-humdb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>{String(indicator.localized_type || indicator.type)}</p>
                     </div>
                   ) : null}
 
                   {indicator.localized_unit || indicator.unit ? (
-                    <div className="bg-ngodb-gray-50 p-4 rounded-lg">
-                      <h3 className={`font-medium text-ngodb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.unit')}</h3>
-                      <p className={`text-ngodb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>{String(indicator.localized_unit || indicator.unit)}</p>
+                    <div className="bg-humdb-gray-50 p-4 rounded-lg">
+                      <h3 className={`font-medium text-humdb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.unit')}</h3>
+                      <p className={`text-humdb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>{String(indicator.localized_unit || indicator.unit)}</p>
                     </div>
                   ) : null}
 
                   {indicator.sector && (
-                    <div className="bg-ngodb-gray-50 p-4 rounded-lg">
-                      <h3 className={`font-medium text-ngodb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.sector')}</h3>
-                      <p className={`text-ngodb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <div className="bg-humdb-gray-50 p-4 rounded-lg">
+                      <h3 className={`font-medium text-humdb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.sector')}</h3>
+                      <p className={`text-humdb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
                         {typeof indicator.sector === 'object' && indicator.sector !== null
                           ? String(indicator.sector.localized_name || indicator.sector.primary || indicator.sector.name || indicator.sector)
                           : String(indicator.sector)}
@@ -840,9 +840,9 @@ export default function IndicatorDetailPage() {
                   )}
 
                   {indicator.sub_sector && (
-                    <div className="bg-ngodb-gray-50 p-4 rounded-lg">
-                      <h3 className={`font-medium text-ngodb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.subSector')}</h3>
-                      <p className={`text-ngodb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <div className="bg-humdb-gray-50 p-4 rounded-lg">
+                      <h3 className={`font-medium text-humdb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.subSector')}</h3>
+                      <p className={`text-humdb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
                         {typeof indicator.sub_sector === 'object' && indicator.sub_sector !== null
                           ? String(indicator.sub_sector.localized_name || indicator.sub_sector.primary || indicator.sub_sector.name || indicator.sub_sector)
                           : String(indicator.sub_sector)}
@@ -851,9 +851,9 @@ export default function IndicatorDetailPage() {
                   )}
 
                   {indicator.emergency !== null && indicator.emergency !== undefined && (
-                    <div className="bg-ngodb-gray-50 p-4 rounded-lg">
-                      <h3 className={`font-medium text-ngodb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.emergencyContext')}</h3>
-                      <p className={`text-ngodb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <div className="bg-humdb-gray-50 p-4 rounded-lg">
+                      <h3 className={`font-medium text-humdb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.emergencyContext')}</h3>
+                      <p className={`text-humdb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
                         {typeof indicator.emergency === 'boolean' ?
                           (indicator.emergency ? t('common.yes') : t('common.no')) :
                           String(indicator.emergency)
@@ -862,9 +862,9 @@ export default function IndicatorDetailPage() {
                     </div>
                   )}
 
-                  <div className="bg-ngodb-gray-50 p-4 rounded-lg">
-                    <h3 className={`font-medium text-ngodb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.status')}</h3>
-                    <p className={`text-ngodb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
+                  <div className="bg-humdb-gray-50 p-4 rounded-lg">
+                    <h3 className={`font-medium text-humdb-gray-700 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.status')}</h3>
+                    <p className={`text-humdb-gray-900 ${isRTL ? 'text-right' : 'text-left'}`}>
                       {indicator.archived ? t('indicatorDetail.content.archived') : t('indicatorDetail.content.active')}
                     </p>
                   </div>
@@ -875,10 +875,10 @@ export default function IndicatorDetailPage() {
               {/* Related Programs */}
               {indicator.related_programs && Array.isArray(indicator.related_programs) && indicator.related_programs.length > 0 && (
                 <div className="mb-8">
-                  <h2 className={`text-xl font-semibold text-ngodb-navy mb-4 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.relatedPrograms')}</h2>
+                  <h2 className={`text-xl font-semibold text-humdb-navy mb-4 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.relatedPrograms')}</h2>
                   <div className={`flex flex-wrap gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                     {indicator.related_programs.map((program, index) => (
-                      <span key={index} className={`bg-ngodb-red-light text-ngodb-red px-4 py-2 rounded-full text-sm font-medium ${isRTL ? 'text-right' : 'text-left'}`}>
+                      <span key={index} className={`bg-humdb-red-light text-humdb-red px-4 py-2 rounded-full text-sm font-medium ${isRTL ? 'text-right' : 'text-left'}`}>
                         {typeof program === 'string' ? program :
                          typeof program === 'object' && program !== null ?
                            String(program.primary || program.name || t('indicatorDetail.content.unknownProgram')) :
@@ -890,14 +890,14 @@ export default function IndicatorDetailPage() {
               )}
 
               {/* Metadata */}
-              <div className="border-t border-ngodb-gray-200 pt-6">
-                <h2 className={`text-xl font-semibold text-ngodb-navy mb-4 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.metadata')}</h2>
+              <div className="border-t border-humdb-gray-200 pt-6">
+                <h2 className={`text-xl font-semibold text-humdb-navy mb-4 ${isRTL ? 'text-right' : 'text-left'}`}>{t('indicatorDetail.content.metadata')}</h2>
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 text-sm ${isRTL ? 'rtl' : ''}`}>
 
                   {indicator.created_at && (
                     <div className={isRTL ? 'text-right' : 'text-left'}>
-                      <span className="font-medium text-ngodb-gray-700">{t('indicatorDetail.content.created')}:</span>
-                      <p className="text-ngodb-gray-600 mt-1">
+                      <span className="font-medium text-humdb-gray-700">{t('indicatorDetail.content.created')}:</span>
+                      <p className="text-humdb-gray-600 mt-1">
                         {new Date(indicator.created_at).toLocaleDateString(router.locale || 'en-US', {
                           year: 'numeric',
                           month: 'long',
@@ -911,8 +911,8 @@ export default function IndicatorDetailPage() {
 
                   {indicator.updated_at && (
                     <div className={isRTL ? 'text-right' : 'text-left'}>
-                      <span className="font-medium text-ngodb-gray-700">{t('indicatorDetail.content.lastUpdated')}:</span>
-                      <p className="text-ngodb-gray-600 mt-1">
+                      <span className="font-medium text-humdb-gray-700">{t('indicatorDetail.content.lastUpdated')}:</span>
+                      <p className="text-humdb-gray-600 mt-1">
                         {new Date(indicator.updated_at).toLocaleDateString(router.locale || 'en-US', {
                           year: 'numeric',
                           month: 'long',
@@ -930,11 +930,11 @@ export default function IndicatorDetailPage() {
             </div>
 
             {/* Footer Actions */}
-            <div className={`px-8 py-4 bg-ngodb-gray-50 border-t border-ngodb-gray-200 ${isRTL ? 'rtl' : ''}`}>
+            <div className={`px-8 py-4 bg-humdb-gray-50 border-t border-humdb-gray-200 ${isRTL ? 'rtl' : ''}`}>
               <div className={`flex ${isRTL ? 'flex-row-reverse' : ''} justify-between items-center`}>
                 <Link
                   href="/indicator-bank"
-                  className="inline-flex items-center text-ngodb-red hover:text-ngodb-red-dark transition-colors duration-150"
+                  className="inline-flex items-center text-humdb-red hover:text-humdb-red-dark transition-colors duration-150"
                 >
                   <svg className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -944,7 +944,7 @@ export default function IndicatorDetailPage() {
 
                 <button
                   onClick={() => router.back()}
-                  className="bg-ngodb-gray-300 hover:bg-ngodb-gray-400 text-ngodb-gray-700 font-medium px-4 py-2 rounded-md transition-colors duration-150"
+                  className="bg-humdb-gray-300 hover:bg-humdb-gray-400 text-humdb-gray-700 font-medium px-4 py-2 rounded-md transition-colors duration-150"
                 >
                   {t('indicatorDetail.footer.goBack')}
                 </button>
@@ -962,19 +962,19 @@ export default function IndicatorDetailPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-ngodb-gray-200">
+            <div className="px-6 py-4 border-b border-humdb-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-ngodb-navy">Suggest Updates</h2>
+                <h2 className="text-xl font-semibold text-humdb-navy">Suggest Updates</h2>
                 <button
                   onClick={closeSuggestModal}
-                  className="text-ngodb-gray-400 hover:text-ngodb-gray-600 transition-colors duration-150"
+                  className="text-humdb-gray-400 hover:text-humdb-gray-600 transition-colors duration-150"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-              <p className="text-ngodb-gray-600 mt-1">
+              <p className="text-humdb-gray-600 mt-1">
                 Help us improve this indicator by suggesting corrections or improvements.
               </p>
             </div>
@@ -988,8 +988,8 @@ export default function IndicatorDetailPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-ngodb-navy mb-2">Thank You!</h3>
-                  <p className="text-ngodb-gray-600 mb-6">
+                  <h3 className="text-lg font-semibold text-humdb-navy mb-2">Thank You!</h3>
+                  <p className="text-humdb-gray-600 mb-6">
                     Your suggestion has been submitted successfully. We'll review it and get back to you if needed.
                   </p>
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
@@ -1008,7 +1008,7 @@ export default function IndicatorDetailPage() {
                   </div>
                   <button
                     onClick={closeSuggestModal}
-                    className="bg-ngodb-red hover:bg-ngodb-red-dark text-white font-medium px-6 py-2 rounded-md transition-colors duration-150"
+                    className="bg-humdb-red hover:bg-humdb-red-dark text-white font-medium px-6 py-2 rounded-md transition-colors duration-150"
                   >
                     Close
                   </button>
@@ -1018,7 +1018,7 @@ export default function IndicatorDetailPage() {
                   {/* Contact Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="name" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Your Name *
                       </label>
                       <input
@@ -1028,11 +1028,11 @@ export default function IndicatorDetailPage() {
                         value={suggestForm.name}
                         onChange={handleSuggestFormChange}
                         required
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="email" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Email Address *
                       </label>
                       <input
@@ -1042,14 +1042,14 @@ export default function IndicatorDetailPage() {
                         value={suggestForm.email}
                         onChange={handleSuggestFormChange}
                         required
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                   </div>
 
                   {/* Suggestion Type */}
                   <div>
-                    <label htmlFor="suggestion_type" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                    <label htmlFor="suggestion_type" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                       Type of Suggestion *
                     </label>
                     <select
@@ -1058,7 +1058,7 @@ export default function IndicatorDetailPage() {
                       value={suggestForm.suggestion_type}
                       onChange={handleSuggestFormChange}
                       required
-                      className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                      className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                     >
                       <option value="correction">{t('indicatorDetail.suggestModal.suggestionTypes.correction')}</option>
                       <option value="improvement">{t('indicatorDetail.suggestModal.suggestionTypes.improvement')}</option>
@@ -1068,12 +1068,12 @@ export default function IndicatorDetailPage() {
                   </div>
 
                   {/* Indicator Fields */}
-                  <div className="border-t border-ngodb-gray-200 pt-6">
-                    <h3 className="text-lg font-semibold text-ngodb-navy mb-4">Indicator Information</h3>
+                  <div className="border-t border-humdb-gray-200 pt-6">
+                    <h3 className="text-lg font-semibold text-humdb-navy mb-4">Indicator Information</h3>
 
                     {/* Indicator Name */}
                     <div className="mb-4">
-                      <label htmlFor="indicator_name" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="indicator_name" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Indicator Name *
                       </label>
                       <input
@@ -1083,13 +1083,13 @@ export default function IndicatorDetailPage() {
                         value={suggestForm.indicator_name}
                         onChange={handleSuggestFormChange}
                         required
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
 
                     {/* Definition */}
                     <div className="mb-4">
-                      <label htmlFor="definition" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="definition" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Definition *
                       </label>
                       <textarea
@@ -1099,14 +1099,14 @@ export default function IndicatorDetailPage() {
                         onChange={handleSuggestFormChange}
                         required
                         rows={4}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
 
                     {/* Type and Unit */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label htmlFor="type" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                        <label htmlFor="type" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                           Type
                         </label>
                         <input
@@ -1115,11 +1115,11 @@ export default function IndicatorDetailPage() {
                           name="type"
                           value={suggestForm.type}
                           onChange={handleSuggestFormChange}
-                          className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                          className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                         />
                       </div>
                       <div>
-                        <label htmlFor="unit" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                        <label htmlFor="unit" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                           Unit of Measurement
                         </label>
                         <input
@@ -1128,23 +1128,23 @@ export default function IndicatorDetailPage() {
                           name="unit"
                           value={suggestForm.unit}
                           onChange={handleSuggestFormChange}
-                          className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                          className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                         />
                       </div>
                     </div>
 
                     {/* Sector and Sub-sector */}
                     <div className="mb-4">
-                      <h4 className="text-md text-ngodb-navy mb-3">Sector</h4>
+                      <h4 className="text-md text-humdb-navy mb-3">Sector</h4>
 
                       {/* Sector */}
                       <div className="mb-6">
-                        <label className="block text-sm font-medium text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-medium text-humdb-gray-700 mb-3">
                           Sector
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Primary Sector *
                             </label>
                             <input
@@ -1153,11 +1153,11 @@ export default function IndicatorDetailPage() {
                               value={suggestForm.sector.primary}
                               onChange={handleSuggestFormChange}
                               placeholder={t('forms.placeholders.sectorPrimary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Secondary Sector
                             </label>
                             <input
@@ -1166,11 +1166,11 @@ export default function IndicatorDetailPage() {
                               value={suggestForm.sector.secondary}
                               onChange={handleSuggestFormChange}
                               placeholder={t('forms.placeholders.sectorSecondary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Tertiary Sector
                             </label>
                             <input
@@ -1179,7 +1179,7 @@ export default function IndicatorDetailPage() {
                               value={suggestForm.sector.tertiary}
                               onChange={handleSuggestFormChange}
                               placeholder={t('forms.placeholders.sectorTertiary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                         </div>
@@ -1192,12 +1192,12 @@ export default function IndicatorDetailPage() {
 
                       {/* Sub-sector */}
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-ngodb-gray-700 mb-3">
+                        <label className="block text-sm font-medium text-humdb-gray-700 mb-3">
                           Sub-Sector
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Primary Sub-Sector *
                             </label>
                             <input
@@ -1206,11 +1206,11 @@ export default function IndicatorDetailPage() {
                               value={suggestForm.sub_sector.primary}
                               onChange={handleSuggestFormChange}
                               placeholder={t('forms.placeholders.subsectorPrimary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Secondary Sub-Sector
                             </label>
                             <input
@@ -1219,11 +1219,11 @@ export default function IndicatorDetailPage() {
                               value={suggestForm.sub_sector.secondary}
                               onChange={handleSuggestFormChange}
                               placeholder={t('forms.placeholders.subsectorSecondary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-ngodb-gray-600 mb-2">
+                            <label className="block text-xs font-medium text-humdb-gray-600 mb-2">
                               Tertiary Sub-Sector
                             </label>
                             <input
@@ -1232,7 +1232,7 @@ export default function IndicatorDetailPage() {
                               value={suggestForm.sub_sector.tertiary}
                               onChange={handleSuggestFormChange}
                               placeholder={t('forms.placeholders.subsectorTertiary')}
-                              className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                              className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                             />
                           </div>
                         </div>
@@ -1253,9 +1253,9 @@ export default function IndicatorDetailPage() {
                           name="emergency"
                           checked={suggestForm.emergency}
                           onChange={handleSuggestFormChange}
-                          className="h-4 w-4 text-ngodb-red focus:ring-ngodb-red border-ngodb-gray-300 rounded"
+                          className="h-4 w-4 text-humdb-red focus:ring-humdb-red border-humdb-gray-300 rounded"
                         />
-                        <span className="ml-2 text-sm font-medium text-ngodb-gray-700">
+                        <span className="ml-2 text-sm font-medium text-humdb-gray-700">
                           Emergency Context
                         </span>
                       </label>
@@ -1263,7 +1263,7 @@ export default function IndicatorDetailPage() {
 
                     {/* Related Programs */}
                     <div className="mb-4">
-                      <label htmlFor="related_programs" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="related_programs" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Related Programs
                       </label>
                       <input
@@ -1273,15 +1273,15 @@ export default function IndicatorDetailPage() {
                         value={suggestForm.related_programs}
                         onChange={handleSuggestFormChange}
                         placeholder={t('forms.placeholders.programs')}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                   </div>
 
                   {/* Reason and Additional Notes */}
-                  <div className="border-t border-ngodb-gray-200 pt-6">
+                  <div className="border-t border-humdb-gray-200 pt-6">
                     <div className="mb-4">
-                      <label htmlFor="reason" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="reason" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Reason for Change *
                       </label>
                       <textarea
@@ -1292,12 +1292,12 @@ export default function IndicatorDetailPage() {
                         required
                         rows={3}
                         placeholder={t('forms.placeholders.reasonForChange')}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
 
                     <div className="mb-4">
-                      <label htmlFor="additional_notes" className="block text-sm font-medium text-ngodb-gray-700 mb-1">
+                      <label htmlFor="additional_notes" className="block text-sm font-medium text-humdb-gray-700 mb-1">
                         Additional Notes
                       </label>
                       <textarea
@@ -1307,18 +1307,18 @@ export default function IndicatorDetailPage() {
                         onChange={handleSuggestFormChange}
                         rows={3}
                         placeholder={t('forms.placeholders.additionalNotes')}
-                        className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-md focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red"
+                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                       />
                     </div>
                   </div>
 
                   {/* Form Actions */}
-                  <div className="flex justify-between items-center pt-4 border-t border-ngodb-gray-200">
+                  <div className="flex justify-between items-center pt-4 border-t border-humdb-gray-200">
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={clearAllFormFields}
-                        className="px-3 py-2 text-ngodb-gray-600 bg-ngodb-gray-100 hover:bg-ngodb-gray-200 rounded-md transition-colors duration-150 text-sm"
+                        className="px-3 py-2 text-humdb-gray-600 bg-humdb-gray-100 hover:bg-humdb-gray-200 rounded-md transition-colors duration-150 text-sm"
                       >
                         Clear All
                       </button>
@@ -1327,14 +1327,14 @@ export default function IndicatorDetailPage() {
                       <button
                         type="button"
                         onClick={closeSuggestModal}
-                        className="px-4 py-2 text-ngodb-gray-700 bg-ngodb-gray-200 hover:bg-ngodb-gray-300 rounded-md transition-colors duration-150"
+                        className="px-4 py-2 text-humdb-gray-700 bg-humdb-gray-200 hover:bg-humdb-gray-300 rounded-md transition-colors duration-150"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={submitting || !validateSectorSelection() || !validateSubsectorSelection()}
-                        className="px-6 py-2 bg-ngodb-red hover:bg-ngodb-red-dark text-white font-medium rounded-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-6 py-2 bg-humdb-red hover:bg-humdb-red-dark text-white font-medium rounded-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {submitting ? (
                           <>

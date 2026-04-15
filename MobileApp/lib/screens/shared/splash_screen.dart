@@ -116,8 +116,8 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  Future<void> _openNgoDatabankGithub() async {
-    final uri = Uri.parse(AppConstants.ngoDatabankGithubRepoUrl);
+  Future<void> _openHumDatabankGithub() async {
+    final uri = Uri.parse(AppConstants.humdatabankGithubRepoUrl);
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -320,7 +320,7 @@ class _SplashScreenState extends State<SplashScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            localizations.poweredByNgoDatabank,
+                            localizations.poweredByHumDatabank,
                             style: TextStyle(
                               fontSize: 12,
                               color: Theme.of(context)
@@ -331,7 +331,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                           const SizedBox(height: 10),
                           ElevatedButton.icon(
-                            onPressed: _openNgoDatabankGithub,
+                            onPressed: _openHumDatabankGithub,
                             icon: FaIcon(
                               FontAwesomeIcons.github,
                               size: 18,

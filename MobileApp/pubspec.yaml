@@ -1,5 +1,5 @@
-name: ngo_databank_app
-description: NGO Databank Mobile Application - Generic mobile app for NGO databank ecosystems (configurable for any organization)
+name: hum_databank_app
+description: Humanitarian Databank Mobile Application - Generic mobile app for Humanitarian Databank ecosystems (configurable for any organization)
 publish_to: 'none'
 version: 1.0.0+1
 

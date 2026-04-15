@@ -1,5 +1,5 @@
 #!/bin/bash
-# Azure Deployment Script for NGO Databank
+# Azure Deployment Script for Humanitarian Databank
 # Bash script to automate Azure resource creation and deployment
 #
 # USAGE: Run this script from the Backoffice/azure directory
@@ -25,7 +25,7 @@ print_warning() { echo -e "\033[0;33m$*\033[0m"; }
 print_error() { echo -e "\033[0;31m$*\033[0m"; }
 
 print_info "=========================================="
-print_info "NGO Databank - Azure Deployment"
+print_info "Humanitarian Databank - Azure Deployment"
 print_info "=========================================="
 echo ""
 

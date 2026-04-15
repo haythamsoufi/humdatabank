@@ -7,10 +7,12 @@
 name: Deploy to Webapp
 
 # Shown in the Actions run list instead of the default "Manually run by …" title.
+# Manual runs: prefer inputs.release_tag, then repo var LATEST_RELEASE_TAG, then the image tag
+# (run-name cannot read job outputs, so it cannot use the /releases/latest curl from the build job).
 run-name: >-
   ${{ github.event_name == 'release'
     && format('Auto-deploy to Staging — {0}', github.event.release.tag_name)
-    || format('Deploy to Webapp — {0} ({1})', inputs.environment, inputs.version) }}
+    || format('Deploy to Webapp — {0} ({1})', inputs.environment, inputs.release_tag || vars.LATEST_RELEASE_TAG || inputs.version) }}
 
 on:
   # Automatically deploy to Staging whenever a new release is published.
@@ -28,9 +30,14 @@ on:
           - Staging
           - Production
       version:
-        description: 'Image version tag (e.g., v1.1, v1.2)'
+        description: 'Container image tag in ACR (e.g., v1.1, v1.2)'
         required: true
         default: 'v1.7'
+        type: string
+      release_tag:
+        description: 'GitHub release tag for the Actions run title (optional). If empty, uses repo variable LATEST_RELEASE_TAG when set, else the image tag.'
+        required: false
+        default: ''
         type: string
 
 env:

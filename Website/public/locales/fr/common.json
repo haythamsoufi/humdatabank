@@ -13,7 +13,7 @@
     "organizationalStructure": "Structure Organisationnelle",
     "apiBuilder": "Constructeur d'API",
     "language": "Langue",
-    "siteTitle": "NGO Databank",
+    "siteTitle": "Humanitarian Databank",
     "databank": "Banque de Données",
     "login": "Connexion",
     "openMainMenu": "Ouvrir le menu principal"
@@ -25,7 +25,7 @@
   },
   "homepage": {
     "hero": {
-      "title": "La NGO Databank",
+      "title": "La Humanitarian Databank",
       "subtitle": "Accès aux données, visualisations et analyses",
       "description": "Explorez des données humanitaires complètes, des indicateurs et des publications de la Fédération Internationale des Sociétés de la Croix-Rouge et du Croissant-Rouge.",
       "exploreButton": "Explorer les Données",
@@ -123,11 +123,11 @@
   "indicatorBank": {
     "title": "Banque d'Indicateurs",
     "meta": {
-      "description": "Parcourez les indicateurs de la banque d'indicateurs du NGO Databank."
+      "description": "Parcourez les indicateurs de la banque d'indicateurs du Humanitarian Databank."
     },
     "hero": {
-      "title": "Banque d'indicateurs NGO Databank",
-      "description": "Explorez notre collection complète d'indicateurs utilisés dans les opérations du NGO Databank."
+      "title": "Banque d'indicateurs Humanitarian Databank",
+      "description": "Explorez notre collection complète d'indicateurs utilisés dans les opérations du Humanitarian Databank."
     },
     "loading": {
       "title": "Chargement de la Banque d'Indicateurs",
@@ -221,11 +221,11 @@
   "resources": {
     "title": "Ressources",
     "meta": {
-      "description": "Parcourez les rapports de recherche, publications et ressources du NGO Databank."
+      "description": "Parcourez les rapports de recherche, publications et ressources du Humanitarian Databank."
     },
     "hero": {
       "title": "Ressources",
-      "description": "Rapports de recherche, publications et ressources du NGO Databank"
+      "description": "Rapports de recherche, publications et ressources du Humanitarian Databank"
     },
     "loading": {
       "title": "Chargement des Ressources",
@@ -282,7 +282,7 @@
   "dataVisualization": {
     "title": "Visualisation de Données",
     "meta": {
-      "description": "Explorez les visualisations de données interactives du NGO Databank."
+      "description": "Explorez les visualisations de données interactives du Humanitarian Databank."
     },
     "hero": {
       "title": "Visualisation de Données",
@@ -307,7 +307,7 @@
   "exploreData": {
     "title": "Explorer les Données",
     "meta": {
-      "description": "Créez des visualisations de données personnalisées et explorez les données du NGO Databank en sélectionnant des indicateurs, des pays et des types de graphiques."
+      "description": "Créez des visualisations de données personnalisées et explorez les données du Humanitarian Databank en sélectionnant des indicateurs, des pays et des types de graphiques."
     },
     "hero": {
       "title": "Explorer les Données",
@@ -433,13 +433,13 @@
       "send": "Envoyer"
     },
     "placeholder": {
-      "response": "J'ai reçu votre message : \"{{message}}\". En tant que placeholder, je ne peux pas encore accéder aux données en temps réel, mais je suis conçu pour répondre aux questions sur les activités NGO Databank, le financement et l'impact basé sur la banque de données disponible."
+      "response": "J'ai reçu votre message : \"{{message}}\". En tant que placeholder, je ne peux pas encore accéder aux données en temps réel, mais je suis conçu pour répondre aux questions sur les activités Humanitarian Databank, le financement et l'impact basé sur la banque de données disponible."
     }
   },
   "globalOverview": {
     "title": "Vue d'Ensemble Globale",
     "meta": {
-      "description": "Explorez les données humanitaires mondiales et les indicateurs du NGO Databank."
+      "description": "Explorez les données humanitaires mondiales et les indicateurs du Humanitarian Databank."
     },
     "hero": {
       "title": "Vue d'Ensemble Globale",
@@ -554,14 +554,14 @@
       "humanitarianIndicators": "Quels sont les indicateurs humanitaires clés ?"
     },
     "aiResponses": {
-      "afghanRedCrescent": "Au cours des dernières années, la Société du Croissant-Rouge Afghan (ARCS) s'est largement appuyée sur son réseau de bénévoles pour répondre aux catastrophes naturelles, aux crises sanitaires et aux urgences liées aux conflits à travers l'Afghanistan. En 2013, l'ARCS a signalé avoir environ 23 440 bénévoles actifs (<a href=\"https://arcs.af/sites/default/files/2021-05/English%20Booklet%20size%209%20x%2014%20cm.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">source</a>), contribuant aux activités dans presque toutes les provinces. Une revue longitudinale des efforts d'engagement des bénévoles de l'ARCS, soutenue par la Croix-Rouge suédoise et le CICR, est détaillée dans une étude de cas (<a href=\"https://ifrc.org/sites/default/files/2024-10/Longitudunal%20Review%20Case%20study_Afghan%20Red%20Crescent.pdf\" target=\"_blank\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline\">source</a>). Les bénévoles ont joué des rôles cruciaux dans les urgences majeures telles que les avalanches de 2015, le tremblement de terre de Paktika en 2022 et les tremblements de terre de Herat en 2023. Selon le <a href=\"/resources\" class=\"text-ngodb-red hover:text-ngodb-red-dark underline inline-flex items-center\"><svg class=\"w-4 h-4 mr-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1\" /></svg>Rapport Everyone Counts 2022</a> de l'IFRC, l'ARCS a signalé 393 077 bénévoles contribuant plus de 2,1 millions d'heures de service, dont 257 437 heures dans des activités liées à la santé, avec 56 456 personnes formées et 31 600 recevant les premiers secours. Ces chiffres soulignent l'ampleur et l'impact du bénévolat dans les opérations de l'ARCS, bien que d'autres sources suggèrent des fluctuations dans le nombre de bénévoles au fil du temps.",
-      "disasterResponse": "Le NGO Databank répond à des centaines de catastrophes et d'urgences chaque année, fournissant une assistance humanitaire critique dans le monde entier. En 2023, la plateforme a soutenu plus de 1 000 opérations de réponse aux catastrophes, atteignant plus de 160 millions de personnes touchées par des catastrophes liées au climat, des conflits et des urgences sanitaires. Les domaines de réponse clés incluent l'abri d'urgence, la sécurité alimentaire, l'eau et l'assainissement, les services de santé et le soutien psychosocial. La réponse aux catastrophes du réseau est coordonnée par le Fonds d'Urgence pour la Réponse aux Catastrophes (DREF) de la plateforme et les Appels d'Urgence, assurant une assistance rapide et efficace aux communautés touchées.",
-      "humanitarianIndicators": "La NGO Databank suit plusieurs indicateurs humanitaires clés, y compris les bénévoles, le personnel, les unités locales, les donneurs de sang, les bénéficiaires des premiers secours, les personnes atteintes, les revenus et les dépenses. Ces indicateurs fournissent des insights complets sur la capacité, la portée et l'impact du réseau dans différentes régions et contextes. Les données aident à mesurer les progrès vers les objectifs humanitaires et informent la prise de décision stratégique pour les opérations futures.",
+      "afghanRedCrescent": "Au cours des dernières années, la Société du Croissant-Rouge Afghan (ARCS) s'est largement appuyée sur son réseau de bénévoles pour répondre aux catastrophes naturelles, aux crises sanitaires et aux urgences liées aux conflits à travers l'Afghanistan. En 2013, l'ARCS a signalé avoir environ 23 440 bénévoles actifs (<a href=\"https://arcs.af/sites/default/files/2021-05/English%20Booklet%20size%209%20x%2014%20cm.pdf\" target=\"_blank\" class=\"text-humdb-red hover:text-humdb-red-dark underline\">source</a>), contribuant aux activités dans presque toutes les provinces. Une revue longitudinale des efforts d'engagement des bénévoles de l'ARCS, soutenue par la Croix-Rouge suédoise et le CICR, est détaillée dans une étude de cas (<a href=\"https://ifrc.org/sites/default/files/2024-10/Longitudunal%20Review%20Case%20study_Afghan%20Red%20Crescent.pdf\" target=\"_blank\" class=\"text-humdb-red hover:text-humdb-red-dark underline\">source</a>). Les bénévoles ont joué des rôles cruciaux dans les urgences majeures telles que les avalanches de 2015, le tremblement de terre de Paktika en 2022 et les tremblements de terre de Herat en 2023. Selon le <a href=\"/resources\" class=\"text-humdb-red hover:text-humdb-red-dark underline inline-flex items-center\"><svg class=\"w-4 h-4 mr-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1\" /></svg>Rapport Everyone Counts 2022</a> de l'IFRC, l'ARCS a signalé 393 077 bénévoles contribuant plus de 2,1 millions d'heures de service, dont 257 437 heures dans des activités liées à la santé, avec 56 456 personnes formées et 31 600 recevant les premiers secours. Ces chiffres soulignent l'ampleur et l'impact du bénévolat dans les opérations de l'ARCS, bien que d'autres sources suggèrent des fluctuations dans le nombre de bénévoles au fil du temps.",
+      "disasterResponse": "Le Humanitarian Databank répond à des centaines de catastrophes et d'urgences chaque année, fournissant une assistance humanitaire critique dans le monde entier. En 2023, la plateforme a soutenu plus de 1 000 opérations de réponse aux catastrophes, atteignant plus de 160 millions de personnes touchées par des catastrophes liées au climat, des conflits et des urgences sanitaires. Les domaines de réponse clés incluent l'abri d'urgence, la sécurité alimentaire, l'eau et l'assainissement, les services de santé et le soutien psychosocial. La réponse aux catastrophes du réseau est coordonnée par le Fonds d'Urgence pour la Réponse aux Catastrophes (DREF) de la plateforme et les Appels d'Urgence, assurant une assistance rapide et efficace aux communautés touchées.",
+      "humanitarianIndicators": "La Humanitarian Databank suit plusieurs indicateurs humanitaires clés, y compris les bénévoles, le personnel, les unités locales, les donneurs de sang, les bénéficiaires des premiers secours, les personnes atteintes, les revenus et les dépenses. Ces indicateurs fournissent des insights complets sur la capacité, la portée et l'impact du réseau dans différentes régions et contextes. Les données aident à mesurer les progrès vers les objectifs humanitaires et informent la prise de décision stratégique pour les opérations futures.",
       "regionalComparison": "La comparaison régionale du nombre de bénévoles montre des niveaux d'engagement variables dans différentes parties du monde. L'Afrique et l'Asie ont généralement le plus grand nombre de bénévoles, reflétant les programmes communautaires étendus dans ces régions. L'Europe et les Amériques montrent un engagement bénévole fort dans des domaines spécifiques comme la réponse aux catastrophes et les services de santé. Le Moyen-Orient démontre une participation bénévole croissante, particulièrement dans la réponse d'urgence et les initiatives de santé communautaire."
     },
     "chartTitles": {
       "arcsVolunteers": "Bénévoles ARCS (2019-2023)",
-      "disasterResponse": "Opérations de Réponse aux Catastrophes NGO Databank (2019-2023)",
+      "disasterResponse": "Opérations de Réponse aux Catastrophes Humanitarian Databank (2019-2023)",
       "humanitarianIndicators": "Indicateurs Humanitaires Clés (2023)",
       "regionalComparison": "Bénévoles par Région (2023)",
       "afghanistanVolunteers": "Bénévoles en Afghanistan ({{year}})"
@@ -679,7 +679,7 @@
     "api": {
       "readDocs": "Lire la documentation de l'API"
     },
-    "orgLogoAlt": "Logo NGO Databank",
+    "orgLogoAlt": "Logo Humanitarian Databank",
     "organizationName": "Fédération Internationale des Sociétés de la Croix-Rouge et du Croissant-Rouge",
     "developerTools": {
       "title": "Outils de Développement",
@@ -692,11 +692,11 @@
   "downloadApps": {
     "title": "Télécharger les Applications Mobiles",
     "meta": {
-      "description": "Téléchargez l'application mobile de la NGO Databank pour les appareils Android et iOS."
+      "description": "Téléchargez l'application mobile de la Humanitarian Databank pour les appareils Android et iOS."
     },
     "hero": {
       "title": "Télécharger les Applications Mobiles",
-      "description": "Obtenez l'application mobile de la NGO Databank pour les appareils Android et iOS."
+      "description": "Obtenez l'application mobile de la Humanitarian Databank pour les appareils Android et iOS."
     },
     "android": {
       "title": "Application Android",
@@ -712,6 +712,8 @@
     },
     "instructions": {
       "title": "Instructions d'Installation",
+      "revealTitle": "Comment installer",
+      "dismiss": "Compris",
       "android": {
         "title": "Android",
         "step1": "Téléchargez le fichier APK en utilisant le bouton ci-dessus",
@@ -721,9 +723,9 @@
       "ios": {
         "title": "iOS",
         "step1": "Téléchargez le fichier IPA en utilisant le bouton ci-dessus",
-        "step2": "Connectez votre appareil iOS à votre ordinateur",
-        "step3": "Utilisez iTunes ou Finder pour installer le fichier IPA sur votre appareil",
-        "step4": "Faites confiance au certificat du développeur dans Réglages > Général > Gestion de l'appareil"
+        "step2": "Installez Sideloadly sur votre Mac ou PC Windows (sideloadly.io), puis connectez votre iPhone ou iPad en USB",
+        "step3": "Dans Sideloadly, sélectionnez l'appareil, ajoutez l'IPA et lancez l'installation ; connectez-vous avec votre Apple ID si demandé",
+        "step4": "Sur l'appareil, accordez votre confiance au développeur dans Réglages > Général > VPN et gestion des appareils (ou Gestion de l'appareil sur les anciennes versions d'iOS)"
       }
     }
   },
@@ -748,9 +750,9 @@
     },
     "endpoint": {
       "title": "Point de Terminaison",
-      "method": "GET",
+      "method": "GET",Humanitarian Databank
       "path": "http://localhost:5000/api/v1/data",
-      "description": "Récupérer les données des formulaires et soumissions NGO Databank (clé API incluse automatiquement)"
+      "description": "Récupérer les données des formulaires et soumissions Humanitarian Databank (clé API incluse automatiquement)"
     },
     "parameters": {
       "title": "Paramètres de Requête",

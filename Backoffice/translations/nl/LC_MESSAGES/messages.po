@@ -1,7 +1,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: NGO Databank 1.0\n"
+"Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-04-11 01:11+0200\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
@@ -8960,7 +8960,7 @@ msgid "N/A"
 msgstr ""
 
 #: app/templates/core/layout.html:557 app/templates/core/layout.html:1080
-msgid "NGO Databank"
+msgid "Humanitarian Databank"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:1222
@@ -17028,11 +17028,11 @@ msgid "e.g., Monthly Newsletter, System Maintenance"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:296
-msgid "e.g., NGO"
+msgid "e.g., IFRC"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:282
-msgid "e.g., NGO Databank"
+msgid "e.g., Humanitarian Databank"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:136
@@ -17060,12 +17060,12 @@ msgid "e.g., https://example.com or /forms/assignment/123"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:413
-msgid "e.g., https://ngo.org/indicator-bank"
+msgid "e.g., https://example.org/indicator-bank"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:403
 #, python-brace-format
-msgid "e.g., https://ngo.org/{id}"
+msgid "e.g., https://example.org/{id}"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:352
@@ -17074,7 +17074,7 @@ msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:326
 #: app/templates/admin/settings/manage_settings.html:335
-msgid "e.g., ngodatabank.org"
+msgid "e.g., humdatabank.org"
 msgstr ""
 
 #: app/templates/admin/notifications/center.html:433

@@ -254,7 +254,7 @@ export default function ApiBuilder() {
         throw new Error('Endpoint did not return JSON');
       }
       const dataToExport = await res.json();
-      await downloadExcelFromJson(dataToExport, 'ngodb-api-data.xlsx');
+      await downloadExcelFromJson(dataToExport, 'humdb-api-data.xlsx');
     } catch (err) {
       console.error('Excel download failed:', err);
       alert(t('alerts.failedToDownloadExcel'));
@@ -313,12 +313,12 @@ export default function ApiBuilder() {
   return (
     <>
       <Head>
-        <title>{`${t('apiBuilder.title')} - NGO Databank`}</title>
+        <title>{`${t('apiBuilder.title')} - Humanitarian Databank`}</title>
         <meta name="description" content={t('apiBuilder.meta.description')} />
       </Head>
 
       {/* Hero Section */}
-      <section className="bg-ngodb-navy text-ngodb-white py-16 md:py-24 -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36">
+      <section className="bg-humdb-navy text-humdb-white py-16 md:py-24 -mt-20 md:-mt-[136px] xl:-mt-20 pt-36 md:pt-[156px] xl:pt-36">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial="hidden"
@@ -329,7 +329,7 @@ export default function ApiBuilder() {
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
               {t('apiBuilder.hero.title')}
             </h1>
-            <p className="text-xl text-ngodb-gray-200 max-w-3xl mx-auto">
+            <p className="text-xl text-humdb-gray-200 max-w-3xl mx-auto">
               {t('apiBuilder.hero.description')}
             </p>
           </motion.div>
@@ -337,12 +337,12 @@ export default function ApiBuilder() {
       </section>
 
                 {/* In-page Navigation */}
-          <div className="bg-ngodb-gray-50 border-b border-ngodb-gray-200">
+          <div className="bg-humdb-gray-50 border-b border-humdb-gray-200">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <nav className="flex flex-wrap items-center gap-3 py-3 text-sm" aria-label="API page navigation">
-                <a href="#overview" className="px-3 py-1 rounded-full bg-white border hover:border-ngodb-red hover:text-ngodb-red transition-colors">{t('apiBuilder.navigation.overview')}</a>
-                <a href="#docs" className="px-3 py-1 rounded-full bg-white border hover:border-ngodb-red hover:text-ngodb-red transition-colors">{t('apiBuilder.navigation.documentation')}</a>
-                <a href="#builder" className="px-3 py-1 rounded-full bg-white border hover:border-ngodb-red hover:text-ngodb-red transition-colors">{t('apiBuilder.navigation.builder')}</a>
+                <a href="#overview" className="px-3 py-1 rounded-full bg-white border hover:border-humdb-red hover:text-humdb-red transition-colors">{t('apiBuilder.navigation.overview')}</a>
+                <a href="#docs" className="px-3 py-1 rounded-full bg-white border hover:border-humdb-red hover:text-humdb-red transition-colors">{t('apiBuilder.navigation.documentation')}</a>
+                <a href="#builder" className="px-3 py-1 rounded-full bg-white border hover:border-humdb-red hover:text-humdb-red transition-colors">{t('apiBuilder.navigation.builder')}</a>
               </nav>
             </div>
           </div>
@@ -357,18 +357,18 @@ export default function ApiBuilder() {
         >
           {/* Overview Section */}
           <motion.div variants={fadeInUp} className="scroll-mt-24 mb-8" id="overview">
-            <div className="bg-ngodb-white rounded-2xl shadow-sm p-8">
+            <div className="bg-humdb-white rounded-2xl shadow-sm p-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Description */}
                 <div className="md:col-span-2">
-                  <h2 className="text-2xl font-bold text-ngodb-navy mb-4">
+                  <h2 className="text-2xl font-bold text-humdb-navy mb-4">
                     {t('apiBuilder.description.title')}
                   </h2>
-                  <p className="text-ngodb-gray-700 mb-4">
+                  <p className="text-humdb-gray-700 mb-4">
                     {t('apiBuilder.description.text')}
                   </p>
-                  <div className="bg-ngodb-gray-50 rounded-lg p-4">
-                    <p className="text-sm text-ngodb-gray-600">
+                  <div className="bg-humdb-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-humdb-gray-600">
                       {(() => {
                         const note = t('apiBuilder.description.note');
                         const email = 'data@example.com';
@@ -377,7 +377,7 @@ export default function ApiBuilder() {
                           return (
                             <>
                               {parts[0]}
-                              <a href={`mailto:${email}`} className="text-ngodb-red hover:text-ngodb-red-dark underline">{email}</a>
+                              <a href={`mailto:${email}`} className="text-humdb-red hover:text-humdb-red-dark underline">{email}</a>
                               {parts[1]}
                             </>
                           );
@@ -389,25 +389,25 @@ export default function ApiBuilder() {
                 </div>
 
                 {/* Endpoint Info */}
-                <div className="bg-ngodb-navy text-ngodb-white rounded-xl p-6">
+                <div className="bg-humdb-navy text-humdb-white rounded-xl p-6">
                   <h3 className="text-lg font-semibold mb-4">
                     {t('apiBuilder.endpoint.title')}
                   </h3>
                   <div className="space-y-3">
                     <div className="flex items-center space-x-3">
-                      <span className="px-2 py-1 bg-ngodb-red text-ngodb-white text-xs font-semibold rounded">
+                      <span className="px-2 py-1 bg-humdb-red text-humdb-white text-xs font-semibold rounded">
                         {t('apiBuilder.endpoint.method')}
                       </span>
                     </div>
-                    <div className="text-ngodb-gray-200 font-mono text-sm break-all">
+                    <div className="text-humdb-gray-200 font-mono text-sm break-all">
                       <div className="opacity-80">{t('apiBuilder.labels.baseUrl', { defaultValue: 'Base URL' })}</div>
                       <code>{backendBaseUrl}</code>
                     </div>
-                    <div className="text-ngodb-gray-200 font-mono text-sm break-all">
+                    <div className="text-humdb-gray-200 font-mono text-sm break-all">
                       <div className="opacity-80">{t('apiBuilder.labels.endpoint', { defaultValue: 'Endpoint' })}</div>
                       <code>/api/v1/data</code>
                     </div>
-                    <p className="text-ngodb-gray-300 text-sm">
+                    <p className="text-humdb-gray-300 text-sm">
                       {t('apiBuilder.endpoint.description')}
                     </p>
                   </div>
@@ -418,28 +418,28 @@ export default function ApiBuilder() {
 
           {/* API Documentation */}
           <motion.div variants={fadeInUp} className="scroll-mt-24 mb-8" id="docs">
-            <div className="bg-ngodb-white rounded-2xl shadow-sm p-8">
-              <h2 className="text-2xl font-bold text-ngodb-navy mb-2">{t('apiBuilder.docs.title', { defaultValue: 'API Documentation' })}</h2>
-              <p className="text-ngodb-gray-700 mb-6">{t('apiBuilder.docs.intro', { defaultValue: 'Construct requests and learn how to use the Databank API effectively. Below are essentials for authentication, filtering, pagination, and disaggregation.' })}</p>
+            <div className="bg-humdb-white rounded-2xl shadow-sm p-8">
+              <h2 className="text-2xl font-bold text-humdb-navy mb-2">{t('apiBuilder.docs.title', { defaultValue: 'API Documentation' })}</h2>
+              <p className="text-humdb-gray-700 mb-6">{t('apiBuilder.docs.intro', { defaultValue: 'Construct requests and learn how to use the Databank API effectively. Below are essentials for authentication, filtering, pagination, and disaggregation.' })}</p>
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-ngodb-navy">{t('apiBuilder.docs.authentication', { defaultValue: 'Authentication' })}</h3>
-                  <p className="text-sm text-ngodb-gray-700 mt-2">{t('apiBuilder.docs.authInstruction', { param: 'api_key', defaultValue: 'Pass your API key via the api_key query parameter.' })}</p>
-                  <pre className="text-xs whitespace-pre-wrap bg-ngodb-gray-50 border border-ngodb-gray-200 rounded-lg p-3 mt-2">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY`}</pre>
+                  <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.docs.authentication', { defaultValue: 'Authentication' })}</h3>
+                  <p className="text-sm text-humdb-gray-700 mt-2">{t('apiBuilder.docs.authInstruction', { param: 'api_key', defaultValue: 'Pass your API key via the api_key query parameter.' })}</p>
+                  <pre className="text-xs whitespace-pre-wrap bg-humdb-gray-50 border border-humdb-gray-200 rounded-lg p-3 mt-2">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY`}</pre>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-ngodb-navy">{t('apiBuilder.endpoint.title')}</h3>
-                  <div className="mt-2 p-3 bg-ngodb-gray-50 border border-ngodb-gray-200 rounded-lg">
+                  <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.endpoint.title')}</h3>
+                  <div className="mt-2 p-3 bg-humdb-gray-50 border border-humdb-gray-200 rounded-lg">
                     <code className="text-sm">GET /api/v1/data</code>
                   </div>
-                  <p className="text-sm text-ngodb-gray-600 mt-2">
+                  <p className="text-sm text-humdb-gray-600 mt-2">
                     Returns submitted form data with optional filtering and pagination.
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-ngodb-navy">{t('apiBuilder.docs.queryParameters', { defaultValue: 'Query Parameters' })}</h3>
+                  <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.docs.queryParameters', { defaultValue: 'Query Parameters' })}</h3>
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-ngodb-gray-50 rounded-lg border">
+                    <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <ul className="text-sm space-y-2">
                         <li><span className="font-medium">api_key</span>: required API key</li>
                         <li><span className="font-medium">template_id</span>: number</li>
@@ -450,7 +450,7 @@ export default function ApiBuilder() {
                         <li><span className="font-medium">submission_type</span>: 'assigned' | 'public'</li>
                       </ul>
                     </div>
-                    <div className="p-4 bg-ngodb-gray-50 rounded-lg border">
+                    <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <ul className="text-sm space-y-2">
                         <li><span className="font-medium">period_name</span>: string (e.g. '2023', 'FY2023', 'Q1 2024')</li>
                         <li><span className="font-medium">indicator_bank_id</span>: number</li>
@@ -462,21 +462,21 @@ export default function ApiBuilder() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-ngodb-navy">{t('apiBuilder.docs.examplesTitle', { defaultValue: 'Examples' })}</h3>
+                  <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.docs.examplesTitle', { defaultValue: 'Examples' })}</h3>
                   <div className="mt-3 space-y-4">
-                    <div className="p-4 bg-ngodb-gray-50 rounded-lg border">
+                    <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleBasic', { defaultValue: 'Basic request (without disaggregation)' })}</p>
                       <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY`}</pre>
                     </div>
-                    <div className="p-4 bg-ngodb-gray-50 rounded-lg border">
+                    <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleDisagg', { defaultValue: 'Include disaggregation data' })}</p>
                       <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY&disagg=true`}</pre>
                     </div>
-                    <div className="p-4 bg-ngodb-gray-50 rounded-lg border">
+                    <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleFilterPaginate', { defaultValue: 'Filter by template, period, and paginate' })}</p>
                       <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY&template_id=21&period_name=2023&page=1&per_page=100`}</pre>
                     </div>
-                    <div className="p-4 bg-ngodb-gray-50 rounded-lg border">
+                    <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleCurlTitle', { defaultValue: 'cURL example' })}</p>
                       <pre className="text-xs whitespace-pre-wrap">{`curl -G "${backendBaseUrl}/api/v1/data" \\
   --data-urlencode "api_key=YOUR_KEY" \\
@@ -487,8 +487,8 @@ export default function ApiBuilder() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-ngodb-navy">{t('apiBuilder.docs.errorsTitle', { defaultValue: 'Errors' })}</h3>
-                  <div className="mt-2 p-3 bg-ngodb-gray-50 border border-ngodb-gray-200 rounded-lg text-sm text-ngodb-gray-700">
+                  <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.docs.errorsTitle', { defaultValue: 'Errors' })}</h3>
+                  <div className="mt-2 p-3 bg-humdb-gray-50 border border-humdb-gray-200 rounded-lg text-sm text-humdb-gray-700">
                     <ul className="list-disc pl-5 space-y-1">
                       <li>{t('apiBuilder.docs.errors.400', { defaultValue: '400: Invalid parameter or value' })}</li>
                       <li>{t('apiBuilder.docs.errors.401', { defaultValue: '401: Missing or invalid api_key' })}</li>
@@ -502,14 +502,14 @@ export default function ApiBuilder() {
           </motion.div>
 
           {/* Main Builder Section */}
-          <h2 className="scroll-mt-24 text-2xl font-bold text-ngodb-navy mb-4" id="builder">{t('apiBuilder.builder.title', { defaultValue: 'Build Endpoint' })}</h2>
+          <h2 className="scroll-mt-24 text-2xl font-bold text-humdb-navy mb-4" id="builder">{t('apiBuilder.builder.title', { defaultValue: 'Build Endpoint' })}</h2>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             {/* Left Column - Parameters */}
             <motion.div variants={fadeInUp} className="xl:col-span-2 space-y-6">
               {/* Parameters Section */}
-              <div className="bg-ngodb-white rounded-2xl shadow-sm p-6">
+              <div className="bg-humdb-white rounded-2xl shadow-sm p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-ngodb-navy">
+                  <h3 className="text-xl font-semibold text-humdb-navy">
                     {t('apiBuilder.parameters.title')}
                   </h3>
                   <button
@@ -522,19 +522,19 @@ export default function ApiBuilder() {
                         return newParams;
                       });
                     }}
-                    className="text-sm text-ngodb-red hover:text-ngodb-red-dark transition-colors"
+                    className="text-sm text-humdb-red hover:text-humdb-red-dark transition-colors"
                   >
                     {t('apiBuilder.parameters.clearAll', { defaultValue: 'Clear All' })}
                   </button>
                 </div>
-                <p className="text-ngodb-gray-600 mb-6">
+                <p className="text-humdb-gray-600 mb-6">
                   {t('apiBuilder.parameters.description')}
                 </p>
 
                 {isLoadingData ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ngodb-red mx-auto mb-4"></div>
-                    <p className="text-ngodb-gray-600 text-sm">{t('apiBuilder.parameters.loadingOptions', { defaultValue: 'Loading parameter options...' })}</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-humdb-red mx-auto mb-4"></div>
+                    <p className="text-humdb-gray-600 text-sm">{t('apiBuilder.parameters.loadingOptions', { defaultValue: 'Loading parameter options...' })}</p>
                   </div>
                 ) : dataError ? (
                   <div className="text-center py-8">
@@ -546,7 +546,7 @@ export default function ApiBuilder() {
                     <p className="text-red-600 text-sm mb-4">{dataError}</p>
                     <button
                       onClick={fetchData}
-                      className="px-4 py-2 bg-ngodb-red text-ngodb-white rounded-lg hover:bg-ngodb-red-dark transition-colors text-sm"
+                      className="px-4 py-2 bg-humdb-red text-humdb-white rounded-lg hover:bg-humdb-red-dark transition-colors text-sm"
                     >
                       Retry
                     </button>
@@ -556,8 +556,8 @@ export default function ApiBuilder() {
                     {Object.entries(parameterDefinitions).map(([key, def]) => (
                       <div key={key} className={`border rounded-lg p-4 transition-all duration-200 ${
                         parameters[key].enabled
-                          ? 'border-ngodb-red bg-ngodb-red bg-opacity-5 shadow-sm'
-                          : 'border-ngodb-gray-200 hover:border-ngodb-gray-300'
+                          ? 'border-humdb-red bg-humdb-red bg-opacity-5 shadow-sm'
+                          : 'border-humdb-gray-200 hover:border-humdb-gray-300'
                       }`}>
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
@@ -566,22 +566,22 @@ export default function ApiBuilder() {
                               id={`enable_${key}`}
                               checked={parameters[key].enabled}
                               onChange={(e) => handleParameterChange(key, 'enabled', e.target.checked)}
-                              className="w-4 h-4 text-ngodb-red border-ngodb-gray-300 rounded focus:ring-ngodb-red"
+                              className="w-4 h-4 text-humdb-red border-humdb-gray-300 rounded focus:ring-humdb-red"
                             />
                             <label htmlFor={`enable_${key}`} className={`font-medium transition-colors ${
-                              parameters[key].enabled ? 'text-ngodb-red' : 'text-ngodb-gray-800'
+                              parameters[key].enabled ? 'text-humdb-red' : 'text-humdb-gray-800'
                             }`}>
                               {t(`apiBuilder.parameters.${key}.label`)}
                             </label>
                           </div>
                           {def.type === 'select' && (
-                            <span className="text-xs bg-ngodb-gray-100 text-ngodb-gray-600 px-2 py-1 rounded">{t('apiBuilder.fieldType.select', { defaultValue: 'Select' })}</span>
+                            <span className="text-xs bg-humdb-gray-100 text-humdb-gray-600 px-2 py-1 rounded">{t('apiBuilder.fieldType.select', { defaultValue: 'Select' })}</span>
                           )}
                           {def.type === 'number' && (
-                            <span className="text-xs bg-ngodb-gray-100 text-ngodb-gray-600 px-2 py-1 rounded">{t('apiBuilder.fieldType.number', { defaultValue: 'Number' })}</span>
+                            <span className="text-xs bg-humdb-gray-100 text-humdb-gray-600 px-2 py-1 rounded">{t('apiBuilder.fieldType.number', { defaultValue: 'Number' })}</span>
                           )}
                           {def.type === 'text' && (
-                            <span className="text-xs bg-ngodb-gray-100 text-ngodb-gray-600 px-2 py-1 rounded">{t('apiBuilder.fieldType.text', { defaultValue: 'Text' })}</span>
+                            <span className="text-xs bg-humdb-gray-100 text-humdb-gray-600 px-2 py-1 rounded">{t('apiBuilder.fieldType.text', { defaultValue: 'Text' })}</span>
                           )}
                         </div>
 
@@ -591,7 +591,7 @@ export default function ApiBuilder() {
                               <select
                                 value={parameters[key].value}
                                 onChange={(e) => handleParameterChange(key, 'value', e.target.value)}
-                                className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                                className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                               >
                                 <option value="">{t('common.select')}</option>
                                 {def.options.map(option => (
@@ -606,10 +606,10 @@ export default function ApiBuilder() {
                                 value={parameters[key].value}
                                 onChange={(e) => handleParameterChange(key, 'value', e.target.value)}
                                 placeholder={def.placeholder}
-                                className="w-full px-3 py-2 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-ngodb-red text-sm"
+                                className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                               />
                             )}
-                            <p className="text-xs text-ngodb-gray-500">
+                            <p className="text-xs text-humdb-gray-500">
                               {def.description}
                             </p>
                           </div>
@@ -621,34 +621,34 @@ export default function ApiBuilder() {
               </div>
 
                           {/* Quick Start Guide */}
-            <div className="bg-gradient-to-r from-ngodb-red to-ngodb-red-dark text-ngodb-white rounded-2xl shadow-sm p-6">
+            <div className="bg-gradient-to-r from-humdb-red to-humdb-red-dark text-humdb-white rounded-2xl shadow-sm p-6">
               <h3 className="text-xl font-semibold mb-4">{t('apiBuilder.quickStart.title', { defaultValue: 'Quick Start Guide' })}</h3>
               <div className="space-y-3 text-sm">
                 <div className="flex items-start space-x-3">
-                  <span className="bg-ngodb-white text-ngodb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
+                  <span className="bg-humdb-white text-humdb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
                   <p>{t('apiBuilder.quickStart.step1', { defaultValue: 'Select the parameters you want to filter by using the checkboxes' })}</p>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <span className="bg-ngodb-white text-ngodb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
+                  <span className="bg-humdb-white text-humdb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
                   <p>{t('apiBuilder.quickStart.step2', { defaultValue: 'Enter values for the selected parameters' })}</p>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <span className="bg-ngodb-white text-ngodb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
+                  <span className="bg-humdb-white text-humdb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
                   <p>{t('apiBuilder.quickStart.step3', { defaultValue: 'Copy the generated URL or test it directly' })}</p>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <span className="bg-ngodb-white text-ngodb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">4</span>
+                  <span className="bg-humdb-white text-humdb-red rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">4</span>
                   <p>{t('apiBuilder.quickStart.step4', { defaultValue: 'Use the URL in your applications or scripts' })}</p>
                 </div>
               </div>
             </div>
 
             {/* Example Queries */}
-            <div className="bg-ngodb-white rounded-2xl shadow-sm p-6">
-              <h3 className="text-xl font-semibold text-ngodb-navy mb-4">
+            <div className="bg-humdb-white rounded-2xl shadow-sm p-6">
+              <h3 className="text-xl font-semibold text-humdb-navy mb-4">
                 {t('apiBuilder.examples.title')}
               </h3>
-              <p className="text-ngodb-gray-600 mb-4">
+              <p className="text-humdb-gray-600 mb-4">
                 {t('apiBuilder.examples.description')}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -656,9 +656,9 @@ export default function ApiBuilder() {
                   <button
                     key={index}
                     onClick={() => handleExampleQuery(example.params)}
-                    className="text-left p-3 border border-ngodb-gray-200 rounded-lg hover:bg-ngodb-gray-50 hover:border-ngodb-red transition-colors group"
+                    className="text-left p-3 border border-humdb-gray-200 rounded-lg hover:bg-humdb-gray-50 hover:border-humdb-red transition-colors group"
                   >
-                    <span className="font-medium text-ngodb-gray-800 text-sm group-hover:text-ngodb-red transition-colors">{example.name}</span>
+                    <span className="font-medium text-humdb-gray-800 text-sm group-hover:text-humdb-red transition-colors">{example.name}</span>
                   </button>
                 ))}
               </div>
@@ -668,11 +668,11 @@ export default function ApiBuilder() {
             {/* Right Column - URL Builder & Response */}
             <motion.div variants={fadeInUp} className="space-y-6">
               {/* Active Parameters Summary */}
-              <div className="bg-ngodb-white rounded-2xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-ngodb-navy mb-4">{t('apiBuilder.activeParams.title', { defaultValue: 'Active Parameters' })}</h3>
+              <div className="bg-humdb-white rounded-2xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-humdb-navy mb-4">{t('apiBuilder.activeParams.title', { defaultValue: 'Active Parameters' })}</h3>
                 <div className="space-y-2">
                   {Object.entries(parameters).filter(([key, param]) => param.enabled && param.value !== '').length === 0 ? (
-                    <p className="text-sm text-ngodb-gray-500 italic">{t('apiBuilder.activeParams.none', { defaultValue: 'No parameters selected' })}</p>
+                    <p className="text-sm text-humdb-gray-500 italic">{t('apiBuilder.activeParams.none', { defaultValue: 'No parameters selected' })}</p>
                   ) : (
                     Object.entries(parameters)
                       .filter(([key, param]) => param.enabled && param.value !== '')
@@ -707,11 +707,11 @@ export default function ApiBuilder() {
                         }
 
                         return (
-                          <div key={key} className="flex items-center justify-between bg-ngodb-gray-50 rounded-lg px-3 py-2">
-                            <span className="text-sm font-medium text-ngodb-gray-700">
+                          <div key={key} className="flex items-center justify-between bg-humdb-gray-50 rounded-lg px-3 py-2">
+                            <span className="text-sm font-medium text-humdb-gray-700">
                               {t(`apiBuilder.parameters.${key}.label`)}
                             </span>
-                            <span className="text-sm text-ngodb-gray-600 bg-white px-2 py-1 rounded border">
+                            <span className="text-sm text-humdb-gray-600 bg-white px-2 py-1 rounded border">
                               {displayValue}
                             </span>
                           </div>
@@ -722,11 +722,11 @@ export default function ApiBuilder() {
               </div>
 
               {/* Generated URL */}
-              <div className="bg-ngodb-white rounded-2xl shadow-sm p-6 sticky top-24 md:top-[144px] xl:top-24">
-                <h3 className="text-xl font-semibold text-ngodb-navy mb-4">
+              <div className="bg-humdb-white rounded-2xl shadow-sm p-6 sticky top-24 md:top-[144px] xl:top-24">
+                <h3 className="text-xl font-semibold text-humdb-navy mb-4">
                   {t('apiBuilder.generatedUrl.title')}
                 </h3>
-                <p className="text-ngodb-gray-600 mb-4 text-sm">
+                <p className="text-humdb-gray-600 mb-4 text-sm">
                   {t('apiBuilder.generatedUrl.description')}
                 </p>
 
@@ -736,21 +736,21 @@ export default function ApiBuilder() {
                       type="text"
                       value={generatedUrl}
                       readOnly
-                      className="w-full px-4 py-3 bg-ngodb-gray-50 border border-ngodb-gray-300 rounded-lg font-mono text-xs"
+                      className="w-full px-4 py-3 bg-humdb-gray-50 border border-humdb-gray-300 rounded-lg font-mono text-xs"
                     />
                   </div>
 
                   <div className="flex flex-col space-y-2">
                     <button
                       onClick={copyToClipboard}
-                      className="w-full px-4 py-2 bg-ngodb-red text-ngodb-white rounded-lg hover:bg-ngodb-red-dark transition-colors text-sm font-medium"
+                      className="w-full px-4 py-2 bg-humdb-red text-humdb-white rounded-lg hover:bg-humdb-red-dark transition-colors text-sm font-medium"
                     >
                       {copyStatus === 'copied' ? t('apiBuilder.generatedUrl.copied') : t('apiBuilder.generatedUrl.copy')}
                     </button>
                     <button
                       onClick={testEndpoint}
                       disabled={isLoading}
-                      className="w-full px-4 py-2 bg-ngodb-navy text-ngodb-white rounded-lg hover:bg-ngodb-navy-dark transition-colors disabled:opacity-50 text-sm font-medium"
+                      className="w-full px-4 py-2 bg-humdb-navy text-humdb-white rounded-lg hover:bg-humdb-navy-dark transition-colors disabled:opacity-50 text-sm font-medium"
                     >
                       {isLoading ? t('apiBuilder.generatedUrl.testing') : t('apiBuilder.generatedUrl.test')}
                     </button>
@@ -766,15 +766,15 @@ export default function ApiBuilder() {
               </div>
 
               {/* Response Preview */}
-              <div className="bg-ngodb-white rounded-2xl shadow-sm p-6">
-                <h3 className="text-xl font-semibold text-ngodb-navy mb-4">
+              <div className="bg-humdb-white rounded-2xl shadow-sm p-6">
+                <h3 className="text-xl font-semibold text-humdb-navy mb-4">
                   {t('apiBuilder.response.title')}
                 </h3>
 
                 {isLoading && (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ngodb-red mx-auto mb-4"></div>
-                    <p className="text-ngodb-gray-600 text-sm">{t('apiBuilder.response.loading')}</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-humdb-red mx-auto mb-4"></div>
+                    <p className="text-humdb-gray-600 text-sm">{t('apiBuilder.response.loading')}</p>
                   </div>
                 )}
 
@@ -803,8 +803,8 @@ export default function ApiBuilder() {
                         )}
                       </div>
                     ) : (
-                      <div className="bg-ngodb-gray-50 rounded-lg p-4 max-h-96 overflow-auto">
-                        <pre className="text-xs text-ngodb-gray-800 whitespace-pre-wrap">
+                      <div className="bg-humdb-gray-50 rounded-lg p-4 max-h-96 overflow-auto">
+                        <pre className="text-xs text-humdb-gray-800 whitespace-pre-wrap">
                           {JSON.stringify(response.data, null, 2)}
                         </pre>
                       </div>
@@ -813,7 +813,7 @@ export default function ApiBuilder() {
                 )}
 
                 {!response && !isLoading && (
-                  <div className="text-center py-8 text-ngodb-gray-500">
+                  <div className="text-center py-8 text-humdb-gray-500">
                     <p className="text-sm">{t('apiBuilder.response.noData')}</p>
                   </div>
                 )}

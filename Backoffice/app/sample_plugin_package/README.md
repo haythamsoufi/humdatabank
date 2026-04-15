@@ -1,6 +1,6 @@
 # Sample Plugin Package
 
-This is a minimal starter plugin for the NGO Databank.
+This is a minimal starter plugin for the Humanitarian Databank.
 
 ## Contents
 

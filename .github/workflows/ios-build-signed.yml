@@ -4,7 +4,7 @@ on:
   workflow_dispatch:  # Manual trigger only for security
     inputs:
       backend_url:
-        description: 'Backoffice URL (databank.ifrc.org → production; *.fly.dev → NGO demo; IFRC *-stage.ifrc.org → staging)'
+        description: 'Backoffice URL (databank.ifrc.org → production; *.fly.dev → Humanitarian Databank demo; IFRC *-stage.ifrc.org → staging)'
         required: true
         type: choice
         options:
@@ -133,21 +133,21 @@ jobs:
           fi
 
           if [ -n "$SUFFIX" ]; then
-            sed -i '' "s/com\.ngo\.databank/com.ngo.databank${SUFFIX}/g" ios/Runner.xcodeproj/project.pbxproj
-            sed -i '' "s/group\.com\.ngo\.databank/group.com.ngo.databank${SUFFIX}/g" ios/Runner/Runner.entitlements
-            sed -i '' "s/com\.ngo\.databank/com.ngo.databank${SUFFIX}/g" android/app/build.gradle
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" ios/Runner.xcodeproj/project.pbxproj
+            sed -i '' "s/group\.com\.hum\.databank/group.com.hum.databank${SUFFIX}/g" ios/Runner/Runner.entitlements
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" android/app/build.gradle
           fi
 
           if [ "$PROFILE" = "staging" ]; then
             ENV_DISPLAY_NAME="IFRC Databank (Staging)"
           elif [ "$PROFILE" = "demo" ]; then
-            ENV_DISPLAY_NAME="NGO Databank (Demo)"
+            ENV_DISPLAY_NAME="Humanitarian Databank (Demo)"
           else
             ORG="${{ inputs.organization_config }}"
             if [ "$ORG" = "ifrc" ]; then
               ENV_DISPLAY_NAME="IFRC Databank"
             else
-              ENV_DISPLAY_NAME="NGO Databank (CI - $PROFILE)"
+              ENV_DISPLAY_NAME="Humanitarian Databank (CI - $PROFILE)"
             fi
           fi
           /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" ios/Runner/Info.plist > /dev/null 2>&1 && \

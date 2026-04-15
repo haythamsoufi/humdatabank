@@ -32,7 +32,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.ngo.databank"
+    namespace "com.hum.databank"
     compileSdkVersion 36
     // jni (and other plugins) require NDK 28.x; align with highest required version
     ndkVersion = "28.2.13676358"
@@ -52,7 +52,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.ngo.databank"
+        applicationId "com.hum.databank"
         // Firebase Messaging 25.0.1 requires minSdkVersion 23
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion 36

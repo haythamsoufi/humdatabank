@@ -1,4 +1,4 @@
-package com.ngo.databank
+package com.hum.databank
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -32,7 +32,7 @@ class AuditTrailWidgetProvider : HomeWidgetProvider() {
                         HomeWidgetLaunchIntent.getActivity(
                             context,
                             MainActivity::class.java,
-                            Uri.parse("ngodatabank://"),
+                            Uri.parse("humdatabank://"),
                         )
                     setOnClickPendingIntent(R.id.audit_trail_widget_root, pending)
                     setTextViewText(R.id.audit_trail_widget_body, body)

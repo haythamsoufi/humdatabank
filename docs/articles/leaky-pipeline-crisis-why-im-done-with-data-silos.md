@@ -30,9 +30,9 @@ What changed wasn't the idea, it was the speed of execution. AI removed the fric
 
 I didn't need a massive budget or a three-year roadmap. I needed a different way of building. I bypassed the red tape to create a system that forces the architecture to earn trust, so the data can finally make sense.
 
-## What is the NGO Databank?
+## What is the Humanitarian Databank?
 
-The NGO Databank is a unified, three-dimensional data ecosystem designed to remove the friction between collecting data and using it. It consolidates three years of humanitarian data lessons into one architecture so we move away from "collect first, clean later" toward data that is **clean by design**—not because someone heroically fixed it in Excel after the fact, but because definitions, ownership, and review are built into the same spine as the form.
+The Humanitarian Databank is a unified, three-dimensional data ecosystem designed to remove the friction between collecting data and using it. It consolidates three years of humanitarian data lessons into one architecture so we move away from "collect first, clean later" toward data that is **clean by design**—not because someone heroically fixed it in Excel after the fact, but because definitions, ownership, and review are built into the same spine as the form.
 
 The ecosystem has three primary pillars:
 
@@ -90,7 +90,7 @@ The same AI APIs can power companion experiences on the website or mobile app wh
 
 ## Governance by Design: Fixing the Architect, Not Just the Data
 
-Most organizations try to fix data after it's collected. That's like trying to unscramble an egg. I'm done with "data governance policies" that live on paper and die in practice. My conviction is that governance must live in the workflow itself. In the NGO Databank ecosystem, we tackle "garbage in, garbage out" at the source:
+Most organizations try to fix data after it's collected. That's like trying to unscramble an egg. I'm done with "data governance policies" that live on paper and die in practice. My conviction is that governance must live in the workflow itself. In the Humanitarian Databank ecosystem, we tackle "garbage in, garbage out" at the source:
 
 **The Indicator Bank:** This is the heart of the system. Indicators are defined once, with clear metadata, units, and definitions. Forms reuse that vocabulary instead of inventing a new dialect for every exercise. If you want to track "People Reached," you use the standard, not a variation that breaks your aggregate. NGOs and particularly National Societies can manage their own indicator bank in this system, or reuse IFRC's indicator bank (even contribute to it) which is even better as it leads to a shared standard across the humanitarian sector.
 
@@ -114,7 +114,7 @@ Governance at the source does not mean pretending the sector's habits do not exi
 
 Because I was able to build this prototype rapidly via vibe coding, I was able to show my team that we didn't need to wait for traditional funding to solve our biggest data headaches.
 
-The system has now been vetted across roles—from field-facing colleagues to global analysts. After surviving that gauntlet, NGO Databank is now heading into its first real-life, large-scale data collection. My team at the IFRC is deploying the Backoffice part of this ecosystem to support global reporting across 130 National Societies for the **2026 Unified Mid-year Reporting**. We are turning bottom-up accountability into something operational. In this model, National Societies own and manage their data at the source.
+The system has now been vetted across roles—from field-facing colleagues to global analysts. After surviving that gauntlet, Humanitarian Databank is now heading into its first real-life, large-scale data collection. My team at the IFRC is deploying the Backoffice part of this ecosystem to support global reporting across 130 National Societies for the **2026 Unified Mid-year Reporting**. We are turning bottom-up accountability into something operational. In this model, National Societies own and manage their data at the source.
 
 ## The Power of Local Sovereignty: Internal Deployment for NGOs & NSs
 
@@ -137,7 +137,7 @@ The source code is documented not just for human developers, but specifically fo
 If an NGO wants to add a bespoke feature or customize a workflow, they don't need a massive dev shop. Because the codebase is structured for "vibe coding," an AI agent (like Claude or GPT) can ingest the documentation and immediately understand the system architecture.
 
 - **Rapid customization:** Want to add a new reporting module? The AI agent already has what it needs to write the code that fits your specific context.
-- **Low-cost evolution:** You can maintain and grow your own instance of the Databank with a fraction of the traditional technical overhead. You aren't just buying a tool; you're inheriting an agile ecosystem that evolves as fast as you can "vibe" it.
+- **Low-cost evolution:** You can maintain and grow your own instance of the Humanitarian Databank with a fraction of the traditional technical overhead. You aren't just buying a tool; you're inheriting an agile ecosystem that evolves as fast as you can "vibe" it.
 
 ### Vertical Integrity, Horizontal Standards
 
@@ -155,7 +155,7 @@ This isn't just a "vetted" tool; it's a system designed to survive the entire fo
 
 ## Core Capabilities: Built for the Humanitarian Reality
 
-Beyond the governance and the architecture, the NGO Databank is packed with features designed for the specific constraints of our sector:
+Beyond the governance and the architecture, the Humanitarian Databank is packed with features designed for the specific constraints of our sector:
 
 - **Offline First:** A native mobile app designed for the most remote areas. Data is captured locally and syncs seamlessly only when connectivity returns, ensuring no story is lost to a bad signal.
 - **True RTL Support:** Native, full Arabic support (and other Right-to-Left languages) that doesn't break your layouts. We speak the languages the teams actually work in.
@@ -194,6 +194,6 @@ It's time to stop pouring resources into isolated silos. Let's build a unified, 
 ### Explore the vision in action
 
 - **Demos:** [Backoffice](https://backoffice-databank.fly.dev), [Website portal](https://website-databank.fly.dev), mobile (iOS and Android in browser simulator).
-- **GitHub repository (open source):** [github.com/haythamsoufi/ngodatabank](https://github.com/haythamsoufi/ngodatabank)
+- **GitHub repository (open source):** [github.com/haythamsoufi/humdatabank](https://github.com/haythamsoufi/humdatabank)
 
-For social posts: #HumanitarianTech #DataGovernance #VibeCoding #NGO #DigitalTransformation #IFRC #OpenSource #Innovation #DataSilos #BottomUpAccountability
+For social posts: #HumanitarianTech #DataGovernance #VibeCoding #HumanitarianData #DigitalTransformation #IFRC #OpenSource #Innovation #DataSilos #BottomUpAccountability

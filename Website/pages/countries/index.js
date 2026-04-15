@@ -79,18 +79,18 @@ export default function CountriesListPage({ countries: initialCountries, error: 
   return (
     <>
       <Head>
-        <title>{`${t('navigation.countries')} - NGO Databank`}</title>
-        <meta name="description" content="Browse all countries in the NGO Databank. Explore country profiles, indicators, and data." />
+        <title>{`${t('navigation.countries')} - Humanitarian Databank`}</title>
+        <meta name="description" content="Browse all countries in the Humanitarian Databank. Explore country profiles, indicators, and data." />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-ngodb-gray-50 to-ngodb-gray-100">
+      <div className="min-h-screen bg-gradient-to-br from-humdb-gray-50 to-humdb-gray-100">
         <div className="w-full px-6 sm:px-8 lg:px-12 py-12">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-ngodb-navy mb-4">
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-humdb-navy mb-4">
               {t('navigation.countries')}
             </h1>
-            <p className="text-lg text-ngodb-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-humdb-gray-600 max-w-2xl mx-auto">
               {t('countriesList.description', { default: 'Explore country profiles, indicators, and data from National Societies around the world.' })}
             </p>
           </div>
@@ -105,10 +105,10 @@ export default function CountriesListPage({ countries: initialCountries, error: 
                   placeholder={t('countriesList.searchPlaceholder', { default: 'Search countries...' })}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                 />
                 <svg
-                  className="absolute left-3 top-2.5 w-5 h-5 text-ngodb-gray-400"
+                  className="absolute left-3 top-2.5 w-5 h-5 text-humdb-gray-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -122,7 +122,7 @@ export default function CountriesListPage({ countries: initialCountries, error: 
                 <select
                   value={selectedRegion}
                   onChange={(e) => setSelectedRegion(e.target.value)}
-                  className="w-full px-4 py-2 border border-ngodb-gray-300 rounded-lg focus:ring-2 focus:ring-ngodb-red focus:border-transparent"
+                  className="w-full px-4 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                 >
                   <option value="all">{t('countriesList.allRegions', { default: 'All Regions' })}</option>
                   {regions.filter(r => r !== 'all').map(region => (
@@ -133,7 +133,7 @@ export default function CountriesListPage({ countries: initialCountries, error: 
             </div>
 
             {/* Results count */}
-            <div className="mt-4 text-sm text-ngodb-gray-600">
+            <div className="mt-4 text-sm text-humdb-gray-600">
               {t('countriesList.showing', {
                 default: 'Showing {count} of {total} countries',
                 count: sortedCountries.length,
@@ -145,8 +145,8 @@ export default function CountriesListPage({ countries: initialCountries, error: 
           {/* Loading State */}
           {loading && (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ngodb-red"></div>
-              <span className="ml-3 text-ngodb-gray-600">{t('countriesList.loading', { default: 'Loading countries...' })}</span>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-humdb-red"></div>
+              <span className="ml-3 text-humdb-gray-600">{t('countriesList.loading', { default: 'Loading countries...' })}</span>
             </div>
           )}
 
@@ -175,10 +175,10 @@ export default function CountriesListPage({ countries: initialCountries, error: 
                     <Link
                       key={country.id || country.iso3}
                       href={`/countries/${country.iso3?.toUpperCase() || country.iso3}`}
-                      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-ngodb-gray-200 hover:border-ngodb-red group"
+                      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-humdb-gray-200 hover:border-humdb-red group"
                     >
                       {/* Flag */}
-                      <div className="h-32 bg-gradient-to-br from-ngodb-navy to-ngodb-red flex items-center justify-center relative overflow-hidden">
+                      <div className="h-32 bg-gradient-to-br from-humdb-navy to-humdb-red flex items-center justify-center relative overflow-hidden">
                         {country.iso2 ? (
                           <img
                             src={`/flags/${country.iso2.toLowerCase()}.svg`}
@@ -200,16 +200,16 @@ export default function CountriesListPage({ countries: initialCountries, error: 
 
                       {/* Content */}
                       <div className="p-4">
-                        <h3 className="text-lg font-bold text-ngodb-navy mb-1 group-hover:text-ngodb-red transition-colors line-clamp-2">
+                        <h3 className="text-lg font-bold text-humdb-navy mb-1 group-hover:text-humdb-red transition-colors line-clamp-2">
                           {country.name}
                         </h3>
                         {country.national_society_name && (
-                          <p className="text-sm text-ngodb-gray-600 mb-2 line-clamp-2">
+                          <p className="text-sm text-humdb-gray-600 mb-2 line-clamp-2">
                             {country.national_society_name}
                           </p>
                         )}
                         {country.region && (
-                          <p className="text-xs text-ngodb-gray-500">
+                          <p className="text-xs text-humdb-gray-500">
                             {country.region}
                           </p>
                         )}
@@ -217,7 +217,7 @@ export default function CountriesListPage({ countries: initialCountries, error: 
 
                       {/* Hover Arrow */}
                       <div className="px-4 pb-4">
-                        <div className="flex items-center text-ngodb-red opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="flex items-center text-humdb-red opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           <span className="text-sm font-medium mr-2">
                             {t('countriesList.viewProfile', { default: 'View Profile' })}
                           </span>
@@ -231,13 +231,13 @@ export default function CountriesListPage({ countries: initialCountries, error: 
                 </div>
               ) : (
                 <div className="text-center py-12 bg-white rounded-xl shadow-lg">
-                  <svg className="w-16 h-16 text-ngodb-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-16 h-16 text-humdb-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-lg text-ngodb-gray-600 mb-2">
+                  <p className="text-lg text-humdb-gray-600 mb-2">
                     {t('countriesList.noCountriesFound', { default: 'No countries found' })}
                   </p>
-                  <p className="text-sm text-ngodb-gray-500">
+                  <p className="text-sm text-humdb-gray-500">
                     {t('countriesList.tryDifferentSearch', { default: 'Try adjusting your search or filter criteria' })}
                   </p>
                 </div>

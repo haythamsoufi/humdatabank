@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart' as cupertino;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngo_databank_app/l10n/app_localizations.dart';
-import 'package:ngo_databank_app/widgets/error_state.dart';
+import 'package:hum_databank_app/l10n/app_localizations.dart';
+import 'package:hum_databank_app/widgets/error_state.dart';
 
 Widget _wrapWithMaterialApp(Widget child) {
   return MaterialApp(

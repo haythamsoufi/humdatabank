@@ -8,10 +8,10 @@
       theme: {
         extend: {
           colors: {
-            'ngodb-red': '#ED1C24', // Primary brand red
-            'ngodb-red-dark': '#C91A20',
-            'ngodb-red-light': '#FDE9E9',
-            'ngodb-gray': {
+            'humdb-red': '#ED1C24', // Primary brand red
+            'humdb-red-dark': '#C91A20',
+            'humdb-red-light': '#FDE9E9',
+            'humdb-gray': {
               100: '#F7FAFC', // Lightest gray for backgrounds
               200: '#EDF2F7',
               300: '#E2E8F0',
@@ -22,7 +22,7 @@
               800: '#2D3748',
               900: '#1A202C', // Darkest gray
             },
-            'ngodb-blue': { // Accent blue
+            'humdb-blue': { // Accent blue
                 50: '#eff6ff',
                 100: '#dbeafe',
                 200: '#bfdbfe',
@@ -35,13 +35,13 @@
                 900: '#1e3a8a',
                 950: '#172554',
             },
-            'ngodb-green': '#28A745', // Success green
-            'ngodb-green-dark': '#1E7E34',
-            'ngodb-blue-dark': '#1E40AF',
+            'humdb-green': '#28A745', // Success green
+            'humdb-green-dark': '#1E7E34',
+            'humdb-blue-dark': '#1E40AF',
              // Brand navy (from site theme)
-            'ngodb-navy': '#011E41',
-            'ngodb-black': '#000000', // Added black
-            'ngodb-white': '#FFFFFF', // Added white
+            'humdb-navy': '#011E41',
+            'humdb-black': '#000000', // Added black
+            'humdb-white': '#FFFFFF', // Added white
           },
           fontFamily: {
             sans: ['Inter', 'sans-serif'], // Using Inter as a modern, clean font

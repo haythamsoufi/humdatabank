@@ -728,6 +728,8 @@ class UserSessionLog(db.Model):
 
     # Session statistics
     page_views = db.Column(db.Integer, default=0, nullable=False)
+    # Histogram of canonical path keys (url_rule pattern or path; mobile /m/...); see app.utils.page_view_paths
+    page_view_path_counts = db.Column(db.JSON, nullable=True)
     actions_performed = db.Column(db.Integer, default=0, nullable=False)
     forms_submitted = db.Column(db.Integer, default=0, nullable=False)
     files_uploaded = db.Column(db.Integer, default=0, nullable=False)

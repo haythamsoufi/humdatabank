@@ -9,7 +9,13 @@ from functools import wraps
 from flask import request, g, session, current_app
 from flask_login import current_user
 from app.utils.request_utils import is_static_asset_request
-from app.services.user_analytics_service import log_user_activity, log_admin_action
+from app.services.user_analytics_service import (
+    log_user_activity,
+    log_admin_action,
+    increment_session_page_views_without_activity_log,
+    increment_session_page_views_without_activity_log_deferred,
+    log_user_activity_explicit,
+)
 from app.utils.activity_endpoint_overrides import (
     resolve_post_activity_type,
     resolve_delete_activity_type,
@@ -18,6 +24,7 @@ from app.utils.activity_endpoint_overrides import (
     strip_endpoint_verb_prefix,
 )
 from app.utils.activity_form_data_redaction import redact_activity_form_data
+from app.utils.page_view_paths import page_view_path_key_from_request
 import time
 
 
@@ -33,6 +40,7 @@ _SKIP_ENDPOINTS = frozenset([
     'auth.login', 'auth.logout',
     # System health / heartbeat
     'api.heartbeat', 'api.status',
+    'public.health_check',
     # Presence heartbeat + active-users poll (high-frequency background)
     'forms_api.api_presence_heartbeat',
     'forms_api.api_presence_active_users',
@@ -141,6 +149,46 @@ def _should_skip_auto_activity_request(req):
     if req.endpoint == 'analytics.user_analytics' and req.args.get('partial', '0') == '1':
         return True
     return False
+
+
+def _endpoint_last_segment(endpoint: str) -> str:
+    if not endpoint or "." not in endpoint:
+        return endpoint or ""
+    return endpoint.rsplit(".", 1)[-1]
+
+
+def _should_count_session_page_view_for_request(req) -> bool:
+    """
+    Decide whether to bump ``UserSessionLog.page_views`` for this request.
+
+    Historically every GET was treated as a "page view", which inflated session
+    counts with JSON/API/plugin GETs (``api_*`` routes, fetch() calls, etc.).
+    We align with browser Fetch Metadata where available: real top-level document
+    navigations send Sec-Fetch-Mode: navigate and Sec-Fetch-Dest: document.
+    Subresource GETs (cors, same-origin XHR, etc.) typically do not.
+
+    When Fetch Metadata is absent (older clients, some bots), we still exclude
+    obvious JSON route names (last segment ``api_*``).
+
+    The deferred path also maps main.dashboard POST to page_view for filter UI;
+    those still bump the counter.
+    """
+    if not req:
+        return False
+    if req.endpoint == "main.dashboard" and req.method == "POST":
+        return True
+    if req.method != "GET":
+        return False
+    if _should_skip_auto_activity_request(req):
+        return False
+    seg = _endpoint_last_segment(req.endpoint or "")
+    if seg.startswith("api_"):
+        return False
+    mode = (req.headers.get("Sec-Fetch-Mode") or "").lower()
+    dest = (req.headers.get("Sec-Fetch-Dest") or "").lower()
+    if mode or dest:
+        return mode == "navigate" and dest == "document"
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +553,6 @@ def init_activity_tracking(app):
             # Instead, log activity after the response closes using a fresh app context / new transaction.
             if getattr(g, "_auto_txn_managed", False):
                 try:
-                    from app.services.user_analytics_service import log_user_activity_explicit
                     from flask import current_app as _current_app
 
                     app_obj = _current_app._get_current_object()
@@ -551,6 +598,13 @@ def init_activity_tracking(app):
                     if request.method == 'POST' and is_admin_route_with_logging:
                         return response
 
+                    if activity_type == "page_view" and not _should_count_session_page_view_for_request(
+                        request
+                    ):
+                        return response
+
+                    page_view_path_key = page_view_path_key_from_request(request)
+
                     description = _build_activity_description(request.method, endpoint, activity_type)
 
                     context_data = {
@@ -569,21 +623,27 @@ def init_activity_tracking(app):
                     def _on_close():
                         try:
                             with app_obj.app_context():
-                                log_user_activity_explicit(
-                                    user_id=user_id,
-                                    session_id=session_id,
-                                    activity_type=activity_type,
-                                    description=description,
-                                    context_data=context_data,
-                                    response_time_ms=response_time_ms,
-                                    status_code=response.status_code,
-                                    endpoint=endpoint,
-                                    http_method=method,
-                                    url_path=url_path,
-                                    referrer=referrer,
-                                    ip_address=ip_address,
-                                    user_agent=user_agent,
-                                )
+                                if activity_type == "page_view":
+                                    increment_session_page_views_without_activity_log_deferred(
+                                        session_id,
+                                        page_view_path_key=page_view_path_key,
+                                    )
+                                else:
+                                    log_user_activity_explicit(
+                                        user_id=user_id,
+                                        session_id=session_id,
+                                        activity_type=activity_type,
+                                        description=description,
+                                        context_data=context_data,
+                                        response_time_ms=response_time_ms,
+                                        status_code=response.status_code,
+                                        endpoint=endpoint,
+                                        http_method=method,
+                                        url_path=url_path,
+                                        referrer=referrer,
+                                        ip_address=ip_address,
+                                        user_agent=user_agent,
+                                    )
                         except Exception as e:
                             app_obj.logger.warning(f"Deferred activity logging failed: {str(e)}")
 
@@ -621,6 +681,11 @@ def init_activity_tracking(app):
                 if request.method == 'POST' and is_admin_route_with_logging:
                     return response
 
+                if activity_type == "page_view" and not _should_count_session_page_view_for_request(
+                    request
+                ):
+                    return response
+
                 # Build description
                 description = _build_activity_description(request.method, request.endpoint, activity_type)
 
@@ -638,14 +703,17 @@ def init_activity_tracking(app):
                 # Extract country information from form data, URL args, or view args
                 _extract_entity_into_context(app, request, context_data)
 
-                # Log the activity
-                log_user_activity(
-                    activity_type=activity_type,
-                    description=description,
-                    context_data=context_data,
-                    response_time_ms=response_time_ms,
-                    status_code=response.status_code
-                )
+                # Automatic GET "page_view" — session stats only (no per-hit audit row)
+                if activity_type == "page_view":
+                    increment_session_page_views_without_activity_log()
+                else:
+                    log_user_activity(
+                        activity_type=activity_type,
+                        description=description,
+                        context_data=context_data,
+                        response_time_ms=response_time_ms,
+                        status_code=response.status_code
+                    )
             except Exception as e:
                 app.logger.error(f"Error in activity tracking: {str(e)}")
                 # Don't let activity tracking errors affect the response

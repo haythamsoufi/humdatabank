@@ -100,7 +100,8 @@ class ScreenViewTracker {
   }
 
   /// Track a screen view. Fire-and-forget — errors are swallowed.
-  void trackScreenView(String screenName, {String? screenClass}) {
+  /// [routePath] Navigator route string (e.g. `/admin/analytics`) for Backoffice path keys.
+  void trackScreenView(String screenName, {String? screenClass, String? routePath}) {
     if (screenName.isEmpty) return;
 
     // Client-side dedup
@@ -120,10 +121,14 @@ class ScreenViewTracker {
     );
 
     // Backoffice audit trail (fire-and-forget)
-    _postScreenView(screenName, screenClass);
+    _postScreenView(screenName, screenClass, routePath);
   }
 
-  Future<void> _postScreenView(String screenName, String? screenClass) async {
+  Future<void> _postScreenView(
+    String screenName,
+    String? screenClass,
+    String? routePath,
+  ) async {
     try {
       // Skip the Backoffice POST when the user has no stored tokens — this
       // happens at app startup before auth is established and would always
@@ -133,7 +138,8 @@ class ScreenViewTracker {
 
       final body = <String, dynamic>{
         'screen_name': screenName,
-        'screen_class': screenClass,
+        if (screenClass != null && screenClass.isNotEmpty) 'screen_class': screenClass,
+        if (routePath != null && routePath.isNotEmpty) 'route_path': routePath,
       };
       await _api.post(
         AppConfig.mobileScreenViewEndpoint,

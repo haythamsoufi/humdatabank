@@ -33,6 +33,7 @@ class AnalyticsNavigatorObserver extends NavigatorObserver {
       _tracker.trackScreenView(
         screenName,
         screenClass: route.runtimeType.toString(),
+        routePath: routeName,
       );
     }
   }

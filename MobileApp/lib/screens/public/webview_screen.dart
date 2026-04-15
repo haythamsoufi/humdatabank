@@ -19,10 +19,7 @@ import '../../utils/debug_logger.dart';
 class WebViewScreen extends StatefulWidget {
   final String initialUrl;
 
-  const WebViewScreen({
-    super.key,
-    required this.initialUrl,
-  });
+  const WebViewScreen({super.key, required this.initialUrl});
 
   @override
   State<WebViewScreen> createState() => _WebViewScreenState();
@@ -82,7 +79,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
         final localizations = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${localizations.errorOpeningDownload}: ${e.toString()}'),
+            content: Text(
+              '${localizations.errorOpeningDownload}: ${e.toString()}',
+            ),
             backgroundColor: theme.colorScheme.error,
           ),
         );
@@ -135,25 +134,28 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   SizedBox(
-                    height: MediaQuery.of(context).size.height -
+                    height:
+                        MediaQuery.of(context).size.height -
                         MediaQuery.of(context).padding.top -
                         kToolbarHeight -
                         50 - // Bottom navigation bar height
-                        MediaQuery.of(context)
-                            .padding
-                            .bottom, // Safe area bottom padding
+                        MediaQuery.of(
+                          context,
+                        ).padding.bottom, // Safe area bottom padding
                     child: Stack(
                       children: [
                         InAppWebView(
                           key: ValueKey(
-                              url), // Rebuild WebView when language changes
+                            url,
+                          ), // Rebuild WebView when language changes
                           initialUrlRequest: URLRequest(
                             url: WebUri(url),
                             headers: WebViewService.defaultRequestHeaders,
                           ),
                           initialUserScripts:
                               WebViewService.getRequestInterceptorScripts(
-                                  language: language),
+                                language: language,
+                              ),
                           initialSettings: WebViewService.defaultSettings(),
                           onWebViewCreated: (controller) {
                             _webViewController = controller;
@@ -163,29 +165,32 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           },
                           shouldOverrideUrlLoading:
                               (controller, navigationAction) async {
-                            // Validate URL before loading
-                            final url = navigationAction.request.url;
-                            if (url != null && !WebViewService.isUrlAllowed(url)) {
-                              DebugLogger.logWarn(
-                                  'WEBVIEW', 'Blocked navigation to: $url');
-                              // Show error message
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        localizations.navUrlNotAllowed,
-                                    ),
-                                    backgroundColor: Theme.of(context)
-                                        .colorScheme
-                                        .error,
-                                  ),
-                                );
-                              }
-                              return NavigationActionPolicy.CANCEL;
-                            }
-                            // Allow navigation for valid URLs
-                            return NavigationActionPolicy.ALLOW;
-                          },
+                                // Validate URL before loading
+                                final url = navigationAction.request.url;
+                                if (url != null &&
+                                    !WebViewService.isUrlAllowed(url)) {
+                                  DebugLogger.logWarn(
+                                    'WEBVIEW',
+                                    'Blocked navigation to: $url',
+                                  );
+                                  // Show error message
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          localizations.navUrlNotAllowed,
+                                        ),
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.error,
+                                      ),
+                                    );
+                                  }
+                                  return NavigationActionPolicy.CANCEL;
+                                }
+                                // Allow navigation for valid URLs
+                                return NavigationActionPolicy.ALLOW;
+                              },
                           onLoadStart: (controller, url) {
                             setState(() {
                               _isLoading = true;
@@ -200,41 +205,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
                             // Inject Tajawal font after page loads if Arabic is selected
                             if (language == 'ar') {
-                              await controller.evaluateJavascript(source: '''
-                      (function() {
-                        // Ensure Tajawal font is loaded
-                        const link = document.createElement('link');
-                        link.href = 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap';
-                        link.rel = 'stylesheet';
-                        link.crossOrigin = 'anonymous';
-                        if (!document.querySelector('link[href*="Tajawal"]')) {
-                          document.head.appendChild(link);
-                        }
-
-                        // Apply font with high specificity
-                        const styleId = 'tajawal-font-injection-final';
-                        let style = document.getElementById(styleId);
-                        if (!style) {
-                          style = document.createElement('style');
-                          style.id = styleId;
-                          document.head.appendChild(style);
-                        }
-                        style.textContent = `
-                          * {
-                            font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
-                          }
-                          body, html {
-                            font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
-                          }
-                          [dir="rtl"], .rtl, [dir="rtl"] *, .rtl * {
-                            font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
-                          }
-                          h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label, li, td, th, .text-base, .text-sm, .text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl {
-                            font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
-                          }
-                        `;
-                      })();
-                    ''');
+                              await controller.evaluateJavascript(
+                                source: WebViewService
+                                    .arabicTajawalPostLoadEvaluateSource,
+                              );
                             }
 
                             // Update app bar title
@@ -259,9 +233,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           },
                           onReceivedError: (controller, request, error) {
                             if (WebViewService.shouldIgnoreError(
-                                error.description)) {
+                              error.description,
+                            )) {
                               print(
-                                  '[WEBVIEW] Ignored error: ${error.description}');
+                                '[WEBVIEW] Ignored error: ${error.description}',
+                              );
                               return;
                             }
 
@@ -276,16 +252,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
                             if (statusCode != null && statusCode >= 400) {
                               setState(() {
                                 _isLoading = false;
-                                _error = AppLocalizations.of(context)!
-                                    .httpError(statusCode);
+                                _error = AppLocalizations.of(
+                                  context,
+                                )!.httpError(statusCode);
                               });
                             }
                           },
                           onDownloadStartRequest:
-                              (InAppWebViewController controller,
-                                  DownloadStartRequest request) {
-                            _handleDownload(Uri.parse(request.url.toString()));
-                          },
+                              (
+                                InAppWebViewController controller,
+                                DownloadStartRequest request,
+                              ) {
+                                _handleDownload(
+                                  Uri.parse(request.url.toString()),
+                                );
+                              },
                         ),
                         // Loading Indicator
                         if (_isLoading && _progress < 1.0)
@@ -307,7 +288,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
                                       end: Alignment.bottomCenter,
                                       colors: [
                                         context.navyBackgroundColor(
-                                            opacity: 0.05),
+                                          opacity: 0.05,
+                                        ),
                                         theme.scaffoldBackgroundColor,
                                       ],
                                     ),
@@ -320,15 +302,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
                                         CircularProgressIndicator(
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                            Color(AppConstants.ifrcRed),
-                                          ),
+                                                Color(AppConstants.ifrcRed),
+                                              ),
                                         ),
                                         const SizedBox(height: 16),
                                         Text(
                                           localizations.loading,
                                           style: const TextStyle(
                                             color: Color(
-                                                AppConstants.textSecondary),
+                                              AppConstants.textSecondary,
+                                            ),
                                             fontSize: 14,
                                           ),
                                         ),
@@ -361,9 +344,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                                     Container(
                                       padding: const EdgeInsets.all(20),
                                       decoration: BoxDecoration(
-                                        color:
-                                            const Color(AppConstants.errorColor)
-                                                .withValues(alpha: 0.1),
+                                        color: const Color(
+                                          AppConstants.errorColor,
+                                        ).withValues(alpha: 0.1),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
@@ -402,8 +385,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                                       icon: const Icon(Icons.refresh),
                                       label: Text(localizations.retry),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            Color(AppConstants.ifrcRed),
+                                        backgroundColor: Color(
+                                          AppConstants.ifrcRed,
+                                        ),
                                         foregroundColor:
                                             theme.colorScheme.onPrimary,
                                         padding: const EdgeInsets.symmetric(
@@ -411,8 +395,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                                           vertical: 12,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -431,7 +416,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
           floatingActionButton: widget.initialUrl.contains('/countries/')
               ? FloatingActionButton(
                   heroTag: 'menu_button_webview',
-                  onPressed: () => _showNavigationMenu(context, languageProvider, theme, localizations, language),
+                  onPressed: () => _showNavigationMenu(
+                    context,
+                    languageProvider,
+                    theme,
+                    localizations,
+                    language,
+                  ),
                   backgroundColor: Color(AppConstants.ifrcRed),
                   foregroundColor: theme.colorScheme.onPrimary,
                   tooltip: localizations.navigationMenu,
@@ -447,7 +438,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  void _showNavigationMenu(BuildContext context, LanguageProvider languageProvider, ThemeData theme, AppLocalizations localizations, String language) {
+  void _showNavigationMenu(
+    BuildContext context,
+    LanguageProvider languageProvider,
+    ThemeData theme,
+    AppLocalizations localizations,
+    String language,
+  ) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
     final isFocalPoint = user?.isFocalPoint ?? false;
@@ -479,7 +476,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   child: Text(
                     localizations.navigation,
                     style: theme.textTheme.titleLarge?.copyWith(
@@ -502,7 +502,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         onTap: () {
                           Navigator.pop(bottomSheetContext);
                           Navigator.of(context).popUntil((route) {
-                            return route.isFirst || route.settings.name == AppRoutes.dashboard;
+                            return route.isFirst ||
+                                route.settings.name == AppRoutes.dashboard;
                           });
                         },
                       ),
@@ -514,7 +515,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         onTap: () {
                           Navigator.pop(bottomSheetContext);
                           Navigator.of(context).pop();
-                          Navigator.of(context).pushNamed(AppRoutes.indicatorBank);
+                          Navigator.of(
+                            context,
+                          ).pushNamed(AppRoutes.indicatorBank);
                         },
                       ),
                       // Resources/Notifications - navigate to native screen
@@ -527,7 +530,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           onTap: () {
                             Navigator.pop(bottomSheetContext);
                             Navigator.of(context).pop();
-                            Navigator.of(context).pushNamed(AppRoutes.notifications);
+                            Navigator.of(
+                              context,
+                            ).pushNamed(AppRoutes.notifications);
                           },
                         )
                       else
@@ -539,7 +544,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           onTap: () {
                             Navigator.pop(bottomSheetContext);
                             Navigator.of(context).pop();
-                            Navigator.of(context).pushNamed(AppRoutes.resources);
+                            Navigator.of(
+                              context,
+                            ).pushNamed(AppRoutes.resources);
                           },
                         ),
                       _buildMenuTile(
@@ -554,12 +561,19 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         },
                       ),
                       Padding(
-                        padding: const EdgeInsets.only(top: 8, left: 24, right: 24, bottom: 8),
+                        padding: const EdgeInsets.only(
+                          top: 8,
+                          left: 24,
+                          right: 24,
+                          bottom: 8,
+                        ),
                         child: Text(
                           localizations.analysis,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.7,
+                            ),
                           ),
                         ),
                       ),
@@ -572,7 +586,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         onTap: () {
                           Navigator.pop(bottomSheetContext);
                           Navigator.of(context).pop();
-                          Navigator.of(context).pushNamed(AppRoutes.disaggregationAnalysis);
+                          Navigator.of(
+                            context,
+                          ).pushNamed(AppRoutes.disaggregationAnalysis);
                         },
                       ),
                       _buildMenuTile(
@@ -583,11 +599,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         onTap: () {
                           Navigator.pop(bottomSheetContext);
                           Navigator.of(context).pop();
-                          final fullUrl = UrlHelper.buildFrontendUrlWithLanguage('/dataviz', language);
-                          Navigator.of(context).pushNamed(
-                            AppRoutes.webview,
-                            arguments: fullUrl,
-                          );
+                          final fullUrl =
+                              UrlHelper.buildFrontendUrlWithLanguage(
+                                '/dataviz',
+                                language,
+                              );
+                          Navigator.of(
+                            context,
+                          ).pushNamed(AppRoutes.webview, arguments: fullUrl);
                         },
                       ),
                       const SizedBox(height: 16),
@@ -631,7 +650,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -651,9 +673,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ),
                 ),
                 const Divider(height: 1),
-                const Expanded(
-                  child: CountriesWidget(),
-                ),
+                const Expanded(child: CountriesWidget()),
               ],
             ),
           ),
@@ -672,11 +692,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Icon(
-        icon,
-        color: Color(AppConstants.ifrcRed),
-        size: 20,
-      ),
+      leading: Icon(icon, color: Color(AppConstants.ifrcRed), size: 20),
       title: Text(
         title,
         style: theme.textTheme.bodyLarge?.copyWith(

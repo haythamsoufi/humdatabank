@@ -45,12 +45,17 @@ class WebViewService {
     // In debug mode, log blocked URLs but still allow them
     // In production, strictly enforce whitelist
     if (kDebugMode) {
-      DebugLogger.logWarn('WEBVIEW',
-          'URL not in whitelist (allowed in debug): $urlString');
+      DebugLogger.logWarn(
+        'WEBVIEW',
+        'URL not in whitelist (allowed in debug): $urlString',
+      );
       return true; // Allow in debug mode for development
     }
 
-    DebugLogger.logWarn('WEBVIEW', 'URL blocked (not in whitelist): $urlString');
+    DebugLogger.logWarn(
+      'WEBVIEW',
+      'URL blocked (not in whitelist): $urlString',
+    );
     return false;
   }
 
@@ -99,8 +104,9 @@ class WebViewService {
     }
   }
 
-  static UnmodifiableListView<UserScript> getRequestInterceptorScripts(
-      {String? language}) {
+  static UnmodifiableListView<UserScript> getRequestInterceptorScripts({
+    String? language,
+  }) {
     final scripts = <UserScript>[
       // Inject Content Security Policy
       getCspInjectionScript(),
@@ -302,7 +308,8 @@ class WebViewService {
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       ),
       UserScript(
-        source: '''
+        source:
+            '''
         (function() {
           const correctBackendUrl = '${AppConfig.backendUrl}';
           const backendPatterns = [
@@ -384,8 +391,9 @@ class WebViewService {
   static final UnmodifiableListView<UserScript> requestInterceptorScripts =
       getRequestInterceptorScripts();
 
-  static InAppWebViewSettings defaultSettings(
-      {bool allowMixedContent = false}) {
+  static InAppWebViewSettings defaultSettings({
+    bool allowMixedContent = false,
+  }) {
     return InAppWebViewSettings(
       javaScriptEnabled: true,
       domStorageEnabled: true,
@@ -423,7 +431,8 @@ class WebViewService {
     // would break single-quoted embedding: meta.content = 'default-src 'self' ...'
     final cspJsLiteral = jsonEncode(csp);
     return UserScript(
-      source: '''
+      source:
+          '''
         (function() {
           function injectCsp() {
             if (document.querySelector('meta[http-equiv="Content-Security-Policy"]')) return;
@@ -458,6 +467,41 @@ class WebViewService {
     }
   }
 
+  /// Reinforces Tajawal from [InAppWebView.onLoadStop] when the app language is Arabic.
+  /// [getRequestInterceptorScripts] already injects at document start/end; this is idempotent
+  /// and uses a distinct style id for late-loaded markup.
+  static const String arabicTajawalPostLoadEvaluateSource = r'''
+(function() {
+  const link = document.createElement('link');
+  link.href = 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap';
+  link.rel = 'stylesheet';
+  link.crossOrigin = 'anonymous';
+  if (!document.querySelector('link[href*="Tajawal"]')) {
+    document.head.appendChild(link);
+  }
+  const styleId = 'tajawal-font-injection-final';
+  let style = document.getElementById(styleId);
+  if (!style) {
+    style = document.createElement('style');
+    style.id = styleId;
+    document.head.appendChild(style);
+  }
+  style.textContent = `
+    * {
+      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+    }
+    body, html {
+      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+    }
+    [dir="rtl"], .rtl, [dir="rtl"] *, .rtl * {
+      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+    }
+    h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label, li, td, th, .text-base, .text-sm, .text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl {
+      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+    }
+  `;
+})();''';
+
   static bool shouldIgnoreError(String? description) {
     if (description == null || description.isEmpty) {
       return false;
@@ -482,7 +526,8 @@ class WebViewService {
       'networkerror',
     ];
 
-    return ignoredFragments.any((fragment) =>
-      descriptionLower.contains(fragment.toLowerCase()));
+    return ignoredFragments.any(
+      (fragment) => descriptionLower.contains(fragment.toLowerCase()),
+    );
   }
 }

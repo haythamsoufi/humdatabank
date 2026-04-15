@@ -116,6 +116,20 @@
                 }
             },
             {
+                field: 'distinct_page_view_paths',
+                headerName: t.distinctPaths || 'Distinct paths',
+                width: 130,
+                minWidth: 100,
+                filter: 'agNumberColumnFilter',
+                sortable: true,
+                hide: true,
+                cellRenderer: function(params) {
+                    var v = params.value != null ? params.value : 0;
+                    return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">' +
+                        esc(v) + '</span>';
+                }
+            },
+            {
                 field: 'activity_count',
                 headerName: t.activities || 'Activities',
                 width: 120,

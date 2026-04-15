@@ -20,6 +20,7 @@ from app.utils.rate_limiting import mobile_rate_limit
 from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.datetime_helpers import utcnow
 from app.routes.api.mobile import mobile_bp
+from app.utils.page_view_paths import distinct_page_view_path_count
 
 
 def _has_table(table_name):
@@ -315,6 +316,7 @@ def session_logs():
         ua = s.user_agent
         if ua and len(ua) > 400:
             ua = ua[:400] + '…'
+        pvc = s.page_view_path_counts if isinstance(s.page_view_path_counts, dict) else {}
         items.append({
             'session_id': s.session_id,
             'session_start': s.session_start.isoformat() if s.session_start else None,
@@ -322,6 +324,8 @@ def session_logs():
             'last_activity': s.last_activity.isoformat() if s.last_activity else None,
             'duration_minutes': effective_session_duration_minutes(s),
             'page_views': s.page_views or 0,
+            'distinct_page_view_paths': distinct_page_view_path_count(s),
+            'page_view_path_counts': pvc,
             'activity_count': s.actions_performed or 0,
             'is_active': bool(s.is_active),
             'device_type': s.device_type,

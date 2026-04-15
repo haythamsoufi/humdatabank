@@ -31,6 +31,7 @@ from app.services.user_analytics_service import (
     effective_session_duration_minutes,
     session_log_device_icon_classes,
 )
+from app.utils.page_view_paths import distinct_page_view_path_count
 
 
 def _login_log_risk_json(log: UserLoginLog):
@@ -242,6 +243,7 @@ def session_logs_list_api():
         if ua and len(ua) > 400:
             ua = ua[:400] + '…'
 
+        pvc = s.page_view_path_counts if isinstance(s.page_view_path_counts, dict) else {}
         items.append({
             'session_id': s.session_id,
             'session_start': s.session_start.isoformat() if s.session_start else None,
@@ -249,6 +251,8 @@ def session_logs_list_api():
             'last_activity': s.last_activity.isoformat() if s.last_activity else None,
             'duration_minutes': effective_session_duration_minutes(s),
             'page_views': s.page_views or 0,
+            'distinct_page_view_paths': distinct_page_view_path_count(s),
+            'page_view_path_counts': pvc,
             'activity_count': s.actions_performed or 0,
             'is_active': bool(s.is_active),
             'device_type': s.device_type,

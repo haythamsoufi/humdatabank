@@ -102,7 +102,15 @@ class PushNotificationService {
         DebugLogger.logWarn(
             'PUSH', '⚠️ User granted provisional notification permission');
       } else {
-        DebugLogger.logWarn('PUSH', '❌ User declined notification permission');
+        DebugLogger.logWarn(
+            'PUSH',
+            '❌ User declined notification permission — '
+            'registering device for app/heartbeat tracking (no push)');
+        await _registerDeviceWithPersistentInstallId();
+        _startHeartbeat();
+        _initialized = true;
+        DebugLogger.logNotifications(
+            '✅ Android device registered for tracking (push disabled)');
         return;
       }
 
@@ -200,6 +208,12 @@ class PushNotificationService {
         DebugLogger.logWarn('PUSH',
             '⚠️ Initialized but no token found, attempting to get token...');
         await _registerToken();
+        if (_currentToken == null && Platform.isAndroid) {
+          DebugLogger.logWarn(
+              'PUSH',
+              'FCM unavailable — registering with persistent install id');
+          await _registerDeviceWithPersistentInstallId();
+        }
         if (_currentToken == null) {
           DebugLogger.logWarn(
               'PUSH', '❌ Still no token after registration attempt');
@@ -467,12 +481,11 @@ class PushNotificationService {
     );
   }
 
-  /// Register iOS device with backend (for tracking purposes, no push notifications)
-  Future<void> _registerIOSDevice() async {
+  /// Install-scoped id for backend device/heartbeat when FCM is not used
+  /// (iOS, or Android with notifications denied). Survives logout via
+  /// [AuthService.logout] preserving [AppConfig.persistentDeviceInstallIdKey].
+  Future<void> _registerDeviceWithPersistentInstallId() async {
     try {
-      // Install-scoped UUID (not an Apple device ID). Must survive logout:
-      // AuthService.logout() preserves this key across clearSecure() so the
-      // same physical device reuses the same token on every login.
       final storage = StorageService();
       String? deviceId =
           await storage.getSecure(AppConfig.persistentDeviceInstallIdKey);
@@ -486,7 +499,7 @@ class PushNotificationService {
               AppConfig.persistentDeviceInstallIdKey, deviceId);
           await prefs.remove('ios_device_token');
           DebugLogger.logNotifications(
-              'Migrated iOS device id from SharedPreferences to secure storage');
+              'Migrated device id from SharedPreferences to secure storage');
         }
       }
 
@@ -495,20 +508,25 @@ class PushNotificationService {
         await storage.setSecure(
             AppConfig.persistentDeviceInstallIdKey, deviceId);
         DebugLogger.logNotifications(
-            'Generated new iOS device identifier: ${deviceId.substring(0, 20)}...');
+            'Generated new device install identifier: ${deviceId.substring(0, 20)}...');
       } else {
         DebugLogger.logNotifications(
-            'Using existing iOS device identifier: ${deviceId.substring(0, 20)}...');
+            'Using existing device install identifier: ${deviceId.substring(0, 20)}...');
       }
 
       _currentToken = deviceId;
 
-      DebugLogger.logNotifications('Registering iOS device with backend...');
+      DebugLogger.logNotifications('Registering device with backend (install id)...');
       await _registerTokenWithBackend(deviceId);
     } catch (e, stackTrace) {
-      DebugLogger.logError('❌ Error registering iOS device: $e');
+      DebugLogger.logError('❌ Error registering device with install id: $e');
       DebugLogger.logError('Stack trace: $stackTrace');
     }
+  }
+
+  /// Register iOS device with backend (for tracking purposes, no push notifications)
+  Future<void> _registerIOSDevice() async {
+    await _registerDeviceWithPersistentInstallId();
   }
 
   /// Generate a UUID v4-like string
@@ -733,6 +751,10 @@ class PushNotificationService {
         DebugLogger.logWarn(
             'PUSH', 'No iOS device token, attempting to register...');
         await _registerIOSDevice();
+      } else if (Platform.isAndroid) {
+        DebugLogger.logWarn(
+            'PUSH', 'No Android device token, attempting install-id registration...');
+        await _registerDeviceWithPersistentInstallId();
       }
       // If still no token, skip heartbeat
       if (_currentToken == null) {

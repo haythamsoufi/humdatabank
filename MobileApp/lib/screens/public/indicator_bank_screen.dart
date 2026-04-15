@@ -48,10 +48,8 @@ class _IbRowSectorHeader extends _IbTableRow {
 }
 
 class _IbRowIndicator extends _IbTableRow {
-  const _IbRowIndicator({
-    required this.indicator,
-    required this.isLastInList,
-  }) : super();
+  const _IbRowIndicator({required this.indicator, required this.isLastInList})
+    : super();
   final Indicator indicator;
   final bool isLastInList;
 }
@@ -95,11 +93,7 @@ _IbSlotNames _ibSubSectorSlots(Indicator ind) {
   return const _IbSlotNames();
 }
 
-bool _ibPrimaryTierForFilters(
-  Indicator ind,
-  String selSector,
-  String selSub,
-) {
+bool _ibPrimaryTierForFilters(Indicator ind, String selSector, String selSub) {
   final hasS = selSector.isNotEmpty;
   final hasU = selSub.isNotEmpty;
   if (!hasS && !hasU) return true;
@@ -137,10 +131,14 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
   }
 
   void _loadData({bool forceRefresh = false}) {
-    final indicatorProvider =
-        Provider.of<IndicatorBankProvider>(context, listen: false);
-    final languageProvider =
-        Provider.of<LanguageProvider>(context, listen: false);
+    final indicatorProvider = Provider.of<IndicatorBankProvider>(
+      context,
+      listen: false,
+    );
+    final languageProvider = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    );
     indicatorProvider.loadData(
       locale: languageProvider.currentLanguage,
       forceRefresh: forceRefresh,
@@ -163,67 +161,67 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
 
   void _showCountriesSheet(BuildContext context, ThemeData theme) {
     final localizations = AppLocalizations.of(context)!;
+    final sheetHeight = MediaQuery.sizeOf(context).height * 0.9;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (BuildContext bottomSheetContext) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Handle bar
-                Container(
-                  margin: const EdgeInsets.only(
-                    top: IOSSpacing.md - 4,
-                    bottom: IOSSpacing.sm,
+        return SizedBox(
+          height: sheetHeight,
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(
+                      top: IOSSpacing.md - 4,
+                      bottom: IOSSpacing.sm,
+                    ),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.dividerColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                // Title
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: IOSSpacing.xl,
-                    vertical: IOSSpacing.md,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        localizations.countries,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
+                  // Title
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: IOSSpacing.xl,
+                      vertical: IOSSpacing.md,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          localizations.countries,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
-                      ),
-                      IOSIconButton(
-                        icon: Icons.close,
-                        onPressed: () => Navigator.pop(bottomSheetContext),
-                        tooltip: localizations.close,
-                        semanticLabel: localizations.close,
-                      ),
-                    ],
+                        IOSIconButton(
+                          icon: Icons.close,
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                          tooltip: localizations.close,
+                          semanticLabel: localizations.close,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const Divider(height: 1),
-                // Countries widget
-                const Expanded(
-                  child: CountriesWidget(),
-                ),
-              ],
+                  const Divider(height: 1),
+                  const Expanded(child: CountriesWidget()),
+                ],
+              ),
             ),
           ),
         );
@@ -316,8 +314,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
               if (indicatorProvider.viewMode == 'table')
                 IOSIconButton(
                   icon: Icons.filter_list,
-                  onPressed: () =>
-                      _openIndicatorBankFilters(indicatorProvider),
+                  onPressed: () => _openIndicatorBankFilters(indicatorProvider),
                   tooltip: localizations.indicatorBankShowFilters,
                   semanticLabel: localizations.indicatorBankShowFilters,
                 ),
@@ -343,8 +340,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
               child: Builder(
                 builder: (context) {
                   final provider = indicatorProvider;
-                  if (provider.isLoading &&
-                      provider.allIndicators.isEmpty) {
+                  if (provider.isLoading && provider.allIndicators.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -357,9 +353,9 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                           const SizedBox(height: 16),
                           Text(
                             localizations.indicatorBankLoading,
-                            style: IOSTextStyle.subheadline(context).copyWith(
-                              color: context.textSecondaryColor,
-                            ),
+                            style: IOSTextStyle.subheadline(
+                              context,
+                            ).copyWith(color: context.textSecondaryColor),
                           ),
                         ],
                       ),
@@ -408,8 +404,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                               icon: const Icon(Icons.refresh, size: 18),
                               label: Text(localizations.retry),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor:
-                                    Color(AppConstants.ifrcRed),
+                                foregroundColor: Color(AppConstants.ifrcRed),
                                 side: BorderSide(
                                   color: Color(AppConstants.ifrcRed),
                                 ),
@@ -442,8 +437,8 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                             padding: EdgeInsets.symmetric(
                               horizontal:
                                   MediaQuery.of(context).size.width > 600
-                                      ? 32
-                                      : 20,
+                                  ? 32
+                                  : 20,
                               vertical: 20,
                             ),
                             child: Column(
@@ -472,7 +467,9 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                   currentIndex: 2, // Home tab highlighted
                   onTap: (index) {
                     NavigationHelper.popToMainThenOpenAiIfNeeded(
-                        context, index);
+                      context,
+                      index,
+                    );
                   },
                 )
               : null,
@@ -491,8 +488,10 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
           controller: _searchController,
           decoration: InputDecoration(
             hintText: localizations.indicatorBankSearchPlaceholder,
-            prefixIcon: const Icon(Icons.search,
-                color: Color(AppConstants.textSecondary)),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: Color(AppConstants.textSecondary),
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
               borderSide: const BorderSide(
@@ -573,8 +572,9 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black
-                              .withValues(alpha: isDark ? 0.35 : 0.1),
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.35 : 0.1,
+                          ),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -753,12 +753,16 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                   final sectorList = uniqueSectors.values.toList();
 
                   return DropdownButtonFormField<String>(
-                    key: ValueKey<String>('ib_sector_${provider.selectedSector}'),
+                    key: ValueKey<String>(
+                      'ib_sector_${provider.selectedSector}',
+                    ),
                     initialValue: provider.selectedSector.isEmpty
                         ? null
-                        : (sectorList.any((s) => s.name == provider.selectedSector)
-                            ? provider.selectedSector
-                            : null),
+                        : (sectorList.any(
+                                (s) => s.name == provider.selectedSector,
+                              )
+                              ? provider.selectedSector
+                              : null),
                     decoration: InputDecoration(
                       labelText: loc.indicatorBankFilterSector,
                     ),
@@ -821,9 +825,10 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                     initialValue: provider.selectedSubSector.isEmpty
                         ? null
                         : (subsectorList.any(
-                                (s) => s.name == provider.selectedSubSector)
-                            ? provider.selectedSubSector
-                            : null),
+                                (s) => s.name == provider.selectedSubSector,
+                              )
+                              ? provider.selectedSubSector
+                              : null),
                     decoration: InputDecoration(
                       labelText: loc.indicatorBankFilterSubsector,
                     ),
@@ -855,9 +860,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String>(
-                key: ValueKey<String>(
-                  'ib_arch_${provider.archived}',
-                ),
+                key: ValueKey<String>('ib_arch_${provider.archived}'),
                 initialValue: provider.archived ? 'all' : 'active',
                 decoration: InputDecoration(
                   labelText: loc.indicatorBankFilterStatus,
@@ -925,12 +928,14 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
             // Group sectors into rows
             final rows = <List<dynamic>>[];
             for (int i = 0; i < sectorsWithCounts.length; i += crossAxisCount) {
-              rows.add(sectorsWithCounts.sublist(
-                i,
-                i + crossAxisCount > sectorsWithCounts.length
-                    ? sectorsWithCounts.length
-                    : i + crossAxisCount,
-              ));
+              rows.add(
+                sectorsWithCounts.sublist(
+                  i,
+                  i + crossAxisCount > sectorsWithCounts.length
+                      ? sectorsWithCounts.length
+                      : i + crossAxisCount,
+                ),
+              );
             }
 
             return Column(
@@ -944,8 +949,9 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                       children: row.asMap().entries.map((entry) {
                         final index = entry.key;
                         final sector = entry.value;
-                        final count =
-                            provider.getSectorIndicatorCount(sector.name);
+                        final count = provider.getSectorIndicatorCount(
+                          sector.name,
+                        );
 
                         return Expanded(
                           child: Padding(
@@ -956,10 +962,13 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
-                                    AppConstants.radiusLarge),
+                                  AppConstants.radiusLarge,
+                                ),
                               ),
                               shadowColor: Theme.of(context).ambientShadow(
-                                  lightOpacity: 0.05, darkOpacity: 0.3),
+                                lightOpacity: 0.05,
+                                darkOpacity: 0.3,
+                              ),
                               child: InkWell(
                                 onTap: () {
                                   provider.setSelectedSector(sector.name);
@@ -967,7 +976,8 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                   provider.applyFilters();
                                 },
                                 borderRadius: BorderRadius.circular(
-                                    AppConstants.radiusLarge),
+                                  AppConstants.radiusLarge,
+                                ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(10),
                                   child: Column(
@@ -985,12 +995,13 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                           fit: BoxFit.contain,
                                           errorBuilder:
                                               (context, error, stackTrace) {
-                                            return Text(
-                                              _getSectorIcon(sector.name),
-                                              style:
-                                                  const TextStyle(fontSize: 36),
-                                            );
-                                          },
+                                                return Text(
+                                                  _getSectorIcon(sector.name),
+                                                  style: const TextStyle(
+                                                    fontSize: 36,
+                                                  ),
+                                                );
+                                              },
                                         )
                                       else
                                         Text(
@@ -1000,7 +1011,8 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                       const SizedBox(height: 8),
                                       Padding(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 4),
+                                          horizontal: 4,
+                                        ),
                                         child: Text(
                                           sector.displayName,
                                           textAlign: TextAlign.center,
@@ -1017,8 +1029,9 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                         '$count ${count == 1 ? localizations.indicatorBankIndicator : localizations.indicatorBankIndicators}',
                                         style: const TextStyle(
                                           fontSize: 11,
-                                          color:
-                                              Color(AppConstants.textSecondary),
+                                          color: Color(
+                                            AppConstants.textSecondary,
+                                          ),
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -1038,26 +1051,27 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
 
                                               if (position != null &&
                                                   size != null) {
-                                                final result =
-                                                    await showMenu<String>(
+                                                final result = await showMenu<String>(
                                                   context: context,
                                                   position:
                                                       RelativeRect.fromLTRB(
-                                                    position.dx,
-                                                    position.dy + size.height,
-                                                    position.dx + size.width,
-                                                    position.dy +
-                                                        size.height +
-                                                        200,
-                                                  ),
+                                                        position.dx,
+                                                        position.dy +
+                                                            size.height,
+                                                        position.dx +
+                                                            size.width,
+                                                        position.dy +
+                                                            size.height +
+                                                            200,
+                                                      ),
                                                   items: [
                                                     PopupMenuItem<String>(
                                                       enabled: false,
                                                       child: Padding(
                                                         padding:
-                                                            const EdgeInsets
-                                                                .only(
-                                                                bottom: 8),
+                                                            const EdgeInsets.only(
+                                                              bottom: 8,
+                                                            ),
                                                         child: Text(
                                                           'Sub-sectors',
                                                           style: TextStyle(
@@ -1071,12 +1085,13 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                                       ),
                                                     ),
                                                     const PopupMenuDivider(),
-                                                    ...sector.subsectors
-                                                        .map((subsector) {
+                                                    ...sector.subsectors.map((
+                                                      subsector,
+                                                    ) {
                                                       // Count using English subsector name, not localized
-                                                      final subCount = provider
-                                                          .allIndicators
-                                                          .where((ind) {
+                                                      final subCount = provider.allIndicators.where((
+                                                        ind,
+                                                      ) {
                                                         if (ind.subSector ==
                                                             null) {
                                                           return false;
@@ -1091,11 +1106,12 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                                             is Map) {
                                                           final subSectorMap =
                                                               ind.subSector
-                                                                  as Map<String,
-                                                                      dynamic>;
+                                                                  as Map<
+                                                                    String,
+                                                                    dynamic
+                                                                  >;
                                                           final primarySubSectorName =
-                                                              subSectorMap[
-                                                                      'primary']
+                                                              subSectorMap['primary']
                                                                   as String?;
                                                           return primarySubSectorName ==
                                                               subsector.name;
@@ -1103,7 +1119,8 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                                         return false;
                                                       }).length;
                                                       return PopupMenuItem<
-                                                          String>(
+                                                        String
+                                                      >(
                                                         value: subsector.name,
                                                         child: Row(
                                                           mainAxisAlignment:
@@ -1116,8 +1133,9 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                                                     .displayName,
                                                                 style:
                                                                     const TextStyle(
-                                                                        fontSize:
-                                                                            13),
+                                                                      fontSize:
+                                                                          13,
+                                                                    ),
                                                                 maxLines: 2,
                                                                 overflow:
                                                                     TextOverflow
@@ -1125,15 +1143,16 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                                               ),
                                                             ),
                                                             const SizedBox(
-                                                                width: 8),
+                                                              width: 8,
+                                                            ),
                                                             Text(
                                                               '$subCount',
-                                                              style:
-                                                                  const TextStyle(
+                                                              style: const TextStyle(
                                                                 fontSize: 12,
                                                                 color: Color(
-                                                                    AppConstants
-                                                                        .textSecondary),
+                                                                  AppConstants
+                                                                      .textSecondary,
+                                                                ),
                                                               ),
                                                             ),
                                                           ],
@@ -1145,9 +1164,11 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
 
                                                 if (result != null) {
                                                   provider.setSelectedSector(
-                                                      sector.name);
+                                                    sector.name,
+                                                  );
                                                   provider.setSelectedSubSector(
-                                                      result);
+                                                    result,
+                                                  );
                                                   provider.setViewMode('table');
                                                   provider.applyFilters();
                                                 }
@@ -1185,7 +1206,8 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
 
   /// Groups [indicators] by [Indicator.displaySector]; empty sector → key `""`.
   Map<String, List<Indicator>> _groupIndicatorsBySector(
-      List<Indicator> indicators) {
+    List<Indicator> indicators,
+  ) {
     final map = <String, List<Indicator>>{};
     for (final ind in indicators) {
       final key = ind.displaySector.trim();
@@ -1193,9 +1215,8 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
     }
     for (final list in map.values) {
       list.sort(
-        (a, b) => a.displayName.toLowerCase().compareTo(
-              b.displayName.toLowerCase(),
-            ),
+        (a, b) =>
+            a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
       );
     }
     return map;
@@ -1222,10 +1243,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
     if (last < 0) return rows;
     final out = List<_IbTableRow>.from(rows);
     final old = out[last] as _IbRowIndicator;
-    out[last] = _IbRowIndicator(
-      indicator: old.indicator,
-      isLastInList: true,
-    );
+    out[last] = _IbRowIndicator(indicator: old.indicator, isLastInList: true);
     return out;
   }
 
@@ -1322,169 +1340,161 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
       );
     }
 
-    final tableRows =
-        _buildIbTableRowsForList(provider, indicators, localizations);
+    final tableRows = _buildIbTableRowsForList(
+      provider,
+      indicators,
+      localizations,
+    );
 
     return SliverPadding(
       padding: EdgeInsets.symmetric(
         horizontal: MediaQuery.of(context).size.width > 600 ? 32 : 20,
       ),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final row = tableRows[index];
-            if (row is _IbRowSummary) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16, top: 8),
-                child: Text(
-                  '${localizations.indicatorBankShowing} ${indicators.length} ${indicators.length == 1 ? localizations.indicatorBankIndicator : localizations.indicatorBankIndicators}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(AppConstants.textSecondary),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final row = tableRows[index];
+          if (row is _IbRowSummary) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16, top: 8),
+              child: Text(
+                '${localizations.indicatorBankShowing} ${indicators.length} ${indicators.length == 1 ? localizations.indicatorBankIndicator : localizations.indicatorBankIndicators}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(AppConstants.textSecondary),
+                ),
+              ),
+            );
+          }
+          if (row is _IbRowTierLabel) {
+            final theme = Theme.of(context);
+            final bannerFill = Color(
+              AppConstants.ifrcNavy,
+            ).withValues(alpha: context.isDarkTheme ? 0.42 : 0.08);
+            return Padding(
+              padding: EdgeInsets.only(top: row.marginTop, bottom: 10),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: bannerFill,
+                  border: Border(
+                    left: BorderSide(
+                      color: Color(AppConstants.ifrcRed),
+                      width: 4,
+                    ),
                   ),
                 ),
-              );
-            }
-            if (row is _IbRowTierLabel) {
-              final theme = Theme.of(context);
-              final bannerFill = Color(AppConstants.ifrcNavy).withValues(
-                alpha: context.isDarkTheme ? 0.42 : 0.08,
-              );
-              return Padding(
-                padding: EdgeInsets.only(top: row.marginTop, bottom: 10),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: bannerFill,
-                    border: Border(
-                      left: BorderSide(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.hub_outlined,
+                        size: 22,
                         color: Color(AppConstants.ifrcRed),
-                        width: 4,
                       ),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.hub_outlined,
-                          size: 22,
-                          color: Color(AppConstants.ifrcRed),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            row.title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.3,
-                                  letterSpacing: -0.15,
-                                  color: context.navyTextColor,
-                                ) ??
-                                TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.3,
-                                  color: context.navyTextColor,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-            if (row is _IbRowSectorHeader) {
-              return Padding(
-                padding: EdgeInsets.only(
-                  top: row.marginTop,
-                  bottom: 8,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        row.displayTitle,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: context.navyTextColor,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          row.title,
+                          style:
+                              theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                height: 1.3,
+                                letterSpacing: -0.15,
+                                color: context.navyTextColor,
+                              ) ??
+                              TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                height: 1.3,
+                                color: context.navyTextColor,
+                              ),
                         ),
                       ),
-                    ),
-                    Text(
-                      '${row.count}',
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+          if (row is _IbRowSectorHeader) {
+            return Padding(
+              padding: EdgeInsets.only(top: row.marginTop, bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      row.displayTitle,
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: context.textSecondaryColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: context.navyTextColor,
                       ),
                     ),
-                  ],
-                ),
-              );
-            }
-            if (row is _IbRowIndicator) {
-              final indicator = row.indicator;
-              return Card(
-                margin: EdgeInsets.only(bottom: row.isLastInList ? 24 : 8),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(AppConstants.radiusLarge),
-                  side: BorderSide(
-                    color: context.borderColor,
-                    width: 1,
                   ),
-                ),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).pushNamed(
-                      '/indicator-bank/${indicator.id}',
-                    );
-                  },
-                  borderRadius:
-                      BorderRadius.circular(AppConstants.radiusLarge),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+                  Text(
+                    '${row.count}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.textSecondaryColor,
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            indicator.displayName,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: context.textColor,
-                            ),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (row is _IbRowIndicator) {
+            final indicator = row.indicator;
+            return Card(
+              margin: EdgeInsets.only(bottom: row.isLastInList ? 24 : 8),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                side: BorderSide(color: context.borderColor, width: 1),
+              ),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(
+                    context,
+                  ).pushNamed('/indicator-bank/${indicator.id}');
+                },
+                borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          indicator.displayName,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: context.textColor,
                           ),
                         ),
-                        const Icon(
-                          Icons.chevron_right,
-                          color: Color(AppConstants.textSecondary),
-                          size: 18,
-                        ),
-                      ],
-                    ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Color(AppConstants.textSecondary),
+                        size: 18,
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }
-            return const SizedBox.shrink();
-          },
-          childCount: tableRows.length,
-        ),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        }, childCount: tableRows.length),
       ),
     );
   }
-
 }

@@ -24,6 +24,10 @@ from user_agents import parse
 from app.utils.transactions import request_transaction_rollback
 from app.utils.constants import DEFAULT_SESSION_CLEANUP_LOCK_ID
 from app.utils.activity_types import normalize_activity_type
+from app.utils.page_view_paths import (
+    merge_page_view_path_count,
+    page_view_path_key_from_request,
+)
 
 
 def get_client_info():
@@ -428,7 +432,15 @@ def log_user_activity(activity_type, description=None, context_data=None, respon
         db.session.add(activity_log)
 
         # Update session statistics
-        update_session_activity(normalized_activity_type)
+        pv_key = None
+        if normalized_activity_type == "page_view":
+            if context_data and isinstance(context_data, dict):
+                pv_key = context_data.get("page_view_path_key")
+            if not pv_key:
+                pv_key = page_view_path_key_from_request(request)
+        update_session_activity(
+            normalized_activity_type, page_view_path_key=pv_key
+        )
 
         _commit_or_flush()
 
@@ -437,7 +449,55 @@ def log_user_activity(activity_type, description=None, context_data=None, respon
         _rollback_transaction("log_user_activity_error")
 
 
-def _update_session_activity_explicit(session_id: Optional[str], activity_type: str) -> None:
+def increment_session_page_views_without_activity_log() -> None:
+    """
+    Middleware-only: bump ``UserSessionLog.page_views`` without inserting ``UserActivityLog``.
+
+    Automatic GET tracking used to write one audit row per navigation, which dominated
+    the table while the audit UI hid ``page_view`` by default. Session analytics
+    (dashboards, session detail) still need accurate page-view counts.
+
+    Explicit ``page_view`` rows (e.g. mobile ``screen_view`` via ``log_user_activity``)
+    are unchanged.
+    """
+    if not current_user.is_authenticated:
+        return
+    try:
+        pv_key = page_view_path_key_from_request(request)
+        update_session_activity("page_view", page_view_path_key=pv_key)
+        _commit_or_flush()
+    except Exception as e:
+        current_app.logger.error(
+            "Error incrementing session page views (no activity log): %s", e
+        )
+        _rollback_transaction("increment_session_page_views_without_activity_log_error")
+
+
+def increment_session_page_views_without_activity_log_deferred(
+    session_id: Optional[str],
+    page_view_path_key: Optional[str] = None,
+) -> None:
+    """Deferred middleware path: session counter only, no ``UserActivityLog`` row."""
+    if not session_id:
+        return
+    try:
+        from app.utils.transactions import atomic
+
+        with atomic(remove_session=True):
+            _update_session_activity_explicit(
+                session_id, "page_view", page_view_path_key=page_view_path_key
+            )
+    except Exception as e:
+        current_app.logger.error(
+            "Error incrementing session page views deferred (no activity log): %s", e
+        )
+
+
+def _update_session_activity_explicit(
+    session_id: Optional[str],
+    activity_type: str,
+    page_view_path_key: Optional[str] = None,
+) -> None:
     """
     Update session activity statistics without relying on Flask request/session context.
     Intended for deferred/background logging.
@@ -462,6 +522,7 @@ def _update_session_activity_explicit(session_id: Optional[str], activity_type: 
 
         if normalized_activity_type == 'page_view':
             session_log.page_views += 1
+            merge_page_view_path_count(session_log, page_view_path_key or "/")
         elif normalized_activity_type in ['form_submitted', 'form_saved', 'data_save']:
             session_log.forms_submitted += 1
             session_log.actions_performed += 1
@@ -489,6 +550,7 @@ def log_user_activity_explicit(
     referrer: Optional[str],
     ip_address: str,
     user_agent: Optional[str],
+    page_view_path_key: Optional[str] = None,
 ) -> None:
     """
     Log a user activity using a standalone transaction, without Flask request/current_user dependencies.
@@ -530,7 +592,12 @@ def log_user_activity_explicit(
             )
 
             db.session.add(activity_log)
-            _update_session_activity_explicit(session_id, normalized_activity_type)
+            pv_key = page_view_path_key
+            if normalized_activity_type == "page_view" and pv_key is None and context_data:
+                pv_key = context_data.get("page_view_path_key")
+            _update_session_activity_explicit(
+                session_id, normalized_activity_type, page_view_path_key=pv_key
+            )
     except Exception as e:
         current_app.logger.error(f"Error logging user activity (explicit): {str(e)}")
 
@@ -614,12 +681,13 @@ def start_user_session(user, session_id):
         _rollback_transaction("start_user_session_error")
 
 
-def update_session_activity(activity_type):
+def update_session_activity(activity_type, page_view_path_key: Optional[str] = None):
     """
     Update session activity statistics.
 
     Args:
         activity_type (str): Type of activity performed
+        page_view_path_key: Canonical path key when activity_type is page_view
     """
     try:
         # Check if the session is in a failed state and rollback if needed
@@ -637,6 +705,9 @@ def update_session_activity(activity_type):
 
             if normalized_activity_type == 'page_view':
                 session_log.page_views += 1
+                merge_page_view_path_count(
+                    session_log, page_view_path_key or "/"
+                )
             elif normalized_activity_type in ['form_submitted', 'form_saved', 'data_save']:
                 session_log.forms_submitted += 1
                 session_log.actions_performed += 1

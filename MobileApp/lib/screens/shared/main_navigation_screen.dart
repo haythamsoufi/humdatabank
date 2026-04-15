@@ -189,8 +189,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (index >= 0 && index < tabs.length) {
       final tabId = tabs[index].id;
       final screenName = ScreenViewTracker.screenNameFromTabId(tabId);
-      _screenViewTracker.trackScreenView(screenName,
-          screenClass: 'MainNavigationScreen');
+      _screenViewTracker.trackScreenView(
+        screenName,
+        screenClass: 'MainNavigationScreen',
+        routePath: '/tab/$tabId',
+      );
     }
   }
 

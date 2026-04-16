@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' as cupertino;
 import 'package:flutter/services.dart';
@@ -6,9 +8,11 @@ import '../../providers/shared/dashboard_provider.dart';
 import '../../providers/shared/notification_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
+import '../../providers/shared/offline_provider.dart';
 import '../../widgets/assignment_card.dart';
 import '../../widgets/app_bar.dart';
 import '../../config/routes.dart';
+import '../../config/app_config.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../utils/ios_constants.dart';
@@ -18,6 +22,9 @@ import '../../widgets/loading_indicator.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/app_fade_in_up.dart';
 import '../../widgets/entity_selector_bottom_sheet.dart';
+import '../../services/assignment_offline_bundle_service.dart';
+import '../../services/storage_service.dart';
+import '../public/webview_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -44,6 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   /// Open-assignments [ExpansionTile] on the dashboard.
   bool _currentAssignmentsExpanded = true;
+
+  final Set<int> _offlineBundleAssignmentIds = {};
+  final Set<int> _downloadingOfflineAssignmentIds = {};
 
   @override
   void initState() {
@@ -87,6 +97,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     // Force refresh if authenticated or if explicitly requested (e.g., language change)
     await dashboardProvider.loadDashboard(forceRefresh: isAuthenticated || forceRefresh);
 
+    await _syncOfflineBundleFlags(dashboardProvider.currentAssignments);
+
     // Mark that we've completed at least one load
     if (mounted) {
       setState(() {
@@ -100,6 +112,132 @@ class _DashboardScreenState extends State<DashboardScreen>
       dashboardProvider.loadEntities();
       notificationProvider.refreshUnreadCount(authProvider: authProvider);
     }
+  }
+
+  Future<void> _syncOfflineBundleFlags(List<Assignment> assignments) async {
+    if (assignments.isEmpty) {
+      if (mounted) {
+        setState(() => _offlineBundleAssignmentIds.clear());
+      }
+      return;
+    }
+    final svc = AssignmentOfflineBundleService();
+    final next = <int>{};
+    for (final a in assignments) {
+      if (await svc.hasOfflineBundle(a.id)) {
+        next.add(a.id);
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _offlineBundleAssignmentIds
+          ..clear()
+          ..addAll(next);
+      });
+    }
+  }
+
+  Future<void> _openAssignmentForm(
+    BuildContext context,
+    Assignment assignment,
+  ) async {
+    final offline = Provider.of<OfflineProvider>(context, listen: false);
+    final loc = AppLocalizations.of(context)!;
+    final path = AppRoutes.formEntry(assignment.id);
+
+    if (offline.isOffline) {
+      final svc = AssignmentOfflineBundleService();
+      if (await svc.hasOfflineBundle(assignment.id)) {
+        if (!context.mounted) return;
+        Navigator.of(context).pushNamed(
+          AppRoutes.webview,
+          arguments: WebViewScreenArgs(
+            initialUrl: path,
+            forceOfflineAssignmentBundle: true,
+            offlineAssignmentId: assignment.id,
+          ),
+        );
+        return;
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.offlineFormNotDownloaded)),
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
+    Navigator.of(context).pushNamed(
+      AppRoutes.webview,
+      arguments: path,
+    );
+  }
+
+  Future<void> _downloadOfflineBundle(
+    BuildContext context,
+    Assignment assignment,
+    LanguageProvider languageProvider,
+  ) async {
+    final offline = Provider.of<OfflineProvider>(context, listen: false);
+    final loc = AppLocalizations.of(context)!;
+
+    if (!offline.isOnline) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.offlineDownloadRequiresConnection)),
+      );
+      return;
+    }
+
+    setState(() {
+      _downloadingOfflineAssignmentIds.add(assignment.id);
+    });
+
+    final cookie =
+        await StorageService().getSecure(AppConfig.sessionCookieKey);
+
+    try {
+      await AssignmentOfflineBundleService().downloadAndSave(
+        assignmentId: assignment.id,
+        formPath: AppRoutes.formEntry(assignment.id),
+        language: languageProvider.currentLanguage,
+        sessionCookieHeader: cookie,
+      );
+      if (!context.mounted) return;
+      setState(() {
+        _downloadingOfflineAssignmentIds.remove(assignment.id);
+        _offlineBundleAssignmentIds.add(assignment.id);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.offlineFormSaved)),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      setState(() {
+        _downloadingOfflineAssignmentIds.remove(assignment.id);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.offlineFormSaveFailed),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  void _openOfflineCopyOnly(
+    BuildContext context,
+    Assignment assignment,
+  ) {
+    final path = AppRoutes.formEntry(assignment.id);
+    Navigator.of(context).pushNamed(
+      AppRoutes.webview,
+      arguments: WebViewScreenArgs(
+        initialUrl: path,
+        forceOfflineAssignmentBundle: true,
+        offlineAssignmentId: assignment.id,
+      ),
+    );
   }
 
   bool _shouldShowEnterDataButton(String? userRole, Assignment assignment) {
@@ -144,6 +282,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildCurrentAssignmentsSection({
     required DashboardProvider provider,
     required AuthProvider authProvider,
+    required OfflineProvider offlineProvider,
+    required LanguageProvider languageProvider,
     required AppLocalizations localizations,
   }) {
     final theme = Theme.of(context);
@@ -208,29 +348,47 @@ class _DashboardScreenState extends State<DashboardScreen>
                         .map((entry) {
                       final index = entry.key;
                       final assignment = entry.value;
+                      final showEnter = _shouldShowEnterDataButton(
+                        authProvider.user?.role,
+                        assignment,
+                      );
+                      final hasBundle =
+                          _offlineBundleAssignmentIds.contains(assignment.id);
                       return AppFadeInUp(
                         staggerIndex: index,
                         child: AssignmentCard(
                           assignment: assignment,
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            Navigator.of(context).pushNamed(
-                              AppRoutes.webview,
-                              arguments: AppRoutes.formEntry(assignment.id),
+                            unawaited(
+                              _openAssignmentForm(context, assignment),
                             );
                           },
-                          showEnterDataButton: _shouldShowEnterDataButton(
-                            authProvider.user?.role,
-                            assignment,
-                          ),
+                          showEnterDataButton: showEnter,
                           enterDataButtonText: localizations.enterData,
                           onEnterData: () {
                             HapticFeedback.mediumImpact();
-                            Navigator.of(context).pushNamed(
-                              AppRoutes.webview,
-                              arguments: AppRoutes.formEntry(assignment.id),
+                            unawaited(
+                              _openAssignmentForm(context, assignment),
                             );
                           },
+                          onDownloadForOffline: showEnter && offlineProvider.isOnline
+                              ? () => _downloadOfflineBundle(
+                                    context,
+                                    assignment,
+                                    languageProvider,
+                                  )
+                              : null,
+                          onOpenOfflineCopy: hasBundle
+                              ? () {
+                                  HapticFeedback.lightImpact();
+                                  _openOfflineCopyOnly(context, assignment);
+                                }
+                              : null,
+                          hasOfflineFormSnapshot: hasBundle,
+                          isDownloadingOfflineForm:
+                              _downloadingOfflineAssignmentIds
+                                  .contains(assignment.id),
                         ),
                       );
                     }).toList(),
@@ -744,10 +902,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         assignment: assignment,
         onTap: () {
           HapticFeedback.lightImpact();
-          Navigator.of(context).pushNamed(
-            AppRoutes.webview,
-            arguments: AppRoutes.formEntry(assignment.id),
-          );
+          unawaited(_openAssignmentForm(context, assignment));
         },
       ),
     );
@@ -759,8 +914,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<AuthProvider, LanguageProvider>(
-      builder: (context, authProvider, languageProvider, child) {
+    return Consumer3<AuthProvider, LanguageProvider, OfflineProvider>(
+      builder: (context, authProvider, languageProvider, offlineProvider, child) {
         final localizations = AppLocalizations.of(context)!;
 
         // Listen to language changes and reload dashboard data
@@ -910,6 +1065,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             _buildCurrentAssignmentsSection(
                               provider: provider,
                               authProvider: authProvider,
+                              offlineProvider: offlineProvider,
+                              languageProvider: languageProvider,
                               localizations: localizations,
                             ),
 

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/session_service.dart';
+import '../../services/assignment_offline_bundle_service.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../config/routes.dart';
@@ -16,10 +19,74 @@ import '../../services/webview_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart';
 
+/// Route arguments for [WebViewScreen]: either a [String] path/URL, or a map
+/// from the dashboard (offline bundle / future extensions).
+class WebViewScreenArgs {
+  final String initialUrl;
+  final bool forceOfflineAssignmentBundle;
+  final int? offlineAssignmentId;
+
+  const WebViewScreenArgs({
+    required this.initialUrl,
+    this.forceOfflineAssignmentBundle = false,
+    this.offlineAssignmentId,
+  });
+
+  static WebViewScreenArgs parse(Object? raw) {
+    if (raw is WebViewScreenArgs) return raw;
+    if (raw is String) {
+      return WebViewScreenArgs(initialUrl: raw);
+    }
+    if (raw is Map) {
+      final map = Map<String, dynamic>.from(raw as Map);
+      final url = (map['initialUrl'] ?? map['url'])?.toString().trim() ?? '';
+      final offline = map['offline'] == true || map['force_offline'] == true;
+      int? aid;
+      final rawId = map['assignment_id'] ?? map['assignmentId'];
+      if (rawId is int) {
+        aid = rawId;
+      } else if (rawId != null) {
+        aid = int.tryParse(rawId.toString());
+      }
+      return WebViewScreenArgs(
+        initialUrl: url,
+        forceOfflineAssignmentBundle: offline,
+        offlineAssignmentId: aid,
+      );
+    }
+    return WebViewScreenArgs(initialUrl: '');
+  }
+}
+
+class _WebViewPayload {
+  final bool isOfflineBundle;
+  final String? offlineHtml;
+  final String? offlineBundleDir;
+  final String onlineUrl;
+
+  const _WebViewPayload.online(this.onlineUrl)
+      : isOfflineBundle = false,
+        offlineHtml = null,
+        offlineBundleDir = null;
+
+  const _WebViewPayload.offline({
+    required this.offlineHtml,
+    required this.offlineBundleDir,
+    required this.onlineUrl,
+  }) : isOfflineBundle = true;
+}
+
 class WebViewScreen extends StatefulWidget {
   final String initialUrl;
+  final bool forceOfflineAssignmentBundle;
+  final int? offlineAssignmentId;
 
-  const WebViewScreen({super.key, required this.initialUrl});
+  const WebViewScreen({
+    super.key,
+    required this.initialUrl,
+    this.forceOfflineAssignmentBundle = false,
+    this.offlineAssignmentId,
+  });
 
   @override
   State<WebViewScreen> createState() => _WebViewScreenState();
@@ -34,6 +101,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
   String? _pageTitle;
   final int _currentNavIndex =
       -1; // -1 means no tab is active (WebView is on top)
+
+  String? _payloadLanguage;
+  Future<_WebViewPayload>? _payloadFuture;
 
   @override
   void initState() {
@@ -93,12 +163,249 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return UrlHelper.resolveWebViewInitialUrl(path, language);
   }
 
+  Future<_WebViewPayload> _resolvePayload(String language) async {
+    final onlineUrl = _buildUrl(widget.initialUrl, language);
+    if (widget.forceOfflineAssignmentBundle &&
+        widget.offlineAssignmentId != null) {
+      final svc = AssignmentOfflineBundleService();
+      final html =
+          await svc.readOfflineIndexHtml(widget.offlineAssignmentId!);
+      if (html != null && html.isNotEmpty) {
+        final dir = await svc.offlineBundleDirectoryPath(
+          widget.offlineAssignmentId!,
+        );
+        return _WebViewPayload.offline(
+          offlineHtml: html,
+          offlineBundleDir: dir,
+          onlineUrl: onlineUrl,
+        );
+      }
+    }
+    return _WebViewPayload.online(onlineUrl);
+  }
+
+  Future<_WebViewPayload> _payloadForLanguage(String language) {
+    if (_payloadLanguage != language) {
+      _payloadLanguage = language;
+      _payloadFuture = _resolvePayload(language);
+    }
+    return _payloadFuture!;
+  }
+
+  void _invalidatePayload() {
+    _payloadLanguage = null;
+    _payloadFuture = null;
+  }
+
+  WebUri _offlineFileBaseWebUri(String bundleDir) {
+    final withSlash =
+        bundleDir.endsWith('/') ? bundleDir : '$bundleDir/';
+    return WebUri.uri(Uri.file(withSlash));
+  }
+
+  Widget _buildInAppWebView({
+    required _WebViewPayload payload,
+    required String language,
+    required AppLocalizations localizations,
+  }) {
+    if (payload.isOfflineBundle) {
+      final base = _offlineFileBaseWebUri(payload.offlineBundleDir!);
+      return InAppWebView(
+        key: ValueKey('offline|${payload.onlineUrl}|$language'),
+        initialData: InAppWebViewInitialData(
+          data: payload.offlineHtml!,
+          baseUrl: base,
+          mimeType: 'text/html',
+          encoding: 'utf8',
+          historyUrl: base,
+        ),
+        initialUserScripts: WebViewService.getRequestInterceptorScripts(
+          language: language,
+        ),
+        initialSettings: WebViewService.offlineAssignmentBundleSettings(
+          payload.offlineBundleDir!,
+        ),
+        onWebViewCreated: (controller) {
+          _webViewController = controller;
+        },
+        onConsoleMessage: (controller, consoleMessage) {},
+        shouldOverrideUrlLoading: (controller, navigationAction) async {
+          final url = navigationAction.request.url;
+          if (url != null && !WebViewService.isUrlAllowed(url)) {
+            DebugLogger.logWarn('WEBVIEW', 'Blocked navigation to: $url');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(localizations.navUrlNotAllowed),
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+              );
+            }
+            return NavigationActionPolicy.CANCEL;
+          }
+          return NavigationActionPolicy.ALLOW;
+        },
+        onLoadStart: (controller, url) {
+          setState(() {
+            _isLoading = true;
+            _error = null;
+          });
+        },
+        onLoadStop: (controller, url) async {
+          setState(() {
+            _isLoading = false;
+            _error = null;
+          });
+          if (language == 'ar') {
+            await controller.evaluateJavascript(
+              source: WebViewService.arabicTajawalPostLoadEvaluateSource,
+            );
+          }
+          final title = await controller.getTitle();
+          if (title != null && mounted) {
+            setState(() {
+              _pageTitle = title;
+            });
+          }
+        },
+        onTitleChanged: (controller, title) {
+          if (title != null && mounted) {
+            setState(() {
+              _pageTitle = title;
+            });
+          }
+        },
+        onProgressChanged: (controller, progress) {
+          setState(() {
+            _progress = progress / 100;
+          });
+        },
+        onReceivedError: (controller, request, error) {
+          if (WebViewService.shouldIgnoreError(error.description)) {
+            return;
+          }
+          setState(() {
+            _isLoading = false;
+            _error = error.description;
+          });
+        },
+        onReceivedHttpError: (controller, request, response) {
+          if (request.isForMainFrame != true) return;
+          final statusCode = response.statusCode;
+          if (statusCode != null && statusCode >= 400) {
+            setState(() {
+              _isLoading = false;
+              _error = AppLocalizations.of(context)!.httpError(statusCode);
+            });
+          }
+        },
+        onDownloadStartRequest:
+            (InAppWebViewController controller, DownloadStartRequest request) {
+          _handleDownload(Uri.parse(request.url.toString()));
+        },
+      );
+    }
+
+    final url = payload.onlineUrl;
+    return InAppWebView(
+      key: ValueKey('online|$url|$language'),
+      initialUrlRequest: URLRequest(
+        url: WebUri(url),
+        headers: WebViewService.defaultRequestHeaders,
+      ),
+      initialUserScripts: WebViewService.getRequestInterceptorScripts(
+        language: language,
+      ),
+      initialSettings: WebViewService.defaultSettings(),
+      onWebViewCreated: (controller) {
+        _webViewController = controller;
+      },
+      onConsoleMessage: (controller, consoleMessage) {
+        // Remote site console noise suppressed intentionally.
+      },
+      shouldOverrideUrlLoading: (controller, navigationAction) async {
+        final navUrl = navigationAction.request.url;
+        if (navUrl != null && !WebViewService.isUrlAllowed(navUrl)) {
+          DebugLogger.logWarn('WEBVIEW', 'Blocked navigation to: $navUrl');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localizations.navUrlNotAllowed),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+          return NavigationActionPolicy.CANCEL;
+        }
+        return NavigationActionPolicy.ALLOW;
+      },
+      onLoadStart: (controller, url) {
+        setState(() {
+          _isLoading = true;
+          _error = null;
+        });
+      },
+      onLoadStop: (controller, url) async {
+        setState(() {
+          _isLoading = false;
+          _error = null;
+        });
+        if (language == 'ar') {
+          await controller.evaluateJavascript(
+            source: WebViewService.arabicTajawalPostLoadEvaluateSource,
+          );
+        }
+        final title = await controller.getTitle();
+        if (title != null && mounted) {
+          setState(() {
+            _pageTitle = title;
+          });
+        }
+      },
+      onTitleChanged: (controller, title) {
+        if (title != null && mounted) {
+          setState(() {
+            _pageTitle = title;
+          });
+        }
+      },
+      onProgressChanged: (controller, progress) {
+        setState(() {
+          _progress = progress / 100;
+        });
+      },
+      onReceivedError: (controller, request, error) {
+        if (WebViewService.shouldIgnoreError(error.description)) {
+          print('[WEBVIEW] Ignored error: ${error.description}');
+          return;
+        }
+        setState(() {
+          _isLoading = false;
+          _error = error.description;
+        });
+      },
+      onReceivedHttpError: (controller, request, response) {
+        if (request.isForMainFrame != true) return;
+        final statusCode = response.statusCode;
+        if (statusCode != null && statusCode >= 400) {
+          setState(() {
+            _isLoading = false;
+            _error = AppLocalizations.of(context)!.httpError(statusCode);
+          });
+        }
+      },
+      onDownloadStartRequest:
+          (InAppWebViewController controller, DownloadStartRequest request) {
+        _handleDownload(Uri.parse(request.url.toString()));
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer2<AuthProvider, LanguageProvider>(
       builder: (context, authProvider, languageProvider, child) {
         final language = languageProvider.currentLanguage;
-        final url = _buildUrl(widget.initialUrl, language);
 
         final localizations = AppLocalizations.of(context)!;
         final theme = Theme.of(context);
@@ -112,6 +419,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
+                    if (widget.forceOfflineAssignmentBundle &&
+                        widget.offlineAssignmentId != null) {
+                      _invalidatePayload();
+                    }
                     _webViewController?.reload();
                   },
                   tooltip: localizations.refresh,
@@ -144,129 +455,43 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         ).padding.bottom, // Safe area bottom padding
                     child: Stack(
                       children: [
-                        InAppWebView(
-                          key: ValueKey(
-                            url,
-                          ), // Rebuild WebView when language changes
-                          initialUrlRequest: URLRequest(
-                            url: WebUri(url),
-                            headers: WebViewService.defaultRequestHeaders,
-                          ),
-                          initialUserScripts:
-                              WebViewService.getRequestInterceptorScripts(
-                                language: language,
-                              ),
-                          initialSettings: WebViewService.defaultSettings(),
-                          onWebViewCreated: (controller) {
-                            _webViewController = controller;
-                          },
-                          onConsoleMessage: (controller, consoleMessage) {
-                            // Remote site console noise suppressed intentionally.
-                          },
-                          shouldOverrideUrlLoading:
-                              (controller, navigationAction) async {
-                                // Validate URL before loading
-                                final url = navigationAction.request.url;
-                                if (url != null &&
-                                    !WebViewService.isUrlAllowed(url)) {
-                                  DebugLogger.logWarn(
-                                    'WEBVIEW',
-                                    'Blocked navigation to: $url',
-                                  );
-                                  // Show error message
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          localizations.navUrlNotAllowed,
-                                        ),
-                                        backgroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                      ),
-                                    );
-                                  }
-                                  return NavigationActionPolicy.CANCEL;
-                                }
-                                // Allow navigation for valid URLs
-                                return NavigationActionPolicy.ALLOW;
-                              },
-                          onLoadStart: (controller, url) {
-                            setState(() {
-                              _isLoading = true;
-                              _error = null;
-                            });
-                          },
-                          onLoadStop: (controller, url) async {
-                            setState(() {
-                              _isLoading = false;
-                              _error = null; // Clear error on successful load
-                            });
-
-                            // Inject Tajawal font after page loads if Arabic is selected
-                            if (language == 'ar') {
-                              await controller.evaluateJavascript(
-                                source: WebViewService
-                                    .arabicTajawalPostLoadEvaluateSource,
+                        FutureBuilder<_WebViewPayload>(
+                          future: _payloadForLanguage(language),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState !=
+                                ConnectionState.done) {
+                              return const SizedBox.shrink();
+                            }
+                            if (snapshot.hasError) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                    snapshot.error.toString(),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
                               );
                             }
-
-                            // Update app bar title
-                            final title = await controller.getTitle();
-                            if (title != null && mounted) {
-                              setState(() {
-                                _pageTitle = title;
-                              });
-                            }
-                          },
-                          onTitleChanged: (controller, title) {
-                            if (title != null && mounted) {
-                              setState(() {
-                                _pageTitle = title;
-                              });
-                            }
-                          },
-                          onProgressChanged: (controller, progress) {
-                            setState(() {
-                              _progress = progress / 100;
-                            });
-                          },
-                          onReceivedError: (controller, request, error) {
-                            if (WebViewService.shouldIgnoreError(
-                              error.description,
-                            )) {
-                              print(
-                                '[WEBVIEW] Ignored error: ${error.description}',
+                            final payload = snapshot.data!;
+                            if (widget.forceOfflineAssignmentBundle &&
+                                !payload.isOfflineBundle) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                    localizations.offlineFormNotDownloaded,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
                               );
-                              return;
                             }
-
-                            setState(() {
-                              _isLoading = false;
-                              _error = error.description;
-                            });
+                            return _buildInAppWebView(
+                              payload: payload,
+                              language: language,
+                              localizations: localizations,
+                            );
                           },
-                          onReceivedHttpError: (controller, request, response) {
-                            if (request.isForMainFrame != true) return;
-                            final statusCode = response.statusCode;
-                            if (statusCode != null && statusCode >= 400) {
-                              setState(() {
-                                _isLoading = false;
-                                _error = AppLocalizations.of(
-                                  context,
-                                )!.httpError(statusCode);
-                              });
-                            }
-                          },
-                          onDownloadStartRequest:
-                              (
-                                InAppWebViewController controller,
-                                DownloadStartRequest request,
-                              ) {
-                                _handleDownload(
-                                  Uri.parse(request.url.toString()),
-                                );
-                              },
                         ),
                         // Loading Indicator
                         if (_isLoading && _progress < 1.0)

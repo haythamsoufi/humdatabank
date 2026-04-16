@@ -11,7 +11,8 @@ import '../screens/shared/settings_screen.dart';
 import '../screens/shared/ai_chat_screen.dart';
 import '../screens/shared/main_navigation_screen.dart';
 // Public screens
-import '../screens/public/webview_screen.dart';
+import '../screens/public/webview_screen.dart'
+    show WebViewScreen, WebViewScreenArgs;
 import '../screens/public/indicator_bank_screen.dart';
 import '../screens/public/propose_indicator_screen.dart';
 import '../screens/public/indicator_detail_screen.dart';
@@ -128,8 +129,12 @@ class AppGoRouter {
           path: '/webview',
           name: 'webview',
           builder: (context, state) {
-            final url = state.extra as String;
-            return WebViewScreen(initialUrl: url);
+            final args = WebViewScreenArgs.parse(state.extra);
+            return WebViewScreen(
+              initialUrl: args.initialUrl,
+              forceOfflineAssignmentBundle: args.forceOfflineAssignmentBundle,
+              offlineAssignmentId: args.offlineAssignmentId,
+            );
           },
         ),
 

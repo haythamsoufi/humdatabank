@@ -1,5 +1,5 @@
-/// A reunified (unified) planning PDF from the IFRC GO PublicSiteAppeals API.
-class ReunifiedPlanningDocument {
+/// A unified planning PDF from the IFRC GO PublicSiteAppeals API.
+class UnifiedPlanningDocument {
   final String url;
   final String title;
   final String? countryCode;
@@ -8,7 +8,7 @@ class ReunifiedPlanningDocument {
   final String? documentTypeLabel;
   final int? year;
 
-  const ReunifiedPlanningDocument({
+  const UnifiedPlanningDocument({
     required this.url,
     required this.title,
     this.countryCode,

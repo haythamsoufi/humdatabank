@@ -4,7 +4,7 @@
 Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
     indicator-suggestions, data/periods, data/fdrs-overview, data/resources,
-    data/reunified-planning-config (IFRC GO URL + unified planning type IDs for the mobile app).
+    data/unified-planning-config (IFRC GO URL + unified planning type IDs for the mobile app).
     Rate-limited to prevent abuse.
   - Auth-required: quiz/leaderboard, quiz/submit-score (scores are tied to authenticated users).
 """
@@ -783,10 +783,10 @@ def public_resources():
     )
 
 
-@mobile_bp.route('/data/reunified-planning-config', methods=['GET'])
+@mobile_bp.route('/data/unified-planning-config', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
-def reunified_planning_config():
-    """Public config for reunified (unified) planning documents: IFRC GO API URL and type IDs.
+def unified_planning_config():
+    """Public config for unified planning documents: IFRC GO API URL and type IDs.
 
     The mobile app calls the IFRC API directly using credentials supplied in the app
     build (not returned here). This endpoint only exposes the canonical base URL and

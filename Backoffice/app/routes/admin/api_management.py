@@ -437,7 +437,7 @@ MOBILE_ENDPOINT_REGISTRY = [
      ),
      'flutter': 'PublicResourcesProvider',
      'overlaps': ['/api/v1/resources']},
-    {'group': 'Public Data', 'path': '/api/mobile/v1/data/reunified-planning-config', 'methods': ['GET'],
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/unified-planning-config', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': True,
      'description': (
          'IFRC GO PublicSiteAppeals base URL and unified planning AppealsTypeId list '

@@ -3,21 +3,21 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
-import '../models/shared/reunified_planning_document.dart';
+import '../models/shared/unified_planning_document.dart';
 import '../utils/debug_logger.dart';
 
-/// Fetches reunified planning documents from IFRC GO using config from the backoffice.
-class IfrcReunifiedPlanningService {
-  IfrcReunifiedPlanningService._();
-  static final IfrcReunifiedPlanningService instance = IfrcReunifiedPlanningService._();
+/// Fetches unified planning documents from IFRC GO using config from the backoffice.
+class IfrcUnifiedPlanningService {
+  IfrcUnifiedPlanningService._();
+  static final IfrcUnifiedPlanningService instance = IfrcUnifiedPlanningService._();
 
   static final _yearRe = RegExp(r'\b(20\d{2})\b');
   static final _iso2SuffixRe = RegExp(r'\s*\([A-Z]{2}\)\s*$');
 
-  /// GET [AppConfig.mobileReunifiedPlanningConfigEndpoint] — public mobile API.
+  /// GET [AppConfig.mobileUnifiedPlanningConfigEndpoint] — public mobile API.
   Future<Map<String, dynamic>?> fetchConfig() async {
     final uri = Uri.parse(
-      '${AppConfig.baseApiUrl}${AppConfig.mobileReunifiedPlanningConfigEndpoint}',
+      '${AppConfig.baseApiUrl}${AppConfig.mobileUnifiedPlanningConfigEndpoint}',
     );
     final headers = <String, String>{
       'Accept': 'application/json',
@@ -31,7 +31,7 @@ class IfrcReunifiedPlanningService {
       final res = await http.get(uri, headers: headers).timeout(const Duration(seconds: 25));
       if (res.statusCode != 200) {
         DebugLogger.logErrorWithTag(
-          'IFRC_REUNIFIED',
+          'IFRC_UNIFIED_PLANNING',
           'Config HTTP ${res.statusCode}',
         );
         return null;
@@ -43,7 +43,7 @@ class IfrcReunifiedPlanningService {
       if (data is! Map<String, dynamic>) return null;
       return data;
     } catch (e, st) {
-      DebugLogger.logErrorWithTag('IFRC_REUNIFIED', 'Config error: $e\n$st');
+      DebugLogger.logErrorWithTag('IFRC_UNIFIED_PLANNING', 'Config error: $e\n$st');
       return null;
     }
   }
@@ -77,7 +77,6 @@ class IfrcReunifiedPlanningService {
       var port = parsed.hasPort ? parsed.port : null;
       if (scheme == 'https' && port == 443) port = null;
       if (scheme == 'http' && port == 80) port = null;
-      final authority = port != null && port > 0 ? '$host:$port' : host;
       var path = parsed.path;
       if (path.isEmpty) path = '/';
       path = path.replaceAll(RegExp(r'/+'), '/');
@@ -102,7 +101,7 @@ class IfrcReunifiedPlanningService {
   }
 
   /// GET IFRC appeals list with HTTP Basic auth (credentials from app env / dart-define).
-  Future<List<ReunifiedPlanningDocument>> fetchDocuments({
+  Future<List<UnifiedPlanningDocument>> fetchDocuments({
     required String ifrcListUrl,
     required Map<int, String> typeLabels,
   }) async {
@@ -133,7 +132,7 @@ class IfrcReunifiedPlanningService {
       throw StateError('ifrc_invalid_json');
     }
 
-    final out = <ReunifiedPlanningDocument>[];
+    final out = <UnifiedPlanningDocument>[];
     for (final item in decoded) {
       if (item is! Map<String, dynamic>) continue;
       if (item['Hidden'] == true) continue;
@@ -164,7 +163,7 @@ class IfrcReunifiedPlanningService {
       final title = name.trim().isNotEmpty ? name.trim() : (orig.trim().isNotEmpty ? orig.trim() : 'Document');
 
       out.add(
-        ReunifiedPlanningDocument(
+        UnifiedPlanningDocument(
           url: url,
           title: title,
           countryCode: locCode?.isEmpty ?? true ? null : locCode,

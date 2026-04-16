@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/routes.dart';
 import '../../l10n/app_localizations.dart';
-import '../../models/shared/reunified_planning_document.dart';
+import '../../models/shared/unified_planning_document.dart';
 import '../../models/shared/resource.dart';
 import '../../providers/public/public_resources_provider.dart';
 import '../../providers/shared/language_provider.dart';
@@ -249,15 +249,15 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
       );
     }
 
-    // ── Empty state (library only — reunified section may still show) ─
-    final reunifiedDocs = provider.reunifiedPlanningDocuments;
-    final showReunifiedBlock = provider.reunifiedLoading ||
-        reunifiedDocs.isNotEmpty ||
-        provider.reunifiedErrorCode != null;
+    // ── Empty state (library only — unified planning section may still show) ─
+    final unifiedDocs = provider.unifiedPlanningDocuments;
+    final showUnifiedPlanningBlock = provider.unifiedPlanningLoading ||
+        unifiedDocs.isNotEmpty ||
+        provider.unifiedPlanningErrorCode != null;
 
     if (!provider.isLoading &&
         provider.resources.isEmpty &&
-        !showReunifiedBlock) {
+        !showUnifiedPlanningBlock) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -281,7 +281,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
       );
     }
 
-    // ── Scroll: reunified planning + resource grid ──────────────────
+    // ── Scroll: unified planning + resource grid ───────────────────
     return RefreshIndicator(
       onRefresh: () => provider.loadResources(locale: language, refresh: true),
       color: Color(AppConstants.ifrcRed),
@@ -289,14 +289,14 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          if (showReunifiedBlock)
+          if (showUnifiedPlanningBlock)
             SliverToBoxAdapter(
-              child: _ReunifiedPlanningSection(
+              child: _UnifiedPlanningSection(
                 loc: loc,
                 theme: theme,
-                isLoading: provider.reunifiedLoading,
-                errorCode: provider.reunifiedErrorCode,
-                documents: reunifiedDocs,
+                isLoading: provider.unifiedPlanningLoading,
+                errorCode: provider.unifiedPlanningErrorCode,
+                documents: unifiedDocs,
                 onOpen: (url, title) => _openResource(context, url, title: title),
               ),
             ),
@@ -333,7 +333,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                 ),
               ),
             )
-          else if (!provider.isLoading && showReunifiedBlock)
+          else if (!provider.isLoading && showUnifiedPlanningBlock)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
@@ -425,17 +425,17 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   }
 }
 
-// ── Reunified planning (IFRC GO — client-side) ─────────────────────────────
+// ── Unified planning (IFRC GO — client-side) ────────────────────────────────
 
-class _ReunifiedPlanningSection extends StatelessWidget {
+class _UnifiedPlanningSection extends StatelessWidget {
   final AppLocalizations loc;
   final ThemeData theme;
   final bool isLoading;
   final String? errorCode;
-  final List<ReunifiedPlanningDocument> documents;
+  final List<UnifiedPlanningDocument> documents;
   final void Function(String url, String title) onOpen;
 
-  const _ReunifiedPlanningSection({
+  const _UnifiedPlanningSection({
     required this.loc,
     required this.theme,
     required this.isLoading,
@@ -446,14 +446,14 @@ class _ReunifiedPlanningSection extends StatelessWidget {
 
   String? _errorMessage() {
     switch (errorCode) {
-      case 'reunified_error_config':
-        return loc.reunifiedPlanningErrorConfig;
-      case 'reunified_error_credentials':
-        return loc.reunifiedPlanningErrorCredentials;
-      case 'reunified_error_ifrc_auth':
-        return loc.reunifiedPlanningErrorIfrcAuth;
-      case 'reunified_error_ifrc':
-        return loc.reunifiedPlanningErrorIfrc;
+      case 'unified_error_config':
+        return loc.unifiedPlanningErrorConfig;
+      case 'unified_error_credentials':
+        return loc.unifiedPlanningErrorCredentials;
+      case 'unified_error_ifrc_auth':
+        return loc.unifiedPlanningErrorIfrcAuth;
+      case 'unified_error_ifrc':
+        return loc.unifiedPlanningErrorIfrc;
       default:
         return null;
     }
@@ -469,7 +469,7 @@ class _ReunifiedPlanningSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            loc.resourcesReunifiedSectionTitle,
+            loc.resourcesUnifiedPlanningSectionTitle,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
               color: context.textColor,
@@ -477,7 +477,7 @@ class _ReunifiedPlanningSection extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            loc.resourcesReunifiedSectionSubtitle,
+            loc.resourcesUnifiedPlanningSectionSubtitle,
             style: theme.textTheme.bodySmall?.copyWith(
               color: context.textSecondaryColor,
               height: 1.35,
@@ -529,7 +529,7 @@ class _ReunifiedPlanningSection extends StatelessWidget {
             )
           else if (documents.isEmpty)
             Text(
-              loc.reunifiedPlanningEmpty,
+              loc.unifiedPlanningEmpty,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: context.textSecondaryColor,
               ),

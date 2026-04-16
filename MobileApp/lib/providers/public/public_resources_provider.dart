@@ -3,20 +3,20 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../config/app_config.dart';
-import '../../models/shared/reunified_planning_document.dart';
+import '../../models/shared/unified_planning_document.dart';
 import '../../models/shared/resource.dart';
 import '../../services/api_service.dart';
-import '../../services/ifrc_reunified_planning_service.dart';
+import '../../services/ifrc_unified_planning_service.dart';
 import '../../utils/debug_logger.dart';
 
 class PublicResourcesProvider with ChangeNotifier {
   final ApiService _api = ApiService();
-  final IfrcReunifiedPlanningService _ifrcReunified = IfrcReunifiedPlanningService.instance;
+  final IfrcUnifiedPlanningService _ifrcUnified = IfrcUnifiedPlanningService.instance;
 
   List<Resource> _resources = [];
-  List<ReunifiedPlanningDocument> _reunifiedPlanningDocuments = [];
-  bool _reunifiedLoading = false;
-  String? _reunifiedErrorCode;
+  List<UnifiedPlanningDocument> _unifiedPlanningDocuments = [];
+  bool _unifiedPlanningLoading = false;
+  String? _unifiedPlanningErrorCode;
   bool _isLoading = false;
   bool _isLoadingMore = false;
   String? _error;
@@ -39,10 +39,10 @@ class PublicResourcesProvider with ChangeNotifier {
   String get searchQuery => _searchQuery;
   String? get selectedType => _selectedType;
 
-  List<ReunifiedPlanningDocument> get reunifiedPlanningDocuments {
+  List<UnifiedPlanningDocument> get unifiedPlanningDocuments {
     final q = _searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return List.unmodifiable(_reunifiedPlanningDocuments);
-    return _reunifiedPlanningDocuments
+    if (q.isEmpty) return List.unmodifiable(_unifiedPlanningDocuments);
+    return _unifiedPlanningDocuments
         .where((d) {
           final hay =
               '${d.title} ${d.countryName ?? ''} ${d.documentTypeLabel ?? ''} ${d.countryCode ?? ''}'
@@ -52,10 +52,10 @@ class PublicResourcesProvider with ChangeNotifier {
         .toList(growable: false);
   }
 
-  bool get reunifiedLoading => _reunifiedLoading;
+  bool get unifiedPlanningLoading => _unifiedPlanningLoading;
 
   /// Localization key (see [AppLocalizations]); null when there is no error.
-  String? get reunifiedErrorCode => _reunifiedErrorCode;
+  String? get unifiedPlanningErrorCode => _unifiedPlanningErrorCode;
 
   /// Load the first page, optionally replacing search/type/locale filters.
   Future<void> loadResources({
@@ -75,7 +75,7 @@ class PublicResourcesProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    final reunifiedFuture = _loadReunifiedPlanningDocuments();
+    final unifiedFuture = _loadUnifiedPlanningDocuments();
 
     try {
       final items = await _fetchPage(_currentPage);
@@ -86,7 +86,7 @@ class PublicResourcesProvider with ChangeNotifier {
       DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Load error: $e');
     }
 
-    await reunifiedFuture;
+    await unifiedFuture;
 
     _isLoading = false;
     notifyListeners();
@@ -150,57 +150,57 @@ class PublicResourcesProvider with ChangeNotifier {
     throw Exception('Failed to load resources (${response.statusCode}).');
   }
 
-  Future<void> _loadReunifiedPlanningDocuments() async {
-    _reunifiedLoading = true;
-    _reunifiedErrorCode = null;
+  Future<void> _loadUnifiedPlanningDocuments() async {
+    _unifiedPlanningLoading = true;
+    _unifiedPlanningErrorCode = null;
     notifyListeners();
 
     try {
-      final config = await _ifrcReunified.fetchConfig();
+      final config = await _ifrcUnified.fetchConfig();
       if (config == null) {
-        _reunifiedPlanningDocuments = [];
-        _reunifiedErrorCode = 'reunified_error_config';
+        _unifiedPlanningDocuments = [];
+        _unifiedPlanningErrorCode = 'unified_error_config';
         return;
       }
 
       final listUrl = (config['ifrc_public_site_appeals_url'] as String?)?.trim();
       if (listUrl == null || listUrl.isEmpty) {
-        _reunifiedPlanningDocuments = [];
-        _reunifiedErrorCode = 'reunified_error_config';
+        _unifiedPlanningDocuments = [];
+        _unifiedPlanningErrorCode = 'unified_error_config';
         return;
       }
 
       if (AppConfig.ifrcApiUser.isEmpty || AppConfig.ifrcApiPassword.isEmpty) {
-        _reunifiedPlanningDocuments = [];
-        _reunifiedErrorCode = 'reunified_error_credentials';
+        _unifiedPlanningDocuments = [];
+        _unifiedPlanningErrorCode = 'unified_error_credentials';
         return;
       }
 
-      final labels = IfrcReunifiedPlanningService.parseTypeLabels(config);
-      _reunifiedPlanningDocuments = await _ifrcReunified.fetchDocuments(
+      final labels = IfrcUnifiedPlanningService.parseTypeLabels(config);
+      _unifiedPlanningDocuments = await _ifrcUnified.fetchDocuments(
         ifrcListUrl: listUrl,
         typeLabels: labels,
       );
-      _reunifiedErrorCode = null;
+      _unifiedPlanningErrorCode = null;
     } on StateError catch (e) {
-      _reunifiedPlanningDocuments = [];
+      _unifiedPlanningDocuments = [];
       switch (e.message) {
         case 'missing_credentials':
-          _reunifiedErrorCode = 'reunified_error_credentials';
+          _unifiedPlanningErrorCode = 'unified_error_credentials';
           break;
         case 'ifrc_auth_failed':
-          _reunifiedErrorCode = 'reunified_error_ifrc_auth';
+          _unifiedPlanningErrorCode = 'unified_error_ifrc_auth';
           break;
         default:
-          _reunifiedErrorCode = 'reunified_error_ifrc';
+          _unifiedPlanningErrorCode = 'unified_error_ifrc';
       }
-      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Reunified IFRC: $e');
+      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Unified planning IFRC: $e');
     } catch (e) {
-      _reunifiedPlanningDocuments = [];
-      _reunifiedErrorCode = 'reunified_error_ifrc';
-      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Reunified IFRC: $e');
+      _unifiedPlanningDocuments = [];
+      _unifiedPlanningErrorCode = 'unified_error_ifrc';
+      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Unified planning IFRC: $e');
     } finally {
-      _reunifiedLoading = false;
+      _unifiedPlanningLoading = false;
     }
   }
 

@@ -460,6 +460,13 @@ class AppLocalizations {
       'unknown': 'Unknown',
       'n_a': 'N/A',
       'enter_data': 'Enter Data',
+      'download_for_offline': 'Download for offline',
+      'downloading_offline_form': 'Downloading form for offline use…',
+      'offline_form_saved': 'Form saved for offline access.',
+      'offline_form_save_failed': 'Could not save the form offline. Try again when you have a stable connection.',
+      'offline_form_not_downloaded': 'This form is not available offline. Download it while you are online.',
+      'offline_download_requires_connection': 'Connect to the internet to download this form for offline use.',
+      'offline_open_saved_copy': 'Open saved offline copy',
       'approve': 'Approve',
       'reopen': 'Reopen',
       'view_public_submissions': 'View Public Submissions',
@@ -1510,6 +1517,13 @@ class AppLocalizations {
       'unknown': 'Desconocido',
       'n_a': 'N/A',
       'enter_data': 'Ingresar Datos',
+      'download_for_offline': 'Descargar para uso sin conexión',
+      'downloading_offline_form': 'Descargando formulario para uso sin conexión…',
+      'offline_form_saved': 'Formulario guardado para acceso sin conexión.',
+      'offline_form_save_failed': 'No se pudo guardar el formulario sin conexión. Inténtelo de nuevo con una conexión estable.',
+      'offline_form_not_downloaded': 'Este formulario no está disponible sin conexión. Descárguelo mientras esté en línea.',
+      'offline_download_requires_connection': 'Conéctese a internet para descargar este formulario para uso sin conexión.',
+      'offline_open_saved_copy': 'Abrir copia sin conexión guardada',
       'approve': 'Aprobar',
       'reopen': 'Reabrir',
       'view_public_submissions': 'Ver Envíos Públicos',
@@ -2414,6 +2428,13 @@ class AppLocalizations {
       'unknown': 'Inconnu',
       'n_a': 'N/A',
       'enter_data': 'Saisir les Données',
+      'download_for_offline': 'Télécharger pour hors ligne',
+      'downloading_offline_form': 'Téléchargement du formulaire pour utilisation hors ligne…',
+      'offline_form_saved': 'Formulaire enregistré pour un accès hors ligne.',
+      'offline_form_save_failed': 'Impossible d’enregistrer le formulaire hors ligne. Réessayez avec une connexion stable.',
+      'offline_form_not_downloaded': 'Ce formulaire n’est pas disponible hors ligne. Téléchargez-le en étant connecté.',
+      'offline_download_requires_connection': 'Connectez-vous à Internet pour télécharger ce formulaire pour une utilisation hors ligne.',
+      'offline_open_saved_copy': 'Ouvrir la copie hors ligne enregistrée',
       'approve': 'Approuver',
       'reopen': 'Rouvrir',
       'view_public_submissions': 'Voir les Soumissions Publiques',
@@ -3312,6 +3333,13 @@ class AppLocalizations {
       'unknown': 'غير معروف',
       'n_a': 'غير متاح',
       'enter_data': 'إدخال البيانات',
+      'download_for_offline': 'تنزيل للعمل دون اتصال',
+      'downloading_offline_form': 'جارٍ تنزيل النموذج للاستخدام دون اتصال…',
+      'offline_form_saved': 'تم حفظ النموذج للوصول دون اتصال.',
+      'offline_form_save_failed': 'تعذر حفظ النموذج دون اتصال. أعد المحاولة عند توفر اتصال مستقر.',
+      'offline_form_not_downloaded': 'هذا النموذج غير متاح دون اتصال. قم بتنزيله أثناء الاتصال بالإنترنت.',
+      'offline_download_requires_connection': 'اتصل بالإنترنت لتنزيل هذا النموذج للاستخدام دون اتصال.',
+      'offline_open_saved_copy': 'فتح النسخة المحفوظة دون اتصال',
       'approve': 'الموافقة',
       'reopen': 'إعادة الفتح',
       'view_public_submissions': 'عرض التقديمات العامة',
@@ -4192,6 +4220,13 @@ class AppLocalizations {
       'unknown': 'अज्ञात',
       'n_a': 'अनुपलब्ध',
       'enter_data': 'डेटा दर्ज करें',
+      'download_for_offline': 'ऑफ़लाइन के लिए डाउनलोड करें',
+      'downloading_offline_form': 'ऑफ़लाइन उपयोग के लिए फ़ॉर्म डाउनलोड हो रहा है…',
+      'offline_form_saved': 'फ़ॉर्म ऑफ़लाइन पहुँच के लिए सहेजा गया।',
+      'offline_form_save_failed': 'फ़ॉर्म ऑफ़लाइन सहेजा नहीं जा सका। स्थिर कनेक्शन पर पुनः प्रयास करें।',
+      'offline_form_not_downloaded': 'यह फ़ॉर्म ऑफ़लाइन उपलब्ध नहीं है। ऑनलाइन रहते हुए इसे डाउनलोड करें।',
+      'offline_download_requires_connection': 'ऑफ़लाइन उपयोग के लिए इस फ़ॉर्म को डाउनलोड करने हेतु इंटरनेट से जुड़ें।',
+      'offline_open_saved_copy': 'सहेजी गई ऑफ़लाइन प्रति खोलें',
       'approve': 'अनुमोदित करें',
       'reopen': 'पुनः खोलें',
       'view_public_submissions': 'सार्वजनिक सबमिशन देखें',
@@ -5090,6 +5125,13 @@ class AppLocalizations {
       'unknown': 'Неизвестно',
       'n_a': 'Н/Д',
       'enter_data': 'Ввести Данные',
+      'download_for_offline': 'Скачать для офлайн',
+      'downloading_offline_form': 'Скачивание формы для офлайн-использования…',
+      'offline_form_saved': 'Форма сохранена для офлайн-доступа.',
+      'offline_form_save_failed': 'Не удалось сохранить форму офлайн. Повторите при стабильном соединении.',
+      'offline_form_not_downloaded': 'Эта форма недоступна офлайн. Скачайте её при подключении к сети.',
+      'offline_download_requires_connection': 'Подключитесь к интернету, чтобы скачать эту форму для офлайн-использования.',
+      'offline_open_saved_copy': 'Открыть сохранённую офлайн-копию',
       'approve': 'Одобрить',
       'reopen': 'Переоткрыть',
       'view_public_submissions': 'Просмотр Публичных Отправок',
@@ -5966,6 +6008,13 @@ class AppLocalizations {
       'unknown': '未知',
       'n_a': '不适用',
       'enter_data': '输入数据',
+      'download_for_offline': '下载以供离线使用',
+      'downloading_offline_form': '正在下载表单以供离线使用…',
+      'offline_form_saved': '表单已保存，可离线访问。',
+      'offline_form_save_failed': '无法离线保存表单。请在网络稳定时重试。',
+      'offline_form_not_downloaded': '此表单无法离线使用。请在联网时下载。',
+      'offline_download_requires_connection': '请连接互联网以下载此表单以供离线使用。',
+      'offline_open_saved_copy': '打开已保存的离线副本',
       'approve': '批准',
       'reopen': '重新开放',
       'view_public_submissions': '查看公开提交',
@@ -7077,6 +7126,17 @@ class AppLocalizations {
   String get unknown => translate('unknown');
   String get nA => translate('n_a');
   String get enterData => translate('enter_data');
+  String get downloadForOffline => translate('download_for_offline');
+  String get downloadingOfflineForm =>
+      translate('downloading_offline_form');
+  String get offlineFormSaved => translate('offline_form_saved');
+  String get offlineFormSaveFailed =>
+      translate('offline_form_save_failed');
+  String get offlineFormNotDownloaded =>
+      translate('offline_form_not_downloaded');
+  String get offlineDownloadRequiresConnection =>
+      translate('offline_download_requires_connection');
+  String get offlineOpenSavedCopy => translate('offline_open_saved_copy');
   String get approve => translate('approve');
   String get reopen => translate('reopen');
   String get viewPublicSubmissions => translate('view_public_submissions');

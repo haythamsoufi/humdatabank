@@ -24,6 +24,10 @@ jobs:
       - name: pub get
         run: flutter pub get
 
+      # pubspec.yaml lists `.env` as an asset; CI checkouts omit the gitignored file.
+      - name: Ensure .env exists for asset bundle / tests
+        run: touch .env
+
       - name: dart analyze
         run: dart analyze lib --fatal-infos
 

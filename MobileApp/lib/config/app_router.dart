@@ -11,7 +11,7 @@ import '../screens/shared/ai_chat_screen.dart';
 import '../screens/shared/main_navigation_screen.dart';
 // Public screens
 import '../screens/public/pdf_viewer_screen.dart';
-import '../screens/public/webview_screen.dart';
+import '../screens/public/webview_screen.dart' show WebViewScreen, WebViewScreenArgs;
 import '../screens/public/indicator_bank_screen.dart';
 import '../screens/public/propose_indicator_screen.dart';
 import '../screens/public/indicator_detail_screen.dart';
@@ -126,10 +126,14 @@ class AppRouter {
     }
 
     if (settings.name == AppRoutes.webview) {
-      final url = settings.arguments as String;
+      final args = WebViewScreenArgs.parse(settings.arguments);
       return MaterialPageRoute(
         settings: settings,
-        builder: (context) => WebViewScreen(initialUrl: url),
+        builder: (context) => WebViewScreen(
+          initialUrl: args.initialUrl,
+          forceOfflineAssignmentBundle: args.forceOfflineAssignmentBundle,
+          offlineAssignmentId: args.offlineAssignmentId,
+        ),
       );
     }
 

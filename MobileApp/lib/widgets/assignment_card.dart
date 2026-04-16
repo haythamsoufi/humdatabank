@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,10 @@ class AssignmentCard extends StatefulWidget {
   final VoidCallback? onEnterData;
   final bool showEnterDataButton;
   final String? enterDataButtonText;
+  final Future<void> Function()? onDownloadForOffline;
+  final VoidCallback? onOpenOfflineCopy;
+  final bool hasOfflineFormSnapshot;
+  final bool isDownloadingOfflineForm;
 
   const AssignmentCard({
     super.key,
@@ -24,6 +29,10 @@ class AssignmentCard extends StatefulWidget {
     this.onEnterData,
     this.showEnterDataButton = false,
     this.enterDataButtonText,
+    this.onDownloadForOffline,
+    this.onOpenOfflineCopy,
+    this.hasOfflineFormSnapshot = false,
+    this.isDownloadingOfflineForm = false,
   });
 
   @override
@@ -423,10 +432,40 @@ class _AssignmentCardState extends State<AssignmentCard>
                   Expanded(
                     child: Align(
                       alignment: AlignmentDirectional.centerStart,
-                      child: _enterDataActionButton(
-                        context,
-                        onPressed: widget.onEnterData!,
-                        label: widget.enterDataButtonText ?? localizations.enterData,
+                      child: Wrap(
+                        spacing: 2,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _enterDataActionButton(
+                            context,
+                            onPressed: widget.onEnterData!,
+                            label: widget.enterDataButtonText ??
+                                localizations.enterData,
+                          ),
+                          if (widget.onDownloadForOffline != null &&
+                              !widget.hasOfflineFormSnapshot)
+                            _OfflineFormIconButton(
+                              tooltip: localizations.downloadForOffline,
+                              icon: Icons.download_for_offline_outlined,
+                              busy: widget.isDownloadingOfflineForm,
+                              color: scheme.onSurfaceVariant,
+                              onPressed: widget.isDownloadingOfflineForm
+                                  ? null
+                                  : () {
+                                      unawaited(widget.onDownloadForOffline!());
+                                    },
+                            ),
+                          if (widget.hasOfflineFormSnapshot &&
+                              widget.onOpenOfflineCopy != null)
+                            _OfflineFormIconButton(
+                              tooltip: localizations.offlineOpenSavedCopy,
+                              icon: Icons.offline_pin_rounded,
+                              busy: false,
+                              color: const Color(AppConstants.successColor),
+                              onPressed: widget.onOpenOfflineCopy,
+                            ),
+                        ],
                       ),
                     ),
                   )
@@ -650,6 +689,46 @@ class _FlipCardButton extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
         child: Icon(Icons.flip_outlined, size: 19, color: color),
+      ),
+    );
+  }
+}
+
+class _OfflineFormIconButton extends StatelessWidget {
+  const _OfflineFormIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.color,
+    required this.busy,
+    this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final Color color;
+  final bool busy;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+          child: busy
+              ? SizedBox(
+                  width: 19,
+                  height: 19,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  ),
+                )
+              : Icon(icon, size: 19, color: color),
+        ),
       ),
     );
   }

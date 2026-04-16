@@ -391,6 +391,36 @@ class WebViewService {
   static final UnmodifiableListView<UserScript> requestInterceptorScripts =
       getRequestInterceptorScripts();
 
+  /// Settings for opening a saved assignment bundle from disk (`file://` HTML + assets).
+  static InAppWebViewSettings offlineAssignmentBundleSettings(
+    String bundleDirectoryPath,
+  ) {
+    final access = WebUri(Uri.directory(bundleDirectoryPath).toString());
+    final s = defaultSettings();
+    return InAppWebViewSettings(
+      javaScriptEnabled: s.javaScriptEnabled,
+      domStorageEnabled: s.domStorageEnabled,
+      databaseEnabled: s.databaseEnabled,
+      useHybridComposition: s.useHybridComposition,
+      allowsInlineMediaPlayback: s.allowsInlineMediaPlayback,
+      mediaPlaybackRequiresUserGesture: s.mediaPlaybackRequiresUserGesture,
+      supportMultipleWindows: s.supportMultipleWindows,
+      verticalScrollBarEnabled: s.verticalScrollBarEnabled,
+      horizontalScrollBarEnabled: s.horizontalScrollBarEnabled,
+      disableVerticalScroll: s.disableVerticalScroll,
+      disableHorizontalScroll: s.disableHorizontalScroll,
+      supportZoom: s.supportZoom,
+      builtInZoomControls: s.builtInZoomControls,
+      displayZoomControls: s.displayZoomControls,
+      transparentBackground: s.transparentBackground,
+      mixedContentMode: s.mixedContentMode,
+      allowingReadAccessTo: access,
+      allowFileAccess: true,
+      allowFileAccessFromFileURLs: true,
+      allowUniversalAccessFromFileURLs: true,
+    );
+  }
+
   static InAppWebViewSettings defaultSettings({
     bool allowMixedContent = false,
   }) {

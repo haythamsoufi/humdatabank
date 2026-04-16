@@ -773,6 +773,73 @@ class _NotificationTile extends StatelessWidget {
             : '')
         : notification.message;
 
+    final titleChipsRow = Row(
+      children: [
+        Flexible(
+          child: Text(
+            primaryLine,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: isUnread
+                      ? FontWeight.w600
+                      : (isHighPriority
+                          ? FontWeight.w500
+                          : FontWeight.w400),
+                  color: isHighPriority
+                      ? (isUnread
+                          ? (theme.isDarkTheme
+                              ? const Color(AppConstants
+                                  .semanticNotificationOrangeDarkUnread)
+                              : const Color(AppConstants
+                                  .semanticNotificationOrangeTextStrongLight))
+                          : (theme.isDarkTheme
+                              ? const Color(AppConstants
+                                  .semanticNotificationOrangeDarkRead)
+                              : const Color(AppConstants
+                                  .semanticNotificationOrangeTextMutedLight)))
+                      : theme.textTheme.bodyLarge?.color,
+                ),
+          ),
+        ),
+        if (isAdminMessage)
+          Container(
+            margin: const EdgeInsets.only(left: 6),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: 2,
+            ),
+            decoration: BoxDecoration(
+              color: theme.isDarkTheme
+                  ? const Color(AppConstants.themeSwitchCheckboxActiveDark)
+                      .withValues(alpha: isUnread ? 1.0 : 0.7)
+                  : theme.colorScheme.primary
+                      .withValues(alpha: isUnread ? 1.0 : 0.7),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              'ADMIN',
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onPrimary,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        if (hasRedirect)
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Icon(
+              Icons.open_in_new,
+              size: 14,
+              color: theme.isDarkTheme
+                  ? const Color(AppConstants.themeSwitchCheckboxActiveDark)
+                      .withValues(alpha: isUnread ? 1.0 : 0.7)
+                  : theme.colorScheme.primary
+                      .withValues(alpha: isUnread ? 1.0 : 0.7),
+            ),
+          ),
+      ],
+    );
+
     // Theme-aware background colors
     Color getBackgroundColor() {
       if (theme.isDarkTheme) {
@@ -806,7 +873,9 @@ class _NotificationTile extends StatelessWidget {
                   : BorderSide.none)
               : (isUnread
                   ? BorderSide(
-                      color: context.linkOnSurfaceColor,
+                      color: theme.isDarkTheme
+                          ? context.linkOnSurfaceColor
+                          : const Color(AppConstants.errorColor),
                       width: 3,
                     )
                   : BorderSide.none),
@@ -832,210 +901,140 @@ class _NotificationTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
+                      Padding(
+                        padding: EdgeInsets.only(right: isUnread ? 20 : 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    primaryLine,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: isUnread
-                                              ? FontWeight.w600
-                                              : (isHighPriority
-                                                  ? FontWeight.w500
-                                                  : FontWeight.w400),
-                                          color: isHighPriority
-                                              ? (isUnread
-                                                  ? (theme.isDarkTheme
-                                                      ? const Color(
-                                                          AppConstants
-                                                              .semanticNotificationOrangeDarkUnread)
-                                                      : const Color(
-                                                          AppConstants
-                                                              .semanticNotificationOrangeTextStrongLight))
-                                                  : (theme.isDarkTheme
-                                                      ? const Color(
-                                                          AppConstants
-                                                              .semanticNotificationOrangeDarkRead)
-                                                      : const Color(
-                                                          AppConstants
-                                                              .semanticNotificationOrangeTextMutedLight)))
-                                              : theme
-                                                  .textTheme.bodyLarge?.color,
-                                        ),
-                                  ),
-                                ),
-                                if (isAdminMessage)
-                                  Container(
-                                    margin: const EdgeInsets.only(left: 6),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme.isDarkTheme
-                                          ? const Color(AppConstants
-                                                  .themeSwitchCheckboxActiveDark)
-                                              .withValues(alpha: 
-                                                  isUnread ? 1.0 : 0.7)
-                                          : theme.colorScheme.primary
-                                              .withValues(alpha: 
-                                                  isUnread ? 1.0 : 0.7),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'ADMIN',
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: theme.colorScheme.onPrimary,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                if (hasRedirect)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 6),
-                                    child: Icon(
-                                      Icons.open_in_new,
-                                      size: 14,
-                                      color: theme.isDarkTheme
-                                          ? const Color(AppConstants
-                                                  .themeSwitchCheckboxActiveDark)
-                                              .withValues(alpha: 
-                                                  isUnread ? 1.0 : 0.7)
-                                          : theme.colorScheme.primary
-                                              .withValues(alpha: 
-                                                  isUnread ? 1.0 : 0.7),
-                                    ),
-                                  ),
+                                Expanded(child: titleChipsRow),
                               ],
                             ),
-                          ),
-                          if (isUnread && !isHighPriority)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: theme.isDarkTheme
-                                    ? theme.colorScheme.inversePrimary
-                                    : theme.colorScheme.primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          if (isUnread && isHighPriority)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: theme.isDarkTheme
-                                    ? theme.colorScheme.inversePrimary
-                                    : const Color(
-                                        AppConstants.semanticNotificationOrange),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                        ],
-                      ),
-                      if (secondaryLine.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          secondaryLine,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                height: 1.4,
-                                fontSize: notification.primaryIsMessage ? 13 : null,
-                                color: notification.primaryIsMessage
-                                    ? theme.textTheme.bodySmall?.color
-                                    : null,
-                              ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          if (notification.entityName != null &&
-                              notification.entityName!.isNotEmpty)
-                            Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: theme.isDarkTheme
-                                      ? const Color(AppConstants
-                                              .semanticNotificationSky)
-                                          .withValues(alpha: 0.2)
-                                      : const Color(AppConstants
-                                          .semanticEntityChipLightWash),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: theme.isDarkTheme
-                                        ? const Color(AppConstants
-                                                .semanticNotificationSky)
-                                            .withValues(alpha: 0.5)
-                                        : const Color(AppConstants
-                                                .semanticNotificationSky)
-                                            .withValues(alpha: 0.3),
-                                    width: 0.5,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.location_on,
-                                      size: 12,
-                                      color: theme.isDarkTheme
-                                          ? const Color(AppConstants
-                                              .semanticNotificationSkyLight)
-                                          : const Color(AppConstants
-                                              .semanticNotificationSky),
+                            if (secondaryLine.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                secondaryLine,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      height: 1.4,
+                                      fontSize: notification.primaryIsMessage
+                                          ? 13
+                                          : null,
+                                      color: notification.primaryIsMessage
+                                          ? theme.textTheme.bodySmall?.color
+                                          : null,
                                     ),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        notification.entityName!,
-                                        style:
-                                            theme.textTheme.labelSmall?.copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color:
-                                              theme.isDarkTheme
-                                                  ? const Color(AppConstants
-                                                      .semanticNotificationSkyLight)
-                                                  : const Color(AppConstants
-                                                      .semanticNotificationSky),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                if (notification.entityName != null &&
+                                    notification.entityName!.isNotEmpty)
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme.isDarkTheme
+                                            ? const Color(AppConstants
+                                                    .semanticNotificationSky)
+                                                .withValues(alpha: 0.2)
+                                            : const Color(AppConstants
+                                                .semanticEntityChipLightWash),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: theme.isDarkTheme
+                                              ? const Color(AppConstants
+                                                      .semanticNotificationSky)
+                                                  .withValues(alpha: 0.5)
+                                              : const Color(AppConstants
+                                                      .semanticNotificationSky)
+                                                  .withValues(alpha: 0.3),
+                                          width: 0.5,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.location_on,
+                                            size: 12,
+                                            color: theme.isDarkTheme
+                                                ? const Color(AppConstants
+                                                    .semanticNotificationSkyLight)
+                                                : const Color(AppConstants
+                                                    .semanticNotificationSky),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              notification.entityName!,
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                fontWeight: FontWeight.w500,
+                                                color: theme.isDarkTheme
+                                                    ? const Color(AppConstants
+                                                        .semanticNotificationSkyLight)
+                                                    : const Color(AppConstants
+                                                        .semanticNotificationSky),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
+                                  ),
+                                if (notification.entityName != null &&
+                                    notification.entityName!.isNotEmpty)
+                                  const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    formattedDate,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
                                 ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isUnread)
+                        PositionedDirectional(
+                          end: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: theme.isDarkTheme
+                                    ? theme.colorScheme.inversePrimary
+                                    : (isHighPriority
+                                        ? const Color(
+                                            AppConstants
+                                                .semanticNotificationOrange)
+                                        : const Color(AppConstants.errorColor)),
+                                shape: BoxShape.circle,
                               ),
                             ),
-                          if (notification.entityName != null &&
-                              notification.entityName!.isNotEmpty)
-                            const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              formattedDate,
-                              style: Theme.of(context).textTheme.bodySmall,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
                           ),
-                        ],
-                      ),
+                        ),
                     ],
                   ),
                 ),

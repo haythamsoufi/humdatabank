@@ -189,3 +189,65 @@ def parse_ids_from_request(key: str = "ids") -> list[int]:
                     continue
     seen: set[int] = set()
     return [i for i in ids if i not in seen and not seen.add(i)]
+
+
+# --- Mobile app embedded WebView (Flutter InAppWebView) ----------------------------
+
+# Must match MobileApp/lib/services/webview_service.dart defaultRequestHeaders.
+MOBILE_APP_WEBVIEW_HEADER = "X-Mobile-App"
+MOBILE_APP_WEBVIEW_HEADER_VALUE = "IFRC-Databank-Flutter"
+MOBILE_APP_EMBED_COOKIE_NAME = "HD_MOBILE_EMBED"
+MOBILE_APP_EMBED_COOKIE_VALUE = "1"
+
+
+def mobile_app_webview_embed_active() -> bool:
+    """True when the Humanitarian Databank mobile app is loading this page in its WebView.
+
+    Uses the custom header sent on the initial document request and a short-lived
+    cookie set from that header so follow-up navigations (clicks, redirects) still
+    render without the full backoffice chrome even when extra headers are not replayed.
+    """
+    h = (request.headers.get(MOBILE_APP_WEBVIEW_HEADER) or "").strip()
+    if h == MOBILE_APP_WEBVIEW_HEADER_VALUE:
+        return True
+    return (request.cookies.get(MOBILE_APP_EMBED_COOKIE_NAME) or "") == MOBILE_APP_EMBED_COOKIE_VALUE
+
+
+def mark_mobile_app_webview_embed_request() -> None:
+    """Set a request flag when the mobile WebView header is present (used by after_request)."""
+    from flask import g
+
+    g._hd_mobile_webview_header = (
+        (request.headers.get(MOBILE_APP_WEBVIEW_HEADER) or "").strip()
+        == MOBILE_APP_WEBVIEW_HEADER_VALUE
+    )
+
+
+def persist_mobile_app_embed_cookie(response):
+    """If this request carried the mobile WebView header, persist embed mode for later navigations."""
+    from flask import current_app, g, request
+
+    if not getattr(g, "_hd_mobile_webview_header", False):
+        return response
+    try:
+        secure = bool(current_app.config.get("SESSION_COOKIE_SECURE", False)) or request.is_secure
+        response.set_cookie(
+            MOBILE_APP_EMBED_COOKIE_NAME,
+            MOBILE_APP_EMBED_COOKIE_VALUE,
+            path="/",
+            httponly=True,
+            samesite="Lax",
+            secure=secure,
+        )
+    except Exception:
+        pass
+    return response
+
+
+def clear_mobile_app_embed_cookie(response):
+    """Remove embed-mode cookie (e.g. on logout)."""
+    try:
+        response.delete_cookie(MOBILE_APP_EMBED_COOKIE_NAME, path="/")
+    except Exception:
+        pass
+    return response

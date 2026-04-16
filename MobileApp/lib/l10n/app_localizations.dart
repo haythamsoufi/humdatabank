@@ -467,6 +467,8 @@ class AppLocalizations {
       'offline_form_not_downloaded': 'This form is not available offline. Download it while you are online.',
       'offline_download_requires_connection': 'Connect to the internet to download this form for offline use.',
       'offline_open_saved_copy': 'Open saved offline copy',
+      'remove_offline_copy': 'Remove offline copy',
+      'offline_form_removed': 'Offline copy removed. Download again when online.',
       'approve': 'Approve',
       'reopen': 'Reopen',
       'view_public_submissions': 'View Public Submissions',
@@ -890,6 +892,9 @@ class AppLocalizations {
       'offline_synced_time': 'Synced %s',
       'offline_requests_will_sync':
           '%s request(s) will be synced when online',
+      'backend_unreachable_title': 'Cannot reach server',
+      'backend_unreachable_subtitle':
+          'Showing saved data where available. Actions may not sync until the server is available again.',
 
       // PDF viewer
       'pdf_viewer_connecting': 'Connecting…',
@@ -1524,6 +1529,9 @@ class AppLocalizations {
       'offline_form_not_downloaded': 'Este formulario no está disponible sin conexión. Descárguelo mientras esté en línea.',
       'offline_download_requires_connection': 'Conéctese a internet para descargar este formulario para uso sin conexión.',
       'offline_open_saved_copy': 'Abrir copia sin conexión guardada',
+      'remove_offline_copy': 'Quitar copia sin conexión',
+      'offline_form_removed':
+          'Copia sin conexión eliminada. Vuelva a descargar cuando tenga conexión.',
       'approve': 'Aprobar',
       'reopen': 'Reabrir',
       'view_public_submissions': 'Ver Envíos Públicos',
@@ -2435,6 +2443,9 @@ class AppLocalizations {
       'offline_form_not_downloaded': 'Ce formulaire n’est pas disponible hors ligne. Téléchargez-le en étant connecté.',
       'offline_download_requires_connection': 'Connectez-vous à Internet pour télécharger ce formulaire pour une utilisation hors ligne.',
       'offline_open_saved_copy': 'Ouvrir la copie hors ligne enregistrée',
+      'remove_offline_copy': 'Supprimer la copie hors ligne',
+      'offline_form_removed':
+          'Copie hors ligne supprimée. Téléchargez à nouveau en ligne.',
       'approve': 'Approuver',
       'reopen': 'Rouvrir',
       'view_public_submissions': 'Voir les Soumissions Publiques',
@@ -3340,6 +3351,9 @@ class AppLocalizations {
       'offline_form_not_downloaded': 'هذا النموذج غير متاح دون اتصال. قم بتنزيله أثناء الاتصال بالإنترنت.',
       'offline_download_requires_connection': 'اتصل بالإنترنت لتنزيل هذا النموذج للاستخدام دون اتصال.',
       'offline_open_saved_copy': 'فتح النسخة المحفوظة دون اتصال',
+      'remove_offline_copy': 'إزالة النسخة دون اتصال',
+      'offline_form_removed':
+          'تمت إزالة النسخة دون اتصال. أعد التنزيل عند الاتصال بالإنترنت.',
       'approve': 'الموافقة',
       'reopen': 'إعادة الفتح',
       'view_public_submissions': 'عرض التقديمات العامة',
@@ -4227,6 +4241,9 @@ class AppLocalizations {
       'offline_form_not_downloaded': 'यह फ़ॉर्म ऑफ़लाइन उपलब्ध नहीं है। ऑनलाइन रहते हुए इसे डाउनलोड करें।',
       'offline_download_requires_connection': 'ऑफ़लाइन उपयोग के लिए इस फ़ॉर्म को डाउनलोड करने हेतु इंटरनेट से जुड़ें।',
       'offline_open_saved_copy': 'सहेजी गई ऑफ़लाइन प्रति खोलें',
+      'remove_offline_copy': 'ऑफ़लाइन प्रति हटाएँ',
+      'offline_form_removed':
+          'ऑफ़लाइन प्रति हटा दी गई। ऑनलाइन होने पर फिर से डाउनलोड करें।',
       'approve': 'अनुमोदित करें',
       'reopen': 'पुनः खोलें',
       'view_public_submissions': 'सार्वजनिक सबमिशन देखें',
@@ -5132,6 +5149,9 @@ class AppLocalizations {
       'offline_form_not_downloaded': 'Эта форма недоступна офлайн. Скачайте её при подключении к сети.',
       'offline_download_requires_connection': 'Подключитесь к интернету, чтобы скачать эту форму для офлайн-использования.',
       'offline_open_saved_copy': 'Открыть сохранённую офлайн-копию',
+      'remove_offline_copy': 'Удалить офлайн-копию',
+      'offline_form_removed':
+          'Офлайн-копия удалена. Скачайте снова при подключении к сети.',
       'approve': 'Одобрить',
       'reopen': 'Переоткрыть',
       'view_public_submissions': 'Просмотр Публичных Отправок',
@@ -6015,6 +6035,8 @@ class AppLocalizations {
       'offline_form_not_downloaded': '此表单无法离线使用。请在联网时下载。',
       'offline_download_requires_connection': '请连接互联网以下载此表单以供离线使用。',
       'offline_open_saved_copy': '打开已保存的离线副本',
+      'remove_offline_copy': '删除离线副本',
+      'offline_form_removed': '已删除离线副本。联网后请重新下载。',
       'approve': '批准',
       'reopen': '重新开放',
       'view_public_submissions': '查看公开提交',
@@ -7137,6 +7159,8 @@ class AppLocalizations {
   String get offlineDownloadRequiresConnection =>
       translate('offline_download_requires_connection');
   String get offlineOpenSavedCopy => translate('offline_open_saved_copy');
+  String get removeOfflineCopy => translate('remove_offline_copy');
+  String get offlineFormRemoved => translate('offline_form_removed');
   String get approve => translate('approve');
   String get reopen => translate('reopen');
   String get viewPublicSubmissions => translate('view_public_submissions');
@@ -7539,6 +7563,10 @@ class AppLocalizations {
       translate('offline_synced_time').replaceAll('%s', time);
   String offlineRequestsWillSync(int count) =>
       translate('offline_requests_will_sync').replaceAll('%s', '$count');
+  String get backendUnreachableTitle =>
+      translate('backend_unreachable_title');
+  String get backendUnreachableSubtitle =>
+      translate('backend_unreachable_subtitle');
 
   // PDF viewer & sharing
   String get pdfViewerConnecting => translate('pdf_viewer_connecting');

@@ -11,6 +11,7 @@ import '../../services/ai_chat_persistence_service.dart';
 import '../../services/storage_service.dart';
 import '../../utils/ai_chat_structured_coerce.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class AiChatProvider with ChangeNotifier {
   final AiChatService _service = AiChatService();
@@ -801,34 +802,36 @@ class AiChatProvider with ChangeNotifier {
       });
       notifyListeners();
 
-      // Then sync from server (if online)
-      try {
-        final raw = await _service.listConversations();
-        final serverConvos = raw.map((e) => AiConversationSummary.fromJson(Map<String, dynamic>.from(e))).toList();
+      // Then sync from server (skip when offline — avoids timeouts)
+      if (!shouldDeferRemoteFetch) {
+        try {
+          final raw = await _service.listConversations();
+          final serverConvos = raw.map((e) => AiConversationSummary.fromJson(Map<String, dynamic>.from(e))).toList();
 
-        // Save server conversations to local DB
-        for (final convo in serverConvos) {
-          await _persistence.saveConversation(convo);
-        }
-
-        // Merge: keep local-only conversations that don't exist on server yet
-        final byId = <String, AiConversationSummary>{for (final c in serverConvos) c.id: c};
-        for (final local in _conversations) {
-          if (!byId.containsKey(local.id)) {
-            byId[local.id] = local;
+          // Save server conversations to local DB
+          for (final convo in serverConvos) {
+            await _persistence.saveConversation(convo);
           }
+
+          // Merge: keep local-only conversations that don't exist on server yet
+          final byId = <String, AiConversationSummary>{for (final c in serverConvos) c.id: c};
+          for (final local in _conversations) {
+            if (!byId.containsKey(local.id)) {
+              byId[local.id] = local;
+            }
+          }
+          _conversations = byId.values.toList();
+          // Sort by most recent first
+          _conversations.sort((a, b) {
+            final aTime = a.lastMessageAt ?? a.updatedAt ?? DateTime(0);
+            final bTime = b.lastMessageAt ?? b.updatedAt ?? DateTime(0);
+            return bTime.compareTo(aTime);
+          });
+          _pruneStalePinnedIds();
+        } catch (e) {
+          DebugLogger.logWarn('AI', 'Failed to sync conversations from server, using local: $e');
+          // Keep local conversations if server sync fails
         }
-        _conversations = byId.values.toList();
-        // Sort by most recent first
-        _conversations.sort((a, b) {
-          final aTime = a.lastMessageAt ?? a.updatedAt ?? DateTime(0);
-          final bTime = b.lastMessageAt ?? b.updatedAt ?? DateTime(0);
-          return bTime.compareTo(aTime);
-        });
-        _pruneStalePinnedIds();
-      } catch (e) {
-        DebugLogger.logWarn('AI', 'Failed to sync conversations from server, using local: $e');
-        // Keep local conversations if server sync fails
       }
     } catch (e) {
       _error = e.toString();

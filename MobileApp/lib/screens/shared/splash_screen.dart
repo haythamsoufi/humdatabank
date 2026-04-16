@@ -10,6 +10,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/performance_service.dart';
 import '../../services/launcher_shortcuts_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -148,8 +149,11 @@ class _SplashScreenState extends State<SplashScreen>
       'splash_auth_check',
       () async {
         try {
-          return await authProvider.checkAuthStatus(forceRevalidate: true)
-            .timeout(authCheckTimeout);
+          return await authProvider
+              .checkAuthStatus(
+                forceRevalidate: !shouldDeferRemoteFetch,
+              )
+              .timeout(authCheckTimeout);
         } on TimeoutException {
           // Log timeout but don't throw - allow app to continue
           DebugLogger.logWarn(

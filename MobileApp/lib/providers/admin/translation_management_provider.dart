@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class TranslationManagementProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -52,6 +53,11 @@ class TranslationManagementProvider with ChangeNotifier {
     }
     if (_translationSourcesLoading) return;
     if (_translationSourcesLoaded) return;
+    if (shouldDeferRemoteFetch) {
+      _translationSourcesLoading = false;
+      notifyListeners();
+      return;
+    }
     _translationSourcesLoading = true;
     notifyListeners();
     try {
@@ -121,6 +127,12 @@ class TranslationManagementProvider with ChangeNotifier {
     String? statusFilter,
     String? sourceFilter,
   }) async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      _isLoadingMore = false;
+      notifyListeners();
+      return;
+    }
     if (reset) {
       _isLoading = true;
       _page = 0;

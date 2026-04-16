@@ -6,6 +6,7 @@ import '../../config/app_config.dart';
 import '../../models/admin/session_log_item.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
+import '../../utils/network_availability.dart';
 
 /// Loads [GET /api/mobile/v1/admin/analytics/session-logs] and force-logout via
 /// [POST /api/mobile/v1/admin/analytics/sessions/<session_id>/end].
@@ -124,6 +125,12 @@ class SessionLogsProvider with ChangeNotifier {
   }
 
   Future<void> _fetch({required bool reset}) async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      _isLoadingMore = false;
+      notifyListeners();
+      return;
+    }
     if (reset) {
       _isLoading = true;
       _page = 1;

@@ -132,7 +132,7 @@ html[dir="rtl"] #sidebar-tooltip.visible {
 
 /* RTL Chatbot Positioning */
 html[dir="rtl"] #aiChatbotFAB {
-    left: 1.5rem !important;
+    left: calc(1.5rem + env(safe-area-inset-left, 0px)) !important;
     right: auto !important;
 }
 
@@ -145,7 +145,7 @@ html[dir="rtl"] #aiChatWidget {
 /* RTL Mobile FAB positioning */
 @media (max-width: 768px) {
     html[dir="rtl"] #aiChatbotFAB {
-        left: 1.5rem !important;
+        left: calc(1.5rem + env(safe-area-inset-left, 0px)) !important;
         right: auto !important;
     }
 

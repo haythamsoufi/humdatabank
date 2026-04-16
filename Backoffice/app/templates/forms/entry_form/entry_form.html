@@ -143,7 +143,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-2 py-6 max-w-full" data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}" data-public-token="{{ public_token if is_public_submission else '' }}">
+<div class="entry-form-root w-full max-w-full mx-auto px-0 sm:px-2 py-4 sm:py-6 min-w-0" data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}" data-public-token="{{ public_token if is_public_submission else '' }}">
 
     {# Template Preview Mode banner (with "view as" controls) #}
     {% if is_preview_mode %}
@@ -458,8 +458,8 @@
             </div>
         </div>
 
-        <div id="entry-form-ui" style="display:none;">
-        <div id="entry-form-layout" class="flex flex-col lg:flex-row gap-6">
+        <div id="entry-form-ui" class="min-w-0" style="display:none;">
+        <div id="entry-form-layout" class="flex flex-col lg:flex-row gap-4 lg:gap-6 min-w-0">
             {# Sections Pane - Static pane on large screens (≥1100px), overlay sidebar on smaller screens #}
             <div id="section-navigation-sidebar"
                  class="fixed inset-y-0 left-0 z-40 w-4/5 max-w-xs bg-white pt-6 px-6 pb-0 flex flex-col transform -translate-x-full transition-transform duration-300 ease-in-out shadow-xl border-r border-gray-200
@@ -682,16 +682,16 @@
             {# Main Form Area - Adjusts width based on sidebar state #}
             <div class="lg:flex-1 transition-all duration-300" id="main-form-area">
 
-                    <div id="sections-container" class="space-y-8 mb-8" data-is-paginated="{{ template_structure.is_paginated|lower }}">
+                    <div id="sections-container" class="space-y-4 sm:space-y-8 mb-6 sm:mb-8 min-w-0" data-is-paginated="{{ template_structure.is_paginated|lower }}">
                         {% if is_public_submission %}
                             <!-- Submitter Information Section -->
-                            <div id="submitter-information-section" class="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-6 scroll-mt-20" data-page-number="1">
-                                <h3 class="text-xl font-semibold mb-4 pb-4 border-b text-gray-700 flex items-center">
+                            <div id="submitter-information-section" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20" data-page-number="1">
+                                <h3 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
                                     <i class="fas fa-user w-5 h-5 mr-2 text-gray-500"></i>
                                     {{ _('Submitter Information') }}
                                 </h3>
                                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                    <div class="form-group form-item-block border p-4 rounded-md bg-white">
+                                    <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white">
                                         {{ country_select_form.country_id.label(class="block text-md font-semibold text-gray-800 mb-1") }}
                                         {{ country_select_form.country_id(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
                                         {% if country_select_form.country_id.errors %}
@@ -703,7 +703,7 @@
                                         {% endif %}
                                     </div>
 
-                                    <div class="form-group form-item-block border p-4 rounded-md bg-white">
+                                    <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white">
                                         {{ submission_details_form.submitter_name.label(class="block text-md font-semibold text-gray-800 mb-1") }}
                                         {{ submission_details_form.submitter_name(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
                                         {% if submission_details_form.submitter_name.errors %}
@@ -715,7 +715,7 @@
                                         {% endif %}
                                     </div>
 
-                                    <div class="form-group form-item-block border p-4 rounded-md bg-white">
+                                    <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white">
                                         {{ submission_details_form.submitter_email.label(class="block text-md font-semibold text-gray-800 mb-1") }}
                                         {{ submission_details_form.submitter_email(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
                                         {% if submission_details_form.submitter_email.errors %}
@@ -802,8 +802,8 @@
                                 {% set page_key_main = section.page_id if section.page_id is not none else 'default' %}
                                 {% set page_number_main = page_display_order_main.get(page_key_main, 1) %}
                                 {% set page_name_main = page_names_main.get(page_key_main, section.page.display_name if section.page and section.page.display_name else (section.page.name if section.page else 'Page ' ~ page_number_main)) %}
-                                <div id="section-container-{{ section.id }}" class="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-6 scroll-mt-20" data-section-type="{{ section.section_type }}" data-page-number="{{ page_number_main }}" data-page-name="{{ page_name_main }}"{% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and section.max_entries %} data-max-entries="{{ section.max_entries }}"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ section.id }}"{% if section.relevance_condition %} data-relevance-condition='{{ section.relevance_condition|tojson }}' data-item-id="{{ section.id }}"{% endif %}>
-                                    <h3 class="text-xl font-semibold mb-4 pb-4 border-b text-gray-700 flex items-center">
+                                <div id="section-container-{{ section.id }}" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20" data-section-type="{{ section.section_type }}" data-page-number="{{ page_number_main }}" data-page-name="{{ page_name_main }}"{% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and section.max_entries %} data-max-entries="{{ section.max_entries }}"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ section.id }}"{% if section.relevance_condition %} data-relevance-condition='{{ section.relevance_condition|tojson }}' data-item-id="{{ section.id }}"{% endif %}>
+                                    <h3 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
                                          <i class="fas fa-layer-group w-5 h-5 mr-2 text-gray-500"></i>
                                         {% if template_structure.display_order_visible %}<span class="text-xl font-semibold text-gray-700 mr-1">{{ section.display_order }}.</span>{% endif %}
                                         {% set section_display_name = section._display_name_resolved if hasattr(section, '_display_name_resolved') and section._display_name_resolved else section.display_name %}
@@ -813,7 +813,7 @@
                                         </button>
                                     </h3>
 
-                                    <div id="collapsible-content-{{ section.id }}" data-collapsible-content class="space-y-6"> {# Container for parent section's direct fields AND its sub-sections #}
+                                    <div id="collapsible-content-{{ section.id }}" data-collapsible-content class="space-y-4 sm:space-y-6"> {# Container for parent section's direct fields AND its sub-sections #}
                                         {# Render direct fields of the parent section #}
                                         {% if section.fields_ordered %}
                                             {% for field in section.fields_ordered %}
@@ -854,9 +854,9 @@
                                                         {% set is_plugin_active = plugin_type in active_field_types %}
                                                     {% endif %}
 
-                                                    <div class="form-group form-item-block border p-4 rounded-md bg-white
+                                                    <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white
                                                          {% if plugin_is_prefilled %} bg-yellow-50 border-yellow-300{% elif plugin_is_imputed %} bg-blue-50 border-blue-300{% endif %}
-                                                         {{ 'ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item_plugin else '' }}"
+                                                         {{ 'ml-3 sm:ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item_plugin else '' }}"
                                                          data-item-id="{{ field.id }}"
                                                          data-item-type="plugin"
                                                          data-plugin-type="{{ field.plugin_type }}"
@@ -996,7 +996,7 @@
                                                         {% set is_unified_matrix = field.item_type == 'matrix' %}
                                                         {% set is_unified_document = not is_unified_indicator and not is_unified_question and not is_unified_matrix %}
                                                     {% endif %}
-                                                    <div class="form-group form-item-block border p-4 rounded-md bg-white {{ 'ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item else '' }} {{ 'border-l-4 border-l-green-300 bg-green-50' if is_dynamic_indicator else '' }}"
+                                                    <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white {{ 'ml-3 sm:ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item else '' }} {{ 'border-l-4 border-l-green-300 bg-green-50' if is_dynamic_indicator else '' }}"
                                                          data-item-id="{{ unified_item_id }}"
                                                          data-item-type="{{ unified_item_type }}"
                                                          data-layout-width="{{ field.layout_column_width or 12 }}"
@@ -1809,8 +1809,8 @@
                                                 {% set sub_page_key_main = (sub_section.page_id if sub_section.page_id is not none else page_key_main) %}
                                                 {% set sub_page_number_main = page_display_order_main.get(sub_page_key_main, page_number_main) %}
                                                 {% set sub_page_name_main = page_names_main.get(sub_page_key_main, page_name_main) %}
-                                                <div id="section-container-{{ sub_section.id }}" class="pt-6 {% if not loop.first or section.fields_ordered %}border-t border-gray-300 {% endif %}mt-6 scroll-mt-20" data-section-type="{{ sub_section.section_type }}" data-page-number="{{ sub_page_number_main }}" data-page-name="{{ sub_page_name_main }}"{% if sub_section.section_type == 'dynamic_indicators' and sub_section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ sub_section.max_dynamic_indicators }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.max_entries %} data-max-entries="{{ sub_section.max_entries }}"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ sub_section.id }}"{% if sub_section.relevance_condition %} data-relevance-condition='{{ sub_section.relevance_condition|tojson }}' data-item-id="{{ sub_section.id }}"{% endif %}>
-                                                    <h4 class="text-lg font-semibold mb-4 pb-4 border-b text-gray-700 flex items-center">
+                                                <div id="section-container-{{ sub_section.id }}" class="pt-4 sm:pt-6 {% if not loop.first or section.fields_ordered %}border-t border-gray-300 {% endif %}mt-4 sm:mt-6 scroll-mt-20" data-section-type="{{ sub_section.section_type }}" data-page-number="{{ sub_page_number_main }}" data-page-name="{{ sub_page_name_main }}"{% if sub_section.section_type == 'dynamic_indicators' and sub_section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ sub_section.max_dynamic_indicators }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.max_entries %} data-max-entries="{{ sub_section.max_entries }}"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ sub_section.id }}"{% if sub_section.relevance_condition %} data-relevance-condition='{{ sub_section.relevance_condition|tojson }}' data-item-id="{{ sub_section.id }}"{% endif %}>
+                                                    <h4 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
                                                         <i class="fas fa-indent w-4 h-4 mr-3 text-gray-500"></i>
                                                         {% if template_structure.display_order_visible %}<span class="text-gray-700 mr-1">{{ sub_section.display_order }}.</span>{% endif %}
                                                         {% set sub_section_display_name = sub_section._display_name_resolved if hasattr(sub_section, '_display_name_resolved') and sub_section._display_name_resolved else sub_section.display_name %}
@@ -1819,7 +1819,7 @@
                                                             <i class="fas fa-chevron-up"></i>
                                                         </button>
                                                     </h4>
-                                                    <div id="collapsible-content-sub-{{ sub_section.id }}" data-collapsible-content class="space-y-4 pl-6">
+                                                    <div id="collapsible-content-sub-{{ sub_section.id }}" data-collapsible-content class="space-y-3 sm:space-y-4 pl-3 sm:pl-6">
                                                         {% if sub_section.fields_ordered %}
                                                             {% for field in sub_section.fields_ordered %}
                                                             {% if hasattr(field, 'item_type') %}
@@ -1841,9 +1841,9 @@
                                                                         {% set is_plugin_active = plugin_type in active_field_types %}
                                                                     {% endif %}
 
-                                                                    <div class="form-group form-item-block border p-4 rounded-md bg-white
+                                                                    <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white
                                                                          {% if plugin_is_prefilled %} bg-yellow-50 border-yellow-300{% elif plugin_is_imputed %} bg-blue-50 border-blue-300{% endif %}
-                                                                         {{ 'ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item_plugin else '' }}"
+                                                                         {{ 'ml-3 sm:ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item_plugin else '' }}"
                                                                          data-item-id="{{ field.id }}"
                                                                          data-item-type="plugin"
                                                                          data-plugin-type="{{ field.plugin_type }}"
@@ -1970,7 +1970,7 @@
                                                                     {% set unified_item_type = 'indicator' if (field.is_indicator or is_dynamic_indicator) else ('question' if field.is_question else ('matrix' if field.item_type == 'matrix' else 'document_field')) %}
                                                                     {% set is_unified_matrix = unified_item_type == 'matrix' %}
 
-                                                                    <div class="form-group form-item-block border p-4 rounded-md bg-white {{ 'ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item else '' }} {{ 'border-l-4 border-l-green-300 bg-green-50' if is_dynamic_indicator else '' }}"
+                                                                    <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white {{ 'ml-3 sm:ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item else '' }} {{ 'border-l-4 border-l-green-300 bg-green-50' if is_dynamic_indicator else '' }}"
                                                                          data-item-id="{{ field.id }}"
                                                                          data-item-type="{{ 'indicator' if field.is_indicator else ('question' if field.is_question else ('matrix' if field.item_type == 'matrix' else 'document_field')) }}"
                                                                          data-layout-width="{{ field.layout_column_width or 12 }}"
@@ -2532,7 +2532,7 @@
                                                                 {% include 'forms/entry_form/partials/dynamic_indicators_interface.html' %}
 
                                                                 {% if sub_section.section_type == 'repeat' %}
-                                                                <div class="ml-6" id="repeat-interface-{{ sub_section.id }}">
+                                                                <div class="ml-3 sm:ml-6" id="repeat-interface-{{ sub_section.id }}">
                                                                     <div id="repeat-entries-{{ sub_section.id }}" class="space-y-4">
                                                                         <!-- Repeat entries will be added here -->
                                                                     </div>
@@ -2598,7 +2598,7 @@
                                         </div> {# End section-container-{{ section.id }} for parent section #}
                                     {% endfor %} {# End main_sections_form loop #}
                                 {% else %}
-                                    <div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+                                    <div class="bg-white p-4 sm:p-6 rounded-lg shadow border border-gray-200">
                                         <p class="text-gray-700">{{ _('No sections or items found for this template.') }}</p>
                                     </div>
                                 {% endif %}
@@ -2613,7 +2613,7 @@
                     </div>
                 </div>
             {% else %}
-                <div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+                <div class="bg-white p-4 sm:p-6 rounded-lg shadow border border-gray-200">
                     <p class="text-gray-700">{{ _('Assignment status for this country not found.') }}</p>
                 </div>
             {% endif %}
@@ -2654,7 +2654,7 @@
             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
             <div id="chatbot-ai-hover-menu"
                  class="fixed z-[1059] flex flex-col items-end gap-3 pointer-events-none opacity-0 transition-all duration-200"
-                 style="bottom: calc(var(--chat-fab-offset, 1.5rem) + 72px); right: var(--chat-fab-offset, 1.5rem);">
+                 style="bottom: calc(var(--chat-fab-bottom-inset, 1.5rem) + 72px); right: calc(var(--chat-fab-offset, 1.5rem) + env(safe-area-inset-right, 0px));">
                 <div class="chatbot-ai-hover-row flex items-center gap-3 pointer-events-auto">
                     <span class="chatbot-ai-tooltip">{{ _('Validation Summary') }}</span>
                     <button type="button" id="fab-validation-summary-btn"

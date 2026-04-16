@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'dart:convert' show jsonEncode;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../config/app_config.dart';
@@ -89,6 +88,23 @@ class WebViewService {
     return false;
   }
 
+  /// True for assignment exports that require the WebView session cookie.
+  ///
+  /// Android routes these through [onDownloadStartRequest]; opening them with
+  /// [launchUrl] runs in the system browser without cookies and hits the login page.
+  static bool isFormAssignmentSessionDownloadUrl(Uri uri) {
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      return false;
+    }
+    final path = uri.path;
+    if (!path.contains('/forms/assignment_status/')) {
+      return false;
+    }
+    return path.contains('/export_pdf') ||
+        path.contains('/export_excel') ||
+        path.contains('/validation_summary');
+  }
+
   /// Validates if a URL string is allowed to load in WebView
   static bool isUrlStringAllowed(String? urlString) {
     if (urlString == null || urlString.isEmpty) {
@@ -108,8 +124,9 @@ class WebViewService {
     String? language,
   }) {
     final scripts = <UserScript>[
-      // Inject Content Security Policy
-      getCspInjectionScript(),
+      // Do not inject a second CSP via <meta>: the backoffice (and website) already
+      // send Content-Security-Policy headers. A stricter client CSP intersects with the
+      // server's policy and blocks allowed third-party scripts/styles (e.g. cdnjs).
       // Suppress console messages from WebView pages
       UserScript(
         source: '''
@@ -245,8 +262,13 @@ class WebViewService {
         source: '''
           (function() {
             window.isMobileApp = true;
+            window.humdatabankMobileApp = true;
             window.IFRCMobileApp = true;
-            document.documentElement.setAttribute('data-mobile-app', 'true');
+            var root = document.documentElement;
+            if (root) {
+              root.setAttribute('data-mobile-app', 'true');
+              root.classList.add('mobile-app');
+            }
           })();
         ''',
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
@@ -448,39 +470,8 @@ class WebViewService {
       mixedContentMode: allowMixedContent
           ? MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW
           : MixedContentMode.MIXED_CONTENT_NEVER_ALLOW,
-      // Security settings
-      // Note: CSP enforcement is done via injected meta tag (see getRequestInterceptorScripts)
-      // as InAppWebView doesn't directly support CSP header injection
-    );
-  }
-
-  /// Get Content Security Policy injection script
-  static UserScript getCspInjectionScript() {
-    final csp = AppConfig.contentSecurityPolicy;
-    // jsonEncode produces a double-quoted JS string literal; CSP contains 'self' which
-    // would break single-quoted embedding: meta.content = 'default-src 'self' ...'
-    final cspJsLiteral = jsonEncode(csp);
-    return UserScript(
-      source:
-          '''
-        (function() {
-          function injectCsp() {
-            if (document.querySelector('meta[http-equiv="Content-Security-Policy"]')) return;
-            var parent = document.head || document.documentElement;
-            if (!parent) return;
-            var meta = document.createElement('meta');
-            meta.httpEquiv = 'Content-Security-Policy';
-            meta.content = $cspJsLiteral;
-            parent.insertBefore(meta, parent.firstChild);
-          }
-          if (document.head) {
-            injectCsp();
-          } else {
-            document.addEventListener('DOMContentLoaded', injectCsp);
-          }
-        })();
-      ''',
-      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+      // Security: rely on the document's own CSP response headers; URL allowlisting
+      // remains in [isUrlAllowed] / shouldOverrideUrlLoading.
     );
   }
 
@@ -530,6 +521,57 @@ class WebViewService {
       font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
     }
   `;
+})();''';
+
+  /// Run from [InAppWebView.onLoadStop] via [InAppWebViewController.evaluateJavascript].
+  /// Compact JSON (keeps under logger truncation): stylesheet counts + sample hrefs.
+  static const String stylesheetLoadDiagEvaluateSource = r'''
+(function() {
+  function trunc(s, n) {
+    s = String(s || '');
+    return s.length > n ? s.substring(0, n) + '…' : s;
+  }
+  var blocked = 0;
+  var rulePositive = 0;
+  var sample = [];
+  try {
+    var n = document.styleSheets.length;
+    for (var i = 0; i < n; i++) {
+      var sh = document.styleSheets[i];
+      var href = '';
+      try { href = String(sh.href || ''); } catch (e0) { href = '?'; }
+      var rules = -2;
+      try {
+        if (sh.cssRules) {
+          rules = sh.cssRules.length;
+          if (rules > 0) { rulePositive++; }
+        }
+      } catch (e1) {
+        rules = -1;
+        blocked++;
+      }
+      if (sample.length < 4) {
+        sample.push({ href: trunc(href, 96), rules: rules });
+      }
+    }
+  } catch (e) {
+    return JSON.stringify({ err: trunc(String(e), 120) });
+  }
+  var linkHrefs = [];
+  try {
+    var nodes = document.querySelectorAll('link[rel*="stylesheet"]');
+    for (var j = 0; j < nodes.length && linkHrefs.length < 5; j++) {
+      linkHrefs.push(trunc(String(nodes[j].href || ''), 96));
+    }
+  } catch (e2) {}
+  return JSON.stringify({
+    u: trunc(String(document.URL || ''), 120),
+    sheets: document.styleSheets.length,
+    blocked: blocked,
+    withRules: rulePositive,
+    sample: sample,
+    linkHrefs: linkHrefs
+  });
 })();''';
 
   static bool shouldIgnoreError(String? description) {

@@ -451,9 +451,29 @@ class AppConfig {
   // WebView Security - Allowed URL patterns
   // Only URLs matching these patterns will be allowed to load in WebView
   static List<String> getAllowedUrlPatterns() {
+    // Hosts the Backoffice CSP permits for scripts/styles/fonts/embeds (see
+    // Backoffice/app/middleware/security_headers.py). Without these, release
+    // builds can block iframes or navigations that the server already allows,
+    // which looks like missing CSS/JS in the embedded WebView.
+    const cdnAndEmbedHosts = <String>[
+      'https://cdnjs.cloudflare.com',
+      'https://cdn.jsdelivr.net',
+      'https://unpkg.com',
+      'https://code.jquery.com',
+      'https://www.gstatic.com',
+      'https://fonts.googleapis.com',
+      'https://fonts.gstatic.com',
+      'https://nominatim.openstreetmap.org',
+      'https://ipapi.co',
+      'https://app.powerbi.com',
+      'https://app.powerbigov.us',
+      'https://msit.powerbi.com',
+      'https://public.tableau.com',
+    ];
     return [
       backendUrl,
       frontendUrl,
+      ...cdnAndEmbedHosts,
       // Allow staging URLs
       if (isStaging) ...[
         'https://databank-stage.ifrc.org',
@@ -476,25 +496,5 @@ class AppConfig {
         'http://10.0.2.2:*', // Android emulator
       ],
     ];
-  }
-
-  // Content Security Policy for WebView
-  static String get contentSecurityPolicy {
-    // Default-src: allow same-origin and backend API
-    // script-src: allow same-origin and inline scripts (required for some pages)
-    // style-src: allow same-origin, inline styles, and Google Fonts (for Tajawal)
-    // font-src: allow same-origin and Google Fonts
-    // img-src: allow data URLs and same-origin
-    // connect-src: allow same-origin and backend API
-    return "default-src 'self' $backendUrl $frontendUrl; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src 'self' https://fonts.gstatic.com data:; "
-        "img-src 'self' data: blob: $backendUrl $frontendUrl; "
-        "connect-src 'self' $backendUrl $frontendUrl; "
-        "frame-src 'self' $backendUrl $frontendUrl; "
-        "object-src 'none'; "
-        "base-uri 'self'; "
-        "form-action 'self' $backendUrl $frontendUrl;";
   }
 }

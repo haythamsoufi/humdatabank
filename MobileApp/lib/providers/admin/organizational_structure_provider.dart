@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class OrganizationalStructureProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -19,6 +20,11 @@ class OrganizationalStructureProvider with ChangeNotifier {
     String? search,
     String? levelFilter,
   }) async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();

@@ -1,7 +1,7 @@
 from app.utils.transactions import request_transaction_rollback
 from contextlib import suppress
 # ========== File: app/routes/auth.py ==========
-from flask import Blueprint, render_template, redirect, url_for, request, flash, session, abort
+from flask import Blueprint, render_template, redirect, url_for, request, flash, session, abort, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from flask_babel import _
 # Removed check_password_hash as it's now in the User model method
@@ -36,6 +36,7 @@ from app.extensions import mail, csrf
 from app.services.email.client import send_email
 from app.services.app_settings_service import get_organization_name, is_organization_email, user_has_ai_beta_access
 from app.utils.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
+from app.utils.request_utils import clear_mobile_app_embed_cookie
 
 bp = Blueprint("auth", __name__)
 
@@ -825,6 +826,10 @@ def logout():
     # Log logout event
     log_logout(current_user, session_duration_minutes=session_duration)
 
+    def _logout_redirect(location: str):
+        resp = make_response(redirect(location))
+        return clear_mobile_app_embed_cookie(resp)
+
     # Grab the B2C id_token before wiping the session (needed for id_token_hint)
     b2c_id_token = session.get('b2c_id_token')
 
@@ -840,7 +845,7 @@ def logout():
         or url_for("auth.login", _external=True)
     )
     if "localhost" in post_logout_uri or "127.0.0.1" in post_logout_uri:
-        return redirect(url_for("auth.login"))
+        return _logout_redirect(url_for("auth.login"))
 
     # End the Azure B2C SSO session so the user must re-authenticate with B2C
     # on next login (prevents silent re-login after logout).
@@ -854,9 +859,9 @@ def logout():
                 if b2c_id_token:
                     params['id_token_hint'] = b2c_id_token
                 logout_url = f"{end_session_endpoint}?{urlencode(params)}"
-                return redirect(logout_url)
+                return _logout_redirect(logout_url)
 
-    return redirect(url_for("auth.login"))
+    return _logout_redirect(url_for("auth.login"))
 
 def _generate_reset_token(email: str) -> str | None:
     """

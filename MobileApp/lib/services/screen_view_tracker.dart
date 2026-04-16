@@ -2,7 +2,8 @@ import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 import '../services/jwt_token_service.dart';
-import '../utils/debug_logger.dart';
+import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
+import '../utils/network_availability.dart';
 
 /// Tracks mobile screen views on both Firebase Analytics and the Backoffice
 /// audit trail via `POST /api/mobile/v1/analytics/screen-view`.
@@ -21,6 +22,11 @@ class ScreenViewTracker {
   String? _lastScreenName;
   DateTime? _lastTrackedAt;
   static const _dedupWindow = Duration(seconds: 2);
+
+  /// After transport failures, skip Backoffice POST briefly (Wi‑Fi can stay
+  /// "connected" while the dev server or tunnel is down).
+  DateTime? _suppressServerScreenViewUntil;
+  static const _suppressAfterFailure = Duration(seconds: 45);
 
   /// Human-readable screen name for a route path (Navigator-pushed routes).
   static String screenNameFromRoute(String routePath) {
@@ -133,11 +139,20 @@ class ScreenViewTracker {
     String? routePath,
   ) async {
     try {
+      final now = DateTime.now();
+      if (_suppressServerScreenViewUntil != null &&
+          now.isBefore(_suppressServerScreenViewUntil!)) {
+        return;
+      }
+
       // Skip the Backoffice POST when the user has no stored tokens — this
       // happens at app startup before auth is established and would always
       // produce an auth error, generating noisy [ERROR] log lines.
       final hasTokens = await _jwtService.hasTokens();
       if (!hasTokens) return;
+
+      // Includes recent primary-backend transport failures (Wi‑Fi can stay "on").
+      if (shouldDeferRemoteFetch) return;
 
       final body = <String, dynamic>{
         'screen_name': screenName,
@@ -150,9 +165,17 @@ class ScreenViewTracker {
         queueOnOffline: false,
       );
     } catch (e) {
-      // Fire-and-forget: auth expiry or network errors during tracking are
-      // expected and non-fatal — log as warning, not error.
-      DebugLogger.logWarn('SCREEN_VIEW', 'screen_view tracking failed: $e');
+      if (isTransientBackendFailure(e)) {
+        _suppressServerScreenViewUntil =
+            DateTime.now().add(_suppressAfterFailure);
+        DebugLogger.log(
+          'SCREEN_VIEW',
+          'screen_view skipped (transient): $e',
+          level: LogLevel.debug,
+        );
+      } else {
+        DebugLogger.logWarn('SCREEN_VIEW', 'screen_view tracking failed: $e');
+      }
     }
   }
 }

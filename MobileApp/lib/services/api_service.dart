@@ -12,7 +12,9 @@ import 'push_notification_service.dart';
 import 'connectivity_service.dart';
 import 'offline_queue_service.dart';
 import 'offline_cache_service.dart';
+import 'backend_reachability_service.dart';
 import '../utils/debug_logger.dart';
+import '../utils/network_availability.dart';
 import 'user_scope_service.dart';
 
 // Custom exception for authentication errors
@@ -308,6 +310,18 @@ class ApiService {
     return headers;
   }
 
+  void _notePrimaryBackendTransportSuccess(Uri uri, {required bool usedLiveNetwork}) {
+    if (!usedLiveNetwork) return;
+    if (!BackendReachabilityService().matchesPrimaryBackend(uri)) return;
+    BackendReachabilityService().recordPrimaryBackendSuccess();
+  }
+
+  void _notePrimaryBackendTransportFailure(Uri uri, {required bool usedLiveNetwork}) {
+    if (!usedLiveNetwork) return;
+    if (!BackendReachabilityService().matchesPrimaryBackend(uri)) return;
+    BackendReachabilityService().recordPrimaryBackendTransportFailure();
+  }
+
   Future<http.Response> get(
     String endpoint, {
     Map<String, String>? queryParams,
@@ -353,6 +367,22 @@ class ApiService {
       // We'll handle the error in the catch block
     }
 
+    // Wi‑Fi can stay "online" while the backoffice is down. After a transport
+    // failure we defer non‑critical work — serve cache immediately when
+    // available so pull‑to‑refresh does not wait through live timeouts/retries.
+    if (useCache && shouldDeferRemoteFetch) {
+      final cached = await _cacheService.getCachedResponse(cacheKey);
+      if (cached != null) {
+        DebugLogger.logApi(
+            'Backend defer active — returning cached response for: $endpoint');
+        return http.Response(
+          cached.data,
+          200,
+          headers: cached.headers ?? {},
+        );
+      }
+    }
+
     // GET requests shouldn't have Content-Type header
     var headers = await _getHeaders(
       includeAuth: includeAuth,
@@ -374,16 +404,20 @@ class ApiService {
     // Use default timeout of 10 seconds if not specified
     final requestTimeout = timeout ?? const Duration(seconds: 10);
 
-    // Retry configuration
-    const retryConfig = RetryConfig(
-      maxRetries: 3,
-      initialDelay: Duration(seconds: 1),
+    // For cacheable GETs, a single live attempt then cache fallback keeps the
+    // UI responsive when the server is stopped but the radio still shows online.
+    final retryConfig = RetryConfig(
+      maxRetries: useCache ? 0 : 3,
+      initialDelay: const Duration(seconds: 1),
       backoffMultiplier: 2.0,
     );
+
+    var usedLiveNetwork = false;
 
     // Create a client that doesn't follow redirects automatically
     // This prevents redirect loops when backend redirects to /login
     final client = http.Client();
+    usedLiveNetwork = true;
     try {
       http.Response? response;
       Exception? lastException;
@@ -430,14 +464,10 @@ class ApiService {
           rethrow;
         } on http.ClientException catch (e) {
           lastException = e;
-          if (attempt < retryConfig.maxRetries) {
-            final delay = _calculateRetryDelay(attempt, retryConfig);
-            DebugLogger.logApi(
-                'Client error, retrying in ${delay.inSeconds}s... (attempt ${attempt + 1}/${retryConfig.maxRetries + 1}) - URL: ${uri.toString()}');
-            await Future.delayed(delay);
-            continue;
-          }
-          // Max retries reached - will be handled below
+          // Connection closed / refused / reset will not recover with backoff;
+          // retrying only adds multi‑second delays before cache fallback.
+          DebugLogger.logApi(
+              'Client error (no retry): $e — URL: ${uri.toString()}');
           break;
         }
       }
@@ -449,6 +479,8 @@ class ApiService {
         }
         throw Exception('Request failed after ${retryConfig.maxRetries + 1} attempts');
       }
+
+      _notePrimaryBackendTransportSuccess(uri, usedLiveNetwork: usedLiveNetwork);
 
       // Check for redirect to login page - treat as auth error
       if (response.statusCode >= 300 && response.statusCode < 400) {
@@ -557,6 +589,7 @@ class ApiService {
 
       return response;
     } on http.ClientException catch (e) {
+      _notePrimaryBackendTransportFailure(uri, usedLiveNetwork: usedLiveNetwork);
       // Handle redirect loops and other client errors
       final errorMsg = e.toString().toLowerCase();
       if (errorMsg.contains('redirect loop') ||
@@ -599,6 +632,7 @@ class ApiService {
       // Re-throw other client exceptions
       rethrow;
     } catch (e) {
+      _notePrimaryBackendTransportFailure(uri, usedLiveNetwork: usedLiveNetwork);
       // Try cache as fallback if network request failed
       if (useCache) {
         final cached = await _cacheService.getCachedResponse(cacheKey);
@@ -720,7 +754,9 @@ class ApiService {
     );
 
     final requestTimeout = const Duration(seconds: 30); // Longer timeout for POST
+    var usedLiveNetwork = false;
     final client = http.Client();
+    usedLiveNetwork = true;
     try {
       http.Response? response;
       Exception? lastException;
@@ -767,13 +803,8 @@ class ApiService {
           rethrow;
         } on http.ClientException catch (e) {
           lastException = e;
-          if (attempt < retryConfig.maxRetries) {
-            final delay = _calculateRetryDelay(attempt, retryConfig);
-            DebugLogger.logApi(
-                'Client error, retrying in ${delay.inSeconds}s... (attempt ${attempt + 1}/${retryConfig.maxRetries + 1}) - URL: ${uri.toString()}');
-            await Future.delayed(delay);
-            continue;
-          }
+          DebugLogger.logApi(
+              'POST client error (no retry): $e — URL: ${uri.toString()}');
           break;
         }
       }
@@ -785,6 +816,8 @@ class ApiService {
         }
         throw Exception('Request failed after ${retryConfig.maxRetries + 1} attempts');
       }
+
+      _notePrimaryBackendTransportSuccess(uri, usedLiveNetwork: usedLiveNetwork);
 
       DebugLogger.logApi('Response Status: ${response.statusCode}');
       DebugLogger.logApi('Response Headers: ${response.headers}');
@@ -875,6 +908,7 @@ class ApiService {
 
       return response;
     } on http.ClientException catch (_) {
+      _notePrimaryBackendTransportFailure(uri, usedLiveNetwork: usedLiveNetwork);
       // Queue request if offline
       if (!isOnline && queueOnOffline) {
         await _queuePostRequest(
@@ -887,6 +921,7 @@ class ApiService {
       }
       rethrow;
     } catch (_) {
+      _notePrimaryBackendTransportFailure(uri, usedLiveNetwork: usedLiveNetwork);
       // Queue request if offline
       if (!isOnline && queueOnOffline) {
         await _queuePostRequest(

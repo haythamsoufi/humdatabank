@@ -1,7 +1,7 @@
 {% from "components/_svg_icons.html" import svg_icon %}
 {% from "components/_profile_icon.html" import profile_icon, profile_icon_button, profile_icon_tooltip %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -55,6 +55,17 @@
             window.ASSET_VERSION = assetVersion;
         })();
 
+        {# Service worker: skip entirely in the Flutter mobile WebView. Chromium WebView + SW
+           intercepting /static/ has produced unstyled pages (CSS not applied). Desktop browsers
+           keep SW for caching; embed mode is detected via X-Mobile-App + HD_MOBILE_EMBED cookie. #}
+        {% if mobile_app_embedded|default(false) %}
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(reg) { reg.unregister(); });
+            }).catch(function() { /* no-op */ });
+        }
+        {% endif %}
+        {% if not (mobile_app_embedded|default(false)) %}
         // Register service worker on ALL pages to enable client-side caching of static assets.
         // The service worker will cache essential files (layout.js, layout.css, etc.) for faster loading.
         // NOTE: SW only works after at least one successful online load (it must install first).
@@ -92,6 +103,7 @@
                     .catch(function(e){ window.__clientWarn && window.__clientWarn('SW registration failed', e); });
             });
         }
+        {% endif %}
 
         // Enhanced error tracking for IndexedDB errors from polyfills
         // This helps identify which library is causing the issue
@@ -218,11 +230,42 @@
         html[data-mobile-app="true"] #mobileMenuScrim,
         html.mobile-app #mobileMenuScrim,
         html[data-mobile-app="true"] #mobileFloatingMenu,
-        html.mobile-app #mobileFloatingMenu {
+        html.mobile-app #mobileFloatingMenu,
+        /* Main sticky top bar + AI launcher: redundant inside the Flutter app shell */
+        html[data-mobile-app="true"] #appTopNav,
+        html.mobile-app #appTopNav,
+        html[data-mobile-app="true"] #aiChatbotFAB,
+        html.mobile-app #aiChatbotFAB,
+        html[data-mobile-app="true"] #aiChatWidget,
+        html.mobile-app #aiChatWidget {
             display: none !important;
             visibility: hidden !important;
             opacity: 0 !important;
             pointer-events: none !important;
+        }
+
+        /* Embedded mobile WebView: backoffice top nav is hidden — drop reserved height + tighten top padding */
+        html[data-mobile-app="true"] #mainContent > main.admin-scroll-main,
+        html.mobile-app #mainContent > main.admin-scroll-main {
+            max-height: none !important;
+        }
+        html[data-mobile-app="true"] #flashMessagesContainer:not(:has(.flash-messages)),
+        html.mobile-app #flashMessagesContainer:not(:has(.flash-messages)) {
+            margin-top: 0 !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        html[data-mobile-app="true"] #flashMessagesContainer:has(.flash-messages),
+        html.mobile-app #flashMessagesContainer:has(.flash-messages) {
+            margin-top: 0.5rem !important;
+        }
+        html[data-mobile-app="true"] #pageContentContainer,
+        html.mobile-app #pageContentContainer {
+            padding-top: 0.375rem !important;
+            padding-bottom: 1rem !important;
         }
 
         /* CSS class for hiding mobile menu elements - used instead of inline styles for CSP compliance */
@@ -565,7 +608,7 @@
 
         {# min-w-0: flex item may otherwise refuse to shrink below wide page content (e.g. wide tables), forcing horizontal overflow of the shell #}
         <div id="mainContent" class="flex-1 flex flex-col min-w-0 {% if is_admin_user %}content-with-sidebar{% endif %}">
-            <nav class="{% if is_system_manager %}nav-system-manager{% elif is_focal_point %}nav-focal-point{% else %}bg-red-700{% endif %} px-4 text-white shadow-md sticky top-0 z-30 h-14 flex items-center">
+            <nav id="appTopNav" class="{% if is_system_manager %}nav-system-manager{% elif is_focal_point %}nav-focal-point{% else %}bg-red-700{% endif %} px-4 text-white shadow-md sticky top-0 z-30 h-14 flex items-center">
                 <div id="navContainer" class="container mx-auto h-full flex justify-between items-center">
                     <div class="flex nav-menu-wrapper space-x-8 h-full items-center">
                         <div class="flex items-center min-w-0 flex-1 nav-brand-cluster">

@@ -1,7 +1,7 @@
 """Jinja2 filters, globals, and context processors for the Flask application."""
 
 from datetime import datetime
-from flask import current_app, url_for
+from flask import current_app, has_request_context, url_for
 from flask_login import current_user
 
 
@@ -50,6 +50,19 @@ def register_template_context(app, config_class):
     app.jinja_env.globals['LANGUAGE_MODEL_KEY'] = getattr(Config, 'LANGUAGE_MODEL_KEY', {})
     app.jinja_env.globals['TRANSLATABLE_LANGUAGES'] = app.config.get('TRANSLATABLE_LANGUAGES', [])
     app.jinja_env.globals['SHOW_LANGUAGE_FLAGS'] = bool(app.config.get('SHOW_LANGUAGE_FLAGS', True))
+
+    @app.context_processor
+    def inject_mobile_webview_embed():
+        """Expose whether the Humanitarian Databank mobile app WebView is embedding this page."""
+        if not has_request_context():
+            return {"mobile_app_embedded": False}
+        try:
+            from app.utils.request_utils import mobile_app_webview_embed_active
+
+            return {"mobile_app_embedded": bool(mobile_app_webview_embed_active())}
+        except Exception as e:
+            current_app.logger.debug("inject_mobile_webview_embed failed: %s", e)
+            return {"mobile_app_embedded": False}
 
     @app.context_processor
     def inject_dynamic_locale_settings():

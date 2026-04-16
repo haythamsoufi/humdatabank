@@ -300,7 +300,7 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
 
     // Create new repeat entry container
     const repeatEntry = document.createElement('div');
-    repeatEntry.className = 'repeat-entry border-2 border-green-200 rounded-lg p-4 bg-green-50 mb-4';
+        repeatEntry.className = 'repeat-entry border-2 border-green-200 rounded-lg p-3 sm:p-4 bg-green-50 mb-4';
     repeatEntry.id = `repeat-entry-${sectionId}-${instanceNumber}`;
     repeatEntry.setAttribute('data-repeat-instance', instanceNumber);
 

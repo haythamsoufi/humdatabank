@@ -24,6 +24,7 @@ import '../../widgets/app_fade_in_up.dart';
 import '../../widgets/entity_selector_bottom_sheet.dart';
 import '../../services/assignment_offline_bundle_service.dart';
 import '../../services/storage_service.dart';
+import '../../utils/network_availability.dart';
 import '../public/webview_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -88,6 +89,28 @@ class _DashboardScreenState extends State<DashboardScreen>
     final notificationProvider =
         Provider.of<NotificationProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final offline = Provider.of<OfflineProvider>(context, listen: false);
+
+    // Offline or primary backoffice unreachable: avoid forced session checks and
+    // dashboard API (retries/timeouts make pull-to-refresh feel stuck). Re-apply
+    // last snapshot from disk only.
+    if (offline.isOffline || shouldDeferRemoteFetch) {
+      await authProvider.checkAuthStatus(forceRevalidate: false);
+      await dashboardProvider.refreshFromDiskOnly(allowStale: true);
+      await _syncOfflineBundleFlags(
+        dashboardProvider.currentAssignments,
+        dashboardProvider.pastAssignments,
+      );
+      if (mounted) {
+        setState(() {
+          _hasLoadedOnce = true;
+        });
+      }
+      if (authProvider.isAuthenticated) {
+        await dashboardProvider.loadEntities();
+      }
+      return;
+    }
 
     // Force revalidation on dashboard load to ensure fresh session and role
     // This ensures we have a valid session before making API calls
@@ -97,7 +120,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     // Force refresh if authenticated or if explicitly requested (e.g., language change)
     await dashboardProvider.loadDashboard(forceRefresh: isAuthenticated || forceRefresh);
 
-    await _syncOfflineBundleFlags(dashboardProvider.currentAssignments);
+    await _syncOfflineBundleFlags(
+      dashboardProvider.currentAssignments,
+      dashboardProvider.pastAssignments,
+    );
 
     // Mark that we've completed at least one load
     if (mounted) {
@@ -106,26 +132,35 @@ class _DashboardScreenState extends State<DashboardScreen>
       });
     }
 
-    // Refresh user after dashboard loads to get updated profile data including profile color
+    // [checkAuthStatus(forceRevalidate: true)] already validated the session and
+    // loaded the profile via AuthService — avoid a second [refreshUser] round-trip
+    // (duplicate session check + duplicate profile fetch, noisy when the server
+    // is down but Wi‑Fi still reports connected).
     if (isAuthenticated) {
-      await authProvider.refreshUser();
       dashboardProvider.loadEntities();
       notificationProvider.refreshUnreadCount(authProvider: authProvider);
     }
   }
 
-  Future<void> _syncOfflineBundleFlags(List<Assignment> assignments) async {
-    if (assignments.isEmpty) {
-      if (mounted) {
-        setState(() => _offlineBundleAssignmentIds.clear());
-      }
+  /// Resolves which assignment IDs have a saved offline bundle on disk.
+  ///
+  /// When the dashboard API fails (e.g. device just went offline), provider
+  /// lists can be empty briefly or for an entire load; we must **not** clear
+  /// [_offlineBundleAssignmentIds] in that case or the "downloaded for offline"
+  /// indicator disappears even though files still exist.
+  Future<void> _syncOfflineBundleFlags(
+    List<Assignment> current,
+    List<Assignment> past,
+  ) async {
+    final ids = <int>{...current.map((a) => a.id), ...past.map((a) => a.id)};
+    if (ids.isEmpty) {
       return;
     }
     final svc = AssignmentOfflineBundleService();
     final next = <int>{};
-    for (final a in assignments) {
-      if (await svc.hasOfflineBundle(a.id)) {
-        next.add(a.id);
+    for (final id in ids) {
+      if (await svc.hasOfflineBundle(id)) {
+        next.add(id);
       }
     }
     if (mounted) {
@@ -145,7 +180,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     final loc = AppLocalizations.of(context)!;
     final path = AppRoutes.formEntry(assignment.id);
 
-    if (offline.isOffline) {
+    // Use saved assignment bundle when there is no reliable path to the server
+    // (device offline, or Wi‑Fi "online" but backoffice transport is deferred).
+    if (offline.isOffline || shouldDeferRemoteFetch) {
       final svc = AssignmentOfflineBundleService();
       if (await svc.hasOfflineBundle(assignment.id)) {
         if (!context.mounted) return;
@@ -219,6 +256,35 @@ class _DashboardScreenState extends State<DashboardScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(loc.offlineFormSaveFailed),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeOfflineBundle(
+    BuildContext context,
+    Assignment assignment,
+  ) async {
+    final loc = AppLocalizations.of(context)!;
+    final dashboardProvider =
+        Provider.of<DashboardProvider>(context, listen: false);
+    try {
+      await AssignmentOfflineBundleService().deleteBundle(assignment.id);
+      if (!context.mounted) return;
+      await _syncOfflineBundleFlags(
+        dashboardProvider.currentAssignments,
+        dashboardProvider.pastAssignments,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.offlineFormRemoved)),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.accessRequestsActionFailed),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -372,7 +438,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                               _openAssignmentForm(context, assignment),
                             );
                           },
-                          onDownloadForOffline: showEnter && offlineProvider.isOnline
+                          onDownloadForOffline: showEnter &&
+                                  offlineProvider.isOnline &&
+                                  !shouldDeferRemoteFetch
                               ? () => _downloadOfflineBundle(
                                     context,
                                     assignment,
@@ -383,6 +451,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ? () {
                                   HapticFeedback.lightImpact();
                                   _openOfflineCopyOnly(context, assignment);
+                                }
+                              : null,
+                          onRemoveOfflineCopy: hasBundle
+                              ? () {
+                                  HapticFeedback.mediumImpact();
+                                  unawaited(
+                                    _removeOfflineBundle(context, assignment),
+                                  );
                                 }
                               : null,
                           hasOfflineFormSnapshot: hasBundle,

@@ -19,6 +19,7 @@ class AssignmentCard extends StatefulWidget {
   final String? enterDataButtonText;
   final Future<void> Function()? onDownloadForOffline;
   final VoidCallback? onOpenOfflineCopy;
+  final VoidCallback? onRemoveOfflineCopy;
   final bool hasOfflineFormSnapshot;
   final bool isDownloadingOfflineForm;
 
@@ -31,6 +32,7 @@ class AssignmentCard extends StatefulWidget {
     this.enterDataButtonText,
     this.onDownloadForOffline,
     this.onOpenOfflineCopy,
+    this.onRemoveOfflineCopy,
     this.hasOfflineFormSnapshot = false,
     this.isDownloadingOfflineForm = false,
   });
@@ -358,6 +360,17 @@ class _AssignmentCardState extends State<AssignmentCard>
         ? _formatDate(context, widget.assignment.dueDate!)
         : localizations.noDueDate;
 
+    final canEnter =
+        widget.showEnterDataButton && widget.onEnterData != null;
+    final hasOfflineExtras = widget.hasOfflineFormSnapshot &&
+        (widget.onOpenOfflineCopy != null ||
+            widget.onRemoveOfflineCopy != null);
+    final showDownloadOffline = canEnter &&
+        widget.onDownloadForOffline != null &&
+        !widget.hasOfflineFormSnapshot;
+    final showFooterActionStrip =
+        canEnter || hasOfflineExtras || showDownloadOffline;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -428,7 +441,9 @@ class _AssignmentCardState extends State<AssignmentCard>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (widget.showEnterDataButton && widget.onEnterData != null)
+                if (!showFooterActionStrip)
+                  const Spacer()
+                else
                   Expanded(
                     child: Align(
                       alignment: AlignmentDirectional.centerStart,
@@ -437,14 +452,14 @@ class _AssignmentCardState extends State<AssignmentCard>
                         runSpacing: 4,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          _enterDataActionButton(
-                            context,
-                            onPressed: widget.onEnterData!,
-                            label: widget.enterDataButtonText ??
-                                localizations.enterData,
-                          ),
-                          if (widget.onDownloadForOffline != null &&
-                              !widget.hasOfflineFormSnapshot)
+                          if (canEnter)
+                            _enterDataActionButton(
+                              context,
+                              onPressed: widget.onEnterData!,
+                              label: widget.enterDataButtonText ??
+                                  localizations.enterData,
+                            ),
+                          if (showDownloadOffline)
                             _OfflineFormIconButton(
                               tooltip: localizations.downloadForOffline,
                               icon: Icons.download_for_offline_outlined,
@@ -453,7 +468,9 @@ class _AssignmentCardState extends State<AssignmentCard>
                               onPressed: widget.isDownloadingOfflineForm
                                   ? null
                                   : () {
-                                      unawaited(widget.onDownloadForOffline!());
+                                      unawaited(
+                                        widget.onDownloadForOffline!(),
+                                      );
                                     },
                             ),
                           if (widget.hasOfflineFormSnapshot &&
@@ -465,12 +482,19 @@ class _AssignmentCardState extends State<AssignmentCard>
                               color: const Color(AppConstants.successColor),
                               onPressed: widget.onOpenOfflineCopy,
                             ),
+                          if (widget.hasOfflineFormSnapshot &&
+                              widget.onRemoveOfflineCopy != null)
+                            _OfflineFormIconButton(
+                              tooltip: localizations.removeOfflineCopy,
+                              icon: Icons.delete_outline_rounded,
+                              busy: false,
+                              color: scheme.onSurfaceVariant,
+                              onPressed: widget.onRemoveOfflineCopy,
+                            ),
                         ],
                       ),
                     ),
-                  )
-                else
-                  const Spacer(),
+                  ),
                 _FlipCardButton(
                   color: scheme.onSurfaceVariant,
                   onPressed: FlipListCardScope.of(context).toggleFlip,

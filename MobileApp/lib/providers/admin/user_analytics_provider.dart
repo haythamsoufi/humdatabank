@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class UserAnalyticsProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -19,6 +20,11 @@ class UserAnalyticsProvider with ChangeNotifier {
     String? timeRange,
     String? metricFilter,
   }) async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -78,6 +84,9 @@ class UserAnalyticsProvider with ChangeNotifier {
   }
 
   Future<void> loadActivityData({String? timeRange}) async {
+    if (shouldDeferRemoteFetch) {
+      return;
+    }
     try {
       final queryParams = <String, String>{};
       if (timeRange != null && timeRange.isNotEmpty) {

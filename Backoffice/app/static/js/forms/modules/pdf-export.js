@@ -3,6 +3,35 @@ import { debugLog } from '../modules/debug.js';
 
 const MODULE_NAME = 'pdf-export';
 
+/**
+ * PDF / validation export URLs must stay in the same WebView when the Humanitarian Databank
+ * mobile app embeds the form: window.open(..., '_blank') opens the system browser, which has
+ * no session cookie and gets bounced to the login page.
+ */
+function openAssignmentExportUrl(url, popupFeatures) {
+    try {
+        const root = document.documentElement;
+        const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+        const looksEmbeddedWebView = /\bwv\b/i.test(ua) || ua.includes('Flutter');
+        const inMobileAppShell = window.isMobileApp === true
+            || window.humdatabankMobileApp === true
+            || window.IFRCMobileApp === true
+            || (root && root.getAttribute('data-mobile-app') === 'true')
+            || (root && root.classList && root.classList.contains('mobile-app'));
+        if (inMobileAppShell || looksEmbeddedWebView) {
+            window.location.assign(url);
+            return;
+        }
+    } catch (_e) {
+        /* fall through */
+    }
+    if (popupFeatures) {
+        window.open(url, '_blank', popupFeatures);
+    } else {
+        window.open(url, '_blank');
+    }
+}
+
 // Professional color palette and branding
 const IFRC_BRANDING = {
     colors: {
@@ -2460,8 +2489,8 @@ export function initPDFExport(formId, buttonId, title) {
 
                 const qs = params.toString();
                 const url = `/forms/assignment_status/${aesId}/export_pdf${qs ? `?${qs}` : ''}`;
-                // Open in a new tab to allow the file download
-                window.open(url, '_blank');
+                // New tab on desktop; same WebView on mobile app / Android WebView (session cookie)
+                openAssignmentExportUrl(url);
             } catch (err) {
                 if (window.showAlert) {
                     window.showAlert('Failed to start PDF export.', 'error');
@@ -2551,8 +2580,7 @@ export function initValidationSummaryExport(formId, buttonId) {
             const qs = params.toString();
             const url = `/forms/assignment_status/${aesId}/validation_summary${qs ? `?${qs}` : ''}`;
 
-            // Open in a new tab (prefer user expectation over popup windows)
-            window.open(url, '_blank', 'noopener,noreferrer');
+            openAssignmentExportUrl(url, 'noopener,noreferrer');
         } catch (err) {
             if (window.showAlert) {
                 window.showAlert('Failed to generate validation summary.', 'error');

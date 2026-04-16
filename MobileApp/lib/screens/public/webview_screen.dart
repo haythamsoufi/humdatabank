@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/session_service.dart';
 import '../../services/assignment_offline_bundle_service.dart';
@@ -17,7 +21,7 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/countries_widget.dart';
 import '../../services/webview_service.dart';
 import '../../l10n/app_localizations.dart';
-import '../../utils/debug_logger.dart';
+import '../../utils/debug_logger.dart' show DebugLogger, LogLevel;
 
 /// Route arguments for [WebViewScreen]: either a [String] path/URL, or a map
 /// from the dashboard (offline bundle / future extensions).
@@ -105,6 +109,23 @@ class _WebViewScreenState extends State<WebViewScreen> {
   String? _payloadLanguage;
   Future<_WebViewPayload>? _payloadFuture;
 
+  /// Throttles [setState] from WebView progress ticks (reduces rebuild / log noise).
+  int _lastProgressBucket = -1;
+
+  void _resetWebViewProgressThrottle() {
+    _lastProgressBucket = -1;
+  }
+
+  void _maybeUpdateWebViewProgress(int progress) {
+    final bucket = progress >= 100 ? 1000 : progress ~/ 5;
+    if (bucket == _lastProgressBucket) return;
+    _lastProgressBucket = bucket;
+    if (!mounted) return;
+    setState(() {
+      _progress = progress / 100;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -125,10 +146,97 @@ class _WebViewScreenState extends State<WebViewScreen> {
     await _sessionService.injectSessionIntoWebView();
   }
 
-  Future<void> _handleDownload(Uri url) async {
+  bool _bytesLookLikePdf(List<int> bytes) =>
+      bytes.length >= 4 &&
+      bytes[0] == 0x25 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x44 &&
+      bytes[3] == 0x46;
+
+  bool _bytesLookLikeZip(List<int> bytes) =>
+      bytes.length >= 2 && bytes[0] == 0x50 && bytes[1] == 0x4B;
+
+  String _suggestedExportFileName(Uri url, List<int> bytes) {
+    final m = RegExp(r'/assignment_status/(\d+)/').firstMatch(url.path);
+    final id = m?.group(1) ?? 'export';
+    if (url.path.contains('/export_pdf') && _bytesLookLikePdf(bytes)) {
+      return 'assignment_$id.pdf';
+    }
+    if (url.path.contains('/export_excel') && _bytesLookLikeZip(bytes)) {
+      return 'assignment_$id.xlsx';
+    }
+    if (url.path.contains('/validation_summary')) {
+      final ct = _bytesLookLikePdf(bytes) ? 'pdf' : 'html';
+      return 'assignment_${id}_validation.$ct';
+    }
+    return 'assignment_$id.bin';
+  }
+
+  /// Assignment PDF/Excel (and similar) are delivered as downloads; Android then
+  /// invokes this path. [launchUrl] opens Samsung Internet / Chrome without the
+  /// WebView cookie jar, so we re-fetch with [CookieManager] and share the file.
+  Future<void> _handleDownload(
+    Uri url,
+    InAppWebViewController controller,
+  ) async {
+    if (WebViewService.isFormAssignmentSessionDownloadUrl(url)) {
+      try {
+        final webUri = WebUri(url.toString());
+        final stored = await CookieManager.instance().getCookies(url: webUri);
+        final cookieHeader = stored.map((c) => '${c.name}=${c.value}').join('; ');
+        final headers = <String, String>{
+          ...WebViewService.defaultRequestHeaders,
+          if (cookieHeader.isNotEmpty) HttpHeaders.cookieHeader: cookieHeader,
+        };
+        final resp = await http.get(url, headers: headers);
+        if (resp.statusCode < 200 || resp.statusCode >= 300) {
+          throw HttpException('HTTP ${resp.statusCode}');
+        }
+        final body = resp.bodyBytes;
+        if (url.path.contains('/export_pdf') && !_bytesLookLikePdf(body)) {
+          throw const FormatException('Not a PDF (session may have expired)');
+        }
+        if (url.path.contains('/export_excel') && !_bytesLookLikeZip(body)) {
+          throw const FormatException('Not an Excel file (session may have expired)');
+        }
+        final dir = await getTemporaryDirectory();
+        final name = _suggestedExportFileName(url, body);
+        final file = File('${dir.path}/$name');
+        await file.writeAsBytes(body, flush: true);
+        if (url.path.contains('/export_pdf') && _bytesLookLikePdf(body)) {
+          if (mounted) {
+            await Navigator.of(context).pushNamed(
+              AppRoutes.pdfViewer,
+              arguments: <String, String>{
+                'filePath': file.path,
+                'title': name,
+              },
+            );
+          }
+          DebugLogger.logInfo('WEBVIEW', 'Session PDF export opened in viewer: $name');
+        } else {
+          await Share.shareXFiles([XFile(file.path)], subject: name);
+          DebugLogger.logInfo('WEBVIEW', 'Session export saved for share: $name');
+        }
+      } catch (e, st) {
+        DebugLogger.logError('WEBVIEW session export failed: $e\n$st');
+        if (mounted) {
+          final theme = Theme.of(context);
+          final localizations = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${localizations.errorOpeningDownload}: $e',
+              ),
+              backgroundColor: theme.colorScheme.error,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
     try {
-      // Use platformDefault instead of externalApplication to trigger
-      // Android's download manager within the app context
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.platformDefault);
       } else {
@@ -174,13 +282,24 @@ class _WebViewScreenState extends State<WebViewScreen> {
         final dir = await svc.offlineBundleDirectoryPath(
           widget.offlineAssignmentId!,
         );
+        DebugLogger.logInfo(
+          'WEBVIEW',
+          'Using offline bundle assignment=${widget.offlineAssignmentId} '
+          'dir=$dir htmlChars=${html.length} onlineRef=$onlineUrl',
+        );
         return _WebViewPayload.offline(
           offlineHtml: html,
           offlineBundleDir: dir,
           onlineUrl: onlineUrl,
         );
       }
+      DebugLogger.logWarn(
+        'WEBVIEW',
+        'Offline bundle missing/empty for assignment=${widget.offlineAssignmentId}; '
+        'falling back to online $onlineUrl',
+      );
     }
+    DebugLogger.logInfo('WEBVIEW', 'Using online WebView url=$onlineUrl');
     return _WebViewPayload.online(onlineUrl);
   }
 
@@ -201,6 +320,49 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final withSlash =
         bundleDir.endsWith('/') ? bundleDir : '$bundleDir/';
     return WebUri.uri(Uri.file(withSlash));
+  }
+
+  /// Logs subresource load failures; CSS and `/static/` always at WARN.
+  void _logWebViewResourceFailure({
+    required bool isForMainFrame,
+    required WebUri? url,
+    required String kind,
+    String? extra,
+  }) {
+    final u = url?.toString() ?? '(null url)';
+    final lower = u.toLowerCase();
+    final highlight = isForMainFrame ||
+        lower.contains('.css') ||
+        lower.contains('/static/') ||
+        lower.contains('stylesheet');
+    final msg =
+        '$kind mainFrame=$isForMainFrame url=$u${extra != null ? ' $extra' : ''}';
+    if (highlight) {
+      DebugLogger.logWarn('WEBVIEW_ASSET', msg);
+    } else if (DebugLogger.verboseDebugLogs) {
+      DebugLogger.log('WEBVIEW_ASSET', msg, level: LogLevel.debug);
+    }
+  }
+
+  Future<void> _logStylesheetDiagnostics(
+    InAppWebViewController controller, {
+    required bool offline,
+    String? bundleDir,
+    WebUri? pageUrl,
+  }) async {
+    try {
+      final raw = await controller.evaluateJavascript(
+        source: WebViewService.stylesheetLoadDiagEvaluateSource,
+      );
+      final s = raw?.toString() ?? '(null)';
+      DebugLogger.logInfo(
+        'WEBVIEW_CSS',
+        'stylesheet_diag offline=$offline bundleDir=${bundleDir ?? "-"} '
+        'pageUrl=${pageUrl ?? "-"} => $s',
+      );
+    } catch (e, st) {
+      DebugLogger.logWarn('WEBVIEW_CSS', 'stylesheet_diag failed: $e\n$st');
+    }
   }
 
   Widget _buildInAppWebView({
@@ -227,8 +389,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
         ),
         onWebViewCreated: (controller) {
           _webViewController = controller;
+          DebugLogger.logInfo(
+            'WEBVIEW',
+            'offline WebView created baseUrl=$base '
+            'allowingRead=${payload.offlineBundleDir}',
+          );
         },
-        onConsoleMessage: (controller, consoleMessage) {},
+        onConsoleMessage: (controller, consoleMessage) {
+          if (!DebugLogger.verboseDebugLogs) return;
+          DebugLogger.log(
+            'WEBVIEW_CONSOLE',
+            '${consoleMessage.messageLevel}: ${consoleMessage.message}',
+            level: LogLevel.debug,
+          );
+        },
         shouldOverrideUrlLoading: (controller, navigationAction) async {
           final url = navigationAction.request.url;
           if (url != null && !WebViewService.isUrlAllowed(url)) {
@@ -246,6 +420,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
           return NavigationActionPolicy.ALLOW;
         },
         onLoadStart: (controller, url) {
+          DebugLogger.logInfo('WEBVIEW', 'offline onLoadStart url=$url');
+          _resetWebViewProgressThrottle();
           setState(() {
             _isLoading = true;
             _error = null;
@@ -267,6 +443,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
               _pageTitle = title;
             });
           }
+          await _logStylesheetDiagnostics(
+            controller,
+            offline: true,
+            bundleDir: payload.offlineBundleDir,
+            pageUrl: url,
+          );
         },
         onTitleChanged: (controller, title) {
           if (title != null && mounted) {
@@ -276,11 +458,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
           }
         },
         onProgressChanged: (controller, progress) {
-          setState(() {
-            _progress = progress / 100;
-          });
+          _maybeUpdateWebViewProgress(progress);
         },
         onReceivedError: (controller, request, error) {
+          final main = request.isForMainFrame == true;
+          _logWebViewResourceFailure(
+            isForMainFrame: main,
+            url: request.url,
+            kind: 'net_error',
+            extra: '${error.type} ${error.description}',
+          );
+          if (!main) return;
           if (WebViewService.shouldIgnoreError(error.description)) {
             return;
           }
@@ -290,7 +478,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
           });
         },
         onReceivedHttpError: (controller, request, response) {
-          if (request.isForMainFrame != true) return;
+          final main = request.isForMainFrame == true;
+          _logWebViewResourceFailure(
+            isForMainFrame: main,
+            url: request.url,
+            kind: 'http_error',
+            extra: 'status=${response.statusCode}',
+          );
+          if (!main) return;
           final statusCode = response.statusCode;
           if (statusCode != null && statusCode >= 400) {
             setState(() {
@@ -301,7 +496,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         },
         onDownloadStartRequest:
             (InAppWebViewController controller, DownloadStartRequest request) {
-          _handleDownload(Uri.parse(request.url.toString()));
+          _handleDownload(Uri.parse(request.url.toString()), controller);
         },
       );
     }
@@ -316,14 +511,32 @@ class _WebViewScreenState extends State<WebViewScreen> {
       initialUserScripts: WebViewService.getRequestInterceptorScripts(
         language: language,
       ),
-      initialSettings: WebViewService.defaultSettings(),
+      // Allow passive/active mixed content for this trusted surface only (some
+      // deployments still emit occasional http:// asset URLs behind proxies).
+      initialSettings: WebViewService.defaultSettings(allowMixedContent: true),
       onWebViewCreated: (controller) {
         _webViewController = controller;
+        DebugLogger.logInfo('WEBVIEW', 'online WebView created initialUrl=$url');
       },
       onConsoleMessage: (controller, consoleMessage) {
-        // Remote site console noise suppressed intentionally.
+        if (!DebugLogger.verboseDebugLogs) return;
+        DebugLogger.log(
+          'WEBVIEW_CONSOLE',
+          '${consoleMessage.messageLevel}: ${consoleMessage.message}',
+          level: LogLevel.debug,
+        );
       },
       shouldOverrideUrlLoading: (controller, navigationAction) async {
+        // Only gate top-level navigations; subframes/embeds are already allowed
+        // by the Backoffice CSP and must match our expanded host allowlist separately.
+        if (navigationAction.isForMainFrame != true) {
+          final subUrl = navigationAction.request.url;
+          if (subUrl != null && !WebViewService.isUrlAllowed(subUrl)) {
+            DebugLogger.logWarn('WEBVIEW', 'Blocked subframe navigation: $subUrl');
+            return NavigationActionPolicy.CANCEL;
+          }
+          return NavigationActionPolicy.ALLOW;
+        }
         final navUrl = navigationAction.request.url;
         if (navUrl != null && !WebViewService.isUrlAllowed(navUrl)) {
           DebugLogger.logWarn('WEBVIEW', 'Blocked navigation to: $navUrl');
@@ -340,6 +553,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
         return NavigationActionPolicy.ALLOW;
       },
       onLoadStart: (controller, url) {
+        DebugLogger.logInfo('WEBVIEW', 'online onLoadStart url=$url');
+        _resetWebViewProgressThrottle();
         setState(() {
           _isLoading = true;
           _error = null;
@@ -361,6 +576,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
             _pageTitle = title;
           });
         }
+        await _logStylesheetDiagnostics(
+          controller,
+          offline: false,
+          pageUrl: url,
+        );
       },
       onTitleChanged: (controller, title) {
         if (title != null && mounted) {
@@ -370,13 +590,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
         }
       },
       onProgressChanged: (controller, progress) {
-        setState(() {
-          _progress = progress / 100;
-        });
+        _maybeUpdateWebViewProgress(progress);
       },
       onReceivedError: (controller, request, error) {
+        final main = request.isForMainFrame == true;
+        _logWebViewResourceFailure(
+          isForMainFrame: main,
+          url: request.url,
+          kind: 'net_error',
+          extra: '${error.type} ${error.description}',
+        );
+        if (!main) return;
         if (WebViewService.shouldIgnoreError(error.description)) {
-          print('[WEBVIEW] Ignored error: ${error.description}');
+          DebugLogger.logInfo(
+            'WEBVIEW',
+            'mainFrame net error ignored: ${error.description}',
+          );
           return;
         }
         setState(() {
@@ -385,7 +614,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
         });
       },
       onReceivedHttpError: (controller, request, response) {
-        if (request.isForMainFrame != true) return;
+        final main = request.isForMainFrame == true;
+        _logWebViewResourceFailure(
+          isForMainFrame: main,
+          url: request.url,
+          kind: 'http_error',
+          extra: 'status=${response.statusCode}',
+        );
+        if (!main) return;
         final statusCode = response.statusCode;
         if (statusCode != null && statusCode >= 400) {
           setState(() {
@@ -396,7 +632,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
       },
       onDownloadStartRequest:
           (InAppWebViewController controller, DownloadStartRequest request) {
-        _handleDownload(Uri.parse(request.url.toString()));
+        _handleDownload(Uri.parse(request.url.toString()), controller);
       },
     );
   }
@@ -605,6 +841,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
                                         setState(() {
                                           _error = null;
                                         });
+                                        if (widget.forceOfflineAssignmentBundle &&
+                                            widget.offlineAssignmentId != null) {
+                                          _invalidatePayload();
+                                          setState(() {});
+                                          return;
+                                        }
                                         _webViewController?.reload();
                                       },
                                       icon: const Icon(Icons.refresh),

@@ -14,14 +14,24 @@ import '../../utils/navigation_helper.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 
 class PdfViewerScreen extends StatefulWidget {
-  final String url;
+  /// Remote PDF URL (mutually exclusive with [localFilePath]).
+  final String? url;
+
+  /// Absolute path to a PDF already on disk (e.g. WebView session export).
+  final String? localFilePath;
+
   final String title;
 
-  const PdfViewerScreen({
+  PdfViewerScreen({
     super.key,
-    required this.url,
     required this.title,
-  });
+    this.url,
+    this.localFilePath,
+  }) : assert(
+          (url != null && url.trim().isNotEmpty) ^
+              (localFilePath != null && localFilePath.trim().isNotEmpty),
+          'PdfViewerScreen: pass exactly one of url or localFilePath',
+        );
 
   @override
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
@@ -41,7 +51,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void initState() {
     super.initState();
-    _downloadAndOpen();
+    _loadDocument();
   }
 
   @override
@@ -50,7 +60,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     super.dispose();
   }
 
-  Future<void> _downloadAndOpen() async {
+  Future<void> _loadDocument() async {
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0;
@@ -58,10 +68,28 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     });
 
     try {
+      if (widget.localFilePath != null && widget.localFilePath!.trim().isNotEmpty) {
+        DebugLogger.logApi('PDF open: file ${widget.localFilePath}');
+        final bytes = Uint8List.fromList(
+          await File(widget.localFilePath!).readAsBytes(),
+        );
+        if (!mounted) return;
+        _pdfBytes = bytes;
+        _controller = PdfController(
+          document: PdfDocument.openData(bytes),
+        );
+        setState(() {
+          _isDownloading = false;
+          _downloadProgress = 1.0;
+        });
+        return;
+      }
+
       final client = http.Client();
       try {
-        DebugLogger.logApi('PDF download: GET ${widget.url}');
-        final request = http.Request('GET', Uri.parse(widget.url));
+        final sourceUrl = widget.url!;
+        DebugLogger.logApi('PDF download: GET $sourceUrl');
+        final request = http.Request('GET', Uri.parse(sourceUrl));
         final streamed = await client.send(request);
 
         DebugLogger.logApi('PDF response: HTTP ${streamed.statusCode}');
@@ -283,7 +311,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               runSpacing: 10,
               children: [
                 OutlinedButton.icon(
-                  onPressed: _downloadAndOpen,
+                  onPressed: _loadDocument,
                   icon: const Icon(Icons.refresh_rounded, size: 16),
                   label: Text(loc.retry),
                   style: OutlinedButton.styleFrom(

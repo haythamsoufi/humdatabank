@@ -13,6 +13,7 @@ import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../config/app_config.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/network_availability.dart';
 
 class IndicatorDetailScreen extends StatefulWidget {
   final int indicatorId;
@@ -80,6 +81,14 @@ class _IndicatorDetailScreenState extends State<IndicatorDetailScreen> {
   }
 
   Future<void> _fetchIndicatorFromApi(String locale) async {
+    if (shouldDeferRemoteFetch) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = AppLocalizations.of(context)!.offlineNoInternet;
+      });
+      return;
+    }
     try {
       final provider =
           Provider.of<IndicatorBankProvider>(context, listen: false);

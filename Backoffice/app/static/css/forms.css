@@ -147,6 +147,18 @@ body.overflow-hidden { overflow: hidden; }
 }
 
 /* Mobile Navigation FAB styling */
+/* .btn forces sharp corners; keep this control circular like #mobileMenuFAB / #aiChatbotFAB */
+#mobile-nav-toggle-button.btn {
+  border-radius: 50% !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  box-sizing: border-box;
+  width: 3.5rem !important;
+  height: 3.5rem !important;
+  min-width: 3.5rem !important;
+  min-height: 3.5rem !important;
+}
+
 #mobile-nav-toggle-button:hover {
   background-color: #1d4ed8 !important;
   transform: scale(1.05) translateY(-2px);
@@ -565,21 +577,32 @@ button.force-visible,
   visibility: hidden !important;
 }
 
-/* Mobile-only positioning adjustments */
+/* Match corner FAB inset (see responsive.css #mobileMenuFAB / #aiChatbotFAB) incl. iOS home indicator */
 @media (max-width: 1099px) {
   #mobile-nav-toggle-button,
   #mobile-nav-toggle-button.force-visible {
-    /* Align with global mobile menu FAB (left: 1.5rem) and position above it */
-    left: 1.5rem !important; /* ensure vertical alignment with #mobileMenuFAB */
-    bottom: 1.5rem !important; /* Position closer to bottom edge */
+    left: calc(1.5rem + env(safe-area-inset-left, 0px)) !important;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  /* When mobile menu FAB is hidden (Flutter app), move sections button down to FAB position */
+  /* Flutter / embedded app: keep sections control at the corner */
   html[data-mobile-app="true"] #mobile-nav-toggle-button,
   html.mobile-app #mobile-nav-toggle-button,
   html[data-mobile-app="true"] #mobile-nav-toggle-button.force-visible,
   html.mobile-app #mobile-nav-toggle-button.force-visible {
-    bottom: 1.5rem !important; /* Same position as mobile menu FAB would be */
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/*
+ * Phone widths only: #mobileMenuFAB is display:flex only ≤768px (responsive.css).
+ * Above that the node may stay in the DOM hidden (e.g. focal-point tablet), so :has(#mobileMenuFAB)
+ * must not drive stacking outside this breakpoint.
+ */
+@media (max-width: 768px) {
+  html:not([data-mobile-app="true"]):not(.mobile-app) body:has(#mobileMenuFAB) #mobile-nav-toggle-button,
+  html:not([data-mobile-app="true"]):not(.mobile-app) body:has(#mobileMenuFAB) #mobile-nav-toggle-button.force-visible {
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + 3.5rem + 0.75rem) !important;
   }
 }
 
@@ -752,4 +775,73 @@ a.btn.entry-form-doc-library-btn {
   background-size: 1.5em 1.5em;
   padding-right: 2.5rem;
   max-height: 200px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Entry form — mobile width: trim nested padding, matrices, FAB clearance    */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 1024px) {
+  #pageContentContainer:has(.entry-form-root),
+  #mainContent.content-with-sidebar #pageContentContainer:has(.entry-form-root),
+  #mainContent.content-with-collapsed-sidebar #pageContentContainer:has(.entry-form-root) {
+    padding-left: max(0.5rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.5rem, env(safe-area-inset-right, 0px)) !important;
+  }
+}
+
+@media (max-width: 1099px) {
+  /* Fixed sections FAB + hover menu + global chatbot: keep last fields scrollable above them */
+  .entry-form-root #sections-container {
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 768px) {
+  #pageContentContainer:has(.entry-form-root),
+  #mainContent.content-with-sidebar #pageContentContainer:has(.entry-form-root),
+  #mainContent.content-with-collapsed-sidebar #pageContentContainer:has(.entry-form-root) {
+    padding-left: max(0.25rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.25rem, env(safe-area-inset-right, 0px)) !important;
+  }
+
+  .entry-form-root .matrix-container table thead th:first-child {
+    min-width: 3rem !important;
+    max-width: min(36vw, 8.75rem) !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .entry-form-root .matrix-container table td[role="rowheader"] {
+    min-width: 3rem !important;
+    max-width: min(36vw, 8.75rem) !important;
+    padding: 6px 6px !important;
+    font-size: 0.75rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .entry-form-root .matrix-container table th:not(:first-child),
+  .entry-form-root .matrix-container table td:not([role="rowheader"]) {
+    padding-left: 3px !important;
+    padding-right: 3px !important;
+  }
+
+  .entry-form-root .matrix-container.disaggregation-inputs table input[type="number"],
+  .entry-form-root .matrix-container.disaggregation-inputs table input[type="text"] {
+    font-size: 0.8rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .entry-form-root .matrix-container table thead th:first-child {
+    max-width: min(34vw, 7.5rem) !important;
+    font-size: 0.65rem !important;
+  }
+
+  .entry-form-root .matrix-container table td[role="rowheader"] {
+    max-width: min(34vw, 7.5rem) !important;
+    font-size: 0.7rem !important;
+    padding: 4px 4px !important;
+  }
 }

@@ -14,6 +14,7 @@ import 'providers/shared/notification_provider.dart';
 import 'providers/shared/language_provider.dart';
 import 'providers/shared/theme_provider.dart';
 import 'providers/shared/offline_provider.dart';
+import 'providers/shared/backend_reachability_notifier.dart';
 // Admin providers
 import 'providers/admin/templates_provider.dart';
 import 'providers/admin/assignments_provider.dart';
@@ -306,6 +307,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             performanceService.endInit('offline_provider');
           });
           return offlineProvider;
+        }),
+        ChangeNotifierProvider(create: (_) {
+          final notifier = BackendReachabilityNotifier();
+          notifier.start();
+          return notifier;
         }),
         ChangeNotifierProvider(create: (_) => IndicatorBankProvider()),
         ChangeNotifierProvider(create: (_) => PublicResourcesProvider()),

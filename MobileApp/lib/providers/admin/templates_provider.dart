@@ -6,6 +6,7 @@ import '../../models/shared/template.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class TemplatesProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -20,6 +21,11 @@ class TemplatesProvider with ChangeNotifier {
   String? get error => _error;
 
   Future<void> loadTemplates() async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();

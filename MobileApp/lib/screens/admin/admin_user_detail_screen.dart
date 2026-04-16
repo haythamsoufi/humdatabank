@@ -9,6 +9,7 @@ import '../../providers/shared/auth_provider.dart';
 import '../../utils/avatar_initials.dart';
 import '../../widgets/profile_leading_avatar.dart';
 import '../../utils/constants.dart';
+import '../../utils/network_availability.dart';
 import '../../utils/ios_constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
@@ -267,6 +268,14 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
   }
 
   Future<void> _load() async {
+    if (shouldDeferRemoteFetch) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = AppLocalizations.of(context)!.offlineNoInternet;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;

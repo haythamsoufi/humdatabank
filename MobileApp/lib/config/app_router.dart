@@ -138,12 +138,33 @@ class AppRouter {
     }
 
     if (settings.name == AppRoutes.pdfViewer) {
-      final args = settings.arguments as Map<String, String>;
+      final raw = settings.arguments;
+      final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+      final url = map['url']?.toString().trim();
+      final filePath = map['filePath']?.toString().trim();
+      final title = map['title']?.toString().trim() ?? 'Document';
+      final hasUrl = url != null && url.isNotEmpty;
+      final hasFile = filePath != null && filePath.isNotEmpty;
+      if (hasUrl == hasFile) {
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (context) => Scaffold(
+            appBar: AppAppBar(title: 'PDF'),
+            body: Center(
+              child: Text(
+                'Invalid PDF viewer arguments (need url or filePath).',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          ),
+        );
+      }
       return MaterialPageRoute(
         settings: settings,
         builder: (context) => PdfViewerScreen(
-          url: args['url']!,
-          title: args['title'] ?? 'Document',
+          title: title,
+          url: hasUrl ? url : null,
+          localFilePath: hasFile ? filePath : null,
         ),
       );
     }

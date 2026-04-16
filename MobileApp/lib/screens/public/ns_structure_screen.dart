@@ -6,6 +6,7 @@ import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 import 'dart:convert';
 
 class NSStructureScreen extends StatefulWidget {
@@ -42,6 +43,14 @@ class _NSStructureScreenState extends State<NSStructureScreen> {
 
   Future<void> _loadNSStructure() async {
     if (widget.countryId == null) return;
+
+    if (shouldDeferRemoteFetch) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;

@@ -4,6 +4,7 @@ import '../../models/public/leaderboard_entry.dart';
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 /// Leaderboard provider that manages leaderboard data
 class LeaderboardProvider with ChangeNotifier {
@@ -19,6 +20,11 @@ class LeaderboardProvider with ChangeNotifier {
 
   /// Load leaderboard from backend
   Future<void> loadLeaderboard({int limit = 5}) async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();

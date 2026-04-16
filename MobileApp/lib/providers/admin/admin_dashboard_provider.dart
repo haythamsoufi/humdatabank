@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
+import '../../utils/network_availability.dart';
 
 class AdminDashboardProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -43,6 +44,11 @@ class AdminDashboardProvider with ChangeNotifier {
       0; // Not provided by API, default to 0
 
   Future<void> loadDashboardStats() async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();

@@ -163,7 +163,11 @@ class DashboardRepository {
 
   /// Load dashboard data from cache.
   /// Returns null if cache is invalid or missing.
-  Future<DashboardData?> loadDashboardFromCache() async {
+  ///
+  /// When [ignoreExpiry] is true, a snapshot older than [AppConfig.cacheExpiration]
+  /// is still returned (used for offline pull-to-refresh so the UI can reload
+  /// from disk without hitting the network).
+  Future<DashboardData?> loadDashboardFromCache({bool ignoreExpiry = false}) async {
     try {
       final cachedData =
           await _storage.getString(AppConfig.cachedDashboardKey);
@@ -175,7 +179,8 @@ class DashboardRepository {
       final cacheTime = DateTime.parse(data['timestamp']);
 
       // Check if cache is still valid (within 1 hour)
-      if (DateTime.now().difference(cacheTime) >= AppConfig.cacheExpiration) {
+      if (!ignoreExpiry &&
+          DateTime.now().difference(cacheTime) >= AppConfig.cacheExpiration) {
         DebugLogger.logDashboard('Cache expired');
         return null;
       }

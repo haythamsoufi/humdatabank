@@ -8,6 +8,7 @@ import '../../utils/url_helper.dart';
 import '../../config/app_config.dart';
 import '../../config/routes.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/network_availability.dart';
 import 'dart:convert';
 
 class CountriesScreen extends StatefulWidget {
@@ -40,6 +41,14 @@ class _CountriesScreenState extends State<CountriesScreen> {
   }
 
   Future<void> _loadCountries() async {
+    if (shouldDeferRemoteFetch) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;

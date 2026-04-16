@@ -11,6 +11,7 @@ import '../../services/api_service.dart';
 import '../../services/ifrc_unified_planning_service.dart';
 import '../../services/unified_planning_pdf_thumbnail_cache.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class PublicResourcesProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -70,6 +71,13 @@ class PublicResourcesProvider with ChangeNotifier {
   }) async {
     if (_isLoading) return;
 
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      _isLoadingMore = false;
+      notifyListeners();
+      return;
+    }
+
     if (search != null) _searchQuery = search;
     if (type != null || refresh) _selectedType = type;
     if (locale != null) _locale = locale;
@@ -119,6 +127,10 @@ class PublicResourcesProvider with ChangeNotifier {
   Future<void> loadMore() async {
     if (_groupedMode) return;
     if (_isLoadingMore || !_hasMore || _isLoading) return;
+    if (shouldDeferRemoteFetch) {
+      notifyListeners();
+      return;
+    }
 
     _isLoadingMore = true;
     notifyListeners();
@@ -226,6 +238,12 @@ class PublicResourcesProvider with ChangeNotifier {
   }
 
   Future<void> _loadUnifiedPlanningDocuments() async {
+    if (shouldDeferRemoteFetch) {
+      _unifiedPlanningLoading = false;
+      _unifiedPlanningErrorCode = null;
+      notifyListeners();
+      return;
+    }
     _unifiedPlanningLoading = true;
     _unifiedPlanningErrorCode = null;
     notifyListeners();

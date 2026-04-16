@@ -6,6 +6,7 @@ import '../../models/indicator_bank/indicator.dart';
 import '../../models/indicator_bank/sector.dart';
 import '../../config/app_config.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class RateLimitException implements Exception {
   final String message;
@@ -152,6 +153,16 @@ class IndicatorBankProvider with ChangeNotifier {
       _error = _rateLimitMessage ??
           'Indicator Bank is temporarily unavailable. Please try again soon.';
       if (_allIndicators.isNotEmpty) {
+        _applyFilters();
+      }
+      notifyListeners();
+      return;
+    }
+
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      if (_allIndicators.isNotEmpty) {
+        _error = null;
         _applyFilters();
       }
       notifyListeners();

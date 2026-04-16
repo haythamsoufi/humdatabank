@@ -30,7 +30,12 @@ def get_locale():
 
 # Import session timeout functions from middleware
 from app.middleware import check_session_timeout
-from app.utils.request_utils import is_json_request, is_static_asset_request
+from app.utils.request_utils import (
+    is_json_request,
+    is_static_asset_request,
+    mark_mobile_app_webview_embed_request,
+    persist_mobile_app_embed_cookie,
+)
 from app.utils.api_responses import (
     json_bad_request,
     json_error,
@@ -774,6 +779,24 @@ def create_app(config_name=None):
         except Exception as e:
             current_app.logger.debug("Failed to clear flashes for XHR: %s", e)
         return response
+
+    @app.before_request
+    def _mark_mobile_app_webview_embed():
+        if is_static_asset_request():
+            return None
+        try:
+            mark_mobile_app_webview_embed_request()
+        except Exception as e:
+            current_app.logger.debug("mark_mobile_app_webview_embed_request failed: %s", e)
+        return None
+
+    @app.after_request
+    def _persist_mobile_app_embed_cookie(response):
+        try:
+            return persist_mobile_app_embed_cookie(response)
+        except Exception as e:
+            current_app.logger.debug("persist_mobile_app_embed_cookie failed: %s", e)
+            return response
 
 
     # Register session timeout middleware

@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../config/app_config.dart';
 import '../config/routes.dart';
 import 'api_service.dart';
+import '../utils/network_availability.dart';
 import 'storage_service.dart';
 import '../utils/debug_logger.dart';
 
@@ -744,6 +745,10 @@ class PushNotificationService {
 
   /// Send heartbeat to backend
   Future<void> _sendHeartbeat() async {
+    if (shouldDeferRemoteFetch) {
+      return;
+    }
+
     // For iOS, we might not have a token yet if registration failed
     // Try to register if we don't have a token
     if (_currentToken == null) {

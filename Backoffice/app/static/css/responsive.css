@@ -48,6 +48,8 @@
 
     #mobileMenuFAB {
         display: flex !important;
+        /* Lock to chatbot FAB baseline; beats legacy inline bottom from flash-messages.js */
+        bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
     }
 
     /* Hide mobile menu FAB when in Flutter mobile app - must use !important to override media query */
@@ -98,10 +100,12 @@
     align-items: center;
     justify-content: center;
     position: fixed;
-    bottom: 1.5rem;
-    left: 1.5rem;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    left: calc(1.5rem + env(safe-area-inset-left, 0px));
     width: 3.5rem;
     height: 3.5rem;
+    padding: 0 !important;
+    box-sizing: border-box;
     background-color: #c53030;
     color: white;
     border-radius: 50%;
@@ -266,20 +270,24 @@
     }
 
     #aiChatbotFAB {
-        bottom: 1.5rem; /* Same line as mobile menu FAB */
+        /* Same baseline as #mobileMenuFAB; !important overrides inline bottom from flash adjustments */
+        bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
         width: 3.5rem; /* Same size as mobile menu FAB */
         height: 3.5rem; /* Same size as mobile menu FAB */
+        /* Match #mobileMenuFAB ring so the two controls share the same outer box (avoids optical “float”) */
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        box-sizing: border-box;
     }
 
     /* LTR positioning for mobile */
     html[dir="ltr"] #aiChatbotFAB {
-        right: 1.5rem; /* Same spacing as mobile menu FAB */
+        right: calc(1.5rem + env(safe-area-inset-right, 0px));
         left: auto;
     }
 
     /* RTL positioning for mobile */
     html[dir="rtl"] #aiChatbotFAB {
-        left: 1.5rem !important;
+        left: calc(1.5rem + env(safe-area-inset-left, 0px)) !important;
         right: auto !important;
     }
 

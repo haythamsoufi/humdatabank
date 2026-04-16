@@ -3,7 +3,10 @@
 /* Design tokens for consistent sizing */
 :root {
     --chat-fab-size: 56px;
+    /* Horizontal inset from viewport edge (also used by entry_form inline for hover menu `right`) */
     --chat-fab-offset: 1.5rem;
+    /* Bottom inset for fixed FABs — matches responsive.css #mobileMenuFAB on phones */
+    --chat-fab-bottom-inset: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     --chat-fab-tooltip-gap: 16px;
     --chat-message-max-width: 85%;
     --chat-input-max-height: 200px;
@@ -13,10 +16,13 @@
 /* AI Chatbot FAB – circular, branded, friendly */
 #aiChatbotFAB {
     position: fixed;
-    bottom: var(--chat-fab-offset);
-    right: var(--chat-fab-offset);
+    bottom: var(--chat-fab-bottom-inset);
+    right: calc(var(--chat-fab-offset) + env(safe-area-inset-right, 0px));
     width: var(--chat-fab-size);
     height: var(--chat-fab-size);
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
     background: linear-gradient(145deg, #c53030 0%, #9b2424 100%);
     color: #ffffff;
     border: none;

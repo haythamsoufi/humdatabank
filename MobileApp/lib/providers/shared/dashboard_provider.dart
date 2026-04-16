@@ -94,6 +94,34 @@ class DashboardProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-applies dashboard data from on-device storage only (no API).
+  ///
+  /// Intended when the device is offline so pull-to-refresh does not block on
+  /// network timeouts and retries. When [allowStale] is true, snapshots older
+  /// than the normal cache TTL are still applied if present on disk.
+  Future<void> refreshFromDiskOnly({bool allowStale = false}) async {
+    DebugLogger.logDashboard(
+      'refreshFromDiskOnly(allowStale=$allowStale)',
+    );
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final cached = await _repository.loadDashboardFromCache(
+      ignoreExpiry: allowStale,
+    );
+    if (cached != null) {
+      _updateStateFromData(cached, preserveSelectedEntity: true);
+      _error = null;
+    } else if (_currentAssignments.isEmpty && _pastAssignments.isEmpty) {
+      _error =
+          'Unable to load dashboard. Please check your connection and try again.';
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
   /// Update provider state from repository data.
   void _updateStateFromData(DashboardData data, {bool preserveSelectedEntity = false}) {
     _currentAssignments = data.currentAssignments;

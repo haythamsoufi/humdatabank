@@ -222,21 +222,23 @@ class SidebarCollapseController {
     if (this.isLargeScreen()) {
       this.setButtonPositions(leftPosition);
     } else {
-      // On small screens, still adjust FAB menu position if admin sidebar is present
-      // The mobile toggle button position is handled by CSS, but FAB menu needs JS
-      const { adminsidebar, fabmenu, mobiletoggle } = this.elements;
-      if (adminsidebar && fabmenu && mobiletoggle) {
-        // Only adjust FAB menu position, toggle button uses CSS
+      // Small screens: pin Save/Submit FAB column above the sections toggle (toggle uses CSS)
+      const { fabmenu, mobiletoggle } = this.elements;
+      if (fabmenu && mobiletoggle) {
+        const rect = mobiletoggle.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          fabmenu.style.left = `${Math.round(rect.left)}px`;
+        } else {
+          fabmenu.style.left = this.getAdminSidebarAdjustedPosition();
+        }
         const toggleBottomPx = parseInt(
           window.getComputedStyle(mobiletoggle).bottom || '24',
           10
         );
         const toggleHeightPx = mobiletoggle.offsetHeight || 56;
-        fabmenu.style.left = leftPosition;
-        fabmenu.style.bottom = (toggleBottomPx + toggleHeightPx + FAB_SPACING) + 'px';
+        fabmenu.style.bottom = `${toggleBottomPx + toggleHeightPx + FAB_SPACING}px`;
         fabmenu.style.display = '';
       } else {
-        // No admin sidebar, clear inline positions
         this.clearInlinePositions();
       }
     }

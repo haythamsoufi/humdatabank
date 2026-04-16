@@ -6,6 +6,7 @@ import '../../models/admin/admin_assignment.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class AssignmentsProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -20,6 +21,11 @@ class AssignmentsProvider with ChangeNotifier {
   String? get error => _error;
 
   Future<void> loadAssignments() async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();

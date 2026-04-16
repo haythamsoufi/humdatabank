@@ -6,6 +6,7 @@ import '../../config/app_config.dart';
 import '../../models/admin/login_log_item.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
+import '../../utils/network_availability.dart';
 
 /// Loads [GET /api/mobile/v1/admin/analytics/login-logs] (JWT auth, `admin.analytics.view`).
 class LoginLogsProvider with ChangeNotifier {
@@ -71,6 +72,12 @@ class LoginLogsProvider with ChangeNotifier {
   }
 
   Future<void> _fetch({required bool reset}) async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      _isLoadingMore = false;
+      notifyListeners();
+      return;
+    }
     if (reset) {
       _isLoading = true;
       _page = 1;

@@ -255,36 +255,48 @@ document.addEventListener('DOMContentLoaded', function() {
         return totalHeight;
     };
 
+    /**
+     * True when the UI uses the compact corner FAB layout (matches CSS max-width: 768px rules
+     * plus common phone-landscape viewports where width > 768 but we must not use the desktop
+     * "push FAB up by flash height" path — that left the chatbot misaligned above #mobileMenuFAB).
+     */
+    const isCompactTouchFabLayout = () => {
+        if (window.matchMedia('(max-width: 768px)').matches) return true;
+        if (
+            window.matchMedia('(orientation: landscape)').matches &&
+            window.matchMedia('(max-height: 500px)').matches &&
+            window.innerWidth <= 1024
+        ) {
+            return true;
+        }
+        return false;
+    };
+
     // Function to adjust FAB position based on flash messages
     const adjustFABPosition = () => {
         if (!aiChatbotFAB) return;
 
         const messagesHeight = calculateFlashMessagesHeight();
-        const baseBottomOffset = 24; // 1.5rem = 24px
-        const isMobile = window.innerWidth <= 768;
+        const baseBottomOffset = 24; // 1.5rem = 24px (desktop push-up math only)
         const extraPadding = 16; // Extra space for visual breathing room
         const isRTL = document.documentElement.getAttribute('dir') === 'rtl';
+        const compact = isCompactTouchFabLayout();
 
         if (messagesHeight > 0) {
-            let newBottom;
-            let newRight;
-            let newLeft;
-
-            if (isMobile) {
-                // On mobile, move FAB to avoid flash messages
-                newBottom = baseBottomOffset;
+            if (compact) {
+                // Keep the same bottom inset as #mobileMenuFAB (CSS + safe-area); nudge horizontally only
+                aiChatbotFAB.style.removeProperty('bottom');
                 if (isRTL) {
-                    newLeft = 96; // 6rem = 96px (move right to avoid messages)
-                    aiChatbotFAB.style.left = `${newLeft}px`;
+                    aiChatbotFAB.style.left = '96px'; // 6rem — clear centered flashes
                     aiChatbotFAB.style.right = 'auto';
                 } else {
-                    newRight = 96; // 6rem = 96px (move left to avoid messages)
-                    aiChatbotFAB.style.right = `${newRight}px`;
+                    aiChatbotFAB.style.right = '96px';
                     aiChatbotFAB.style.left = 'auto';
                 }
             } else {
-                // On desktop, push FAB up by the height of messages plus padding
-                newBottom = baseBottomOffset + messagesHeight + extraPadding;
+                // Desktop: push FAB up by the height of messages plus padding
+                const newBottom = baseBottomOffset + messagesHeight + extraPadding;
+                aiChatbotFAB.style.bottom = `${newBottom}px`;
                 if (isRTL) {
                     aiChatbotFAB.style.left = '1.5rem';
                     aiChatbotFAB.style.right = 'auto';
@@ -293,8 +305,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     aiChatbotFAB.style.left = 'auto';
                 }
             }
-
-            aiChatbotFAB.style.bottom = `${newBottom}px`;
 
             // Add bounce animation
             aiChatbotFAB.classList.add('pushed-by-messages');
@@ -316,15 +326,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 600);
         } else {
-            // Return to original position
-            aiChatbotFAB.style.bottom = `${baseBottomOffset}px`;
-            if (isRTL) {
-                aiChatbotFAB.style.left = '1.5rem';
-                aiChatbotFAB.style.right = 'auto';
-            } else {
-                aiChatbotFAB.style.right = '1.5rem';
-                aiChatbotFAB.style.left = 'auto';
-            }
+            // Drop inline overrides so chatbot.css / responsive.css control bottom + safe-area (same as main menu FAB)
+            aiChatbotFAB.style.removeProperty('bottom');
+            aiChatbotFAB.style.removeProperty('left');
+            aiChatbotFAB.style.removeProperty('right');
         }
     };
 

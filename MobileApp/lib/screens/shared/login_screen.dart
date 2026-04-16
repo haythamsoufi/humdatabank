@@ -9,6 +9,7 @@ import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../config/app_config.dart';
 import '../../widgets/bottom_navigation_bar.dart';
+import '../../widgets/offline_indicator.dart';
 import '../../l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -178,15 +179,21 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: MediaQuery.of(context).size.width > 600 ? 40 : 20,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const OfflineBanner(),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal:
+                        MediaQuery.of(context).size.width > 600 ? 40 : 20,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 20),
                 // Logo - Instagram style
                 Image.asset(
                   'assets/images/ifrc_logo.png',
@@ -371,6 +378,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
+        ),
+        ),
+          ],
         ),
       ),
       bottomNavigationBar: Consumer<AuthProvider>(

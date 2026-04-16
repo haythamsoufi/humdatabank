@@ -12,7 +12,8 @@ import 'jwt_token_service.dart';
 import 'user_profile_service.dart';
 import 'connectivity_service.dart';
 import 'error_handler.dart';
-import '../utils/debug_logger.dart';
+import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
+import '../utils/network_availability.dart';
 import 'offline_cache_service.dart';
 import 'offline_queue_service.dart';
 import 'ai_chat_service.dart';
@@ -91,6 +92,9 @@ class AuthService {
   DateTime? _lastRefreshTime;
   final List<DateTime> _refreshAttempts = [];
   static const int _maxRefreshAttemptsHistory = 100; // Keep last 100 refresh attempts
+
+  /// Coalesces concurrent [_loadUserProfile] calls (e.g. parallel auth checks).
+  Future<void>? _userProfileLoadInFlight;
 
   // Login with email and password — issues JWT tokens via the mobile token endpoint.
   Future<AuthResult> loginWithEmailPassword({
@@ -312,6 +316,22 @@ class AuthService {
   // Load user profile using the new UserProfileService
   // This service attempts API first, then falls back to HTML parsing
   Future<void> _loadUserProfile() async {
+    if (_userProfileLoadInFlight != null) {
+      await _userProfileLoadInFlight;
+      return;
+    }
+    final load = _loadUserProfileBody();
+    _userProfileLoadInFlight = load;
+    try {
+      await load;
+    } finally {
+      if (identical(_userProfileLoadInFlight, load)) {
+        _userProfileLoadInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _loadUserProfileBody() async {
     try {
       DebugLogger.logAuth('Loading user profile...');
 
@@ -982,6 +1002,38 @@ class AuthService {
       }
     }
 
+    // Radio can show "connected" while the backoffice is unreachable. After
+    // [BackendReachabilityService] marks defer, skip the live session probe so
+    // pull‑to‑refresh returns immediately when a cached user exists.
+    if (shouldDeferRemoteFetch) {
+      final isValidForOffline = await _session.isSessionValidForOffline();
+      if (isValidForOffline) {
+        if (_currentUser != null) {
+          DebugLogger.logAuth(
+              'Backend defer active — skipping live session check (cached user)');
+          _registerRefreshCallback();
+          if (_periodicRefreshTimer == null) {
+            _startPeriodicRefresh();
+          }
+          if (_sessionStateCheckTimer == null) {
+            _startSessionStateMonitoring();
+          }
+          return true;
+        }
+        DebugLogger.logAuth(
+            'Backend defer active — loading profile without live session probe');
+        await _loadUserProfile();
+        _registerRefreshCallback();
+        if (_periodicRefreshTimer == null) {
+          _startPeriodicRefresh();
+        }
+        if (_sessionStateCheckTimer == null) {
+          _startSessionStateMonitoring();
+        }
+        return _currentUser != null;
+      }
+    }
+
     // Validate session with backend using the JWT-aware mobile session endpoint.
     // We must NOT use /account-settings here — that route uses @login_required
     // (cookie-based) and ignores the JWT Bearer token.  Flask redirects the JWT
@@ -1052,9 +1104,18 @@ class AuthService {
       }
       return hasSession && _currentUser != null;
     } catch (e) {
-      DebugLogger.logError('Error validating session: $e');
-      // On error, check if we're offline and session is valid for offline
-      if (_connectivity.isOffline) {
+      final transient = isTransientBackendFailure(e);
+      if (transient) {
+        DebugLogger.logAuth(
+          'Session validation: transient transport error ($e)',
+          level: LogLevel.debug,
+        );
+      } else {
+        DebugLogger.logError('Error validating session: $e');
+      }
+      // On error, check if we're offline (or backend recently unreachable) and
+      // session is valid for offline-style use.
+      if (_connectivity.isOffline || transient || shouldDeferRemoteFetch) {
         final isValidForOffline = await _session.isSessionValidForOffline();
         if (isValidForOffline && _currentUser != null) {
           DebugLogger.logAuth('Using cached session for offline operations (error occurred)');
@@ -1063,9 +1124,12 @@ class AuthService {
       }
       // On error, check if we have a cached user
       if (_currentUser != null) {
-        // Return true with cached user, but log the error
-        DebugLogger.logWarn(
-            'AUTH', 'Using cached user due to validation error');
+        DebugLogger.logAuth(
+          transient
+              ? 'Using cached user after transient network error during validation'
+              : 'Using cached user due to validation error',
+          level: transient ? LogLevel.debug : LogLevel.warn,
+        );
         return true;
       }
       // No cached user and validation failed

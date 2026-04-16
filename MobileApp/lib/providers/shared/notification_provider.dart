@@ -7,6 +7,7 @@ import '../../services/auth_error_handler.dart';
 import '../../services/error_handler.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class NotificationProvider with ChangeNotifier {
   final NotificationService _notificationService = NotificationService();
@@ -30,6 +31,11 @@ class NotificationProvider with ChangeNotifier {
   String? get preferencesError => _preferencesError;
 
   Future<void> loadNotifications() async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -58,6 +64,10 @@ class NotificationProvider with ChangeNotifier {
   }
 
   Future<void> refreshUnreadCount({AuthProvider? authProvider}) async {
+    if (shouldDeferRemoteFetch) {
+      notifyListeners();
+      return;
+    }
     final authErrorHandler = AuthErrorHandler();
 
     try {

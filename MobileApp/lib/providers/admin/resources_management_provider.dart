@@ -4,6 +4,7 @@ import '../../config/app_config.dart';
 import '../../models/shared/resource.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
 
 class ResourcesManagementProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -21,6 +22,11 @@ class ResourcesManagementProvider with ChangeNotifier {
     String? categoryFilter,
     String? languageFilter,
   }) async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();

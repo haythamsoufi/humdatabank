@@ -7,6 +7,7 @@ import '../../config/app_config.dart';
 import '../../models/admin/country_access_request_item.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
+import '../../utils/network_availability.dart';
 
 /// Country access requests via [GET /api/mobile/v1/admin/access-requests] and actions.
 class AccessRequestsProvider with ChangeNotifier {
@@ -28,6 +29,13 @@ class AccessRequestsProvider with ChangeNotifier {
   bool get actionInFlight => _actionInFlight;
 
   Future<void> load({bool showLoading = true}) async {
+    if (shouldDeferRemoteFetch) {
+      if (showLoading) {
+        _isLoading = false;
+      }
+      notifyListeners();
+      return;
+    }
     if (showLoading) {
       _isLoading = true;
       _error = null;

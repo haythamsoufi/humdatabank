@@ -629,6 +629,18 @@ class AppLocalizations {
       'no_indicators_found': 'No indicators found',
       'no_organizations_found': 'No organizations found',
       'no_resources_found': 'No resources found',
+      'resources_unified_planning_section_title': 'Unified plans and reports',
+      'resources_unified_planning_section_subtitle':
+          'Plans, mid-year reports, and annual reports from IFRC GO (loaded in the app).',
+      'unified_planning_empty': 'No unified planning documents match your search.',
+      'unified_error_config':
+          'Could not load unified planning settings from the server. Try again later.',
+      'unified_error_credentials':
+          'IFRC document access is not configured in this app build. Add IFRC_API_USER and IFRC_API_PASSWORD to the app environment.',
+      'unified_error_ifrc_auth':
+          'IFRC GO rejected the document credentials. Check IFRC_API_USER and IFRC_API_PASSWORD.',
+      'unified_error_ifrc':
+          'Could not load documents from IFRC GO. Check your connection and try again.',
       'no_plugins_found': 'No plugins found',
       'no_translations_found': 'No translations found',
       'no_documents_found': 'No documents found',
@@ -1632,6 +1644,19 @@ class AppLocalizations {
       'no_indicators_found': 'No se encontraron indicadores',
       'no_organizations_found': 'No se encontraron organizaciones',
       'no_resources_found': 'No se encontraron recursos',
+      'resources_unified_planning_section_title': 'Planes e informes unificados',
+      'resources_unified_planning_section_subtitle':
+          'Planes, informes de mitad de año e informes anuales desde IFRC GO (cargados en la app).',
+      'unified_planning_empty':
+          'Ningún documento de planificación unificada coincide con su búsqueda.',
+      'unified_error_config':
+          'No se pudieron cargar los ajustes de planificación unificada desde el servidor. Inténtelo más tarde.',
+      'unified_error_credentials':
+          'El acceso a documentos IFRC no está configurado en esta compilación. Añada IFRC_API_USER e IFRC_API_PASSWORD al entorno de la app.',
+      'unified_error_ifrc_auth':
+          'IFRC GO rechazó las credenciales de documentos. Compruebe IFRC_API_USER e IFRC_API_PASSWORD.',
+      'unified_error_ifrc':
+          'No se pudieron cargar documentos desde IFRC GO. Compruebe la conexión e inténtelo de nuevo.',
       'no_plugins_found': 'No se encontraron complementos',
       'no_translations_found': 'No se encontraron traducciones',
       'no_documents_found': 'No se encontraron documentos',
@@ -2524,6 +2549,19 @@ class AppLocalizations {
       'no_indicators_found': 'Aucun indicateur trouvé',
       'no_organizations_found': 'Aucune organisation trouvée',
       'no_resources_found': 'Aucune ressource trouvée',
+      'resources_unified_planning_section_title': 'Plans et rapports unifiés',
+      'resources_unified_planning_section_subtitle':
+          'Plans, rapports de mi-parcours et rapports annuels depuis IFRC GO (chargés dans l’application).',
+      'unified_planning_empty':
+          'Aucun document de planification unifiée ne correspond à votre recherche.',
+      'unified_error_config':
+          'Impossible de charger les paramètres de planification unifiée depuis le serveur. Réessayez plus tard.',
+      'unified_error_credentials':
+          'L’accès aux documents IFRC n’est pas configuré dans cette version de l’application. Ajoutez IFRC_API_USER et IFRC_API_PASSWORD à l’environnement de l’application.',
+      'unified_error_ifrc_auth':
+          'IFRC GO a rejeté les identifiants documentaires. Vérifiez IFRC_API_USER et IFRC_API_PASSWORD.',
+      'unified_error_ifrc':
+          'Impossible de charger les documents depuis IFRC GO. Vérifiez votre connexion et réessayez.',
       'no_plugins_found': 'Aucun plugin trouvé',
       'no_translations_found': 'Aucune traduction trouvée',
       'no_documents_found': 'Aucun document trouvé',
@@ -3404,6 +3442,18 @@ class AppLocalizations {
       'no_indicators_found': 'لم يتم العثور على مؤشرات',
       'no_organizations_found': 'لم يتم العثور على منظمات',
       'no_resources_found': 'لم يتم العثور على موارد',
+      'resources_unified_planning_section_title': 'الخطط والتقارير الموحدة',
+      'resources_unified_planning_section_subtitle':
+          'خطط وتقارير منتصف العام والتقارير السنوية من IFRC GO (يتم تحميلها في التطبيق).',
+      'unified_planning_empty': 'لا توجد وثائق تخطيط موحدة تطابق بحثك.',
+      'unified_error_config':
+          'تعذر تحميل إعدادات التخطيط الموحد من الخادم. حاول مرة أخرى لاحقًا.',
+      'unified_error_credentials':
+          'لم يتم تهيئة وصول وثائق الاتحاد في هذا الإصدار. أضف IFRC_API_USER و IFRC_API_PASSWORD إلى بيئة التطبيق.',
+      'unified_error_ifrc_auth':
+          'رفض IFRC GO بيانات اعتماد الوثائق. تحقق من IFRC_API_USER و IFRC_API_PASSWORD.',
+      'unified_error_ifrc':
+          'تعذر تحميل الوثائق من IFRC GO. تحقق من الاتصال وحاول مرة أخرى.',
       'no_plugins_found': 'لم يتم العثور على إضافات',
       'no_translations_found': 'لم يتم العثور على ترجمات',
       'no_documents_found': 'لم يتم العثور على مستندات',
@@ -4272,6 +4322,19 @@ class AppLocalizations {
       'no_indicators_found': 'कोई संकेतक नहीं मिला',
       'no_organizations_found': 'कोई संगठन नहीं मिला',
       'no_resources_found': 'कोई संसाधन नहीं मिला',
+      'resources_unified_planning_section_title': 'एकीकृत योजनाएँ और रिपोर्ट',
+      'resources_unified_planning_section_subtitle':
+          'IFRC GO से योजनाएँ, मध्यवर्ष रिपोर्ट और वार्षिक रिपोर्ट (ऐप में लोड)।',
+      'unified_planning_empty':
+          'आपकी खोज से मेल खाने वाली कोई एकीकृत योजना दस्तावेज़ नहीं।',
+      'unified_error_config':
+          'सर्वर से एकीकृत योजना सेटिंग लोड नहीं हो सकीं। बाद में पुनः प्रयास करें।',
+      'unified_error_credentials':
+          'इस ऐप बिल्ड में IFRC दस्तावेज़ पहुँच कॉन्फ़िगर नहीं है। ऐप वातावरण में IFRC_API_USER और IFRC_API_PASSWORD जोड़ें।',
+      'unified_error_ifrc_auth':
+          'IFRC GO ने दस्तावेज़ क्रेडेंशियल अस्वीकार किए। IFRC_API_USER और IFRC_API_PASSWORD जाँचें।',
+      'unified_error_ifrc':
+          'IFRC GO से दस्तावेज़ लोड नहीं हो सके। कनेक्शन जाँचें और पुनः प्रयास करें।',
       'no_plugins_found': 'कोई प्लगइन नहीं मिला',
       'no_translations_found': 'कोई अनुवाद नहीं मिला',
       'no_documents_found': 'कोई दस्तावेज नहीं मिला',
@@ -5157,6 +5220,19 @@ class AppLocalizations {
       'no_indicators_found': 'Индикаторы не найдены',
       'no_organizations_found': 'Организации не найдены',
       'no_resources_found': 'Ресурсы не найдены',
+      'resources_unified_planning_section_title': 'Единые планы и отчёты',
+      'resources_unified_planning_section_subtitle':
+          'Планы, полугодовые и годовые отчёты из IFRC GO (загружаются в приложении).',
+      'unified_planning_empty':
+          'Нет документов единого планирования по вашему запросу.',
+      'unified_error_config':
+          'Не удалось загрузить настройки единого планирования с сервера. Попробуйте позже.',
+      'unified_error_credentials':
+          'Доступ к документам IFRC не настроен в этой сборке. Добавьте IFRC_API_USER и IFRC_API_PASSWORD в окружение приложения.',
+      'unified_error_ifrc_auth':
+          'IFRC GO отклонил учётные данные для документов. Проверьте IFRC_API_USER и IFRC_API_PASSWORD.',
+      'unified_error_ifrc':
+          'Не удалось загрузить документы из IFRC GO. Проверьте соединение и повторите попытку.',
       'no_plugins_found': 'Плагины не найдены',
       'no_translations_found': 'Переводы не найдены',
       'no_documents_found': 'Документы не найдены',
@@ -6014,6 +6090,16 @@ class AppLocalizations {
       'no_indicators_found': '未找到指标',
       'no_organizations_found': '未找到组织',
       'no_resources_found': '未找到资源',
+      'resources_unified_planning_section_title': '统一规划与报告',
+      'resources_unified_planning_section_subtitle':
+          '来自 IFRC GO 的计划、年中报告和年度报告（在应用中加载）。',
+      'unified_planning_empty': '没有符合您搜索条件的统一规划文件。',
+      'unified_error_config': '无法从服务器加载统一规划设置。请稍后重试。',
+      'unified_error_credentials':
+          '此应用版本未配置 IFRC 文档访问。请在应用环境中添加 IFRC_API_USER 和 IFRC_API_PASSWORD。',
+      'unified_error_ifrc_auth':
+          'IFRC GO 拒绝了文档凭据。请检查 IFRC_API_USER 和 IFRC_API_PASSWORD。',
+      'unified_error_ifrc': '无法从 IFRC GO 加载文档。请检查网络连接后重试。',
       'no_plugins_found': '未找到插件',
       'no_translations_found': '未找到翻译',
       'no_documents_found': '未找到文档',
@@ -7141,6 +7227,17 @@ class AppLocalizations {
   String get noIndicatorsFound => translate('no_indicators_found');
   String get noOrganizationsFound => translate('no_organizations_found');
   String get noResourcesFound => translate('no_resources_found');
+  String get resourcesUnifiedPlanningSectionTitle =>
+      translate('resources_unified_planning_section_title');
+  String get resourcesUnifiedPlanningSectionSubtitle =>
+      translate('resources_unified_planning_section_subtitle');
+  String get unifiedPlanningEmpty => translate('unified_planning_empty');
+  String get unifiedPlanningErrorConfig => translate('unified_error_config');
+  String get unifiedPlanningErrorCredentials =>
+      translate('unified_error_credentials');
+  String get unifiedPlanningErrorIfrcAuth =>
+      translate('unified_error_ifrc_auth');
+  String get unifiedPlanningErrorIfrc => translate('unified_error_ifrc');
   String get noPluginsFound => translate('no_plugins_found');
   String get noTranslationsFound => translate('no_translations_found');
   String get noDocumentsFound => translate('no_documents_found');

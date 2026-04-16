@@ -3,20 +3,25 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../config/app_config.dart';
+import '../../models/shared/unified_planning_document.dart';
 import '../../models/shared/resource.dart';
 import '../../models/shared/resource_list_section.dart';
 import '../../models/shared/resource_subcategory.dart';
 import '../../services/api_service.dart';
+import '../../services/ifrc_unified_planning_service.dart';
 import '../../utils/debug_logger.dart';
 
 class PublicResourcesProvider with ChangeNotifier {
   final ApiService _api = ApiService();
+  final IfrcUnifiedPlanningService _ifrcUnified = IfrcUnifiedPlanningService.instance;
 
   List<Resource> _resources = [];
   List<ResourceListSection> _sections = [];
   bool _groupedMode = false;
   bool _groupedCapped = false;
-
+  List<UnifiedPlanningDocument> _unifiedPlanningDocuments = [];
+  bool _unifiedPlanningLoading = false;
+  String? _unifiedPlanningErrorCode;
   bool _isLoading = false;
   bool _isLoadingMore = false;
   String? _error;
@@ -42,6 +47,24 @@ class PublicResourcesProvider with ChangeNotifier {
   String get searchQuery => _searchQuery;
   String? get selectedType => _selectedType;
 
+  List<UnifiedPlanningDocument> get unifiedPlanningDocuments {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return List.unmodifiable(_unifiedPlanningDocuments);
+    return _unifiedPlanningDocuments
+        .where((d) {
+          final hay =
+              '${d.title} ${d.countryName ?? ''} ${d.documentTypeLabel ?? ''} ${d.countryCode ?? ''}'
+                  .toLowerCase();
+          return hay.contains(q);
+        })
+        .toList(growable: false);
+  }
+
+  bool get unifiedPlanningLoading => _unifiedPlanningLoading;
+
+  /// Localization key (see [AppLocalizations]); null when there is no error.
+  String? get unifiedPlanningErrorCode => _unifiedPlanningErrorCode;
+
   /// Load the first page, optionally replacing search/type/locale filters.
   Future<void> loadResources({
     String? search,
@@ -62,6 +85,8 @@ class PublicResourcesProvider with ChangeNotifier {
     _groupedMode = false;
     _groupedCapped = false;
     notifyListeners();
+
+    final unifiedFuture = _loadUnifiedPlanningDocuments();
 
     try {
       final useGrouped = _searchQuery.isEmpty;
@@ -90,10 +115,12 @@ class PublicResourcesProvider with ChangeNotifier {
       _groupedMode = false;
       _groupedCapped = false;
       DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Load error: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
+
+    await unifiedFuture;
+
+    _isLoading = false;
+    notifyListeners();
   }
 
   /// Append the next page when the user scrolls to the bottom.
@@ -204,6 +231,60 @@ class PublicResourcesProvider with ChangeNotifier {
       out.add(ResourceListSection(subcategory: sub, resources: items));
     }
     return (out, capped);
+  }
+
+  Future<void> _loadUnifiedPlanningDocuments() async {
+    _unifiedPlanningLoading = true;
+    _unifiedPlanningErrorCode = null;
+    notifyListeners();
+
+    try {
+      final config = await _ifrcUnified.fetchConfig();
+      if (config == null) {
+        _unifiedPlanningDocuments = [];
+        _unifiedPlanningErrorCode = 'unified_error_config';
+        return;
+      }
+
+      final listUrl = (config['ifrc_public_site_appeals_url'] as String?)?.trim();
+      if (listUrl == null || listUrl.isEmpty) {
+        _unifiedPlanningDocuments = [];
+        _unifiedPlanningErrorCode = 'unified_error_config';
+        return;
+      }
+
+      if (AppConfig.ifrcApiUser.isEmpty || AppConfig.ifrcApiPassword.isEmpty) {
+        _unifiedPlanningDocuments = [];
+        _unifiedPlanningErrorCode = 'unified_error_credentials';
+        return;
+      }
+
+      final labels = IfrcUnifiedPlanningService.parseTypeLabels(config);
+      _unifiedPlanningDocuments = await _ifrcUnified.fetchDocuments(
+        ifrcListUrl: listUrl,
+        typeLabels: labels,
+      );
+      _unifiedPlanningErrorCode = null;
+    } on StateError catch (e) {
+      _unifiedPlanningDocuments = [];
+      switch (e.message) {
+        case 'missing_credentials':
+          _unifiedPlanningErrorCode = 'unified_error_credentials';
+          break;
+        case 'ifrc_auth_failed':
+          _unifiedPlanningErrorCode = 'unified_error_ifrc_auth';
+          break;
+        default:
+          _unifiedPlanningErrorCode = 'unified_error_ifrc';
+      }
+      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Unified planning IFRC: $e');
+    } catch (e) {
+      _unifiedPlanningDocuments = [];
+      _unifiedPlanningErrorCode = 'unified_error_ifrc';
+      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Unified planning IFRC: $e');
+    } finally {
+      _unifiedPlanningLoading = false;
+    }
   }
 
   void clearError() {

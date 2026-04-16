@@ -3,7 +3,8 @@
 
 Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
-    indicator-suggestions, data/periods, data/fdrs-overview, data/resources.
+    indicator-suggestions, data/periods, data/fdrs-overview, data/resources,
+    data/unified-planning-config (IFRC GO URL + unified planning type IDs for the mobile app).
     Rate-limited to prevent abuse.
   - Auth-required: quiz/leaderboard, quiz/submit-score (scores are tied to authenticated users).
 """
@@ -28,6 +29,7 @@ from app.utils.mobile_responses import (
 from app.utils.transactions import request_transaction_rollback
 from app.utils.sql_utils import safe_ilike_pattern
 from app.routes.api.mobile import mobile_bp
+from app.utils.constants import APPEALS_TYPE_DEFAULT_IDS_STR, APPEALS_TYPE_DISPLAY_NAMES
 
 
 @mobile_bp.route('/data/countrymap', methods=['GET'])
@@ -848,6 +850,31 @@ def public_resources():
         total=paginated.total,
         page=paginated.page,
         per_page=paginated.per_page,
+    )
+
+
+@mobile_bp.route('/data/unified-planning-config', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def unified_planning_config():
+    """Public config for unified planning documents: IFRC GO API URL and type IDs.
+
+    The mobile app calls the IFRC API directly using credentials supplied in the app
+    build (not returned here). This endpoint only exposes the canonical base URL and
+    the three AppealsTypeId values (Plan, Mid-Year Report, Annual Report).
+    """
+    base = 'https://go-api.ifrc.org/Api/PublicSiteAppeals'
+    ids = APPEALS_TYPE_DEFAULT_IDS_STR
+    document_types = [
+        {'id': tid, 'label': APPEALS_TYPE_DISPLAY_NAMES[tid]}
+        for tid in sorted(APPEALS_TYPE_DISPLAY_NAMES.keys())
+    ]
+    return mobile_ok(
+        data={
+            'ifrc_public_site_appeals_base_url': base,
+            'appeals_type_ids': ids,
+            'ifrc_public_site_appeals_url': f'{base}?AppealsTypeId={ids}',
+            'document_types': document_types,
+        },
     )
 
 

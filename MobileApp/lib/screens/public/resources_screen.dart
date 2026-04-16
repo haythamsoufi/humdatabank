@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/routes.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/shared/reunified_planning_document.dart';
 import '../../models/shared/resource.dart';
 import '../../providers/public/public_resources_provider.dart';
 import '../../providers/shared/language_provider.dart';
@@ -248,8 +249,15 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
       );
     }
 
-    // ── Empty state ────────────────────────────────────────────────
-    if (!provider.isLoading && provider.resources.isEmpty) {
+    // ── Empty state (library only — reunified section may still show) ─
+    final reunifiedDocs = provider.reunifiedPlanningDocuments;
+    final showReunifiedBlock = provider.reunifiedLoading ||
+        reunifiedDocs.isNotEmpty ||
+        provider.reunifiedErrorCode != null;
+
+    if (!provider.isLoading &&
+        provider.resources.isEmpty &&
+        !showReunifiedBlock) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -273,39 +281,74 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
       );
     }
 
-    // ── Grid ───────────────────────────────────────────────────────
+    // ── Scroll: reunified planning + resource grid ──────────────────
     return RefreshIndicator(
       onRefresh: () => provider.loadResources(locale: language, refresh: true),
       color: Color(AppConstants.ifrcRed),
-      child: GridView.builder(
+      child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 0.66,
-        ),
-        itemCount:
-            provider.resources.length + (provider.isLoadingMore ? 2 : 0),
-        itemBuilder: (context, index) {
-          if (index >= provider.resources.length) {
-            return const _ShimmerCard();
-          }
-          final res = provider.resources[index];
-          return _ResourceCard(
-            key: ValueKey(res.id),
-            resource: res,
-            index: index,
-            currentLanguage: language,
-            onOpen: (url) => _openResource(
-              context,
-              url,
-              title: res.title ?? loc.document,
+        slivers: [
+          if (showReunifiedBlock)
+            SliverToBoxAdapter(
+              child: _ReunifiedPlanningSection(
+                loc: loc,
+                theme: theme,
+                isLoading: provider.reunifiedLoading,
+                errorCode: provider.reunifiedErrorCode,
+                documents: reunifiedDocs,
+                onOpen: (url, title) => _openResource(context, url, title: title),
+              ),
             ),
-          );
-        },
+          if (provider.resources.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.66,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    if (index >= provider.resources.length) {
+                      return const _ShimmerCard();
+                    }
+                    final res = provider.resources[index];
+                    return _ResourceCard(
+                      key: ValueKey(res.id),
+                      resource: res,
+                      index: index,
+                      currentLanguage: language,
+                      onOpen: (url) => _openResource(
+                        context,
+                        url,
+                        title: res.title ?? loc.document,
+                      ),
+                    );
+                  },
+                  childCount:
+                      provider.resources.length + (provider.isLoadingMore ? 2 : 0),
+                ),
+              ),
+            )
+          else if (!provider.isLoading && showReunifiedBlock)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                child: Text(
+                  loc.noResourcesFound,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textSecondaryColor,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
       ),
     );
   }
@@ -378,6 +421,173 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Reunified planning (IFRC GO — client-side) ─────────────────────────────
+
+class _ReunifiedPlanningSection extends StatelessWidget {
+  final AppLocalizations loc;
+  final ThemeData theme;
+  final bool isLoading;
+  final String? errorCode;
+  final List<ReunifiedPlanningDocument> documents;
+  final void Function(String url, String title) onOpen;
+
+  const _ReunifiedPlanningSection({
+    required this.loc,
+    required this.theme,
+    required this.isLoading,
+    required this.errorCode,
+    required this.documents,
+    required this.onOpen,
+  });
+
+  String? _errorMessage() {
+    switch (errorCode) {
+      case 'reunified_error_config':
+        return loc.reunifiedPlanningErrorConfig;
+      case 'reunified_error_credentials':
+        return loc.reunifiedPlanningErrorCredentials;
+      case 'reunified_error_ifrc_auth':
+        return loc.reunifiedPlanningErrorIfrcAuth;
+      case 'reunified_error_ifrc':
+        return loc.reunifiedPlanningErrorIfrc;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final err = _errorMessage();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            loc.resourcesReunifiedSectionTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: context.textColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            loc.resourcesReunifiedSectionSubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: context.textSecondaryColor,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+              ),
+            )
+          else if (err != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(AppConstants.errorColor).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(AppConstants.errorColor).withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 20,
+                    color: Color(AppConstants.errorColor),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      err,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: context.textColor,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (documents.isEmpty)
+            Text(
+              loc.reunifiedPlanningEmpty,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: context.textSecondaryColor,
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: documents.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, i) {
+                final d = documents[i];
+                final meta = <String>[
+                  if (d.documentTypeLabel != null && d.documentTypeLabel!.isNotEmpty)
+                    d.documentTypeLabel!,
+                  if (d.countryName != null && d.countryName!.isNotEmpty)
+                    d.countryName!,
+                  if (d.year != null) '${d.year}',
+                ].join(' · ');
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.picture_as_pdf_rounded,
+                      color: Color(0xFFB71C1C),
+                      size: 22,
+                    ),
+                  ),
+                  title: Text(
+                    d.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: meta.isEmpty
+                      ? null
+                      : Text(
+                          meta,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: context.textSecondaryColor,
+                          ),
+                        ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => onOpen(d.url, d.title),
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 }

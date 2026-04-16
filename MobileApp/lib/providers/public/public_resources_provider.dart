@@ -3,14 +3,20 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../config/app_config.dart';
+import '../../models/shared/reunified_planning_document.dart';
 import '../../models/shared/resource.dart';
 import '../../services/api_service.dart';
+import '../../services/ifrc_reunified_planning_service.dart';
 import '../../utils/debug_logger.dart';
 
 class PublicResourcesProvider with ChangeNotifier {
   final ApiService _api = ApiService();
+  final IfrcReunifiedPlanningService _ifrcReunified = IfrcReunifiedPlanningService.instance;
 
   List<Resource> _resources = [];
+  List<ReunifiedPlanningDocument> _reunifiedPlanningDocuments = [];
+  bool _reunifiedLoading = false;
+  String? _reunifiedErrorCode;
   bool _isLoading = false;
   bool _isLoadingMore = false;
   String? _error;
@@ -33,6 +39,24 @@ class PublicResourcesProvider with ChangeNotifier {
   String get searchQuery => _searchQuery;
   String? get selectedType => _selectedType;
 
+  List<ReunifiedPlanningDocument> get reunifiedPlanningDocuments {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return List.unmodifiable(_reunifiedPlanningDocuments);
+    return _reunifiedPlanningDocuments
+        .where((d) {
+          final hay =
+              '${d.title} ${d.countryName ?? ''} ${d.documentTypeLabel ?? ''} ${d.countryCode ?? ''}'
+                  .toLowerCase();
+          return hay.contains(q);
+        })
+        .toList(growable: false);
+  }
+
+  bool get reunifiedLoading => _reunifiedLoading;
+
+  /// Localization key (see [AppLocalizations]); null when there is no error.
+  String? get reunifiedErrorCode => _reunifiedErrorCode;
+
   /// Load the first page, optionally replacing search/type/locale filters.
   Future<void> loadResources({
     String? search,
@@ -51,6 +75,8 @@ class PublicResourcesProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    final reunifiedFuture = _loadReunifiedPlanningDocuments();
+
     try {
       final items = await _fetchPage(_currentPage);
       _resources = items;
@@ -58,10 +84,12 @@ class PublicResourcesProvider with ChangeNotifier {
       _error = e.toString();
       _resources = [];
       DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Load error: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
+
+    await reunifiedFuture;
+
+    _isLoading = false;
+    notifyListeners();
   }
 
   /// Append the next page when the user scrolls to the bottom.
@@ -120,6 +148,60 @@ class PublicResourcesProvider with ChangeNotifier {
 
     _hasMore = false;
     throw Exception('Failed to load resources (${response.statusCode}).');
+  }
+
+  Future<void> _loadReunifiedPlanningDocuments() async {
+    _reunifiedLoading = true;
+    _reunifiedErrorCode = null;
+    notifyListeners();
+
+    try {
+      final config = await _ifrcReunified.fetchConfig();
+      if (config == null) {
+        _reunifiedPlanningDocuments = [];
+        _reunifiedErrorCode = 'reunified_error_config';
+        return;
+      }
+
+      final listUrl = (config['ifrc_public_site_appeals_url'] as String?)?.trim();
+      if (listUrl == null || listUrl.isEmpty) {
+        _reunifiedPlanningDocuments = [];
+        _reunifiedErrorCode = 'reunified_error_config';
+        return;
+      }
+
+      if (AppConfig.ifrcApiUser.isEmpty || AppConfig.ifrcApiPassword.isEmpty) {
+        _reunifiedPlanningDocuments = [];
+        _reunifiedErrorCode = 'reunified_error_credentials';
+        return;
+      }
+
+      final labels = IfrcReunifiedPlanningService.parseTypeLabels(config);
+      _reunifiedPlanningDocuments = await _ifrcReunified.fetchDocuments(
+        ifrcListUrl: listUrl,
+        typeLabels: labels,
+      );
+      _reunifiedErrorCode = null;
+    } on StateError catch (e) {
+      _reunifiedPlanningDocuments = [];
+      switch (e.message) {
+        case 'missing_credentials':
+          _reunifiedErrorCode = 'reunified_error_credentials';
+          break;
+        case 'ifrc_auth_failed':
+          _reunifiedErrorCode = 'reunified_error_ifrc_auth';
+          break;
+        default:
+          _reunifiedErrorCode = 'reunified_error_ifrc';
+      }
+      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Reunified IFRC: $e');
+    } catch (e) {
+      _reunifiedPlanningDocuments = [];
+      _reunifiedErrorCode = 'reunified_error_ifrc';
+      DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Reunified IFRC: $e');
+    } finally {
+      _reunifiedLoading = false;
+    }
   }
 
   void clearError() {

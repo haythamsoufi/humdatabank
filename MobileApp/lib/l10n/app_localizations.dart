@@ -629,6 +629,18 @@ class AppLocalizations {
       'no_indicators_found': 'No indicators found',
       'no_organizations_found': 'No organizations found',
       'no_resources_found': 'No resources found',
+      'resources_reunified_section_title': 'Reunified plans and reports',
+      'resources_reunified_section_subtitle':
+          'Plans, mid-year reports, and annual reports from IFRC GO (loaded in the app).',
+      'reunified_planning_empty': 'No reunified planning documents match your search.',
+      'reunified_error_config':
+          'Could not load reunified planning settings from the server. Try again later.',
+      'reunified_error_credentials':
+          'IFRC document access is not configured in this app build. Add IFRC_API_USER and IFRC_API_PASSWORD to the app environment.',
+      'reunified_error_ifrc_auth':
+          'IFRC GO rejected the document credentials. Check IFRC_API_USER and IFRC_API_PASSWORD.',
+      'reunified_error_ifrc':
+          'Could not load documents from IFRC GO. Check your connection and try again.',
       'no_plugins_found': 'No plugins found',
       'no_translations_found': 'No translations found',
       'no_documents_found': 'No documents found',
@@ -1629,6 +1641,19 @@ class AppLocalizations {
       'no_indicators_found': 'No se encontraron indicadores',
       'no_organizations_found': 'No se encontraron organizaciones',
       'no_resources_found': 'No se encontraron recursos',
+      'resources_reunified_section_title': 'Planes e informes reunificados',
+      'resources_reunified_section_subtitle':
+          'Planes, informes de mitad de año e informes anuales desde IFRC GO (cargados en la app).',
+      'reunified_planning_empty':
+          'Ningún documento de planificación reunificada coincide con su búsqueda.',
+      'reunified_error_config':
+          'No se pudieron cargar los ajustes de planificación reunificada desde el servidor. Inténtelo más tarde.',
+      'reunified_error_credentials':
+          'El acceso a documentos IFRC no está configurado en esta compilación. Añada IFRC_API_USER e IFRC_API_PASSWORD al entorno de la app.',
+      'reunified_error_ifrc_auth':
+          'IFRC GO rechazó las credenciales de documentos. Compruebe IFRC_API_USER e IFRC_API_PASSWORD.',
+      'reunified_error_ifrc':
+          'No se pudieron cargar documentos desde IFRC GO. Compruebe la conexión e inténtelo de nuevo.',
       'no_plugins_found': 'No se encontraron complementos',
       'no_translations_found': 'No se encontraron traducciones',
       'no_documents_found': 'No se encontraron documentos',
@@ -2518,6 +2543,19 @@ class AppLocalizations {
       'no_indicators_found': 'Aucun indicateur trouvé',
       'no_organizations_found': 'Aucune organisation trouvée',
       'no_resources_found': 'Aucune ressource trouvée',
+      'resources_reunified_section_title': 'Plans et rapports réunifiés',
+      'resources_reunified_section_subtitle':
+          'Plans, rapports de mi-parcours et rapports annuels depuis IFRC GO (chargés dans l’application).',
+      'reunified_planning_empty':
+          'Aucun document de planification réunifiée ne correspond à votre recherche.',
+      'reunified_error_config':
+          'Impossible de charger les paramètres de planification réunifiée depuis le serveur. Réessayez plus tard.',
+      'reunified_error_credentials':
+          'L’accès aux documents IFRC n’est pas configuré dans cette version de l’application. Ajoutez IFRC_API_USER et IFRC_API_PASSWORD à l’environnement de l’application.',
+      'reunified_error_ifrc_auth':
+          'IFRC GO a rejeté les identifiants documentaires. Vérifiez IFRC_API_USER et IFRC_API_PASSWORD.',
+      'reunified_error_ifrc':
+          'Impossible de charger les documents depuis IFRC GO. Vérifiez votre connexion et réessayez.',
       'no_plugins_found': 'Aucun plugin trouvé',
       'no_translations_found': 'Aucune traduction trouvée',
       'no_documents_found': 'Aucun document trouvé',
@@ -5142,6 +5180,19 @@ class AppLocalizations {
       'no_indicators_found': 'Индикаторы не найдены',
       'no_organizations_found': 'Организации не найдены',
       'no_resources_found': 'Ресурсы не найдены',
+      'resources_reunified_section_title': 'Воссоединённые планы и отчёты',
+      'resources_reunified_section_subtitle':
+          'Планы, полугодовые и годовые отчёты из IFRC GO (загружаются в приложении).',
+      'reunified_planning_empty':
+          'Нет документов воссоединённого планирования по вашему запросу.',
+      'reunified_error_config':
+          'Не удалось загрузить настройки воссоединённого планирования с сервера. Попробуйте позже.',
+      'reunified_error_credentials':
+          'Доступ к документам IFRC не настроен в этой сборке. Добавьте IFRC_API_USER и IFRC_API_PASSWORD в окружение приложения.',
+      'reunified_error_ifrc_auth':
+          'IFRC GO отклонил учётные данные для документов. Проверьте IFRC_API_USER и IFRC_API_PASSWORD.',
+      'reunified_error_ifrc':
+          'Не удалось загрузить документы из IFRC GO. Проверьте соединение и повторите попытку.',
       'no_plugins_found': 'Плагины не найдены',
       'no_translations_found': 'Переводы не найдены',
       'no_documents_found': 'Документы не найдены',
@@ -7120,6 +7171,18 @@ class AppLocalizations {
   String get noIndicatorsFound => translate('no_indicators_found');
   String get noOrganizationsFound => translate('no_organizations_found');
   String get noResourcesFound => translate('no_resources_found');
+  String get resourcesReunifiedSectionTitle =>
+      translate('resources_reunified_section_title');
+  String get resourcesReunifiedSectionSubtitle =>
+      translate('resources_reunified_section_subtitle');
+  String get reunifiedPlanningEmpty => translate('reunified_planning_empty');
+  String get reunifiedPlanningErrorConfig =>
+      translate('reunified_error_config');
+  String get reunifiedPlanningErrorCredentials =>
+      translate('reunified_error_credentials');
+  String get reunifiedPlanningErrorIfrcAuth =>
+      translate('reunified_error_ifrc_auth');
+  String get reunifiedPlanningErrorIfrc => translate('reunified_error_ifrc');
   String get noPluginsFound => translate('no_plugins_found');
   String get noTranslationsFound => translate('no_translations_found');
   String get noDocumentsFound => translate('no_documents_found');

@@ -7,11 +7,12 @@ import '../../models/admin/session_log_item.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 /// Loads [GET /api/mobile/v1/admin/analytics/session-logs] and force-logout via
 /// [POST /api/mobile/v1/admin/analytics/sessions/<session_id>/end].
 class SessionLogsProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final ErrorHandler _errorHandler = ErrorHandler();
 
   List<SessionLogItem> _items = [];

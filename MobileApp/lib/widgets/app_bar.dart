@@ -33,7 +33,10 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
         automaticallyImplyLeading: automaticallyImplyLeading,
         actions: actions,
         expandedHeight: 96,
-        collapsedHeight: 44,
+        // Must be >= [toolbarHeight] (default [kToolbarHeight]); a smaller
+        // collapsed height fails SliverAppBar's assertion on current Flutter SDKs.
+        toolbarHeight: kToolbarHeight,
+        collapsedHeight: kToolbarHeight,
         flexibleSpace: FlexibleSpaceBar(
           titlePadding: const EdgeInsets.only(left: 16, bottom: 16, right: 16),
           title: Text(

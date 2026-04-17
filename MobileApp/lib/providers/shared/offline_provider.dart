@@ -7,12 +7,13 @@ import '../../services/storage_service.dart';
 import '../../utils/debug_logger.dart';
 import 'package:http/http.dart' as http;
 import '../../services/user_scope_service.dart';
+import '../../di/service_locator.dart';
 
 /// Provider for managing offline state and sync operations
 class OfflineProvider with ChangeNotifier {
   final ConnectivityService _connectivity = ConnectivityService();
   final OfflineQueueService _queueService = OfflineQueueService();
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService = sl<ApiService>();
   final StorageService _storage = StorageService();
   final UserScopeService _scopeService = UserScopeService();
 

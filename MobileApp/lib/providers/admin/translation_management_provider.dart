@@ -4,9 +4,10 @@ import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 class TranslationManagementProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
 
   /// Matches Backoffice `list_translations` max (`max_per_page=200`).
   static const int _perPage = 200;

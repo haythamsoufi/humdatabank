@@ -7,13 +7,14 @@ import 'api_service.dart';
 import 'storage_service.dart';
 import 'package:http/http.dart' as http;
 import '../utils/debug_logger.dart';
+import '../di/service_locator.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final StorageService _storage = StorageService();
 
   // Get notifications list

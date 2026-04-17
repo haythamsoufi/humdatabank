@@ -7,9 +7,10 @@ import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
 import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 class DocumentManagementProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final ErrorHandler _errorHandler = ErrorHandler();
 
   List<Document> _documents = [];

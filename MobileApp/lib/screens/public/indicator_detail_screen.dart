@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../../providers/public/indicator_bank_provider.dart';
 import '../../models/indicator_bank/indicator.dart';
 import '../../models/indicator_bank/sector.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
-import '../../services/api_service.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_bar.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
-import '../../config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/network_availability.dart';
 
@@ -92,26 +89,10 @@ class _IndicatorDetailScreenState extends State<IndicatorDetailScreen> {
     try {
       final provider =
           Provider.of<IndicatorBankProvider>(context, listen: false);
-      final api = ApiService();
-      final response = await api.get(
-        '${AppConfig.mobilePublicIndicatorBankEndpoint}/${widget.indicatorId}',
-        queryParams: {
-          'locale': locale,  // Pass locale for localized type and unit
-        },
-        includeAuth: false,
-      );
+      final indicatorJson =
+          await provider.fetchIndicatorDetailMap(widget.indicatorId, locale);
 
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        final rawData = decoded['data'];
-        final Map<String, dynamic> indicatorJson;
-        if (rawData is Map<String, dynamic> && rawData.containsKey('indicator')) {
-          indicatorJson = rawData['indicator'] as Map<String, dynamic>;
-        } else if (rawData is Map<String, dynamic>) {
-          indicatorJson = rawData;
-        } else {
-          indicatorJson = decoded;
-        }
+      if (indicatorJson != null) {
         final indicator = Indicator.fromJson(indicatorJson);
 
         // Get provider for sector lookups (captured before await above)

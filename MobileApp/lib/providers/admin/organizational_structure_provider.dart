@@ -4,9 +4,10 @@ import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 class OrganizationalStructureProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
 
   List<Map<String, dynamic>> _organizations = [];
   bool _isLoading = false;

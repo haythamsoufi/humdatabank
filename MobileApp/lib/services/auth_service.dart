@@ -19,6 +19,7 @@ import 'offline_queue_service.dart';
 import 'ai_chat_service.dart';
 import 'ai_chat_persistence_service.dart';
 import 'push_notification_service.dart';
+import '../di/service_locator.dart';
 
 /// Session state enum
 enum SessionState {
@@ -46,7 +47,7 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final StorageService _storage = StorageService();
   final SessionService _session = SessionService();
   final JwtTokenService _jwtService = JwtTokenService();

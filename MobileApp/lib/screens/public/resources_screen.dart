@@ -16,6 +16,7 @@ import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/countries_widget.dart';
 import '../../widgets/ios_button.dart';
+import '../../widgets/error_state.dart';
 
 class ResourcesScreen extends StatefulWidget {
   const ResourcesScreen({super.key});
@@ -182,13 +183,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                 onSelected: _applyType,
               ),
 
-              _UnifiedPlanningEntryRow(
-                onOpen: () => Navigator.of(context).pushNamed(
-                  AppRoutes.unifiedPlanningDocuments,
-                ),
-              ),
-
-              // ── Content area ───────────────────────────────────────
+              // ── Content area (includes scrollable unified-planning banner) ──
               Expanded(
                 child: _buildBody(context, provider, loc, theme, language),
               ),
@@ -228,50 +223,15 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
     if (provider.error != null &&
         ((provider.groupedMode && provider.sections.isEmpty) ||
             (!provider.groupedMode && provider.resources.isEmpty))) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(AppConstants.errorColor).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.wifi_off_rounded,
-                  size: 52,
-                  color: Color(AppConstants.errorColor),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                provider.error!,
-                style: TextStyle(
-                  color: context.textSecondaryColor,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: () {
-                  provider.clearError();
-                  provider.loadResources(locale: language, refresh: true);
-                },
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: Text(loc.retry),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Color(AppConstants.ifrcRed),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 12),
-                ),
-              ),
-            ],
-          ),
+      return Padding(
+        padding: const EdgeInsets.all(32),
+        child: AppErrorState.network(
+          message: provider.error!,
+          onRetry: () {
+            provider.clearError();
+            provider.loadResources(locale: language, refresh: true);
+          },
+          retryLabel: loc.retry,
         ),
       );
     }
@@ -314,6 +274,13 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
           controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
+            SliverToBoxAdapter(
+              child: _UnifiedPlanningEntryRow(
+                onOpen: () => Navigator.of(context).pushNamed(
+                  AppRoutes.unifiedPlanningDocuments,
+                ),
+              ),
+            ),
             if (provider.groupedCapped)
               SliverToBoxAdapter(
                 child: Padding(
@@ -376,6 +343,13 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          SliverToBoxAdapter(
+            child: _UnifiedPlanningEntryRow(
+              onOpen: () => Navigator.of(context).pushNamed(
+                AppRoutes.unifiedPlanningDocuments,
+              ),
+            ),
+          ),
           if (provider.resources.isNotEmpty)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
@@ -593,26 +567,11 @@ class _UnifiedPlanningEntryRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.resourcesUnifiedPlanningSectionTitle,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        loc.resourcesUnifiedPlanningSectionSubtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: context.textSecondaryColor,
-                          height: 1.25,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  child: Text(
+                    loc.resourcesUnifiedPlanningSectionTitle,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 Icon(

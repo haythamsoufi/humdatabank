@@ -15,6 +15,9 @@ import '../../widgets/countries_widget.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/ios_button.dart';
+import '../../widgets/loading_indicator.dart';
+import '../../widgets/error_state.dart';
+import '../../widgets/async/async_body.dart';
 import '../../config/routes.dart';
 import '../../utils/navigation_helper.dart';
 import '../../l10n/app_localizations.dart';
@@ -340,90 +343,28 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
               child: Builder(
                 builder: (context) {
                   final provider = indicatorProvider;
-                  if (provider.isLoading && provider.allIndicators.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Color(AppConstants.ifrcRed),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            localizations.indicatorBankLoading,
-                            style: IOSTextStyle.subheadline(
-                              context,
-                            ).copyWith(color: context.textSecondaryColor),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (provider.error != null &&
-                      provider.allIndicators.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              size: 48,
-                              color: Color(AppConstants.errorColor),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              localizations.indicatorBankError,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: context.textColor,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              provider.error!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Color(AppConstants.textSecondary),
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                provider.loadData(
-                                  locale: languageProvider.currentLanguage,
-                                  forceRefresh: true,
-                                );
-                              },
-                              icon: const Icon(Icons.refresh, size: 18),
-                              label: Text(localizations.retry),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Color(AppConstants.ifrcRed),
-                                side: BorderSide(
-                                  color: Color(AppConstants.ifrcRed),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  return RefreshIndicator(
+                  return AsyncBody(
+                    whenLoading:
+                        provider.isLoading && provider.allIndicators.isEmpty,
+                    whenError: provider.error != null &&
+                        provider.allIndicators.isEmpty,
+                    loading: AppLoadingIndicator(
+                      message: localizations.indicatorBankLoading,
+                      color: Color(AppConstants.ifrcRed),
+                    ),
+                    error: AppErrorState(
+                      title: localizations.indicatorBankError,
+                      message: provider.error,
+                      onRetry: () {
+                        provider.loadData(
+                          locale: languageProvider.currentLanguage,
+                          forceRefresh: true,
+                        );
+                      },
+                      retryLabel: localizations.retry,
+                      retryStyle: AppErrorRetryStyle.materialOutlined,
+                    ),
+                    child: RefreshIndicator(
                     onRefresh: () => provider.loadData(
                       locale: languageProvider.currentLanguage,
                       forceRefresh: true,
@@ -457,6 +398,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                           _buildTableView(provider),
                       ],
                     ),
+                  ),
                   );
                 },
               ),

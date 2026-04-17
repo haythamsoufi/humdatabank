@@ -16,6 +16,7 @@ import 'api_service.dart';
 import '../utils/network_availability.dart';
 import 'storage_service.dart';
 import '../utils/debug_logger.dart';
+import '../di/service_locator.dart';
 
 /// Top-level function to handle background messages
 @pragma('vm:entry-point')
@@ -45,7 +46,7 @@ class PushNotificationService {
 
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
 
   bool _initialized = false;
   String? _currentToken;

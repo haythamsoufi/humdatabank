@@ -142,6 +142,10 @@ class AppRouter {
       final map = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
       final url = map['url']?.toString().trim();
       final filePath = map['filePath']?.toString().trim();
+      final thumbRaw = map['thumbnailCacheUrl']?.toString();
+      final thumbnailCacheUrl = thumbRaw != null && thumbRaw.trim().isNotEmpty
+          ? thumbRaw.trim()
+          : null;
       final title = map['title']?.toString().trim() ?? 'Document';
       final hasUrl = url != null && url.isNotEmpty;
       final hasFile = filePath != null && filePath.isNotEmpty;
@@ -165,6 +169,7 @@ class AppRouter {
           title: title,
           url: hasUrl ? url : null,
           localFilePath: hasFile ? filePath : null,
+          thumbnailCacheUrl: thumbnailCacheUrl,
         ),
       );
     }

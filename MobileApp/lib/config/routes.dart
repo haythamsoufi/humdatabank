@@ -28,6 +28,8 @@ class AppRoutes {
   static String editIndicator(int id) => '/admin/indicator_bank/edit/$id';
   static const String userAnalytics = '/admin/analytics/dashboard';
   static const String auditTrail = '/admin/analytics/audit-trail';
+  static const String loginLogs = '/admin/login-logs';
+  static const String sessionLogs = '/admin/session-logs';
   static const String apiManagement = '/api-management';
   static const String pushNotifications = '/admin/push-notifications';
 
@@ -78,6 +80,8 @@ class AppRoutes {
       '/admin/indicator_bank',
       '/admin/analytics/dashboard',
       '/admin/analytics/audit-trail',
+      '/admin/login-logs',
+      '/admin/session-logs',
     };
     if (exact.contains(path)) return true;
 

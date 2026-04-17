@@ -8,6 +8,7 @@ import '../utils/url_helper.dart';
 import '../config/app_config.dart';
 import '../config/routes.dart';
 import 'dart:convert';
+import '../di/service_locator.dart';
 
 class CountriesWidget extends StatefulWidget {
   const CountriesWidget({super.key});
@@ -17,7 +18,7 @@ class CountriesWidget extends StatefulWidget {
 }
 
 class _CountriesWidgetState extends State<CountriesWidget> {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService = sl<ApiService>();
   List<Map<String, dynamic>> _countries = [];
   bool _isLoading = true;
   String? _error;

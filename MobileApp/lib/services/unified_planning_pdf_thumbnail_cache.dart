@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -21,6 +23,9 @@ import '../utils/debug_logger.dart';
 /// Caches bytes in memory for the session and on disk under the application cache
 /// directory (survives app restarts; pruned by LRU when file count grows large).
 /// Web builds skip disk (no `dart:io`).
+///
+/// Local JPEGs (e.g. rendered after opening [PdfViewerScreen]) are merged via
+/// [ingestLocalJpeg]; subscribers use [thumbnailReady].
 class UnifiedPlanningPdfThumbnailCache {
   UnifiedPlanningPdfThumbnailCache._();
   static final UnifiedPlanningPdfThumbnailCache instance =
@@ -38,14 +43,27 @@ class UnifiedPlanningPdfThumbnailCache {
   /// Max JPEG files on disk; oldest modified files are removed when over budget.
   static const int _maxDiskFiles = 400;
 
-  final Map<String, Uint8List?> _cache = {};
+  /// Success-only memory cache (failed server fetches are not stored).
+  final Map<String, Uint8List> _cache = {};
   final Map<String, Future<Uint8List?>> _inFlight = {};
+
+  final StreamController<String> _thumbnailReadyController =
+      StreamController<String>.broadcast();
+
+  /// Fires [url] (trimmed) after a JPEG is stored from server or [ingestLocalJpeg].
+  Stream<String> get thumbnailReady => _thumbnailReadyController.stream;
+
   int _activeLoads = 0;
   static const int _maxConcurrent = 4;
+  final Queue<Completer<void>> _slotWaiters = Queue<Completer<void>>();
+
+  http.Client? _httpClient;
 
   Directory? _diskDir;
   Future<Directory?>? _diskDirFuture;
   bool _diskInitFailed = false;
+
+  static String _normKey(String url) => url.trim();
 
   /// Resolves the on-disk cache folder early (e.g. from [loadUnifiedPlanningDocuments])
   /// so the first thumbnail reads do not pay [getApplicationCacheDirectory] latency alone.
@@ -53,21 +71,40 @@ class UnifiedPlanningPdfThumbnailCache {
     await _cacheDir();
   }
 
+  /// Store a JPEG produced on-device (e.g. first page render). Updates memory, disk, and [thumbnailReady].
+  Future<void> ingestLocalJpeg(String url, Uint8List jpeg) async {
+    final key = _normKey(url);
+    if (key.isEmpty) return;
+    if (!_isJpeg(jpeg) || jpeg.length > _maxBytes) {
+      DebugLogger.logErrorWithTag(
+        'PDF_THUMB',
+        'ingestLocalJpeg: invalid JPEG or over max (${jpeg.length} bytes)',
+      );
+      return;
+    }
+    _cache[key] = jpeg;
+    await _writeDisk(key, jpeg);
+    if (!_thumbnailReadyController.isClosed) {
+      _thumbnailReadyController.add(key);
+    }
+  }
+
   /// Synchronous read from memory or disk when [warmCacheDirectory] has already run
   /// (no server I/O). Use from card [initState] so the first frame can show cached JPEGs.
   Uint8List? readThumbnailSync(String url) {
-    if (_cache.containsKey(url)) {
-      return _cache[url];
+    final key = _normKey(url);
+    if (_cache.containsKey(key)) {
+      return _cache[key];
     }
     if (kIsWeb || _diskInitFailed) return null;
     final dir = _diskDir;
     if (dir == null) return null;
     try {
-      final file = File(p.join(dir.path, '${_urlKey(url)}.jpg'));
+      final file = File(p.join(dir.path, '${_urlKey(key)}.jpg'));
       if (!file.existsSync()) return null;
       final bytes = file.readAsBytesSync();
       if (!_isJpeg(bytes)) return null;
-      _cache[url] = bytes;
+      _cache[key] = bytes;
       return bytes;
     } catch (_) {
       return null;
@@ -78,21 +115,38 @@ class UnifiedPlanningPdfThumbnailCache {
   ///
   /// Order: **memory → disk → server** (server only on miss).
   Future<Uint8List?> getThumbnail(String url) {
-    if (_cache.containsKey(url)) {
-      return Future<Uint8List?>.value(_cache[url]);
+    final key = _normKey(url);
+    if (_cache.containsKey(key)) {
+      return Future<Uint8List?>.value(_cache[key]);
     }
     return _inFlight.putIfAbsent(
-      url,
-      () => _load(url).whenComplete(() => _inFlight.remove(url)),
+      key,
+      () => _load(key).whenComplete(() => _inFlight.remove(key)),
     );
   }
 
-  Future<Uint8List?> _load(String url) async {
+  Future<void> _acquireNetworkSlot() async {
+    while (_activeLoads >= _maxConcurrent) {
+      final c = Completer<void>();
+      _slotWaiters.addLast(c);
+      await c.future;
+    }
+    _activeLoads++;
+  }
+
+  void _releaseNetworkSlot() {
+    _activeLoads--;
+    if (_slotWaiters.isNotEmpty) {
+      _slotWaiters.removeFirst().complete();
+    }
+  }
+
+  Future<Uint8List?> _load(String key) async {
     // Disk hits must not wait on the network semaphore — otherwise a grid of
     // thumbnails after cold start queues 4-at-a-time and feels sluggish.
-    final fromDisk = await _readDisk(url);
+    final fromDisk = await _readDisk(key);
     if (fromDisk != null) {
-      _cache[url] = fromDisk;
+      _cache[key] = fromDisk;
       return fromDisk;
     }
 
@@ -101,21 +155,21 @@ class UnifiedPlanningPdfThumbnailCache {
       return null;
     }
 
-    while (_activeLoads >= _maxConcurrent) {
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-    }
-    _activeLoads++;
+    await _acquireNetworkSlot();
     try {
-      final bytes = await _fetchServerThumbnail(url);
+      final bytes = await _fetchServerThumbnail(key);
       if (bytes != null && bytes.isNotEmpty) {
-        _cache[url] = bytes;
-        await _writeDisk(url, bytes);
+        _cache[key] = bytes;
+        await _writeDisk(key, bytes);
+        if (!_thumbnailReadyController.isClosed) {
+          _thumbnailReadyController.add(key);
+        }
         return bytes;
       }
-      _cache[url] = null;
+      // Do not store failure — allows later retries (reconnect, refresh, etc.).
       return null;
     } finally {
-      _activeLoads--;
+      _releaseNetworkSlot();
     }
   }
 
@@ -232,7 +286,8 @@ class UnifiedPlanningPdfThumbnailCache {
       headers['Authorization'] = 'Bearer $key';
     }
 
-    final client = http.Client();
+    _httpClient ??= http.Client();
+    final client = _httpClient!;
     try {
       final req = http.Request('POST', uri)
         ..headers.addAll(headers)
@@ -274,8 +329,6 @@ class UnifiedPlanningPdfThumbnailCache {
     } catch (e, st) {
       DebugLogger.logErrorWithTag('PDF_THUMB', '$e\n$st');
       return null;
-    } finally {
-      client.close();
     }
   }
 

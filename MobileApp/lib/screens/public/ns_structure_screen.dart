@@ -8,6 +8,7 @@ import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
 import 'dart:convert';
+import '../../di/service_locator.dart';
 
 class NSStructureScreen extends StatefulWidget {
   final int? countryId;
@@ -19,7 +20,7 @@ class NSStructureScreen extends StatefulWidget {
 }
 
 class _NSStructureScreenState extends State<NSStructureScreen> {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService = sl<ApiService>();
   List<Map<String, dynamic>> _branches = [];
   List<Map<String, dynamic>> _subbranches = [];
   bool _isLoading = true;

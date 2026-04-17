@@ -10,6 +10,7 @@ import '../../config/routes.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/network_availability.dart';
 import 'dart:convert';
+import '../../di/service_locator.dart';
 
 class CountriesScreen extends StatefulWidget {
   const CountriesScreen({super.key});
@@ -19,7 +20,7 @@ class CountriesScreen extends StatefulWidget {
 }
 
 class _CountriesScreenState extends State<CountriesScreen> {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService = sl<ApiService>();
   final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _countries = [];
   bool _isLoading = true;

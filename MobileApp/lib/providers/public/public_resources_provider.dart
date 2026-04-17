@@ -12,9 +12,10 @@ import '../../services/ifrc_unified_planning_service.dart';
 import '../../services/unified_planning_pdf_thumbnail_cache.dart';
 import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 class PublicResourcesProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final IfrcUnifiedPlanningService _ifrcUnified = IfrcUnifiedPlanningService.instance;
 
   List<Resource> _resources = [];

@@ -169,7 +169,7 @@ class _UnifiedPlanningAnalyticsScreenState
 
           body = RefreshIndicator(
             onRefresh: () => provider.loadUnifiedPlanningDocuments(),
-            color: Color(AppConstants.ifrcRed),
+            color: theme.colorScheme.primary,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -229,7 +229,7 @@ class _UnifiedPlanningAnalyticsScreenState
                 icon: Badge(
                   isLabelVisible: _criteria.isRestricted,
                   smallSize: 7,
-                  backgroundColor: Color(AppConstants.ifrcRed),
+                  backgroundColor: theme.colorScheme.primary,
                   child: const Icon(Icons.filter_list_rounded),
                 ),
               ),
@@ -388,7 +388,7 @@ class _AnalyticsLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brand = Color(AppConstants.ifrcRed);
+    final accent = theme.colorScheme.primary;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -416,8 +416,8 @@ class _AnalyticsLoading extends StatelessWidget {
                 height: 40,
                 child: CircularProgressIndicator(
                   strokeWidth: 3,
-                  color: brand,
-                  backgroundColor: brand.withValues(alpha: 0.15),
+                  color: accent,
+                  backgroundColor: accent.withValues(alpha: 0.14),
                 ),
               ),
               const SizedBox(height: 20),
@@ -445,7 +445,13 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Color(AppConstants.ifrcRed);
+    final top = theme.colorScheme.primary;
+    final bottom = Color.lerp(
+          top,
+          Color(AppConstants.ifrcNavy),
+          theme.brightness == Brightness.dark ? 0.35 : 0.55,
+        ) ??
+        top;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -457,14 +463,11 @@ class _SectionTitle extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                accent,
-                Color(AppConstants.ifrcDarkRed),
-              ],
+              colors: [top, bottom],
             ),
             boxShadow: [
               BoxShadow(
-                color: accent.withValues(alpha: 0.35),
+                color: top.withValues(alpha: 0.22),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -558,9 +561,12 @@ class _SummaryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brand = Color(AppConstants.ifrcRed);
-    final fill = theme.colorScheme.surfaceContainerHighest.withValues(
-      alpha: theme.brightness == Brightness.dark ? 0.42 : 0.55,
+    final accent = theme.colorScheme.primary;
+    final fill = Color.alphaBlend(
+      accent.withValues(alpha: theme.brightness == Brightness.dark ? 0.06 : 0.04),
+      theme.colorScheme.surfaceContainerHighest.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.42 : 0.55,
+      ),
     );
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -586,11 +592,15 @@ class _SummaryTile extends StatelessWidget {
             DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: brand.withValues(alpha: 0.12),
-                border: Border.all(color: brand.withValues(alpha: 0.2)),
+                color: theme.colorScheme.primaryContainer.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.55 : 0.65,
+                ),
+                border: Border.all(
+                  color: accent.withValues(alpha: 0.18),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: brand.withValues(alpha: 0.12),
+                    color: accent.withValues(alpha: 0.08),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -598,7 +608,7 @@ class _SummaryTile extends StatelessWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child: Icon(icon, size: 22, color: brand),
+                child: Icon(icon, size: 22, color: accent),
               ),
             ),
             const Spacer(),
@@ -697,9 +707,11 @@ class _YearTypeGroupedByYearSection extends StatelessWidget {
                       DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
-                          color: Color(AppConstants.ifrcRed).withValues(alpha: 0.12),
+                          color: theme.colorScheme.primaryContainer.withValues(
+                            alpha: theme.brightness == Brightness.dark ? 0.5 : 0.72,
+                          ),
                           border: Border.all(
-                            color: Color(AppConstants.ifrcRed).withValues(alpha: 0.22),
+                            color: theme.colorScheme.primary.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Padding(
@@ -708,7 +720,7 @@ class _YearTypeGroupedByYearSection extends StatelessWidget {
                             '${groups[gi].yearTotal}',
                             style: theme.textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: Color(AppConstants.ifrcRed),
+                              color: theme.colorScheme.onPrimaryContainer,
                               height: 1,
                             ),
                           ),

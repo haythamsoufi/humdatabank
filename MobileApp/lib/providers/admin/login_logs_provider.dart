@@ -7,10 +7,11 @@ import '../../models/admin/login_log_item.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 /// Loads [GET /api/mobile/v1/admin/analytics/login-logs] (JWT auth, `admin.analytics.view`).
 class LoginLogsProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final ErrorHandler _errorHandler = ErrorHandler();
 
   List<LoginLogItem> _items = [];

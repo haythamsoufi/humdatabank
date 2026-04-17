@@ -5,6 +5,7 @@ import '../providers/shared/language_provider.dart';
 import '../utils/constants.dart';
 import '../utils/theme_extensions.dart';
 import 'dart:convert';
+import '../di/service_locator.dart';
 
 class NSStructureWidget extends StatefulWidget {
   final int countryId;
@@ -16,7 +17,7 @@ class NSStructureWidget extends StatefulWidget {
 }
 
 class _NSStructureWidgetState extends State<NSStructureWidget> {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService = sl<ApiService>();
   List<Map<String, dynamic>> _branches = [];
   List<Map<String, dynamic>> _subbranches = [];
   bool _isLoading = true;

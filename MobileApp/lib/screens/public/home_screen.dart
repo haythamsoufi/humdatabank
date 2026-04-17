@@ -151,6 +151,13 @@ class _HomeScreenState extends State<HomeScreen>
         onTap: () => Navigator.of(context).pushNamed(AppRoutes.resources),
       ),
       LandingShortcutItem(
+        icon: Icons.picture_as_pdf_rounded,
+        title: l10n.resourcesUnifiedPlanningSectionTitle,
+        subtitle: l10n.resourcesUnifiedPlanningSectionSubtitle,
+        onTap: () => Navigator.of(context)
+            .pushNamed(AppRoutes.unifiedPlanningDocuments),
+      ),
+      LandingShortcutItem(
         icon: Icons.public_rounded,
         title: l10n.countries,
         subtitle: l10n.homeLandingShortcutCountriesSubtitle,

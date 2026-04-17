@@ -7,6 +7,7 @@ import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
@@ -18,9 +19,13 @@ class UserAnalyticsScreen extends StatefulWidget {
   State<UserAnalyticsScreen> createState() => _UserAnalyticsScreenState();
 }
 
-class _UserAnalyticsScreenState extends State<UserAnalyticsScreen> {
+class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
+    with AdminScreenViewLoggingMixin {
   String _selectedTimeRange = '7d';
   String? _selectedMetricFilter;
+
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.userAnalytics;
 
   @override
   void initState() {

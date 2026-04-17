@@ -1,12 +1,13 @@
 import 'package:flutter/foundation.dart';
-import 'dart:convert';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
 import '../../models/indicator_bank/indicator.dart';
 import '../../models/indicator_bank/sector.dart';
 import '../../config/app_config.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/mobile_api_json.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 class RateLimitException implements Exception {
   final String message;
@@ -19,7 +20,7 @@ class RateLimitException implements Exception {
 }
 
 class IndicatorBankProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final ErrorHandler _errorHandler = ErrorHandler();
   static const Duration _cacheDuration = Duration(minutes: 20);
 
@@ -230,9 +231,9 @@ class IndicatorBankProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final body = decodeJsonObject(response.body);
         // Mobile API envelope: { success, data: { sectors: [...] }, meta } — each sector includes nested subsectors
-        final payload = (body['data'] as Map<String, dynamic>?) ?? {};
+        final payload = mobileDataMapLoose(body);
         final sectorsRaw = (payload['sectors'] as List<dynamic>?) ?? [];
 
         // Process localized names based on locale from raw JSON
@@ -640,9 +641,9 @@ class IndicatorBankProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final body = decodeJsonObject(response.body);
         // Mobile API envelope: { ok, data: [...items...], meta: { total, page, ... } }
-        final indicatorsRaw = (body['data'] as List<dynamic>?) ?? [];
+        final indicatorsRaw = mobileDataListLoose(body);
 
         // Process indicators to extract localized names and definitions
         final indicatorsList = indicatorsRaw.map((indicatorJson) {
@@ -948,6 +949,36 @@ class IndicatorBankProvider with ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Fetches a single indicator JSON map (for detail when not in cache). Returns `null` on failure or offline.
+  Future<Map<String, dynamic>?> fetchIndicatorDetailMap(
+    int indicatorId,
+    String locale,
+  ) async {
+    if (shouldDeferRemoteFetch) {
+      return null;
+    }
+    try {
+      final response = await _api.get(
+        '${AppConfig.mobilePublicIndicatorBankEndpoint}/$indicatorId',
+        queryParams: {
+          'locale': locale,
+        },
+        includeAuth: false,
+      );
+      if (response.statusCode != 200) {
+        return null;
+      }
+      final root = decodeJsonObject(response.body);
+      return resolveIndicatorDetailPayload(root);
+    } catch (e, stackTrace) {
+      DebugLogger.logWarn(
+        'INDICATOR_BANK',
+        'fetchIndicatorDetailMap failed: $e\n$stackTrace',
+      );
+      return null;
     }
   }
 

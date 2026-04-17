@@ -468,6 +468,8 @@ class AppLocalizations {
       'offline_form_save_failed': 'Could not save the form offline. Try again when you have a stable connection.',
       'offline_form_not_downloaded': 'This form is not available offline. Download it while you are online.',
       'offline_download_requires_connection': 'Connect to the internet to download this form for offline use.',
+      'offline_form_export_requires_connection':
+          'Connect to the internet to export PDF, Excel, or validation reports. The offline copy does not include exports.',
       'offline_open_saved_copy': 'Open saved offline copy',
       'remove_offline_copy': 'Remove offline copy',
       'offline_form_removed': 'Offline copy removed. Download again when online.',
@@ -1532,6 +1534,8 @@ class AppLocalizations {
       'offline_form_save_failed': 'No se pudo guardar el formulario sin conexión. Inténtelo de nuevo con una conexión estable.',
       'offline_form_not_downloaded': 'Este formulario no está disponible sin conexión. Descárguelo mientras esté en línea.',
       'offline_download_requires_connection': 'Conéctese a internet para descargar este formulario para uso sin conexión.',
+      'offline_form_export_requires_connection':
+          'Conéctese a internet para exportar PDF, Excel o informes de validación. La copia sin conexión no incluye exportaciones.',
       'offline_open_saved_copy': 'Abrir copia sin conexión guardada',
       'remove_offline_copy': 'Quitar copia sin conexión',
       'offline_form_removed':
@@ -2448,6 +2452,8 @@ class AppLocalizations {
       'offline_form_save_failed': 'Impossible d’enregistrer le formulaire hors ligne. Réessayez avec une connexion stable.',
       'offline_form_not_downloaded': 'Ce formulaire n’est pas disponible hors ligne. Téléchargez-le en étant connecté.',
       'offline_download_requires_connection': 'Connectez-vous à Internet pour télécharger ce formulaire pour une utilisation hors ligne.',
+      'offline_form_export_requires_connection':
+          'Connectez-vous à Internet pour exporter PDF, Excel ou rapports de validation. La copie hors ligne n’inclut pas les exports.',
       'offline_open_saved_copy': 'Ouvrir la copie hors ligne enregistrée',
       'remove_offline_copy': 'Supprimer la copie hors ligne',
       'offline_form_removed':
@@ -3358,6 +3364,8 @@ class AppLocalizations {
       'offline_form_save_failed': 'تعذر حفظ النموذج دون اتصال. أعد المحاولة عند توفر اتصال مستقر.',
       'offline_form_not_downloaded': 'هذا النموذج غير متاح دون اتصال. قم بتنزيله أثناء الاتصال بالإنترنت.',
       'offline_download_requires_connection': 'اتصل بالإنترنت لتنزيل هذا النموذج للاستخدام دون اتصال.',
+      'offline_form_export_requires_connection':
+          'اتصل بالإنترنت لتصدير PDF أو Excel أو تقارير التحقق. النسخة دون اتصال لا تتضمن ملفات التصدير.',
       'offline_open_saved_copy': 'فتح النسخة المحفوظة دون اتصال',
       'remove_offline_copy': 'إزالة النسخة دون اتصال',
       'offline_form_removed':
@@ -4250,6 +4258,8 @@ class AppLocalizations {
       'offline_form_save_failed': 'फ़ॉर्म ऑफ़लाइन सहेजा नहीं जा सका। स्थिर कनेक्शन पर पुनः प्रयास करें।',
       'offline_form_not_downloaded': 'यह फ़ॉर्म ऑफ़लाइन उपलब्ध नहीं है। ऑनलाइन रहते हुए इसे डाउनलोड करें।',
       'offline_download_requires_connection': 'ऑफ़लाइन उपयोग के लिए इस फ़ॉर्म को डाउनलोड करने हेतु इंटरनेट से जुड़ें।',
+      'offline_form_export_requires_connection':
+          'PDF, Excel या सत्यापन रिपोर्ट निर्यात करने के लिए इंटरनेट से जुड़ें। ऑफ़लाइन प्रति में निर्यात शामिल नहीं हैं।',
       'offline_open_saved_copy': 'सहेजी गई ऑफ़लाइन प्रति खोलें',
       'remove_offline_copy': 'ऑफ़लाइन प्रति हटाएँ',
       'offline_form_removed':
@@ -5160,6 +5170,8 @@ class AppLocalizations {
       'offline_form_save_failed': 'Не удалось сохранить форму офлайн. Повторите при стабильном соединении.',
       'offline_form_not_downloaded': 'Эта форма недоступна офлайн. Скачайте её при подключении к сети.',
       'offline_download_requires_connection': 'Подключитесь к интернету, чтобы скачать эту форму для офлайн-использования.',
+      'offline_form_export_requires_connection':
+          'Подключитесь к интернету, чтобы экспортировать PDF, Excel или отчёты проверки. Офлайн-копия не содержит файлов экспорта.',
       'offline_open_saved_copy': 'Открыть сохранённую офлайн-копию',
       'remove_offline_copy': 'Удалить офлайн-копию',
       'offline_form_removed':
@@ -6048,6 +6060,8 @@ class AppLocalizations {
       'offline_form_save_failed': '无法离线保存表单。请在网络稳定时重试。',
       'offline_form_not_downloaded': '此表单无法离线使用。请在联网时下载。',
       'offline_download_requires_connection': '请连接互联网以下载此表单以供离线使用。',
+      'offline_form_export_requires_connection':
+          '请连接互联网以导出 PDF、Excel 或验证报告。离线副本不包含导出文件。',
       'offline_open_saved_copy': '打开已保存的离线副本',
       'remove_offline_copy': '删除离线副本',
       'offline_form_removed': '已删除离线副本。联网后请重新下载。',
@@ -7174,6 +7188,8 @@ class AppLocalizations {
       translate('offline_form_not_downloaded');
   String get offlineDownloadRequiresConnection =>
       translate('offline_download_requires_connection');
+  String get offlineFormExportRequiresConnection =>
+      translate('offline_form_export_requires_connection');
   String get offlineOpenSavedCopy => translate('offline_open_saved_copy');
   String get removeOfflineCopy => translate('remove_offline_copy');
   String get offlineFormRemoved => translate('offline_form_removed');

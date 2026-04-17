@@ -210,7 +210,7 @@ class AdminScreen extends StatelessWidget {
                         onNavigate: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              settings: const RouteSettings(name: '/admin/login-logs'),
+                              settings: const RouteSettings(name: AppRoutes.loginLogs),
                               builder: (context) => const LoginLogsScreen(),
                             ),
                           );
@@ -224,7 +224,7 @@ class AdminScreen extends StatelessWidget {
                         onNavigate: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              settings: const RouteSettings(name: '/admin/session-logs'),
+                              settings: const RouteSettings(name: AppRoutes.sessionLogs),
                               builder: (context) => const SessionLogsScreen(),
                             ),
                           );

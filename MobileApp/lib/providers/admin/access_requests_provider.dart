@@ -7,11 +7,13 @@ import '../../config/app_config.dart';
 import '../../models/admin/country_access_request_item.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
+import '../../utils/mobile_api_json.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 /// Country access requests via [GET /api/mobile/v1/admin/access-requests] and actions.
 class AccessRequestsProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final ErrorHandler _errorHandler = ErrorHandler();
 
   List<CountryAccessRequestItem> _pending = [];
@@ -75,11 +77,9 @@ class AccessRequestsProvider with ChangeNotifier {
 
     if (response.statusCode == 200) {
       try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic> && decoded['success'] == true) {
-          final rawData = decoded['data'] is Map<String, dynamic>
-              ? decoded['data'] as Map<String, dynamic>
-              : decoded;
+        final decoded = decodeJsonObject(response.body);
+        if (mobileResponseIsSuccess(decoded)) {
+          final rawData = mobileNestedDataOrRootMap(decoded);
           final p = rawData['pending'];
           final r = rawData['processed'];
           _pending = p is List
@@ -189,8 +189,8 @@ class AccessRequestsProvider with ChangeNotifier {
     }
 
     try {
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map<String, dynamic> && decoded['success'] == true) {
+      final decoded = decodeJsonObject(response.body);
+      if (mobileResponseIsSuccess(decoded)) {
         await load(showLoading: false);
         return true;
       }

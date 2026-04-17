@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -154,7 +155,11 @@ class _UnifiedPlanningDocumentsScreenState
   void _openPdf(BuildContext context, String url, String title) {
     Navigator.of(context).pushNamed(
       AppRoutes.pdfViewer,
-      arguments: <String, String>{'url': url, 'title': title},
+      arguments: <String, String>{
+        'url': url,
+        'title': title,
+        'thumbnailCacheUrl': url,
+      },
     );
   }
 
@@ -636,6 +641,7 @@ class _UnifiedPlanningDocCardState extends State<_UnifiedPlanningDocCard>
   late final AnimationController _pressController;
   late final Animation<double> _scale;
   Uint8List? _thumbJpeg;
+  StreamSubscription<String>? _thumbReadySub;
 
   static List<Color> _gradientForDoc(UnifiedPlanningDocument d) {
     final label = (d.documentTypeLabel ?? '').toLowerCase();
@@ -674,10 +680,20 @@ class _UnifiedPlanningDocCardState extends State<_UnifiedPlanningDocCard>
       if (bytes == _thumbJpeg) return;
       setState(() => _thumbJpeg = bytes);
     });
+    final docUrl = widget.document.url.trim();
+    _thumbReadySub = cache.thumbnailReady.listen((u) {
+      if (u.trim() != docUrl) return;
+      if (!mounted) return;
+      final b = cache.readThumbnailSync(widget.document.url);
+      if (b != null && b.isNotEmpty) {
+        setState(() => _thumbJpeg = b);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _thumbReadySub?.cancel();
     _pressController.dispose();
     super.dispose();
   }

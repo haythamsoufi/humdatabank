@@ -105,6 +105,19 @@ class WebViewService {
         path.contains('/validation_summary');
   }
 
+  /// True when a saved offline bundle resolves an export/validation link to
+  /// `file:///…/forms/assignment_status/…` — those handlers exist only on the
+  /// server, so loading them in the WebView yields `net::ERR_FILE_NOT_FOUND`.
+  static bool isOfflineBundleServerOnlyAssignmentExport(Uri? url) {
+    if (url == null) return false;
+    if (url.scheme != 'file') return false;
+    final path = url.path;
+    if (!path.contains('/forms/assignment_status/')) return false;
+    return path.contains('/export_pdf') ||
+        path.contains('/export_excel') ||
+        path.contains('/validation_summary');
+  }
+
   /// Validates if a URL string is allowed to load in WebView
   static bool isUrlStringAllowed(String? urlString) {
     if (urlString == null || urlString.isEmpty) {

@@ -18,7 +18,7 @@ void main() {
       await tester.pumpWidget(
         _wrapWithMaterialApp(const AppLoadingIndicator()),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
     });
@@ -30,7 +30,7 @@ void main() {
           const AppLoadingIndicator(useIOSStyle: false),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.byType(CupertinoActivityIndicator), findsNothing);
@@ -42,7 +42,7 @@ void main() {
           const AppLoadingIndicator(message: 'Please wait...'),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.text('Please wait...'), findsOneWidget);
     });
@@ -52,7 +52,7 @@ void main() {
       await tester.pumpWidget(
         _wrapWithMaterialApp(const AppLoadingIndicator()),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       // Only the spinner should be present, no extra Text widgets for message
       expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
@@ -69,7 +69,7 @@ void main() {
           home: AppFullScreenLoading(),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
@@ -83,7 +83,7 @@ void main() {
           home: AppFullScreenLoading(message: 'Loading data...'),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.text('Loading data...'), findsOneWidget);

@@ -6,6 +6,18 @@ import '../utils/constants.dart';
 import '../utils/theme_extensions.dart';
 import '../l10n/app_localizations.dart';
 
+/// Retry button presentation for [AppErrorState].
+enum AppErrorRetryStyle {
+  /// Default: Cupertino filled (iOS-style).
+  cupertinoFilled,
+
+  /// Outlined button (e.g. Indicator Bank).
+  materialOutlined,
+
+  /// Filled button, IFRC red (e.g. Resources).
+  materialFilled,
+}
+
 /// Standardized error state widget with iOS-style design
 class AppErrorState extends StatelessWidget {
   final String? title;
@@ -15,6 +27,11 @@ class AppErrorState extends StatelessWidget {
   final IconData? icon;
   final Color? iconColor;
 
+  /// When false, the default/localized title line is omitted (message-only layout).
+  final bool showTitle;
+
+  final AppErrorRetryStyle retryStyle;
+
   const AppErrorState({
     super.key,
     this.title,
@@ -23,7 +40,30 @@ class AppErrorState extends StatelessWidget {
     this.retryLabel,
     this.icon,
     this.iconColor,
+    this.showTitle = true,
+    this.retryStyle = AppErrorRetryStyle.cupertinoFilled,
   });
+
+  /// Offline / connectivity-style icon and copy layout (wifi icon, no "Oops" title).
+  factory AppErrorState.network({
+    Key? key,
+    required String message,
+    VoidCallback? onRetry,
+    String? retryLabel,
+    AppErrorRetryStyle retryStyle = AppErrorRetryStyle.materialFilled,
+  }) {
+    return AppErrorState(
+      key: key,
+      title: null,
+      message: message,
+      onRetry: onRetry,
+      retryLabel: retryLabel,
+      icon: Icons.wifi_off_rounded,
+      iconColor: null,
+      showTitle: false,
+      retryStyle: retryStyle,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,15 +101,16 @@ class AppErrorState extends StatelessWidget {
             ),
             const SizedBox(height: IOSSpacing.xl),
 
-            // Error title
-            Text(
-              errorTitle,
-              style: IOSTextStyle.title2(context),
-              textAlign: TextAlign.center,
-            ),
+            if (showTitle) ...[
+              Text(
+                errorTitle,
+                style: IOSTextStyle.title2(context),
+                textAlign: TextAlign.center,
+              ),
+              if (message != null) const SizedBox(height: IOSSpacing.sm),
+            ],
 
-            if (message != null) ...[
-              const SizedBox(height: IOSSpacing.sm),
+            if (message != null)
               Text(
                 errorMessage,
                 style: IOSTextStyle.subheadline(context).copyWith(
@@ -78,51 +119,116 @@ class AppErrorState extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-            ],
 
-            // Retry button
             if (onRetry != null) ...[
               const SizedBox(height: IOSSpacing.xxl),
-              Semantics(
+              _RetryButton(
                 label: retryLabel ?? localizations.retry,
-                hint: localizations.retry,
-                button: true,
-                child: cupertino.CupertinoButton.filled(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    onRetry!();
-                  },
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: IOSSpacing.xxl,
-                    vertical: IOSSpacing.md,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.refresh_rounded,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        retryLabel ?? localizations.retry,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                style: retryStyle,
+                onPressed: onRetry!,
               ),
             ],
           ],
         ),
       ),
     );
+  }
+}
+
+class _RetryButton extends StatelessWidget {
+  const _RetryButton({
+    required this.label,
+    required this.style,
+    required this.onPressed,
+  });
+
+  final String label;
+  final AppErrorRetryStyle style;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
+    // [AppConstants.ifrcRed] is a getter — not a const; avoid const ButtonStyle trees.
+    final ifrcRedColor = Color(AppConstants.ifrcRed);
+
+    switch (style) {
+      case AppErrorRetryStyle.cupertinoFilled:
+        return Semantics(
+          label: label,
+          hint: localizations.retry,
+          button: true,
+          child: cupertino.CupertinoButton.filled(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onPressed();
+            },
+            padding: const EdgeInsets.symmetric(
+              horizontal: IOSSpacing.xxl,
+              vertical: IOSSpacing.md,
+            ),
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.refresh_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      case AppErrorRetryStyle.materialOutlined:
+        return Semantics(
+          label: label,
+          button: true,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onPressed();
+            },
+            icon: Icon(Icons.refresh_rounded, size: 18, color: ifrcRedColor),
+            label: Text(label),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ifrcRedColor,
+              side: BorderSide(color: ifrcRedColor),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        );
+      case AppErrorRetryStyle.materialFilled:
+        return Semantics(
+          label: label,
+          button: true,
+          child: FilledButton.icon(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onPressed();
+            },
+            icon: Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+            label: Text(label),
+            style: FilledButton.styleFrom(
+              backgroundColor: ifrcRedColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        );
+    }
   }
 }

@@ -13,7 +13,7 @@ import 'push_notification_service.dart';
 /// - File upload progress callbacks
 /// - Streaming responses
 ///
-/// Migration: Replace `ApiService().get(...)` with `DioClient.instance.get(...)`
+/// Migration: Replace `ApiService`/`sl<ApiService>()` GET calls with `DioClient.instance.get(...)`
 /// for new endpoints. Existing ApiService calls continue to work unchanged.
 class DioClient {
   static final DioClient _instance = DioClient._internal();

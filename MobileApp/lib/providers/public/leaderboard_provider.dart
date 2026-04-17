@@ -1,35 +1,29 @@
 import 'package:flutter/foundation.dart';
-import 'dart:convert';
 import '../../models/public/leaderboard_entry.dart';
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
-import '../../utils/debug_logger.dart';
+import '../../utils/mobile_api_json.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
+import '../shared/async_operation_mixin.dart';
 
 /// Leaderboard provider that manages leaderboard data
-class LeaderboardProvider with ChangeNotifier {
-  final ApiService _apiService = ApiService();
+class LeaderboardProvider with ChangeNotifier, AsyncOperationMixin {
+  final ApiService _apiService = sl<ApiService>();
 
   List<LeaderboardEntry> _leaderboard = [];
-  bool _isLoading = false;
-  String? _error;
 
   List<LeaderboardEntry> get leaderboard => _leaderboard;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  bool get isLoading => opLoading;
+  String? get error => opError;
 
   /// Load leaderboard from backend
   Future<void> loadLeaderboard({int limit = 5}) async {
     if (shouldDeferRemoteFetch) {
-      _isLoading = false;
       notifyListeners();
       return;
     }
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
+    await runAsyncOperation(() async {
       final response = await _apiService.get(
         AppConfig.mobileQuizLeaderboardEndpoint,
         queryParams: {'limit': limit.toString()},
@@ -39,32 +33,28 @@ class LeaderboardProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final data = response.body;
-        final jsonData = jsonDecode(data) as Map<String, dynamic>;
+        final jsonData = decodeJsonObject(response.body);
 
         if (jsonData['success'] == true) {
-          final rawData = jsonData['data'] is Map<String, dynamic>
-              ? jsonData['data'] as Map<String, dynamic>
-              : jsonData;
-          final leaderboardList = (rawData['leaderboard'] as List<dynamic>)
-              .map((entry) => LeaderboardEntry.fromJson(entry as Map<String, dynamic>))
+          final rawData = mobileNestedDataOrRootMap(jsonData);
+          final list = rawData['leaderboard'] as List<dynamic>?;
+          if (list == null) {
+            opError = 'Failed to load leaderboard';
+            return;
+          }
+          _leaderboard = list
+              .map((entry) =>
+                  LeaderboardEntry.fromJson(entry as Map<String, dynamic>))
               .toList();
-
-          _leaderboard = leaderboardList;
-          _error = null;
+          opError = null;
         } else {
-          _error = jsonData['error'] as String? ?? 'Failed to load leaderboard';
+          opError =
+              jsonData['error'] as String? ?? 'Failed to load leaderboard';
         }
       } else {
-        _error = 'Failed to load leaderboard';
+        opError = 'Failed to load leaderboard';
       }
-    } catch (e) {
-      _error = 'Error loading leaderboard: $e';
-      DebugLogger.logError('Error loading leaderboard: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    });
   }
 
   /// Refresh leaderboard

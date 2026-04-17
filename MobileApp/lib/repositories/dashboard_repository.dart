@@ -8,12 +8,13 @@ import '../services/error_handler.dart';
 import '../services/storage_service.dart';
 import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
+import '../di/service_locator.dart';
 
 /// Repository for dashboard data access.
 /// Handles API calls, caching, and data parsing.
 /// Separates data access logic from state management.
 class DashboardRepository {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final StorageService _storage = StorageService();
   final ErrorHandler _errorHandler = ErrorHandler();
 

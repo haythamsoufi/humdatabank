@@ -388,6 +388,14 @@ This URL is required when submitting the app to:
 
 For detailed information about data collection, usage, and user rights, please visit the Privacy Policy page or see [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
 
+## Architecture notes (routing, HTTP, shared UI)
+
+- **Navigation**: The app uses **Navigator 1.0** with [`MaterialApp.routes`](lib/main.dart) / [`AppRouter`](lib/config/app_router.dart) and [`AppRoutes`](lib/config/routes.dart). A **go_router** configuration exists in [`go_router_config.dart`](lib/config/go_router_config.dart) for a future migration; **do not register the same path in both** until the app is switched to `MaterialApp.router`.
+- **Dependency injection**: Shared services are registered in [`setupServiceLocator()`](lib/di/service_locator.dart) (GetIt). Prefer **`sl<ApiService>()`** (and other `sl<T>()`) over calling `ApiService()` directly so tests can override registrations.
+- **Mobile API JSON**: Helpers for `success`/`data` envelopes live in [`lib/utils/mobile_api_json.dart`](lib/utils/mobile_api_json.dart).
+- **Async UI**: [`AppLoadingIndicator`](lib/widgets/loading_indicator.dart), [`AppErrorState`](lib/widgets/error_state.dart), [`AsyncBody`](lib/widgets/async/async_body.dart), and optional [`MobileScreenScaffold`](lib/widgets/mobile_screen_scaffold.dart) for pushed routes.
+- **Provider async helper**: [`AsyncOperationMixin`](lib/providers/shared/async_operation_mixin.dart) is used by [`LeaderboardProvider`](lib/providers/public/leaderboard_provider.dart) and [`ManageUsersProvider.loadUsers`](lib/providers/admin/manage_users_provider.dart).
+
 ## License
 
 **Proprietary — see repository LICENSE**

@@ -5,6 +5,7 @@ import '../../providers/admin/admin_dashboard_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../config/routes.dart';
 import '../../utils/navigation_helper.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../widgets/bottom_navigation_bar.dart';
@@ -71,9 +72,12 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AdminScreenViewLoggingMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.adminDashboard;
 
   @override
   void initState() {

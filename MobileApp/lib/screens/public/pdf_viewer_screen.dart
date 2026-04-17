@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../services/local_pdf_thumbnail_generator.dart';
+import '../../services/unified_planning_pdf_thumbnail_cache.dart';
 import '../../utils/constants.dart';
 import '../../utils/debug_logger.dart';
 import '../../l10n/app_localizations.dart';
@@ -20,6 +24,10 @@ class PdfViewerScreen extends StatefulWidget {
   /// Absolute path to a PDF already on disk (e.g. WebView session export).
   final String? localFilePath;
 
+  /// When set with [url], first-page JPEG is generated after load and stored for
+  /// [UnifiedPlanningPdfThumbnailCache] (e.g. same string as unified-planning document URL).
+  final String? thumbnailCacheUrl;
+
   final String title;
 
   PdfViewerScreen({
@@ -27,6 +35,7 @@ class PdfViewerScreen extends StatefulWidget {
     required this.title,
     this.url,
     this.localFilePath,
+    this.thumbnailCacheUrl,
   }) : assert(
           (url != null && url.trim().isNotEmpty) ^
               (localFilePath != null && localFilePath.trim().isNotEmpty),
@@ -123,6 +132,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           _isDownloading = false;
           _downloadProgress = 1.0;
         });
+        _scheduleUnifiedPlanningLocalThumbnail();
       } finally {
         client.close();
       }
@@ -134,6 +144,34 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           _error = e.toString();
         });
       }
+    }
+  }
+
+  /// Renders first page off-screen after the viewer’s document is ready (separate [PdfDocument]).
+  void _scheduleUnifiedPlanningLocalThumbnail() {
+    if (kIsWeb) return;
+    final key = widget.thumbnailCacheUrl?.trim();
+    if (key == null || key.isEmpty) return;
+    if (_pdfBytes == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_generateUnifiedPlanningThumbnail(key));
+    });
+  }
+
+  Future<void> _generateUnifiedPlanningThumbnail(String cacheUrl) async {
+    // Let [PdfController] / platform renderer initialize before a second openData.
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final bytes = _pdfBytes;
+    if (bytes == null || !mounted) return;
+    try {
+      final jpeg = await localPdfThumbnailFromPdfBytes(bytes);
+      if (jpeg == null || !mounted) return;
+      await UnifiedPlanningPdfThumbnailCache.instance.ingestLocalJpeg(cacheUrl, jpeg);
+    } catch (e, st) {
+      DebugLogger.logErrorWithTag(
+        'PDF_VIEWER',
+        'Local unified-planning thumbnail: $e\n$st',
+      );
     }
   }
 

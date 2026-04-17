@@ -1,12 +1,13 @@
 import 'package:flutter/foundation.dart';
-import 'dart:convert';
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../utils/mobile_api_json.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 class UserAnalyticsProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
 
   Map<String, dynamic>? _analyticsData;
   bool _isLoading = false;
@@ -44,21 +45,11 @@ class UserAnalyticsProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final decoded = decodeJsonObject(response.body);
         // Match AdminDashboardProvider: Flask json_ok(status=..., data={...}) merges
         // stats at the top level — there is often no nested `data` key.
-        final isSuccess = decoded['status'] == 'success' ||
-            decoded['success'] == true;
-        if (isSuccess) {
-          final nested = decoded['data'];
-          final Map<String, dynamic> data = Map<String, dynamic>.from(
-            nested is Map ? nested as Map<String, dynamic> : decoded,
-          );
-          if (nested is! Map) {
-            data.remove('success');
-            data.remove('status');
-            data.remove('message');
-          }
+        if (mobileResponseIsSuccess(decoded)) {
+          final data = mergeMobileOrJsonOkPayload(decoded);
           _analyticsData = {
             ...data,
             'total_users': data['user_count'],
@@ -99,19 +90,9 @@ class UserAnalyticsProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        final isSuccess = decoded['status'] == 'success' ||
-            decoded['success'] == true;
-        if (isSuccess) {
-          final nested = decoded['data'];
-          final Map<String, dynamic> activityPayload = Map<String, dynamic>.from(
-            nested is Map ? nested as Map<String, dynamic> : decoded,
-          );
-          if (nested is! Map) {
-            activityPayload.remove('success');
-            activityPayload.remove('status');
-            activityPayload.remove('message');
-          }
+        final decoded = decodeJsonObject(response.body);
+        if (mobileResponseIsSuccess(decoded)) {
+          final activityPayload = mergeMobileOrJsonOkPayload(decoded);
           _analyticsData ??= {};
           _analyticsData!['activity'] = activityPayload;
           notifyListeners();

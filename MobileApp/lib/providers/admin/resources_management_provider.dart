@@ -5,9 +5,10 @@ import '../../models/shared/resource.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
 
 class ResourcesManagementProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
 
   List<Resource> _resources = [];
   bool _isLoading = false;

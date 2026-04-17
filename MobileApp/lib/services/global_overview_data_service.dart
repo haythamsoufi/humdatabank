@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../config/app_config.dart';
 import '../config/fdrs_constants.dart';
 import 'api_service.dart';
+import '../di/service_locator.dart';
 
 /// Aggregated FDRS indicator values per country for the native home map/chart.
 class GlobalOverviewDataset {
@@ -52,7 +53,7 @@ class GlobalOverviewDataset {
 }
 
 class GlobalOverviewDataService {
-  GlobalOverviewDataService({ApiService? api}) : _api = api ?? ApiService();
+  GlobalOverviewDataService({ApiService? api}) : _api = api ?? sl<ApiService>();
 
   final ApiService _api;
 

@@ -12,6 +12,8 @@ import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/shared/elevated_list_card.dart';
+import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 /// Whole minutes from [a] to [b] (truncated toward zero); null if either is null.
 int? _sessionMinutesBetween(DateTime? a, DateTime? b) {
@@ -29,11 +31,15 @@ class SessionLogsScreen extends StatefulWidget {
   State<SessionLogsScreen> createState() => _SessionLogsScreenState();
 }
 
-class _SessionLogsScreenState extends State<SessionLogsScreen> {
+class _SessionLogsScreenState extends State<SessionLogsScreen>
+    with AdminScreenViewLoggingMixin {
   final _emailController = TextEditingController();
   final _minDurationController = TextEditingController();
   bool _activeOnly = false;
   String? _endingSessionId;
+
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.sessionLogs;
 
   @override
   void initState() {
@@ -611,7 +617,6 @@ class _SessionTileState extends State<_SessionTile>
                               statusColor: statusColor,
                               statusLabel: statusLabel,
                               activeStr: activeStr,
-                              sessionLengthStr: sessionLengthStr,
                             )
                           : Transform(
                               transform: Matrix4.identity()..rotateY(math.pi),
@@ -623,6 +628,7 @@ class _SessionTileState extends State<_SessionTile>
                                 loc: loc,
                                 startStr: startStr,
                                 lastStr: lastStr,
+                                sessionLengthStr: sessionLengthStr,
                               ),
                             ),
                     ),
@@ -706,7 +712,6 @@ class _SessionTileState extends State<_SessionTile>
     required Color statusColor,
     required String statusLabel,
     required String activeStr,
-    required String sessionLengthStr,
   }) {
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -786,55 +791,20 @@ class _SessionTileState extends State<_SessionTile>
             spacing: 8,
             runSpacing: 6,
             children: [
-              _statChip(
-                context,
-                widget.localizations.sessionLogsActiveTime,
-                activeStr,
-                leadingIcon: Icons.touch_app_rounded,
-              ),
-              _statChip(
-                context,
-                widget.localizations.sessionLogsSessionLength,
-                sessionLengthStr,
-                leadingIcon: Icons.schedule_rounded,
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _statChip(
-                    context,
-                    widget.localizations.sessionLogsPageViews,
-                    '${widget.log.pageViews}',
-                  ),
-                  if (widget.log.pageViews > 0 ||
-                      widget.log.pageViewPathCounts.isNotEmpty)
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
-                      ),
-                      tooltip: widget.localizations.sessionLogsPathBreakdownOpen,
-                      icon: Icon(
-                        Icons.alt_route,
-                        size: 18,
-                        color: scheme.primary,
-                      ),
-                      onPressed: () => showSessionPathBreakdownSheet(
-                        context,
-                        widget.log,
-                        widget.localizations,
-                      ),
-                    ),
-                ],
-              ),
-              if (widget.log.distinctPageViewPaths > 0)
-                _statChip(
+              Tooltip(
+                message: widget.localizations.sessionLogsActiveTime,
+                child: _statChip(
                   context,
-                  widget.localizations.sessionLogsDistinctPaths,
-                  '${widget.log.distinctPageViewPaths}',
+                  null,
+                  activeStr,
+                  leadingIcon: Icons.touch_app_rounded,
                 ),
+              ),
+              _statChip(
+                context,
+                widget.localizations.sessionLogsPageViews,
+                '${widget.log.pageViews}',
+              ),
               _statChip(
                 context,
                 widget.localizations.sessionLogsActivities,
@@ -853,6 +823,7 @@ class _SessionTileState extends State<_SessionTile>
     required AppLocalizations loc,
     required String startStr,
     required String lastStr,
+    required String sessionLengthStr,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -873,6 +844,20 @@ class _SessionTileState extends State<_SessionTile>
           label: loc.sessionLogsLastActivity,
           value: lastStr,
         ),
+        const SizedBox(height: 12),
+        _backTimeBlock(
+          scheme: scheme,
+          textTheme: textTheme,
+          icon: Icons.timelapse_rounded,
+          label: loc.sessionLogsSessionLength,
+          value: sessionLengthStr,
+        ),
+        ..._buildSessionPathsSection(
+          context,
+          scheme: scheme,
+          textTheme: textTheme,
+          loc: loc,
+        ),
         ..._buildSessionDeviceDetails(
           scheme: scheme,
           textTheme: textTheme,
@@ -880,6 +865,107 @@ class _SessionTileState extends State<_SessionTile>
         ),
       ],
     );
+  }
+
+  List<Widget> _buildSessionPathsSection(
+    BuildContext context, {
+    required ColorScheme scheme,
+    required TextTheme textTheme,
+    required AppLocalizations loc,
+  }) {
+    final log = widget.log;
+    final hasPathStats = log.pageViews > 0 ||
+        log.distinctPageViewPaths > 0 ||
+        log.pageViewPathCounts.isNotEmpty;
+    if (!hasPathStats) return const [];
+
+    return [
+      const SizedBox(height: 14),
+      DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.alt_route_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      loc.sessionLogsPathBreakdownTitle,
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _statChip(
+                    context,
+                    loc.sessionLogsPageViews,
+                    '${log.pageViews}',
+                  ),
+                  if (log.distinctPageViewPaths > 0)
+                    _statChip(
+                      context,
+                      loc.sessionLogsDistinctPaths,
+                      '${log.distinctPageViewPaths}',
+                      leadingIcon: Icons.alt_route_rounded,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: () => showSessionPathBreakdownSheet(
+                    context,
+                    log,
+                    loc,
+                  ),
+                  icon: Icon(
+                    Icons.view_list_rounded,
+                    size: 18,
+                    color: scheme.primary,
+                  ),
+                  label: Text(loc.sessionLogsPathBreakdownOpen),
+                  style: TextButton.styleFrom(
+                    foregroundColor: scheme.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    alignment: AlignmentDirectional.centerStart,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _backTimeBlock({

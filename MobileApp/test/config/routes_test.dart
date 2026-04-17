@@ -22,6 +22,8 @@ void main() {
       expect(AppRoutes.assignments, '/admin/assignments');
       expect(AppRoutes.users, '/admin/users');
       expect(AppRoutes.indicatorBankAdmin, '/admin/indicator_bank');
+      expect(AppRoutes.loginLogs, '/admin/login-logs');
+      expect(AppRoutes.sessionLogs, '/admin/session-logs');
     });
 
     test('public routes have correct values', () {

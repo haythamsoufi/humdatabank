@@ -7,12 +7,13 @@ import '../../providers/shared/language_provider.dart';
 import '../../config/app_config.dart';
 import '../../services/api_service.dart';
 import '../../utils/debug_logger.dart';
+import '../../di/service_locator.dart';
 
 /// Quiz game provider that manages quiz state and logic
 class QuizGameProvider with ChangeNotifier {
   IndicatorBankProvider _indicatorBankProvider;
   LanguageProvider? _languageProvider;
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService = sl<ApiService>();
 
   // Quiz state
   bool _isQuizActive = false;

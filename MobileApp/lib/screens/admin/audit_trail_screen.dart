@@ -8,6 +8,7 @@ import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 
@@ -18,13 +19,17 @@ class AuditTrailScreen extends StatefulWidget {
   State<AuditTrailScreen> createState() => _AuditTrailScreenState();
 }
 
-class _AuditTrailScreenState extends State<AuditTrailScreen> {
+class _AuditTrailScreenState extends State<AuditTrailScreen>
+    with AdminScreenViewLoggingMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _selectedActionFilter;
   String? _selectedUserFilter;
   DateTime? _selectedDateFrom;
   DateTime? _selectedDateTo;
+
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.auditTrail;
 
   @override
   void initState() {

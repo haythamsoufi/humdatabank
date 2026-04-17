@@ -8,16 +8,18 @@ import '../../models/admin/admin_user_detail.dart';
 import '../../models/admin/admin_user_list_item.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
+import '../../utils/mobile_api_json.dart';
 import '../../utils/network_availability.dart';
+import '../../di/service_locator.dart';
+import '../shared/async_operation_mixin.dart';
 
 /// Loads the admin user directory via [GET /api/mobile/v1/admin/users] (JWT auth, `admin.users.view`).
 /// Updates: [PUT /api/mobile/v1/admin/users/:id] (`admin.users.edit`; optional RBAC via `admin.users.roles.assign`).
-class ManageUsersProvider with ChangeNotifier {
-  final ApiService _api = ApiService();
+class ManageUsersProvider with ChangeNotifier, AsyncOperationMixin {
+  final ApiService _api = sl<ApiService>();
   final ErrorHandler _errorHandler = ErrorHandler();
 
   List<AdminUserListItem> _users = [];
-  bool _isLoading = false;
   String? _error;
 
   /// From GET /api/mobile/v1/data/countrymap; fills missing `entity_region` on user detail.
@@ -38,85 +40,73 @@ class ManageUsersProvider with ChangeNotifier {
   }
 
   List<AdminUserListItem> get users => List.unmodifiable(_users);
-  bool get isLoading => _isLoading;
+  bool get isLoading => opLoading;
   String? get error => _error;
 
   Future<void> loadUsers() async {
     if (shouldDeferRemoteFetch) {
-      _isLoading = false;
       notifyListeners();
       return;
     }
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    await runAsyncOperation(() async {
+      final response =
+          await _errorHandler.executeWithErrorHandling<http.Response>(
+        apiCall: () => _api.get(
+              AppConfig.mobileAdminUsersEndpoint,
+              useCache: false,
+            ),
+        context: 'Manage Users',
+        defaultValue: null,
+        maxRetries: 1,
+        handleAuthErrors: true,
+      );
 
-    final response =
-        await _errorHandler.executeWithErrorHandling<http.Response>(
-      apiCall: () => _api.get(
-            AppConfig.mobileAdminUsersEndpoint,
-            useCache: false,
-          ),
-      context: 'Manage Users',
-      defaultValue: null,
-      maxRetries: 1,
-      handleAuthErrors: true,
-    );
+      if (response == null) {
+        _error = 'Unable to load users. Please try again.';
+        _users = [];
+        return;
+      }
 
-    if (response == null) {
-      _error = 'Unable to load users. Please try again.';
-      _users = [];
-      _isLoading = false;
-      notifyListeners();
-      return;
-    }
+      if (response.statusCode == 403) {
+        _error =
+            'You do not have permission to view users. This requires admin user access on the server.';
+        _users = [];
+        return;
+      }
 
-    if (response.statusCode == 403) {
-      _error =
-          'You do not have permission to view users. This requires admin user access on the server.';
-      _users = [];
-      _isLoading = false;
-      notifyListeners();
-      return;
-    }
-
-    if (response.statusCode == 200) {
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic> &&
-            decoded['success'] == true &&
-            decoded['data'] is List) {
-          final list = decoded['data'] as List<dynamic>;
-          _users = list
-              .whereType<Map<String, dynamic>>()
-              .map(AdminUserListItem.fromJson)
-              .toList();
-          _error = null;
-        } else {
-          _error = 'Unexpected response from server.';
+      if (response.statusCode == 200) {
+        try {
+          final decoded = decodeJsonObject(response.body);
+          if (decoded['success'] == true && decoded['data'] is List) {
+            final list = decoded['data'] as List<dynamic>;
+            _users = list
+                .whereType<Map<String, dynamic>>()
+                .map(AdminUserListItem.fromJson)
+                .toList();
+            _error = null;
+          } else {
+            _error = 'Unexpected response from server.';
+            _users = [];
+          }
+        } catch (e, stackTrace) {
+          final err = _errorHandler.parseError(
+            error: e,
+            stackTrace: stackTrace,
+            context: 'Parse users list',
+          );
+          _error = err.getUserMessage();
           _users = [];
         }
-      } catch (e, stackTrace) {
+      } else {
         final err = _errorHandler.parseError(
-          error: e,
-          stackTrace: stackTrace,
-          context: 'Parse users list',
+          error: Exception('HTTP ${response.statusCode}'),
+          response: response,
+          context: 'Manage Users',
         );
         _error = err.getUserMessage();
         _users = [];
       }
-    } else {
-      final err = _errorHandler.parseError(
-        error: Exception('HTTP ${response.statusCode}'),
-        response: response,
-        context: 'Manage Users',
-      );
-      _error = err.getUserMessage();
-      _users = [];
-    }
-
-    _isLoading = false;
-    notifyListeners();
+    });
   }
 
   /// Single-user profile (roles, RBAC permissions, entity grants). Does not mutate the list cache.

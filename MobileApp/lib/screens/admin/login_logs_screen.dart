@@ -8,6 +8,8 @@ import '../../providers/admin/login_logs_provider.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
+import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 /// Login / logout / failed-login events (aligned with web `/admin/analytics/login-logs`).
 class LoginLogsScreen extends StatefulWidget {
@@ -17,13 +19,17 @@ class LoginLogsScreen extends StatefulWidget {
   State<LoginLogsScreen> createState() => _LoginLogsScreenState();
 }
 
-class _LoginLogsScreenState extends State<LoginLogsScreen> {
+class _LoginLogsScreenState extends State<LoginLogsScreen>
+    with AdminScreenViewLoggingMixin {
   final _emailController = TextEditingController();
   final _ipController = TextEditingController();
   String? _eventType;
   bool _suspiciousOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
+
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.loginLogs;
 
   @override
   void initState() {

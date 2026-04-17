@@ -8,13 +8,14 @@ import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
+import '../di/service_locator.dart';
 
 class AiChatService {
   static final AiChatService _instance = AiChatService._internal();
   factory AiChatService() => _instance;
   AiChatService._internal();
 
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final StorageService _storage = StorageService();
 
   static const String _aiTokenKey = 'ai_token_v1';

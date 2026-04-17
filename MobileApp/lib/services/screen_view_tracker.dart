@@ -4,6 +4,7 @@ import '../services/analytics_service.dart';
 import '../services/jwt_token_service.dart';
 import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
 import '../utils/network_availability.dart';
+import '../di/service_locator.dart';
 
 /// Tracks mobile screen views on both Firebase Analytics and the Backoffice
 /// audit trail via `POST /api/mobile/v1/analytics/screen-view`.
@@ -15,11 +16,12 @@ class ScreenViewTracker {
   factory ScreenViewTracker() => _instance;
   ScreenViewTracker._internal();
 
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
   final AnalyticsService _analytics = AnalyticsService();
   final JwtTokenService _jwtService = JwtTokenService();
 
   String? _lastScreenName;
+  String? _lastRoutePath;
   DateTime? _lastTrackedAt;
   static const _dedupWindow = Duration(seconds: 2);
 
@@ -113,14 +115,18 @@ class ScreenViewTracker {
   void trackScreenView(String screenName, {String? screenClass, String? routePath}) {
     if (screenName.isEmpty) return;
 
-    // Client-side dedup
+    // Client-side dedup (screen + route so observer + explicit init hooks
+    // do not double-count within the same navigation).
     final now = DateTime.now();
+    final pathKey = (routePath ?? '').trim();
     if (_lastScreenName == screenName &&
+        _lastRoutePath == pathKey &&
         _lastTrackedAt != null &&
         now.difference(_lastTrackedAt!) < _dedupWindow) {
       return;
     }
     _lastScreenName = screenName;
+    _lastRoutePath = pathKey;
     _lastTrackedAt = now;
 
     // Firebase Analytics (always, even when unauthenticated)

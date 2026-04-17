@@ -10,6 +10,8 @@ import '../../utils/theme_extensions.dart';
 import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/routes.dart';
+import '../../widgets/error_state.dart';
+import '../../widgets/loading_indicator.dart';
 
 class QuizGameScreen extends StatefulWidget {
   const QuizGameScreen({super.key});
@@ -769,27 +771,11 @@ class _QuizGameScreenState extends State<QuizGameScreen>
               ),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 52,
-                height: 52,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3.5,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                localizations.quizGameLoading,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: context.textSecondaryColor,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
+          child: AppLoadingIndicator(
+            message: localizations.quizGameLoading,
+            color: theme.colorScheme.primary,
+            size: 26,
+            useIOSStyle: false,
           ),
         ),
       ),
@@ -802,28 +788,16 @@ class _QuizGameScreenState extends State<QuizGameScreen>
     ThemeData theme,
     AppLocalizations localizations,
   ) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
-            const SizedBox(height: 16),
-            Text(
-              quizProvider.error!,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => quizProvider.startQuiz(),
-              child: Text(localizations.quizGameTryAgain),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: AppErrorState(
+        showTitle: false,
+        message: quizProvider.error!,
+        icon: Icons.error_outline_rounded,
+        iconColor: theme.colorScheme.error,
+        onRetry: () => quizProvider.startQuiz(),
+        retryLabel: localizations.quizGameTryAgain,
+        retryStyle: AppErrorRetryStyle.materialFilled,
       ),
     );
   }

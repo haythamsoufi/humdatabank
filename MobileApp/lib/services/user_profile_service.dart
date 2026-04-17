@@ -3,6 +3,7 @@ import '../config/app_config.dart';
 import '../models/shared/user.dart';
 import 'api_service.dart';
 import '../utils/debug_logger.dart';
+import '../di/service_locator.dart';
 
 /// Service for fetching and updating the authenticated user's profile.
 ///
@@ -12,7 +13,7 @@ class UserProfileService {
   factory UserProfileService() => _instance;
   UserProfileService._internal();
 
-  final ApiService _api = ApiService();
+  final ApiService _api = sl<ApiService>();
 
   /// Mobile routes wrap payloads in `{ "success": true, "data": { ... } }`.
   Map<String, dynamic> _unwrapMobileEnvelope(Map<String, dynamic> body) {

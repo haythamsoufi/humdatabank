@@ -405,6 +405,23 @@ class _WebViewScreenState extends State<WebViewScreen> {
         },
         shouldOverrideUrlLoading: (controller, navigationAction) async {
           final url = navigationAction.request.url;
+          if (url != null &&
+              WebViewService.isOfflineBundleServerOnlyAssignmentExport(url)) {
+            DebugLogger.logInfo(
+              'WEBVIEW',
+              'Blocked offline bundle server-only export navigation: $url',
+            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    localizations.offlineFormExportRequiresConnection,
+                  ),
+                ),
+              );
+            }
+            return NavigationActionPolicy.CANCEL;
+          }
           if (url != null && !WebViewService.isUrlAllowed(url)) {
             DebugLogger.logWarn('WEBVIEW', 'Blocked navigation to: $url');
             if (mounted) {

@@ -217,6 +217,9 @@ jobs:
 
       - name: Build iOS (no codesign)
         working-directory: ${{ steps.flutter_path.outputs.path }}
+        env:
+          IFRC_API_USER: ${{ secrets.IFRC_API_USER }}
+          IFRC_API_PASSWORD: ${{ secrets.IFRC_API_PASSWORD }}
         run: |
           # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step)
           case "${{ steps.resolve_env.outputs.profile }}" in
@@ -240,6 +243,8 @@ jobs:
               --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \
               $ORG_CONFIG \
               --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
+              --dart-define=IFRC_API_USER="$IFRC_API_USER" \
+              --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
               --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
           else
             flutter build ios --release --no-codesign \
@@ -248,6 +253,8 @@ jobs:
               --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \
               $ORG_CONFIG \
               --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
+              --dart-define=IFRC_API_USER="$IFRC_API_USER" \
+              --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
               --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
           fi
 

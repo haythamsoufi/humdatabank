@@ -277,7 +277,10 @@ def session_logs():
     """Paginated user session logs."""
     from app.models import User, UserSessionLog
     from app.services.user_analytics_service import (
-        effective_session_duration_minutes, session_log_device_icon_classes,
+        effective_session_active_duration_minutes,
+        effective_session_duration_minutes,
+        session_log_device_icon_classes,
+        user_session_log_active_duration_minutes_sql,
     )
     from app.services.audit_trail_session_query import count_audit_visible_entries_for_session
 
@@ -297,16 +300,18 @@ def session_logs():
         query = query.filter(UserSessionLog.is_active == True)  # noqa: E712
     if min_duration and min_duration > 0:
         cutoff = utcnow() - timedelta(minutes=min_duration)
-        query = query.filter(
-            or_(
-                UserSessionLog.duration_minutes >= min_duration,
-                and_(
-                    UserSessionLog.is_active == True,  # noqa: E712
-                    UserSessionLog.session_start.isnot(None),
-                    UserSessionLog.session_start <= cutoff,
-                ),
-            )
-        )
+        active_min_sql = user_session_log_active_duration_minutes_sql()
+        min_parts = [
+            UserSessionLog.duration_minutes >= min_duration,
+            and_(
+                UserSessionLog.is_active == True,  # noqa: E712
+                UserSessionLog.session_start.isnot(None),
+                UserSessionLog.session_start <= cutoff,
+            ),
+        ]
+        if active_min_sql is not None:
+            min_parts.append(active_min_sql >= min_duration)
+        query = query.filter(or_(*min_parts))
 
     query = query.order_by(desc(UserSessionLog.session_start))
     paginated = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -324,6 +329,7 @@ def session_logs():
             'session_end': s.session_end.isoformat() if s.session_end else None,
             'last_activity': s.last_activity.isoformat() if s.last_activity else None,
             'duration_minutes': effective_session_duration_minutes(s),
+            'active_duration_minutes': effective_session_active_duration_minutes(s),
             'page_views': s.page_views or 0,
             'distinct_page_view_paths': distinct_page_view_path_count(s),
             'page_view_path_counts': pvc,

@@ -48,9 +48,10 @@
                    value="{{ filters.user or '' }}" placeholder="{{ _('Search by email') }}">
         </div>
         <div>
-            <label for="min_duration" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Min duration (min)') }}</label>
+            <label for="min_duration" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Min minutes (session length or active time)') }}</label>
             <input type="number" class="form-input w-full" id="min_duration" name="min_duration"
-                   value="{{ filters.min_duration or '' }}" placeholder="{{ _('e.g. 10') }}" min="0">
+                   value="{{ filters.min_duration or '' }}" placeholder="{{ _('e.g. 10') }}" min="0"
+                   title="{{ _('Include rows where wall-clock session length or active time (start to last activity) is at least this many minutes, or the session is still active and has been open at least this long.') }}">
         </div>
         <div class="flex items-center pt-7">
             <input class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" type="checkbox" id="active_only"
@@ -122,7 +123,8 @@
         deviceType: {{ _('Device')|tojson }},
         operatingSystem: {{ _('OS')|tojson }},
         sessionStart: {{ _('Session start')|tojson }},
-        duration: {{ _('Duration')|tojson }},
+        duration: {{ _('Session length')|tojson }},
+        activeDuration: {{ _('Active time')|tojson }},
         minutesShort: {{ _('min')|tojson }},
         pageViews: {{ _('Page views')|tojson }},
         distinctPaths: {{ _('Distinct paths')|tojson }},

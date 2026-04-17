@@ -14,7 +14,9 @@ import '../utils/debug_logger.dart';
 /// JPEG thumbnails for unified-planning PDF URLs (IFRC GO).
 ///
 /// Loads a small server-rendered image from the Backoffice mobile API instead of
-/// downloading full PDFs and rendering them on-device.
+/// downloading full PDFs and rendering them on-device. The Backoffice must have
+/// ``IFRC_API_USER`` / ``IFRC_API_PASSWORD`` (same IFRC basic auth as document import);
+/// the app’s IFRC credentials used for the appeals list are not sent to this endpoint.
 ///
 /// Caches bytes in memory for the session and on disk under the application cache
 /// directory (survives app restarts; pruned by LRU when file count grows large).
@@ -23,6 +25,12 @@ class UnifiedPlanningPdfThumbnailCache {
   UnifiedPlanningPdfThumbnailCache._();
   static final UnifiedPlanningPdfThumbnailCache instance =
       UnifiedPlanningPdfThumbnailCache._();
+
+  /// When false, [getThumbnail] never calls the Backoffice (IFRC creds missing there).
+  /// Set from unified-planning-config ``pdf_thumbnail_enabled`` after each config fetch.
+  bool _serverThumbnailsEnabled = true;
+
+  set serverThumbnailsEnabled(bool enabled) => _serverThumbnailsEnabled = enabled;
 
   /// Upper bound on JPEG body size (server renders ~280px wide).
   static const int _maxBytes = 512 * 1024;
@@ -86,6 +94,11 @@ class UnifiedPlanningPdfThumbnailCache {
     if (fromDisk != null) {
       _cache[url] = fromDisk;
       return fromDisk;
+    }
+
+    if (!_serverThumbnailsEnabled) {
+      // Do not cache null — server may gain IFRC env after deploy without app restart.
+      return null;
     }
 
     while (_activeLoads >= _maxConcurrent) {
@@ -203,13 +216,15 @@ class UnifiedPlanningPdfThumbnailCache {
   Future<Uint8List?> _fetchServerThumbnail(String pdfUrl) async {
     if (pdfUrl.trim().isEmpty) return null;
 
-    final base = Uri.parse(
+    // POST JSON so the PDF URL is not in the query string — Azure Application Gateway
+    // WAF often returns 403 for long or token-heavy ?url=... GET requests.
+    final uri = Uri.parse(
       '${AppConfig.baseApiUrl}${AppConfig.mobileUnifiedPlanningThumbnailEndpoint}',
     );
-    final uri = base.replace(queryParameters: {'url': pdfUrl});
 
     final headers = <String, String>{
       'Accept': 'image/jpeg',
+      'Content-Type': 'application/json; charset=utf-8',
       'User-Agent': 'hum-databank-mobile/1.0',
     };
     final key = AppConfig.apiKey.trim();
@@ -219,11 +234,17 @@ class UnifiedPlanningPdfThumbnailCache {
 
     final client = http.Client();
     try {
-      final req = http.Request('GET', uri)..headers.addAll(headers);
+      final req = http.Request('POST', uri)
+        ..headers.addAll(headers)
+        ..body = jsonEncode(<String, String>{'url': pdfUrl});
       final streamed =
           await client.send(req).timeout(const Duration(seconds: 45));
       if (streamed.statusCode != 200) {
-        await streamed.stream.drain();
+        final errBody = await _readErrorBodyForLog(streamed.stream);
+        DebugLogger.logErrorWithTag(
+          'PDF_THUMB',
+          'HTTP ${streamed.statusCode} for thumbnail${errBody == null ? '' : ': $errBody'}',
+        );
         return null;
       }
       final len = streamed.contentLength;
@@ -253,6 +274,23 @@ class UnifiedPlanningPdfThumbnailCache {
       return null;
     } finally {
       client.close();
+    }
+  }
+
+  /// Small UTF-8 snippet from a failed JSON (mobile envelope) or raw body for logs.
+  static Future<String?> _readErrorBodyForLog(Stream<List<int>> stream) async {
+    try {
+      final chunks = <int>[];
+      await for (final chunk in stream.timeout(const Duration(seconds: 5))) {
+        chunks.addAll(chunk);
+        if (chunks.length >= 400) break;
+      }
+      if (chunks.isEmpty) return null;
+      final s = utf8.decode(chunks, allowMalformed: true).trim();
+      if (s.length > 300) return '${s.substring(0, 300)}…';
+      return s.isEmpty ? null : s;
+    } catch (_) {
+      return null;
     }
   }
 }

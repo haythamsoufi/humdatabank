@@ -10,6 +10,7 @@ void main() {
         'session_end': '2025-03-10T11:00:00Z',
         'last_activity': '2025-03-10T10:55:00Z',
         'duration_minutes': 120,
+        'active_duration_minutes': 115,
         'page_views': 45,
         'activity_count': 30,
         'is_active': false,
@@ -31,6 +32,7 @@ void main() {
       expect(item.sessionEndIso, '2025-03-10T11:00:00Z');
       expect(item.lastActivityIso, '2025-03-10T10:55:00Z');
       expect(item.durationMinutes, 120);
+      expect(item.activeDurationMinutes, 115);
       expect(item.pageViews, 45);
       expect(item.activityCount, 30);
       expect(item.isActive, false);
@@ -51,6 +53,7 @@ void main() {
       expect(item.sessionEndIso, isNull);
       expect(item.lastActivityIso, isNull);
       expect(item.durationMinutes, isNull);
+      expect(item.activeDurationMinutes, isNull);
       expect(item.pageViews, 0);
       expect(item.activityCount, 0);
       expect(item.isActive, false);
@@ -124,6 +127,18 @@ void main() {
       });
 
       expect(item.durationMinutes, 90);
+    });
+
+    test('handles string active_duration_minutes', () {
+      final item = SessionLogItem.fromJson({
+        'session_id': 'sess-act',
+        'active_duration_minutes': '42',
+        'page_views': 0,
+        'activity_count': 0,
+        'is_active': false,
+      });
+
+      expect(item.activeDurationMinutes, 42);
     });
 
     test('isActive is true only when JSON value is exactly true', () {

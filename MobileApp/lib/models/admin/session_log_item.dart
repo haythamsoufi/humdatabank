@@ -6,6 +6,7 @@ class SessionLogItem {
     this.sessionEndIso,
     this.lastActivityIso,
     this.durationMinutes,
+    this.activeDurationMinutes,
     required this.pageViews,
     this.distinctPageViewPaths = 0,
     this.pageViewPathCounts = const {},
@@ -25,6 +26,8 @@ class SessionLogItem {
   final String? sessionEndIso;
   final String? lastActivityIso;
   final int? durationMinutes;
+  /// Minutes from session start to last activity (excludes idle after last activity).
+  final int? activeDurationMinutes;
   final int pageViews;
   /// Number of distinct canonical path keys in [pageViewPathCounts] (from API).
   final int distinctPageViewPaths;
@@ -49,6 +52,7 @@ class SessionLogItem {
       uemail = user['email']?.toString();
     }
     final dm = json['duration_minutes'];
+    final am = json['active_duration_minutes'];
     return SessionLogItem(
       sessionId: json['session_id']?.toString() ?? '',
       sessionStartIso: json['session_start']?.toString(),
@@ -57,6 +61,9 @@ class SessionLogItem {
       durationMinutes: dm == null
           ? null
           : (dm is int ? dm : int.tryParse('$dm')),
+      activeDurationMinutes: am == null
+          ? null
+          : (am is int ? am : int.tryParse('$am')),
       pageViews: json['page_views'] is int
           ? json['page_views'] as int
           : int.tryParse('${json['page_views'] ?? 0}') ?? 0,

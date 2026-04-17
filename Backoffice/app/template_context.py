@@ -344,9 +344,15 @@ def register_template_context(app, config_class):
 
     @app.template_filter('session_effective_duration_minutes')
     def session_effective_duration_minutes_filter(session_log):
-        """Minutes since session start for active sessions; stored duration when ended."""
+        """Wall-clock session length: login to close (includes idle after last activity)."""
         from app.services.user_analytics_service import effective_session_duration_minutes
         return effective_session_duration_minutes(session_log)
+
+    @app.template_filter('session_effective_active_duration_minutes')
+    def session_effective_active_duration_minutes_filter(session_log):
+        """Minutes from session start to last activity (excludes post-last-idle until close)."""
+        from app.services.user_analytics_service import effective_session_active_duration_minutes
+        return effective_session_active_duration_minutes(session_log)
 
     @app.template_filter('session_device_icon')
     def session_device_icon_filter(session_log):

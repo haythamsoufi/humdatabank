@@ -251,12 +251,17 @@ class PublicResourcesProvider with ChangeNotifier {
     try {
       // Resolve disk cache dir before IFRC fetch so grid cards can read JPEGs synchronously.
       await UnifiedPlanningPdfThumbnailCache.instance.warmCacheDirectory();
+      UnifiedPlanningPdfThumbnailCache.instance.serverThumbnailsEnabled = true;
       final config = await _ifrcUnified.fetchConfig();
       if (config == null) {
         _unifiedPlanningDocuments = [];
         _unifiedPlanningErrorCode = 'unified_error_config';
         return;
       }
+
+      final thumbFlag = config['pdf_thumbnail_enabled'];
+      UnifiedPlanningPdfThumbnailCache.instance.serverThumbnailsEnabled =
+          thumbFlag is bool ? thumbFlag : true;
 
       final listUrl = (config['ifrc_public_site_appeals_url'] as String?)?.trim();
       if (listUrl == null || listUrl.isEmpty) {

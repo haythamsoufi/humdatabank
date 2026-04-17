@@ -5,7 +5,8 @@ Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
     indicator-suggestions, data/periods, data/fdrs-overview, data/resources,
     data/unified-planning-config (IFRC GO URL + unified planning type IDs for the mobile app),
-    data/unified-planning-thumbnail (JPEG first page — server-rendered; IFRC URL allowlist).
+    data/unified-planning-thumbnail (JPEG first page — server-rendered; IFRC URL allowlist;
+    prefer POST JSON ``{"url": "https://..."}`` so Azure WAF does not block long query strings).
     Rate-limited to prevent abuse.
   - Auth-required: quiz/leaderboard, quiz/submit-score (scores are tied to authenticated users).
 """
@@ -870,7 +871,14 @@ def unified_planning_config():
     The mobile app calls the IFRC API directly using credentials supplied in the app
     build (not returned here). This endpoint only exposes the canonical base URL and
     the three AppealsTypeId values (Plan, Mid-Year Report, Annual Report).
+
+    ``pdf_thumbnail_enabled`` is true only when the server has IFRC basic auth
+    configured so ``/data/unified-planning-thumbnail`` can fetch PDFs. The list
+    still works with app-side IFRC credentials alone; thumbnails require
+    ``IFRC_API_USER`` / ``IFRC_API_PASSWORD`` on the Backoffice host.
     """
+    from app.routes.ai_documents.helpers import _get_ifrc_basic_auth
+
     base = 'https://go-api.ifrc.org/Api/PublicSiteAppeals'
     ids = APPEALS_TYPE_DEFAULT_IDS_STR
     document_types = [
@@ -883,12 +891,13 @@ def unified_planning_config():
             'appeals_type_ids': ids,
             'ifrc_public_site_appeals_url': f'{base}?AppealsTypeId={ids}',
             'document_types': document_types,
+            'pdf_thumbnail_enabled': _get_ifrc_basic_auth() is not None,
         },
     )
 
 
-@mobile_bp.route('/data/unified-planning-thumbnail', methods=['GET'])
-@mobile_rate_limit(requests_per_minute=45)
+@mobile_bp.route('/data/unified-planning-thumbnail', methods=['GET', 'POST'])
+@mobile_rate_limit(requests_per_minute=120)
 def unified_planning_thumbnail():
     """Return a small JPEG of the PDF first page for unified-planning grid tiles.
 
@@ -896,19 +905,32 @@ def unified_planning_thumbnail():
     fetches the IFRC PDF (same allowlist / Basic auth as document import), renders with
     PyMuPDF, and returns ``image/jpeg`` (not the usual mobile JSON envelope).
 
-    Query: ``url`` — full https URL of the PDF (must pass IFRC_DOCUMENT_ALLOWED_HOSTS checks).
+    **URL input (use POST in production):**
+
+    - **POST** ``application/json``: ``{"url": "<https pdf url>"}`` — preferred; avoids
+      Azure Application Gateway / WAF false blocks on long ``?url=`` query strings.
+    - **GET** ``?url=`` — legacy; same validation (must pass IFRC_DOCUMENT_ALLOWED_HOSTS).
     """
     from urllib.parse import unquote
 
     import requests
     import fitz  # PyMuPDF
 
+    from app.utils.api_helpers import get_json_safe
+
     from app.routes.ai_documents.helpers import (
         _get_ifrc_basic_auth,
         _validate_ifrc_fetch_url,
     )
 
-    raw = (request.args.get('url') or '').strip()
+    _max_url_len = int(current_app.config.get('UNIFIED_PLANNING_THUMB_MAX_URL_CHARS') or 16384)
+    if request.method == 'POST':
+        data = get_json_safe()
+        raw = (data.get('url') or '').strip() if isinstance(data, dict) else ''
+    else:
+        raw = (request.args.get('url') or '').strip()
+    if len(raw) > _max_url_len:
+        return mobile_bad_request('url is too long')
     url = unquote(raw).strip()
     ok, err = _validate_ifrc_fetch_url(url)
     if not ok:

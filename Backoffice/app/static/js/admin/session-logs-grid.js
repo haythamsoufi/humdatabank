@@ -163,6 +163,7 @@
         'operating_system',
         'session_start',
         'duration_minutes',
+        'active_duration_minutes',
         'page_views',
         'distinct_page_view_paths',
         'activity_count',
@@ -259,7 +260,7 @@
             },
             {
                 field: 'duration_minutes',
-                headerName: t.duration || 'Duration',
+                headerName: t.duration || 'Session length',
                 width: 120,
                 minWidth: 100,
                 filter: 'agNumberColumnFilter',
@@ -270,6 +271,22 @@
                         return '<span class="text-sm text-gray-400">-</span>';
                     }
                     return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">' +
+                        esc(v) + ' ' + (t.minutesShort || 'min') + '</span>';
+                }
+            },
+            {
+                field: 'active_duration_minutes',
+                headerName: t.activeDuration || 'Active time',
+                width: 120,
+                minWidth: 100,
+                filter: 'agNumberColumnFilter',
+                sortable: true,
+                cellRenderer: function(params) {
+                    var v = params.data && params.data.active_duration_minutes;
+                    if (v === null || v === undefined) {
+                        return '<span class="text-sm text-gray-400">-</span>';
+                    }
+                    return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">' +
                         esc(v) + ' ' + (t.minutesShort || 'min') + '</span>';
                 }
             },

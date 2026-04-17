@@ -13,6 +13,14 @@ import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/shared/elevated_list_card.dart';
 
+/// Whole minutes from [a] to [b] (truncated toward zero); null if either is null.
+int? _sessionMinutesBetween(DateTime? a, DateTime? b) {
+  if (a == null || b == null) return null;
+  final d = b.difference(a);
+  if (d.isNegative) return 0;
+  return d.inMinutes;
+}
+
 /// User session list (aligned with web `/admin/analytics/sessions`).
 class SessionLogsScreen extends StatefulWidget {
   const SessionLogsScreen({super.key});
@@ -514,12 +522,16 @@ class _SessionTileState extends State<_SessionTile>
     final loc = widget.localizations;
     DateTime? start;
     DateTime? lastAct;
+    DateTime? end;
     try {
       if (widget.log.sessionStartIso != null) {
         start = DateTime.parse(widget.log.sessionStartIso!);
       }
       if (widget.log.lastActivityIso != null) {
         lastAct = DateTime.parse(widget.log.lastActivityIso!);
+      }
+      if (widget.log.sessionEndIso != null) {
+        end = DateTime.parse(widget.log.sessionEndIso!);
       }
     } catch (_) {}
 
@@ -543,8 +555,16 @@ class _SessionTileState extends State<_SessionTile>
     final lastStr = lastAct != null
         ? widget.dateFmt.format(lastAct.toLocal())
         : loc.sessionLogsNoActivity;
-    final durationStr = widget.log.durationMinutes != null
-        ? loc.sessionLogsMinutes(widget.log.durationMinutes!)
+    final activeMinutes = widget.log.activeDurationMinutes ??
+        _sessionMinutesBetween(start, lastAct);
+    final activeStr = activeMinutes != null
+        ? loc.sessionLogsMinutes(activeMinutes)
+        : '—';
+
+    final wallMinutes = widget.log.durationMinutes ??
+        _sessionMinutesBetween(start, end);
+    final sessionLengthStr = wallMinutes != null
+        ? loc.sessionLogsMinutes(wallMinutes)
         : '—';
 
     final cardSurface = elevatedListCardSurfaceColor(Theme.of(context));
@@ -590,7 +610,8 @@ class _SessionTileState extends State<_SessionTile>
                                   _sessionDeviceLeadingIcon(widget.log),
                               statusColor: statusColor,
                               statusLabel: statusLabel,
-                              durationStr: durationStr,
+                              activeStr: activeStr,
+                              sessionLengthStr: sessionLengthStr,
                             )
                           : Transform(
                               transform: Matrix4.identity()..rotateY(math.pi),
@@ -684,7 +705,8 @@ class _SessionTileState extends State<_SessionTile>
     required IconData deviceIcon,
     required Color statusColor,
     required String statusLabel,
-    required String durationStr,
+    required String activeStr,
+    required String sessionLengthStr,
   }) {
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -766,8 +788,14 @@ class _SessionTileState extends State<_SessionTile>
             children: [
               _statChip(
                 context,
-                null,
-                durationStr,
+                widget.localizations.sessionLogsActiveTime,
+                activeStr,
+                leadingIcon: Icons.touch_app_rounded,
+              ),
+              _statChip(
+                context,
+                widget.localizations.sessionLogsSessionLength,
+                sessionLengthStr,
                 leadingIcon: Icons.schedule_rounded,
               ),
               Row(

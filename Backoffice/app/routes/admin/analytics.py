@@ -29,6 +29,7 @@ from app.services.user_analytics_service import (
     log_admin_action,
     aggregate_page_view_path_histogram,
     format_page_path_histogram_csv,
+    effective_session_active_duration_minutes,
 )
 from app.middleware.activity_middleware import track_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
@@ -47,7 +48,7 @@ from app.services.audit_trail_display_service import (
     refine_activity_row_consolidated_type,
 )
 from sqlalchemy import func, desc, and_, or_, cast, String
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 import json
@@ -487,24 +488,25 @@ def user_analytics(user_id):
         UserSessionLog.session_start >= from_date
     ).count()
 
-    # Total time spent = sum(last_activity - session_start) across all sessions in the
-    # period.  This avoids the inactivity-timeout padding that is baked into
-    # duration_minutes (a session isn't ended until up to SESSION_INACTIVITY_TIMEOUT
-    # minutes after the last real action).
-    all_period_sessions = UserSessionLog.query.filter(
+    # Total active time = sum of per-session active minutes (session_start →
+    # last_activity), same rule as ``effective_session_active_duration_minutes`` /
+    # session logs "Active time". Excludes idle after last activity until close.
+    period_sessions_for_active_total = UserSessionLog.query.filter(
         UserSessionLog.user_id == user_id,
-        UserSessionLog.session_start >= from_date
-    ).with_entities(
-        UserSessionLog.session_start,
-        UserSessionLog.last_activity
+        UserSessionLog.session_start >= from_date,
+    ).options(
+        load_only(
+            UserSessionLog.id,
+            UserSessionLog.session_start,
+            UserSessionLog.last_activity,
+        )
     ).all()
 
-    total_time_minutes = 0
-    for s in all_period_sessions:
-        if s.last_activity and s.session_start:
-            from app.utils.datetime_helpers import ensure_utc
-            delta = ensure_utc(s.last_activity) - ensure_utc(s.session_start)
-            total_time_minutes += max(0, int(delta.total_seconds() / 60))
+    total_active_time_minutes = 0
+    for _s in period_sessions_for_active_total:
+        m = effective_session_active_duration_minutes(_s)
+        if m is not None:
+            total_active_time_minutes += m
 
     total_page_views_row = db.session.query(
         func.coalesce(func.sum(UserSessionLog.page_views), 0)
@@ -528,7 +530,7 @@ def user_analytics(user_id):
         activity_analytics=activity_analytics,
         recent_sessions=recent_sessions,
         total_sessions_count=total_sessions_count,
-        total_time_minutes=total_time_minutes,
+        total_active_time_minutes=total_active_time_minutes,
         total_page_views=total_page_views,
         recent_logins=recent_logins,
         selected_days=days

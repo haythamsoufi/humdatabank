@@ -13,7 +13,7 @@ import csv
 from flask import request, session, current_app, has_request_context, g
 from flask_babel import gettext as _
 from flask_login import current_user
-from sqlalchemy import and_, or_, func, inspect, text
+from sqlalchemy import and_, or_, func, inspect, text, Integer
 from app import db
 from app.utils.datetime_helpers import utcnow, ensure_utc
 from app.models import (
@@ -802,13 +802,17 @@ def end_user_session(session_id, ended_by='logout'):
 
 def effective_session_duration_minutes(session_log):
     """
-    Minutes of session length for display and filtering.
+    Wall-clock session length in minutes (login to session close).
 
     When ``session_end`` is set, duration is always derived from
     ``session_end - session_start`` (UTC-normalized) so the value matches the
-    timestamps shown in the UI. Stored ``duration_minutes`` can be wrong (e.g.
-    legacy naive/aware subtraction or bad writes) and is only used as a fallback
-    when ``session_end`` is missing.
+    timestamps shown in the UI. This includes idle time after the last request
+    until the session is ended (timeout, logout, or cleanup). Stored
+    ``duration_minutes`` can be wrong (e.g. legacy naive/aware subtraction or bad
+    writes) and is only used as a fallback when ``session_end`` is missing.
+
+    For time until the last recorded activity only, use
+    ``effective_session_active_duration_minutes``.
     """
     if session_log is None:
         return None
@@ -827,6 +831,55 @@ def effective_session_duration_minutes(session_log):
 
     if session_log.duration_minutes is not None:
         return session_log.duration_minutes
+    return None
+
+
+def effective_session_active_duration_minutes(session_log):
+    """
+    Minutes from ``session_start`` to ``last_activity`` (UTC-normalized).
+
+    Represents how long the user was generating activity before the last bump;
+    it does not include idle time after ``last_activity`` until the session row
+    is closed (unlike ``effective_session_duration_minutes``).
+    """
+    if session_log is None or session_log.session_start is None:
+        return None
+    session_start_aware = ensure_utc(session_log.session_start)
+    if session_log.last_activity is None:
+        return 0
+    last_aware = ensure_utc(session_log.last_activity)
+    delta = last_aware - session_start_aware
+    return max(0, int(delta.total_seconds() / 60))
+
+
+def user_session_log_active_duration_minutes_sql():
+    """
+    SQL expression for whole minutes between ``session_start`` and ``last_activity``.
+
+    Used for ``min_duration`` filtering alongside ``duration_minutes``. Returns
+    ``None`` when the dialect is not supported (filter omits the active branch).
+    """
+    dialect = db.engine.dialect.name
+    start = UserSessionLog.session_start
+    last = UserSessionLog.last_activity
+    if dialect == 'postgresql':
+        return func.coalesce(
+            func.cast(
+                func.floor(func.extract('epoch', last - start) / 60.0),
+                Integer,
+            ),
+            0,
+        )
+    if dialect == 'sqlite':
+        return func.coalesce(
+            func.cast(
+                (func.julianday(last) - func.julianday(start)) * (24 * 60),
+                Integer,
+            ),
+            0,
+        )
+    if dialect in ('mysql', 'mariadb'):
+        return func.coalesce(func.timestampdiff(text('MINUTE'), start, last), 0)
     return None
 
 

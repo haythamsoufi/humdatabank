@@ -6,7 +6,7 @@ Auth policy:
     indicator-suggestions, data/periods, data/fdrs-overview, data/resources,
     data/unified-planning-config (IFRC GO URL + unified planning type IDs for the mobile app),
     data/unified-planning-thumbnail (JPEG first page — server-rendered; IFRC URL allowlist;
-    prefer POST JSON ``{"url": "https://..."}`` so Azure WAF does not block long query strings).
+    prefer POST JSON ``{"url_b64": "<base64url>"}`` so Azure WAF does not inspect raw IFRC URLs).
     Rate-limited to prevent abuse.
   - Auth-required: quiz/leaderboard, quiz/submit-score (scores are tied to authenticated users).
 """
@@ -907,10 +907,12 @@ def unified_planning_thumbnail():
 
     **URL input (use POST in production):**
 
-    - **POST** ``application/json``: ``{"url": "<https pdf url>"}`` — preferred; avoids
-      Azure Application Gateway / WAF false blocks on long ``?url=`` query strings.
-    - **GET** ``?url=`` — legacy; same validation (must pass IFRC_DOCUMENT_ALLOWED_HOSTS).
+    - **POST** ``application/json``: ``{"url_b64": "<base64url UTF-8 of url>"}`` — preferred;
+      avoids Azure WAF blocking raw IFRC URLs (tokens / ``&`` / ``=`` in JSON or query strings).
+    - **POST** ``{"url": "<https...>"}`` — legacy plaintext (may be blocked by WAF).
+    - **GET** ``?url=`` — legacy query string (often blocked by WAF for long SAS URLs).
     """
+    import base64
     from urllib.parse import unquote
 
     import requests
@@ -924,9 +926,25 @@ def unified_planning_thumbnail():
     )
 
     _max_url_len = int(current_app.config.get('UNIFIED_PLANNING_THUMB_MAX_URL_CHARS') or 16384)
+    _max_b64_len = int(current_app.config.get('UNIFIED_PLANNING_THUMB_MAX_URL_B64_CHARS') or 32768)
+
     if request.method == 'POST':
         data = get_json_safe()
-        raw = (data.get('url') or '').strip() if isinstance(data, dict) else ''
+        raw = ''
+        if isinstance(data, dict):
+            url_b64 = (data.get('url_b64') or '').strip()
+            if url_b64:
+                if len(url_b64) > _max_b64_len:
+                    return mobile_bad_request('url_b64 is too long')
+                try:
+                    pad = (-len(url_b64)) % 4
+                    if pad:
+                        url_b64 += '=' * pad
+                    raw = base64.urlsafe_b64decode(url_b64.encode('ascii')).decode('utf-8')
+                except Exception:
+                    return mobile_bad_request('Invalid url_b64')
+            else:
+                raw = (data.get('url') or '').strip()
     else:
         raw = (request.args.get('url') or '').strip()
     if len(raw) > _max_url_len:

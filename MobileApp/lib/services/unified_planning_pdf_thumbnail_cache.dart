@@ -216,8 +216,8 @@ class UnifiedPlanningPdfThumbnailCache {
   Future<Uint8List?> _fetchServerThumbnail(String pdfUrl) async {
     if (pdfUrl.trim().isEmpty) return null;
 
-    // POST JSON so the PDF URL is not in the query string — Azure Application Gateway
-    // WAF often returns 403 for long or token-heavy ?url=... GET requests.
+    // POST JSON with base64url-encoded URL — Azure WAF often still blocks POST bodies
+    // that contain raw IFRC SAS/query strings; encoding avoids those signatures.
     final uri = Uri.parse(
       '${AppConfig.baseApiUrl}${AppConfig.mobileUnifiedPlanningThumbnailEndpoint}',
     );
@@ -236,7 +236,9 @@ class UnifiedPlanningPdfThumbnailCache {
     try {
       final req = http.Request('POST', uri)
         ..headers.addAll(headers)
-        ..body = jsonEncode(<String, String>{'url': pdfUrl});
+        ..body = jsonEncode(<String, String>{
+          'url_b64': base64Url.encode(utf8.encode(pdfUrl)),
+        });
       final streamed =
           await client.send(req).timeout(const Duration(seconds: 45));
       if (streamed.statusCode != 200) {

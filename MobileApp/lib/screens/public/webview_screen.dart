@@ -223,23 +223,37 @@ class _WebViewScreenState extends State<WebViewScreen> {
     Future<void> tick() async {
       if (!mounted || _offlineDiagPanelHidden) return;
       try {
+        // WKWebView often returns null for async `evaluateJavascript` results; use
+        // synchronous `__ifrcAuthDraftsPeekSync` from auth-drafts.js (Backoffice).
         final raw = await controller.evaluateJavascript(source: r'''
-(async () => {
+(function() {
   try {
-    if (typeof window.__ifrcAuthDraftsGetDiag !== 'function') {
-      return JSON.stringify({error: 'no hook yet (wait for form JS)'});
+    if (typeof window.__ifrcAuthDraftsPeekSync === 'function') {
+      return JSON.stringify(window.__ifrcAuthDraftsPeekSync());
     }
-    const r = await window.__ifrcAuthDraftsGetDiag();
-    return JSON.stringify(r);
+    return JSON.stringify({
+      error: 'no __ifrcAuthDraftsPeekSync (re-download offline bundle after deploy)',
+      protocol: typeof location !== 'undefined' ? location.protocol : '',
+      hookGetDiag: typeof window.__ifrcAuthDraftsGetDiag
+    });
   } catch (e) {
-    return JSON.stringify({error: String(e)});
+    return JSON.stringify({ error: String(e) });
   }
 })()
 ''');
         if (!mounted) return;
+        final s = raw?.toString().trim() ?? '';
+        if (s.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _offlineDraftStorageLive =
+                  'draft probe: empty WebView result (will retry)';
+            });
+          }
+          return;
+        }
         dynamic decoded;
         try {
-          final s = raw?.toString().trim() ?? '';
           decoded = jsonDecode(s);
           if (decoded is String) {
             decoded = jsonDecode(decoded);
@@ -247,7 +261,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
         } catch (e) {
           if (mounted) {
             setState(() {
-              _offlineDraftStorageLive = 'draft probe JSON error: $e ← $raw';
+              _offlineDraftStorageLive =
+                  'draft probe JSON error: $e ← ${s.length > 120 ? s.substring(0, 120) : s}';
             });
           }
           return;
@@ -257,17 +272,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
           final key = decoded['draftKey']?.toString() ?? '';
           final store = decoded['idbStore']?.toString() ?? '';
           final proto = decoded['protocol']?.toString() ?? '';
-          final has = decoded['hasRecord'];
-          final n = decoded['savedFieldCount'];
-          final keys = decoded['sampleFieldKeys'];
-          final buf = StringBuffer('IndexedDB `$store` · key `$key` · $proto');
-          if (err != null && err.isNotEmpty) {
+          final snap = decoded['snapshot'];
+          final buf = StringBuffer(
+            'IndexedDB `$store` · draftKey `$key` · $proto',
+          );
+          if (err != null &&
+              err.isNotEmpty &&
+              err.contains('no __ifrcAuthDraftsPeekSync')) {
             buf.write(' · $err');
-          } else {
-            buf.write(' · savedFields=${n ?? "?"} · hasRecord=$has');
-            if (keys is List && keys.isNotEmpty) {
-              buf.write(' · e.g. ${keys.take(4).join(",")}');
-            }
+          } else if (err != null && err.isNotEmpty) {
+            buf.write(' · $err');
+          }
+          if (snap is Map) {
+            final fc = snap['fieldCount'];
+            final hr = snap['hasRecord'];
+            buf.write(' · lastSnapshot fields=$fc hasRecord=$hr');
           }
           setState(() {
             _offlineDraftStorageLive = buf.toString();

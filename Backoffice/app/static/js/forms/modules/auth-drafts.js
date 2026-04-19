@@ -44,6 +44,17 @@ function isIndexedDBAvailable() {
   }
 }
 
+/** Updated on save/load for mobile WebView sync probes (no async IndexedDB in evaluateJavascript). */
+function updateDraftDiagSnapshot(data) {
+  try {
+    window.__ifrcAuthDraftsDiagSnapshot = {
+      fieldCount: data && typeof data === 'object' ? Object.keys(data).length : 0,
+      hasRecord: true,
+      updatedAt: Date.now(),
+    };
+  } catch (e) { /* no-op */ }
+}
+
 // Initialize store name with version
 async function initializeStoreName() {
   let version = getDraftVersion();
@@ -121,6 +132,7 @@ async function saveDraft(key, data) {
       tx.onerror = () => reject(tx.error || new Error('tx error'));
       tx.objectStore(STORE_NAME).put({ key, data, updatedAt: Date.now() });
     });
+    updateDraftDiagSnapshot(data);
   } catch (e) {
     // drafts are non-critical
     // eslint-disable-next-line no-console
@@ -320,6 +332,15 @@ export function initAuthDrafts() {
   // Restore if draft exists (after form init + matrix so hidden fields and cells sync)
   if (isIndexedDBAvailable()) {
     loadDraft(key).then(async (record) => {
+      try {
+        if (record && record.data) {
+          window.__ifrcAuthDraftsDiagSnapshot = {
+            fieldCount: Object.keys(record.data).length,
+            hasRecord: true,
+            updatedAt: Date.now(),
+          };
+        }
+      } catch (_) { /* no-op */ }
       if (!record || !record.data) return;
       await waitForFormInitialized();
       const shouldRestore = isOffline || await showCustomConfirm('A local draft is available for this form. Restore it?');
@@ -396,6 +417,18 @@ export function initAuthDrafts() {
   } catch (e) { /* no-op */ }
 
   try {
+    /** Synchronous — safe for WKWebView `evaluateJavascript` (async results often come back null). */
+    window.__ifrcAuthDraftsPeekSync = function () {
+      return {
+        draftKey: key,
+        indexedDB: isIndexedDBAvailable(),
+        idbStore: STORE_NAME,
+        protocol: (typeof location !== 'undefined' ? location.protocol : ''),
+        origin: (typeof location !== 'undefined' ? location.origin : ''),
+        hrefSample: (typeof location !== 'undefined' ? String(location.href).substring(0, 96) : ''),
+        snapshot: window.__ifrcAuthDraftsDiagSnapshot || null,
+      };
+    };
     window.__ifrcAuthDraftsGetDiag = async () => {
       const out = {
         draftKey: key,

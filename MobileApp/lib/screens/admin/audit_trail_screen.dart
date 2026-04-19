@@ -105,6 +105,7 @@ class _AuditTrailScreenState extends State<AuditTrailScreen>
     if (usersProv.users.isEmpty && !usersProv.isLoading) {
       await usersProv.loadUsers();
     }
+    if (!mounted) return;
     await showAdminFiltersBottomSheet<void>(
       context: context,
       builder: (sheetContext, setModalState) {
@@ -167,7 +168,8 @@ class _AuditTrailScreenState extends State<AuditTrailScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       DropdownButtonFormField<String?>(
-                        value: dropdownValue,
+                        key: ValueKey<String?>(dropdownValue),
+                        initialValue: dropdownValue,
                         isExpanded: true,
                         menuMaxHeight: 360,
                         decoration: InputDecoration(
@@ -223,7 +225,8 @@ class _AuditTrailScreenState extends State<AuditTrailScreen>
               ),
               AdminFilterPanel.fieldGap,
               DropdownButtonFormField<String?>(
-                value: _activityTypeFilter,
+                key: ValueKey<String?>(_activityTypeFilter),
+                initialValue: _activityTypeFilter,
                 decoration:
                     InputDecoration(labelText: loc.auditTrailActivityLabel),
                 items: [

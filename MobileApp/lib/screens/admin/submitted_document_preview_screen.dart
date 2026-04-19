@@ -31,7 +31,7 @@ class SubmittedDocumentPreviewScreen extends StatelessWidget {
                 child: Image.memory(
                   bytes,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Padding(
+                  errorBuilder: (_, _, _) => Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
                       'Could not display this image.',

@@ -468,7 +468,7 @@ class _OverviewTopCountriesBar extends StatelessWidget {
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
               maxY: maxY > 0 ? maxY * 1.12 : 1,
-              barTouchData: BarTouchData(enabled: false),
+              barTouchData: const BarTouchData(enabled: false),
               titlesData: FlTitlesData(
                 show: true,
                 topTitles: const AxisTitles(

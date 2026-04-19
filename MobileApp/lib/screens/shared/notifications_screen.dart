@@ -12,6 +12,7 @@ import '../../widgets/profile_leading_avatar.dart';
 import '../../models/shared/notification.dart' as model;
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
+import '../../config/app_navigation.dart';
 import '../../config/routes.dart';
 import '../../config/app_config.dart';
 import '../../utils/url_helper.dart';
@@ -227,7 +228,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               IconButton(
                 icon: const Icon(Icons.settings_outlined),
                 onPressed: () {
-                  Navigator.of(context).push(
+                  final nav = appNavigatorKey.currentState ??
+                      Navigator.of(context, rootNavigator: true);
+                  nav.push(
                     MaterialPageRoute(
                       settings: const RouteSettings(name: '/notification-preferences'),
                       builder: (context) =>

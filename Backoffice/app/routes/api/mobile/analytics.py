@@ -55,6 +55,20 @@ def screen_view():
         flask_session.get('session_id')
         or getattr(g, '_mobile_jwt_sid', None)
     )
+    # JWT may omit `sid` on some token pairs; still attach histogram to an active row.
+    if not session_id:
+        from app.models import UserSessionLog
+
+        row = (
+            UserSessionLog.query.filter_by(
+                user_id=user_id,
+                is_active=True,
+            )
+            .order_by(UserSessionLog.last_activity.desc())
+            .first()
+        )
+        if row:
+            session_id = row.session_id
 
     try:
         from app.utils.page_view_paths import mobile_page_view_path_key

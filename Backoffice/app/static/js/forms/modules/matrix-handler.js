@@ -4997,6 +4997,34 @@ class MatrixHandler {
         debugWarn('matrix-handler', 'No CSRF token found - API requests may fail');
         return '';
     }
+
+    /**
+     * After auth-drafts restores flat field values (including matrix hidden JSON),
+     * re-parse hidden fields into matrix.data and repaint cells. Required because
+     * initializeMatrices() ran before IndexedDB restore updated those inputs.
+     */
+    syncFromDraftRestore() {
+        const matrixPromises = [];
+        this.matrices.forEach((matrix, fieldId) => {
+            const container = matrix.container;
+            if (!container || !container.isConnected) return;
+            const existingData = this.parseExistingData(container);
+            matrix.data = existingData && typeof existingData === 'object' ? existingData : {};
+            const config = matrix.config || {};
+            if (config.row_mode === 'list_library') {
+                matrixPromises.push(
+                    this.restoreDynamicRows(fieldId).then(() => {
+                        this.applyManualRowHighlighting(fieldId);
+                    }).catch((err) => {
+                        debugError('matrix-handler', 'syncFromDraftRestore restoreDynamicRows failed', err);
+                    })
+                );
+            } else {
+                this.restoreStaticMatrixValues(fieldId);
+            }
+        });
+        return Promise.all(matrixPromises);
+    }
 }
 
 // Create and export singleton instance

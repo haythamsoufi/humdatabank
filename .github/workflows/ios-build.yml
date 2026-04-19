@@ -59,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Determine Flutter project path
         id: flutter_path
@@ -78,7 +78,7 @@ jobs:
       # cache: false on the action so only this step reads/writes the ~2GB SDK artifact.
       # Bump ...-v2 if you change flutter-version above.
       - name: Cache Flutter SDK (hostedtoolcache)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /Users/runner/hostedtoolcache/flutter/stable-3.41.6-arm64
           key: flutter-sdk-3.41.6-stable-${{ runner.os }}-${{ runner.arch }}-v2
@@ -88,7 +88,7 @@ jobs:
       # Speed: avoid re-downloading Dart packages when lockfiles are unchanged (~10–20s per step).
       # hashFiles() only accepts workspace-relative literals; this repo uses MobileApp/ (see Determine path step).
       - name: Cache Pub (Dart packages)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.pub-cache
           key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('MobileApp/pubspec.lock', 'MobileApp/pubspec.yaml') }}
@@ -98,7 +98,7 @@ jobs:
       # Cache workspace Pods AND CocoaPods download cache — Firebase binaries often land under
       # ~/Library/Caches/CocoaPods, so caching only ios/Pods stays tiny (~15MB) and pod install re-downloads.
       - name: Cache CocoaPods (Pods + CocoaPods cache)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             MobileApp/ios/Pods
@@ -328,7 +328,7 @@ jobs:
 
       - name: Archive iOS build artifacts (device)
         if: steps.ios_target.outputs.target == 'device'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ios-build-ci
           path: |
@@ -354,7 +354,7 @@ jobs:
 
       - name: Archive iOS Simulator build (Appetize .zip)
         if: steps.ios_target.outputs.target == 'simulator'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ios-simulator-ci
           path: ${{ steps.flutter_path.outputs.path }}/build/ios/iphonesimulator/Runner.zip
@@ -381,7 +381,7 @@ jobs:
       #     # or STAGING=true / DEVELOPMENT=true
       #
       # - name: Upload IPA
-      #   uses: actions/upload-artifact@v4
+      #   uses: actions/upload-artifact@v6
       #   with:
       #     name: ios-ipa
       #     path: MobileApp/build/ios/ipa/*.ipa

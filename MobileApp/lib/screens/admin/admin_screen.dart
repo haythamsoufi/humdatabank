@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../models/shared/user.dart';
+import '../../config/app_navigation.dart';
 import '../../config/routes.dart';
 import '../../utils/ios_constants.dart';
 import '../../utils/ios_settings_style.dart';
@@ -252,7 +253,9 @@ class _AdminScreenState extends State<AdminScreen>
             title: localizations.loginLogsTitle,
             iconColor: context.adminHubCyan,
             onNavigate: () {
-              Navigator.of(context).push(
+              final nav = appNavigatorKey.currentState ??
+                  Navigator.of(context, rootNavigator: true);
+              nav.push(
                 MaterialPageRoute<void>(
                   settings: const RouteSettings(name: AppRoutes.loginLogs),
                   builder: (context) => const LoginLogsScreen(),
@@ -266,7 +269,9 @@ class _AdminScreenState extends State<AdminScreen>
             title: localizations.sessionLogsTitle,
             iconColor: context.adminHubCyan,
             onNavigate: () {
-              Navigator.of(context).push(
+              final nav = appNavigatorKey.currentState ??
+                  Navigator.of(context, rootNavigator: true);
+              nav.push(
                 MaterialPageRoute<void>(
                   settings: const RouteSettings(name: AppRoutes.sessionLogs),
                   builder: (context) => const SessionLogsScreen(),
@@ -330,9 +335,10 @@ class _AdminScreenState extends State<AdminScreen>
           return;
         }
         if (route != null) {
-          Navigator.of(context).pushNamed(route);
+          pushNamedOnRootNavigator(context, route);
         } else if (webviewRoute != null) {
-          Navigator.of(context).pushNamed(
+          pushNamedOnRootNavigator(
+            context,
             AppRoutes.webview,
             arguments: webviewRoute,
           );

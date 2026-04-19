@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # APK builds need JDK 17 (AGP / Kotlin); avoid relying on runner defaults
       - name: Setup Java
@@ -220,7 +220,7 @@ jobs:
         continue-on-error: true  # Don't fail if bundle build fails
 
       - name: Archive Android build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: android-build-ci
           path: |
@@ -243,7 +243,7 @@ jobs:
       #     flutter build apk --release --dart-define=PRODUCTION=true
       #
       # - name: Upload signed APK
-      #   uses: actions/upload-artifact@v4
+      #   uses: actions/upload-artifact@v6
       #   with:
       #     name: android-apk-signed
       #     path: ${{ steps.flutter_path.outputs.path }}/build/app/outputs/flutter-apk/*.apk

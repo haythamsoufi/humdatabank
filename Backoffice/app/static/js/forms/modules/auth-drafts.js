@@ -197,6 +197,32 @@ function collectFormData(form) {
   return data;
 }
 
+function waitForFormInitialized(maxMs = 90000) {
+  return new Promise((resolve) => {
+    const done = () => resolve();
+    try {
+      if (document.body && document.body.dataset && document.body.dataset.formInitialized === 'true') {
+        done();
+        return;
+      }
+    } catch (_) { /* no-op */ }
+    const start = Date.now();
+    const t = setInterval(() => {
+      try {
+        if (document.body && document.body.dataset && document.body.dataset.formInitialized === 'true') {
+          clearInterval(t);
+          done();
+          return;
+        }
+      } catch (_) { /* no-op */ }
+      if (Date.now() - start > maxMs) {
+        clearInterval(t);
+        done();
+      }
+    }, 50);
+  });
+}
+
 function restoreFormData(form, data) {
   if (!data) return;
   Object.entries(data).forEach(([name, value]) => {
@@ -291,13 +317,29 @@ export function initAuthDrafts() {
     updateDraftButtonVisibility();
   }
 
-  // Restore if draft exists
+  // Restore if draft exists (after form init + matrix so hidden fields and cells sync)
   if (isIndexedDBAvailable()) {
     loadDraft(key).then(async (record) => {
       if (!record || !record.data) return;
+      await waitForFormInitialized();
       const shouldRestore = isOffline || await showCustomConfirm('A local draft is available for this form. Restore it?');
       if (!shouldRestore) return;
       restoreFormData(form, record.data);
+      try {
+        if (window.matrixHandler && typeof window.matrixHandler.syncFromDraftRestore === 'function') {
+          await window.matrixHandler.syncFromDraftRestore();
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[auth-drafts] matrix sync after draft restore failed:', e);
+      }
+      try {
+        Array.from(form.querySelectorAll('input, select, textarea')).forEach((el) => {
+          if (!el.name) return;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      } catch (_) { /* no-op */ }
       if (typeof window.showFlashMessage === 'function') window.showFlashMessage('Draft restored', 'info');
     }).catch(() => {});
   }
@@ -333,6 +375,9 @@ export function initAuthDrafts() {
   if (draftBtn) {
     draftBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
+        window.matrixHandler.collectMatrixData();
+      }
       saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('Draft saved', 'success'); });
     });
   }
@@ -340,8 +385,42 @@ export function initAuthDrafts() {
   // Expose helpers for other modules (e.g., ajax-save fallback)
   try {
     window.__ifrcAuthDrafts = {
-      saveNow: () => saveDraft(key, collectFormData(form)),
+      saveNow: () => {
+        if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
+          window.matrixHandler.collectMatrixData();
+        }
+        return saveDraft(key, collectFormData(form));
+      },
       setOffline
+    };
+  } catch (e) { /* no-op */ }
+
+  try {
+    window.__ifrcAuthDraftsGetDiag = async () => {
+      const out = {
+        draftKey: key,
+        indexedDB: isIndexedDBAvailable(),
+        protocol: (typeof location !== 'undefined' ? location.protocol : ''),
+        origin: (typeof location !== 'undefined' ? location.origin : ''),
+        hrefSample: (typeof location !== 'undefined' ? String(location.href).substring(0, 96) : ''),
+      };
+      try {
+        await initializeStoreName();
+        out.idbStore = STORE_NAME;
+      } catch (e) {
+        out.idbStoreError = String(e);
+      }
+      try {
+        const rec = await loadDraft(key);
+        out.hasRecord = !!(rec && rec.data);
+        out.savedFieldCount = rec && rec.data ? Object.keys(rec.data).length : 0;
+        if (rec && rec.data) {
+          out.sampleFieldKeys = Object.keys(rec.data).slice(0, 12);
+        }
+      } catch (e) {
+        out.loadError = String(e);
+      }
+      return out;
     };
   } catch (e) { /* no-op */ }
 
@@ -351,6 +430,9 @@ export function initAuthDrafts() {
     e.preventDefault();
     e.stopPropagation();
     if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+    if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
+      window.matrixHandler.collectMatrixData();
+    }
     saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('You are offline. Draft saved locally.', 'warning'); });
   };
 
@@ -363,6 +445,9 @@ export function initAuthDrafts() {
   form.addEventListener('submit', (e) => {
     if (!isOffline) return;
     e.preventDefault();
+    if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
+      window.matrixHandler.collectMatrixData();
+    }
     saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('You are offline. Draft saved locally.', 'warning'); });
   }, true);
 }

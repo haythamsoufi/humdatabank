@@ -5,6 +5,7 @@ import '../services/jwt_token_service.dart';
 import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
 import '../utils/network_availability.dart';
 import '../di/service_locator.dart';
+import 'connectivity_service.dart';
 
 /// Tracks mobile screen views on both Firebase Analytics and the Backoffice
 /// audit trail via `POST /api/mobile/v1/analytics/screen-view`.
@@ -25,10 +26,11 @@ class ScreenViewTracker {
   DateTime? _lastTrackedAt;
   static const _dedupWindow = Duration(seconds: 2);
 
-  /// After transport failures, skip Backoffice POST briefly (Wi‑Fi can stay
-  /// "connected" while the dev server or tunnel is down).
+  /// Brief backoff after a failed screen-view POST to avoid log spam (do not
+  /// use the long [BackendReachabilityService] defer window — that hid entire
+  /// admin sub-route histograms when the first POST failed transiently).
   DateTime? _suppressServerScreenViewUntil;
-  static const _suppressAfterFailure = Duration(seconds: 45);
+  static const _suppressAfterFailure = Duration(seconds: 5);
 
   /// Human-readable screen name for a route path (Navigator-pushed routes).
   static String screenNameFromRoute(String routePath) {
@@ -170,8 +172,10 @@ class ScreenViewTracker {
       final hasTokens = await _jwtService.hasTokens();
       if (!hasTokens) return;
 
-      // Includes recent primary-backend transport failures (Wi‑Fi can stay "on").
-      if (shouldDeferRemoteFetch) return;
+      // Only gate on OS connectivity. Do not use [shouldDeferRemoteFetch]
+      // (backend reachability): it can stay false for 45s and drop every
+      // sub-screen histogram POST while tab-level views appear later.
+      if (!ConnectivityService().isOnline) return;
 
       final body = <String, dynamic>{
         'screen_name': screenName,

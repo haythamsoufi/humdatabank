@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/admin/admin_dashboard_provider.dart';
 import '../../providers/shared/auth_provider.dart';
+import '../../config/app_navigation.dart';
 import '../../config/routes.dart';
 import '../../utils/navigation_helper.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
@@ -437,7 +438,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 onTap: metric.route != null
                     ? () {
                         HapticFeedback.lightImpact();
-                        Navigator.of(context).pushNamed(metric.route!);
+                        pushNamedOnRootNavigator(context, metric.route!);
                       }
                     : null,
               );
@@ -589,7 +590,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   if (action.onTapOverride != null) {
                     action.onTapOverride!();
                   } else {
-                    Navigator.of(context).pushNamed(action.route);
+                    pushNamedOnRootNavigator(context, action.route);
                   }
                 },
               );

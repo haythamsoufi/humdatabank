@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -184,7 +184,7 @@ jobs:
             --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
 
       - name: Upload IPA
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ios-ipa-${{ github.run_number }}
           path: ${{ steps.flutter_path.outputs.path }}/build/ios/ipa/*.ipa
@@ -192,7 +192,7 @@ jobs:
 
       - name: Upload build logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: build-logs
           path: |

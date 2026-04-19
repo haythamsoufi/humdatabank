@@ -28,7 +28,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -85,7 +85,7 @@ jobs:
           echo "path=${ROOT}/ios/Podfile.lock" >> "$GITHUB_OUTPUT"
 
       - name: Upload Podfile.lock artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ios-podfile-lock
           path: ${{ steps.flutter_path.outputs.path }}/ios/Podfile.lock

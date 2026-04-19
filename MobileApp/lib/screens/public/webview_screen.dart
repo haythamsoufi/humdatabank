@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' show jsonDecode;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart'
@@ -116,9 +117,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
   String? _payloadLanguage;
   Future<_WebViewPayload>? _payloadFuture;
 
-  /// On-screen trail for offline WebView (see [_kShowOfflineWebViewDiag]).
+  /// Short event lines (errors, milestones) for offline WebView.
   final List<String> _offlineWebViewDiagLog = [];
-  static const int _offlineWebViewDiagMaxLines = 16;
+  static const int _offlineWebViewDiagMaxLines = 10;
+
+  /// Live summary from `window.__ifrcAuthDraftsGetDiag` (IndexedDB draft key, field count).
+  String _offlineDraftStorageLive = '';
+
+  bool _offlineDiagPanelHidden = false;
+  Timer? _offlineDraftPollTimer;
 
   /// Throttles [setState] from WebView progress ticks (reduces rebuild / log noise).
   int _lastProgressBucket = -1;
@@ -172,7 +179,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             _pageTitle = loc.offlineOpenSavedCopy;
           }
         });
-        _offlineWebViewDiag('iOS fallback: cleared loading (title=${title ?? ""})');
+        _offlineWebViewDiag('loading overlay cleared (iOS fallback)');
         DebugLogger.logInfo(
           'WEBVIEW',
           'offline iOS: loading fallback cleared stuck overlay (file URL)',
@@ -200,12 +207,84 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   @override
   void dispose() {
+    _offlineDraftPollTimer?.cancel();
+    _offlineDraftPollTimer = null;
     // Dispose WebView controller to free memory
     if (_webViewController != null) {
       _webViewController!.stopLoading();
       _webViewController = null;
     }
     super.dispose();
+  }
+
+  void _startOfflineDraftStoragePolling(InAppWebViewController controller) {
+    _offlineDraftPollTimer?.cancel();
+    if (!_kShowOfflineWebViewDiag || !widget.forceOfflineAssignmentBundle) return;
+    Future<void> tick() async {
+      if (!mounted || _offlineDiagPanelHidden) return;
+      try {
+        final raw = await controller.evaluateJavascript(source: r'''
+(async () => {
+  try {
+    if (typeof window.__ifrcAuthDraftsGetDiag !== 'function') {
+      return JSON.stringify({error: 'no hook yet (wait for form JS)'});
+    }
+    const r = await window.__ifrcAuthDraftsGetDiag();
+    return JSON.stringify(r);
+  } catch (e) {
+    return JSON.stringify({error: String(e)});
+  }
+})()
+''');
+        if (!mounted) return;
+        dynamic decoded;
+        try {
+          final s = raw?.toString().trim() ?? '';
+          decoded = jsonDecode(s);
+          if (decoded is String) {
+            decoded = jsonDecode(decoded);
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _offlineDraftStorageLive = 'draft probe JSON error: $e ← $raw';
+            });
+          }
+          return;
+        }
+        if (decoded is Map) {
+          final err = decoded['error']?.toString();
+          final key = decoded['draftKey']?.toString() ?? '';
+          final store = decoded['idbStore']?.toString() ?? '';
+          final proto = decoded['protocol']?.toString() ?? '';
+          final has = decoded['hasRecord'];
+          final n = decoded['savedFieldCount'];
+          final keys = decoded['sampleFieldKeys'];
+          final buf = StringBuffer('IndexedDB `$store` · key `$key` · $proto');
+          if (err != null && err.isNotEmpty) {
+            buf.write(' · $err');
+          } else {
+            buf.write(' · savedFields=${n ?? "?"} · hasRecord=$has');
+            if (keys is List && keys.isNotEmpty) {
+              buf.write(' · e.g. ${keys.take(4).join(",")}');
+            }
+          }
+          setState(() {
+            _offlineDraftStorageLive = buf.toString();
+          });
+        }
+      } catch (e, st) {
+        DebugLogger.logWarn('WEBVIEW_OFFLINE_DIAG', 'draft poll: $e\n$st');
+      }
+    }
+
+    unawaited(tick());
+    _offlineDraftPollTimer = Timer.periodic(const Duration(seconds: 2), (_) => tick());
+  }
+
+  void _stopOfflineDraftStoragePolling() {
+    _offlineDraftPollTimer?.cancel();
+    _offlineDraftPollTimer = null;
   }
 
   Future<void> _injectSession() async {
@@ -384,7 +463,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         );
         final indexPath = p.join(dir, 'index.html');
         _offlineWebViewDiag(
-          'payload: assignment=${widget.offlineAssignmentId} index=$indexPath',
+          'open bundle assignment=${widget.offlineAssignmentId} → $indexPath',
         );
         return _WebViewPayload.offline(
           offlineBundleDir: dir,
@@ -415,8 +494,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
     if (_kShowOfflineWebViewDiag && widget.forceOfflineAssignmentBundle && mounted) {
       setState(() {
         _offlineWebViewDiagLog.clear();
+        _offlineDraftStorageLive = '';
       });
     }
+    _stopOfflineDraftStoragePolling();
   }
 
   /// Logs subresource load failures; CSS and `/static/` always at WARN.
@@ -485,7 +566,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
         ),
         onWebViewCreated: (controller) {
           _webViewController = controller;
-          _offlineWebViewDiag('created fileUrl=$indexUri');
           DebugLogger.logInfo(
             'WEBVIEW',
             'offline WebView created fileUrl=$indexUri allowingRead=$bundleDir',
@@ -504,7 +584,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
           final url = navigationAction.request.url;
           if (url != null &&
               WebViewService.isOfflineBundleServerOnlyAssignmentExport(url)) {
-            _offlineWebViewDiag('nav blocked (export needs network): $url');
             DebugLogger.logInfo(
               'WEBVIEW',
               'Blocked offline bundle server-only export navigation: $url',
@@ -525,7 +604,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 url,
                 payload.offlineBundleDir!,
               )) {
-            _offlineWebViewDiag('nav blocked (not allowed): $url');
             DebugLogger.logWarn('WEBVIEW', 'Blocked navigation to: $url');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -540,7 +618,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
           return NavigationActionPolicy.ALLOW;
         },
         onLoadStart: (controller, url) {
-          _offlineWebViewDiag('onLoadStart url=$url');
           DebugLogger.logInfo('WEBVIEW', 'offline onLoadStart url=$url');
           _resetWebViewProgressThrottle();
           setState(() {
@@ -549,7 +626,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
           });
         },
         onLoadStop: (controller, url) async {
-          _offlineWebViewDiag('onLoadStop url=$url');
           setState(() {
             _isLoading = false;
             _error = null;
@@ -571,6 +647,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             bundleDir: payload.offlineBundleDir,
             pageUrl: url,
           );
+          _startOfflineDraftStoragePolling(controller);
         },
         onTitleChanged: (controller, title) {
           if (title != null && mounted) {
@@ -592,9 +669,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
           );
           if (!main) return;
           if (WebViewService.shouldIgnoreError(error.description)) {
-            _offlineWebViewDiag(
-              'onReceivedError mainFrame IGNORED: ${error.description}',
-            );
             DebugLogger.logInfo(
               'WEBVIEW',
               'offline mainFrame net error ignored (clearing loading): '
@@ -609,7 +683,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             return;
           }
           _offlineWebViewDiag(
-            'onReceivedError mainFrame: ${error.type} ${error.description}',
+            'load error: ${error.type} ${error.description}',
           );
           setState(() {
             _isLoading = false;
@@ -627,7 +701,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           if (!main) return;
           final statusCode = response.statusCode;
           if (statusCode != null && statusCode >= 400) {
-            _offlineWebViewDiag('onReceivedHttpError mainFrame status=$statusCode');
+            _offlineWebViewDiag('HTTP error mainFrame $statusCode');
             setState(() {
               _isLoading = false;
               _error = AppLocalizations.of(context)!.httpError(statusCode);
@@ -636,7 +710,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
         },
         onDownloadStartRequest:
             (InAppWebViewController controller, DownloadStartRequest request) {
-          _offlineWebViewDiag('onDownloadStartRequest ${request.url}');
           _handleDownload(Uri.parse(request.url.toString()), controller);
         },
       );
@@ -1029,6 +1102,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                             ),
                           ),
                         _buildOfflineWebViewDiagOverlay(),
+                        _buildOfflineWebViewDiagShowAgainChip(),
                       ],
                     ),
                   ),
@@ -1061,14 +1135,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  /// When [_kShowOfflineWebViewDiag] is true: bottom panel with recent offline WebView
-  /// milestones (payload path, load start/stop, errors). Disabled via
+  /// Live IndexedDB draft probe + short event lines. Disabled via
   /// `--dart-define=SHOW_OFFLINE_WEBVIEW_DIAG=false`.
   Widget _buildOfflineWebViewDiagOverlay() {
     if (!_kShowOfflineWebViewDiag || !widget.forceOfflineAssignmentBundle) {
       return const SizedBox.shrink();
     }
-    if (_offlineWebViewDiagLog.isEmpty) {
+    if (_offlineDiagPanelHidden) {
       return const SizedBox.shrink();
     }
     return Positioned(
@@ -1076,47 +1149,140 @@ class _WebViewScreenState extends State<WebViewScreen> {
       right: 8,
       bottom: 8,
       child: Material(
-        elevation: 8,
-        color: const Color(0xE6000000),
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+        color: Colors.transparent,
+        elevation: 0,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.38),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.bug_report_outlined, size: 14, color: Colors.white70),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Offline WebView log',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.95),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.storage_outlined,
+                        size: 16,
+                        color: Colors.white70,
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Draft storage (live)',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18, color: Colors.white70),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        tooltip: 'Hide',
+                        onPressed: () {
+                          setState(() {
+                            _offlineDiagPanelHidden = true;
+                          });
+                          _stopOfflineDraftStoragePolling();
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ..._offlineWebViewDiagLog.map(
-                (line) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    line,
+                  const SizedBox(height: 6),
+                  Text(
+                    _offlineDraftStorageLive.isEmpty
+                        ? 'Waiting for IndexedDB draft probe (form JS)…'
+                        : _offlineDraftStorageLive,
                     style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 10,
-                      height: 1.25,
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      height: 1.35,
                       fontFamily: 'monospace',
                     ),
                   ),
-                ),
+                  if (_offlineWebViewDiagLog.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    const Divider(height: 1, color: Colors.white24),
+                    const SizedBox(height: 4),
+                    ..._offlineWebViewDiagLog.map(
+                      (line) => Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          line,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.88),
+                            fontSize: 10,
+                            height: 1.2,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineWebViewDiagShowAgainChip() {
+    if (!_kShowOfflineWebViewDiag ||
+        !widget.forceOfflineAssignmentBundle ||
+        !_offlineDiagPanelHidden) {
+      return const SizedBox.shrink();
+    }
+    return Positioned(
+      right: 8,
+      bottom: 8,
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              _offlineDiagPanelHidden = false;
+            });
+            final c = _webViewController;
+            if (c != null) {
+              _startOfflineDraftStoragePolling(c);
+            }
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.storage_outlined,
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Draft log',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

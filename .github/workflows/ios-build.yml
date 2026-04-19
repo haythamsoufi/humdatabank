@@ -44,6 +44,11 @@ on:
           - device
           - simulator
         default: 'device'
+      run_flutter_analyze:
+        description: 'Run flutter analyze before CocoaPods / Xcode (saves ~30–40s when disabled; tag pushes always analyze)'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   build-ios:
@@ -192,6 +197,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Dart (catch dependency/API issues before CocoaPods)
+        if: github.event_name != 'workflow_dispatch' || inputs.run_flutter_analyze
         working-directory: ${{ steps.flutter_path.outputs.path }}
         # --no-pub: pub get already ran; avoids a second full resolve (~10–20s in logs).
         run: flutter analyze --no-fatal-infos --no-pub

@@ -187,6 +187,19 @@ class _WebViewScreenState extends State<WebViewScreen> {
     Uri url,
     InAppWebViewController controller,
   ) async {
+    // WKWebView on iOS often fires [onDownloadStartRequest] for non-download
+    // activity (e.g. `file://` subresources in offline assignment bundles).
+    // Only http(s) URLs can be fetched for session exports or opened via
+    // [launchUrl]; other schemes previously hit the iOS branch below and showed
+    // "Could not open download link" with no valid action.
+    if (url.scheme != 'http' && url.scheme != 'https') {
+      DebugLogger.logInfo(
+        'WEBVIEW',
+        'Ignoring download callback for scheme=${url.scheme} url=$url',
+      );
+      return;
+    }
+
     if (WebViewService.isFormAssignmentSessionDownloadUrl(url)) {
       try {
         final webUri = WebUri(url.toString());

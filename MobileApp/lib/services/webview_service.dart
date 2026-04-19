@@ -684,6 +684,11 @@ class WebViewService {
       // These are often transient and don't prevent page from loading
       'failed to fetch',
       'networkerror',
+      // iOS WKWebView: common when a navigation is cancelled/replaced (e.g.
+      // policy decision) — not a user-facing load failure for the main frame.
+      'webkiterrordomain',
+      'frame load interrupted',
+      'error 102',
     ];
 
     return ignoredFragments.any(

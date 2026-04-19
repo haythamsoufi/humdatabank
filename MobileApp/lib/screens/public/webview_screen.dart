@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kReleaseMode, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -65,17 +67,14 @@ class WebViewScreenArgs {
 
 class _WebViewPayload {
   final bool isOfflineBundle;
-  final String? offlineHtml;
   final String? offlineBundleDir;
   final String onlineUrl;
 
   const _WebViewPayload.online(this.onlineUrl)
       : isOfflineBundle = false,
-        offlineHtml = null,
         offlineBundleDir = null;
 
   const _WebViewPayload.offline({
-    required this.offlineHtml,
     required this.offlineBundleDir,
     required this.onlineUrl,
   }) : isOfflineBundle = true;
@@ -110,8 +109,26 @@ class _WebViewScreenState extends State<WebViewScreen> {
   String? _payloadLanguage;
   Future<_WebViewPayload>? _payloadFuture;
 
+  /// On-screen trail for offline WebView (debug/profile only — not release).
+  final List<String> _offlineWebViewDiagLog = [];
+  static const int _offlineWebViewDiagMaxLines = 16;
+
   /// Throttles [setState] from WebView progress ticks (reduces rebuild / log noise).
   int _lastProgressBucket = -1;
+
+  void _offlineWebViewDiag(String message) {
+    if (kReleaseMode || !widget.forceOfflineAssignmentBundle) return;
+    final ts = DateTime.now().toIso8601String().substring(11, 23);
+    final line = '$ts $message';
+    DebugLogger.logInfo('WEBVIEW_OFFLINE_DIAG', line);
+    if (!mounted) return;
+    setState(() {
+      _offlineWebViewDiagLog.add(line);
+      while (_offlineWebViewDiagLog.length > _offlineWebViewDiagMaxLines) {
+        _offlineWebViewDiagLog.removeAt(0);
+      }
+    });
+  }
 
   void _resetWebViewProgressThrottle() {
     _lastProgressBucket = -1;
@@ -127,9 +144,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
     });
   }
 
-  /// WKWebView may omit [onLoadStop] / final progress for [InAppWebViewInitialData]
-  /// (offline HTML from disk). Without this, the loading overlay and "Loading…" title
-  /// can persist even though the document is visible.
+  /// WKWebView may omit [onLoadStop] / final progress for local `file://` loads.
+  /// Without this, the loading overlay and "Loading…" title can persist.
   void _scheduleOfflineIosLoadingFallback(InAppWebViewController controller) {
     if (defaultTargetPlatform != TargetPlatform.iOS) return;
     Future<void>(() async {
@@ -149,11 +165,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
             _pageTitle = loc.offlineOpenSavedCopy;
           }
         });
+        _offlineWebViewDiag('iOS fallback: cleared loading (title=${title ?? ""})');
         DebugLogger.logInfo(
           'WEBVIEW',
-          'offline iOS: loading fallback cleared stuck overlay (initialData)',
+          'offline iOS: loading fallback cleared stuck overlay (file URL)',
         );
       } catch (e, st) {
+        _offlineWebViewDiag('iOS fallback ERROR: $e');
         DebugLogger.logWarn('WEBVIEW', 'offline iOS loading fallback: $e\n$st');
         if (mounted) {
           final loc = AppLocalizations.of(context)!;
@@ -357,8 +375,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
           'Using offline bundle assignment=${widget.offlineAssignmentId} '
           'dir=$dir htmlChars=${html.length} onlineRef=$onlineUrl',
         );
+        final indexPath = p.join(dir, 'index.html');
+        _offlineWebViewDiag(
+          'payload: assignment=${widget.offlineAssignmentId} index=$indexPath',
+        );
         return _WebViewPayload.offline(
-          offlineHtml: html,
           offlineBundleDir: dir,
           onlineUrl: onlineUrl,
         );
@@ -384,12 +405,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void _invalidatePayload() {
     _payloadLanguage = null;
     _payloadFuture = null;
-  }
-
-  WebUri _offlineFileBaseWebUri(String bundleDir) {
-    final withSlash =
-        bundleDir.endsWith('/') ? bundleDir : '$bundleDir/';
-    return WebUri.uri(Uri.file(withSlash));
+    if (!kReleaseMode && widget.forceOfflineAssignmentBundle && mounted) {
+      setState(() {
+        _offlineWebViewDiagLog.clear();
+      });
+    }
   }
 
   /// Logs subresource load failures; CSS and `/static/` always at WARN.
@@ -441,28 +461,27 @@ class _WebViewScreenState extends State<WebViewScreen> {
     required AppLocalizations localizations,
   }) {
     if (payload.isOfflineBundle) {
-      final base = _offlineFileBaseWebUri(payload.offlineBundleDir!);
+      final bundleDir = payload.offlineBundleDir!;
+      final indexPath = p.join(bundleDir, 'index.html');
+      final indexUri = WebUri.uri(Uri.file(indexPath));
       return InAppWebView(
-        key: ValueKey('offline|${payload.onlineUrl}|$language'),
-        initialData: InAppWebViewInitialData(
-          data: payload.offlineHtml!,
-          baseUrl: base,
-          mimeType: 'text/html',
-          encoding: 'utf8',
-          historyUrl: base,
-        ),
+        key: ValueKey('offline|file|$indexPath|$language'),
+        // iOS WKWebView often renders nothing when using [InAppWebViewInitialData]
+        // (loadHTMLString + file base URL). Loading `index.html` via file:// matches
+        // Safari/WKWebView expectations and fixes a blank white WebView on iOS.
+        initialUrlRequest: URLRequest(url: indexUri),
         initialUserScripts: WebViewService.getRequestInterceptorScripts(
           language: language,
         ),
         initialSettings: WebViewService.offlineAssignmentBundleSettings(
-          payload.offlineBundleDir!,
+          bundleDir,
         ),
         onWebViewCreated: (controller) {
           _webViewController = controller;
+          _offlineWebViewDiag('created fileUrl=$indexUri');
           DebugLogger.logInfo(
             'WEBVIEW',
-            'offline WebView created baseUrl=$base '
-            'allowingRead=${payload.offlineBundleDir}',
+            'offline WebView created fileUrl=$indexUri allowingRead=$bundleDir',
           );
           _scheduleOfflineIosLoadingFallback(controller);
         },
@@ -478,6 +497,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           final url = navigationAction.request.url;
           if (url != null &&
               WebViewService.isOfflineBundleServerOnlyAssignmentExport(url)) {
+            _offlineWebViewDiag('nav blocked (export needs network): $url');
             DebugLogger.logInfo(
               'WEBVIEW',
               'Blocked offline bundle server-only export navigation: $url',
@@ -498,6 +518,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 url,
                 payload.offlineBundleDir!,
               )) {
+            _offlineWebViewDiag('nav blocked (not allowed): $url');
             DebugLogger.logWarn('WEBVIEW', 'Blocked navigation to: $url');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -512,6 +533,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           return NavigationActionPolicy.ALLOW;
         },
         onLoadStart: (controller, url) {
+          _offlineWebViewDiag('onLoadStart url=$url');
           DebugLogger.logInfo('WEBVIEW', 'offline onLoadStart url=$url');
           _resetWebViewProgressThrottle();
           setState(() {
@@ -520,6 +542,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           });
         },
         onLoadStop: (controller, url) async {
+          _offlineWebViewDiag('onLoadStop url=$url');
           setState(() {
             _isLoading = false;
             _error = null;
@@ -562,6 +585,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
           );
           if (!main) return;
           if (WebViewService.shouldIgnoreError(error.description)) {
+            _offlineWebViewDiag(
+              'onReceivedError mainFrame IGNORED: ${error.description}',
+            );
             DebugLogger.logInfo(
               'WEBVIEW',
               'offline mainFrame net error ignored (clearing loading): '
@@ -575,6 +601,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
             }
             return;
           }
+          _offlineWebViewDiag(
+            'onReceivedError mainFrame: ${error.type} ${error.description}',
+          );
           setState(() {
             _isLoading = false;
             _error = error.description;
@@ -591,6 +620,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           if (!main) return;
           final statusCode = response.statusCode;
           if (statusCode != null && statusCode >= 400) {
+            _offlineWebViewDiag('onReceivedHttpError mainFrame status=$statusCode');
             setState(() {
               _isLoading = false;
               _error = AppLocalizations.of(context)!.httpError(statusCode);
@@ -599,6 +629,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         },
         onDownloadStartRequest:
             (InAppWebViewController controller, DownloadStartRequest request) {
+          _offlineWebViewDiag('onDownloadStartRequest ${request.url}');
           _handleDownload(Uri.parse(request.url.toString()), controller);
         },
       );
@@ -990,6 +1021,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                               ),
                             ),
                           ),
+                        _buildOfflineWebViewDiagOverlay(),
                       ],
                     ),
                   ),
@@ -1019,6 +1051,68 @@ class _WebViewScreenState extends State<WebViewScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// Visible only in debug/profile when opening a saved offline assignment: shows
+  /// recent WebView milestones (payload path, load start/stop, errors). Release
+  /// builds omit this panel entirely.
+  Widget _buildOfflineWebViewDiagOverlay() {
+    if (kReleaseMode || !widget.forceOfflineAssignmentBundle) {
+      return const SizedBox.shrink();
+    }
+    if (_offlineWebViewDiagLog.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Positioned(
+      left: 8,
+      right: 8,
+      bottom: 8,
+      child: Material(
+        elevation: 8,
+        color: const Color(0xE6000000),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.bug_report_outlined, size: 14, color: Colors.white70),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Offline WebView log (not in release)',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ..._offlineWebViewDiagLog.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    line,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 10,
+                      height: 1.25,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

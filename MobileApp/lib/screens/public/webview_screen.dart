@@ -127,6 +127,46 @@ class _WebViewScreenState extends State<WebViewScreen> {
     });
   }
 
+  /// WKWebView may omit [onLoadStop] / final progress for [InAppWebViewInitialData]
+  /// (offline HTML from disk). Without this, the loading overlay and "Loading…" title
+  /// can persist even though the document is visible.
+  void _scheduleOfflineIosLoadingFallback(InAppWebViewController controller) {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    Future<void>(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      if (!mounted) return;
+      if (!_isLoading) return;
+      try {
+        final title = await controller.getTitle();
+        if (!mounted) return;
+        final loc = AppLocalizations.of(context)!;
+        setState(() {
+          _isLoading = false;
+          _progress = 1.0;
+          if (title != null && title.isNotEmpty) {
+            _pageTitle = title;
+          } else {
+            _pageTitle = loc.offlineOpenSavedCopy;
+          }
+        });
+        DebugLogger.logInfo(
+          'WEBVIEW',
+          'offline iOS: loading fallback cleared stuck overlay (initialData)',
+        );
+      } catch (e, st) {
+        DebugLogger.logWarn('WEBVIEW', 'offline iOS loading fallback: $e\n$st');
+        if (mounted) {
+          final loc = AppLocalizations.of(context)!;
+          setState(() {
+            _isLoading = false;
+            _progress = 1.0;
+            _pageTitle ??= loc.offlineOpenSavedCopy;
+          });
+        }
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -424,6 +464,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             'offline WebView created baseUrl=$base '
             'allowingRead=${payload.offlineBundleDir}',
           );
+          _scheduleOfflineIosLoadingFallback(controller);
         },
         onConsoleMessage: (controller, consoleMessage) {
           if (!DebugLogger.verboseDebugLogs) return;
@@ -521,6 +562,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
           );
           if (!main) return;
           if (WebViewService.shouldIgnoreError(error.description)) {
+            DebugLogger.logInfo(
+              'WEBVIEW',
+              'offline mainFrame net error ignored (clearing loading): '
+              '${error.description}',
+            );
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _progress = 1.0;
+              });
+            }
             return;
           }
           setState(() {
@@ -663,8 +715,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
         if (WebViewService.shouldIgnoreError(error.description)) {
           DebugLogger.logInfo(
             'WEBVIEW',
-            'mainFrame net error ignored: ${error.description}',
+            'mainFrame net error ignored (clearing loading): ${error.description}',
           );
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _progress = 1.0;
+            });
+          }
           return;
         }
         setState(() {

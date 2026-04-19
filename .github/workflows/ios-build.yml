@@ -1,5 +1,11 @@
 name: iOS Build
 
+# Avoid parallel iOS builds racing on the same Actions cache keys (Flutter SDK save often fails with
+# "Unable to reserve cache ... another job may be creating this cache", so the next run re-downloads ~2GB).
+concurrency:
+  group: ios-build-${{ github.repository }}
+  cancel-in-progress: false
+
 run-name: >-
   ${{ github.event_name == 'push'
     && format('iOS Build — {0}', github.ref_name)
@@ -50,22 +56,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          # Default image Xcode can lag; plugins may reference newer SDK APIs (e.g. device_info_plus 12+).
-          xcode-version: latest-stable
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.6 stable ships Dart 3.11.4.
-          flutter-version: '3.41.6'
-          channel: 'stable'
-          # Caches the Flutter SDK under hostedtoolcache (same pattern as android-build.yml).
-          # Saves ~30–40s+ per run vs downloading the full SDK tarball every time.
-          cache: true
-
       - name: Determine Flutter project path
         id: flutter_path
         run: |
@@ -78,6 +68,18 @@ jobs:
             exit 1
           fi
 
+      # subosito/flutter-action's built-in cache uses a key that includes the engine revision and races when
+      # multiple jobs run (save fails → every run misses). We restore this path BEFORE the action and set
+      # cache: false on the action so only this step reads/writes the ~2GB SDK artifact.
+      # Bump ...-v2 if you change flutter-version above.
+      - name: Cache Flutter SDK (hostedtoolcache)
+        uses: actions/cache@v4
+        with:
+          path: /Users/runner/hostedtoolcache/flutter/stable-3.41.6-arm64
+          key: flutter-sdk-3.41.6-stable-${{ runner.os }}-${{ runner.arch }}-v2
+          restore-keys: |
+            flutter-sdk-3.41.6-stable-${{ runner.os }}-${{ runner.arch }}-
+
       # Speed: avoid re-downloading Dart packages when lockfiles are unchanged (~10–20s per step).
       # hashFiles() only accepts workspace-relative literals; this repo uses MobileApp/ (see Determine path step).
       - name: Cache Pub (Dart packages)
@@ -88,14 +90,33 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-pub-
 
-      # Speed: reuse checked-out Pods when Podfile.lock + Flutter deps unchanged (Firebase download is slow).
-      - name: Cache CocoaPods (ios/Pods)
+      # Cache workspace Pods AND CocoaPods download cache — Firebase binaries often land under
+      # ~/Library/Caches/CocoaPods, so caching only ios/Pods stays tiny (~15MB) and pod install re-downloads.
+      - name: Cache CocoaPods (Pods + CocoaPods cache)
         uses: actions/cache@v4
         with:
-          path: ${{ steps.flutter_path.outputs.path }}/ios/Pods
+          path: |
+            MobileApp/ios/Pods
+            /Users/runner/Library/Caches/CocoaPods
           key: ${{ runner.os }}-${{ runner.arch }}-ios-pods-${{ hashFiles('MobileApp/ios/Podfile.lock', 'MobileApp/pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ios-pods-
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # Default image Xcode can lag; plugins may reference newer SDK APIs (e.g. device_info_plus 12+).
+          xcode-version: latest-stable
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.6 stable ships Dart 3.11.4.
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          # Disabled: we cache hostedtoolcache ourselves (see Cache Flutter SDK) to avoid cache key churn
+          # and "Unable to reserve cache" when multiple workflows use flutter-action concurrently.
+          cache: false
 
       - name: Resolve iOS build target (device vs simulator)
         id: ios_target

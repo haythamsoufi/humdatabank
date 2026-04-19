@@ -3,13 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
-
-/// On-screen diagnostics for saved offline assignment WebViews. Default `true`
-/// (including release / CI). Hide with `--dart-define=SHOW_OFFLINE_WEBVIEW_DIAG=false`.
-const bool _kShowOfflineWebViewDiag = bool.fromEnvironment(
-  'SHOW_OFFLINE_WEBVIEW_DIAG',
-  defaultValue: true,
-);
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
@@ -32,6 +25,13 @@ import '../../widgets/countries_widget.dart';
 import '../../services/webview_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart' show DebugLogger, LogLevel;
+
+/// On-screen diagnostics for saved offline assignment WebViews. Default `true`
+/// (including release / CI). Hide with `--dart-define=SHOW_OFFLINE_WEBVIEW_DIAG=false`.
+const bool _kShowOfflineWebViewDiag = bool.fromEnvironment(
+  'SHOW_OFFLINE_WEBVIEW_DIAG',
+  defaultValue: true,
+);
 
 /// Route arguments for [WebViewScreen]: either a [String] path/URL, or a map
 /// from the dashboard (offline bundle / future extensions).

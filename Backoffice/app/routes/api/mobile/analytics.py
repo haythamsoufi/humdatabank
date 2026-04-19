@@ -11,18 +11,21 @@ from app.utils.mobile_responses import mobile_ok, mobile_bad_request
 from app.utils.rate_limiting import mobile_rate_limit
 from app.routes.api.mobile import mobile_bp
 
-# Per-user dedup cache: user_id -> (screen_name, timestamp)
-_recent_screen_views: dict[int, tuple[str, float]] = {}
+# Per-user dedup cache: user_id -> (screen_name, route_path, timestamp)
+_recent_screen_views: dict[int, tuple[str, str, float]] = {}
 _DEDUP_WINDOW_SECONDS = 2.0
 
 
-def _is_duplicate(user_id: int, screen_name: str) -> bool:
+def _is_duplicate(user_id: int, screen_name: str, route_path: str | None) -> bool:
     """Return True if this screen was already logged within the dedup window."""
     entry = _recent_screen_views.get(user_id)
     if entry is None:
         return False
-    prev_screen, prev_time = entry
-    return prev_screen == screen_name and (time.time() - prev_time) < _DEDUP_WINDOW_SECONDS
+    prev_screen, prev_route, prev_time = entry
+    rp = (route_path or "").strip()
+    if prev_screen != screen_name or prev_route != rp:
+        return False
+    return (time.time() - prev_time) < _DEDUP_WINDOW_SECONDS
 
 
 @mobile_bp.route('/analytics/screen-view', methods=['POST'])
@@ -40,12 +43,13 @@ def screen_view():
         return mobile_bad_request('screen_name is required')
 
     route_path = (data.get('route_path') or '').strip() or None
+    route_key = (route_path or "").strip()
 
     user_id = current_user.id
-    if _is_duplicate(user_id, screen_name):
+    if _is_duplicate(user_id, screen_name, route_path):
         return mobile_ok()
 
-    _recent_screen_views[user_id] = (screen_name, time.time())
+    _recent_screen_views[user_id] = (screen_name, route_key, time.time())
 
     session_id = (
         flask_session.get('session_id')

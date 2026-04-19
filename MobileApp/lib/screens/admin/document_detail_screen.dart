@@ -98,7 +98,10 @@ Future<void> openSubmittedDocumentPreview(
     final bytes = response.bodyBytes;
     if (!_bytesLookLikePdf(bytes)) {
       final u8 = Uint8List.fromList(bytes);
-      if (SubmittedDocumentPreviewScreen.shouldUseNativePreview(u8)) {
+      if (SubmittedDocumentPreviewScreen.shouldUseNativePreview(
+            u8,
+            fileName: document.fileName,
+          )) {
         if (!context.mounted) return;
         await nav.push<void>(
           MaterialPageRoute<void>(
@@ -109,6 +112,7 @@ Future<void> openSubmittedDocumentPreview(
               title: document.fileName ?? loc.previewDocument,
               bytes: u8,
               isImage: SubmittedDocumentPreviewScreen.bytesLookLikeImage(u8),
+              fileName: document.fileName,
             ),
           ),
         );
@@ -272,8 +276,8 @@ String? _formatDocumentUploadedAt(BuildContext context, DateTime? at) {
 
 /// Full-screen summary for one document from the admin list.
 /// Download fetches the file via the mobile API and opens the system share
-/// sheet. Preview loads PDFs in [PdfViewerScreen] (non-PDF files fall back
-/// to the WebView serve URL).
+/// sheet. Preview loads PDFs in [PdfViewerScreen]; other common types use
+/// [SubmittedDocumentPreviewScreen], with WebView as a last resort.
 class DocumentDetailScreen extends StatefulWidget {
   const DocumentDetailScreen({
     super.key,

@@ -9,15 +9,20 @@ import '../services/screen_view_tracker.dart';
 /// but some admin flows (nested [Navigator] context, or timing) can miss a
 /// notification — calling this from [State.initState] is safe: duplicates within
 /// [ScreenViewTracker]'s dedup window are dropped.
+///
+/// Always uses [routePath] for the server payload. Do **not** prefer
+/// [ModalRoute.of] here: when the app shell is [MainNavigationScreen]
+/// (`/dashboard`), the nearest modal route can remain the dashboard route even
+/// after a push, which would mis-label every admin sub-screen as `Home` and
+/// collide with Backoffice `screen_name`-only dedup on
+/// `POST /analytics/screen-view`.
 void scheduleMobileScreenViewForRoutePath(
   BuildContext context, {
   required String routePath,
 }) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (!context.mounted) return;
-    final fromRoute = ModalRoute.of(context)?.settings.name;
-    final path =
-        (fromRoute != null && fromRoute.isNotEmpty) ? fromRoute : routePath;
+    final path = routePath;
     final tracker = ScreenViewTracker();
     final screenName = ScreenViewTracker.screenNameFromRoute(path);
     tracker.trackScreenView(

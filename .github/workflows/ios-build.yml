@@ -62,7 +62,9 @@ jobs:
           # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.6 stable ships Dart 3.11.4.
           flutter-version: '3.41.6'
           channel: 'stable'
-          cache: false  # Disabled because pubspec.lock is in MobileApp/ subdirectory
+          # Caches the Flutter SDK under hostedtoolcache (same pattern as android-build.yml).
+          # Saves ~30–40s+ per run vs downloading the full SDK tarball every time.
+          cache: true
 
       - name: Determine Flutter project path
         id: flutter_path
@@ -75,6 +77,25 @@ jobs:
             echo "Error: Could not find Flutter project"
             exit 1
           fi
+
+      # Speed: avoid re-downloading Dart packages when lockfiles are unchanged (~10–20s per step).
+      # hashFiles() only accepts workspace-relative literals; this repo uses MobileApp/ (see Determine path step).
+      - name: Cache Pub (Dart packages)
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('MobileApp/pubspec.lock', 'MobileApp/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-pub-
+
+      # Speed: reuse checked-out Pods when Podfile.lock + Flutter deps unchanged (Firebase download is slow).
+      - name: Cache CocoaPods (ios/Pods)
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.flutter_path.outputs.path }}/ios/Pods
+          key: ${{ runner.os }}-${{ runner.arch }}-ios-pods-${{ hashFiles('MobileApp/ios/Podfile.lock', 'MobileApp/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ios-pods-
 
       - name: Resolve iOS build target (device vs simulator)
         id: ios_target
@@ -151,14 +172,20 @@ jobs:
 
       - name: Analyze Dart (catch dependency/API issues before CocoaPods)
         working-directory: ${{ steps.flutter_path.outputs.path }}
-        run: flutter analyze --no-fatal-infos
+        # --no-pub: pub get already ran; avoids a second full resolve (~10–20s in logs).
+        run: flutter analyze --no-fatal-infos --no-pub
 
       - name: Install CocoaPods dependencies
         working-directory: ${{ steps.flutter_path.outputs.path }}/ios
+        env:
+          COCOAPODS_DISABLE_STATS: 'true'
         run: |
-          sudo gem install cocoapods
-          # --repo-update: refresh CocoaPods trunk when FlutterFire bumps Firebase (avoids lock/snapshot mismatches)
-          pod install --repo-update
+          if ! command -v pod >/dev/null 2>&1; then
+            sudo gem install --no-document cocoapods
+          fi
+          # Plain install: Podfile.lock is authoritative. After Firebase bumps, refresh the lock via
+          # `.github/workflows/ios-regenerate-podfile-lock.yml` (repo-update every CI run costs ~30s+).
+          pod install
 
       - name: Configure alternate bundle identifier and app name
         working-directory: ${{ steps.flutter_path.outputs.path }}
@@ -237,7 +264,8 @@ jobs:
 
           # Simulator: Flutter does not support release or profile for iphonesimulator (JIT debug only).
           if [ "${{ steps.ios_target.outputs.target }}" = "simulator" ]; then
-            flutter build ios --simulator --debug --no-codesign \
+            # --no-pub: dependencies already resolved (pub get + pod install).
+            flutter build ios --simulator --debug --no-codesign --no-pub \
               --dart-define=$ENV_FLAG \
               --dart-define=BACKEND_URL="${{ inputs.backend_url }}" \
               --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \
@@ -247,7 +275,7 @@ jobs:
               --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
               --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
           else
-            flutter build ios --release --no-codesign \
+            flutter build ios --release --no-codesign --no-pub \
               --dart-define=$ENV_FLAG \
               --dart-define=BACKEND_URL="${{ inputs.backend_url }}" \
               --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \

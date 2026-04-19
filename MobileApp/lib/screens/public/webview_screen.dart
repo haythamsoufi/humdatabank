@@ -439,7 +439,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
             }
             return NavigationActionPolicy.CANCEL;
           }
-          if (url != null && !WebViewService.isUrlAllowed(url)) {
+          if (url != null &&
+              !WebViewService.isOfflineBundleNavigationAllowed(
+                url,
+                payload.offlineBundleDir!,
+              )) {
             DebugLogger.logWarn('WEBVIEW', 'Blocked navigation to: $url');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(

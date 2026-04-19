@@ -1,6 +1,10 @@
 import 'dart:collection';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:path/path.dart' as p;
+
 import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
 
@@ -131,6 +135,62 @@ class WebViewService {
     return path.contains('/export_pdf') ||
         path.contains('/export_excel') ||
         path.contains('/validation_summary');
+  }
+
+  /// Whether a navigation is allowed inside a saved offline assignment WebView.
+  ///
+  /// Release builds enforce [isUrlAllowed] for http(s), which **does not**
+  /// include `file:` URLs. WKWebView on iOS often invokes
+  /// [InAppWebView.shouldOverrideUrlLoading] for `file:` loads (main frame and
+  /// assets); Android may not, which made offline bundles appear to work only
+  /// on Android. Local `file:` URLs under [bundleDirectoryPath] must be allowed.
+  static bool isOfflineBundleNavigationAllowed(
+    WebUri? webUri,
+    String bundleDirectoryPath,
+  ) {
+    if (webUri == null) return true;
+    final uri = Uri.tryParse(webUri.toString());
+    if (uri == null) return false;
+
+    if (uri.scheme == 'about') {
+      return true;
+    }
+
+    if (uri.scheme == 'file') {
+      return _isFileUrlUnderOfflineBundle(uri, bundleDirectoryPath);
+    }
+
+    return isUrlAllowed(uri);
+  }
+
+  static bool _isFileUrlUnderOfflineBundle(Uri fileUri, String bundleDirectoryPath) {
+    assert(fileUri.scheme == 'file');
+    String filePath;
+    try {
+      filePath = fileUri.toFilePath();
+    } catch (_) {
+      filePath = fileUri.path;
+    }
+
+    try {
+      final bundleDir = Directory(bundleDirectoryPath);
+      if (!bundleDir.existsSync()) return false;
+      final bundleResolved = bundleDir.resolveSymbolicLinksSync();
+      final fileResolved = File(filePath).resolveSymbolicLinksSync();
+      return p.equals(bundleResolved, fileResolved) ||
+          p.isWithin(bundleResolved, fileResolved);
+    } catch (e, st) {
+      DebugLogger.logWarn(
+        'WEBVIEW',
+        'offline bundle file URL check fallback: $e\n$st',
+      );
+      final normBundle = p.normalize(bundleDirectoryPath);
+      final normFile = p.normalize(filePath);
+      if (normFile == normBundle) return true;
+      final sep = p.separator;
+      final prefix = normBundle.endsWith(sep) ? normBundle : '$normBundle$sep';
+      return normFile.startsWith(prefix);
+    }
   }
 
   /// Validates if a URL string is allowed to load in WebView

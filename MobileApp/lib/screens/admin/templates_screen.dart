@@ -9,6 +9,7 @@ import '../../utils/constants.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_bar.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class TemplatesScreen extends StatefulWidget {
   const TemplatesScreen({super.key});
@@ -17,7 +18,11 @@ class TemplatesScreen extends StatefulWidget {
   State<TemplatesScreen> createState() => _TemplatesScreenState();
 }
 
-class _TemplatesScreenState extends State<TemplatesScreen> {
+class _TemplatesScreenState extends State<TemplatesScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.templates;
+
   @override
   void initState() {
     super.initState();

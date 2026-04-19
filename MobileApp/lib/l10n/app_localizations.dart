@@ -211,6 +211,12 @@ class AppLocalizations {
       'home_landing_global_indicator_volunteers': 'Volunteers',
       'home_landing_global_indicator_staff': 'Staff',
       'home_landing_global_indicator_branches': 'Branches',
+      'home_landing_global_indicator_local_units': 'Local units',
+      'home_landing_global_indicator_blood_donors': 'Blood donors',
+      'home_landing_global_indicator_first_aid': 'First aid',
+      'home_landing_global_indicator_people_reached': 'People reached',
+      'home_landing_global_indicator_income': 'Income',
+      'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'Top countries',
       'home_landing_global_load_error':
           'Could not load map data. Check your connection or API key.',
@@ -1290,6 +1296,12 @@ class AppLocalizations {
       'home_landing_global_indicator_volunteers': 'Voluntarios',
       'home_landing_global_indicator_staff': 'Personal',
       'home_landing_global_indicator_branches': 'Sucursales',
+      'home_landing_global_indicator_local_units': 'Local units',
+      'home_landing_global_indicator_blood_donors': 'Blood donors',
+      'home_landing_global_indicator_first_aid': 'First aid',
+      'home_landing_global_indicator_people_reached': 'People reached',
+      'home_landing_global_indicator_income': 'Income',
+      'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'Principales países',
       'home_landing_global_load_error':
           'No se pudieron cargar los datos del mapa. Compruebe la conexión o la clave API.',
@@ -2207,6 +2219,12 @@ class AppLocalizations {
       'home_landing_global_indicator_volunteers': 'Bénévoles',
       'home_landing_global_indicator_staff': 'Personnel',
       'home_landing_global_indicator_branches': 'Antennes',
+      'home_landing_global_indicator_local_units': 'Local units',
+      'home_landing_global_indicator_blood_donors': 'Blood donors',
+      'home_landing_global_indicator_first_aid': 'First aid',
+      'home_landing_global_indicator_people_reached': 'People reached',
+      'home_landing_global_indicator_income': 'Income',
+      'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'Principaux pays',
       'home_landing_global_load_error':
           'Impossible de charger les données de la carte. Vérifiez la connexion ou la clé API.',
@@ -3128,6 +3146,12 @@ class AppLocalizations {
       'home_landing_global_indicator_volunteers': 'المتطوعون',
       'home_landing_global_indicator_staff': 'الموظفون',
       'home_landing_global_indicator_branches': 'الفروع',
+      'home_landing_global_indicator_local_units': 'Local units',
+      'home_landing_global_indicator_blood_donors': 'Blood donors',
+      'home_landing_global_indicator_first_aid': 'First aid',
+      'home_landing_global_indicator_people_reached': 'People reached',
+      'home_landing_global_indicator_income': 'Income',
+      'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'أبرز الدول',
       'home_landing_global_load_error':
           'تعذر تحميل بيانات الخريطة. تحقق من الاتصال أو مفتاح واجهة البرمجة.',
@@ -4017,6 +4041,12 @@ class AppLocalizations {
       'home_landing_global_indicator_volunteers': 'स्वयंसेवक',
       'home_landing_global_indicator_staff': 'कर्मचारी',
       'home_landing_global_indicator_branches': 'शाखाएँ',
+      'home_landing_global_indicator_local_units': 'Local units',
+      'home_landing_global_indicator_blood_donors': 'Blood donors',
+      'home_landing_global_indicator_first_aid': 'First aid',
+      'home_landing_global_indicator_people_reached': 'People reached',
+      'home_landing_global_indicator_income': 'Income',
+      'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'शीर्ष देश',
       'home_landing_global_load_error':
           'मानचित्र डेटा लोड नहीं हो सका। कनेक्शन या API कुंजी जाँचें।',
@@ -4927,6 +4957,12 @@ class AppLocalizations {
       'home_landing_global_indicator_volunteers': 'Волонтёры',
       'home_landing_global_indicator_staff': 'Персонал',
       'home_landing_global_indicator_branches': 'Филиалы',
+      'home_landing_global_indicator_local_units': 'Local units',
+      'home_landing_global_indicator_blood_donors': 'Blood donors',
+      'home_landing_global_indicator_first_aid': 'First aid',
+      'home_landing_global_indicator_people_reached': 'People reached',
+      'home_landing_global_indicator_income': 'Income',
+      'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'Топ стран',
       'home_landing_global_load_error':
           'Не удалось загрузить данные карты. Проверьте соединение или ключ API.',
@@ -5839,6 +5875,12 @@ class AppLocalizations {
       'home_landing_global_indicator_volunteers': '志愿者',
       'home_landing_global_indicator_staff': '员工',
       'home_landing_global_indicator_branches': '分支机构',
+      'home_landing_global_indicator_local_units': 'Local units',
+      'home_landing_global_indicator_blood_donors': 'Blood donors',
+      'home_landing_global_indicator_first_aid': 'First aid',
+      'home_landing_global_indicator_people_reached': 'People reached',
+      'home_landing_global_indicator_income': 'Income',
+      'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': '主要国家/地区',
       'home_landing_global_load_error':
           '无法加载地图数据。请检查网络连接或 API 密钥。',
@@ -6798,6 +6840,18 @@ class AppLocalizations {
       translate('home_landing_global_indicator_staff');
   String get homeLandingGlobalIndicatorBranches =>
       translate('home_landing_global_indicator_branches');
+  String get homeLandingGlobalIndicatorLocalUnits =>
+      translate('home_landing_global_indicator_local_units');
+  String get homeLandingGlobalIndicatorBloodDonors =>
+      translate('home_landing_global_indicator_blood_donors');
+  String get homeLandingGlobalIndicatorFirstAid =>
+      translate('home_landing_global_indicator_first_aid');
+  String get homeLandingGlobalIndicatorPeopleReached =>
+      translate('home_landing_global_indicator_people_reached');
+  String get homeLandingGlobalIndicatorIncome =>
+      translate('home_landing_global_indicator_income');
+  String get homeLandingGlobalIndicatorExpenditure =>
+      translate('home_landing_global_indicator_expenditure');
   String get homeLandingGlobalTopCountries =>
       translate('home_landing_global_top_countries');
   String get homeLandingGlobalLoadError =>

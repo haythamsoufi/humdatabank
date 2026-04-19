@@ -5,6 +5,7 @@ import '../../config/routes.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class EditEntityScreen extends StatefulWidget {
   final int entityId;
@@ -22,7 +23,12 @@ class EditEntityScreen extends StatefulWidget {
   State<EditEntityScreen> createState() => _EditEntityScreenState();
 }
 
-class _EditEntityScreenState extends State<EditEntityScreen> {
+class _EditEntityScreenState extends State<EditEntityScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath =>
+      AppRoutes.editEntity(widget.entityId, widget.entityType);
+
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _codeController;

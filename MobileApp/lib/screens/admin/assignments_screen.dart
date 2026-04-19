@@ -10,6 +10,7 @@ import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/error_state.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({super.key});
@@ -18,7 +19,11 @@ class AssignmentsScreen extends StatefulWidget {
   State<AssignmentsScreen> createState() => _AssignmentsScreenState();
 }
 
-class _AssignmentsScreenState extends State<AssignmentsScreen> {
+class _AssignmentsScreenState extends State<AssignmentsScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.assignments;
+
   @override
   void initState() {
     super.initState();

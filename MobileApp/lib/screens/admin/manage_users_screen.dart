@@ -14,6 +14,8 @@ import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/profile_leading_avatar.dart';
+import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 import 'access_requests_screen.dart';
 import 'admin_user_detail_screen.dart';
 
@@ -29,7 +31,11 @@ class ManageUsersScreen extends StatefulWidget {
   State<ManageUsersScreen> createState() => _ManageUsersScreenState();
 }
 
-class _ManageUsersScreenState extends State<ManageUsersScreen> {
+class _ManageUsersScreenState extends State<ManageUsersScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.users;
+
   final _searchController = TextEditingController();
   String _query = '';
   _DirectoryStatusFilter _statusFilter = _DirectoryStatusFilter.all;
@@ -308,7 +314,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                settings: const RouteSettings(name: '/admin/user-detail'),
+                settings: const RouteSettings(name: AppRoutes.adminUserDetail),
                 builder: (ctx) => AdminUserDetailScreen(summary: u),
               ),
             );

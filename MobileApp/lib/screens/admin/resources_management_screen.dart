@@ -11,6 +11,7 @@ import '../../config/routes.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class ResourcesManagementScreen extends StatefulWidget {
   const ResourcesManagementScreen({super.key});
@@ -20,7 +21,11 @@ class ResourcesManagementScreen extends StatefulWidget {
       _ResourcesManagementScreenState();
 }
 
-class _ResourcesManagementScreenState extends State<ResourcesManagementScreen> {
+class _ResourcesManagementScreenState extends State<ResourcesManagementScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.resourcesManagement;
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _selectedCategoryFilter;

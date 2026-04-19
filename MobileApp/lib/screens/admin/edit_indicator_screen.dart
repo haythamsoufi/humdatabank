@@ -7,6 +7,8 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/app_checkbox_list_tile.dart';
 import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
+import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class EditIndicatorScreen extends StatefulWidget {
   final int indicatorId;
@@ -20,7 +22,12 @@ class EditIndicatorScreen extends StatefulWidget {
   State<EditIndicatorScreen> createState() => _EditIndicatorScreenState();
 }
 
-class _EditIndicatorScreenState extends State<EditIndicatorScreen> {
+class _EditIndicatorScreenState extends State<EditIndicatorScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath =>
+      AppRoutes.editIndicator(widget.indicatorId);
+
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _typeController;

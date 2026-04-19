@@ -14,6 +14,7 @@ import '../../services/api_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 bool _bytesLookLikePdf(List<int> bytes) =>
     bytes.length >= 5 &&
@@ -247,7 +248,12 @@ class ResourceDetailScreen extends StatefulWidget {
   State<ResourceDetailScreen> createState() => _ResourceDetailScreenState();
 }
 
-class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
+class _ResourceDetailScreenState extends State<ResourceDetailScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath =>
+      AppRoutes.resourceDetail(widget.resource.id);
+
   late String _languageCode;
 
   Resource get _r => widget.resource;

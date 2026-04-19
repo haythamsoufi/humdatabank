@@ -10,6 +10,8 @@ import '../../providers/shared/auth_provider.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/shared/elevated_list_card.dart';
+import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 ButtonStyle _compactFilledButtonStyle() => FilledButton.styleFrom(
       visualDensity: VisualDensity.compact,
@@ -96,7 +98,11 @@ class AccessRequestsScreen extends StatefulWidget {
   State<AccessRequestsScreen> createState() => _AccessRequestsScreenState();
 }
 
-class _AccessRequestsScreenState extends State<AccessRequestsScreen> {
+class _AccessRequestsScreenState extends State<AccessRequestsScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.accessRequests;
+
   bool _isAdmin(User? user) => user?.isAdmin ?? false;
 
   @override

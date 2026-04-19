@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -152,7 +153,7 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
             ),
           ),
           const SizedBox(height: 14),
-          _IndicatorSegmentBar(
+          FdrsIndicatorScrollBar(
             l10n: l10n,
             indicatorBankId: _indicatorBankId,
             onSelect: _selectIndicator,
@@ -369,115 +370,6 @@ class _ShortcutStripTile extends StatelessWidget {
   }
 }
 
-/// Underline-style metric selector (replaces pill chips; clearer hierarchy for dense labels).
-class _IndicatorSegmentBar extends StatelessWidget {
-  const _IndicatorSegmentBar({
-    required this.l10n,
-    required this.indicatorBankId,
-    required this.onSelect,
-  });
-
-  final AppLocalizations l10n;
-  final int indicatorBankId;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final accent = cs.secondary;
-    final baseLine = cs.outlineVariant.withValues(alpha: isDark ? 0.55 : 0.4);
-
-    Widget segment({
-      required String label,
-      required int id,
-    }) {
-      final selected = indicatorBankId == id;
-      return Expanded(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onSelect(id);
-            },
-            splashColor: accent.withValues(alpha: 0.08),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: selected ? accent : Colors.transparent,
-                    width: selected ? 2.5 : 0,
-                  ),
-                ),
-              ),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 12.5,
-                  height: 1.2,
-                  color: selected ? accent : cs.onSurface,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: baseLine, width: 1)),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            segment(
-              label: l10n.homeLandingGlobalIndicatorVolunteers,
-              id: FdrsConstants.indicatorVolunteers,
-            ),
-            _SegmentVerticalRule(color: baseLine),
-            segment(
-              label: l10n.homeLandingGlobalIndicatorStaff,
-              id: FdrsConstants.indicatorStaff,
-            ),
-            _SegmentVerticalRule(color: baseLine),
-            segment(
-              label: l10n.homeLandingGlobalIndicatorBranches,
-              id: FdrsConstants.indicatorBranches,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SegmentVerticalRule extends StatelessWidget {
-  const _SegmentVerticalRule({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: double.infinity,
-      child: Center(
-        child: Container(width: 1, height: 28, color: color),
-      ),
-    );
-  }
-}
-
 class _ErrorBlock extends StatelessWidget {
   const _ErrorBlock({required this.message, required this.onRetry});
 
@@ -510,6 +402,158 @@ class _ErrorBlock extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Top countries for the selected indicator (complements the map).
+class _OverviewTopCountriesBar extends StatelessWidget {
+  const _OverviewTopCountriesBar({
+    required this.theme,
+    required this.l10n,
+    required this.locale,
+    required this.data,
+    required this.indicatorLabel,
+  });
+
+  final ThemeData theme;
+  final AppLocalizations l10n;
+  final String locale;
+  final GlobalOverviewDataset data;
+  final String indicatorLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = data.topByValue(8);
+    if (top.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final maxY = top.map((e) => e.value).reduce(math.max);
+    final rodColor = Color(AppConstants.ifrcRed);
+    final gridColor = theme.colorScheme.outlineVariant
+        .withValues(alpha: theme.brightness == Brightness.dark ? 0.35 : 0.45);
+
+    String shortLabel(int countryId) {
+      final iso = data.countryIso2[countryId];
+      if (iso != null && iso.isNotEmpty) {
+        return iso.toUpperCase();
+      }
+      final name = data.countryNames[countryId];
+      if (name != null && name.isNotEmpty) {
+        return name.length <= 10 ? name : '${name.substring(0, 9)}…';
+      }
+      return '#$countryId';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.homeLandingGlobalTopCountries,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          indicatorLabel,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 200,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxY > 0 ? maxY * 1.12 : 1,
+              barTouchData: const BarTouchData(enabled: false),
+              titlesData: FlTitlesData(
+                show: true,
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 44,
+                    interval: maxY > 0 ? (maxY / 3).clamp(1, double.infinity) : 1,
+                    getTitlesWidget: (value, meta) {
+                      if (value < 0 || value > meta.max) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(
+                          formatFdrsOverviewValue(value, locale),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.end,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (value, meta) {
+                      final i = value.toInt();
+                      if (i < 0 || i >= top.length) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          shortLabel(top[i].key),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: maxY > 0 ? maxY / 4 : 1,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: gridColor,
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: [
+                for (var i = 0; i < top.length; i++)
+                  BarChartGroupData(
+                    x: i,
+                    barsSpace: 6,
+                    barRods: [
+                      BarChartRodData(
+                        toY: top[i].value,
+                        width: 14,
+                        color: rodColor.withValues(alpha: 0.85),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -715,6 +759,14 @@ class _OverviewBody extends StatelessWidget {
             highColor: high,
           ),
         ],
+        const SizedBox(height: 12),
+        _OverviewTopCountriesBar(
+          theme: theme,
+          l10n: l10n,
+          locale: locale,
+          data: data,
+          indicatorLabel: indicatorLabel,
+        ),
         const SizedBox(height: 6),
         Text(
           l10n.homeLandingGlobalMapHint,

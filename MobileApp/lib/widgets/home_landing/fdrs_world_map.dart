@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../config/app_config.dart';
 import '../../config/fdrs_constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/global_overview_data_service.dart';
@@ -41,6 +42,18 @@ String fdrsIndicatorTitle(AppLocalizations l10n, int indicatorBankId) {
       return l10n.homeLandingGlobalIndicatorStaff;
     case FdrsConstants.indicatorBranches:
       return l10n.homeLandingGlobalIndicatorBranches;
+    case FdrsConstants.indicatorLocalUnits:
+      return l10n.homeLandingGlobalIndicatorLocalUnits;
+    case FdrsConstants.indicatorBloodDonors:
+      return l10n.homeLandingGlobalIndicatorBloodDonors;
+    case FdrsConstants.indicatorFirstAid:
+      return l10n.homeLandingGlobalIndicatorFirstAid;
+    case FdrsConstants.indicatorPeopleReached:
+      return l10n.homeLandingGlobalIndicatorPeopleReached;
+    case FdrsConstants.indicatorIncome:
+      return l10n.homeLandingGlobalIndicatorIncome;
+    case FdrsConstants.indicatorExpenditure:
+      return l10n.homeLandingGlobalIndicatorExpenditure;
     default:
       return '';
   }
@@ -127,8 +140,21 @@ MapOptions fdrsWorldMapOptions(
   );
 }
 
+/// IFRC-style Mapbox raster tiles (public token). Falls back to Carto when unset.
 List<Widget> fdrsWorldMapTiles(ThemeData theme) {
   final isDark = theme.brightness == Brightness.dark;
+  final token = AppConfig.mapboxAccessToken;
+  if (token.isNotEmpty) {
+    final stylePath = isDark ? 'mapbox/dark-v11' : 'mapbox/light-v11';
+    final url =
+        'https://api.mapbox.com/styles/v1/$stylePath/tiles/{z}/{x}/{y}?access_token=$token';
+    return [
+      TileLayer(
+        urlTemplate: url,
+        userAgentPackageName: 'hum_databank_app',
+      ),
+    ];
+  }
   return [
     TileLayer(
       urlTemplate: isDark
@@ -307,38 +333,233 @@ class FdrsMapModeToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SegmentedButton<FdrsMapVisualMode>(
-      style: ButtonStyle(
-        visualDensity: VisualDensity.compact,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: WidgetStateProperty.all(
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final track = cs.surfaceContainerHighest.withValues(alpha: isDark ? 0.55 : 0.65);
+    final border = cs.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.28);
+
+    Widget pill({
+      required FdrsMapVisualMode value,
+      required IconData icon,
+      required String label,
+    }) {
+      final selected = mode == value;
+      return Expanded(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (!selected) {
+                HapticFeedback.selectionClick();
+                onChanged(value);
+              }
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+              decoration: BoxDecoration(
+                color: selected ? cs.secondaryContainer : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: cs.secondary.withValues(alpha: 0.12),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 18,
+                    color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: track,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: [
+            pill(
+              value: FdrsMapVisualMode.bubble,
+              icon: Icons.bubble_chart_outlined,
+              label: l10n.homeLandingGlobalMapModeBubble,
+            ),
+            pill(
+              value: FdrsMapVisualMode.choropleth,
+              icon: Icons.layers_outlined,
+              label: l10n.homeLandingGlobalMapModeChoropleth,
+            ),
+          ],
         ),
       ),
-      showSelectedIcon: false,
-      segments: [
-        ButtonSegment<FdrsMapVisualMode>(
-          value: FdrsMapVisualMode.bubble,
-          label: Text(
-            l10n.homeLandingGlobalMapModeBubble,
-            style: theme.textTheme.labelMedium,
-          ),
-          icon: const Icon(Icons.bubble_chart_outlined, size: 18),
+    );
+  }
+}
+
+/// Horizontally scrollable key-indicator picker (matches website indicator set).
+class FdrsIndicatorScrollBar extends StatelessWidget {
+  const FdrsIndicatorScrollBar({
+    super.key,
+    required this.l10n,
+    required this.indicatorBankId,
+    required this.onSelect,
+    this.compact = false,
+  });
+
+  final AppLocalizations l10n;
+  final int indicatorBankId;
+  final ValueChanged<int> onSelect;
+  final bool compact;
+
+  static const List<int> _ids = [
+    FdrsConstants.indicatorVolunteers,
+    FdrsConstants.indicatorStaff,
+    FdrsConstants.indicatorBranches,
+    FdrsConstants.indicatorLocalUnits,
+    FdrsConstants.indicatorBloodDonors,
+    FdrsConstants.indicatorFirstAid,
+    FdrsConstants.indicatorPeopleReached,
+    FdrsConstants.indicatorIncome,
+    FdrsConstants.indicatorExpenditure,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = cs.secondary;
+    final baseLine = cs.outlineVariant.withValues(alpha: isDark ? 0.55 : 0.4);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: baseLine, width: 1)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Row(
+          children: [
+            for (var i = 0; i < _ids.length; i++) ...[
+              if (i > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: SizedBox(
+                    height: 28,
+                    child: Center(
+                      child: Container(
+                        width: 1,
+                        height: 22,
+                        color: baseLine,
+                      ),
+                    ),
+                  ),
+                ),
+              _IndicatorChip(
+                label: fdrsIndicatorTitle(l10n, _ids[i]),
+                selected: indicatorBankId == _ids[i],
+                accent: accent,
+                onSurface: cs.onSurface,
+                compact: compact,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onSelect(_ids[i]);
+                },
+              ),
+            ],
+          ],
         ),
-        ButtonSegment<FdrsMapVisualMode>(
-          value: FdrsMapVisualMode.choropleth,
-          label: Text(
-            l10n.homeLandingGlobalMapModeChoropleth,
-            style: theme.textTheme.labelMedium,
+      ),
+    );
+  }
+}
+
+class _IndicatorChip extends StatelessWidget {
+  const _IndicatorChip({
+    required this.label,
+    required this.selected,
+    required this.accent,
+    required this.onSurface,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color accent;
+  final Color onSurface;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.symmetric(
+            vertical: compact ? 9 : 12,
+            horizontal: compact ? 10 : 12,
           ),
-          icon: const Icon(Icons.layers_outlined, size: 18),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: selected ? accent : Colors.transparent,
+                width: selected ? 2.5 : 0,
+              ),
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: compact ? 11 : 12.5,
+              height: 1.2,
+              color: selected ? accent : onSurface,
+            ),
+          ),
         ),
-      ],
-      selected: <FdrsMapVisualMode>{mode},
-      onSelectionChanged: (s) {
-        if (s.isEmpty) return;
-        onChanged(s.first);
-      },
+      ),
     );
   }
 }
@@ -510,10 +731,14 @@ class _FdrsWorldMapFullscreenPageState extends State<FdrsWorldMapFullscreenPage>
                 onChanged: (m) => setState(() => _visualMode = m),
               ),
               const SizedBox(height: 16),
-              _FullscreenIndicatorBar(
-                l10n: l10n,
-                indicatorBankId: _indicatorBankId,
-                onSelect: _selectIndicator,
+              SizedBox(
+                height: 44,
+                child: FdrsIndicatorScrollBar(
+                  l10n: l10n,
+                  indicatorBankId: _indicatorBankId,
+                  onSelect: _selectIndicator,
+                  compact: true,
+                ),
               ),
               if (widget.periodOptions.isNotEmpty) ...[
                 const SizedBox(height: 16),
@@ -808,110 +1033,6 @@ class _MapToolButton extends StatelessWidget {
         onPressed: onPressed,
         icon: Icon(icon, size: 22),
         color: theme.colorScheme.secondary,
-      ),
-    );
-  }
-}
-
-class _FullscreenIndicatorBar extends StatelessWidget {
-  const _FullscreenIndicatorBar({
-    required this.l10n,
-    required this.indicatorBankId,
-    required this.onSelect,
-  });
-
-  final AppLocalizations l10n;
-  final int indicatorBankId;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final accent = cs.secondary;
-    final baseLine = cs.outlineVariant.withValues(alpha: isDark ? 0.55 : 0.4);
-
-    Widget segment({required String label, required int id}) {
-      final selected = indicatorBankId == id;
-      return Expanded(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onSelect(id);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: selected ? accent : Colors.transparent,
-                    width: selected ? 2.5 : 0,
-                  ),
-                ),
-              ),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 11.5,
-                  height: 1.15,
-                  color: selected ? accent : cs.onSurface,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: baseLine, width: 1)),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            segment(
-              label: l10n.homeLandingGlobalIndicatorVolunteers,
-              id: FdrsConstants.indicatorVolunteers,
-            ),
-            _SegmentVLine(color: baseLine),
-            segment(
-              label: l10n.homeLandingGlobalIndicatorStaff,
-              id: FdrsConstants.indicatorStaff,
-            ),
-            _SegmentVLine(color: baseLine),
-            segment(
-              label: l10n.homeLandingGlobalIndicatorBranches,
-              id: FdrsConstants.indicatorBranches,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SegmentVLine extends StatelessWidget {
-  const _SegmentVLine({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: double.infinity,
-      child: Center(
-        child: Container(width: 1, height: 26, color: color),
       ),
     );
   }

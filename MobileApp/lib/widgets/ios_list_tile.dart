@@ -207,11 +207,12 @@ class IOSGroupedList extends StatelessWidget {
     final double groupCornerRadius = IOSSettingsStyle.useIosSettingsChrome
         ? IOSDimensions.borderRadiusLargeOf(context)
         : IOSDimensions.borderRadiusMediumOf(context);
-    final Border? groupBorder = IOSSettingsStyle.useIosSettingsChrome
+    // Light theme: inset card without outer stroke (matches iOS Settings groups).
+    final Border? groupBorder = IOSSettingsStyle.useIosSettingsChrome && isDark
         ? Border.all(
             color: cupertino.CupertinoColors.separator
                 .resolveFrom(context)
-                .withValues(alpha: isDark ? 0.4 : 0.72),
+                .withValues(alpha: 0.4),
             width: 0.5,
           )
         : null;

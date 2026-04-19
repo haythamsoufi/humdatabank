@@ -17,6 +17,8 @@ class AppRoutes {
   static String assignmentDetail(int assignmentId) =>
       '/admin/assignments/$assignmentId';
   static const String users = '/admin/users';
+  /// Native user edit/detail (not in [routes] map — pushed from [ManageUsersScreen]).
+  static const String adminUserDetail = '/admin/user-detail';
   static const String accessRequests = '/admin/access-requests';
   static const String documentManagement = '/admin/documents';
 

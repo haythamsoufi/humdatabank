@@ -10,6 +10,8 @@ import '../../providers/admin/assignments_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 /// Assignment summary: loads full detail (entities, deadlines) from the mobile API.
 class AssignmentDetailScreen extends StatefulWidget {
@@ -25,7 +27,12 @@ class AssignmentDetailScreen extends StatefulWidget {
   State<AssignmentDetailScreen> createState() => _AssignmentDetailScreenState();
 }
 
-class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
+class _AssignmentDetailScreenState extends State<AssignmentDetailScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath =>
+      AppRoutes.assignmentDetail(widget.assignment.id);
+
   AdminAssignmentDetail? _detail;
   bool _loading = true;
   String? _loadError;

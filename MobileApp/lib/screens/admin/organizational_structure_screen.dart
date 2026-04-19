@@ -9,6 +9,7 @@ import '../../widgets/bottom_navigation_bar.dart';
 import '../../config/routes.dart';
 import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class OrganizationalStructureScreen extends StatefulWidget {
   const OrganizationalStructureScreen({super.key});
@@ -18,8 +19,11 @@ class OrganizationalStructureScreen extends StatefulWidget {
       _OrganizationalStructureScreenState();
 }
 
-class _OrganizationalStructureScreenState
-    extends State<OrganizationalStructureScreen> {
+class _OrganizationalStructureScreenState extends State<OrganizationalStructureScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.organizationalStructure;
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _selectedLevelFilter;

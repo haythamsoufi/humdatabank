@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -13,7 +14,9 @@ import '../../models/shared/document.dart';
 import '../../services/api_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../widgets/app_bar.dart';
+import 'submitted_document_preview_screen.dart';
 
 bool _bytesLookLikePdf(List<int> bytes) =>
     bytes.length >= 5 &&
@@ -94,6 +97,23 @@ Future<void> openSubmittedDocumentPreview(
 
     final bytes = response.bodyBytes;
     if (!_bytesLookLikePdf(bytes)) {
+      final u8 = Uint8List.fromList(bytes);
+      if (SubmittedDocumentPreviewScreen.shouldUseNativePreview(u8)) {
+        if (!context.mounted) return;
+        await nav.push<void>(
+          MaterialPageRoute<void>(
+            settings: RouteSettings(
+              name: '${AppRoutes.documentDetail(document.id)}/preview-native',
+            ),
+            builder: (ctx) => SubmittedDocumentPreviewScreen(
+              title: document.fileName ?? loc.previewDocument,
+              bytes: u8,
+              isImage: SubmittedDocumentPreviewScreen.bytesLookLikeImage(u8),
+            ),
+          ),
+        );
+        return;
+      }
       await nav.pushNamed(
         AppRoutes.webview,
         arguments: '/admin/documents/serve/${document.id}',
@@ -227,11 +247,34 @@ Future<void> downloadSubmittedDocument(
   }
 }
 
+Color _documentDetailStatusColor(String status, BuildContext context) {
+  switch (status.toLowerCase()) {
+    case 'approved':
+      return Colors.green;
+    case 'pending':
+      return Colors.orange;
+    case 'rejected':
+      return Colors.red;
+    default:
+      return context.textSecondaryColor;
+  }
+}
+
+String? _formatDocumentUploadedAt(BuildContext context, DateTime? at) {
+  if (at == null) return null;
+  try {
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    return DateFormat.yMMMd(locale).add_jm().format(at.toLocal());
+  } catch (_) {
+    return at.toIso8601String();
+  }
+}
+
 /// Full-screen summary for one document from the admin list.
 /// Download fetches the file via the mobile API and opens the system share
 /// sheet. Preview loads PDFs in [PdfViewerScreen] (non-PDF files fall back
 /// to the WebView serve URL).
-class DocumentDetailScreen extends StatelessWidget {
+class DocumentDetailScreen extends StatefulWidget {
   const DocumentDetailScreen({
     super.key,
     required this.document,
@@ -239,36 +282,26 @@ class DocumentDetailScreen extends StatelessWidget {
 
   final Document document;
 
-  static Color _statusColor(String status, BuildContext context) {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return context.textSecondaryColor;
-    }
-  }
+  @override
+  State<DocumentDetailScreen> createState() => _DocumentDetailScreenState();
+}
 
-  String? _formatUploadedAt(BuildContext context, DateTime? at) {
-    if (at == null) return null;
-    try {
-      final locale = Localizations.localeOf(context).toLanguageTag();
-      return DateFormat.yMMMd(locale).add_jm().format(at.toLocal());
-    } catch (_) {
-      return at.toIso8601String();
-    }
-  }
+class _DocumentDetailScreenState extends State<DocumentDetailScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath =>
+      AppRoutes.documentDetail(widget.document.id);
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final document = widget.document;
     final title = document.fileName ?? loc.genericUntitledDocument;
-    final uploadedAtLabel = _formatUploadedAt(context, document.uploadedAt);
+    final uploadedAtLabel = _formatDocumentUploadedAt(context, document.uploadedAt);
+    final accent = Color(AppConstants.ifrcRed);
+    final onAccent = theme.colorScheme.onPrimary;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -288,11 +321,13 @@ class DocumentDetailScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: context.subtleSurfaceColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: context.borderColor),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,11 +353,12 @@ class DocumentDetailScreen extends StatelessWidget {
                       Expanded(
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                            horizontal: 10,
+                            vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: _statusColor(document.status!, context)
+                            color: _documentDetailStatusColor(
+                                    document.status!, context)
                                 .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -330,8 +366,10 @@ class DocumentDetailScreen extends StatelessWidget {
                             document.status!,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color:
-                                  _statusColor(document.status!, context),
+                              color: _documentDetailStatusColor(
+                                document.status!,
+                                context,
+                              ),
                             ),
                           ),
                         ),
@@ -399,13 +437,13 @@ class DocumentDetailScreen extends StatelessWidget {
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
+            child: FilledButton.icon(
               onPressed: () => openSubmittedDocumentPreview(context, document),
               icon: const Icon(Icons.preview_outlined),
               label: Text(loc.previewDocument),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Color(AppConstants.ifrcRed),
-                side: BorderSide(color: Color(AppConstants.ifrcRed)),
+              style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: onAccent,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
@@ -418,8 +456,8 @@ class DocumentDetailScreen extends StatelessWidget {
               icon: const Icon(Icons.download_outlined),
               label: Text(loc.downloadDocument),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Color(AppConstants.ifrcRed),
-                side: BorderSide(color: Color(AppConstants.ifrcRed)),
+                foregroundColor: accent,
+                side: BorderSide(color: accent),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),

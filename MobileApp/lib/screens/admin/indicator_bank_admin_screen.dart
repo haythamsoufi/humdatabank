@@ -9,6 +9,7 @@ import '../../widgets/bottom_navigation_bar.dart';
 import '../../config/routes.dart';
 import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class IndicatorBankAdminScreen extends StatefulWidget {
   const IndicatorBankAdminScreen({super.key});
@@ -18,7 +19,11 @@ class IndicatorBankAdminScreen extends StatefulWidget {
       _IndicatorBankAdminScreenState();
 }
 
-class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen> {
+class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.indicatorBankAdmin;
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _selectedCategoryFilter;

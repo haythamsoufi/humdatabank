@@ -6,6 +6,7 @@ import '../../config/routes.dart';
 import '../../utils/ios_constants.dart';
 import '../../utils/ios_settings_style.dart';
 import '../../utils/theme_extensions.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../widgets/admin_user_banner.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_bar.dart';
@@ -15,13 +16,22 @@ import '../../l10n/app_localizations.dart';
 import 'login_logs_screen.dart';
 import 'session_logs_screen.dart';
 
-class AdminScreen extends StatelessWidget {
+class AdminScreen extends StatefulWidget {
   final bool showBottomNav;
 
   const AdminScreen({
     super.key,
     this.showBottomNav = false,
   });
+
+  @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.admin;
 
   bool _isAdmin(User? user) => user?.isAdmin ?? false;
 
@@ -66,7 +76,7 @@ class AdminScreen extends StatelessWidget {
           localizations,
         );
 
-        final bottomBar = showBottomNav
+        final bottomBar = widget.showBottomNav
             ? AppBottomNavigationBar(
                 currentIndex: AppBottomNavigationBar.adminTabNavIndex(
                   chatbotEnabled: user.chatbotEnabled,

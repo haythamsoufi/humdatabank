@@ -14,6 +14,8 @@ import '../../utils/ios_constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/profile_color_picker_dialog.dart';
+import '../../config/routes.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 /// Profile and (with permission) granular admin View/Manage matrix + Data Explorer; entity grants read-only.
 class AdminUserDetailScreen extends StatefulWidget {
@@ -25,7 +27,11 @@ class AdminUserDetailScreen extends StatefulWidget {
   State<AdminUserDetailScreen> createState() => _AdminUserDetailScreenState();
 }
 
-class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
+class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.adminUserDetail;
+
   AdminUserDetail? _detail;
   bool _loading = true;
   String? _error;
@@ -518,12 +524,21 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
     final theme = Theme.of(context);
 
     InputDecoration fieldDeco(String label, {String? hint, bool compact = false}) {
+      final outline = theme.colorScheme.outlineVariant.withValues(alpha: 0.45);
       return InputDecoration(
         labelText: label,
         hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.colorScheme.secondary, width: 2),
+        ),
         filled: true,
-        fillColor: theme.cardTheme.color ?? theme.colorScheme.surface,
+        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
         isDense: true,
         contentPadding: compact
             ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
@@ -531,10 +546,17 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
       );
     }
 
-    return Card(
-      margin: EdgeInsets.zero,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: context.subtleSurfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

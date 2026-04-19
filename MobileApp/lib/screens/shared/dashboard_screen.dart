@@ -571,7 +571,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             horizontal: IOSSpacing.lg,
             vertical: IOSSpacing.xs,
           ),
-          minTileHeight: 40,
+          minTileHeight: 44,
           dense: true,
           initiallyExpanded: false,
           backgroundColor: Colors.transparent,
@@ -579,30 +579,42 @@ class _DashboardScreenState extends State<DashboardScreen>
           shape: const Border(),
           collapsedShape: const Border(),
           title: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                localizations.pastAssignments.toUpperCase(),
-                style: IOSTextStyle.footnote(context).copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  letterSpacing: 0.5,
-                ),
+              Icon(
+                Icons.history_rounded,
+                size: 20,
+                color: context.isDarkTheme
+                    ? theme.colorScheme.tertiary
+                    : context.navyIconColor,
               ),
               SizedBox(width: IOSSpacing.smOf(context)),
-              Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: IOSSpacing.xsOf(context) + 2,
-                vertical: IOSSpacing.xsOf(context) / 2,
+              Expanded(
+                child: Text(
+                  localizations.pastAssignments,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: IOSTextStyle.subheadline(context).copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.92),
+                    height: 1.25,
+                  ),
+                ),
               ),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: IOSSpacing.xsOf(context) + 6,
+                  vertical: IOSSpacing.xsOf(context) / 2 + 1,
+                ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(IOSDimensions.borderRadiusSmallOf(context)),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(
+                    IOSDimensions.borderRadiusSmallOf(context),
+                  ),
                 ),
                 child: Text(
                   '${filteredAssignments.length}',
                   style: IOSTextStyle.caption2(context).copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
                     fontWeight: FontWeight.w700,
                   ),
                 ),

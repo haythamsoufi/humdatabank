@@ -11,6 +11,7 @@ import '../../config/routes.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class DocumentManagementScreen extends StatefulWidget {
   const DocumentManagementScreen({super.key});
@@ -20,7 +21,11 @@ class DocumentManagementScreen extends StatefulWidget {
       _DocumentManagementScreenState();
 }
 
-class _DocumentManagementScreenState extends State<DocumentManagementScreen> {
+class _DocumentManagementScreenState extends State<DocumentManagementScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.documentManagement;
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _selectedStatusFilter;

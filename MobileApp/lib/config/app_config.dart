@@ -459,6 +459,16 @@ class AppConfig {
     return '';
   }
 
+  /// Public Mapbox token for raster tiles (same style family as the website).
+  /// Set `MAPBOX_ACCESS_TOKEN` in `.env` or `--dart-define=MAPBOX_ACCESS_TOKEN=pk.…`.
+  /// When empty, the app falls back to Carto basemaps in `fdrs_world_map.dart`.
+  static String get mapboxAccessToken {
+    final env = dotenv.env['MAPBOX_ACCESS_TOKEN']?.trim();
+    if (env != null && env.isNotEmpty) return env;
+    const define = String.fromEnvironment('MAPBOX_ACCESS_TOKEN', defaultValue: '');
+    return define.trim();
+  }
+
   // Security Note: Authentication bypass removed for security.
   // If needed for development, use environment variables with kDebugMode checks
   // and ensure it can NEVER be enabled in release builds.

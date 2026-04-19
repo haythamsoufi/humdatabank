@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
@@ -172,6 +173,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return 'assignment_$id.bin';
   }
 
+  Future<void> _fetchDownloadWithCookiesThenDeliver(
+    Uri url,
+    InAppWebViewController controller,
+  ) async {
+    await _handleDownload(url, controller);
+  }
+
   /// Assignment PDF/Excel (and similar) are delivered as downloads; Android then
   /// invokes this path. [launchUrl] opens Samsung Internet / Chrome without the
   /// WebView cookie jar, so we re-fetch with [CookieManager] and share the file.
@@ -237,6 +245,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
 
     try {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        if (mounted) {
+          final localizations = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(localizations.couldNotOpenDownloadLink)),
+          );
+        }
+        return;
+      }
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.platformDefault);
       } else {
@@ -565,6 +582,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
               ),
             );
           }
+          return NavigationActionPolicy.CANCEL;
+        }
+        final parsedNav = navUrl != null ? Uri.tryParse(navUrl.toString()) : null;
+        if (parsedNav != null &&
+            WebViewService.isFormAssignmentSessionDownloadUrl(parsedNav)) {
+          unawaited(
+            _fetchDownloadWithCookiesThenDeliver(parsedNav, controller),
+          );
           return NavigationActionPolicy.CANCEL;
         }
         return NavigationActionPolicy.ALLOW;

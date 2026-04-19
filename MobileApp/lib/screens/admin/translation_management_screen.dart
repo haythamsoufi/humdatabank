@@ -11,6 +11,7 @@ import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
 import 'translation_entry_ui.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class TranslationManagementScreen extends StatefulWidget {
   const TranslationManagementScreen({super.key});
@@ -20,8 +21,11 @@ class TranslationManagementScreen extends StatefulWidget {
       _TranslationManagementScreenState();
 }
 
-class _TranslationManagementScreenState
-    extends State<TranslationManagementScreen> {
+class _TranslationManagementScreenState extends State<TranslationManagementScreen>
+    with AdminScreenViewLoggingMixin {
+  @override
+  String get adminScreenViewRoutePath => AppRoutes.translationManagement;
+
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _sourceFilterController = TextEditingController();
   final FocusNode _sourceFilterFocusNode = FocusNode();

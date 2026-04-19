@@ -868,7 +868,7 @@ class _NotificationTile extends StatelessWidget {
               ? (isUnread
                   ? const BorderSide(
                       color: Color(AppConstants.semanticNotificationOrange),
-                      width: 4,
+                      width: 6,
                     )
                   : BorderSide.none)
               : (isUnread
@@ -876,7 +876,7 @@ class _NotificationTile extends StatelessWidget {
                       color: theme.isDarkTheme
                           ? context.linkOnSurfaceColor
                           : const Color(AppConstants.errorColor),
-                      width: 3,
+                      width: 6,
                     )
                   : BorderSide.none),
           bottom: BorderSide(

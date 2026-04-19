@@ -20,6 +20,12 @@ class WebViewService {
       return false;
     }
 
+    // Document preview (non-PDF) uses `/admin/documents/serve/{id}` in WebView.
+    if (isAdminDocumentServeUrl(url)) {
+      DebugLogger.logInfo('WEBVIEW', 'URL allowed (admin document serve): ${url.toString()}');
+      return true;
+    }
+
     final allowedPatterns = AppConfig.getAllowedUrlPatterns();
     final urlString = url.toString();
 
@@ -86,6 +92,15 @@ class WebViewService {
     }
 
     return false;
+  }
+
+  /// Streamed file delivery for submitted documents (`?download=1` / serve).
+  /// Must stay allowed in the WebView whitelist so previews can load in release.
+  static bool isAdminDocumentServeUrl(Uri url) {
+    if (url.scheme != 'http' && url.scheme != 'https') return false;
+    final path = url.path;
+    return path.startsWith('/admin/documents/serve/') ||
+        path.startsWith('/admin/documents/download/');
   }
 
   /// True for assignment exports that require the WebView session cookie.

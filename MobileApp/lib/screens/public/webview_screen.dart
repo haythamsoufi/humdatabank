@@ -2,7 +2,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kReleaseMode, TargetPlatform;
+    show defaultTargetPlatform, TargetPlatform;
+
+/// On-screen diagnostics for saved offline assignment WebViews. Default `true`
+/// (including release / CI). Hide with `--dart-define=SHOW_OFFLINE_WEBVIEW_DIAG=false`.
+const bool _kShowOfflineWebViewDiag = bool.fromEnvironment(
+  'SHOW_OFFLINE_WEBVIEW_DIAG',
+  defaultValue: true,
+);
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
@@ -109,7 +116,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   String? _payloadLanguage;
   Future<_WebViewPayload>? _payloadFuture;
 
-  /// On-screen trail for offline WebView (debug/profile only — not release).
+  /// On-screen trail for offline WebView (see [_kShowOfflineWebViewDiag]).
   final List<String> _offlineWebViewDiagLog = [];
   static const int _offlineWebViewDiagMaxLines = 16;
 
@@ -117,7 +124,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   int _lastProgressBucket = -1;
 
   void _offlineWebViewDiag(String message) {
-    if (kReleaseMode || !widget.forceOfflineAssignmentBundle) return;
+    if (!_kShowOfflineWebViewDiag || !widget.forceOfflineAssignmentBundle) return;
     final ts = DateTime.now().toIso8601String().substring(11, 23);
     final line = '$ts $message';
     DebugLogger.logInfo('WEBVIEW_OFFLINE_DIAG', line);
@@ -405,7 +412,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void _invalidatePayload() {
     _payloadLanguage = null;
     _payloadFuture = null;
-    if (!kReleaseMode && widget.forceOfflineAssignmentBundle && mounted) {
+    if (_kShowOfflineWebViewDiag && widget.forceOfflineAssignmentBundle && mounted) {
       setState(() {
         _offlineWebViewDiagLog.clear();
       });
@@ -1054,11 +1061,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  /// Visible only in debug/profile when opening a saved offline assignment: shows
-  /// recent WebView milestones (payload path, load start/stop, errors). Release
-  /// builds omit this panel entirely.
+  /// When [_kShowOfflineWebViewDiag] is true: bottom panel with recent offline WebView
+  /// milestones (payload path, load start/stop, errors). Disabled via
+  /// `--dart-define=SHOW_OFFLINE_WEBVIEW_DIAG=false`.
   Widget _buildOfflineWebViewDiagOverlay() {
-    if (kReleaseMode || !widget.forceOfflineAssignmentBundle) {
+    if (!_kShowOfflineWebViewDiag || !widget.forceOfflineAssignmentBundle) {
       return const SizedBox.shrink();
     }
     if (_offlineWebViewDiagLog.isEmpty) {
@@ -1084,7 +1091,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Offline WebView log (not in release)',
+                      'Offline WebView log',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.95),
                         fontWeight: FontWeight.w600,

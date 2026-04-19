@@ -11,6 +11,8 @@ A modern, multilingual, full‑stack ecosystem for humanitarian data management,
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-UI-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![i18next](https://img.shields.io/badge/i18next-multilingual-26A69A)](https://www.i18next.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
+[![iOS Build](https://img.shields.io/github/actions/workflow/status/haythamsoufi/humdatabank/ios-build.yml?label=iOS%20Build&logo=apple&logoColor=white)](https://github.com/haythamsoufi/humdatabank/actions/workflows/ios-build.yml)
+[![Android Build](https://img.shields.io/github/actions/workflow/status/haythamsoufi/humdatabank/android-build.yml?label=Android%20Build&logo=android&logoColor=white)](https://github.com/haythamsoufi/humdatabank/actions/workflows/android-build.yml)
 
 **Complete Ecosystem**: This repository includes the full ecosystem of applications:
 - 🖥️ **Backoffice/Admin Panel**: Flask-based backend with comprehensive admin interface for data management

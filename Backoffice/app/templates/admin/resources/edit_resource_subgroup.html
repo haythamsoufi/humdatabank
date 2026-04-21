@@ -1,0 +1,54 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{% if subgroup %}Edit subcategory{% else %}New subcategory{% endif %}{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set manage_url = url_for('content_management.manage_resource_subgroups') %}
+
+{{ page_header(
+    title='Edit subcategory' if subgroup else 'New subcategory',
+    icon='fas fa-layer-group',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'Resource Management', 'url': url_for('content_management.manage_resources')},
+        {'name': 'Subcategories', 'url': manage_url},
+        {'name': 'Edit' if subgroup else 'New'}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': 'Cancel',
+            'url': manage_url,
+            'icon': 'fas fa-times',
+            'classes': 'professional-action-btn',
+        },
+    ]
+) }}
+
+<div class="container mx-auto px-4 py-6 max-w-xl">
+    <form method="POST" class="bg-white border border-gray-200 rounded-lg shadow-sm p-6 space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div>
+            <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">Name</label>
+            <input type="text" name="name" id="name" required maxlength="120"
+                   value="{{ subgroup.name if subgroup else '' }}"
+                   class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="e.g. Annual reports" />
+        </div>
+        <div>
+            <label for="display_order" class="block text-sm font-semibold text-gray-700 mb-1">Display order</label>
+            <input type="number" name="display_order" id="display_order" step="1"
+                   value="{{ subgroup.display_order if subgroup else 0 }}"
+                   class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            <p class="text-xs text-gray-500 mt-1">Lower numbers appear first in the mobile app.</p>
+        </div>
+        <div class="pt-2">
+            <button type="submit" class="professional-action-btn professional-action-btn-green">
+                <i class="fas fa-save mr-2"></i>Save
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

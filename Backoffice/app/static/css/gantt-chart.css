@@ -1,0 +1,267 @@
+/* Gantt Chart Styles - Separate CSS file for better control */
+
+.gantt-container {
+    background: white !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    overflow: hidden !important;
+    margin-bottom: 20px !important;
+}
+
+.gantt-header {
+    background: #f8f9fa !important;
+    padding: 20px !important;
+    border-bottom: 1px solid #e9ecef !important;
+}
+
+.gantt-header h2 {
+    color: #2d3748 !important;
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    margin: 0 0 8px 0 !important;
+}
+
+.gantt-header p {
+    color: #718096 !important;
+    font-size: 14px !important;
+    margin: 0 !important;
+}
+
+.gantt-timeline {
+    position: relative !important;
+    padding: 20px !important;
+    min-height: 400px !important;
+}
+
+.gantt-row {
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 15px !important;
+    padding: 12px 0 !important;
+    border-bottom: 1px solid #f0f0f0 !important;
+    transition: background-color 0.1s ease !important;
+}
+
+.gantt-row:hover {
+    background: #f8f9fa !important;
+}
+
+.gantt-row:last-child {
+    border-bottom: none !important;
+}
+
+.gantt-label {
+    width: 300px !important;
+    padding-right: 20px !important;
+    flex-shrink: 0 !important;
+}
+
+.gantt-label h4 {
+    margin: 0 0 5px 0 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #2d3748 !important;
+}
+
+.gantt-label p {
+    margin: 0 !important;
+    font-size: 14px !important;
+    color: #718096 !important;
+}
+
+.gantt-chart {
+    flex: 1 !important;
+    position: relative !important;
+    height: 60px !important;
+    background: #f7fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+    overflow: hidden !important;
+}
+
+.gantt-bar {
+    position: absolute !important;
+    height: 100% !important;
+    border-radius: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: white !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.gantt-bar:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+.gantt-bar.active {
+    background: linear-gradient(135deg, #48bb78, #38a169) !important;
+}
+
+.gantt-bar.inactive {
+    background: linear-gradient(135deg, #e53e3e, #c53030) !important;
+}
+
+.gantt-bar.no-url {
+    background: linear-gradient(135deg, #a0aec0, #718096) !important;
+}
+
+.gantt-timeline-header {
+    display: flex !important;
+    margin-bottom: 20px !important;
+    padding: 12px 20px !important;
+    background: #f8f9fa !important;
+    border-radius: 4px !important;
+}
+
+.gantt-timeline-header .gantt-label {
+    font-weight: 600 !important;
+    color: #4a5568 !important;
+}
+
+.gantt-timeline-header .gantt-chart {
+    background: #e2e8f0 !important;
+    height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-weight: 600 !important;
+    color: #4a5568 !important;
+    border: 1px solid #cbd5e0 !important;
+}
+
+.gantt-legend {
+    display: flex !important;
+    gap: 20px !important;
+    margin-bottom: 20px !important;
+    padding: 0 20px !important;
+    font-size: 14px !important;
+    color: #4a5568 !important;
+}
+
+.legend-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.legend-color {
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 4px !important;
+    border: 1px solid #cbd5e0 !important;
+}
+
+.legend-color.active {
+    background: linear-gradient(135deg, #48bb78, #38a169) !important;
+}
+
+.legend-color.inactive {
+    background: linear-gradient(135deg, #e53e3e, #c53030) !important;
+}
+
+.legend-color.no-url {
+    background: linear-gradient(135deg, #a0aec0, #718096) !important;
+}
+
+.gantt-stats {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+    gap: 20px !important;
+    margin-bottom: 20px !important;
+    padding: 0 20px !important;
+}
+
+.stat-card {
+    background: #f8f9fa !important;
+    padding: 20px !important;
+    border-radius: 8px !important;
+    text-align: center !important;
+    border: 1px solid #e2e8f0 !important;
+    transition: all 0.2s ease !important;
+}
+
+.stat-card:hover {
+    background: #edf2f7 !important;
+    border-color: #cbd5e0 !important;
+}
+
+.stat-number {
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    color: #2d3748 !important;
+    margin-bottom: 8px !important;
+}
+
+.stat-label {
+    font-size: 14px !important;
+    color: #718096 !important;
+    font-weight: 500 !important;
+}
+
+.gantt-tooltip {
+    position: absolute !important;
+    background: #2d3748 !important;
+    color: white !important;
+    padding: 12px 16px !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    z-index: 1000 !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.2s ease !important;
+    max-width: 300px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.gantt-tooltip.show {
+    opacity: 1 !important;
+}
+
+.gantt-tooltip h4 {
+    margin: 0 0 8px 0 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: white !important;
+}
+
+.gantt-tooltip p {
+    margin: 0 0 4px 0 !important;
+    font-size: 12px !important;
+    opacity: 0.9 !important;
+    color: #e2e8f0 !important;
+}
+
+.gantt-tooltip p:last-child {
+    margin-bottom: 0 !important;
+}
+
+@media (max-width: 768px) {
+    .gantt-row {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+
+    .gantt-label {
+        width: 100% !important;
+        margin-bottom: 10px !important;
+    }
+
+    .gantt-chart {
+        width: 100% !important;
+    }
+
+    .gantt-legend {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+
+    .gantt-stats {
+        grid-template-columns: 1fr !important;
+    }
+}

@@ -1,0 +1,229 @@
+{# Print-optimized HTML for assignment validation summary PDF export (admin-only) #}
+<!DOCTYPE html>
+{% set _lang_raw = session.get('language', 'en') %}
+{% set _lang_norm = (_lang_raw|string|lower|replace('-', '_')) %}
+{% set _lang = (_lang_norm.split('_')[0] if _lang_norm else 'en') %}
+<html lang="{{ _lang }}" dir="{{ 'rtl' if _lang == 'ar' else 'ltr' }}">
+<head>
+    <meta charset="utf-8">
+    <title>{{ _('Validation Summary') }} - {{ assignment_display_name or _('Assignment') }}{% if country_display_name %} - {{ country_display_name }}{% endif %}</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    {% if _lang == 'ar' %}
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    {% endif %}
+</head>
+<body>
+    <header>
+        <h1>{{ _('Validation Summary') }}</h1>
+        <div class="meta">
+            <div><strong>{{ _('Assignment:') }}</strong> {{ assignment_display_name or (assignment.template.name if assignment and assignment.template else '-') }}</div>
+            <div><strong>{{ _('Country:') }}</strong> {{ country_display_name if country_display_name else (country.name if country else '-') }}</div>
+            <div><strong>{{ _('Period:') }}</strong> {{ assignment.period_name if assignment else '-' }}</div>
+            <div><strong>{{ _('Generated:') }}</strong> {{ generated_at|datetime_local('datetime') if generated_at else '' }}</div>
+            <div><strong>{{ _('Items:') }}</strong> {{ stats.total_items or 0 }}</div>
+            {% if stats.ran_count is defined %}
+            <div><strong>{{ _('Validated now:') }}</strong> {{ stats.ran_count }}</div>
+            {% endif %}
+        </div>
+    </header>
+
+    {% macro ai_block(v) %}
+        <div class="ai-block">
+            <div class="ai-title">{{ _('AI validation') }}</div>
+            {% if v and v.verdict %}
+                {% set ui = (v.evidence.get('opinion_ui') if (v.evidence is mapping) else none) %}
+                {% set verdict = (v.verdict|string|lower) %}
+                {% set st = (v.status|string|lower) if v.status else '' %}
+                {% if st == 'failed' %}
+                    <span class="badge badge-failed">{{ _('failed') }}</span>
+                {% elif verdict == 'good' %}
+                    <span class="badge badge-good">{{ _('good') }}</span>
+                {% elif verdict == 'discrepancy' %}
+                    <span class="badge badge-discrepancy">{{ _('discrepancy') }}</span>
+                {% else %}
+                    <span class="badge badge-uncertain">{{ _('uncertain') }}</span>
+                {% endif %}
+                {% if v.confidence is not none %}
+                    <span class="ai-meta">{{ _('Confidence:') }} {{ (v.confidence * 100) | round(0) }}%</span>
+                {% endif %}
+                {% set summary = (ui.get('summary') if ui is mapping else none) or v.opinion_text %}
+                {% set details = (ui.get('details') if ui is mapping else none) %}
+                {% set decision = (ui.get('decision') if ui is mapping else none) %}
+                {% set basis = (ui.get('basis') if ui is mapping else none) %}
+                {% set sources = (ui.get('sources') if ui is mapping else none) %}
+
+                {% if summary %}
+                    <div class="ai-opinion">{{ summary }}</div>
+                {% endif %}
+                {% if details %}
+                    <div class="ai-meta" style="margin-top: 6px; white-space: pre-wrap;">{{ details }}</div>
+                {% endif %}
+                {% if decision or (basis is iterable and basis is not string and (basis|length > 0)) %}
+                    <div class="ai-meta" style="margin-top: 6px;">
+                        {% if decision %}<div><strong>{{ _('Decision:') }}</strong> <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{ decision }}</span></div>{% endif %}
+                        {% if basis is iterable and basis is not string and (basis|length > 0) %}
+                            <div style="margin-top: 2px;"><strong>{{ _('Based on:') }}</strong> {{ basis|join(', ') }}</div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                {% if sources is iterable and sources is not string and (sources|length > 0) %}
+                    <div class="ai-meta" style="margin-top: 8px;">
+                        <div style="font-weight: 700; color: #374151;">{{ _('Sources') }}</div>
+                        <ul style="margin: 4px 0 0 16px; padding: 0;">
+                            {% for s in sources[:5] %}
+                                {% set title = s.get('document_title') if s is mapping else '' %}
+                                {% set url = s.get('document_url') if s is mapping else '' %}
+                                {% set page = s.get('page_number') if s is mapping else none %}
+                                {% set quote = s.get('quote') if s is mapping else '' %}
+                                <li style="margin: 0 0 4px 0;">
+                                    {% if url %}
+                                        <a href="{{ url }}" style="color: #6d28d9; text-decoration: underline;">{{ title or _('Document') }}</a>
+                                    {% else %}
+                                        <span>{{ title or _('Document') }}</span>
+                                    {% endif %}
+                                    {% if page %}<span> ({{ _('p.') }} {{ page }})</span>{% endif %}
+                                    {% if quote %}<span> — “{{ quote }}”</span>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            {% else %}
+                <span class="badge badge-missing">{{ _('not run') }}</span>
+            {% endif %}
+        </div>
+    {% endmacro %}
+
+    {% macro render_item(it) %}
+        {% set required = (it.model.is_required_for_js if it.model is defined and it.model else (it.model.is_required if it.model is defined and it.model else false)) %}
+        {% set has_value = false %}
+        {% if it.data_not_available or it.not_applicable %}
+            {% set has_value = true %}
+        {% elif it.value is not none %}
+            {% if it.value is mapping %}
+                {% set has_value = (it.value|length) > 0 %}
+            {% else %}
+                {% set has_value = (it.value|string|trim) != '' %}
+            {% endif %}
+        {% endif %}
+
+        <div class="field-box {{ 'field-filled' if has_value else ('field-empty-required' if required else 'field-empty-optional') }}">
+            <div class="field-header">
+                <span class="field-label">{{ it.label }}</span>
+            </div>
+            <div class="field-content">
+                {% if it.kind == 'note' %}
+                    {% if it.value %}
+                        <span class="field-value">{{ it.value | format_number }}</span>
+                    {% else %}
+                        <span class="not-reported-optional">{{ _('Not Reported') }}</span>
+                    {% endif %}
+                {% elif it.data_not_available %}
+                    <span class="not-reported-optional">{{ _('Data not available') }}</span>
+                {% elif it.not_applicable %}
+                    <span class="not-reported-optional">{{ _('Not applicable') }}</span>
+                {% elif it.value is none %}
+                    <span class="{{ 'not-reported' if required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
+                {% elif it.value is mapping %}
+                    {# Disaggregation/matrix-like structures: show a compact key/value list #}
+                    {% set values = it.value.get('values') if it.value.get('values') is mapping else it.value %}
+                    {% if values is mapping %}
+                        <div class="field-value">
+{% for k, v in values.items() %}
+                                    {% if not (k is string and k.startswith('_')) %}
+                                        <div><strong>{{ k }}:</strong> {{ v | format_number }}</div>
+                                    {% endif %}
+                                {% endfor %}
+                        </div>
+                    {% else %}
+                        <span class="field-value">{{ (it.value|string) | format_number }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="field-value">{{ it.value | format_number }}</span>
+                {% endif %}
+
+                {{ ai_block(it.ai_validation) }}
+            </div>
+        </div>
+    {% endmacro %}
+
+    {% macro render_section(sec, level=0) %}
+        <section class="section {{ 'subsection' if level > 0 else '' }}">
+            {% if level == 0 %}
+                <h3>{{ sec['display_name'] }}</h3>
+            {% elif level == 1 %}
+                <h4>{{ sec['display_name'] }}</h4>
+            {% else %}
+                <h4>{{ sec['display_name'] }}</h4>
+            {% endif %}
+
+            {% for it in (sec['fields_ordered'] or []) %}
+                {{ render_item(it) }}
+            {% endfor %}
+
+            {% if (sec['fields_ordered'] or [])|length == 0 and (sec['subsections'] or [])|length == 0 %}
+                <p class="section-empty-note">{{ _('No indicators added.') }}</p>
+            {% endif %}
+
+            {% for child in (sec['subsections'] or []) %}
+                {{ render_section(child, level + 1) }}
+            {% endfor %}
+        </section>
+    {% endmacro %}
+
+    <section class="section">
+        <h2>{{ _('Summary') }}</h2>
+        <div class="summary-grid">
+            <div class="summary-card summary-good">
+                <div class="summary-label">{{ _('Good') }}</div>
+                <div class="summary-value">{{ stats.good or 0 }}</div>
+            </div>
+            <div class="summary-card summary-discrepancy">
+                <div class="summary-label">{{ _('Discrepancy') }}</div>
+                <div class="summary-value">{{ stats.discrepancy or 0 }}</div>
+            </div>
+            <div class="summary-card summary-uncertain">
+                <div class="summary-label">{{ _('Uncertain') }}</div>
+                <div class="summary-value">{{ stats.uncertain or 0 }}</div>
+            </div>
+            <div class="summary-card summary-failed">
+                <div class="summary-label">{{ _('Failed') }}</div>
+                <div class="summary-value">{{ stats.failed or 0 }}</div>
+            </div>
+            <div class="summary-card summary-missing">
+                <div class="summary-label">{{ _('Not run') }}</div>
+                <div class="summary-value">{{ stats.missing or 0 }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>{{ _('Items') }}</h2>
+
+        {% set default_page_id = 0 %}
+        {% if pages and pages|length > 0 and pages[0] is not none %}
+            {% for page in pages %}
+                <h2 class="form-page-title">{{ get_localized_page_name(page) }}</h2>
+                {% for section in sections_by_page.get(page.id, []) %}
+                    {{ render_section(section, 0) }}
+                {% endfor %}
+                {% if not loop.last %}<div class="page-break"></div>{% endif %}
+            {% endfor %}
+        {% else %}
+            {% for section in sections_by_page.get(default_page_id, []) %}
+                {# Use h2 for top-level when not paginated (matches export_pdf.html) #}
+                <section class="section">
+                    <h2>{{ section['display_name'] }}</h2>
+                </section>
+                {# Render items + subsections with consistent layout #}
+                {% for it in (section['fields_ordered'] or []) %}
+                    {{ render_item(it) }}
+                {% endfor %}
+                {% for child in (section['subsections'] or []) %}
+                    {{ render_section(child, 1) }}
+                {% endfor %}
+            {% endfor %}
+        {% endif %}
+    </section>
+</body>
+</html>

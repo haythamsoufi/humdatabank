@@ -1,0 +1,84 @@
+{# Country Dropdown Component - Wrapper for Enhanced Search Dropdown #}
+{#
+  Usage:
+  {% include 'components/country_dropdown.html' %}
+
+  Required variables:
+  - user_countries: List of country objects
+  - selected_country: Currently selected country object (optional)
+  - form_action: URL for form submission
+  - csrf_token: CSRF token for form
+#}
+
+{# Country Dropdown Component - Wrapper for Enhanced Search Dropdown #}
+{#
+  Usage:
+  {% include 'components/country_dropdown.html' %}
+
+  Required variables:
+  - user_countries: List of country objects
+  - selected_country: Currently selected country object (optional)
+  - form_action: URL for form submission
+  - csrf_token: CSRF token for form
+#}
+
+<div class="enhanced-search-dropdown relative">
+    <div class="flex items-center gap-2">
+        <label for="search_input" class="control-label flex-shrink-0">{{ _('Country') }}:</label>
+        <div class="relative">
+            <input type="text"
+                   id="search_input"
+                   placeholder="{{ _('Search countries...') }}"
+                   class="block w-48 py-2 px-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                   autocomplete="off">
+            <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                <button type="button"
+                        id="clear_search"
+                        class="text-gray-400 hover:text-gray-600 mr-1 hidden"
+                        title="{{ _('Clear search') }}">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    {# Hidden form for submission #}
+    <form id="search_form" method="POST" action="{{ form_action }}" class="hidden">
+        <input type="hidden" id="search_select" name="country_select" value="">
+        {% if csrf_token %}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% endif %}
+    </form>
+
+    {# Dropdown with search results #}
+    <div id="search_dropdown" class="absolute z-50 w-80 mt-1 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-60 overflow-y-auto">
+        <div id="search_list" class="py-1">
+            {% for country in user_countries %}
+                <div class="dropdown-option px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-center justify-between"
+                     data-item-id="{{ country.id }}"
+                     data-item-name="{{ get_localized_country_name(country) }}"
+                     {% if selected_country and selected_country.id == country.id %}data-selected="true"{% endif %}>
+                    <span class="item-name">{{ get_localized_country_name(country) }}</span>
+                    {% if selected_country and selected_country.id == country.id %}
+                        <svg class="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+        <div id="no_results" class="px-3 py-2 text-sm text-gray-500 hidden">
+            <div class="text-center py-2">
+                <svg class="mx-auto h-6 w-6 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                {{ _('No countries found matching your search.') }}
+            </div>
+        </div>
+    </div>
+</div>

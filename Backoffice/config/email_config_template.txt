@@ -1,0 +1,39 @@
+# Email Configuration Template
+# Copy these lines to your .env file or set as environment variables
+
+# Your Gmail address
+MAIL_USERNAME=your.email@gmail.com
+
+# Your Gmail App Password (16-character password from Google)
+# Get this from: Google Account > Security > 2-Step Verification > App passwords
+MAIL_PASSWORD=your-app-password-here
+
+# Sender email (can be the same as your Gmail)
+MAIL_DEFAULT_SENDER=your.email@gmail.com
+
+# No-reply sender for automated system emails (password reset, digests)
+MAIL_NOREPLY_SENDER=noreply.your.email@gmail.com
+
+# Admin emails for notifications (comma-separated)
+ADMIN_EMAILS=your.email@gmail.com
+
+# Team email for BCC (optional, defaults to sender email)
+TEAM_EMAIL=your.email@gmail.com
+
+# Base URL for your application
+BASE_URL=http://localhost:5000
+
+# Instructions:
+# 1. Replace 'your.email@gmail.com' with your actual Gmail address
+# 2. Replace 'your-app-password-here' with the 16-character App Password from Google
+# 3. Save this as .env file in the Backoffice directory
+# 4. Or set these as environment variables in your terminal
+
+# To get an App Password:
+# 1. Go to your Google Account settings
+# 2. Navigate to Security
+# 3. Enable "2-Step Verification" if not already enabled
+# 4. Under "2-Step Verification", click "App passwords"
+# 5. Select "Mail" as app and "Other" as device
+# 6. Click "Generate"
+# 7. Copy the 16-character password (remove spaces)

@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "title": "ECHO Programmatic Partnership",
+    "description": null,
+    "category": "global_initiative",
+    "embed_url": "https://public.tableau.com/views/PPPdashboard_16805965348010/1_Overview",
+    "embed_type": "tableau",
+    "aspect_ratio": "7:6",
+    "page_slot": "echo_partnership",
+    "is_active": true,
+    "sort_order": 1,
+    "created_at": "2026-04-13T16:17:09.139134",
+    "updated_at": "2026-04-13T16:30:03.781065"
+  },
+  {
+    "id": 2,
+    "title": "Global Route-based Migration Programme",
+    "description": null,
+    "category": "global_initiative",
+    "embed_url": "https://app.powerbi.com/view?r=eyJrIjoiMjU1NTliMTctY2U4Mi00ZDY5LWE3Y2MtNWIzMDEyNzZkZDVlIiwidCI6ImEyYjUzYmU1LTczNGUtNGU2Yy1hYjBkLWQxODRmNjBmZDkxNyIsImMiOjh9&pageName=ReportSection",
+    "embed_type": "powerbi",
+    "aspect_ratio": null,
+    "page_slot": "grbm",
+    "is_active": true,
+    "sort_order": 2,
+    "created_at": "2026-04-13T16:17:27.719763",
+    "updated_at": "2026-04-13T16:18:21.454454"
+  },
+  {
+    "id": 3,
+    "title": "Professional health services mapping project",
+    "description": null,
+    "category": "global_initiative",
+    "embed_url": "https://app.powerbi.com/view?r=eyJrIjoiOGQ4NmYwZjMtYWU4NS00Yjg5LThhYmYtMjllNzU3NDk0OWQ5IiwidCI6ImEyYjUzYmU1LTczNGUtNGU2Yy1hYjBkLWQxODRmNjBmZDkxNyIsImMiOjh9",
+    "embed_type": "powerbi",
+    "aspect_ratio": "100:780",
+    "page_slot": "phsm",
+    "is_active": true,
+    "sort_order": 3,
+    "created_at": "2026-04-13T16:31:55.082878",
+    "updated_at": "2026-04-13T16:31:55.082882"
+  }
+]

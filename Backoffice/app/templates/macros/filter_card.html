@@ -1,0 +1,27 @@
+{#
+  Reusable analytics filter-card wrapper.
+
+  Usage (call-block pattern):
+    {% from "macros/filter_card.html" import filter_card %}
+    {% call filter_card(grid_cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5") %}
+        <div> ... field ... </div>
+        <div class="col-span-1 sm:col-span-2 ... flex ...">
+            <button type="submit" class="btn btn-primary ..."> Filter </button>
+            <a href="..."> Clear Filters </a>
+        </div>
+    {% endcall %}
+
+  The caller block includes all filter fields AND the submit / clear-filters
+  row so each template retains full control over column spans and layout.
+#}
+
+{% macro filter_card(title="Filters", method="GET", grid_cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5") %}
+<div class="bg-gray-50 p-4 sm:p-6 rounded-lg shadow mb-8">
+    <h5 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+        <i class="fas fa-filter mr-2"></i> {{ title }}
+    </h5>
+    <form method="{{ method }}" class="grid {{ grid_cols }} gap-4 items-end">
+        {{ caller() }}
+    </form>
+</div>
+{% endmacro %}

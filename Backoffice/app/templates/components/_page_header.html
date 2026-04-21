@@ -1,0 +1,155 @@
+{# Standardized Page Header Component #}
+{# This component ensures consistent positioning of page titles and breadcrumbs across all templates #}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_svg_icons.html" import svg_icon %}
+
+{% macro page_header(title, breadcrumbs=None, icon=None, actions=None, subtitle=None, info_tooltip=None, pin_actions_on_scroll=False) %}
+{# Executive Page Header - styles in css/executive-header.css #}
+{# pin_actions_on_scroll: when True and actions are present, header sticks to the scroll area top and compacts while scrolled (see js/page-header-pin.js). #}
+{# Use {% call page_header(...) %}...{% endcall %} to inject markup before action buttons (e.g. entity dropdown on Documents). #}
+{% if pin_actions_on_scroll and (actions or (caller is defined)) %}
+{# Sentinel sits above the sticky header; IntersectionObserver uses it so compact mode does not depend on header height (avoids scroll↔layout feedback loops). #}
+<div class="page-header-pin-sentinel" aria-hidden="true"></div>
+{% endif %}
+<div class="executive-page-header mb-6{% if pin_actions_on_scroll and (actions or (caller is defined)) %} executive-page-header--pin-actions{% endif %}">
+    <div class="header-background-pattern"></div>
+    <div class="header-content-wrapper">
+        <div class="header-main-content">
+            {# Left side: Title section with professional branding #}
+            <div class="title-section">
+                {% if icon %}
+                    <div class="brand-icon-wrapper">
+                        <div class="brand-icon">
+                            {% if icon.startswith('fas ') or icon.startswith('far ') or icon.startswith('fab ') or icon.startswith('fal ') %}
+                                <i class="{{ icon }}"></i>
+                            {% else %}
+                                {{ svg_icon(icon, 'w-full h-full') }}
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+                <div class="title-text-group">
+                    <div class="title-with-info">
+                        <h1 class="main-title">{{ title }}</h1>
+                        {% if info_tooltip %}
+                            <div class="info-tooltip-wrapper">
+                                <i class="fas fa-info-circle text-blue-500 hover:text-blue-600 cursor-help ml-2"></i>
+                                <div class="custom-tooltip">{{ info_tooltip }}</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% if subtitle %}
+                        <p class="page-subtitle">{{ subtitle }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Right side: Professional action controls (optional {% call %} body renders first, e.g. entity selector) #}
+            {% if actions or (caller is defined) %}
+                <div class="action-controls">
+                    {% if caller is defined %}
+                        {{ caller() }}
+                    {% endif %}
+                    {% if actions %}
+                    {% for action in actions %}
+                        {% if action.type == 'button' %}
+                            <button type="button"
+                                    class="{{ action.classes | default('professional-action-btn') }}"
+                                    {% if action.attributes %}
+                                        {% for attr, value in action.attributes.items() %}
+                                            {{ attr }}="{{ value }}"
+                                        {% endfor %}
+                                    {% endif %}>
+                                {% if action.icon %}
+                                    {% if action.icon.startswith('fas ') or action.icon.startswith('far ') or action.icon.startswith('fab ') or action.icon.startswith('fal ') %}
+                                        <i class="{{ action.icon }}"></i>
+                                    {% else %}
+                                        {{ svg_icon(action.icon, 'w-4 h-4') }}
+                                    {% endif %}
+                                {% endif %}
+                                <span>{{ action.text }}</span>
+                            </button>
+                        {% elif action.type == 'submit' %}
+                            {# type="submit" with optional form="" for controls outside the form (associate via form attribute) #}
+                            <button type="submit"
+                                    class="{{ action.classes | default('professional-action-btn') }}"
+                                    {% if action.attributes %}
+                                        {% for attr, value in action.attributes.items() %}
+                                            {{ attr }}="{{ value }}"
+                                        {% endfor %}
+                                    {% endif %}>
+                                {% if action.icon %}
+                                    {% if action.icon.startswith('fas ') or action.icon.startswith('far ') or action.icon.startswith('fab ') or action.icon.startswith('fal ') %}
+                                        <i class="{{ action.icon }}"></i>
+                                    {% else %}
+                                        {{ svg_icon(action.icon, 'w-4 h-4') }}
+                                    {% endif %}
+                                {% endif %}
+                                <span>{{ action.text }}</span>
+                            </button>
+                        {% elif action.type == 'link' %}
+                            <a href="{{ action.url }}"
+                               class="{{ action.classes | default('professional-action-btn') }}"
+                               {% if action.attributes %}
+                                   {% for attr, value in action.attributes.items() %}
+                                       {{ attr }}="{{ value }}"
+                                   {% endfor %}
+                               {% endif %}>
+                                {% if action.icon %}
+                                    {% if action.icon.startswith('fas ') or action.icon.startswith('far ') or action.icon.startswith('fab ') or action.icon.startswith('fal ') %}
+                                        <i class="{{ action.icon }}"></i>
+                                    {% else %}
+                                        {{ svg_icon(action.icon, 'w-4 h-4') }}
+                                    {% endif %}
+                                {% endif %}
+                                <span>{{ action.text }}</span>
+                            </a>
+                        {% elif action.type == 'form' %}
+                            <form action="{{ action.url }}" method="POST" class="{{ action.form_class | default('inline-block') }}"
+                                  {% if action.form_attributes %}
+                                      {% for attr, value in action.form_attributes.items() %}
+                                          {{ attr }}="{{ value | e }}"
+                                      {% endfor %}
+                                  {% endif %}>
+                                {% if action.csrf %}
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                {% elif action.csrf_token %}
+                                    {{ action.csrf_token | safe }}
+                                {% endif %}
+                                <button type="submit"
+                                        class="{{ action.classes | default('professional-action-btn') }}"
+                                        {% if action.attributes %}
+                                            {% for attr, value in action.attributes.items() %}
+                                                {{ attr }}="{{ value }}"
+                                            {% endfor %}
+                                        {% endif %}>
+                                    {% if action.icon %}
+                                        {% if action.icon.startswith('fas ') or action.icon.startswith('far ') or action.icon.startswith('fab ') or action.icon.startswith('fal ') %}
+                                            <i class="{{ action.icon }}"></i>
+                                        {% else %}
+                                            {{ svg_icon(action.icon, 'w-4 h-4') }}
+                                        {% endif %}
+                                    {% endif %}
+                                    <span>{{ action.text }}</span>
+                                </button>
+                            </form>
+                        {% elif action.type == 'custom' %}
+                            {{ action.content | safe }}
+                        {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Breadcrumbs: collapsible wrapper when pin-actions so the strip animates smoothly #}
+    {% if breadcrumbs %}
+        <div class="page-header-breadcrumb-slot{% if pin_actions_on_scroll and (actions or (caller is defined)) %} page-header-breadcrumb-slot--collapsible{% endif %}">
+            <div class="breadcrumb-section">
+                {{ breadcrumb(breadcrumbs) }}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}

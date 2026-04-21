@@ -1,0 +1,2200 @@
+[
+  {
+    "id": 914,
+    "type": "indicator",
+    "label": "Number of people on the National Society \r\nGoverning Board",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 256,
+      "name": "Governing Board",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 722,
+      "name": "Number of people on the National Society \nGoverning Board.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "The National Society Governing Board is the highest, national level decision-making governing body between sessions of the General Assembly. The Governing Board uses its authority to direct and make decisions on behalf of the National Society, in particular\nin regard to setting direction and priorities, being accountable to stakeholders and ensuring compliance with internal rules and agreements. The Governing Board traditionally includes the President, Vice President(s), Treasurer and other elected or appointed members. Do not include governing boards related to branches,\nsections or local units.",
+      "sector": {
+        "primary": 9,
+        "secondary": 11
+      },
+      "sub_sector": {
+        "primary": 12,
+        "secondary": 16
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 915,
+    "type": "indicator",
+    "label": "Number of National Society branches",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "6",
+    "layout_break_after": false,
+    "section": {
+      "id": 258,
+      "name": "Local Units and Branches",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Branch",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 1117,
+      "name": "Number of National Society branches.",
+      "type": "Number",
+      "unit": "Branch",
+      "definition": "The majority of National Societies have two or more organizational levels under their National Headquarters, with the aim of ensuring territorial reach and managing different aspects of National Society operations. Branch is the second layer immediately after the National Headquarters. A Branch has its roles and responsibilities and relationship with the National Headquarters defined through National Societies’ Statutes, including the level of autonomy given especially in the area of its legal status, mobilising local resources and building local partnership, and decisions it makes. It has local level decision making mechanism through its Branch members, board and volunteers, equally defined through National Societies’ Statutes.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 916,
+    "type": "indicator",
+    "label": "Number of people volunteering",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 259,
+      "name": "National Society Volunteers",
+      "order": 4,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 724,
+      "name": "Number of people volunteering.",
+      "type": "Number",
+      "unit": "Volunteers",
+      "definition": "People that have given their time voluntarily to support the delivery of services of the reporting National Society for at least four hours during the Reporting Year. This includes young people and/or participants in youth programs, while it excludes blood donors, who are counted separately.",
+      "sector": {
+        "primary": 20
+      },
+      "sub_sector": {
+        "primary": 37
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 917,
+    "type": "indicator",
+    "label": "Number of paid staff",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 260,
+      "name": "National Society Staff",
+      "order": 5,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 727,
+      "name": "Number of paid staff.",
+      "type": "Number",
+      "unit": "Staff",
+      "definition": "Paid staff: People who are contracted by the Reporting National Society for a minimum of three months in total during the Reporting Year and are either remunerated for their work or are interns.  Staff contracted by the Secretariat are not counted by the reporting National Society even if they are working for the NS within the country to which the reporting National Society belongs. Staff contracted by a reporting National Society are reported by that National Society regardless of who remunerates them and where they work, whether it is in-country, delegates in the field, out-of-country, or staff on-loan. If a person is contracted for the first three months to the reporting National Society and then is contracted again for the last three months, they should only be counted once.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 920,
+    "type": "indicator",
+    "label": "Number of people donating blood.",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 251,
+      "name": "Blood and First Aid Activities",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 626,
+      "name": "Number of people donating blood.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "People who have donated blood at a blood donation centre / blood bank or similar, owned or run by thereporting National Society at least once during the Reporting Year. If the reporting National Society does not have blood donation facilities, but promotes blood donations, it should count people reached with these promotional activities as part of “People Reached” (irrespective of whether they actually donate blood at some other facility). People who would like to give blood but cannot (e.g., because of medical conditions, risk behaviors for transmissible infections, or other) should not be counted as people donating blood. Only the number of people, not number of times or quantity of blood given, should be reported. Therefore, a person who gives blood, say, four times during the reporting period, is still only counted once. Tip: If this service is not offered by your national society, please add “0” as value",
+      "sector": {
+        "primary": 7
+      },
+      "sub_sector": {
+        "primary": 31
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 921,
+    "type": "indicator",
+    "label": "Number of people reached with emergency response and early recovery programmes.",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 254,
+      "name": "By Type of Programme",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 619,
+      "name": "Number of people reached with emergency response and early recovery programmes.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "This indicator reflects numbers of people reached by all National Society services to respond to and strengthen recovery from disasters and crises caused by all types of hazards. It covers all sectors in emergency response and recovery, including support services, in-kind, cash and voucher assistance.  Other examples include: Emergency shelter; Food and nutrition distribution; Restoring family links; Psychosocial support; Any other programme implemented specifically for disaster response and early recovery.",
+      "sector": {
+        "primary": 15,
+        "secondary": 2
+      },
+      "sub_sector": {
+        "primary": 29,
+        "secondary": 2
+      },
+      "emergency": true,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators",
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 922,
+    "type": "indicator",
+    "label": "Number of people reached with disaster risk reduction.",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 618,
+      "name": "Number of people reached with disaster risk reduction.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Disaster Risk Reduction is the concept and practice of reducing disaster risks through systematic efforts to analyse and manage the causal factors of disasters, including through reduced exposure to hazards, lessened vulnerability of people and property, wise management of land and the environment, and improved preparedness for adverse events. National Society activities include preparing and assisting communities in disaster- and crisis-vulnerable areas in adopting climate-risk informed and environmentally responsible and other relevant values and practices. Examples include: Contingency planning, particularly at community and household level; Establishment of appropriate early warning and risk management systems; Community-wide awareness raising and engagement on climate change; Improvement and/or implementation of environmentally responsive practices such as forecast-based; financing; Tree planting.",
+      "sector": {
+        "primary": 10
+      },
+      "sub_sector": {
+        "primary": 14
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 924,
+    "type": "question",
+    "label": "Sex of president",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "question",
+    "layout_column_width": "4",
+    "layout_break_after": false,
+    "section": {
+      "id": 256,
+      "name": "Governing Board",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "question_type": "single_choice",
+    "definition": null,
+    "options": [
+      "Male",
+      "Female",
+      "Other"
+    ],
+    "lookup_list_id": null,
+    "list_display_column": null,
+    "list_filters": null
+  },
+  {
+    "id": 925,
+    "type": "indicator",
+    "label": "Number of National Society Local Units",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "6",
+    "layout_break_after": false,
+    "section": {
+      "id": 258,
+      "name": "Local Units and Branches",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Local unit",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 723,
+      "name": "Number of National Society Local Units.",
+      "type": "Number",
+      "unit": "Local unit",
+      "definition": "Local units are any physical subdivisions of a National Society that coordinate and deliver services to people. These include branches, sections or chapters, headquarters, regional and intermediate offices. These count as Local Units: All units or subdivisions that directly provide services to people. This includes intermediate level subdivisions that provide support for local units, but also might work directly with the community; A HQ or regional office that serves the local population, such as the people in the city where they are located; A blood bank which is a Corporate Member and is counted as part of the reporting National Society; All units that directly provide service to people for corporate members that are considered to be part of the National Societies; If both a District Branch and a Town Branch (even within the same District) work directly with local populations, they both count as Local Units. These do not count as Local Units: A District Office that does not work directly with local populations. A regional subdivision (e.g., “North District”) which exists on paper but does not have a physical office. Corporate members that are independent from the National Society and not sufficiently integrated within the work of a National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 926,
+    "type": "indicator",
+    "label": "Number of volunteers covered by accident insurance.",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 259,
+      "name": "National Society Volunteers",
+      "order": 4,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 725,
+      "name": "Number of volunteers covered by accident insurance.",
+      "type": "Number",
+      "unit": "Volunteers",
+      "definition": "Active volunteers: registered as volunteer in a current year. Covered by accident insurance: Volunteers who are included in an insurance policy that provides financial protection and coverage for medical expenses, disability, or death resulting from accidents that occur during their volunteer activities. Covers health, accident, and death compensation: Provision of insurance policies or compensation schemes that offer financial protection for medical expenses, injuries sustained during volunteer activities, and compensation in the event of death.",
+      "sector": {
+        "primary": 20
+      },
+      "sub_sector": {
+        "primary": 37
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 927,
+    "type": "indicator",
+    "label": "Number of paid staff covered by accident insurance.",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 260,
+      "name": "National Society Staff",
+      "order": 5,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 728,
+      "name": "Number of paid staff covered by accident insurance.",
+      "type": "Number",
+      "unit": "Staff",
+      "definition": "Covered by accident insurance:  People who are covered under an accident insurance scheme of the National Society (e.g., the IFRC global accident insurance scheme or another similar scheme) during their activities for the National Society in the reporting year.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 930,
+    "type": "indicator",
+    "label": "Number of people trained by the National Society in first aid.",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 251,
+      "name": "Blood and First Aid Activities",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 625,
+      "name": "Number of people trained by the National Society in first aid.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "People who have completed at least one first aid course led or facilitated by the reporting National Society (at any level, either online or face to face) during the Reporting Year. If this service is not offered by your national society, please add “0” as value.",
+      "sector": {
+        "primary": 7
+      },
+      "sub_sector": {
+        "primary": 27
+      },
+      "emergency": false,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators",
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 931,
+    "type": "indicator",
+    "label": "Number of people reached with long term services and programmes.",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 254,
+      "name": "By Type of Programme",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 754,
+      "name": "Number of people reached with long term services and programmes.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "National Society services to strengthen community resilience, improve health, and address the needs of the most vulnerable. Examples include: Health: HIV/AIDS, malaria, tuberculosis, non-communicable diseases, maternal, newborn, and child health, community-based health and first aid, water, sanitation and hygiene promotion, hospital and ambulance services, etc.; Community development: livelihoods, road safety, security, etc.; Social services: psychosocial support, migrant services, elderly support, advocacy campaign against violence.",
+      "sector": {
+        "primary": 15
+      },
+      "sub_sector": {
+        "primary": 29
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 932,
+    "type": "indicator",
+    "label": "Number of people reached with shelter support.",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 622,
+      "name": "Number of people reached with shelter support.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Shelter services and assistance are provided before, during, and after a disaster in order to meet the accommodation and settlement needs of affected people, to reduce their accommodation and settlement risks and to strengthen their safety, well-being and longer-term recovery. Examples include: Short- and medium-term shelter and settlement assistance provided to affected households; Longer-term shelter and settlement issues including housing land and property rights, adaptation to climate change, sustainability and urbanization; Technical support, guidance and awareness raising in safe shelter design, settlement planning and; building techniques",
+      "sector": {
+        "primary": 1,
+        "secondary": 2
+      },
+      "sub_sector": {
+        "primary": 1,
+        "secondary": 2
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 934,
+    "type": "question",
+    "label": "Sex of Secretary General",
+    "order": 3,
+    "display_order": "3",
+    "is_required": true,
+    "form_item_type": "question",
+    "layout_column_width": "6",
+    "layout_break_after": false,
+    "section": {
+      "id": 256,
+      "name": "Governing Board",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "question_type": "single_choice",
+    "definition": null,
+    "options": [
+      "Male",
+      "Female",
+      "Other"
+    ],
+    "lookup_list_id": null,
+    "list_display_column": null,
+    "list_filters": null
+  },
+  {
+    "id": 936,
+    "type": "indicator",
+    "label": "Number of staff deaths on duty.",
+    "order": 3,
+    "display_order": "3",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 260,
+      "name": "National Society Staff",
+      "order": 5,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff_Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 729,
+      "name": "Number of staff deaths on duty.",
+      "type": "Number",
+      "unit": "Staff_Volunteers",
+      "definition": "People who have died during the Reporting Year while performing duties for the reporting National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 938,
+    "type": "indicator",
+    "label": "Number of people reached with livelihoods support",
+    "order": 3,
+    "display_order": "3",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 621,
+      "name": "Number of people reached with livelihoods support",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Livelihoods comprise the capabilities, assets and activities (or strategies) required for generating income and securing a means of living. Livelihoods services help communities (especially but not only in disaster and crisis affected areas) by supporting people to replace livelihood assets, restore livelihood activities, and strengthen, diversify and protect livelihoods, without damaging the natural resource base. Examples include: Prevention of further damage and loss; Repair of essential infrastructures (e.g., schools, roads, and community facilities); Restoration of social services; Basic needs assistance for livelihoods security including food, clothes and other relief items; Improvement of income sources (e.g., via vocational training); Food production and income generation (e.g., through seed distribution programmes and husbandry programmes); Community awareness activities on livelihoods strengthening and protection.",
+      "sector": {
+        "primary": 5,
+        "secondary": 2
+      },
+      "sub_sector": {
+        "primary": 5,
+        "secondary": 2
+      },
+      "emergency": true,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 939,
+    "type": "indicator",
+    "label": "Funding",
+    "order": 4,
+    "display_order": "4",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "6",
+    "layout_break_after": false,
+    "section": {
+      "id": 253,
+      "name": "National Society Financial Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Funds",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 733,
+      "name": "Total income of the National Society.",
+      "type": "Number",
+      "unit": "Funds",
+      "definition": "The fiscal value of money, material goods, and services received by the reporting National Society during the Reporting Year, from any source, excluding internal transfers within the reporting National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 940,
+    "type": "indicator",
+    "label": "Number of people reached by the National Society with contextually appropriate health services.",
+    "order": 4,
+    "display_order": "4",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 623,
+      "name": "Number of people reached by the National Society with contextually appropriate health services.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Health activities directly protect and promote the health of the population they serve, from health promotion to prevention, diagnosis, treatment, rehabilitation, palliative care, acute care and long-term care services. Examples include: Activities focused on informing, educating and communicating necessary behavior change messages on prevailing health issues and problems. Inclusive of prevention and community-based management (e.g., HIV/AIDS, Hepatitis, TB, family planning, non-communicable diseases, etc.); Programmes supporting vulnerable populations through routine home visits and outreach activities to provide basic community care services (e.g., older people, socially isolated groups, migrants etc.); Provision of health care and treatment by trained health professionals, through acute or longer-term care in health facilities such as hospitals, clinics and health posts; Provision of health products such as vaccines, essential medicines and other medical supplies; Sourcing and management of voluntary non-remunerated blood donations; Training of individuals in first aid and subsequent activities providing immediate first aid care to injured persons; Programmes supporting reproductive, maternal, newborn and child activities ranging from acute hospital care to community-based services. Inclusive of prenatal (before birth) and post-partum (after birth) such as the promotion of healthy practices and illness detection; Programmes sourcing, distributing and promoting the proper use of malaria nets; Programmes providing support to immunisation campaigns and routine immunisation programmes through community mobilisation, sensitisation, surveillance, demand creation, etc; Promotion of proper nutrition and food education;  Programmes providing mental health and/or psychosocial support services; Prevention, preparation and response to infectious disease outbreaks; Community-based surveillance activities contributing to early-warning systems for disease outbreaks; Referral activities acting in support of health systems; Harm reduction services providing support for marginalised or excluded populations who are denied or; have restricted access to health care; Programmes providing advice, counselling and basic services to drug and other substance abuse users.",
+      "sector": {
+        "primary": 7
+      },
+      "sub_sector": {
+        "primary": 39
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 941,
+    "type": "indicator",
+    "label": "Expenditure",
+    "order": 5,
+    "display_order": "5",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "6",
+    "layout_break_after": false,
+    "section": {
+      "id": 253,
+      "name": "National Society Financial Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Funds",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 734,
+      "name": "Total expenditure of the National Society.",
+      "type": "Number",
+      "unit": "Funds",
+      "definition": "The fiscal value of money, material goods, and services which the Reporting National Society spends during the Reporting Year, excluding internal transfers within the reporting National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 942,
+    "type": "indicator",
+    "label": "Number of people reached with psychosocial and mental health services.",
+    "order": 5,
+    "display_order": "5",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 627,
+      "name": "Number of people reached with psychosocial and mental health services.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Mental health and psychosocial support (MHPSS) includes any support that people receive to protect or promote their mental health and psychosocial wellbeing. Examples include: Basic psychological support such as psychological first aid (PFA) and recreational activities; Psychological support with a specific focus on groups and families such as peer support and group work; Prevention and treatment activities for individuals who present complicated psychological distress and are at risk of developing mental health conditions; Basic psychological interventions such as counselling and psychotherapy provided in healthcare facilities with accompanying outreach work in community facilities; Programmes providing specialized clinical care and treatment for individuals with chronic mental health conditions suffering severe distress and over a long period of time; Activities in treatment centres for survivors of torture provided in detention facilities; Alternative approaches to drug therapy provided within State healthcare and social welfare systems.",
+      "sector": {
+        "primary": 7
+      },
+      "sub_sector": {
+        "primary": 10
+      },
+      "emergency": false,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators",
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 943,
+    "type": "matrix",
+    "label": "Income Sources",
+    "order": 6,
+    "display_order": "6",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 253,
+      "name": "National Society Financial Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 944,
+    "type": "indicator",
+    "label": "Number of people reached with immunization services.",
+    "order": 6,
+    "display_order": "6",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 628,
+      "name": "Number of people reached with immunization services.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "People who have been reached by National Societies with life-saving vaccines. Immunization is a critical entry point for primary health care and investing in immunization saves lives, strengthens health systems, ensures health security and advances universal health coverage. This indicator includes any immunization related activities for vaccine preventable diseases. Examples include: Support to routine immunization efforts; Supporting supplementary immunization activities; Immunization campaigns and other outreach activities; Administrative support at vaccination sites; Risk communication and community engagement; Transporting vaccine recipients to vaccination sites; Cold chain and logistics; Directly administering vaccines; Conducting vaccine perception survey.",
+      "sector": {
+        "primary": 7
+      },
+      "sub_sector": {
+        "primary": 40
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 945,
+    "type": "indicator",
+    "label": "Number of people reached by the National Society with contextually appropriate water, sanitation and hygiene services.",
+    "order": 7,
+    "display_order": "7",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 624,
+      "name": "Number of people reached by the National Society with contextually appropriate water, sanitation and hygiene services.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "WASH activities and services promote the availability and sustainability of safe water, sanitation and hygiene of vulnerable people. Examples include: Programmes providing communities with access to safe water; Programmes providing communities with knowledge on treatment and reuse of waste water; Programmes supporting communities to reduce open defecation; Programmes focusing on the community-based management of water and sanitation facilities, including safe excreta and refuse disposal; Programmes providing vector control services; The sourcing and distribution of hygiene/dignity kits; Programmes supporting women and girls in managing their menstrual hygiene needs with dignity; Training, education, awareness-raising activities on personal and community hygiene practices (e.g., in schools, or community groups).",
+      "sector": {
+        "primary": 3
+      },
+      "sub_sector": {
+        "primary": 18
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 946,
+    "type": "indicator",
+    "label": "Number of migrants and displaced persons reached with services for assistance and protection.",
+    "order": 8,
+    "display_order": "8",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 629,
+      "name": "Number of migrants and displaced persons reached with services for assistance and protection.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Migration activities support the needs of people who leave or flee their homes in search of a more secure and stable environment in other countries. The Red Cross and Red Crescent has a trusted and vital role to play in meeting immediate needs and insisting on principled humanitarian action to protect the dignity and well-being of migrants, including migrant workers, irregular migrants, refugees and unaccompanied minors, among others. Examples include: Assistance and protection services in the context of migration (e.g., provision of foods, water, essential; goods, and services like primary health care and essential medicines); Services supporting the integration of migrants into a new society (e.g., help with legal papers, language, housing, and employment); Awareness-raising and advocacy addressing xenophobia, discrimination, and negative perceptions towards migrants.",
+      "sector": {
+        "primary": 14,
+        "secondary": 8
+      },
+      "sub_sector": {
+        "primary": 24,
+        "secondary": 11
+      },
+      "emergency": false,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators",
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 947,
+    "type": "indicator",
+    "label": "Number of people reached with activities to address rising climate risks.",
+    "order": 9,
+    "display_order": "9",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 612,
+      "name": "Number of people reached with activities to address rising climate risks.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Address rising climate risks: Programs that reduce risks and vulnerability to climate-related shocks, stresses and longer-term changes, such as climate change adaptation, climate-smart disaster risk reduction and anticipatory action to climate hazards. Climate hazards include changes in temperature and rainfall patterns; heat/cold waves;  pest and diseases; more intense and frequent cyclones/typhoons, droughts and floods, as well as longer-term changes such as sea level rise and glacial retreat.",
+      "sector": {
+        "primary": 13
+      },
+      "sub_sector": {
+        "primary": 20
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 948,
+    "type": "indicator",
+    "label": "Number of people reached with heatwave risk reduction, preparedness or response activities.",
+    "order": 10,
+    "display_order": "10",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 613,
+      "name": "Number of people reached with heatwave risk reduction, preparedness or response activities.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Heatwave risk reduction and preparedness refers to reducing risks related to heatwaves. Heatwave response includes taking actions during a heatwave. Examples include: Engaging in developing a Heat Action Plan in a city, conducting heat safety or awareness raising; campaigns before or during the hot season; Integrating heat stress into first aid training for volunteers and collaborating with the national weather authority on heatwave warning systems; Distributing water; Informing people of the heatwave;  Encouraging people to take self-protective actions; Household check-ins or phone calls to vulnerable populations(definition from the FDRS).",
+      "sector": {
+        "primary": 13
+      },
+      "sub_sector": {
+        "primary": 20
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 949,
+    "type": "indicator",
+    "label": "Number of people reached per year with support services, in-kind, cash and voucher assistance for emergency response and recovery",
+    "order": 11,
+    "display_order": "11",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 765,
+      "name": "Number of people reached - Cash Transfer Programming.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Cash transfer programming supports and provides the transfer of cash or cash equivalents (e.g. vouchers), including cash for work programmes, in order to cover the short- and/or long-term essential food and non-food needs of vulnerable populations. Transfers may or may not depend on recipients having certain characteristics or doing certain things. Examples include: One-off payments after a disaster as well as repeated payments during a protracted crisis; Blanket provision as well as payments targeted to specific groups; Programmes implemented alone as well as programmes in partnership with government agencies.",
+      "sector": {
+        "primary": 4
+      },
+      "sub_sector": {
+        "primary": 8
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "PPP"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 950,
+    "type": "indicator",
+    "label": "Number of people reached by protection, gender and inclusion programming.",
+    "order": 12,
+    "display_order": "12",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 635,
+      "name": "Number of people reached by protection, gender and inclusion programming.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "PGI activities seek to prevent, respond and mitigate the causes, risks and consequences of all forms of violence, discrimination and exclusion. General categories of activities are based on the PGI Policy and Operational Framework (forthcoming). These include activities with a specific focus on addressing violence, discrimination and exclusion. Note that many activities address all three categories, with a particular focus. Examples include: Establish community centres (“dignity, access, participation and safety (DAPS) centres”) in a displacement camp, urban context or other setting where people at risk of violence, exclusion or discrimination can receive a range of adapted services; Programmes to prevent and respond to people affected by violence, exploitation or abuse (e.g. SGBV survivors, survivors of trafficking in persons, children affected by violence, minority groups affected by violence) providing comprehensive support through case management; on-site counselling, legal assistance, mapping, testing, monitoring and coordinating referral pathways for survivors, setting up a shelter (run by with qualified staff and trained volunteers) for people affected by or at risk of violence; Designing and implementing “safe spaces” in emergency response, e.g.: for women and girls to share information and concerns related to sexual and reproductive health and rights b) for children to have a place to play, to learn or received psychosocial support; Equitable access to resources for marginalised and excluded groups (in both emergency and long-term work) e.g.: design and implement peer support groups for older men in a refugee camp to improve mental health and psychosocial wellbeing, designing and implementing a disaster preparedness programme that specifically addresses the needs of persons with disabilities; Longer-term social inclusion work focusing on access to opportunities and fulfilment of rights for marginalised and excluded groups e.g.: designing and implementing a livelihood and life skills programme targeting women and girls, programmes to provide access to employment for marginalised groups (e.g. migrant populations) though language courses, training and partnership with local employers; Public campaigns or activities to reduce discrimination and stigma and promote the equality and/or rights of marginalised or excluded groups (People Reached Indirectly).",
+      "sector": {
+        "primary": 8
+      },
+      "sub_sector": {
+        "primary": 11
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 951,
+    "type": "indicator",
+    "label": "Number of people reached by the National Society's educational programmes.",
+    "order": 13,
+    "display_order": "13",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 257,
+      "name": "By thematic areas",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 21,
+      "name": "FDRS",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 633,
+      "name": "Number of people reached by the National Society's educational programmes.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "Reached by National Society educational programmes: who have participated in or attended educational interventions carried out by NS staff or volunteers. \"Educational intervention\"= a learning session of any duration, that targets students, teachers or other education personnel, on any topic of National Society expertise such as DRR, health, first aid, hygiene, sanitation, migration, IHL, Principles and values, RC history, climate change, violence prevention, gender, protection, inclusion, etc. It can be delivered either as part of the curriculum or as an extra-curricular activity (e.g., in school clubs, child-friendly spaces, non-formal community-based education)",
+      "sector": {
+        "primary": 6
+      },
+      "sub_sector": {
+        "primary": 9
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1303,
+    "type": "matrix",
+    "label": "Funding Requirements",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 388,
+      "name": "Funding Requirements for [assignment_period]",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 22,
+      "name": "Annual Planning - International Bilateral Support",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 952,
+    "type": "matrix",
+    "label": "Matrix Table",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 261,
+      "name": "Funding",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 23,
+      "name": "Annual Reporting - International Bilateral Support",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 954,
+    "type": "matrix",
+    "label": "Longer term programmes",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 263,
+      "name": "People to be reached by [entity_name]",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 955,
+    "type": "matrix",
+    "label": "List National Societies supporting bilaterally",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 264,
+      "name": "Planned Bilateral Support",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 956,
+    "type": "question",
+    "label": "Please include any comments you have on the data you entered above",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "question",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 267,
+      "name": "Comments",
+      "order": 5,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null,
+    "question_type": "textarea",
+    "definition": null,
+    "options": [],
+    "lookup_list_id": null,
+    "list_display_column": null,
+    "list_filters": null
+  },
+  {
+    "id": 960,
+    "type": "matrix",
+    "label": "Emergency Appeals in [assignment_period]",
+    "order": 2,
+    "display_order": "2",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 263,
+      "name": "People to be reached by [entity_name]",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 967,
+    "type": "matrix",
+    "label": "HNS and IFRC Secretariat",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 269,
+      "name": "Funding Requirements for [assignment_period]",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 968,
+    "type": "matrix",
+    "label": "HNS and IFRC Secretariat",
+    "order": 2,
+    "display_order": "2",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 271,
+      "name": "Funding Requirements for  [[assignment_period]+1]",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 970,
+    "type": "matrix",
+    "label": "Participating National Societies (PNSs)",
+    "order": 2,
+    "display_order": "2",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 269,
+      "name": "Funding Requirements for [assignment_period]",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 973,
+    "type": "matrix",
+    "label": "Participating National Societies (PNSs)",
+    "order": 3,
+    "display_order": "3",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 271,
+      "name": "Funding Requirements for  [[assignment_period]+1]",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 974,
+    "type": "matrix",
+    "label": "HNS and IFRC Secretariat",
+    "order": 2,
+    "display_order": "2",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 274,
+      "name": "Funding Requirements for  [[assignment_period]+2]",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 975,
+    "type": "matrix",
+    "label": "Participating National Societies (PNSs)",
+    "order": 3,
+    "display_order": "3",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 274,
+      "name": "Funding Requirements for  [[assignment_period]+2]",
+      "order": 3,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 24,
+      "name": "Unified Country Plan",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 1252,
+    "type": "indicator",
+    "label": "Number of people reached with long term services and programmes.",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "indicator",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 368,
+      "name": "Cross Cutting",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "People",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total",
+      "sex",
+      "age",
+      "sex_age"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": true,
+    "allow_not_applicable": true,
+    "bank_details": {
+      "id": 754,
+      "name": "Number of people reached with long term services and programmes.",
+      "type": "Number",
+      "unit": "People",
+      "definition": "National Society services to strengthen community resilience, improve health, and address the needs of the most vulnerable. Examples include: Health: HIV/AIDS, malaria, tuberculosis, non-communicable diseases, maternal, newborn, and child health, community-based health and first aid, water, sanitation and hygiene promotion, hospital and ambulance services, etc.; Community development: livelihoods, road safety, security, etc.; Social services: psychosocial support, migrant services, elderly support, advocacy campaign against violence.",
+      "sector": {
+        "primary": 15
+      },
+      "sub_sector": {
+        "primary": 29
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1260,
+    "type": "matrix",
+    "label": "NS 2025 Total Funding (CHF)",
+    "order": 1,
+    "display_order": "1",
+    "is_required": true,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 378,
+      "name": "Funding",
+      "order": 7,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 1261,
+    "type": "matrix",
+    "label": "Received Support",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 379,
+      "name": "Bilateral Support",
+      "order": 8,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 1271,
+    "type": "question",
+    "label": "NS 2025 Total Expenditure (CHF)",
+    "order": 2,
+    "display_order": "2",
+    "is_required": true,
+    "form_item_type": "question",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 378,
+      "name": "Funding",
+      "order": 7,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "question_type": "number",
+    "definition": "",
+    "options": [],
+    "lookup_list_id": null,
+    "list_display_column": null,
+    "list_filters": null
+  },
+  {
+    "id": 1278,
+    "type": "indicator",
+    "label": "Volunteers",
+    "order": 3,
+    "display_order": "3",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Volunteers",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 724,
+      "name": "Number of people volunteering.",
+      "type": "Number",
+      "unit": "Volunteers",
+      "definition": "People that have given their time voluntarily to support the delivery of services of the reporting National Society for at least four hours during the Reporting Year. This includes young people and/or participants in youth programs, while it excludes blood donors, who are counted separately.",
+      "sector": {
+        "primary": 20
+      },
+      "sub_sector": {
+        "primary": 37
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1279,
+    "type": "matrix",
+    "label": "Optional breakdown by SP/EF (CHF)",
+    "order": 3,
+    "display_order": "3",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": "12",
+    "layout_break_after": false,
+    "section": {
+      "id": 378,
+      "name": "Funding",
+      "order": 7,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null
+  },
+  {
+    "id": 1286,
+    "type": "indicator",
+    "label": "Staff",
+    "order": 4,
+    "display_order": "4",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Staff",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 727,
+      "name": "Number of paid staff.",
+      "type": "Number",
+      "unit": "Staff",
+      "definition": "Paid staff: People who are contracted by the Reporting National Society for a minimum of three months in total during the Reporting Year and are either remunerated for their work or are interns.  Staff contracted by the Secretariat are not counted by the reporting National Society even if they are working for the NS within the country to which the reporting National Society belongs. Staff contracted by a reporting National Society are reported by that National Society regardless of who remunerates them and where they work, whether it is in-country, delegates in the field, out-of-country, or staff on-loan. If a person is contracted for the first three months to the reporting National Society and then is contracted again for the last three months, they should only be counted once.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1291,
+    "type": "indicator",
+    "label": "Local Units",
+    "order": 5,
+    "display_order": "5",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Local unit",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 723,
+      "name": "Number of National Society Local Units.",
+      "type": "Number",
+      "unit": "Local unit",
+      "definition": "Local units are any physical subdivisions of a National Society that coordinate and deliver services to people. These include branches, sections or chapters, headquarters, regional and intermediate offices. These count as Local Units: All units or subdivisions that directly provide services to people. This includes intermediate level subdivisions that provide support for local units, but also might work directly with the community; A HQ or regional office that serves the local population, such as the people in the city where they are located; A blood bank which is a Corporate Member and is counted as part of the reporting National Society; All units that directly provide service to people for corporate members that are considered to be part of the National Societies; If both a District Branch and a Town Branch (even within the same District) work directly with local populations, they both count as Local Units. These do not count as Local Units: A District Office that does not work directly with local populations. A regional subdivision (e.g., “North District”) which exists on paper but does not have a physical office. Corporate members that are independent from the National Society and not sufficiently integrated within the work of a National Society.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "FDRS",
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1294,
+    "type": "indicator",
+    "label": "Branches",
+    "order": 6,
+    "display_order": "6",
+    "is_required": true,
+    "form_item_type": "indicator",
+    "layout_column_width": "3",
+    "layout_break_after": false,
+    "section": {
+      "id": 369,
+      "name": "NS Data",
+      "order": 1,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 25,
+      "name": "Unified Country Report",
+      "description": null
+    },
+    "assignment": null,
+    "unit": "Branch",
+    "is_sub_indicator": false,
+    "allowed_disaggregation_options": [
+      "total"
+    ],
+    "validation_condition": null,
+    "validation_message": null,
+    "allow_data_not_available": false,
+    "allow_not_applicable": false,
+    "bank_details": {
+      "id": 1117,
+      "name": "Number of National Society branches.",
+      "type": "Number",
+      "unit": "Branch",
+      "definition": "The majority of National Societies have two or more organizational levels under their National Headquarters, with the aim of ensuring territorial reach and managing different aspects of National Society operations. Branch is the second layer immediately after the National Headquarters. A Branch has its roles and responsibilities and relationship with the National Headquarters defined through National Societies’ Statutes, including the level of autonomy given especially in the area of its legal status, mobilising local resources and building local partnership, and decisions it makes. It has local level decision making mechanism through its Branch members, board and volunteers, equally defined through National Societies’ Statutes.",
+      "sector": {
+        "primary": 9
+      },
+      "sub_sector": {
+        "primary": 12
+      },
+      "emergency": false,
+      "related_programs": [
+        "Unified Planning and Reporting core indicators"
+      ],
+      "archived": false
+    }
+  },
+  {
+    "id": 1315,
+    "type": "matrix",
+    "label": "Received Support",
+    "order": 1,
+    "display_order": "1",
+    "is_required": false,
+    "form_item_type": "matrix",
+    "layout_column_width": 12,
+    "layout_break_after": false,
+    "section": {
+      "id": 391,
+      "name": "Reach",
+      "order": 2,
+      "section_type": "standard"
+    },
+    "template": {
+      "id": 26,
+      "name": "Test",
+      "description": null
+    },
+    "assignment": null
+  }
+]

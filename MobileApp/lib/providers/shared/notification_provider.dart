@@ -1,0 +1,288 @@
+import 'package:flutter/foundation.dart';
+import '../../models/shared/notification.dart';
+import '../../models/shared/notification_preferences.dart';
+import '../../services/notification_service.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_error_handler.dart';
+import '../../services/error_handler.dart';
+import '../../providers/shared/auth_provider.dart';
+import '../../utils/debug_logger.dart';
+import '../../utils/network_availability.dart';
+
+class NotificationProvider with ChangeNotifier {
+  final NotificationService _notificationService = NotificationService();
+  final ErrorHandler _errorHandler = ErrorHandler();
+
+  List<Notification> _notifications = [];
+  int _unreadCount = 0;
+  bool _isLoading = false;
+  bool _isLoadingMore = false;
+  String? _error;
+  String? _loadMoreError;
+
+  /// Last page number successfully loaded (1-based). Reset on full refresh.
+  int _lastLoadedPage = 0;
+  int _notificationsTotal = 0;
+  int _perPage = 20;
+
+  NotificationPreferences? _preferences;
+  bool _isLoadingPreferences = false;
+  String? _preferencesError;
+
+  List<Notification> get notifications => _notifications;
+  int get unreadCount => _unreadCount;
+  bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
+  String? get error => _error;
+  String? get loadMoreError => _loadMoreError;
+
+  bool get hasMoreNotifications =>
+      _lastLoadedPage > 0 && _lastLoadedPage * _perPage < _notificationsTotal;
+  NotificationPreferences? get preferences => _preferences;
+  bool get isLoadingPreferences => _isLoadingPreferences;
+  String? get preferencesError => _preferencesError;
+
+  Future<void> loadNotifications() async {
+    if (shouldDeferRemoteFetch) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+    _isLoading = true;
+    _error = null;
+    _loadMoreError = null;
+    _lastLoadedPage = 0;
+    notifyListeners();
+
+    try {
+      DebugLogger.logNotifications('loadNotifications() starting');
+      final result = await _notificationService.fetchNotificationsPage(
+        page: 1,
+        perPage: _perPage,
+      );
+      if (result == null) {
+        _notifications = [];
+        _notificationsTotal = 0;
+        _lastLoadedPage = 0;
+        _error = 'Could not load notifications. Pull to refresh to try again.';
+      } else {
+        _notifications = result.notifications;
+        _notificationsTotal = result.total;
+        _perPage = result.perPage;
+        _lastLoadedPage = result.page;
+        _unreadCount = _notifications.where((n) => !n.isRead).length;
+        DebugLogger.logNotifications(
+          'loadNotifications() done: ${_notifications.length} items on page '
+          '$_lastLoadedPage, total=$_notificationsTotal, unread=$_unreadCount',
+        );
+        _error = null;
+      }
+    } catch (e, stackTrace) {
+      final error = _errorHandler.parseError(
+        error: e,
+        stackTrace: stackTrace,
+        context: 'Load Notifications',
+      );
+      _error = error.getUserMessage();
+      _errorHandler.logError(error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Appends the next page from the API. No-op if nothing more or a load is in flight.
+  Future<void> loadMoreNotifications() async {
+    if (shouldDeferRemoteFetch ||
+        !hasMoreNotifications ||
+        _isLoadingMore ||
+        _isLoading) {
+      return;
+    }
+    _isLoadingMore = true;
+    _loadMoreError = null;
+    notifyListeners();
+
+    try {
+      final nextPage = _lastLoadedPage + 1;
+      final result = await _notificationService.fetchNotificationsPage(
+        page: nextPage,
+        perPage: _perPage,
+      );
+      if (result == null) {
+        _loadMoreError =
+            'Could not load more notifications. Check your connection and try again.';
+      } else {
+        _notificationsTotal = result.total;
+        _perPage = result.perPage;
+        _lastLoadedPage = result.page;
+        final existing = _notifications.map((n) => n.id).toSet();
+        for (final n in result.notifications) {
+          if (!existing.contains(n.id)) {
+            _notifications.add(n);
+            existing.add(n.id);
+          }
+        }
+        _unreadCount = _notifications.where((n) => !n.isRead).length;
+      }
+    } catch (e, stackTrace) {
+      final err = _errorHandler.parseError(
+        error: e,
+        stackTrace: stackTrace,
+        context: 'Load More Notifications',
+      );
+      _loadMoreError = err.getUserMessage();
+      _errorHandler.logError(err);
+    } finally {
+      _isLoadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshUnreadCount({AuthProvider? authProvider}) async {
+    if (shouldDeferRemoteFetch) {
+      notifyListeners();
+      return;
+    }
+    final authErrorHandler = AuthErrorHandler();
+
+    try {
+      final count = await authErrorHandler.executeWithAuthHandling<int>(
+        apiCall: () => _notificationService.getUnreadCount(),
+        context: 'Notifications',
+        defaultValue: 0,
+        silent: true, // Silent for background refresh
+      );
+
+      if (count != null) {
+        _unreadCount = count;
+        notifyListeners();
+      }
+    } catch (e) {
+      // Silently handle timeout/connection errors for unread count
+      // Don't show error to user as this is a background refresh
+      final errorMsg = e.toString();
+      if (errorMsg.contains('timeout') || errorMsg.contains('Timeout')) {
+        DebugLogger.logWarn('NOTIFICATIONS',
+            'Timeout refreshing unread count - will retry later');
+      } else if (errorMsg.contains('Failed host lookup') ||
+          errorMsg.contains('Connection refused')) {
+        DebugLogger.logWarn(
+            'NOTIFICATIONS', 'Cannot connect to server - will retry later');
+      } else if (!authErrorHandler.isAuthenticationError(e)) {
+        // Only log non-auth errors
+        DebugLogger.logWarn(
+            'NOTIFICATIONS', 'Error refreshing unread count: $e');
+      }
+      // Keep previous count on error instead of resetting to 0
+      // _unreadCount = 0; // Commented out to preserve last known count
+      notifyListeners();
+    }
+  }
+
+  Future<bool> markAsRead(List<int> notificationIds) async {
+    try {
+      _error = null;
+      final success = await _notificationService.markAsRead(notificationIds);
+      if (success) {
+        for (final id in notificationIds) {
+          final index = _notifications.indexWhere((n) => n.id == id);
+          if (index != -1) {
+            _notifications[index] =
+                _notifications[index].copyWith(isRead: true);
+          }
+        }
+        _unreadCount = _notifications.where((n) => !n.isRead).length;
+        notifyListeners();
+      }
+      return success;
+    } on AuthenticationException {
+      _error = 'Session expired. Please log in again.';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Error: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> markAsUnread(List<int> notificationIds) async {
+    try {
+      _error = null;
+      final success = await _notificationService.markAsUnread(notificationIds);
+      if (success) {
+        for (final id in notificationIds) {
+          final index = _notifications.indexWhere((n) => n.id == id);
+          if (index != -1) {
+            _notifications[index] =
+                _notifications[index].copyWith(isRead: false);
+          }
+        }
+        _unreadCount = _notifications.where((n) => !n.isRead).length;
+        notifyListeners();
+      }
+      return success;
+    } on AuthenticationException {
+      _error = 'Session expired. Please log in again.';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Error: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  Future<void> loadPreferences() async {
+    _isLoadingPreferences = true;
+    _preferencesError = null;
+    notifyListeners();
+
+    try {
+      _preferences = await _notificationService.getPreferences();
+      _preferences ??= NotificationPreferences(
+          emailNotifications: true,
+          notificationTypesEnabled: [],
+          notificationFrequency: 'instant',
+          digestDay: null,
+          digestTime: null,
+          soundEnabled: false,
+          pushNotifications: true,
+          pushNotificationTypesEnabled: [],
+        );
+    } catch (e) {
+      _preferencesError = e.toString();
+    } finally {
+      _isLoadingPreferences = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updatePreferences(NotificationPreferences preferences) async {
+    _preferencesError = null;
+    notifyListeners();
+    try {
+      final success = await _notificationService.updatePreferences(preferences);
+      if (success) {
+        _preferences = preferences;
+        notifyListeners();
+      }
+      return success;
+    } catch (e) {
+      _preferencesError = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void clearPreferencesError() {
+    _preferencesError = null;
+    notifyListeners();
+  }
+}

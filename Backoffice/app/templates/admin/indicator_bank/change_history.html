@@ -1,0 +1,290 @@
+{% extends "core/layout.html" %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <style>
+        /* Page-specific custom styling */
+
+        /* Change Type Badges */
+        .change-type {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            gap: 0.375rem;
+        }
+
+        .change-created {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .change-updated {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        .change-deleted {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .change-archived {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        /* Changes Details Styling */
+        .changes-list {
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .change-item {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-left: 3px solid #e5e7eb;
+            background-color: #f9fafb;
+            border-radius: 0.25rem;
+        }
+
+        .field-name {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .old-value {
+            color: #dc2626;
+            text-decoration: line-through;
+            background-color: #fee2e2;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+        }
+
+        .new-value {
+            color: #059669;
+            background-color: #d1fae5;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+        }
+
+
+
+        /* Table Row Hover Effect - handled by AG Grid */
+    </style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=_('Indicator Change History'),
+    icon='fas fa-history',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+        {'name': _('Change History')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Back to Indicator Bank'),
+            'url': url_for('system_admin.manage_indicator_bank'),
+            'classes': 'professional-action-btn'
+        }
+    ]
+) }}
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Main Table Card -->
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+        {% if changes %}
+            {{ ag_grid_container('changeHistoryGrid', loading_text=_('Loading...'), include_card=false) }}
+        {% else %}
+            <p class="text-gray-700 text-center py-4">No change history records found.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // Helper function to render change type badge
+    function renderChangeType(changeType) {
+        const type = (changeType || '').toLowerCase();
+        const typeUpper = (changeType || '').toUpperCase();
+        let icon = 'archive';
+        if (typeUpper === 'CREATED') icon = 'plus';
+        else if (typeUpper === 'UPDATED') icon = 'edit';
+        else if (typeUpper === 'DELETED') icon = 'trash';
+
+        return '<span class="change-type change-' + type + '">' +
+            '<i class="fas fa-' + icon + '"></i>' +
+            typeUpper +
+            '</span>';
+    }
+
+    // Helper function to render changes list
+    function renderChanges(changeDescription) {
+        if (!changeDescription) return '';
+        const changes = changeDescription.split('; ');
+        let html = '<div class="changes-list">';
+        if (changes.length > 1) {
+            changes.forEach(function(changeItem) {
+                html += '<div class="change-item">' +
+                    '<i class="fas fa-circle text-gray-400" style="font-size: 6px; margin-right: 8px;"></i>' +
+                    changeItem.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                    '</div>';
+            });
+        } else {
+            html += '<div class="change-item">' +
+                changeDescription.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                '</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // Transform changes data for ag-grid
+    const changesData = [
+        {% for change in changes %}
+        {
+            id: {{ change.id }},
+            created_at: {{ change.created_at|datetime_iso|tojson|safe }},
+            indicator_bank_id: {{ change.indicator_bank_id|tojson|safe }},
+            indicator_url: "{{ url_for('system_admin.view_indicator_bank', id=change.indicator_bank_id) }}",
+            name: {{ (change.name or 'N/A')|tojson|safe }},
+            change_type: {{ (change.change_type or '')|tojson|safe }},
+            changed_by_user_id: {{ (change.user_id if change.user_id else None)|tojson|safe }},
+            changed_by: {{ ((change.user.email if change.user else '') or ('User ID: ' + change.user_id|string if change.user_id else 'No User Info'))|tojson|safe }},
+            changed_by_email: {{ ((change.user.email if change.user else '') or '')|tojson|safe }},
+            changed_by_active: {{ (change.user.active if change.user else True)|tojson|safe }},
+            changed_by_profile_color: {{ ((change.user.profile_color if change.user and change.user.profile_color else '') or '')|tojson|safe }},
+            change_description: {{ (change.change_description or '')|tojson|safe }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        {
+            field: 'created_at',
+            headerName: '{{ _("Date") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateTime
+        },
+        {
+            field: 'indicator_bank_id',
+            headerName: '{{ _("Indicator ID") }}',
+            width: 120,
+            minWidth: 80,
+            maxWidth: 150,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const url = params.data.indicator_url || '#';
+                return '<a href="' + url + '" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">' + params.value + '</a>';
+            },
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'name',
+            headerName: '{{ _("Indicator Name") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'change_type',
+            headerName: '{{ _("Change Type") }}',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return renderChangeType(params.value);
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'changed_by',
+            headerName: '{{ _("Changed By") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'changed_by_user_id',
+                    nameField: 'changed_by',
+                    emailField: 'changed_by_email',
+                    activeField: 'changed_by_active',
+                    profileColorField: 'changed_by_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: false
+                });
+            }
+        },
+        {
+            field: 'change_description',
+            headerName: '{{ _("Changes") }}',
+            width: 400,
+            minWidth: 300,
+            maxWidth: 600,
+            filter: 'agTextColumnFilter',
+            sortable: false,
+            cellRenderer: function(params) {
+                return renderChanges(params.value);
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        var result = AgGridHelper.create('changeHistoryGrid', 'change-history', columnDefs, changesData, {
+            onReady: function(api) {
+                if (api) {
+                    api.applyColumnState({
+                        state: [{ colId: 'created_at', sort: 'desc' }],
+                        defaultState: { sort: null }
+                    });
+                }
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+    </script>
+{% endblock %}

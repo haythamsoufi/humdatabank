@@ -1,0 +1,498 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_profile_icon.html" import profile_icon %}
+{# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
+{% set pending_requests_count = pending_requests_count | default(0) %}
+{% set has_pending_requests = pending_requests_count > 0 %}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_review_access_requests = current_is_system_manager or has_permission('admin.access_requests.view') %}
+{% set can_manage_roles_permissions = current_is_system_manager or has_permission('admin.users.roles.assign') %}
+{# Roles & Permissions (RBAC management) is System Manager only (also enforced server-side). #}
+{% set can_manage_rbac = current_is_system_manager %}
+{% set can_create_user = current_is_system_manager or has_permission('admin.users.create') %}
+{% set can_edit_user = current_is_system_manager or has_permission('admin.users.edit') %}
+
+{% block title %}{{ _('Manage Users') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block content %}
+<style nonce="{{ csp_style_nonce() }}">
+.inactive-user-row {
+    opacity: 0.55;
+    background-color: #f3f4f6 !important;
+}
+.inactive-user-row:hover {
+    opacity: 0.75;
+}
+.inactive-user-row .profile-icon-circle {
+    filter: grayscale(0.7);
+}
+/* Empty queue: greyed-out header action; link still navigates to the review page */
+.executive-page-header .action-controls a.professional-action-btn-disabled.review-access-queue-empty {
+    cursor: pointer;
+}
+.executive-page-header .action-controls a.professional-action-btn-disabled.review-access-queue-empty:hover {
+    color: #6b7280;
+    background: #d1d5db;
+}
+</style>
+{% from "components/_page_header.html" import page_header %}
+
+{% set review_access_classes = (
+    'professional-action-btn professional-action-btn-orange'
+    if has_pending_requests else
+    'professional-action-btn professional-action-btn-disabled review-access-queue-empty'
+) %}
+
+{# Build page header actions dynamically based on permissions #}
+{% set header_actions = namespace(items=[]) %}
+{% if can_review_access_requests %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Review Access Requests') ~ ' (' ~ pending_requests_count ~ ')',
+        'url': url_for('user_management.access_requests'),
+        'icon': 'fas fa-flag',
+        'classes': review_access_classes
+    }) %}
+{% endif %}
+{% if can_manage_rbac %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Roles & Permissions'),
+        'url': url_for('rbac_management.manage_roles'),
+        'icon': 'fas fa-shield-alt',
+        'classes': 'professional-action-btn professional-action-btn-purple'
+    }) %}
+{% endif %}
+{% if can_create_user %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Add New User'),
+        'url': url_for('user_management.new_user'),
+        'icon': 'fas fa-plus',
+        'classes': 'professional-action-btn professional-action-btn-green'
+    }) %}
+{% endif %}
+
+{{ page_header(
+    title=_('Manage Users'),
+    icon='fas fa-users',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('User Management')}
+    ],
+    actions=header_actions.items
+) }}
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Main Table Card -->
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+        {% if users %}
+            {{ ag_grid_container('usersGrid', loading_text=_('Loading users data...'), include_card=false) }}
+        {% else %}
+            <p class="text-gray-700">{{ _('No users found.') }}</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // Transform users data for ag-grid
+    const usersData = [
+        {% for user in users %}
+        {% set user_roles = rbac_roles_by_user_id.get(user.id, []) if rbac_roles_by_user_id is defined else [] %}
+        {% set user_role_codes = user_roles|map(attribute='code')|list %}
+        {% set is_system_manager = 'system_manager' in user_role_codes %}
+        {% set has_admin_full = 'admin_full' in user_role_codes %}
+        {% set has_admin_core = 'admin_core' in user_role_codes %}
+        {% set has_assignment_viewer = 'assignment_viewer' in user_role_codes %}
+        {% set has_assignment_editor_submitter = 'assignment_editor_submitter' in user_role_codes %}
+        {% set has_assignment_approver = 'assignment_approver' in user_role_codes %}
+        {# Focal-point assignment roles (never counted toward Admin +; shown under Assignment:) #}
+        {% set assignment_role_codes = ['assignment_viewer', 'assignment_editor_submitter', 'assignment_approver'] %}
+        {# Granular admin viewer roles whose permissions are already covered by admin_core — ignore for Admin + #}
+        {% set admin_core_overlapping_viewer_codes = [
+            'admin_docs_viewer', 'admin_users_viewer', 'admin_templates_viewer',
+            'admin_assignments_viewer', 'admin_countries_viewer', 'admin_indicator_bank_viewer'
+        ] %}
+        {% set assignment_display_parts = [] %}
+        {# Viewer is redundant when Editor is present (editor covers viewer capability). #}
+        {% if 'assignment_viewer' in user_role_codes and 'assignment_editor_submitter' not in user_role_codes %}
+            {% set __discard = assignment_display_parts.append(_('Viewer')) %}
+        {% endif %}
+        {% if 'assignment_editor_submitter' in user_role_codes %}
+            {% set __discard = assignment_display_parts.append(_('Editor')) %}
+        {% endif %}
+        {% if 'assignment_approver' in user_role_codes %}
+            {% set __discard = assignment_display_parts.append(_('Approver')) %}
+        {% endif %}
+        {% set assignment_segment = (_('Assignment') ~ ': ' ~ assignment_display_parts|join(', ')) if assignment_display_parts else '' %}
+        {% set admin_role_count = namespace(count=0) %}
+        {% set extra_admin_role_count = namespace(count=0) %}
+        {% set other_non_admin_roles = [] %}
+        {% for role in user_roles %}
+            {% if role.code.startswith('admin_') %}
+                {% set admin_role_count.count = admin_role_count.count + 1 %}
+                {% if role.code != 'admin_core' and role.code not in admin_core_overlapping_viewer_codes %}
+                    {% set extra_admin_role_count.count = extra_admin_role_count.count + 1 %}
+                {% endif %}
+            {% elif role.code != 'system_manager' and role.code not in assignment_role_codes %}
+                {% set __discard = other_non_admin_roles.append(role.name) %}
+            {% endif %}
+        {% endfor %}
+        {% set is_admin_user = is_system_manager or admin_role_count.count > 0 %}
+        {% set has_essentials = has_admin_core %}
+        {# Admin + only when admin_core plus at least one admin_* role that adds capability beyond core (and beyond redundant viewers). #}
+        {% set has_more_than_essentials = has_admin_core and extra_admin_role_count.count > 0 %}
+        {% set has_many_admin_roles = admin_role_count.count >= 8 %}
+        {% set is_focal_point = (has_assignment_editor_submitter and (not is_admin_user)) %}
+        {# Focal Point already implies Editor (and viewer capability); only surface extra assignment e.g. Approver. #}
+        {% set focal_point_assignment_extra = '' %}
+        {% if is_focal_point and has_assignment_approver %}
+            {% set focal_point_assignment_extra = _('Assignment') ~ ': ' ~ _('Approver') %}
+        {% endif %}
+        {# Put Assignment:… on its own line when combined with a primary role or other role names. #}
+        {% set other_non_admin_joined = (other_non_admin_roles|join(', ')) if other_non_admin_roles else '' %}
+        {% set primary_role_line = '' %}
+        {% set role_tooltip_text = '' %}
+        {% set role_display_text = '' %}
+        {% if is_system_manager %}
+            {% set primary_role_line = _('System Manager') ~ ((' · ' ~ other_non_admin_joined) if other_non_admin_joined else '') %}
+            {% set role_display_text = primary_role_line
+                ~ (('\n' ~ assignment_segment) if assignment_segment else '') %}
+        {% elif has_admin_full %}
+            {% set primary_role_line = _('Full Admin') ~ ((' · ' ~ other_non_admin_joined) if other_non_admin_joined else '') %}
+            {% set role_display_text = primary_role_line
+                ~ (('\n' ~ assignment_segment) if assignment_segment else '') %}
+        {% elif is_focal_point %}
+            {% set primary_role_line = _('Focal Point') ~ ((' · ' ~ other_non_admin_joined) if other_non_admin_joined else '') %}
+            {% set role_display_text = primary_role_line
+                ~ (('\n' ~ focal_point_assignment_extra) if focal_point_assignment_extra else '') %}
+        {% elif has_essentials %}
+            {% set admin_label = _('Admin +') if has_more_than_essentials else _('Admin') %}
+            {% set primary_role_line = admin_label ~ ((' · ' ~ other_non_admin_joined) if other_non_admin_joined else '') %}
+            {% set role_display_text = primary_role_line
+                ~ (('\n' ~ assignment_segment) if assignment_segment else '') %}
+            {% set essentials_lines = [
+                (_('Admin +') if has_more_than_essentials else _('Admin')) ~ ' ' ~ _('includes:'),
+                '- ' ~ _('Users') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
+                '- ' ~ _('Templates') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
+                '- ' ~ _('Assignments') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
+                '- ' ~ _('Countries & Organization') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
+                '- ' ~ _('Indicator Bank') ~ ': ' ~ _('View'),
+            ] %}
+            {% if assignment_display_parts %}
+                {% set essentials_lines = essentials_lines + [_('Assignment (data entry)') ~ ': ' ~ assignment_display_parts|join(', ')] %}
+            {% endif %}
+            {% if other_non_admin_roles %}
+                {% set essentials_lines = essentials_lines + [_('Also:') ~ ' ' ~ (other_non_admin_roles|join(', '))] %}
+            {% endif %}
+            {% set role_tooltip_text = essentials_lines|join('\n') %}
+        {% elif has_many_admin_roles %}
+            {% set primary_role_line = _('Admin (Multiple)') ~ ((' · ' ~ other_non_admin_joined) if other_non_admin_joined else '') %}
+            {% set role_display_text = primary_role_line
+                ~ (('\n' ~ assignment_segment) if assignment_segment else '') %}
+        {% else %}
+            {% set rest_names = [] %}
+            {% for role in user_roles %}
+                {% if role.code != 'system_manager' and role.code not in assignment_role_codes %}
+                    {% set __discard = rest_names.append(role.name) %}
+                {% endif %}
+            {% endfor %}
+            {% set rest_joined = rest_names|join(', ') %}
+            {% if rest_joined and assignment_segment %}
+                {% set role_display_text = rest_joined ~ '\n' ~ assignment_segment %}
+            {% elif assignment_segment %}
+                {% set role_display_text = assignment_segment %}
+            {% elif rest_joined %}
+                {% set role_display_text = rest_joined %}
+            {% else %}
+                {% set role_display_text = _('No roles') %}
+            {% endif %}
+        {% endif %}
+        {
+            id: {{ user.id }},
+            name: {{ (user.name or '')|tojson|safe }},
+            email: {{ (user.email or '')|tojson|safe }},
+            title: {{ (user.title or '')|tojson|safe }},
+            rbac_roles: {{ (user_roles|map(attribute='name')|list)|tojson|safe }},
+            role_codes: {{ user_role_codes|tojson|safe }},
+            role_display: {{ role_display_text|tojson|safe }},
+            role_tooltip: {{ role_tooltip_text|tojson|safe }},
+            active: {{ user.active|tojson|safe }},
+            profile_color: {{ (user.profile_color if user.profile_color and user.profile_color != '#3B82F6' else user.generate_profile_color())|tojson|safe }},
+            is_system_manager: {{ is_system_manager|tojson|safe }},
+            is_admin_user: {{ is_admin_user|tojson|safe }},
+            country_count: {{ (user_countries_by_id.get(user.id, [])|length) }},
+            countries: [
+                {% for country_name in user_countries_by_id.get(user.id, []) %}
+                {{ country_name|tojson|safe }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            branch_count: {{ entity_counts_by_user_id.get(user.id, {}).get('ns_branch', 0) }},
+            subbranch_count: {{ entity_counts_by_user_id.get(user.id, {}).get('ns_subbranch', 0) }},
+            localunit_count: {{ entity_counts_by_user_id.get(user.id, {}).get('ns_localunit', 0) }},
+            division_count: {{ entity_counts_by_user_id.get(user.id, {}).get('division', 0) }},
+            department_count: {{ entity_counts_by_user_id.get(user.id, {}).get('department', 0) }},
+            regional_count: {{ entity_counts_by_user_id.get(user.id, {}).get('regional_office', 0) }},
+            cluster_count: {{ entity_counts_by_user_id.get(user.id, {}).get('cluster_office', 0) }},
+            countries_by_region: {
+                {% for region, countries in countries_by_region.items() %}
+                {{ region|tojson|safe }}: [
+                    {% for country in countries %}
+                    {{ country.name|tojson|safe }}{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ]{% if not loop.last %},{% endif %}
+                {% endfor %}
+            },
+            total_countries: {{
+                countries_by_region.values() | map('length') | sum
+            }},
+            {# Only System Managers can edit other admins; admins can still edit themselves. #}
+            {% set can_edit_target_user = can_edit_user and (current_is_system_manager or (not is_admin_user) or (current_user.is_authenticated and user.id == current_user.id)) %}
+            edit_url: "{{ url_for('user_management.edit_user', user_id=user.id) if can_edit_target_user else '' }}",
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+
+    // Helper function to render entities
+    function renderEntities(user) {
+        if (user.is_system_manager) {
+            return '<span class="font-medium text-blue-600">{{ _("Global") }}</span>';
+        }
+
+        let html = '';
+        let displayedAny = false;
+
+        // Handle countries
+        if (user.country_count > 0) {
+            displayedAny = true;
+            if (user.country_count === 1) {
+                html += user.countries[0];
+            } else {
+                const totalCountries = Object.values(user.countries_by_region || {}).reduce((sum, countries) => sum + (countries ? countries.length : 0), 0);
+                if (user.country_count === totalCountries) {
+                    html += '<span class="font-medium text-blue-600">{{ _("Global") }}</span>';
+                } else {
+                    // Check for complete regions
+                    let hasCompleteRegion = false;
+                    const regions = {};
+                    for (const [region, countries] of Object.entries(user.countries_by_region || {})) {
+                        const regionTotal = countries ? countries.length : 0;
+                        const regionUserCount = countries ? countries.filter(c => user.countries.includes(c)).length : 0;
+                        if (regionTotal > 0) {
+                            regions[region] = { total: regionTotal, user: regionUserCount };
+                            if (regionUserCount === regionTotal) {
+                                hasCompleteRegion = true;
+                                html += `<div class="font-medium text-green-600">${region}</div>`;
+                            }
+                        }
+                    }
+                    if (!hasCompleteRegion) {
+                        html += `<span class="cursor-help" title="${user.countries.join(', ')}">${user.country_count} {{ _("countries") }}</span>`;
+                    } else {
+                        const completeRegionsTotal = Object.values(regions).reduce((sum, r) => sum + (r.user === r.total ? r.total : 0), 0);
+                        if (user.country_count > completeRegionsTotal) {
+                            html += `<div class="text-gray-500 text-xs mt-1">+${user.country_count - completeRegionsTotal} {{ _("other countries") }}</div>`;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle other entities
+        if (user.branch_count > 0) {
+            displayedAny = true;
+            html += `<div class="text-gray-700 text-xs">${user.branch_count} {{ _("branches") }}</div>`;
+        }
+        if (user.subbranch_count > 0) {
+            displayedAny = true;
+            html += `<div class="text-gray-700 text-xs">${user.subbranch_count} {{ _("sub-branches") }}</div>`;
+        }
+        if (user.localunit_count > 0) {
+            displayedAny = true;
+            html += `<div class="text-gray-700 text-xs">${user.localunit_count} {{ _("local units") }}</div>`;
+        }
+        if (user.division_count > 0) {
+            displayedAny = true;
+            html += `<div class="text-gray-700 text-xs">${user.division_count} {{ _("divisions") }}</div>`;
+        }
+        if (user.department_count > 0) {
+            displayedAny = true;
+            html += `<div class="text-gray-700 text-xs">${user.department_count} {{ _("departments") }}</div>`;
+        }
+        if (user.regional_count > 0) {
+            displayedAny = true;
+            html += `<div class="text-gray-700 text-xs">${user.regional_count} {{ _("regional offices") }}</div>`;
+        }
+        if (user.cluster_count > 0) {
+            displayedAny = true;
+            html += `<div class="text-gray-700 text-xs">${user.cluster_count} {{ _("clusters") }}</div>`;
+        }
+
+        return displayedAny ? html : '-';
+    }
+
+    var escapeHtml = AgGridRenderers.escapeHtml;
+    var escapeHtmlAttr = AgGridRenderers.escapeHtmlAttr;
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        {
+            field: 'id',
+            headerName: '{{ _("ID") }}',
+            width: 80,
+            minWidth: 80,
+            maxWidth: 120,
+            lockVisible: true,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            sort: 'asc',
+            sortIndex: 0,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'name',
+            headerName: '{{ _("User") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                var inner = AgGridRenderers.userHoverCell(
+                    { value: params.data, data: params.data },
+                    {
+                        showEmail: false,
+                        countriesCountField: 'country_count'
+                    }
+                );
+                var editUrl = params.data.edit_url || '';
+                if (editUrl) {
+                    return '<a href="' + escapeHtmlAttr(editUrl) + '" class="block hover:bg-gray-50 rounded -mx-1 px-1" style="text-decoration:none;color:inherit;">' + inner + '</a>';
+                }
+                return inner;
+            },
+            cellStyle: {
+                'white-space': 'normal',
+                'word-wrap': 'break-word',
+                'overflow-wrap': 'break-word',
+                'line-height': '1.4',
+                'overflow': 'hidden',
+                'max-width': '100%'
+            }
+        },
+        {
+            field: 'email',
+            headerName: '{{ _("Email") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'title',
+            headerName: '{{ _("Title") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            }
+        },
+        {
+            field: 'role_display',
+            headerName: '{{ _("Role") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const text = params.value || '-';
+                const tooltip = params?.data?.role_tooltip || '';
+                if (!tooltip) return escapeHtml(text);
+                return `<span class="cursor-help" title="${escapeHtmlAttr(tooltip)}">${escapeHtml(text)}</span>`;
+            },
+            cellStyle: {
+                'white-space': 'pre-line',
+                'word-wrap': 'break-word',
+                'overflow-wrap': 'break-word',
+                'line-height': '1.4'
+            }
+        },
+        {
+            field: 'active',
+            headerName: '{{ _("Status") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.statusBadge,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'entities',
+            headerName: '{{ _("Entities") }}',
+            width: 300,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: false,
+            cellRenderer: function(params) {
+                return renderEntities(params.data);
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        var result = AgGridHelper.create('usersGrid', 'users', columnDefs, usersData, {
+            gridOptions: {
+                getRowClass: function(params) {
+                    if (!params.data.active) {
+                        return 'inactive-user-row';
+                    }
+                    return null;
+                }
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+
+    </script>
+{% endblock %}

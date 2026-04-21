@@ -1,0 +1,782 @@
+[
+  {
+    "id": 1,
+    "term": "advocacy",
+    "meaning": "Efforts to influence public policy, laws, and regulations to better protect and assist people on the move (e.g. addressing barriers that discriminate or restrict assistance or protection to people on the move. These barriers may be due to discriminatory laws or policies, due to impractical documentation requirements, language barriers, fear of arrest and deportation, or other reasons)",
+    "language": "en"
+  },
+  {
+    "id": 2,
+    "term": "analysis",
+    "meaning": "Examination and interpretation of data to generate insights and inform decision-making.",
+    "language": "en"
+  },
+  {
+    "id": 3,
+    "term": "assessment",
+    "meaning": "Enquiries conducted to gather information and analyze the situation during operations.",
+    "language": "en"
+  },
+  {
+    "id": 4,
+    "term": "authorities",
+    "meaning": "Agencies usually, but not always, state controlled, having the power or right to give orders, make decisions, and enforce obedience; moral, legal, or political supremacy in the geographical area.",
+    "language": "en"
+  },
+  {
+    "id": 5,
+    "term": "awareness raising",
+    "meaning": "Campaigns and activities aimed at increasing public understanding and support for needs and rights.",
+    "language": "en"
+  },
+  {
+    "id": 6,
+    "term": "beneficiaries",
+    "meaning": "Those who are assumed to benefit from an activity, distribution, training, etc.",
+    "language": "en"
+  },
+  {
+    "id": 7,
+    "term": "blood donation / banks",
+    "meaning": "The action or process of giving blood for transfusion; an instance of this; a quantity of blood given for this purpose.",
+    "language": "en"
+  },
+  {
+    "id": 8,
+    "term": "campaigns",
+    "meaning": "Campaigns should be seen as distinct from routine activities (e.g. routine childhood immunidation versus immunisation campaigns). A coordinated series of events, actions, etc., aimed at achieving a goal, typically by influencing or persuading others to adopt a particular stance, take a specific action, etc.; (now) esp. such a course of action conducted by professionals in fields such as technical departments of National Societies. Also: the period during which such a course of action is under way. Frequently with modifier indicating the type of campaign.",
+    "language": "en"
+  },
+  {
+    "id": 9,
+    "term": "cash",
+    "meaning": "Cash, in programming or response, refers to the use of financial aid with the aim of helping households or individuals meet their everyday needs, or else access some form of service without restricting their choice. It should be seen as distinct from the direct funding of services by an agency (unless the service provider is the individual or household being assisted). Cash can only be understood as conditional if the payment is withheld prior to some act being undertaken (such as attending an antenatal care consultation). There are no cash programmes, there are only programmes or responses which employ cash to achieve an aim or objective.",
+    "language": "en"
+  },
+  {
+    "id": 10,
+    "term": "child safeguarding",
+    "meaning": "Refers to the broad obligation on personnel, partners, suppliers, and contractors  to ensure that the design and delivery of programmes and organisational operations do not expose children to adverse impacts, including the risk of violence, abuse, exploitation, or neglect and that any concerns about children’s safety within the communities where they work are appropriately reported.",
+    "language": "en"
+  },
+  {
+    "id": 11,
+    "term": "cholera",
+    "meaning": "An acute infectious disease, usually waterborne and frequently occurring in epidemics or pandemics, caused by the bacterium Vibrio cholerae, characterized by vomiting and profuse watery diarrhoea and often resulting in dehydration, shock, and death if untreated. Treatment is rehydration. Often included within a class of AWD or acute watery diarrhoea which has multiple causes including malnutrition, stress and other infections.",
+    "language": "en"
+  },
+  {
+    "id": 12,
+    "term": "Climate change adaptation (CCA)",
+    "meaning": "Refers to actions that reduce the negative impacts of the current and predicted future impacts of climate change, while taking advantage of potential new opportunities. This has a focus on increasing the resilience of communities to both current and future climate hazards.  Climate-smart disaster risk reduction (DRR) and anticipatory action to climate hazards refer to efforts to factor climate information into disaster risk assessments, reduce the exposure and vulnerability of people and communities to risks that might arise from climate-related disasters and preventing the negative impacts of climate-related disasters before they are felt. Examples include: Community-based disaster risk reduction and preparedness that address climate-related risks; Enhancing knowledge and skills of local communities (including schools) on the risks related to climate change; Mangrove restoration to reduce risks from more intense and frequent storm surges or coastal flooding due to climate change; Developing or contributing to national or local early warning systems and preparedness and anticipatory action plans for climate-related hazards; Climate-smart agriculture and climate-smart livelihoods to reduce food insecurity due to drought; Activities to reduce current and future climate-induced displacement; Activities to address health impacts of climate change, such as changing risks of vector-borne diseases (e.g. in new regions or different seasonal timeframes) or integrated water management approaches to WASH in the face of droughts/floods",
+    "language": "en"
+  },
+  {
+    "id": 13,
+    "term": "communication",
+    "meaning": "Use of media, publications, and other channels to disseminate information and shape public perceptions and attitudes (e.g. reducing stigma, discrimination, xenophobia, and tensions. For example, people in host communities may be resistant to migrants travelling along routes that traverse their communities, or may be resistant to humanitarian actors supporting migrants).",
+    "language": "en"
+  },
+  {
+    "id": 14,
+    "term": "communication strategies",
+    "meaning": "Developing communication plans to disseminate information to affected populations and stakeholders.",
+    "language": "en"
+  },
+  {
+    "id": 15,
+    "term": "communities",
+    "meaning": "Villages, towns, or specific population groups targeted by the IFRC Network.",
+    "language": "en"
+  },
+  {
+    "id": 16,
+    "term": "community-based",
+    "meaning": "Designating a facility, service, etc., run by, in or for a particular community.",
+    "language": "en"
+  },
+  {
+    "id": 17,
+    "term": "community-based surveillance",
+    "meaning": "Community-based surveillance (CBS) is defined by the WHO as: ‘…the systematic detection and reporting of events of public health significance within a community by community members’.",
+    "language": "en"
+  },
+  {
+    "id": 18,
+    "term": "consultations",
+    "meaning": "The action of consulting or taking counsel together; deliberation, conference, especially when with a health or mental health professional. In data, tallies of consultations may include the same person more than once, and so any derived statistics should not be assumed to be tallies of people.",
+    "language": "en"
+  },
+  {
+    "id": 19,
+    "term": "contingency plans",
+    "meaning": "Detailed action plans for immediate response, including shelter, food, health, and protection services.",
+    "language": "en"
+  },
+  {
+    "id": 20,
+    "term": "control",
+    "meaning": "To restrain from action, hold in check; (in later use) esp. to curb the growth or spread of. Health and one case will be coercion)",
+    "language": "en"
+  },
+  {
+    "id": 21,
+    "term": "coordination mechanisms",
+    "meaning": "Establishing coordination frameworks with government agencies, international organizations, and other stakeholders.",
+    "language": "en"
+  },
+  {
+    "id": 22,
+    "term": "crisis response",
+    "meaning": "Strategies for responding to crises, including emergency aid and long-term support.",
+    "language": "en"
+  },
+  {
+    "id": 23,
+    "term": "cultural competency",
+    "meaning": "Promoting cultural awareness and sensitivity in dealing with diverse migrant and displaced populations.",
+    "language": "en"
+  },
+  {
+    "id": 24,
+    "term": "data",
+    "meaning": "Strictly plural. An item of (chiefly numerical) information, esp. one obtained by scientific work, a number of which are typically collected together for reference, analysis, or calculation.",
+    "language": "en"
+  },
+  {
+    "id": 25,
+    "term": "data collection",
+    "meaning": "Systematic gathering of quantitative and qualitative data on the needs, conditions, and movements of people.",
+    "language": "en"
+  },
+  {
+    "id": 26,
+    "term": "denominator",
+    "meaning": "Arithmetic and Algebra. The number written below the line in a vulgar fraction, which gives the denomination or value of the parts into which the integer is divided; the corresponding expression in an algebraical fraction, denoting the divisor. (Correlative to Numerator.)",
+    "language": "en"
+  },
+  {
+    "id": 27,
+    "term": "dialogue",
+    "meaning": "Structured conversations with stakeholders, including governments, international organizations, and civil society, to discuss and address their issues.",
+    "language": "en"
+  },
+  {
+    "id": 28,
+    "term": "disaster",
+    "meaning": "An event or occurrence of a ruinous or very distressing nature; a calamity; esp. a sudden accident or natural catastrophe that causes great damage or loss of life.",
+    "language": "en"
+  },
+  {
+    "id": 29,
+    "term": "displacement issues",
+    "meaning": "Addressing internal and cross-border displacement, including IDPs and refugees.",
+    "language": "en"
+  },
+  {
+    "id": 30,
+    "term": "distribution",
+    "meaning": "The action of dividing and dealing out or bestowing in portions among a number of recipients; apportionment, allotment. Does not include, unless otherwise stated, efforts to maintain or sustain impact.",
+    "language": "en"
+  },
+  {
+    "id": 31,
+    "term": "documentation support",
+    "meaning": "Assisting individuals in obtaining, replacing, or retaining important documentation such as ID cards, birth certificates, and travel documents.",
+    "language": "en"
+  },
+  {
+    "id": 32,
+    "term": "educational facilities",
+    "meaning": "Schools, colleges, universities, and other institutions where formal education is provided.",
+    "language": "en"
+  },
+  {
+    "id": 33,
+    "term": "effectiveness",
+    "meaning": "Is the intervention achieving its objectives. The extent to which the intervention achieved, or is expected to achieve, its objectives and its results, including any differential results across groups. Note: Analysis of effectiveness involves taking account of the relative importance of the objectives or results. The term effectiveness is also used as an aggregate measure of the extent to which an intervention has achieved or is expected to achieve relevant and sustainable impacts, efficiently and coherently. (OECD)",
+    "language": "en"
+  },
+  {
+    "id": 34,
+    "term": "emergency",
+    "meaning": "A juncture that arises or ‘turns up’; esp. a state of things unexpectedly arising, and urgently demanding immediate action.",
+    "language": "en"
+  },
+  {
+    "id": 35,
+    "term": "environmental",
+    "meaning": "Of or relating to the surroundings, physical context, or (particular) environment of a person, animal, or thing. Concerned with or relating to the protection of the environment, esp. against the harmful effects of human activity.",
+    "language": "en"
+  },
+  {
+    "id": 36,
+    "term": "evaluation",
+    "meaning": "Evaluation is the systematic application of scientific methods to assess the design, implementation, improvement or outcomes of a project or programme.",
+    "language": "en"
+  },
+  {
+    "id": 37,
+    "term": "facilities",
+    "meaning": "Generally, any location where healthcare is provided. Health facilities range from small health clinics/centres and doctors' offices to urgent care centres and large hospitals with elaborate emergency rooms and trauma centres. The term may also occasionally be used informally to include pathology labs, blood banks, and auxiliary sites which do not provide care to patients.",
+    "language": "en"
+  },
+  {
+    "id": 38,
+    "term": "family",
+    "meaning": "A group of people consisting of one set of parents and their children, whether living together or not. In wider sense: any group of people connected by blood, marriage, adoption, etc. Distinct from Household.",
+    "language": "en"
+  },
+  {
+    "id": 39,
+    "term": "family reunification",
+    "meaning": "Facilitated processes to reunite separated family members.",
+    "language": "en"
+  },
+  {
+    "id": 40,
+    "term": "FDRS",
+    "meaning": "Federation-wide databank and reporting system. FDRS is an IFRC platform dedicated to providing insights on the Red Cross Red Crescent National Societies. The data is gathered through a yearly data collection from National Societies.",
+    "language": "en"
+  },
+  {
+    "id": 41,
+    "term": "feedback",
+    "meaning": "Information about the result of a process, experiment, etc., as a response from users or target groups. Also the modification, adjustment, or control of a process or system (as a social situation or a biological mechanism) by a result or effect of the process, esp. by a difference between a desired and an actual result.",
+    "language": "en"
+  },
+  {
+    "id": 42,
+    "term": "first aid",
+    "meaning": "Help given to a sick or injured person until full medical treatment is available. Also more fully first aid to the injured.",
+    "language": "en"
+  },
+  {
+    "id": 43,
+    "term": "gender and diversity analysis",
+    "meaning": "Helps to understand how opportunities and inequalities may be affected based on a person’s sex or the gender that people identify with. It examines relationships between women and men in their diversity – their roles, responsibilities, access to and control of resources and constraints they face relative to each other. It examines the distinct reality of being a particular age or age group, a person with a disability and other contextual factors including, but not limited to, sexual orientation, HIV status, socio-economic status, religion, faith, nationality and ethnic origin (including minority and migrant groups).",
+    "language": "en"
+  },
+  {
+    "id": 44,
+    "term": "health",
+    "meaning": "The World Health Organization (WHO) defines health as \"a state of complete physical, mental, and social well-being and not merely the absence of disease or infirmity\". This definition implies that mental health is more than just the absence of mental disorders or disabilities.",
+    "language": "en"
+  },
+  {
+    "id": 47,
+    "term": "healthcare",
+    "meaning": "The provision of care for the health of a person, community, etc., esp. that provided by trained health professionals to prevent and treat illness, injury, etc. As a mainly medical approach this should be seen as narrower than health.",
+    "language": "en"
+  },
+  {
+    "id": 45,
+    "term": "health outreach",
+    "meaning": "Any type of health service that mobilizes health workers to provide services to the population or to other health workers, away from the location where they usually work and live. Outreach services can be organized on a permanent basis with health workers hired to serve in remote places according to a set schedule. Outreach services can result from a voluntary or a mandatory approach. When mandatory, the activities would be part of the health worker's job description and fully acknowledged in his/her activity report. Outreach services could also be included in the health system's service delivery options and should therefore be fully supported to ensure success. (WHO)",
+    "language": "en"
+  },
+  {
+    "id": 46,
+    "term": "health services",
+    "meaning": "Providing medical care, vaccinations, and health education.",
+    "language": "en"
+  },
+  {
+    "id": 48,
+    "term": "host communities",
+    "meaning": "Communities or populations that receive and provide refuge, support, and resources to displaced persons (such as IDPs and refugees) and migrants. Host communities may include local residents, local authorities, and organizations that play a significant role in integrating and supporting displaced populations and migrants by offering shelter, services, and social inclusion initiatives. Host communities often face additional challenges as they accommodate the needs of new arrivals.",
+    "language": "en"
+  },
+  {
+    "id": 49,
+    "term": "household",
+    "meaning": "The inhabitants of a house considered collectively; a group of people (esp. a family) living together as a unit; a domestic establishment. To define the limits of a household from other households in the same property, it is often assumed to be those who eat and live together. A family can be made up of more than one household, and a household can contain more than one family. (Unicef). Distinct from Family.",
+    "language": "en"
+  },
+  {
+    "id": 50,
+    "term": "humanitarian",
+    "meaning": "As an adjective, designating an event or situation which causes or involves (widespread) human suffering, esp. one which requires the provision of aid or support on a large scale.",
+    "language": "en"
+  },
+  {
+    "id": 51,
+    "term": "Humanitarian Service Point (HSP)",
+    "meaning": "A safe and neutral physical space free of interference from government authorities operated by the IFRC Network that provides essential assistance and protection services. They can also safely refer migrants to more specialized assistance if they require support with more complex needs. HSPs can be mobile or they may be in fixed locations (can include local branches, gazebos, tents, kiosks, information desk or equiped buses or vans), including along migratory routes.",
+    "language": "en"
+  },
+  {
+    "id": 52,
+    "term": "hygiene",
+    "meaning": "Hygiene is the practice of maintaining health and preventing the spread of disease. It includes a variety of practices, such as: hand hygiene (its most common use in the Movement); environmental cleaning; sterilization; water and sanitation; safe disposal of medical waste. Hygiene is different from sanitation, which is about creating an environment free from pathogens. Sanitation is a necessary precondition for hygiene, but the two terms are not interchangeable.",
+    "language": "en"
+  },
+  {
+    "id": 53,
+    "term": "hygiene promotion",
+    "meaning": "Hygiene promotion is the term used to describe activities that aim to encourage changes of behaviour with the ultimate goal of preventing water- and sanitation- related diseases. It has been defined as “the planned and systematic attempt to enable people to take action to prevent water and sanitation related illness, and to maximize the benefits of water and sanitation facilities” (Ferron et al., 2007)",
+    "language": "en"
+  },
+  {
+    "id": 54,
+    "term": "IFRC",
+    "meaning": "The International Federation of Red Cross and Red Crescent Societies (IFRC) is the world’s largest humanitarian network. The IFRC Secretariat supports local Red Cross and Red Crescent action in countries, whose volunteers work for the good of humanity.",
+    "language": "en"
+  },
+  {
+    "id": 55,
+    "term": "impact",
+    "meaning": "In evaluation, what difference does the intervention make? The extent to which the intervention has generated or is expected to generate significant positive or negative, intended or unintended, higher-level effects. Note: Impact addresses the ultimate significance and potentially transformative effects of the intervention. It seeks to identify the social, environmental and economic effects of the intervention that are longer term or broader in scope than those already captured under the effectiveness criterion. Beyond the immediate results, this criterion seeks to capture the indirect, secondary and potential consequences of the intervention. It does so by examining the holistic and enduring changes in systems or norms, and potential effects on people’s wellbeing, human rights, gender equality, and the environment. (OECD)",
+    "language": "en"
+  },
+  {
+    "id": 56,
+    "term": "information dissemination",
+    "meaning": "Providing accurate and timely information about available services, rights, and safety (e.g. safe migration routes).",
+    "language": "en"
+  },
+  {
+    "id": 57,
+    "term": "information management",
+    "meaning": "Systems and processes for organizing, storing, and sharing data and information to support humanitarian operations.",
+    "language": "en"
+  },
+  {
+    "id": 58,
+    "term": "infrastructure",
+    "meaning": "The basic systems and services, such as transport, health, water, sanitation and power supplies, that a country or organization uses in order to work effectively.",
+    "language": "en"
+  },
+  {
+    "id": 59,
+    "term": "infrastructure improvements",
+    "meaning": "Upgrading or establishing facilities and logistics systems to better support migrants on the move.",
+    "language": "en"
+  },
+  {
+    "id": 60,
+    "term": "input",
+    "meaning": "Inputs are the things we use to deliver projects and services such as human resources, money, and equipment such as public address systems among others.",
+    "language": "en"
+  },
+  {
+    "id": 61,
+    "term": "integration into strategic planning",
+    "meaning": "The process of incorporating population considerations into the strategic plans and frameworks of National Societies. This ensures that their needs are addressed in long-term strategies and operational plans.",
+    "language": "en"
+  },
+  {
+    "id": 62,
+    "term": "integration programs",
+    "meaning": "Facilitating the integration of migrants and displaced persons into host communities through language courses, cultural orientation, and community engagement activities.",
+    "language": "en"
+  },
+  {
+    "id": 63,
+    "term": "internally displaced person or populations (IDP)",
+    "meaning": "Individuals or groups of people who have been forced to flee their homes or places of habitual residence due to conflict, violence, human rights violations, natural or man-made disasters, but who remain within their country's borders. Unlike refugees, IDPs have not crossed an international border and are still subject to the laws and jurisdiction of their own country.",
+    "language": "en"
+  },
+  {
+    "id": 64,
+    "term": "Large scale population movements",
+    "meaning": "Significant migration or displacement events that impact large numbers of people, often due to conflict, natural disasters, economic crises, or other emergencies.",
+    "language": "en"
+  },
+  {
+    "id": 65,
+    "term": "learning spaces",
+    "meaning": "Informal educational settings such as community centers, libraries, and temporary learning spaces set up during emergencies.",
+    "language": "en"
+  },
+  {
+    "id": 66,
+    "term": "legal aid",
+    "meaning": "Providing legal information, counseling, and representation to ensure that displaced and migrant and other individuals understand and can exercise their rights.",
+    "language": "en"
+  },
+  {
+    "id": 67,
+    "term": "legal and policy frameworks",
+    "meaning": "National and international laws and policies governing migration and displacement.",
+    "language": "en"
+  },
+  {
+    "id": 68,
+    "term": "legal assistance",
+    "meaning": "Assisting with legal advice, documentation, and representation.",
+    "language": "en"
+  },
+  {
+    "id": 69,
+    "term": "livelihood support",
+    "meaning": "Providing training, employment opportunities, and financial assistance.",
+    "language": "en"
+  },
+  {
+    "id": 70,
+    "term": "logs",
+    "meaning": "Electronic or paper record of activities, participants, movement, etc.",
+    "language": "en"
+  },
+  {
+    "id": 71,
+    "term": "medical",
+    "meaning": "The provision of care for the health of a person, community, etc., provided by trained health professionals to prevent and treat illness, injury, etc. This should be seen as narrower than health.",
+    "language": "en"
+  },
+  {
+    "id": 72,
+    "term": "mental health",
+    "meaning": "Mental health is a state of mental well-being that enables people to cope with the stresses of life, realize their abilities, learn well and work well, and contribute to their community. It is an integral component of health and well-being that underpins our individual and collective abilities to make decisions, build relationships and shape the world we live in. Mental health is a basic human right. And it is crucial to personal, community and socio-economic development. Mental health is more than the absence of mental disorders. It exists on a complex continuum, which is experienced differently from one person to the next, with varying degrees of difficulty and distress and potentially very different social and clinical outcomes. (WHO)",
+    "language": "en"
+  },
+  {
+    "id": 73,
+    "term": "MHPSS",
+    "meaning": "Mental health and psychosocial support (MHPSS) refers to any type of local or outside support that aims to protect or promote psychosocial well-being or prevent or treat mental health conditions. MHPSS is not confined to a single sector but requires a multi-sectoral approach with involvement of partners in health, education and protection (community-based protection, child protection and GBV).",
+    "language": "en"
+  },
+  {
+    "id": 74,
+    "term": "migrants",
+    "meaning": "Persons who move from one country to another or within their own country, usually to improve their living conditions, for work, education, family reunification, or other reasons. International migrants are individuals who move across international borders. Internal migrants are individuals who move within their own country, from one region to another. Migrants do not include those forcibly displaced, like refugees and IDPs, but encompass a broad category of individuals who relocate voluntarily for various reasons.",
+    "language": "en"
+  },
+  {
+    "id": 75,
+    "term": "migration and displacement needs assessment",
+    "meaning": "A systematic process undertaken by National Societies to identify the needs, vulnerabilities, and priorities of populations affected by migration and displacement. This includes data collection, analysis, and reporting on the specific challenges faced by these populations.",
+    "language": "en"
+  },
+  {
+    "id": 76,
+    "term": "migration dynamics",
+    "meaning": "Understanding the causes, trends, and patterns of migration.",
+    "language": "en"
+  },
+  {
+    "id": 77,
+    "term": "mobile health services/clinics/units",
+    "meaning": "A mobile health unit or team is provided with equipment necessary for primary health care to reach usually remote areas where there are no health's centers. Usually they function from local premises not the vehicle. The mobile clinic has a medical team that may comprise a medical doctor or medical assistant, nurse, pharmacist, midwife and a health worker in various combinations.",
+    "language": "en"
+  },
+  {
+    "id": 78,
+    "term": "monitoring",
+    "meaning": "Project monitoring involves tracking a project’s metrics, progress, and associated tasks to ensure everything is completed on time, on budget, and according to project requirements and standards. It’s also about making sure work doesn’t go beyond the initial project scope. Project monitoring also includes recognizing and identifying roadblocks or issues that might arise during the project’s execution, and taking action to rectify these problems.",
+    "language": "en"
+  },
+  {
+    "id": 79,
+    "term": "National Society",
+    "meaning": "National Societies (or Red Cross and Red Crescent Societies) are organisations within the International Red Cross and Red Crescent Movement.  The specific role of National Societies and the services they provide varies by country dependent on the needs of communities, as well as the different relationships National Societies have with their respective authorities. They are united by the Fundamental Principles. Each one has a network of volunteers and staff who provide a variety of services.",
+    "language": "en"
+  },
+  {
+    "id": 80,
+    "term": "National Society Branch",
+    "meaning": "National Society Branches are regional units of the national Red Cross or Red Crescent society. Each branch operates within a defined area, such as a state, province, or district, and focuses on delivering the core services of the national society, including disaster response, health services, and community-based programs. These branches ensure that the national society's objectives are met locally, fostering community engagement and providing essential services to meet local needs.",
+    "language": "en"
+  },
+  {
+    "id": 81,
+    "term": "numerator",
+    "meaning": "The number written above the line in a vulgar fraction, showing how many of the parts indicated by the denominator are taken; the dividend in an algebraic fraction. See also Denominator",
+    "language": "en"
+  },
+  {
+    "id": 82,
+    "term": "outcomes",
+    "meaning": "Outcomes relate to the changes, often in behaviour and often over the medium term, brought about partly or in whole by the activities of a project or service. Simply put, the outcomes are the changes that occur as a result of an activity (e.g. improved well-being of training participants). Note: certain projects or services might lead to chains of linked outcomes. Sometimes it takes years for outcomes to take place – for example, slowing the rate of climate change – but there may be observable changes along the way. So, following a safe water project, an outcome would be the percentage of households that are using chlorinated drinking water.",
+    "language": "en"
+  },
+  {
+    "id": 83,
+    "term": "output",
+    "meaning": "Outputs are the direct results of an activity and are often short term and countable (e.g. number of people trained, the number of mosquito nets delivered, number of vaccinations). An output tells you that an activity has taken place.",
+    "language": "en"
+  },
+  {
+    "id": 84,
+    "term": "partnerships and collaboration",
+    "meaning": "Establishing or strengthening partnerships with other organizations, governments, and stakeholders to enhance coordinated response efforts.",
+    "language": "en"
+  },
+  {
+    "id": 85,
+    "term": "people on the move",
+    "meaning": "A broad term encompassing various categories of individuals who are moving from one place to another, often driven by a range of factors including conflict, persecution, natural disasters, economic hardship, or the pursuit of better opportunities.",
+    "language": "en"
+  },
+  {
+    "id": 86,
+    "term": "PGI minimum standards",
+    "meaning": "Refers to this document: https://www.ifrc.org/document/minimum-standards-pgi-emergencies",
+    "language": "en"
+  },
+  {
+    "id": 87,
+    "term": "physical rehabilitation",
+    "meaning": "Although physical rehabilitation services are similar to physical therapy or physiotherapy, and the two terms are often used interchangeably, there are also some significant differences. Physical rehabilitation is a more inclusive term of various professions, while physical therapy falls under the scope of physical rehabilitation.",
+    "language": "en"
+  },
+  {
+    "id": 88,
+    "term": "policy",
+    "meaning": "A principle or course of action adopted or proposed as desirable, advantageous, or expedient; formally advocated by an organization. Also as a mass noun: method of acting on matters of principle, settled practice.",
+    "language": "en"
+  },
+  {
+    "id": 89,
+    "term": "preparedness",
+    "meaning": "The state or condition of, esp. an organization, being prepared; readiness.",
+    "language": "en"
+  },
+  {
+    "id": 90,
+    "term": "primary health care",
+    "meaning": "Primary health care is a whole-of-society approach to effectively organize and strengthen national health systems to bring services for health and wellbeing closer to communities. It has 3 components: integrated health services to meet people’s health needs throughout their lives; addressing the broader determinants of health through multisectoral policy and action; empowering individuals, families and communities to take charge of their own health. Primary health care enables health systems to support a person’s health needs – from health promotion to disease prevention, treatment, rehabilitation, palliative care and more. This strategy also ensures that health care is delivered in a way that is centred on people’s needs and respects their preferences. Primary health care is widely regarded as the most inclusive, equitable and cost-effective way to achieve universal health coverage. It is also key to strengthening the resilience of health systems to prepare for, respond to and recover from shocks and crises.(WHO) Distinct from Secondary and Tertiary health care.",
+    "language": "en"
+  },
+  {
+    "id": 91,
+    "term": "programme",
+    "meaning": "The purpose of a programme is to deliver a strategic outcome and organisational benefit. Programmes are generally long term. Because the specific deliverables may not be fully defined at the start, a programme will often have a broad, adaptable scope. In short, a programme consists of several projects. The term \"programme\" may include any organized action such as campaigns, service provision, educational services, public policies, research projects, etc.",
+    "language": "en"
+  },
+  {
+    "id": 92,
+    "term": "project",
+    "meaning": "A project is a unique and temporary organisation, designed to deliver a tangible output. It has a fixed – generally fairly short – timeframe, and a project manager is responsible for delivering the output on time and on budget.",
+    "language": "en"
+  },
+  {
+    "id": 93,
+    "term": "protection",
+    "meaning": "Keeping people safe from harm. Ensuring that the rights of individuals are upheld by preserving the physical, psychological, and emotional safety, integrity, and dignity of those at risk of, or affected, by violence, discrimination, and exclusion.",
+    "language": "en"
+  },
+  {
+    "id": 94,
+    "term": "protection and human rights",
+    "meaning": "Ensuring the protection of rights of individuals",
+    "language": "en"
+  },
+  {
+    "id": 95,
+    "term": "psychological",
+    "meaning": "Of, relating to, or of the nature of psychology. The scientific study of the nature, functioning, and development of the human mind, including the faculties of reason, emotion, perception, communication, etc.; the branch of science that deals with the (human or animal) mind as an entity and in its relationship to the body and to the environmental or social context, based on observation of the behaviour of individuals or groups of individuals in particular (ordinary or experimentally controlled) circumstances.",
+    "language": "en"
+  },
+  {
+    "id": 96,
+    "term": "psychosocial support",
+    "meaning": "Offering mental health services and community support activities where mental wellbeing is an outcome.",
+    "language": "en"
+  },
+  {
+    "id": 97,
+    "term": "RCRC",
+    "meaning": "The FRC Network",
+    "language": "en"
+  },
+  {
+    "id": 98,
+    "term": "recovery phase",
+    "meaning": "Recovery consists of those activities that continue beyond the emergency period to restore critical community functions and begin to manage stabilization efforts. The recovery phase begins immediately after the threat to human life has subsided.",
+    "language": "en"
+  },
+  {
+    "id": 99,
+    "term": "rehabilitated",
+    "meaning": "To repair, renovate, or refurbish (equipment, building, etc.); to refit. To restore to a previous condition; to return (something) to its normal or proper condition.",
+    "language": "en"
+  },
+  {
+    "id": 100,
+    "term": "rehabilitation services",
+    "meaning": "Although physical rehabilitation services are similar to physical therapy or physiotherapy, and the two terms are often used interchangeably, there are also some significant differences. Physical rehabilitation is a more inclusive term of various professions, while physical therapy falls under the scope of physical rehabilitation.",
+    "language": "en"
+  },
+  {
+    "id": 101,
+    "term": "research",
+    "meaning": "Studies and investigations to understand the dynamics, challenges, and opportunities.",
+    "language": "en"
+  },
+  {
+    "id": 102,
+    "term": "resource allocation",
+    "meaning": "Planning for the allocation of resources such as personnel, funds, and supplies.",
+    "language": "en"
+  },
+  {
+    "id": 103,
+    "term": "resource development",
+    "meaning": "Creation of guidelines, toolkits, and manuals to support operations along migration routes.",
+    "language": "en"
+  },
+  {
+    "id": 104,
+    "term": "response period",
+    "meaning": "The duration immediately following an emergency or disaster during which relief efforts are focused on providing essential services and support to the affected population.",
+    "language": "en"
+  },
+  {
+    "id": 105,
+    "term": "response phase",
+    "meaning": "The period immediately following an emergency or disaster when immediate relief efforts are implemented.",
+    "language": "en"
+  },
+  {
+    "id": 106,
+    "term": "risk assessment",
+    "meaning": "Identifying potential scenarios and risks related to crises.",
+    "language": "en"
+  },
+  {
+    "id": 108,
+    "term": "safeguarding",
+    "meaning": "Our responsibility in taking action to:  keep people safe from any form of harm caused by the misuse of power by making sure that our staff, volunteers, programmes and communications do no harm to children and adults, nor expose them to abuse or exploitation. Safeguarding also includes protecting staff and volunteers from harm and inappropriate behaviour such as sexual harassment.",
+    "language": "en"
+  },
+  {
+    "id": 107,
+    "term": "safe spaces",
+    "meaning": "Establishing safe spaces for vulnerable groups, including women and children, to protect them from abuse and exploitation.",
+    "language": "en"
+  },
+  {
+    "id": 109,
+    "term": "sanitation",
+    "meaning": "The devising and application of means for the improvement of sanitary conditions. Also spec. (the provision of) toilet facilities. Distinct from hygiene.",
+    "language": "en"
+  },
+  {
+    "id": 110,
+    "term": "schools",
+    "meaning": "In the sense of most Movement activitiy this is an establishment or institution for the formal education of children or young people.",
+    "language": "en"
+  },
+  {
+    "id": 111,
+    "term": "secondary health care",
+    "meaning": "Secondary healthcare includes: planned or elective care - usually in a hospital; urgent and emergency care, including emergency services, ambulance services, hospital emergency departments, and out-of-hours family health / general practitioner services; and mental health care.",
+    "language": "en"
+  },
+  {
+    "id": 112,
+    "term": "service",
+    "meaning": "The meeting of a public need such as health or communications through the organized provision of labour, equipment, etc.; (as count noun) a system for doing this. This should be seen as very different from a project or even programme which are time limited. A service is the routine delivery of activities which meet a public need through an organised system.",
+    "language": "en"
+  },
+  {
+    "id": 113,
+    "term": "sexual and reproductive health",
+    "meaning": "According to the World Health Organization (WHO), sexual health is: \"...a state of physical, mental and social well-being in relation to sexuality, which is not the absence of disease, dysfunction or disability. Sexual health, when viewed affirmatively, requires a positive and respectful approach to sexuality and sexual relationships, as well as the possibility of having pleasurable and safe sexual experiences, free of coercion, discrimination and violence. For sexual health to be achieved and sustained, the sexual rights of all people must be respected, protected and fully exercised.\" (WHO, 2006a)",
+    "language": "en"
+  },
+  {
+    "id": 114,
+    "term": "sexual exploitation and abuse (SEA)",
+    "meaning": "Refers to any form of sexual exploitation or abuse caused, intentionally or unintentionally, by Red Cross and Red Crescent Movement people, operations or projects. This includes SEA of persons (adult or child) that come into contact with or benefit from our protection or assistance, as well as SEA of Red Cross and Red Crescent personnel. SEA is a form of gender-based violence.",
+    "language": "en"
+  },
+  {
+    "id": 115,
+    "term": "shelter",
+    "meaning": "Shelter is a process, not just a product. It goes beyond simply providing tools and tents to help people cope in the short-term, and involves enabling communities to improve their homes over time so they are better protected should another disaster occur.",
+    "language": "en"
+  },
+  {
+    "id": 116,
+    "term": "shelter and housing",
+    "meaning": "Offering temporary or permanent accommodation solutions.",
+    "language": "en"
+  },
+  {
+    "id": 117,
+    "term": "sites",
+    "meaning": "Specific locations such as schools, health facilities, refugee camps, and community centres.",
+    "language": "en"
+  },
+  {
+    "id": 118,
+    "term": "strategy",
+    "meaning": "The art or practice of planning the future direction or outcome of something; the formulation or implementation of a plan, scheme, or course of action, esp. of a long-term or ambitious nature. Also: policy or means of achieving objectives within a specified field, as political strategy, corporate strategy, etc.",
+    "language": "en"
+  },
+  {
+    "id": 119,
+    "term": "substance abuse",
+    "meaning": "Substance abuse refers to the harmful or hazardous use of psychoactive substances, including alcohol and illicit drugs. One of the key impacts of illicit drug use on society is the negative health consequences experienced by its members. Drug use also puts a heavy financial burden on individuals, families and society. (WHO)",
+    "language": "en"
+  },
+  {
+    "id": 120,
+    "term": "survey",
+    "meaning": "A systematic collection and analysis of data relating to the attitudes, living conditions, opinions, etc., of a population, usually taken from a representative sample of the latter. Also preceded by a defining word, as (public) opinion survey, social survey.",
+    "language": "en"
+  },
+  {
+    "id": 121,
+    "term": "survivors",
+    "meaning": "A person who has experienced a traumatic event or past abuse, esp. of a sexual or psychological nature. Often as the second element in compounds denoting someone who has survived the specified situation or event, as in domestic abuse survivor, rape survivor, etc.",
+    "language": "en"
+  },
+  {
+    "id": 122,
+    "term": "sustainability",
+    "meaning": "The quality of being maintained at a certain rate or level. Duration of impact of an intervention.",
+    "language": "en"
+  },
+  {
+    "id": 123,
+    "term": "technology and information systems",
+    "meaning": "Implementing or upgrading technology solutions to improve data collection, communication, and information management related to migration.",
+    "language": "en"
+  },
+  {
+    "id": 124,
+    "term": "tertiary healthcare",
+    "meaning": "Tertiary care is highly specialist treatment, such as: neurosurgery; transplants; plastic surgery; secure forensic mental health services. As such they are rare for Movement services.",
+    "language": "en"
+  },
+  {
+    "id": 125,
+    "term": "training and capacity building",
+    "meaning": "Ensuring staff and volunteers are trained and equipped to respond effectively.",
+    "language": "en"
+  },
+  {
+    "id": 126,
+    "term": "treatment",
+    "meaning": "Management in the application of remedies; medical or surgical application or service.",
+    "language": "en"
+  },
+  {
+    "id": 127,
+    "term": "violence",
+    "meaning": "The deliberate exercise of physical force against a person, property, etc.; physically violent behaviour or treatment; (Law) the unlawful exercise of physical force, intimidation by the exhibition of such force.",
+    "language": "en"
+  },
+  {
+    "id": 128,
+    "term": "volunteer",
+    "meaning": "One who voluntarily offers his or her services in any capacity; one who of his or her own free will takes part in any enterprise. A Red Cross Red Crescent volunteer is a person who carries out volunteering activities or\nservices, out of their free will and not by a desire for material or financial gain, on behalf of the IFRC\nNetwork, occasionally or regularly and always working in accordance with the Fundamental\nPrinciples of the International Red Cross and Red Crescent Movement. (IFRC Volunteering Policy)",
+    "language": "en"
+  },
+  {
+    "id": 129,
+    "term": "WASH",
+    "meaning": "WASH or WaSH. Water, sanitation and hygiene. Also water, sanitation and hygiene services.",
+    "language": "en"
+  },
+  {
+    "id": 130,
+    "term": "water services",
+    "meaning": "Assistance in increasing the volume, proximity or quality of safer water to communities and facilities.",
+    "language": "en"
+  }
+]

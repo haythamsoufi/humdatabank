@@ -1,0 +1,79 @@
+{% extends "core/layout.html" %}
+
+{% block title %}User Analytics - {{ user.name or user.email }} - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+
+    {% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title=_('User Analytics'),
+        icon='fas fa-chart-line',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Analytics'), 'url': url_for('analytics.analytics_dashboard')},
+            {'name': _('User Detail')}
+        ],
+        actions=[
+            {
+                'type': 'link',
+                'text': _('Back to Analytics'),
+                'url': url_for('analytics.analytics_dashboard'),
+                'icon': 'fas fa-arrow-left',
+                'classes': 'professional-action-btn'
+            }
+        ]
+    ) }}
+
+    <!-- User Information -->
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <h2 class="text-sm font-semibold text-gray-800">
+                <i class="fas fa-user mr-2 text-blue-600"></i>{{ _('User information') }}
+            </h2>
+        </div>
+        <div class="p-4 sm:p-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Name') }}</dt>
+                    <dd class="mt-1 text-lg text-gray-900">{{ user.name or _('Not provided') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Email') }}</dt>
+                    <dd class="mt-1 text-lg text-gray-900">{{ user.email }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Role') }}</dt>
+                    <dd class="mt-1">
+                        {% set lvl = user_access_level(user) %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                        {% if lvl in ['admin', 'system_manager'] %}bg-purple-100 text-purple-800
+                        {% elif lvl == 'focal_point' %}bg-blue-100 text-blue-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {% if lvl == 'system_manager' %}{{ _('System Manager') }}
+                            {% elif lvl == 'admin' %}{{ _('Admin') }}
+                            {% elif lvl == 'focal_point' %}{{ _('Focal Point') }}
+                            {% else %}{{ _('User') }}{% endif %}
+                        </span>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">{{ _('Status') }}</dt>
+                    <dd class="mt-1">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                        {% if user.is_active %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                            {% if user.is_active %}{{ _('Active') }}{% else %}{{ _('Inactive') }}{% endif %}
+                        </span>
+                    </dd>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% with user_analytics_embedded=False %}
+    {% include 'admin/analytics/_user_detail_partial.html' %}
+    {% endwith %}
+
+</div>
+{% endblock %}

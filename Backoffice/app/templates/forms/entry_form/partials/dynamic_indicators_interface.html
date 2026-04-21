@@ -1,0 +1,35 @@
+{# Reusable template for Dynamic Indicators Interface in Entry Form #}
+{# Usage: {% include 'forms/entry_form/partials/dynamic_indicators_interface.html' with context %} #}
+{# Variables expected: section_id, section, can_edit, is_preview_mode, is_public_submission, assignment_status #}
+
+{# Dynamic Indicators Section Interface #}
+{% if section.section_type == 'dynamic_indicators' and (can_edit or is_preview_mode or is_public_submission) %}
+    {# Determine if this is a subsection by checking parent structure #}
+    {% set is_subsection = section.parent_section_id is not none %}
+    <div class="{% if is_subsection %}mt-4{% else %}mt-6{% endif %}" id="dynamic-indicator-interface-{{ section_id }}" data-aes-id="{{ assignment_status.id }}">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex-1">
+                {% if section.add_indicator_note %}
+                    <p class="text-sm text-gray-600 italic">{{ section.add_indicator_note }}</p>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-3">
+                {% if section.max_dynamic_indicators %}
+                    {% set current_count = section.fields_ordered | selectattr('dynamic_assignment_id', 'defined') | list | length %}
+                    <span class="text-sm text-gray-500 mr-4">
+                        {{ _('Max indicators: %(current)s/%(max)s', current=current_count, max=section.max_dynamic_indicators) }}
+                    </span>
+                {% endif %}
+                <button type="button" id="add-indicator-row-btn-{{ section_id }}"
+                        class="btn btn-success">
+                    <i class="fas fa-plus mr-2"></i>
+                    {{ _('Add Indicator') }}
+                </button>
+            </div>
+        </div>
+
+        <div id="dynamic-indicator-rows-{{ section_id }}" class="space-y-3">
+            <!-- Dynamic indicator selection rows will be added here -->
+        </div>
+    </div>
+{% endif %}

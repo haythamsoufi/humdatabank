@@ -1,0 +1,6 @@
+{# SVG Icon Helper Template #}
+{% macro svg_icon(name, class="w-6 h-6") %}
+<span class="inline-block {{ class }}">
+  {% include 'icons/' + name + '.svg' %}
+</span>
+{% endmacro %}

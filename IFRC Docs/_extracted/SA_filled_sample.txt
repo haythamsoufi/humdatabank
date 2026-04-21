@@ -1,0 +1,80 @@
+Solution Architecture Document (Draft — IFRC Network Data Portal)
+Simplified Template (2026)  —  IFRC Digital Transformation Department
+Application Name
+IFRC Network Data Portal
+Document Authorization
+Stakeholder
+Name
+Role
+Date Approved
+Author
+Haytham Al Soufi
+Senior Officer, Federation-Wide Data Analysis (primary author)
+Document Owner
+Rania Alereksoussi
+Manager, Federation-Wide RBM & Data Systems (business owner)
+Stakeholders
+Marie-France Shakour (PM); Carlota Tarazona (PO); DTD/Infra/Dev teams per PCH
+Project steering, product ownership, EA/infra/application support
+Authorizer
+TBD per DTD governance
+Formal sign-off when review cycle completes
+Table of Contents
+1. Purpose, Scope and Audience4
+1.1 Scope4
+1.2 Audience4
+1.3 Document Flow4
+2. Solution Overview4
+2.1 General Information4
+2.2 Business Background4
+2.3 Business Risk Considerations5
+2.4 Solution within the IFRC Ecosystem5
+3. Business Architecture5
+3.1 Business Processes5
+3.2 Business Use Cases ( remove if not needed)5
+4. Application Architecture6
+4.1 Solution Structure6
+4.2 Software Components6
+4.3 APIs & Integrations6
+5. Information Architecture7
+5.1 Data Overview7
+5.2 Information Flow7
+5.3 Reporting & Analytics7
+6. Infrastructure Architecture7
+6.1 Servers7
+6.2 Database8
+6.3 Environments8
+7. Security Architecture8
+7.1 Risk Assessment8
+7.2 Data Classification8
+7.3 Personal Data9
+7.4 Availability Requirements9
+7.5 Identity & Access Management9
+8. Operations10
+8.1 Support10
+8.2 Licensing10
+8.3 Monitoring & Alerting10
+8.4 Testing10
+8.5 Training11
+8.6 Disaster Recovery11
+9. Related Documents & Revision History12
+9.1 Related Documents12
+9.2 Revision History12
+10. Authorising Signatures12
+1. Purpose, Scope and Audience
+This document describes the architecture of the solution — what it does, how it is built, and how it fits into the IFRC IT landscape.
+1.1 Scope
+💡 What is included and what is explicitly out of scope for this solution?
+In Scope: Unified federation-wide structured data collection and management: form/template design (Form Builder), assignments to countries/NS and entities, Indicator Bank–linked indicators, focal-point data entry with validation and audit trail, exports (e.g. Excel), REST APIs (including mobile JWT surface), notifications (in-app/email/push where configured), multilingual content, analytics dashboards, and phased AI/RAG document features. MVP alignment: Unified Mid-Year Reporting 2026 and related PMER/FDS processes (FDRS, Unified Planning/Reporting, fed-wide emergencies) per PCH.
+Out of Scope: Full one-shot migration of all historical legacy systems and datasets at initial launch; complete sunsetting of Kobo/Excel/Power Platform in one release; full public portal publishing scope unless explicitly required for the reporting round; some advanced analytics/AI integrations may evolve post go-live per PCH and knowledge-transfer notes.
+1.2 Audience
+💡 Who should read this document?
+Primary Readers: DTD enterprise & solution architects; infrastructure and security teams; application support; project manager and PMO; product owner and FDS technical administrators.
+Secondary Readers: Business owner and sponsors; National Society and IFRC regional focal points (operational context); senior management consuming federation-wide reporting.
+1.3 Document Flow
+This document follows the TOGAF enterprise architecture layers:
+•  Business — process, roles, responsibilities
+•  Information — data flows and classification
+•  Security — access, confidentiality, integrity, availability
+•  Application — software components and integrations
+•  Infrastructure — servers, databases, environments

@@ -1,0 +1,106 @@
+# Run from Actions when you want a full pip-audit + npm audit without opening a PR.
+# Actions → "Dependency audit (on demand)" → Run workflow.
+# Results: job summary + logs.
+
+name: Dependency audit (on demand)
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Review dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Audit dependencies (report + exit if any issues)
+        run: |
+          set -o pipefail
+          SUMMARY="${GITHUB_STEP_SUMMARY:?}"
+          overall=0
+
+          {
+            echo "## Dependency audit"
+            echo ""
+            echo "Manual run — no PR or branch is created."
+            echo ""
+          } >> "$SUMMARY"
+
+          python -m pip install --upgrade pip pip-audit
+
+          # Known unresolvable CVEs: all 3 require langgraph>=1.0.x which in turn requires
+          # langchain-core>=1.0.0, incompatible with the current langchain 0.3.x family.
+          # Tracked as a future task: migrate the entire LangChain stack to 1.x.
+          # Suppress them here so the workflow reflects *actionable* findings only.
+          KNOWN_IGNORE=(
+            "--ignore-vuln" "CVE-2026-28277"   # langgraph <1.0.10
+            "--ignore-vuln" "CVE-2025-64439"   # langgraph-checkpoint <3.0.0
+            "--ignore-vuln" "CVE-2026-27794"   # langgraph-checkpoint <4.0.0
+          )
+
+          echo "### Python — \`Backoffice/requirements.txt\`" >> "$SUMMARY"
+          echo "" >> "$SUMMARY"
+          echo '```' >> "$SUMMARY"
+          pip_audit_ok=0
+          pip-audit -r Backoffice/requirements.txt "${KNOWN_IGNORE[@]}" 2>&1 | tee -a "$SUMMARY" || pip_audit_ok=$?
+          echo '```' >> "$SUMMARY"
+          echo "" >> "$SUMMARY"
+          if [ "$pip_audit_ok" -ne 0 ]; then overall=1; fi
+
+          echo "### npm — \`Website/\`" >> "$SUMMARY"
+          echo "" >> "$SUMMARY"
+          echo '```' >> "$SUMMARY"
+          if (cd Website && npm ci); then
+            npm_web_ok=0
+            (cd Website && npm audit) 2>&1 | tee -a "$SUMMARY" || npm_web_ok=$?
+            if [ "$npm_web_ok" -ne 0 ]; then overall=1; fi
+          else
+            echo "npm ci failed (see log)." | tee -a "$SUMMARY"
+            overall=1
+          fi
+          echo '```' >> "$SUMMARY"
+          echo "" >> "$SUMMARY"
+
+          echo "### npm — \`Backoffice/\`" >> "$SUMMARY"
+          echo "" >> "$SUMMARY"
+          echo '```' >> "$SUMMARY"
+          if (cd Backoffice && npm ci); then
+            npm_bo_ok=0
+            (cd Backoffice && npm audit) 2>&1 | tee -a "$SUMMARY" || npm_bo_ok=$?
+            if [ "$npm_bo_ok" -ne 0 ]; then overall=1; fi
+          else
+            echo "npm ci failed (see log)." | tee -a "$SUMMARY"
+            overall=1
+          fi
+          echo '```' >> "$SUMMARY"
+          echo "" >> "$SUMMARY"
+
+          if [ "$overall" -ne 0 ]; then
+            echo "### Status" >> "$SUMMARY"
+            echo "" >> "$SUMMARY"
+            echo "One or more audits reported vulnerabilities, or install/audit failed (see sections above)." >> "$SUMMARY"
+          else
+            echo "### Status" >> "$SUMMARY"
+            echo "" >> "$SUMMARY"
+            echo "No issues reported by pip-audit or npm audit for the scanned manifests." >> "$SUMMARY"
+          fi
+
+          exit "$overall"

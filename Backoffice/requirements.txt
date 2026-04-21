@@ -1,0 +1,106 @@
+# ========== Production Dependencies ==========
+# Versions pinned for reproducible builds and supply-chain safety.
+# Run `pip-audit` periodically to check for known CVEs.
+Flask==3.1.3
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-Migrate==4.0.5
+Flask-Mail==0.10.0
+Flask-WTF==1.2.1
+Flask-Cors==6.0.2
+Flask-Babel==4.0.0
+Flask-Compress==1.14
+Flask-Limiter==3.5.0
+flask-sock==0.7.0
+Werkzeug==3.1.7
+polib==1.2.0
+APScheduler==3.10.4
+python-dotenv==1.0.0
+psutil==5.9.8
+email_validator==2.2.0
+alembic==1.15.2
+psycopg2-binary==2.9.10
+PyMuPDF==1.25.5
+Pillow==12.1.1                  # was 10.4.0 — CVE-2026-25990
+openpyxl==3.1.2
+pandas==2.2.3
+XlsxWriter==3.2.3
+reportlab==4.4.1
+user-agents==2.2.0
+weasyprint==68.0                # was 65.1 — CVE-2025-68616
+requests==2.33.0                # was 2.32.3 — CVE-2024-47081, CVE-2026-25645
+PyJWT==2.12.1
+google-auth==2.40.3
+google-auth-oauthlib==1.2.3
+google-auth-httplib2==0.2.0
+# AI Chatbot Services
+openai==1.109.1                 # was 1.93.0 — required by langchain-openai 0.3.35 (needs >=1.104.2)
+google-generativeai==0.8.5
+# Security Dependencies
+bleach==6.2.0
+jsonschema==4.25.1
+# WSGI Servers
+waitress==3.0.2
+gunicorn==23.0.0
+gevent==25.9.1
+gevent-websocket==0.10.1
+# Azure-specific dependencies
+azure-storage-blob==12.27.1
+# NOTE: opencensus-ext-azure and opencensus-ext-flask have been removed.
+# The opencensus project is deprecated and opencensus-ext-flask caps Flask < 3.0.
+# For Azure Monitor telemetry on Flask 3.x, use: azure-monitor-opentelemetry>=1.0.0
+# API Documentation
+PyYAML==6.0.2
+
+# ==================== AI/RAG System Dependencies ====================
+# Vector database and embeddings
+pgvector==0.2.5
+# sentence-transformers 2.x/3.x/4.x all cap at transformers<5.0.0.
+# sentence-transformers 5.x lifts that cap to transformers<6.0.0, making
+# the transformers 5.x upgrade possible. Both must be upgraded together.
+# CVE-2026-1839 has no fix in any 4.x release; 5.0.0 is the minimum stable fix.
+sentence-transformers==5.4.0    # was 2.7.0 — required to allow transformers 5.x
+transformers==5.0.0             # was 4.57.6 — CVE-2026-1839 (min fix: 5.0.0)
+tiktoken==0.11.0
+
+# ==================== LangChain Ecosystem ====================
+# IMPORTANT: This is a MAJOR version upgrade: 0.2.x → 0.3.x.
+# API changes include:
+#   - Many chain constructors replaced with LCEL (RunnableSequence) patterns
+#   - `BaseCallbackHandler` signature changes
+#   - Tool/agent API rework; verify all custom tools and agents
+# Test all AI agent and RAG flows thoroughly before deploying.
+langchain==0.3.28               # was 0.2.17 — ecosystem-wide security fixes (0.3.28 is latest 0.3.x)
+langchain-community==0.3.27     # was 0.2.19 — CVE-2025-6984 (min fix: 0.3.27)
+langchain-openai==0.3.35        # was 0.1.25 — aligns with langchain 0.3.x
+# Explicit transitive pins: langchain-core and langchain-text-splitters had their
+# own CVEs and were previously resolved implicitly. Pin them for reproducibility.
+langchain-core==0.3.84          # was ~0.2.43 (transitive) — CVE-2025-65106, CVE-2025-68664, CVE-2026-40087
+                                # NOTE: CVE-2026-26013 fix requires langchain-core>=1.2.11 (1.x line).
+                                # Migrating to langchain 1.x is a separate, larger upgrade.
+langchain-text-splitters==0.3.11  # was ~0.2.4 (transitive) — CVE-2025-6985 (min fix: 0.3.9)
+
+# ==================== LangGraph Ecosystem ====================
+# ⚠ KNOWN UNRESOLVABLE CVEs — requires LangChain 1.x migration (future task):
+#   CVE-2026-28277 (langgraph)           — fix: langgraph>=1.0.10
+#   CVE-2025-64439 (langgraph-checkpoint) — fix: langgraph-checkpoint>=3.0.0
+#   CVE-2026-27794 (langgraph-checkpoint) — fix: langgraph-checkpoint>=4.0.0
+#
+# langgraph 1.0.x pulls langgraph-prebuilt 1.0.x which requires langchain-core>=1.0.0,
+# but all langchain 0.3.x packages cap at langchain-core<1.0.0 — mutually exclusive.
+# Pinned to latest 0.4.x that remains compatible with the langchain 0.3.x family.
+langgraph==0.4.10               # latest 0.4.x compatible with langchain-core 0.3.x
+langgraph-checkpoint==2.1.2     # latest 2.x compatible with langgraph 0.4.x
+
+# Document processing
+unstructured==0.18.27
+pdf2image==1.17.0
+pytesseract==0.3.13
+python-docx==1.2.0
+xlrd==2.0.2
+markdown==3.10
+beautifulsoup4==4.14.3
+lxml==6.0.2
+
+# Performance and caching
+redis==7.1.0

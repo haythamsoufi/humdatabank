@@ -1,0 +1,20 @@
+# Runs when a pull request is opened/updated. Compares dependency changes in the PR
+# (GitHub dependency review). Does not create PRs or branches.
+
+name: Dependency review (pull requests)
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4

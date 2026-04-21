@@ -1,0 +1,122 @@
+/**
+ * User Hover Profile — centralized styles
+ * Use with .ag-user-hover-trigger on any element (tables, dashboard, etc.).
+ * Include this stylesheet wherever user hover triggers are used.
+ */
+
+.ag-user-hover-cell {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+}
+
+.ag-user-hover-trigger {
+    display: inline-flex;
+    flex-direction: column;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.ag-user-hover-trigger:hover .ag-user-hover-name {
+    text-decoration: underline;
+}
+
+.ag-user-hover-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ag-user-hover-subline {
+    font-size: 0.75rem;
+    color: #6b7280;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ag-user-hover-popup {
+    position: absolute;
+    z-index: 2200;
+    width: 300px;
+    max-width: calc(100vw - 16px);
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.15);
+    padding: 12px;
+}
+
+.ag-user-hover-popup.hidden {
+    display: none;
+}
+
+.ag-user-hover-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.ag-user-hover-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.ag-user-hover-identity {
+    min-width: 0;
+    flex: 1;
+}
+
+.ag-user-hover-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+}
+
+.ag-user-hover-status-active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.ag-user-hover-status-inactive {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.ag-user-hover-email,
+.ag-user-hover-title {
+    color: #6b7280;
+    font-size: 12px;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ag-user-hover-body {
+    margin-top: 10px;
+    border-top: 1px solid #f3f4f6;
+    padding-top: 8px;
+    font-size: 12px;
+    color: #374151;
+    display: grid;
+    gap: 4px;
+}
+
+.ag-user-hover-label {
+    color: #6b7280;
+    font-weight: 600;
+}

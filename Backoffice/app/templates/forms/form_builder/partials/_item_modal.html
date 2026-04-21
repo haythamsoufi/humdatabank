@@ -1,0 +1,965 @@
+{# Item Modal Partial - Handles adding/editing all item types (Indicator, Question, Document, Matrix, Plugin) #}
+<div id="item-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center px-4">
+    <div class="relative p-6 border w-full max-w-xl shadow-xl rounded-lg bg-white">
+        <button type="button" class="absolute top-3 right-3 btn btn-close-icon close-modal" aria-label="Close modal"><i class="fas fa-times w-6 h-6"></i></button>
+        <h3 class="text-xl font-semibold mb-5 text-gray-800 flex items-center modal-title">
+            <i class="fas fa-plus-circle w-6 h-6 mr-2 text-green-600"></i>
+            Add Item to <span id="item-modal-section-name" class="font-bold ml-1">Section</span>
+        </h3>
+        <form id="item-modal-form" method="POST" action="">
+            {# CSRF token - will be dynamically set #}
+            <div id="item-modal-csrf-container">
+                <input id="section-csrf_token-item-modal" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+            </div>
+            <input type="hidden" name="template_id" id="item-modal-template-id" value="{{ template.id }}">
+            <input type="hidden" name="version_id" id="item-modal-version-id" value="{{ active_version_id }}">
+            <input type="hidden" name="section_id" id="item-modal-section-id">
+            <input type="hidden" name="item_id" id="item-modal-id">
+            {# question_type set by JS when adding a question; always at form root so it is always submitted #}
+            <input type="hidden" name="question_type" id="item-question-type-input" value="">
+
+        {# Unified shared fields - single source of truth #}
+        <input type="hidden" name="label" id="item-modal-shared-label" value="">
+        {# Indicator-only: explicit override field so clearing custom label is deterministic #}
+        <input type="hidden" name="indicator_label_override" id="item-modal-indicator-label-override" value="">
+        <textarea name="description" id="item-modal-shared-description" class="hidden" rows="3"></textarea>
+        <input type="hidden" name="label_translations" id="item-modal-shared-label-translations" value="{}">
+        <input type="hidden" name="description_translations" id="item-modal-shared-description-translations" value="{}">
+        <input type="hidden" name="definition_translations" id="item-modal-definition-translations" value="{}">
+
+            {# --- START: Grid Container for Two Halves - Initially single column, becomes two on md screens --- #}
+            <div class="grid grid-cols-1 gap-6 modal-grid-container">
+
+                {# --- Left Half: Basic Item Details and Add Rule Buttons --- #}
+                <div class="modal-left-half">
+                    {# Item Type Selection - Button opens tiles picker #}
+                    <div class="mb-4">
+                        <label for="item-type-trigger-btn" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Select Item Type') }}</label>
+                        <button type="button" id="item-type-trigger-btn" class="item-type-trigger-btn btn btn-secondary w-full justify-start text-left gap-3 mt-1 py-2.5 px-3" aria-haspopup="dialog" aria-expanded="false" aria-controls="item-type-picker-modal">
+                            <span id="item-type-trigger-icon" class="flex items-center justify-center w-9 h-9 rounded-lg bg-purple-100 text-purple-600 shrink-0"><i class="fas fa-chart-line text-lg"></i></span>
+                            <span id="item-type-trigger-label" class="flex-1">{{ _('Indicator from Bank') }}</span>
+                            <i class="fas fa-chevron-down text-gray-400 shrink-0"></i>
+                        </button>
+                    </div>
+
+                    {# Indicator Fields (Initially Visible) #}
+                    <div id="item-indicator-fields">
+                         {# Type and Unit filter dropdowns #}
+                         <div class="grid grid-cols-2 gap-4 mb-4">
+                             <div>
+                                 <label for="item-indicator-type-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Indicator Type') }}</label>
+                                 <select name="indicator_type_filter" id="item-indicator-type-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm">
+                                     <option value="">{{ _('All Types') }}</option>
+                                     {# Options will be populated by JS #}
+                                 </select>
+                             </div>
+                             <div>
+                                 <label for="item-indicator-unit-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Indicator Unit') }}</label>
+                                 <select name="indicator_unit_filter" id="item-indicator-unit-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm">
+                                     <option value="">{{ _('All Units') }}</option>
+                                     {# Options will be populated by JS #}
+                                 </select>
+                             </div>
+                         </div>
+
+                        <div class="mb-4">
+                            <label for="item-indicator-bank-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Standard Indicator (Source)') }}</label>
+                            <select name="indicator_bank_id" id="item-indicator-bank-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm select2-enable" required>
+                                <option value="">{{ _('Select Indicator...') }}</option>
+                                {# Data embedded below in script tag #}
+                            </select>
+                        </div>
+
+                        {# Optional custom label/definition overrides for indicators #}
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="item-indicator-label" class="block text-gray-700 text-sm font-semibold">{{ _('Custom Label (Optional)') }}</label>
+                                <button type="button" id="indicator-translations-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center shrink-0" title="{{ _('Add translations') }}">
+                                    <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                    {{ _('Translations') }}
+                                </button>
+                            </div>
+                            <textarea data-field-type="label" id="item-indicator-label" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Override label (leave empty to use indicator bank name)') }}" autocomplete="off"></textarea>
+                            <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty to use the indicator bank name.') }}</p>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="item-indicator-definition" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Custom Definition (Optional)') }}</label>
+                            <textarea name="definition" id="item-indicator-definition" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Override definition (leave empty to use indicator bank definition)') }}"></textarea>
+                            <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty to use the indicator bank definition.') }}</p>
+                        </div>
+
+                        {# Default value (optional) for indicator numeric entry #}
+                        <div class="mb-4">
+                            <label for="item-indicator-default-value" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Default Value (Optional)') }}</label>
+                            <input type="text"
+                                   name="default_value"
+                                   id="item-indicator-default-value"
+                                   data-enable-variables="true"
+                                   class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                   placeholder="{{ _('e.g., 123 or [some_variable]') }}"
+                                   autocomplete="off">
+                            <p class="mt-1 text-xs text-gray-500">
+                                {{ _('You can enter a value or use a template variable like [variable_name]. For disaggregated indicators, this applies to Total mode only.') }}
+                            </p>
+                        </div>
+
+                        <div class="mb-4 hidden" id="add_item_indicator_disaggregation_options_wrapper">
+                            <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Disaggregation Options') }}</label>
+                            <div id="add_item_indicator_allowed_disaggregation_options_container" class="mt-1 grid grid-cols-2 gap-x-4 gap-y-2">
+                                {# Checkboxes will be populated by JS #}
+                                {# Data embedded below in script tag #}
+                            </div>
+                        </div>
+                        <div class="mb-6 hidden" id="add_item_indicator_age_groups_config_wrapper">
+                            <label for="add_item_modal_indicator_age_groups_input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Age Groups (comma-separated)') }}</label>
+                            <input type="text" name="age_groups_config" id="add_item_modal_indicator_age_groups_input" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., 0-4,5-9,10-14,15+') }}">
+                            <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty for defaults. Only if unit is \'People\' & age disaggregation is allowed.') }}</p>
+                        </div>
+                    </div>
+
+                    {# Question Fields (Initially Hidden) #}
+                    <div id="item-question-fields" class="hidden">
+                        <!-- Question type is chosen in the item type picker (hidden select for UI state only). question_type for submit is in #item-question-type-input at form root. -->
+                        <div class="grid grid-cols-1 gap-4 mb-4">
+                            <div class="hidden" aria-hidden="true">
+                                <label for="item-question-type-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Question Type') }}</label>
+                                <select id="item-question-type-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                    <option value="">{{ _('Select Question Type...') }}</option>
+                                    {% for value, label in question_type_choices_for_js %}
+                                        <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="item-question-unit" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Unit') }}</label>
+                                <input type="text" name="unit" id="item-question-unit" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., People, %, Items, Days') }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="item-question-label" class="block text-gray-700 text-sm font-semibold">{{ _('Question Text') }}</label>
+                                <button type="button" id="question-translations-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center shrink-0" title="{{ _('Add translations') }}">
+                                    <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                    {{ _('Translations') }}
+                                </button>
+                            </div>
+                            <textarea data-field-type="label" id="item-question-label" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Enter question text') }}" autocomplete="off"></textarea>
+                        </div>
+
+                        <!-- Definition -->
+                        <div class="mb-4">
+                            <label for="item-question-definition" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Definition') }}</label>
+                            <textarea name="definition" id="item-question-definition" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Detailed definition/description of this question') }}"></textarea>
+                        </div>
+
+                        <!-- Options Source - Hidden by default -->
+                        <div id="options-source-container" class="mb-4 hidden">
+                            <div class="flex items-center space-x-4">
+                                <span class="text-gray-700 text-sm font-semibold mr-2">{{ _('Options Source') }}</span>
+                                <!-- Radio buttons container -->
+                                <label class="inline-flex items-center">
+                                    <input type="radio" name="options_source" value="manual" class="form-radio h-4 w-4 text-green-600" checked>
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Manual list') }}</span>
+                                </label>
+                                <label class="inline-flex items-center">
+                                    <input type="radio" name="options_source" value="calculated" class="form-radio h-4 w-4 text-green-600">
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('List Library') }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {# Manual Options Input -- visible when manual source selected #}
+                        <div id="item-question-options-container" class="mb-6 hidden">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-gray-700 text-sm font-semibold">{{ _('Question Options') }}</label>
+                                <button type="button" id="question-options-translations-matrix-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center shrink-0" title="{{ _('Manage option translations') }}">
+                                    <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                    {{ _('Translations') }}
+                                </button>
+                            </div>
+
+                            <!-- Options List -->
+                            <div id="item-question-options-list" class="space-y-2 mt-3">
+                                <!-- Options will be added here dynamically -->
+                            </div>
+
+                            <!-- Hidden input for options JSON -->
+                            <input type="hidden" id="item-question-options-json" name="options_json" value="[]">
+                            <!-- Hidden input for options translations JSON -->
+                            <input type="hidden" id="item-question-options-translations-json" name="options_translations_json" value="[]">
+
+                            <!-- Hidden template for new option -->
+                            <template id="item-question-option-template">
+                                <div class="option-row flex items-center space-x-2">
+                                    <input type="text" class="option-text shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Enter option text') }}">
+                                    <button type="button" class="move-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up') }}">
+                                        <i class="fas fa-arrow-up w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="move-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down') }}">
+                                        <i class="fas fa-arrow-down w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="remove-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Option') }}">
+                                        <i class="fas fa-trash w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="add-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-green-300" title="{{ _('Add Option') }}">
+                                        <i class="fas fa-plus w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+
+                        {# Calculated List Selection #}
+                        <div id="item-question-calculated-list-container" class="mb-6 hidden">
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label for="item-calculated-list-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Select List') }}</label>
+                                    <select id="item-calculated-list-select" name="lookup_list_id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                        <option value="">{{ _('Select List...') }}</option>
+                                        {% for lst in lookup_lists_for_js %}
+                                            <option value="{{ lst.id }}" data-columns='{{ (lst.columns_config | tojson | e) if lst.columns_config else "{}" }}'>{{ lst.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <p class="mt-2 text-xs text-gray-500">{{ _('Filters can be added after selecting a list.') }}</p>
+                                </div>
+                                <!-- Display Column Select -->
+                                <div id="item-calculated-display-column-wrapper" class="hidden">
+                                    <label for="item-calculated-list-display-column" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Display Column') }}</label>
+                                    <select id="item-calculated-list-display-column" name="list_display_column" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                        <option value="">{{ _('Select Column...') }}</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500">{{ _('Values from this column will appear as dropdown options. Fields marked as [Multilingual] will display in the user\'s selected language.') }}</p>
+                                </div>
+                            </div>
+                            <button type="button" id="item-calculated-list-add-filter-btn" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2"><i class="fas fa-filter w-3 h-3 mr-1"></i>{{ _('Add Filter') }}</button>
+                            <div id="item-calculated-list-filters-container" class="mt-2 space-y-2"></div>
+                            <input type="hidden" name="list_filters_json" id="item-calculated-list-filters-json">
+                        </div>
+                    </div>
+
+                    <script nonce="{{ csp_nonce() }}">
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const questionTypeSelect = document.getElementById('item-question-type-select');
+                            const optionsSourceContainer = document.getElementById('options-source-container');
+                            const manualOptionsContainer = document.getElementById('item-question-options-container');
+                            const calculatedListContainer = document.getElementById('item-question-calculated-list-container');
+                            const optionsSourceRadios = document.getElementsByName('options_source');
+                            // Remember original parent so we can move container back when needed
+                            const manualOriginalParent = manualOptionsContainer.parentElement;
+                            const calculatedOriginalParent = calculatedListContainer.parentElement;
+                            const gridContainer = optionsSourceContainer.closest('.modal-grid-container');
+                            const rightHalf = gridContainer ? gridContainer.querySelector('.modal-right-half') : null;
+                            const modalContent = optionsSourceContainer.closest('.relative.p-6');
+
+                            // Function to check if question type is choice-based
+                            function isChoiceType(type) {
+                                return type === 'single_choice' || type === 'multiple_choice';
+                            }
+
+                            // Function to handle options containers visibility
+                            function updateOptionsVisibility() {
+                                const selectedType = questionTypeSelect.value;
+                                const isChoice = isChoiceType(selectedType);
+
+                                // Show/hide options source section
+                                optionsSourceContainer.classList.toggle('hidden', !isChoice);
+
+                                // If it's not a choice type, hide both options containers
+                                if (!isChoice) {
+                                    manualOptionsContainer.classList.add('hidden');
+                                    calculatedListContainer.classList.add('hidden');
+                                    return;
+                                }
+
+                                // If it is a choice type, show the appropriate container based on selected source
+                                const selectedSource = Array.from(optionsSourceRadios).find(radio => radio.checked)?.value;
+
+                                // Manual list behaviour
+                                const isManual = selectedSource === 'manual';
+                                manualOptionsContainer.classList.toggle('hidden', !isManual);
+
+                                // List Library behaviour
+                                const isListLibrary = selectedSource === 'calculated';
+
+                                if (isListLibrary) {
+                                    // Ensure right pane is visible & two-column layout activated
+                                    if (rightHalf && gridContainer) {
+                                        rightHalf.classList.remove('hidden');
+                                        gridContainer.classList.add('md:grid-cols-2');
+                                        // Widen modal
+                                        if (modalContent) {
+                                            modalContent.classList.remove('max-w-xl');
+                                            modalContent.classList.add('max-w-6xl');
+                                        }
+
+                                        // Move container into right pane if not already
+                                        if (!rightHalf.contains(calculatedListContainer)) {
+                                            rightHalf.appendChild(calculatedListContainer);
+                                        }
+                                    }
+                                    calculatedListContainer.classList.remove('hidden');
+                                } else {
+                                    // Hide calculated container & move back to original parent if needed
+                                    calculatedListContainer.classList.add('hidden');
+                                    if (calculatedOriginalParent && !calculatedOriginalParent.contains(calculatedListContainer)) {
+                                        calculatedOriginalParent.appendChild(calculatedListContainer);
+                                    }
+
+                                    // If right half has no other visible sections (all children hidden), collapse it
+                                    if (rightHalf && gridContainer) {
+                                        const hasVisibleContent = Array.from(rightHalf.children).some(ch => !ch.classList.contains('hidden'));
+                                        if (!hasVisibleContent) {
+                                            rightHalf.classList.add('hidden');
+                                            gridContainer.classList.remove('md:grid-cols-2');
+                                            if (modalContent) {
+                                                modalContent.classList.remove('max-w-6xl');
+                                                modalContent.classList.add('max-w-xl');
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if(isManual) {
+                                     if (rightHalf && gridContainer) {
+                                        rightHalf.classList.remove('hidden');
+                                        gridContainer.classList.add('md:grid-cols-2');
+                                        // Widen modal
+                                        if (modalContent) {
+                                            modalContent.classList.remove('max-w-xl');
+                                            modalContent.classList.add('max-w-6xl');
+                                        }
+
+                                        // Move container into right pane if not already
+                                        if (!rightHalf.contains(manualOptionsContainer)) {
+                                            rightHalf.appendChild(manualOptionsContainer);
+                                        }
+                                    }
+                                    manualOptionsContainer.classList.remove('hidden');
+
+                                    const optionsList = document.getElementById('item-question-options-list');
+                                    if (optionsList && optionsList.children.length === 0) {
+                                        if (window.addOptionField) {
+                                            window.addOptionField(optionsList);
+                                        }
+                                    }
+                                } else {
+                                    manualOptionsContainer.classList.add('hidden');
+                                    if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
+                                        manualOriginalParent.appendChild(manualOptionsContainer);
+                                    }
+
+                                     if (rightHalf && gridContainer) {
+                                        const hasVisibleContent = Array.from(rightHalf.children).some(ch => !ch.classList.contains('hidden'));
+                                        if (!hasVisibleContent) {
+                                            rightHalf.classList.add('hidden');
+                                            gridContainer.classList.remove('md:grid-cols-2');
+                                            if (modalContent) {
+                                                modalContent.classList.remove('max-w-6xl');
+                                                modalContent.classList.add('max-w-xl');
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Add event listeners
+                            questionTypeSelect.addEventListener('change', updateOptionsVisibility);
+                            optionsSourceRadios.forEach(radio => {
+                                radio.addEventListener('change', updateOptionsVisibility);
+                            });
+
+                            // Initial visibility check
+                            updateOptionsVisibility();
+                        });
+                    </script>
+
+                    {# Document Field Fields (Initially Hidden) #}
+                    <div id="item-document-fields" class="hidden">
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="item-document-label" class="block text-gray-700 text-sm font-semibold">{{ _('Document Label') }}</label>
+                                <button type="button" id="document-translations-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center shrink-0" title="{{ _('Add translations') }}">
+                                    <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                    {{ _('Translations') }}
+                                </button>
+                            </div>
+                            <input type="text" data-field-type="label" id="item-document-label" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Document Label') }}" required>
+                        </div>
+
+                        <!-- Optional Document Type -->
+                        <div class="mb-4">
+                            <label for="item-document-type" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Document Type (Optional)') }}</label>
+                            <select id="item-document-type" name="document_type" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">{{ _('Select document type...') }}</option>
+                                {% for doc_type in config.DOCUMENT_TYPES %}
+                                    <option value="{{ doc_type }}">{{ doc_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="item-document-description" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Description (Optional)') }}</label>
+                            <textarea data-field-type="description" id="item-document-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)') }}"></textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="item-document-max-documents" class="block text-gray-700 text-sm font-semibold mb-2">
+                                {{ _('Maximum Documents Allowed') }}
+                                <span class="ml-1 text-gray-500 text-xs font-normal">({{ _('Leave empty for unlimited') }})</span>
+                            </label>
+                            <input type="number" id="item-document-max-documents" name="max_documents" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" min="1" placeholder="{{ _('Unlimited') }}">
+                        </div>
+
+                        {# Document Field Display Options #}
+                        <div class="mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3">{{ _('Upload Modal Fields') }}</h4>
+                            <p class="text-xs text-gray-600 mb-3">{{ _('Select which fields to show in the document upload modal during data entry:') }}</p>
+
+                            <div class="space-y-3">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="item-document-show-language" name="show_language" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Show Language selector') }}</span>
+                                </label>
+
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="item-document-show-type" name="show_document_type" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Show Document Type selector') }}</span>
+                                </label>
+
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="item-document-show-year" name="show_year" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">{{ _('Show Year/Period selector') }}</span>
+                                    </label>
+
+                                    {# Period Type Options - Shown when year selector is enabled #}
+                                    <div id="period-type-options" class="ml-6 mt-2 space-y-1 hidden">
+                                        <p class="text-xs text-gray-600 mb-1">{{ _('Allowed period types:') }}</p>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="item-document-period-single-year" name="allow_single_year" class="form-checkbox h-3 w-3 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
+                                            <span class="ml-2 text-xs text-gray-700">{{ _('Single Year') }}</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="item-document-period-year-range" name="allow_year_range" class="form-checkbox h-3 w-3 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
+                                            <span class="ml-2 text-xs text-gray-700">{{ _('Year Range') }}</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="item-document-period-month-range" name="allow_month_range" class="form-checkbox h-3 w-3 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
+                                            <span class="ml-2 text-xs text-gray-700">{{ _('Month Range') }}</span>
+                                        </label>
+                                    </div>
+
+                                    {# Fixed period when the focal-point period selector is hidden (show_year off) #}
+                                    <div id="document-fixed-period-block" class="ml-6 mt-3 space-y-2 p-3 border border-gray-200 rounded-md bg-white">
+                                        <p class="text-xs font-medium text-gray-700">{{ _('Fixed period for uploads') }}</p>
+                                        <p class="text-xs text-gray-500">{{ _('When the Year/Period selector is hidden, all uploads use this period. Focal points cannot change it.') }}</p>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" name="preset_period_mode" value="custom" id="item-doc-preset-mode-custom" class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" checked>
+                                                <span class="text-sm text-gray-700">{{ _('Specific period') }}</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" name="preset_period_mode" value="assignment" id="item-doc-preset-mode-assignment" class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                                <span class="text-sm text-gray-700">{{ _('Same as assignment period') }}</span>
+                                            </label>
+                                        </div>
+                                        <p id="item-doc-preset-assignment-hint" class="text-xs text-gray-500 hidden">{{ _('Uses the period of the current assignment (shown in the form header).') }}</p>
+                                        <div id="document-fixed-period-custom-fields">
+                                        <div>
+                                            <label for="item-doc-preset-period-type" class="block text-xs text-gray-600 mb-1">{{ _('Period type') }}</label>
+                                            <select id="item-doc-preset-period-type" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                                <option value="single-year">{{ _('Single Year') }}</option>
+                                                <option value="year-range">{{ _('Year Range') }}</option>
+                                                <option value="month-range">{{ _('Month Range') }}</option>
+                                            </select>
+                                        </div>
+                                        <div id="item-doc-preset-single-year-fields" class="item-doc-preset-period-fields">
+                                            <label for="item-doc-preset-single-year" class="block text-xs text-gray-600 mb-1">{{ _('Year') }}</label>
+                                            <select id="item-doc-preset-single-year"
+                                                    class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                    data-year-select="true"
+                                                    data-year-min="2000"
+                                                    data-year-max="2100">
+                                                <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                            </select>
+                                        </div>
+                                        <div id="item-doc-preset-year-range-fields" class="item-doc-preset-period-fields hidden">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label for="item-doc-preset-start-year" class="block text-xs text-gray-600 mb-1">{{ _('Start Year') }}</label>
+                                                    <select id="item-doc-preset-start-year"
+                                                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                            data-year-select="true"
+                                                            data-year-min="2000"
+                                                            data-year-max="2100">
+                                                        <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="item-doc-preset-end-year" class="block text-xs text-gray-600 mb-1">{{ _('End Year') }}</label>
+                                                    <select id="item-doc-preset-end-year"
+                                                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                            data-year-select="true"
+                                                            data-year-min="2000"
+                                                            data-year-max="2100">
+                                                        <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div id="item-doc-preset-month-range-fields" class="item-doc-preset-period-fields hidden">
+                                            <div class="space-y-2">
+                                                <div>
+                                                    <label class="block text-xs text-gray-600 mb-1">{{ _('Start period') }}</label>
+                                                    <div class="grid grid-cols-2 gap-1">
+                                                        <select id="item-doc-preset-start-month-year"
+                                                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                data-year-select="true"
+                                                                data-year-min="2000"
+                                                                data-year-max="2100">
+                                                            <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                        </select>
+                                                        <select id="item-doc-preset-start-month" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                                            <option value="01">{{ _('Jan') }}</option>
+                                                            <option value="02">{{ _('Feb') }}</option>
+                                                            <option value="03">{{ _('Mar') }}</option>
+                                                            <option value="04">{{ _('Apr') }}</option>
+                                                            <option value="05">{{ _('May') }}</option>
+                                                            <option value="06">{{ _('Jun') }}</option>
+                                                            <option value="07">{{ _('Jul') }}</option>
+                                                            <option value="08">{{ _('Aug') }}</option>
+                                                            <option value="09">{{ _('Sep') }}</option>
+                                                            <option value="10">{{ _('Oct') }}</option>
+                                                            <option value="11">{{ _('Nov') }}</option>
+                                                            <option value="12">{{ _('Dec') }}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs text-gray-600 mb-1">{{ _('End period') }}</label>
+                                                    <div class="grid grid-cols-2 gap-1">
+                                                        <select id="item-doc-preset-end-month-year"
+                                                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                data-year-select="true"
+                                                                data-year-min="2000"
+                                                                data-year-max="2100">
+                                                            <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                        </select>
+                                                        <select id="item-doc-preset-end-month" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                                            <option value="01">{{ _('Jan') }}</option>
+                                                            <option value="02">{{ _('Feb') }}</option>
+                                                            <option value="03">{{ _('Mar') }}</option>
+                                                            <option value="04">{{ _('Apr') }}</option>
+                                                            <option value="05">{{ _('May') }}</option>
+                                                            <option value="06">{{ _('Jun') }}</option>
+                                                            <option value="07">{{ _('Jul') }}</option>
+                                                            <option value="08">{{ _('Aug') }}</option>
+                                                            <option value="09">{{ _('Sep') }}</option>
+                                                            <option value="10">{{ _('Oct') }}</option>
+                                                            <option value="11">{{ _('Nov') }}</option>
+                                                            <option value="12">{{ _('Dec') }}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" name="preset_period" id="item-doc-preset-period-value" value="">
+                                        {# Mirrors preset_period_mode radio; always submitted even when radio is disabled #}
+                                        <input type="hidden" name="preset_period_mode_value" id="item-doc-preset-mode-hidden" value="custom">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="item-document-show-public" name="show_public_checkbox" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Show Public Document checkbox') }}</span>
+                                </label>
+
+                                <div class="pt-2 border-t border-gray-200 mt-2">
+                                    <label class="flex items-start">
+                                        <input type="checkbox" id="item-document-entity-repo" name="cross_assignment_period_reuse" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5">
+                                        <span class="ml-2 text-sm text-gray-700">
+                                            {{ _("Satisfy from this entity's document repository") }}
+                                            <span class="block text-xs text-gray-500 font-normal mt-1">{{ _("Uploads by this entity's focal points for this form template are kept as a shared repository. When enabled, this field is satisfied if a matching document type already exists in that repository for the same entity, its period covers all years of the current assignment, and the document type matches the type set above.") }}</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        {# Translation fields handled by shared fields above #}
+                    </div>
+
+                    {# Matrix Fields (Initially Hidden) #}
+                    <div id="item-matrix-fields" class="hidden">
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="item-matrix-label" class="block text-gray-700 text-sm font-semibold">Matrix Title</label>
+                                <button type="button" id="matrix-translations-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center shrink-0" title="{{ _('Add translations') }}">
+                                    <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                    Translations
+                                </button>
+                            </div>
+                            <input type="text" data-field-type="label" id="item-matrix-label" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="Matrix Title">
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="item-matrix-description" class="block text-gray-700 text-sm font-semibold mb-2">Description (Optional)</label>
+                            <textarea data-field-type="description" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Description (Optional)"></textarea>
+                        </div>
+
+                        {# Matrix Configuration Section #}
+                        <div class="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-4">Matrix Configuration</h4>
+
+                            {# Row Mode Selection #}
+                            <div class="mb-4">
+                                <label class="block text-gray-700 text-sm font-semibold mb-2">Row Configuration Mode</label>
+                                <div class="flex items-center space-x-4">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="matrix_row_mode" value="manual" class="form-radio h-4 w-4 text-orange-600" checked>
+                                        <span class="ml-2 text-sm text-gray-700">Manual</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="matrix_row_mode" value="list_library" class="form-radio h-4 w-4 text-orange-600">
+                                        <span class="ml-2 text-sm text-gray-700">Advanced (List Library)</span>
+                                    </label>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500">Manual: Define fixed row headers. Advanced: Allow dynamic rows from list library during data entry.</p>
+                            </div>
+
+                            {# Manual Row Headers #}
+                            <div id="matrix-manual-rows-section" class="mb-4">
+                                <label class="block text-gray-700 text-sm font-semibold mb-2">Row Headers</label>
+                                <div id="matrix-rows-container" class="space-y-2">
+                                    <!-- Row headers will be added here dynamically -->
+                                </div>
+                                <button type="button" id="add-matrix-row-btn" class="text-sm font-medium text-green-700 hover:text-green-900 focus:outline-none focus:underline inline-flex items-center mt-2">
+                                    <i class="fas fa-plus w-3 h-3 mr-1"></i>
+                                    {{ _('Add Row') }}
+                                </button>
+                            </div>
+
+                            {# Advanced List Library Row Configuration #}
+                            <div id="matrix-list-library-section" class="mb-4 hidden">
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="matrix-list-select" class="block text-gray-700 text-sm font-semibold mb-2">Select List for Rows</label>
+                                        <select id="matrix-list-select" name="matrix_lookup_list_id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                            <option value="">Select List...</option>
+                                            {% for lst in lookup_lists_for_js %}
+                                                <option value="{{ lst.id }}"
+                                                        data-columns='{{ (lst.columns_config | tojson | e) if lst.columns_config else "[]" }}'
+                                                        {% if hasattr(lst, 'has_config_ui') and lst.has_config_ui %}data-has-config-ui="true"{% endif %}
+                                                        {% if hasattr(lst, 'config_js_handler') and lst.config_js_handler %}data-config-js-handler="{{ lst.config_js_handler }}"{% endif %}>{{ lst.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <p class="mt-1 text-xs text-gray-500">Users will be able to select rows from this list during data entry.</p>
+                                    </div>
+                                    <div id="matrix-display-column-wrapper" class="hidden">
+                                        <label for="matrix-list-display-column" class="block text-gray-700 text-sm font-semibold mb-2">Row Label Column</label>
+                                        <select id="matrix-list-display-column" name="matrix_list_display_column" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                            <option value="">Select Column...</option>
+                                        </select>
+                                        <p class="mt-1 text-xs text-gray-500">Values from this column will appear as row headers. Fields marked as [Multilingual] will display in the user's selected language.</p>
+                                    </div>
+                                </div>
+                                <div id="matrix-group-by-wrapper" class="mt-4 hidden">
+                                    <label for="matrix-group-by-column" class="block text-gray-700 text-sm font-semibold mb-2">Group Rows By Column <span class="text-gray-400 font-normal">(optional)</span></label>
+                                    <select id="matrix-group-by-column" name="matrix_group_by_column" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                        <option value="">No grouping</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500">Rows will be grouped under collapsible headers based on this column's values (e.g. group countries by region).</p>
+                                    <div id="matrix-group-controls-wrapper" class="mt-2 space-y-1 hidden">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="matrix-group-dropdown-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                                            <span class="ml-2 text-sm text-gray-700">Group dropdown options</span>
+                                        </label>
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="matrix-group-table-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                                            <span class="ml-2 text-sm text-gray-700">Group matrix table rows</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <label for="matrix-search-placeholder" class="block text-gray-700 text-sm font-semibold mb-2">Search Placeholder Text</label>
+                                    <input type="text"
+                                           id="matrix-search-placeholder"
+                                           name="matrix_search_placeholder"
+                                           class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                           placeholder="Search and select a row to add..."
+                                           value="Search and select a row to add...">
+                                    <p class="mt-1 text-xs text-gray-500">Customize the placeholder text shown in the search input when users add rows.</p>
+                                </div>
+                                <button type="button" id="matrix-list-add-filter-btn" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2">
+                                    <i class="fas fa-filter w-3 h-3 mr-1"></i>{{ _('Add Filter') }}
+                                </button>
+                                <div id="matrix-list-filters-container" class="mt-2 space-y-2"></div>
+                                <input type="hidden" name="matrix_list_filters_json" id="matrix-list-filters-json">
+
+                                {# Plugin-specific configuration UI (e.g., emergency operations) #}
+                                <div id="matrix-plugin-config-container" class="mt-4"></div>
+                            </div>
+
+                            {# Column Headers #}
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-gray-700 text-sm font-semibold">Column Headers</label>
+                                    <button type="button" id="matrix-column-headers-translations-matrix-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center shrink-0" title="{{ _('Manage column header translations') }}">
+                                        <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                        {{ _('Translations') }}
+                                    </button>
+                                </div>
+                                <div id="matrix-columns-container" class="space-y-2">
+                                    <!-- Column headers will be added here dynamically -->
+                                </div>
+                                <button type="button" id="add-matrix-column-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2">
+                                    <i class="fas fa-plus w-3 h-3 mr-1"></i>
+                                    {{ _('Add Column') }}
+                                </button>
+                            </div>
+
+                            {# Matrix Display Options #}
+                            <div class="mb-4">
+                                <label class="block text-gray-700 text-sm font-semibold mb-2">Display Options</label>
+                                <div class="space-y-2">
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" id="matrix-show-row-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                                        <span class="ml-2 text-sm text-gray-700">Show Row Totals</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" id="matrix-show-column-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                                        <span class="ml-2 text-sm text-gray-700">Show Column Totals</span>
+                                    </label>
+                                    <label class="inline-flex items-center hidden" id="matrix-auto-load-entities-wrapper">
+                                        <input type="checkbox" id="matrix-auto-load-entities" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                        <span class="ml-2 text-sm text-gray-700">Auto Load Entities</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" id="matrix-highlight-manual-rows" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                        <span class="ml-2 text-sm text-gray-700">Highlight Manually Added Rows</span>
+                                    </label>
+                                    <div id="matrix-legend-text-wrapper" class="mt-2 hidden">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <label class="block text-sm font-medium text-gray-700">Legend Text</label>
+                                            <div class="flex items-center space-x-2">
+                                                <button type="button" id="matrix-legend-hide-btn" class="text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline inline-flex items-center" title="{{ _('Legend is shown — click to hide') }}">
+                                                    <i class="fas fa-eye w-4 h-4 mr-1"></i>
+                                                    <span>{{ _('Legend shown') }}</span>
+                                                </button>
+                                                <button type="button" id="matrix-legend-text-translations-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center shrink-0" title="{{ _('Add translations') }}">
+                                                    <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                                    {{ _('Translations') }}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <input type="text" id="matrix-legend-text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="Manually added row" value="Manually added row">
+                                        <input type="hidden" id="matrix-legend-text-translations" value="{}">
+                                        <input type="hidden" id="matrix-legend-hide" value="false">
+                                        <p class="text-xs text-gray-500 mt-1">Text to display in the legend when manually added rows are highlighted</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {# Hidden inputs for matrix configuration #}
+                        <input type="hidden" name="config" id="item-matrix-config" value="{}">
+                        {# Translation fields handled by shared fields above #}
+
+                        {# Hidden template for matrix row #}
+                        <template id="matrix-row-template">
+                            <div class="matrix-row flex items-center space-x-2">
+                                <input type="text" class="row-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="Enter row header" data-field-type="label">
+                                <button type="button" class="move-row-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up') }}">
+                                    <i class="fas fa-arrow-up w-4 h-4"></i>
+                                </button>
+                                <button type="button" class="move-row-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down') }}">
+                                    <i class="fas fa-arrow-down w-4 h-4"></i>
+                                </button>
+                                <button type="button" class="remove-row-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Row') }}">
+                                    <i class="fas fa-trash w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </template>
+
+                        {# Hidden template for matrix column #}
+                        <template id="matrix-column-template">
+                            <div class="matrix-column">
+                                <div class="flex items-center space-x-2">
+                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="Enter column header">
+                                    <input type="hidden" class="column-name-translations" value="{}">
+                                    <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-32 sm:text-sm border-gray-300 rounded-md">
+                                        <option value="number">Number</option>
+                                        <option value="tick">Tick (✓)</option>
+                                    </select>
+                                    <select class="column-variable-select shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-40 sm:text-sm border-gray-300 rounded-md hidden" style="display: none;">
+                                        <option value="">Select Variable...</option>
+                                    </select>
+                                    <button type="button" class="move-column-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up') }}">
+                                        <i class="fas fa-arrow-up w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="move-column-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down') }}">
+                                        <i class="fas fa-arrow-down w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Column') }}">
+                                        <i class="fas fa-trash w-4 h-4"></i>
+                                    </button>
+                                </div>
+                                <div class="column-variable-options flex items-center gap-4 mt-2 ml-0">
+                                    <label class="flex items-center text-xs text-gray-600">
+                                        <input type="checkbox" class="column-is-variable mr-1">
+                                        <span>Is Variable</span>
+                                    </label>
+                                    <label class="flex items-center text-xs text-gray-600 column-variable-save-value-label" style="display: none;">
+                                        <input type="checkbox" class="column-variable-save-value mr-1" checked>
+                                        <span>Save value</span>
+                                        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help') }}">
+                                            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                            <span class="tooltip-text">{{ _('When checked, the variable column value is saved with the form and restored when the form is reopened. When unchecked, the value is always resolved fresh from the variable (e.g. template variable) and not stored.') }}</span>
+                                        </span>
+                                    </label>
+                                    <label class="flex items-center text-xs text-gray-600 column-variable-readonly-label" style="display: none;">
+                                        <input type="checkbox" class="column-variable-readonly mr-1" checked>
+                                        <span>Read-only</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    {# Plugin Field Configuration - Dynamically loaded from plugin templates #}
+                    <div id="item-plugin-fields-container">
+                        <!-- Plugin configuration will be dynamically loaded here from individual plugin templates -->
+                    </div>
+
+                    {# Properties Section - Common for all item types #}
+                    <div class="mb-3 border-t border-gray-200 pt-4">
+                        <label class="block text-gray-700 text-sm font-semibold mb-3">{{ _('Properties') }}</label>
+                        <div class="grid grid-cols-2 gap-6 items-center">
+                            {# Section Selector - Full width, spans both columns #}
+                            <div class="col-span-2">
+                                <label for="item-section-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Section') }}</label>
+                                <select name="section_id" id="item-section-select" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" required>
+                                    <option value="">{{ _('Select a section...') }}</option>
+                                </select>
+                            </div>
+
+                            {# Required Field #}
+                            <div>
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="is_required" id="item-required" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Required Field') }}</span>
+                                </label>
+                            </div>
+
+                            {# Order #}
+                            <div class="flex items-center space-x-2">
+                                <label for="item-order" class="text-gray-700 text-sm whitespace-nowrap">
+                                    {{ _('Order') }}
+                                    <i class="fas fa-info-circle ml-1 text-gray-400 cursor-help" title="{{ _('Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, 4.3)') }}"></i>
+                                </label>
+                                <input type="number" name="order" id="item-order" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-20 py-1 sm:text-sm border-gray-300 rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="4.1" step="0.1" min="0">
+                            </div>
+
+                            {# Allow "Data not available" #}
+                            <div>
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="allow_data_not_available" id="item-allow-data-not-available" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Allow "Data not available" option') }}</span>
+                                </label>
+                            </div>
+
+                            {# Layout Column Width #}
+                            <div>
+                                <select name="layout_column_width" id="item-layout-column-width" class="block w-full py-1 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="12">{{ _('Full Width (12/12)') }}</option>
+                                    <option value="6">{{ _('Half Width (6/12)') }}</option>
+                                    <option value="4">{{ _('One Third (4/12)') }}</option>
+                                    <option value="3">{{ _('One Quarter (3/12)') }}</option>
+                                    <option value="8">{{ _('Two Thirds (8/12)') }}</option>
+                                    <option value="9">{{ _('Three Quarters (9/12)') }}</option>
+                                </select>
+                            </div>
+
+                            {# Allow "Not applicable" #}
+                            <div>
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="allow_not_applicable" id="item-allow-not-applicable" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Allow "Not applicable" option') }}</span>
+                                </label>
+                            </div>
+
+                            {# Force new row #}
+                            <div>
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="layout_break_after" id="item-layout-break-after" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Force new row after this item') }}</span>
+                                </label>
+                            </div>
+
+                            {# Indirect reach (shown conditionally) #}
+                            <div id="indirect-reach-row" style="display: none;">
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="indirect_reach" id="item-indirect-reach" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Indirect reach') }}</span>
+                                </label>
+                            </div>
+
+                            {# Plugin options will be dynamically added here by the item modal #}
+                        </div>
+
+                        {# Rules Section - Below Properties Grid #}
+                        <div class="mt-6 pt-4 border-t border-gray-100">
+                            <div class="flex flex-wrap gap-4">
+                                <button type="button" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center toggle-rule-builder" data-target="#item-relevance-rule-section">
+                                    <i class="fas fa-plus-circle mr-1"></i> {{ _('Add Relevance Rule') }}
+                                </button>
+                                <div id="validation-rule-toggle-section">
+                                    <button type="button" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center toggle-rule-builder" data-target="#item-validation-rule-section">
+                                        <i class="fas fa-plus-circle mr-1"></i> {{ _('Add Validation Rule') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {# --- Right Half: Rules (Initially Hidden) --- #}
+                <div class="modal-right-half hidden">
+                    {# Relevance Rule Section #}
+                    <div id="item-relevance-rule-section" class="hidden border p-4 rounded-md bg-gray-50">
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">Relevance Rule</label>
+                        <div id="item-relevance-rule-builder">
+                            {# Rule builder UI will be generated here by JS #}
+                        </div>
+                        <input type="hidden" name="relevance_condition" id="item-relevance-condition">
+                    </div>
+
+                    {# Validation Rule Section (for Indicator/Question only) #}
+                    <div id="item-validation-rule-section" class="hidden mt-6 border p-4 rounded-md bg-gray-50">
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">Validation Rule</label>
+                        <div id="item-validation-rule-builder">
+                            {# Rule builder UI will be generated here by JS #}
+                        </div>
+                        <input type="hidden" name="validation_condition" id="item-validation-condition">
+
+                        <div class="mt-4">
+                            <label for="item-validation-message" class="block text-gray-700 text-sm font-semibold mb-2">Validation Message</label>
+                            <textarea name="validation_message" id="item-validation-message" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="Message to show if validation fails"></textarea>
+                            <p class="mt-1 text-xs text-gray-500">Message to display to the user if the validation rule is not met.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {# --- END: Grid Container for Two Halves --- #}
+
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                <button type="submit" id="item-modal-submit-btn" name="submit" class="btn btn-success">Add Item</button>
+            </div>
+        </form>
+    </div>
+</div>

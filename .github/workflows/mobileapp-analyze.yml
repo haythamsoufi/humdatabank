@@ -1,0 +1,43 @@
+name: MobileApp analyze
+
+on:
+  pull_request:
+    paths:
+      - 'MobileApp/**'
+      - '.github/workflows/mobileapp-analyze.yml'
+
+jobs:
+  dart-analyze:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: MobileApp
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          cache: true
+
+      - name: pub get
+        run: flutter pub get
+
+      # pubspec.yaml lists `.env` as an asset; CI checkouts omit the gitignored file.
+      - name: Ensure .env exists for asset bundle / tests
+        run: touch .env
+
+      - name: dart analyze
+        run: dart analyze lib --fatal-infos
+
+      - name: flutter test
+        run: flutter test --coverage
+
+      - name: Styling guard scripts (diff vs base)
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1 || true
+          python MobileApp/scripts/check_theme_drift.py --git-diff --base "origin/${{ github.base_ref }}"
+          python MobileApp/scripts/check_raw_hex_in_ui.py --git-diff --base "origin/${{ github.base_ref }}"

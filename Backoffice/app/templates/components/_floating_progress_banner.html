@@ -1,0 +1,93 @@
+{# Shared floating progress/status banner.
+
+   Centralize markup so pages only pass IDs and button config.
+
+   NOTE: Use inline colors so Tailwind purge cannot remove bg utilities like bg-black/90
+   (we intentionally keep colors in `style=`).
+
+   z-index must exceed AG Grid column-visibility UI (.ag-column-visibility-button-container z-index 100;
+   panel/backdrop up to 10001) and sit above normal page chrome; inline z-index avoids Tailwind purge issues.
+#}
+
+{% macro floating_progress_banner(
+    banner_id,
+    title_id,
+    detail_id,
+    percent_id,
+    bar_id,
+    spinner_id=None,
+    spinner_classes='mt-0.5 animate-spin rounded-full h-4 w-4 flex-shrink-0',
+    spinner_style='border-bottom: 2px solid rgba(255,255,255,0.85);',
+    title_default='Processing...',
+    detail_default='Preparing...',
+    percent_default='0%',
+    percent_classes='text-xs font-medium tabular-nums flex-shrink-0',
+    percent_style='color: rgba(255,255,255,0.85);',
+    detail_classes='text-xs truncate',
+    detail_style='color: rgba(255,255,255,0.75);',
+    show_percent=True,
+    show_progress=True,
+    cancel_wrap_id=None,
+    cancel_button_id=None,
+    cancel_button_label=None,
+    cancel_button_aria_label=None,
+    buttons=None,
+    width='22rem'
+) -%}
+<div id="{{ banner_id }}"
+     class="hidden fixed top-4 right-4 max-w-[calc(100vw-2rem)] rounded-lg shadow-xl"
+     style="z-index: 11050; width: {{ width }}; background: rgba(0,0,0,0.92); color: #ffffff; border: 1px solid rgba(255,255,255,0.10);"
+     role="status"
+     aria-live="polite">
+    <div class="px-4 py-3">
+        <div class="flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3 min-w-0">
+                {% if spinner_id %}
+                <div id="{{ spinner_id }}"
+                     class="{{ spinner_classes }}"
+                     style="{{ spinner_style }}"></div>
+                {% else %}
+                <div class="{{ spinner_classes }}"
+                     style="{{ spinner_style }}"></div>
+                {% endif %}
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold truncate" id="{{ title_id }}">{{ title_default }}</p>
+                    <p class="{{ detail_classes }}" style="{{ detail_style }}" id="{{ detail_id }}">{{ detail_default }}</p>
+                </div>
+            </div>
+            {% if show_percent %}
+            <div class="{{ percent_classes }}" style="{{ percent_style }}" id="{{ percent_id }}">{{ percent_default }}</div>
+            {% endif %}
+        </div>
+
+        {% if show_progress %}
+        <div class="mt-2 w-full rounded-full h-1.5" style="background: rgba(255,255,255,0.18);">
+            <div id="{{ bar_id }}" class="h-1.5 rounded-full transition-all duration-300" style="width: 0%; background: rgba(255,255,255,0.95);"></div>
+        </div>
+        {% endif %}
+
+        {% if cancel_wrap_id and cancel_button_id %}
+        <div id="{{ cancel_wrap_id }}" class="hidden mt-3 flex justify-end">
+            <button type="button"
+                    id="{{ cancel_button_id }}"
+                    class="processing-status-cancel-btn text-xs font-medium px-3 py-1.5 rounded border transition-colors"
+                    style="color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); background: transparent;"
+                    aria-label="{{ cancel_button_aria_label or cancel_button_label or 'Cancel' }}">{{ cancel_button_label or 'Cancel' }}</button>
+        </div>
+        {% endif %}
+
+        {% if buttons %}
+        <div class="mt-3 flex justify-end gap-2">
+            {% for b in buttons %}
+            <button type="button"
+                    id="{{ b.id }}"
+                    class="{{ b.classes }}"
+                    style="{{ b.style }}"
+                    aria-label="{{ b.aria_label }}">{{ b.label }}</button>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{%- endmacro %}
+

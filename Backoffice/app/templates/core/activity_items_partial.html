@@ -1,0 +1,155 @@
+{% from "components/_profile_icon.html" import profile_icon %}
+{% for activity in recent_activities %}
+    {% set sk = activity.summary_key %}
+    {% set sp = activity.summary_params if activity.summary_params else {} %}
+    {% set ct = (sp.get('change_type') or 'updated')|lower %}
+    {% set assignment_id = activity.assignment_id %}
+    {% set field_id = sp.get('field_id') if sp else None %}
+    {% if assignment_id %}
+        {% set base_url = url_for('forms.view_edit_form', form_type='assignment', form_id=assignment_id) %}
+        {% if field_id %}
+            {% set activity_href = base_url + '#field-' ~ field_id %}
+        {% else %}
+            {% set activity_href = base_url %}
+        {% endif %}
+    {% else %}
+        {% set activity_href = '' %}
+    {% endif %}
+
+    {# Wrap the clickable card in an anchor when we have a target URL (CSP-safe, no inline JS) #}
+    {% set activity_user_id = activity.user.id if activity.user else '' %}
+    {% set activity_template_period = activity.summary_params.get('template_period') if activity.summary_params else '' %}
+    {% if not activity_template_period %}
+        {# Fallback: construct from template and period if template_period not available #}
+        {% set template_name = activity.summary_params.get('template') if activity.summary_params else '' %}
+        {% set period_name = activity.summary_params.get('period') if activity.summary_params else '' %}
+        {% if template_name and period_name %}
+            {% set activity_template_period = template_name ~ ' - ' ~ period_name %}
+        {% elif template_name %}
+            {% set activity_template_period = template_name %}
+        {% endif %}
+    {% endif %}
+    {% if activity_href %}
+    <a href="{{ activity_href }}" class="block activity-item-wrapper" data-user-id="{{ activity_user_id }}" data-template-period="{{ activity_template_period }}">
+        <div class="activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+    {% else %}
+    <div class="activity-item-wrapper activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" data-user-id="{{ activity_user_id }}" data-template-period="{{ activity_template_period }}">
+    {% endif %}
+        <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 mr-3">
+                    {{ profile_icon(activity.user, 'md', false, false, false, 'avatar-circle') }}
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        {% if activity.user %}
+                            {{ activity.user.name or activity.user.email.split('@')[0] }}
+                        {% else %}
+                            {{ _('Unknown User') }}
+                        {% endif %}
+                        <span class="text-xs font-normal text-gray-500">
+                            {{ activity.time_ago }}
+                            {% if activity.created_at %}
+                                <span class="text-gray-400 ml-1">({{ activity.created_at|format_datetime_localized('short', 'short') }})</span>
+                            {% elif activity.timestamp %}
+                                <span class="text-gray-400 ml-1">({{ activity.timestamp|format_datetime_localized('short', 'short') }})</span>
+                            {% elif activity.activity_time %}
+                                <span class="text-gray-400 ml-1">({{ activity.activity_time|format_datetime_localized('short', 'short') }})</span>
+                            {% endif %}
+                        </span>
+                    </h3>
+                    {# Template / assignment title for context #}
+                    {% if sp.get('template') %}
+                        <div class="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                            <i class="fas fa-file-alt text-gray-400"></i>
+                            <span class="font-medium">{{ sp.get('template') }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {# Change-type badge based on summary params (no context_data) #}
+            {# Top-right badge: show count only when multiple #}
+            {% if sk == 'activity.form_data_updated.multiple' and sp.get('count') %}
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    <i class="fas fa-list mr-1"></i>
+                    {{ sp.get('count') }}
+                </span>
+            {% endif %}
+        </div>
+
+        <p class="text-sm text-gray-700">
+            {% if sk == 'activity.form_data_updated.single' %}
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium mr-2 align-middle
+                    {% if ct == 'added' %} bg-green-100 text-green-800
+                    {% elif ct == 'removed' %} bg-red-100 text-red-800
+                    {% else %} bg-blue-100 text-blue-800{% endif %}">
+                    <i class="{% if ct == 'added' %}fas fa-plus{% elif ct == 'removed' %}fas fa-minus{% else %}fas fa-pen{% endif %} mr-1"></i>
+                    {% if ct == 'added' %}{{ _('Added') }}{% elif ct == 'removed' %}{{ _('Removed') }}{% else %}{{ _('Updated') }}{% endif %}
+                </span>
+            {% endif %}
+            {% if sk == 'activity.form_data_updated.single' %}
+                {% set ict = (sp.get('change_type') or 'updated')|lower %}
+                {% set field_label = localized_field_name(sp.get('field_id'), sp.get('field'), sp.get('field_id_kind'), assignment_id) %}
+                {% set field_id = sp.get('field_id') %}
+                {% set old_val = sp.get('old') %}
+                {% set new_val = sp.get('new') %}
+                {% if ict == 'added' %}
+                    {% if (old_val is mapping and old_val.get('_matrix_change')) or (new_val is mapping and new_val.get('_matrix_change')) %}
+                        {{ render_matrix_change(field_label, old_val if old_val is mapping else {}, new_val if new_val is mapping else {}, field_id)|safe }}
+                    {% else %}
+                        {{ field_label }}: <span class="text-green-600">{{ format_activity_value(new_val, field_id, compare_value=old_val)|safe }}</span>
+                    {% endif %}
+                {% elif ict == 'removed' %}
+                    {% if (old_val is mapping and old_val.get('_matrix_change')) or (new_val is mapping and new_val.get('_matrix_change')) %}
+                        {{ render_matrix_change(field_label, old_val if old_val is mapping else {}, new_val if new_val is mapping else {}, field_id)|safe }}
+                    {% else %}
+                        {{ field_label }}: <span class="text-red-600">{{ format_activity_value(old_val, field_id)|safe }}</span>
+                    {% endif %}
+                {% else %}
+                    {# For updated, handle matrix-style changes differently #}
+                    {% if (old_val is mapping and old_val.get('_matrix_change')) or (new_val is mapping and new_val.get('_matrix_change')) %}
+                        {{ render_matrix_change(field_label, old_val if old_val is mapping else {}, new_val if new_val is mapping else {}, field_id)|safe }}
+                    {% else %}
+                        {# Default: show old → new format #}
+                        {{ field_label }}: <span class="text-red-600">{{ format_activity_value(old_val, field_id)|safe }}</span> <span class="text-gray-400">→</span> <span class="text-green-600">{{ format_activity_value(new_val, field_id)|safe }}</span>
+                    {% endif %}
+                {% endif %}
+            {% else %}
+                {{ render_activity_summary(activity) }}
+            {% endif %}
+        </p>
+        {% if sk == 'activity.form_data_updated.multiple' and sp.get('changes') %}
+            <div class="mt-2 space-y-1">
+                {% for ch in sp.get('changes') %}
+                    {% set ict = (ch.get('change_type') or 'updated')|lower %}
+                    <div class="flex items-start text-xs">
+                        <span class="inline-flex items-center px-1 py-0.5 rounded font-medium mr-2
+                            {% if ict == 'added' %} bg-green-100 text-green-800
+                            {% elif ict == 'removed' %} bg-red-100 text-red-800
+                            {% else %} bg-blue-100 text-blue-800{% endif %}">
+                            {% if ict == 'added' %}{{ _('Added') }}{% elif ict == 'removed' %}{{ _('Removed') }}{% else %}{{ _('Updated') }}{% endif %}
+                        </span>
+                        <span class="text-gray-800">
+                            {% set ch_field_id = ch.get('field_id') %}
+                            {% set ch_label = localized_field_name(ch.get('field_id'), ch.get('field'), ch.get('field_id_kind'), assignment_id) %}
+                            {% set ch_old = ch.get('old') %}
+                            {% set ch_new = ch.get('new') %}
+                            {% if (ch_old is mapping and ch_old.get('_matrix_change')) or (ch_new is mapping and ch_new.get('_matrix_change')) %}
+                                {{ render_matrix_change(ch_label, ch_old if ch_old is mapping else {}, ch_new if ch_new is mapping else {}, ch_field_id)|safe }}
+                            {% else %}
+                                {{ ch_label }}
+                                {% if ict == 'added' %}: <span class="text-green-600">{{ format_activity_value(ch_new, ch_field_id)|safe }}</span>
+                                {% elif ict == 'removed' %}: <span class="text-red-600">{{ format_activity_value(ch_old, ch_field_id)|safe }}</span>
+                                {% else %}: <span class="text-red-600">{{ format_activity_value(ch_old, ch_field_id)|safe }}</span> <span class="text-gray-400">→</span> <span class="text-green-600">{{ format_activity_value(ch_new, ch_field_id)|safe }}</span>{% endif %}
+                            {% endif %}
+                        </span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    {% if activity_href %}
+    </a>
+    {% endif %}
+{% endfor %}

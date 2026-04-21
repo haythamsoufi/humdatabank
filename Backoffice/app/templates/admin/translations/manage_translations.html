@@ -1,0 +1,2021 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ _('Manage Translations') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <style>
+        .tab-button {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            border-bottom-color: #3b82f6 !important;
+            color: #2563eb !important;
+        }
+        .po-import-tab-btn {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .po-import-tab-btn.active {
+            border-bottom-color: #3b82f6 !important;
+            color: #2563eb !important;
+        }
+        #translations-io-modal {
+            align-items: flex-start;
+        }
+        #translations-io-modal > div {
+            display: flex;
+            flex-direction: column;
+        }
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+        .tab-panel {
+            /* Let Tailwind's `.hidden` control visibility */
+        }
+        .tab-panel.hidden {
+            display: none !important;
+        }
+
+        /* Build & Apply dropdown in page header */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .action-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
+            min-width: 210px;
+            z-index: 200;
+        }
+        .action-dropdown-menu.hidden {
+            display: none;
+        }
+        .action-dropdown-divider {
+            border-top: 1px solid #e5e7eb;
+            margin: 2px 0;
+        }
+        .action-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 9px 16px;
+            text-align: left;
+            font-size: 13px;
+            color: #374151;
+            background: none;
+            border: none;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit;
+            line-height: 1.4;
+        }
+        .action-dropdown-item:hover {
+            background: #f3f4f6;
+            color: #111827;
+        }
+        .action-dropdown-item i {
+            width: 14px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .action-dropdown-item form {
+            display: contents;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+
+{% set build_apply_dropdown %}
+<div class="action-dropdown" id="build-apply-wrapper">
+    <button type="button"
+            class="professional-action-btn professional-action-btn-blue"
+            id="build-apply-btn"
+            title="{{ _('Extract, compile, and reload translation files') }}"
+            aria-haspopup="true"
+            aria-expanded="false">
+        <i class="fas fa-tools"></i>
+        <span>{{ _('Build & Apply') }}</span>
+        <i class="fas fa-chevron-down" style="font-size:10px;margin-left:4px;"></i>
+    </button>
+    <div class="action-dropdown-menu hidden" id="build-apply-menu" role="menu">
+        <form action="{{ url_for('utilities.extract_update_translations') }}" method="POST" style="display:contents;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="action-dropdown-item" role="menuitem"
+                    title="{{ _('Extract translatable strings from templates and Python files, then update all PO files') }}">
+                <i class="fas fa-sync-alt"></i>
+                <span>{{ _('Regenerate Strings') }}</span>
+            </button>
+        </form>
+        <div class="action-dropdown-divider"></div>
+        <button type="button" id="compile-translations-btn" class="action-dropdown-item" role="menuitem"
+                title="{{ _('Compile translations and restart the application') }}">
+            <i class="fas fa-cog"></i>
+            <span>{{ _('Compile Translations') }}</span>
+        </button>
+        <div class="action-dropdown-divider"></div>
+        <form action="{{ url_for('utilities.reload_translations') }}" method="POST" style="display:contents;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="action-dropdown-item" role="menuitem"
+                    title="{{ _('Reload translations without restarting') }}">
+                <i class="fas fa-rotate-right"></i>
+                <span>{{ _('Reload Translations') }}</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% endset %}
+
+    {{ page_header(
+        title=_('Translation Management'),
+        icon='fas fa-language',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Translation Management')}
+        ],
+        info_tooltip=_('Manage translations for the') + ' ' + ORG_NAME + '. ' + _('You can add, edit, and delete translations for all supported languages. After making changes, remember to compile the translations to apply them.'),
+        actions=[
+            {
+                'type': 'button',
+                'text': _('Import/Export'),
+                'icon': 'fas fa-exchange-alt',
+                'classes': 'professional-action-btn',
+                'attributes': {'id': 'translations-io-btn', 'title': _('Import or export translations safely')}
+            },
+            {
+                'type': 'custom',
+                'content': build_apply_dropdown
+            },
+            {
+                'type': 'button',
+                'text': _('Auto Translate All'),
+                'icon': 'fas fa-magic',
+                'classes': 'professional-action-btn professional-action-btn-purple',
+                'attributes': {'id': 'auto-translate-all-btn', 'title': _('Auto-translate all blank translation fields to all languages')}
+            }
+        ]
+    ) }}
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Main Content Container -->
+    <div class="bg-white shadow-md p-6 relative">
+        {% if translation_data %}
+            {{ ag_grid_container('translationsGrid', loading_text=_('Loading translations...'), grid_height='600px', include_card=false) }}
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-language text-gray-400 text-4xl mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">{{ _('No translations found') }}</h3>
+            <p class="text-gray-500 mb-4">{{ _('Translation files could not be loaded or are empty. Use "%(regenerate_strings)s" to extract translatable strings from your codebase.', regenerate_strings=_('Regenerate Strings')) }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+
+
+
+{# Import/Export Translations Modal #}
+<div id="translations-io-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-start justify-center px-4 py-8" role="dialog" aria-labelledby="translations-io-modal-title" aria-modal="true">
+    <div class="relative p-6 border max-w-4xl w-[90%] mx-auto shadow-xl rounded-lg bg-white flex flex-col" style="max-height: calc(100vh - 4rem);">
+        <div class="flex justify-between items-center mb-5 flex-shrink-0">
+            <h3 id="translations-io-modal-title" class="text-xl font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-exchange-alt w-6 h-6 mr-2 text-blue-600"></i>
+                {{ _('Import / Export Translations') }}
+            </h3>
+            <button type="button" class="text-gray-400 hover:text-gray-600 close-translations-io-modal" aria-label="{{ _('Close') }}">
+                <i class="fas fa-times w-5 h-5"></i>
+            </button>
+        </div>
+
+        {# Tab Navigation #}
+        {% call scroll_tab_bar(wrapper_class='mb-4 flex-shrink-0', inner_class='space-x-8', aria_label=_('Import or export')) %}
+                <button type="button"
+                        id="tab-export"
+                        class="tab-button active whitespace-nowrap py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                    <i class="fas fa-download mr-2"></i>{{ _('Export') }}
+                </button>
+                <button type="button"
+                        id="tab-import"
+                        class="tab-button whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <i class="fas fa-upload mr-2"></i>{{ _('Import') }}
+                </button>
+        {% endcall %}
+
+        {# Tab Content #}
+        <div class="tab-content flex-1 overflow-y-auto min-h-0">
+            {# Export Tab #}
+            <div id="tab-content-export" class="tab-panel">
+                <p class="text-sm text-gray-600 mb-4">
+                    {{ _('You can edit the exported files and reimport them. When importing, only translation columns (msgstr) will be updated. The msgid column is used as a lookup key and will not be changed even if edited.') }}
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {# Excel Export #}
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                            <i class="fas fa-file-excel text-green-600 mr-2"></i>{{ _('Excel Export') }}
+                        </h4>
+                        <p class="text-sm text-gray-600 mb-4">
+                            {{ _('Export all languages in a single Excel file. Easy to edit and reimport.') }}
+                        </p>
+                        <a href="{{ url_for('utilities.export_translations', format='xlsx') }}"
+                           class="btn btn-success btn-block">
+                            <i class="fas fa-download"></i> {{ _('Export Excel (.xlsx)') }}
+                        </a>
+                    </div>
+
+                    {# PO Export #}
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                            <i class="fas fa-file-code text-blue-600 mr-2"></i>{{ _('PO Export') }}
+                        </h4>
+                        <p class="text-sm text-gray-600 mb-4">
+                            {{ _('Export PO files for round-trip fidelity. Preserves plurals and metadata.') }}
+                        </p>
+                        <div class="space-y-3">
+                            <div class="border border-gray-100 rounded-md p-3">
+                                <label for="export-po-lang" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Export PO for language') }}</label>
+                                <div class="flex items-center gap-3">
+                                    <select id="export-po-lang" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                        {% for code in languages %}
+                                            <option value="{{ code }}">{{ (language_names.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <a id="export-po-link"
+                                       href="{{ url_for('utilities.export_translations', format='po', lang=(languages[0] if languages else 'en')) }}"
+                                       class="btn btn-primary whitespace-nowrap">
+                                        <i class="fas fa-download"></i> {{ _('Export') }}
+                                    </a>
+                                </div>
+                            </div>
+                            <a href="{{ url_for('utilities.export_translations', format='po-zip') }}"
+                               class="btn btn-secondary btn-block">
+                                <i class="fas fa-file-archive"></i> {{ _('Export all PO files (.zip)') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Import Tab #}
+            <div id="tab-content-import" class="tab-panel hidden">
+                <p class="text-sm text-gray-600 mb-4">
+                    {{ _('Import your edited files. Only translation values (msgstr) will be updated. The msgid column is used to match entries and will not be modified. Safety defaults: only non-empty translations are applied; unknown msgids are skipped.') }}
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {# Excel Import #}
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                            <i class="fas fa-file-excel text-green-600 mr-2"></i>{{ _('Excel Import') }}
+                        </h4>
+                        <p class="text-sm text-gray-600 mb-4">
+                            {{ _('Import an edited Excel file. Updates translations for all languages.') }}
+                        </p>
+
+                        <form method="POST" action="{{ url_for('utilities.import_translations') }}" enctype="multipart/form-data" id="translations-import-excel-form" class="space-y-4">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="format" value="xlsx"/>
+
+                            <div class="file-upload-wrapper relative h-32 border-2 border-dashed border-gray-300 rounded-lg">
+                                <input type="file" name="file" id="translations-import-excel-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select Excel file to import') }}" accept=".xlsx,.xls"/>
+                                <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
+                                    <div class="text-center">
+                                        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                        <p class="text-sm text-gray-500">{{ _('Click or drag Excel file here') }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start gap-2">
+                                <input id="translations-excel-only-non-empty" type="checkbox" name="only_non_empty" value="1" checked class="mt-1">
+                                <label for="translations-excel-only-non-empty" class="text-sm text-gray-700">
+                                    {{ _('Only apply non-empty translations (recommended)') }}
+                                </label>
+                            </div>
+
+                            <div class="flex items-start gap-2">
+                                <input id="translations-excel-allow-clear" type="checkbox" name="allow_clear" value="1" class="mt-1">
+                                <label for="translations-excel-allow-clear" class="text-sm text-gray-700">
+                                    {{ _('Allow clearing existing translations (dangerous)') }}
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-success btn-block">
+                                <i class="fas fa-upload"></i> {{ _('Import Excel') }}
+                            </button>
+                        </form>
+                    </div>
+
+                    {# PO Import #}
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                            <i class="fas fa-file-code text-blue-600 mr-2"></i>{{ _('PO Import') }}
+                        </h4>
+                        {# PO Import Tabs (Single / ZIP) #}
+                        <div class="border-b border-gray-200 mb-4">
+                            <nav class="-mb-px flex space-x-6" aria-label="{{ _('PO Import Tabs') }}">
+                                <button type="button"
+                                        id="po-import-tab-single"
+                                        class="po-import-tab-btn active whitespace-nowrap py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                                    {{ _('Single PO') }}
+                                </button>
+                                <button type="button"
+                                        id="po-import-tab-zip"
+                                        class="po-import-tab-btn whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                                    {{ _('PO ZIP (all languages)') }}
+                                </button>
+                            </nav>
+                        </div>
+
+                        <div id="po-import-panel-single">
+                            <p class="text-sm text-gray-600 mb-4">
+                                {{ _('Import a PO file for a specific language. Preserves plurals and metadata.') }}
+                            </p>
+
+                            <form method="POST" action="{{ url_for('utilities.import_translations') }}" enctype="multipart/form-data" id="translations-import-po-form" class="space-y-4">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="format" value="po"/>
+
+                                <div>
+                                    <label for="translations-import-po-lang" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Language') }}</label>
+                                    <select name="lang" id="translations-import-po-lang" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                                        {% for code in languages %}
+                                            {% if code != 'en' %}
+                                                <option value="{{ code }}">{{ (language_names.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="file-upload-wrapper relative h-32 border-2 border-dashed border-gray-300 rounded-lg">
+                                    <input type="file" name="file" id="translations-import-po-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select PO file to import') }}" accept=".po"/>
+                                    <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
+                                        <div class="text-center">
+                                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                            <p class="text-sm text-gray-500">{{ _('Click or drag PO file here') }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-start gap-2">
+                                    <input id="translations-po-only-non-empty" type="checkbox" name="only_non_empty" value="1" checked class="mt-1">
+                                    <label for="translations-po-only-non-empty" class="text-sm text-gray-700">
+                                        {{ _('Only apply non-empty translations (recommended)') }}
+                                    </label>
+                                </div>
+
+                                <div class="flex items-start gap-2">
+                                    <input id="translations-po-allow-clear" type="checkbox" name="allow_clear" value="1" class="mt-1">
+                                    <label for="translations-po-allow-clear" class="text-sm text-gray-700">
+                                        {{ _('Allow clearing existing translations (dangerous)') }}
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="btn btn-success btn-block">
+                                    <i class="fas fa-upload"></i> {{ _('Import PO') }}
+                                </button>
+                            </form>
+                        </div>
+
+                        <div id="po-import-panel-zip" class="hidden">
+                            <p class="text-sm text-gray-600 mb-4">
+                                {{ _('Import a ZIP package containing all languages (same format as the exported ZIP).') }}
+                            </p>
+
+                            <form method="POST" action="{{ url_for('utilities.import_translations') }}" enctype="multipart/form-data" id="translations-import-pozip-form" class="space-y-4">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="format" value="po-zip"/>
+
+                                <div class="file-upload-wrapper relative h-32 border-2 border-dashed border-gray-300 rounded-lg">
+                                    <input type="file" name="file" id="translations-import-pozip-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select PO ZIP file to import') }}" accept=".zip"/>
+                                    <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
+                                        <div class="text-center">
+                                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                            <p class="text-sm text-gray-500">{{ _('Click or drag ZIP file here') }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-start gap-2">
+                                    <input id="translations-pozip-only-non-empty" type="checkbox" name="only_non_empty" value="1" checked class="mt-1">
+                                    <label for="translations-pozip-only-non-empty" class="text-sm text-gray-700">
+                                        {{ _('Only apply non-empty translations (recommended)') }}
+                                    </label>
+                                </div>
+
+                                <div class="flex items-start gap-2">
+                                    <input id="translations-pozip-allow-clear" type="checkbox" name="allow_clear" value="1" class="mt-1">
+                                    <label for="translations-pozip-allow-clear" class="text-sm text-gray-700">
+                                        {{ _('Allow clearing existing translations (dangerous)') }}
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="btn btn-success btn-block">
+                                    <i class="fas fa-upload"></i> {{ _('Import PO ZIP') }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-xs text-gray-500 mt-4 text-center">
+                    {{ _('After importing, click "Compile Translations" to apply changes.') }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Edit Translation Modal #}
+<div id="edit-translation-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-start justify-center px-4 py-8" role="dialog" aria-labelledby="edit-translation-modal-title" aria-modal="true">
+    <div class="relative p-6 border max-w-5xl w-[95%] mx-auto shadow-xl rounded-lg bg-white flex flex-col" style="max-height: calc(100vh - 4rem);">
+        <div class="flex justify-between items-center mb-5 flex-shrink-0">
+            <h3 id="edit-translation-modal-title" class="text-xl font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-language w-6 h-6 mr-2 text-blue-600"></i>
+                <span id="edit-translation-modal-title-text">{{ _('Edit Translation') }}</span>
+            </h3>
+            <button type="button" class="btn-close-icon text-gray-500 hover:text-gray-700 close-edit-translation-modal" aria-label="{{ _('Close') }}">
+                <i class="fas fa-times w-5 h-5"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto min-h-0">
+            <form id="edit-translation-form" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" id="edit-translation-msgid" name="msgid" value=""/>
+
+                <div class="space-y-6">
+                    <div>
+                        <label for="edit-translation-msgid-display" class="block text-sm font-medium text-gray-700 mb-2">
+                            {{ _('Message ID') }}
+                        </label>
+                        <input type="text" id="edit-translation-msgid-display" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-100" readonly/>
+                        <p class="mt-1 text-sm text-gray-500">{{ _('This is the original text that will be translated.') }}</p>
+                        <div id="edit-translation-placeholder-warning" class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md hidden">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5 mr-2"></i>
+                                <div class="text-sm text-yellow-800">
+                                    <p class="font-semibold mb-1">{{ _('Format String Detected') }}</p>
+                                    <p class="mb-2">{{ _('This string contains placeholders that must be preserved in translations, for example:') }} <code>%(count)s</code>, <code>%s</code></p>
+                                    <p class="font-mono text-xs bg-yellow-100 p-2 rounded mb-2" id="edit-translation-placeholder-text"></p>
+                                    <p class="mb-1"><strong>{{ _('Important:') }}</strong></p>
+                                    <ul class="list-disc list-inside space-y-1 text-xs">
+                                        <li>{{ _('Keep all placeholders exactly as they appear, for example:') }} <code>%(count)s</code>, <code>%(name)s</code>, <code>%s</code>, <code>%d</code></li>
+                                        <li>{{ _('You can rearrange the text around the placeholders to fit the target language') }}</li>
+                                        <li>{{ _('Example:') }} "<code>%(count)s</code> shared" {{ _('in Arabic could be') }} "مشترك <code>%(count)s</code>" {{ _('or') }} "<code>%(count)s</code> مشترك"</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="edit-translation-fields-container">
+                        {# Translation fields will be dynamically loaded here #}
+                    </div>
+
+                    <div class="flex justify-between items-center gap-2 pt-6 border-t border-gray-200">
+                        <div class="flex gap-2">
+                            <button type="button" id="modal-auto-translate-btn" class="btn btn-warning" title="{{ _('Automatically translate blank fields using AI') }}">
+                                <i class="fas fa-magic" id="modal-auto-translate-icon"></i>
+                                <i class="fas fa-spinner fa-spin hidden" id="modal-auto-translate-spinner"></i>
+                                <span id="modal-auto-translate-text">{{ _('Auto Translate') }}</span>
+                            </button>
+                            <button type="button" id="modal-clear-translations-btn" class="btn btn-ghost-danger" title="{{ _('Clear all translation fields except English') }}">
+                                <i class="fas fa-eraser"></i>
+                                {{ _('Clear Translations') }}
+                            </button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" class="btn btn-secondary close-edit-translation-modal" id="edit-translation-cancel-btn">
+                                {{ _('Cancel') }}
+                            </button>
+                            <button type="submit" id="edit-translation-save-btn" class="btn btn-success" aria-busy="false">
+                                <span id="edit-translation-save-btn-text">{{ _('Save Translation') }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Auto-Translate Modal Configuration #}
+{% set auto_translate_config = {
+    'title': _('Auto-Translate All Translation Fields'),
+    'description': _('Translate all blank translation fields to all languages'),
+    'endpoint': url_for('utilities.api_auto_translate'),
+    'item_type': _('translation fields'),
+    'permission_context': 'translations',
+    'permission_code': 'admin.translations.manage'
+} %}
+
+<script id="auto-translate-config-json" type="application/json">{{ auto_translate_config | tojson | safe }}</script>
+
+{# Include centralized auto-translate modal #}
+{% include "components/auto_translate_modal.html" with context %}
+
+{% endblock %}
+
+{% block extra_js %}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    {# Set global config variable for auto-translate modal JS #}
+    <script nonce="{{ csp_nonce() }}">
+        // Read config from JSON script tag and set as global variable
+        // This must run before auto_translate_modal_js.html
+        (function() {
+            const configEl = document.getElementById('auto-translate-config-json');
+            if (configEl) {
+                try {
+                    const config = JSON.parse(configEl.textContent);
+                    window.autoTranslateConfigFromTemplate = {
+                        endpoint: config.endpoint || null,
+                        itemType: config.item_type || config.itemType || 'items',
+                        permission_context: config.permission_context || config.permissionContext || null,
+                        permission_code: config.permission_code || config.permissionCode || null
+                    };
+                } catch (e) {
+                    console.error('Failed to parse auto-translate config:', e);
+                    // Set defaults if parsing fails
+                    window.autoTranslateConfigFromTemplate = {
+                        endpoint: null,
+                        itemType: 'items',
+                        permission_context: null,
+                        permission_code: null
+                    };
+                }
+            } else {
+                console.error('Auto-translate config JSON element not found');
+                // Set defaults if element not found
+                window.autoTranslateConfigFromTemplate = {
+                    endpoint: null,
+                    itemType: 'items',
+                    permission_context: null,
+                    permission_code: null
+                };
+            }
+        })();
+    </script>
+
+    {# Include centralized auto-translate modal JavaScript #}
+    {% include 'components/auto_translate_modal_js.html' with context %}
+
+    <script nonce="{{ csp_nonce() }}">
+        (function() {
+            const openBtn = document.getElementById('translations-io-btn');
+            const modal = document.getElementById('translations-io-modal');
+            const closeBtn = modal ? modal.querySelector('.close-translations-io-modal') : null;
+
+            function openModal() {
+                if (!modal) return;
+                modal.classList.remove('hidden');
+            }
+            function closeModal() {
+                if (!modal) return;
+                modal.classList.add('hidden');
+            }
+
+            if (openBtn) openBtn.addEventListener('click', openModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeModal);
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) closeModal();
+                });
+            }
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeModal();
+            });
+
+            // Tab switching
+            const tabExport = document.getElementById('tab-export');
+            const tabImport = document.getElementById('tab-import');
+            const tabContentExport = document.getElementById('tab-content-export');
+            const tabContentImport = document.getElementById('tab-content-import');
+
+            function switchTab(tabName) {
+                if (tabName === 'export') {
+                    // Activate Export tab
+                    tabExport.classList.add('active', 'border-blue-500', 'text-blue-600');
+                    tabExport.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    tabImport.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                    tabImport.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    tabContentExport.classList.remove('hidden');
+                    tabContentImport.classList.add('hidden');
+                } else if (tabName === 'import') {
+                    // Activate Import tab
+                    tabImport.classList.add('active', 'border-blue-500', 'text-blue-600');
+                    tabImport.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    tabExport.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                    tabExport.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    tabContentImport.classList.remove('hidden');
+                    tabContentExport.classList.add('hidden');
+                }
+            }
+
+            if (tabExport) tabExport.addEventListener('click', () => switchTab('export'));
+            if (tabImport) tabImport.addEventListener('click', () => switchTab('import'));
+
+            // Export PO link sync
+            const exportPoLang = document.getElementById('export-po-lang');
+            const exportPoLink = document.getElementById('export-po-link');
+            const exportPoBase = "{{ url_for('utilities.export_translations') }}";
+            function syncExportPoLink() {
+                if (!exportPoLang || !exportPoLink) return;
+                const lang = exportPoLang.value || 'en';
+                exportPoLink.href = exportPoBase + "?format=po&lang=" + encodeURIComponent(lang);
+            }
+            if (exportPoLang) exportPoLang.addEventListener('change', syncExportPoLink);
+            syncExportPoLink();
+
+            // Import UI behavior - Safety toggles for Excel form
+            const excelOnlyNonEmpty = document.getElementById('translations-excel-only-non-empty');
+            const excelAllowClear = document.getElementById('translations-excel-allow-clear');
+
+            function syncExcelSafetyToggles() {
+                if (!excelOnlyNonEmpty || !excelAllowClear) return;
+                if (excelOnlyNonEmpty.checked) {
+                    excelAllowClear.checked = false;
+                    excelAllowClear.disabled = true;
+                    if (excelAllowClear.parentElement) excelAllowClear.parentElement.classList.add('opacity-60');
+                } else {
+                    excelAllowClear.disabled = false;
+                    if (excelAllowClear.parentElement) excelAllowClear.parentElement.classList.remove('opacity-60');
+                }
+            }
+            if (excelOnlyNonEmpty) excelOnlyNonEmpty.addEventListener('change', syncExcelSafetyToggles);
+            syncExcelSafetyToggles();
+
+            // Import UI behavior - Safety toggles for PO form
+            const poOnlyNonEmpty = document.getElementById('translations-po-only-non-empty');
+            const poAllowClear = document.getElementById('translations-po-allow-clear');
+
+            function syncPoSafetyToggles() {
+                if (!poOnlyNonEmpty || !poAllowClear) return;
+                if (poOnlyNonEmpty.checked) {
+                    poAllowClear.checked = false;
+                    poAllowClear.disabled = true;
+                    if (poAllowClear.parentElement) poAllowClear.parentElement.classList.add('opacity-60');
+                } else {
+                    poAllowClear.disabled = false;
+                    if (poAllowClear.parentElement) poAllowClear.parentElement.classList.remove('opacity-60');
+                }
+            }
+            if (poOnlyNonEmpty) poOnlyNonEmpty.addEventListener('change', syncPoSafetyToggles);
+            syncPoSafetyToggles();
+
+            // Import UI behavior - Safety toggles for PO ZIP form
+            const pozipOnlyNonEmpty = document.getElementById('translations-pozip-only-non-empty');
+            const pozipAllowClear = document.getElementById('translations-pozip-allow-clear');
+
+            function syncPoZipSafetyToggles() {
+                if (!pozipOnlyNonEmpty || !pozipAllowClear) return;
+                if (pozipOnlyNonEmpty.checked) {
+                    pozipAllowClear.checked = false;
+                    pozipAllowClear.disabled = true;
+                    if (pozipAllowClear.parentElement) pozipAllowClear.parentElement.classList.add('opacity-60');
+                } else {
+                    pozipAllowClear.disabled = false;
+                    if (pozipAllowClear.parentElement) pozipAllowClear.parentElement.classList.remove('opacity-60');
+                }
+            }
+            if (pozipOnlyNonEmpty) pozipOnlyNonEmpty.addEventListener('change', syncPoZipSafetyToggles);
+            syncPoZipSafetyToggles();
+
+            // PO Import sub-tabs (Single / ZIP)
+            const poTabSingle = document.getElementById('po-import-tab-single');
+            const poTabZip = document.getElementById('po-import-tab-zip');
+            const poPanelSingle = document.getElementById('po-import-panel-single');
+            const poPanelZip = document.getElementById('po-import-panel-zip');
+
+            function switchPoImportTab(which) {
+                if (!poTabSingle || !poTabZip || !poPanelSingle || !poPanelZip) return;
+                const isSingle = which === 'single';
+
+                poTabSingle.classList.toggle('active', isSingle);
+                poTabZip.classList.toggle('active', !isSingle);
+
+                // Keep Tailwind classes in sync
+                if (isSingle) {
+                    poTabSingle.classList.add('border-blue-500', 'text-blue-600');
+                    poTabSingle.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    poTabZip.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    poTabZip.classList.remove('border-blue-500', 'text-blue-600');
+                } else {
+                    poTabZip.classList.add('border-blue-500', 'text-blue-600');
+                    poTabZip.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    poTabSingle.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    poTabSingle.classList.remove('border-blue-500', 'text-blue-600');
+                }
+
+                poPanelSingle.classList.toggle('hidden', !isSingle);
+                poPanelZip.classList.toggle('hidden', isSingle);
+            }
+
+            if (poTabSingle) poTabSingle.addEventListener('click', () => switchPoImportTab('single'));
+            if (poTabZip) poTabZip.addEventListener('click', () => switchPoImportTab('zip'));
+            switchPoImportTab('single');
+        })();
+    </script>
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // Transform translations data for ag-grid.
+    // Obsolete (removed) entries carry a source prefixed with \x00 so the renderer
+    // can style them differently without a separate column.
+    const REMOVED_PREFIX = '\x00';
+    const translationsData = [
+        {% for msgid in all_msgids %}
+        {
+            msgid: {{ msgid|tojson|safe }},
+            source: {{ msgid_sources.get(msgid, _('Unknown'))|tojson|safe }},
+            removed: {{ (msgid in obsolete_msgids)|tojson|safe }},
+            {% for code in languages %}
+            {{ code }}: {{ translation_data.get(code, {}).get('translations', {}).get(msgid, '')|tojson|safe }},
+            {% endfor %}
+            edit_url: "{{ url_for('utilities.edit_translation', msgid=msgid) }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for ag-grid - dynamically generated
+    const columnDefs = [
+        {
+            field: 'source',
+            headerName: '{{ _("Source") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            wrapText: true,
+            cellRenderer: function(params) {
+                const removed = params.data && params.data.removed;
+                // Strip the internal \x00 prefix used to mark removed entries
+                const raw = (params.value || '').replace(/^\x00/, '');
+                const isUnknown = !raw || raw === '{{ _("Unknown") }}';
+                let display = raw.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                if (removed) {
+                    const sourceLabel = isUnknown ? '' : display;
+                    const removedBadge = '<span style="display:inline-flex;align-items:center;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;background:#fee2e2;color:#991b1b;margin-right:4px;" title="{{ _("This string was removed from source code") }}"><i class="fas fa-trash-alt" style="margin-right:3px;font-size:10px;"></i>{{ _("Removed") }}</span>';
+                    return '<div style="line-height:1.4">' + removedBadge + (sourceLabel ? '<span style="color:#6b7280;font-size:12px;">' + sourceLabel + '</span>' : '') + '</div>';
+                }
+
+                const hasPlaceholders = /%\([^)]+\)[sd]|%(?:[sd]|\.\d+[fd])/.test(raw);
+                if (hasPlaceholders) {
+                    display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="{{ _("Contains format placeholders - preserve them in translations") | replace("%", "%%") }}"><i class="fas fa-code mr-1"></i>' + display + '</span>';
+                }
+                return '<div title="' + raw.replace(/"/g, '&quot;') + '">' + display + '</div>';
+            },
+            cellStyle: function(params) {
+                const baseStyle = { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' };
+                if (params.data && params.data.removed) {
+                    baseStyle['background-color'] = '#fff7f7';
+                }
+                return baseStyle;
+            },
+            valueGetter: function(params) {
+                // Strip internal prefix for filtering/sorting so users search by page name
+                const v = (params.data && params.data.source) || '';
+                return v.replace(/^\x00/, '');
+            }
+        },
+        {
+            field: 'msgid',
+            headerName: '{{ _("Message ID") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            wrapText: true,
+            cellRenderer: function(params) {
+                const value = params.value || '';
+                const removed = params.data && params.data.removed;
+                const hasPlaceholders = /%\([^)]+\)[sd]|%(?:[sd]|\.\d+[fd])/.test(value);
+                let display = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                if (hasPlaceholders) {
+                    display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="{{ _("Contains format placeholders - preserve them in translations") | replace("%", "%%") }}"><i class="fas fa-code mr-1"></i>' + display + '</span>';
+                }
+                const style = removed ? ' style="text-decoration:line-through;color:#9ca3af;"' : '';
+                return '<div' + style + ' title="' + value.replace(/"/g, '&quot;') + '">' + display + '</div>';
+            },
+            cellStyle: function(params) {
+                const baseStyle = { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' };
+                const value = params.value || '';
+                const removed = params.data && params.data.removed;
+                const hasPlaceholders = /%\([^)]+\)[sd]|%(?:[sd]|\.\d+[fd])/.test(value);
+                if (hasPlaceholders && !removed) {
+                    baseStyle['background-color'] = '#fef3c7'; // yellow-100
+                }
+                if (removed) {
+                    baseStyle['background-color'] = '#fff7f7';
+                }
+                return baseStyle;
+            }
+        }{% for code in languages %},
+        {
+            field: '{{ code }}',
+            headerName: {{ (language_names.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper())|tojson|safe }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            wrapText: true,
+            cellRenderer: function(params) {
+                const value = params.value || '';
+                const hasPlaceholders = /%\([^)]+\)[sd]|%(?:[sd]|\.\d+[fd])/.test(value);
+                let display = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                if (hasPlaceholders) {
+                    display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="{{ _("Contains format placeholders - preserve them in translations") | replace("%", "%%") }}"><i class="fas fa-code mr-1"></i>' + display + '</span>';
+                }
+                return '<div title="' + value.replace(/"/g, '&quot;') + '">' + display + '</div>';
+            },
+            cellStyle: function(params) {
+                const baseStyle = { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' };
+                if (params.data && params.data.removed) {
+                    baseStyle['background-color'] = '#fff7f7';
+                    baseStyle['color'] = '#9ca3af';
+                }
+                return baseStyle;
+            }
+        }{% endfor %},
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 130,
+            minWidth: 100,
+            maxWidth: 160,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const msgid = params.data.msgid || '';
+                const encodedMsgid = encodeURIComponent(msgid);
+                const removed = params.data && params.data.removed;
+                const editBtn = '<button type="button" class="text-blue-600 hover:text-blue-900 edit-translation-btn" data-msgid="' + encodedMsgid + '" title="{{ _("Edit all translations") }}"><i class="fas fa-pen"></i></button>';
+                const delBtn = removed
+                    ? '<button type="button" class="text-red-600 hover:text-red-900 transition-colors delete-removed-translation-btn" data-msgid="' + encodedMsgid + '" title="{{ _("Permanently delete this removed string from all .po files") }}"><i class="fas fa-trash fa-fw"></i></button>'
+                    : '';
+                return '<div class="flex items-center gap-1 flex-nowrap">' + editBtn + delBtn + '</div>';
+            }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        var desiredOrder = ['source', 'msgid']
+            .concat({{ (languages or []) | tojson | safe }})
+            .concat(['actions']);
+
+        var result = AgGridHelper.create('translationsGrid', 'translations', columnDefs, translationsData, {
+            onReady: function(api) {
+                AgGridHelper.pinActionsColumn(api, desiredOrder);
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+
+    // Build & Apply dropdown toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropdownBtn = document.getElementById('build-apply-btn');
+        const dropdownMenu = document.getElementById('build-apply-menu');
+        if (dropdownBtn && dropdownMenu) {
+            dropdownBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isOpen = !dropdownMenu.classList.contains('hidden');
+                dropdownMenu.classList.toggle('hidden', isOpen);
+                dropdownBtn.setAttribute('aria-expanded', String(!isOpen));
+            });
+            document.addEventListener('click', function() {
+                dropdownMenu.classList.add('hidden');
+                dropdownBtn.setAttribute('aria-expanded', 'false');
+            });
+            dropdownMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
+    });
+
+    // Compile Translations with Confirmation
+    document.addEventListener('DOMContentLoaded', function() {
+        const compileBtn = document.getElementById('compile-translations-btn');
+        if (compileBtn) {
+            compileBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                const msg = '{{ _("Compiling translations will restart the application. This may cause a brief interruption in service. Do you want to continue?") }}';
+                function doCompile() {
+                    // Show loading state
+                    const originalText = compileBtn.innerHTML;
+                    compileBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Compiling...") }}';
+                    compileBtn.disabled = true;
+
+                    // Create and submit form
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '{{ url_for("utilities.compile_translations") }}';
+
+                    // Add CSRF token
+                    const csrfToken = document.querySelector('meta[name=csrf-token]');
+                    if (csrfToken) {
+                        const csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = 'csrf_token';
+                        csrfInput.value = csrfToken.getAttribute('content');
+                        form.appendChild(csrfInput);
+                    }
+
+                    // Add restart parameter
+                    const restartInput = document.createElement('input');
+                    restartInput.type = 'hidden';
+                    restartInput.name = 'restart';
+                    restartInput.value = '1';
+                    form.appendChild(restartInput);
+
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+                if (window.showConfirmation) {
+                    window.showConfirmation(msg, doCompile, null, '{{ _("Continue") }}', '{{ _("Cancel") }}', '{{ _("Compile Translations?") }}');
+                } else {
+                    doCompile();
+                }
+            });
+        }
+    });
+
+    // Translation-specific auto-translate implementation
+    // Wait for AG Grid to be initialized
+    function waitForGridApi() {
+        if (!window.gridApi) {
+            setTimeout(waitForGridApi, 50);
+            return;
+        }
+        initializeAutoTranslate();
+    }
+
+    // Start checking for grid API when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        waitForGridApi();
+    });
+
+    // Also try to initialize when the page loads (in case DOMContentLoaded already fired)
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(waitForGridApi, 100);
+    }
+
+
+    // Helper to lazily read the server-provided mapping of locale -> translation key
+    function getTranslationLangMap() {
+        if (!window.translationLangMap) {
+            const mapEl = document.getElementById('translation-lang-map-json');
+            const pairs = mapEl ? JSON.parse(mapEl.textContent) : [];
+            window.translationLangMap = Object.fromEntries(pairs);
+        }
+        return window.translationLangMap;
+    }
+
+    function initializeAutoTranslate() {
+        // Helper function to check if a string is PO file metadata
+        function isMetadataString(str) {
+            if (typeof str !== 'string') return false;
+            const strLower = str.toLowerCase();
+            const metadataKeys = [
+                'project-id-version', 'report-msgid-bugs-to', 'pot-creation-date',
+                'po-revision-date', 'last-translator', 'language-team', 'mime-version',
+                'content-type', 'content-transfer-encoding', 'plural-forms', 'generated-by'
+            ];
+            // Check if string contains 3+ metadata keys (indicates it's the header block)
+            const metadataKeyCount = metadataKeys.filter(key => strLower.includes(key)).length;
+            return metadataKeyCount >= 3;
+        }
+
+        // Helper function to filter out metadata strings from an array or set
+        function filterMetadata(collection) {
+            if (Array.isArray(collection)) {
+                return collection.filter(item => !isMetadataString(item));
+            } else if (collection instanceof Set) {
+                const filtered = new Set();
+                collection.forEach(item => {
+                    if (!isMetadataString(item)) {
+                        filtered.add(item);
+                    }
+                });
+                return filtered;
+            }
+            return collection;
+        }
+
+        // Function to get translation counts for the modal
+        window.getPageSpecificTranslationCounts = function(overwriteExisting = false, selectedMsgids = null) {
+            // Get selected rows from ag-grid if any
+            // Only includes rows that are currently displayed (visible after filtering)
+            let actualSelectedMsgids = selectedMsgids;
+            if (!actualSelectedMsgids && window.gridHelper && typeof window.gridHelper.getSelectedRows === 'function') {
+                const selectedRows = window.gridHelper.getSelectedRows();
+                if (selectedRows && selectedRows.length > 0) {
+                    const msgids = selectedRows.map(row => row.msgid).filter(msgid => msgid);
+                    actualSelectedMsgids = new Set(filterMetadata(msgids));
+                }
+            } else if (!actualSelectedMsgids && window.gridApi) {
+                // Fallback: filter selected nodes to only include displayed ones
+                let selectedRows = [];
+                if (typeof window.gridApi.getSelectedNodes === 'function') {
+                    const nodes = window.gridApi.getSelectedNodes() || [];
+                    selectedRows = nodes
+                        .filter(function(node) {
+                            return node && (node.displayed === true || node.displayed === undefined);
+                        })
+                        .map(function(node) { return node ? node.data : null; })
+                        .filter(function(row) { return row !== null && row !== undefined; });
+                } else if (typeof window.gridApi.getSelectedRows === 'function') {
+                    selectedRows = window.gridApi.getSelectedRows();
+                }
+                if (selectedRows && selectedRows.length > 0) {
+                    const msgids = selectedRows.map(row => row.msgid).filter(msgid => msgid);
+                    actualSelectedMsgids = new Set(filterMetadata(msgids));
+                }
+            }
+
+            // Filter out metadata from actualSelectedMsgids if it exists
+            if (actualSelectedMsgids) {
+                actualSelectedMsgids = filterMetadata(actualSelectedMsgids);
+            }
+
+            // Use server-side calculated counts for more reliability
+            const etcEl = document.getElementById('empty-translation-counts-json');
+            const serverCounts = etcEl ? JSON.parse(etcEl.textContent) : {};
+
+            // Get all msgids count if overwrite is enabled
+            const allMsgidsEl = document.getElementById('all-translation-msgids-json');
+            let allMsgids = allMsgidsEl ? JSON.parse(allMsgidsEl.textContent) : [];
+            // Filter out any metadata strings that might have slipped through
+            allMsgids = filterMetadata(allMsgids);
+            const totalMsgidsCount = allMsgids.length;
+
+            // Get empty translation msgids for filtering
+            const etmEl = document.getElementById('empty-translation-msgids-json');
+            const emptyTranslationMsgidsRaw = etmEl ? JSON.parse(etmEl.textContent) : {};
+            // Filter metadata from empty translation msgids
+            const emptyTranslationMsgids = {};
+            Object.keys(emptyTranslationMsgidsRaw).forEach(locale => {
+                emptyTranslationMsgids[locale] = filterMetadata(emptyTranslationMsgidsRaw[locale] || []);
+            });
+
+            // Build counts object dynamically based on enabled languages with mapping to translation keys
+            const counts = {};
+            const langMap = getTranslationLangMap(); // locale -> key
+            Object.entries(langMap).forEach(([locale, key]) => {
+                // Skip if locale or key is a metadata string
+                if (isMetadataString(locale) || isMetadataString(key)) {
+                    counts[key] = 0;
+                    return;
+                }
+
+                let count = 0;
+
+                if (overwriteExisting) {
+                    // If overwriting, count all msgids (or selected ones if any)
+                    if (actualSelectedMsgids && actualSelectedMsgids.size > 0) {
+                        count = actualSelectedMsgids.size;
+                    } else {
+                        // Ensure totalMsgidsCount is a number
+                        count = typeof totalMsgidsCount === 'number' ? totalMsgidsCount : (parseInt(totalMsgidsCount) || 0);
+                    }
+                } else {
+                    // Count empty translations (or selected empty ones if any)
+                    const emptyMsgids = emptyTranslationMsgids[locale] || [];
+                    if (actualSelectedMsgids && actualSelectedMsgids.size > 0) {
+                        // Count only empty msgids that are in the selection (and not metadata)
+                        count = emptyMsgids.filter(msgid =>
+                            !isMetadataString(msgid) && actualSelectedMsgids.has(msgid)
+                        ).length;
+                    } else {
+                        // Ensure serverCounts[locale] is a number
+                        const serverCount = serverCounts[locale];
+                        if (isMetadataString(serverCount)) {
+                            count = 0;
+                        } else {
+                            count = typeof serverCount === 'number' ? serverCount : (parseInt(serverCount) || 0);
+                        }
+                    }
+                }
+
+                // Ensure count is always a number (defensive programming)
+                const finalCount = typeof count === 'number' ? count : (parseInt(count) || 0);
+                if (isNaN(finalCount) || finalCount < 0) {
+                    counts[key] = 0;
+                } else {
+                    counts[key] = finalCount;
+                }
+            });
+
+            return counts;
+        };
+
+        // Fallback method: Count translations by inspecting AG Grid data
+        function getPageSpecificTranslationCountsFromGrid() {
+            // Build counts object dynamically based on enabled languages
+            const gridCounts = {};
+            const languageKeys = Object.values(getTranslationLangMap());
+            languageKeys.forEach((key) => { gridCounts[key] = 0; });
+
+            try {
+                if (!window.gridApi) {
+                    console.error('Grid API not available');
+                    return gridCounts;
+                }
+
+                // Get all row data from ag-grid
+                const rowData = [];
+                window.gridApi.forEachNode(function(node) {
+                    if (node.data) {
+                        rowData.push(node.data);
+                    }
+                });
+
+                // Process each row
+                rowData.forEach(function(row) {
+                    if (!row.msgid) return;
+                    if (row.removed) return;
+
+                    // Check each language column
+                    languageKeys.forEach(function(lang) {
+                        const translation = row[lang] || '';
+                        const hasTranslation = translation &&
+                                              translation !== '' &&
+                                              translation !== '-' &&
+                                              translation !== 'undefined' &&
+                                              translation !== 'null';
+
+                        if (!hasTranslation) {
+                            gridCounts[lang]++;
+                        }
+                    });
+                });
+
+            } catch (error) {
+                console.error('Error in grid inspection method:', error);
+            }
+
+            return gridCounts;
+        }
+
+        // Override the generic translation function with translation-specific logic
+        window.performPageSpecificTranslation = function(selectedLanguages, selectedService) {
+            const translationsToTranslate = [];
+
+            // Check if overwrite existing translations is enabled
+            const overwriteExisting = jQuery('#overwrite-existing-translations').is(':checked');
+
+            // Helper function to check if a string is PO file metadata (local to this function)
+            function isMetadataStringLocal(str) {
+                if (typeof str !== 'string') return false;
+                const strLower = str.toLowerCase();
+                const metadataKeys = [
+                    'project-id-version', 'report-msgid-bugs-to', 'pot-creation-date',
+                    'po-revision-date', 'last-translator', 'language-team', 'mime-version',
+                    'content-type', 'content-transfer-encoding', 'plural-forms', 'generated-by'
+                ];
+                const metadataKeyCount = metadataKeys.filter(key => strLower.includes(key)).length;
+                return metadataKeyCount >= 3;
+            }
+
+            // Get selected rows from ag-grid if any
+            // Only includes rows that are currently displayed (visible after filtering)
+            let selectedMsgids = null;
+            if (window.gridHelper && typeof window.gridHelper.getSelectedRows === 'function') {
+                const selectedRows = window.gridHelper.getSelectedRows();
+                if (selectedRows && selectedRows.length > 0) {
+                    const msgids = selectedRows.map(row => row.msgid).filter(msgid => msgid && !isMetadataStringLocal(msgid));
+                    selectedMsgids = new Set(msgids);
+                }
+            } else if (window.gridApi) {
+                // Fallback: filter selected nodes to only include displayed ones
+                let selectedRows = [];
+                if (typeof window.gridApi.getSelectedNodes === 'function') {
+                    const nodes = window.gridApi.getSelectedNodes() || [];
+                    selectedRows = nodes
+                        .filter(function(node) {
+                            return node && (node.displayed === true || node.displayed === undefined);
+                        })
+                        .map(function(node) { return node ? node.data : null; })
+                        .filter(function(row) { return row !== null && row !== undefined; });
+                } else if (typeof window.gridApi.getSelectedRows === 'function') {
+                    selectedRows = window.gridApi.getSelectedRows();
+                }
+                if (selectedRows && selectedRows.length > 0) {
+                    const msgids = selectedRows.map(row => row.msgid).filter(msgid => msgid && !isMetadataStringLocal(msgid));
+                    selectedMsgids = new Set(msgids);
+                }
+            }
+
+            // Use server-side data for message IDs that need translation
+            const etmEl = document.getElementById('empty-translation-msgids-json');
+            const emptyTranslationMsgidsRaw = etmEl ? JSON.parse(etmEl.textContent) : {};
+            // Filter metadata from empty translation msgids
+            const emptyTranslationMsgids = {};
+            Object.keys(emptyTranslationMsgidsRaw).forEach(locale => {
+                emptyTranslationMsgids[locale] = (emptyTranslationMsgidsRaw[locale] || []).filter(msgid => !isMetadataStringLocal(msgid));
+            });
+
+            // Get all msgids if overwrite is enabled
+            const allMsgidsEl = document.getElementById('all-translation-msgids-json');
+            let allMsgids = allMsgidsEl ? JSON.parse(allMsgidsEl.textContent) : [];
+            // Filter out any metadata strings that might have slipped through
+            // Use the same filterMetadata function from getPageSpecificTranslationCounts scope
+            allMsgids = allMsgids.filter(function(msgid) {
+                if (typeof msgid !== 'string') return true;
+                const strLower = msgid.toLowerCase();
+                const metadataKeys = [
+                    'project-id-version', 'report-msgid-bugs-to', 'pot-creation-date',
+                    'po-revision-date', 'last-translator', 'language-team', 'mime-version',
+                    'content-type', 'content-transfer-encoding', 'plural-forms', 'generated-by'
+                ];
+                const metadataKeyCount = metadataKeys.filter(key => strLower.includes(key)).length;
+                return metadataKeyCount < 3; // Keep if less than 3 metadata keys (not a header block)
+            });
+
+            // First, get the actual counts to know which languages need translation
+            const selectedCounts = window.getPageSpecificTranslationCounts(overwriteExisting, selectedMsgids);
+            const languagesNeedingTranslation = overwriteExisting
+                ? selectedLanguages  // If overwriting, translate all selected languages
+                : selectedLanguages.filter(lang => selectedCounts[lang] > 0);
+
+            // Derive mapping of language key -> locale from server-provided map
+            const langToLocaleMap = Object.fromEntries(
+                Object.entries(getTranslationLangMap()).map(([locale, key]) => [key, locale])
+            );
+
+            // Collect all translations that need translating using server-side data
+            languagesNeedingTranslation.forEach(lang => {
+                const localeCode = langToLocaleMap[lang];
+                if (!localeCode) {
+                    return;
+                }
+
+                // Use all msgids if overwrite is enabled, otherwise use only empty ones
+                let msgidsForLang = overwriteExisting
+                    ? allMsgids  // All msgids when overwriting (already filtered)
+                    : (emptyTranslationMsgids[localeCode] || []);  // Only empty ones otherwise
+
+                // Filter out any metadata strings that might have slipped through
+                msgidsForLang = msgidsForLang.filter(msgid => !isMetadataStringLocal(msgid));
+
+                // Filter to selected rows if any are selected
+                if (selectedMsgids && selectedMsgids.size > 0) {
+                    msgidsForLang = msgidsForLang.filter(msgid => selectedMsgids.has(msgid));
+                }
+
+                msgidsForLang.forEach(msgid => {
+                    // Double-check it's not metadata before adding
+                    if (!isMetadataStringLocal(msgid)) {
+                        translationsToTranslate.push({
+                            id: msgid,
+                            text: msgid, // Use msgid as source text for translation
+                            definition: '', // Translations don't have separate definitions
+                            language: lang,
+                            type: 'translation' // Use 'translation' type for the API
+                        });
+                    }
+                });
+            });
+
+            if (translationsToTranslate.length === 0) {
+                window.autoTranslateModal.logProgress('{{ _("No translation fields found that need translation") }}', 'info');
+                window.autoTranslateModal.translationState.isRunning = false;
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                return;
+            }
+
+            window.autoTranslateModal.translationState.totalItems = translationsToTranslate.length;
+            window.autoTranslateModal.updateProgress();
+
+            // Process translations one by one
+            processNextTranslation(translationsToTranslate, 0, languagesNeedingTranslation, selectedService);
+        };
+
+        function processNextTranslation(translations, index, selectedLanguages, selectedService) {
+            if (index >= translations.length || window.autoTranslateModal.translationState.shouldStop) {
+                window.autoTranslateModal.translationState.isRunning = false;
+                if (window.autoTranslateModal.translationState.shouldStop) {
+                    window.autoTranslateModal.logProgress('{{ _("Translation stopped by user.") }}', 'info');
+                } else {
+                    window.autoTranslateModal.logProgress('{{ _("Translation completed!") }}', 'success');
+                }
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                if (window.autoTranslateModal.notifyCompletion) {
+                    window.autoTranslateModal.notifyCompletion();
+                }
+                return;
+            }
+
+            // Check if translation is paused
+            if (window.autoTranslateModal.translationState.isPaused) {
+                // Wait a bit and check again
+                setTimeout(() => processNextTranslation(translations, index, selectedLanguages, selectedService), 500);
+                return;
+            }
+
+            const translation = translations[index];
+            const service = selectedService || 'ifrc';
+
+            // Call the translation API
+            const translationPayload = {
+                type: 'translation', // Use 'translation' type for translation API
+                permission_context: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_context) ? window.autoTranslateModal.config.permission_context : 'translations',
+                permission_code: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_code) ? window.autoTranslateModal.config.permission_code : 'admin.translations.manage',
+                id: translation.id, // Message ID is required for translation type
+                text: translation.text,
+                definition: translation.definition,
+                target_languages: [translation.language],
+                translation_service: service
+            };
+            // Intentionally no payload debug logging here; can spam + may contain large strings.
+
+            const translator = (window.AutoTranslateService && typeof window.AutoTranslateService.translate === 'function')
+                ? window.AutoTranslateService
+                : null;
+
+            const reqPromise = translator
+                // AutoTranslateService wraps payload (base64 JSON) to avoid WAF false positives on rich strings (HTML, --, etc.)
+                ? translator.translate(translationPayload)
+                : fetch(window.autoTranslateModal.config.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': jQuery('meta[name=csrf-token]').attr('content')
+                    },
+                    body: JSON.stringify(translationPayload)
+                }).then(r => r.json());
+
+            Promise.resolve(reqPromise)
+            .then(data => {
+                window.autoTranslateModal.translationState.processedItems++;
+
+                if (data.success && data.untranslated) {
+                    // The service responded but returned the text unchanged — it is a proper
+                    // noun or technical term that cannot be auto-translated. Count as skipped.
+                    window.autoTranslateModal.translationState.skippedCount =
+                        (window.autoTranslateModal.translationState.skippedCount || 0) + 1;
+                    window.autoTranslateModal.logProgress(
+                        `{{ _("Skipped") }} ${translation.language} {{ _("translation for") }} ${translation.id} — {{ _("proper noun or technical term, no translation available") }}`,
+                        'warning'
+                    );
+                } else if (data.success && data.translations && data.updated_count > 0) {
+                    // Update the grid cell with the new translation
+                    if (window.gridApi && data.translations && data.translations.label_translations && data.translations.label_translations[translation.language]) {
+                        window.gridApi.forEachNode(function(node) {
+                            if (node.data && node.data.msgid === translation.id) {
+                                // Get locale code for the language
+                                const langToLocaleMap = Object.fromEntries(
+                                    Object.entries(getTranslationLangMap()).map(([locale, key]) => [key, locale])
+                                );
+                                const localeCode = langToLocaleMap[translation.language];
+                                if (localeCode) {
+                                    node.setDataValue(localeCode, data.translations.label_translations[translation.language]);
+                                }
+                            }
+                        });
+                    }
+
+                    window.autoTranslateModal.translationState.successCount++;
+                    window.autoTranslateModal.logProgress(`{{ _("Translated") }} ${translation.language} {{ _("translation for") }} ${translation.id}`, 'success');
+                } else {
+                    window.autoTranslateModal.translationState.errorCount++;
+                    const unknownError = '{{ _("Unknown error") }}';
+                    const errorMsg = `{{ _("Failed to translate") }} ${translation.id} {{ _("to") }} ${translation.language}: ${data.message || unknownError}`;
+                    window.autoTranslateModal.translationState.errors.push(errorMsg);
+                    window.autoTranslateModal.logProgress(errorMsg, 'error');
+                    console.error('Auto-translate: Translation failed:', data);
+                }
+
+                window.autoTranslateModal.updateProgress();
+                // Skip scheduling the next iteration if stop was requested while this call was in-flight.
+                if (!window.autoTranslateModal.translationState.shouldStop) {
+                    setTimeout(() => processNextTranslation(translations, index + 1, selectedLanguages, selectedService), 100);
+                } else {
+                    processNextTranslation(translations, translations.length, selectedLanguages, selectedService);
+                }
+            })
+            .catch(error => {
+                window.autoTranslateModal.translationState.processedItems++;
+                window.autoTranslateModal.translationState.errorCount++;
+                const em = (error && error.message) ? String(error.message) : '';
+                const looksLikeWaf = em.includes('403') || em.toLowerCase().includes('application-gateway') || em.toLowerCase().includes('waf');
+                const prefix = looksLikeWaf
+                    ? `{{ _("Blocked by WAF for translation") }}`
+                    : `{{ _("Network error for translation") }}`;
+                const errorMsg = `${prefix} ${translation.id}: ${em || '{{ _("Unknown error") }}'}`;
+                window.autoTranslateModal.translationState.errors.push(errorMsg);
+                window.autoTranslateModal.logProgress(errorMsg, 'error');
+                window.autoTranslateModal.updateProgress();
+
+                // Skip scheduling the next iteration if stop was requested while this call was in-flight.
+                if (!window.autoTranslateModal.translationState.shouldStop) {
+                    setTimeout(() => processNextTranslation(translations, index + 1, selectedLanguages, selectedService), 100);
+                } else {
+                    processNextTranslation(translations, translations.length, selectedLanguages, selectedService);
+                }
+            });
+        }
+
+        // Helper function to get language column index from header map
+        function getLangColumnIndexFromHeaders(lang, headerMap) {
+            // Map language names to display names in headers
+            const langDisplayMap = {
+                'fr': 'French',
+                'es': 'Spanish',
+                'ar': 'Arabic',
+                'ru': 'Russian',
+                'zh': 'Chinese',
+                'hi': 'Hindi'
+            };
+
+            const displayName = langDisplayMap[lang.toLowerCase()] || lang;
+
+            // Look for exact match first
+            if (headerMap[displayName] !== undefined) {
+                return headerMap[displayName];
+            }
+
+            // Look for partial match
+            for (const [headerText, index] of Object.entries(headerMap)) {
+                if (headerText.toLowerCase().includes(displayName.toLowerCase())) {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        // Helper function to get the column index for a language
+        function getLanguageColumnIndex(lang) {
+            // Build language column map dynamically based on enabled languages
+            const languageCodes = Object.values(getTranslationLangMap());
+
+            const languageColumnMap = {};
+            languageCodes.forEach((langCode, index) => {
+                languageColumnMap[langCode] = 2 + index; // Column index starts at 2 (after Source and Message ID)
+            });
+
+            return languageColumnMap[lang] || -1;
+        }
+    }
+    </script>
+
+    <script id="languages-json" type="application/json">{{ languages | tojson | safe }}</script>
+    <script id="language-names-json" type="application/json">{{ language_names | tojson | safe }}</script>
+    {# Locale -> locale (ISO code) pairs used by JS to avoid inline Jinja in scripts #}
+    {% set lng = namespace(pairs=[]) %}
+    {% for lang_code in TRANSLATABLE_LANGUAGES %}
+        {% set __ignore = lng.pairs.append([lang_code, lang_code]) %}
+    {% endfor %}
+    <script id="translation-lang-map-json" type="application/json">{{ lng.pairs | tojson | safe }}</script>
+    <script id="empty-translation-counts-json" type="application/json">{{ empty_translation_counts | tojson | safe }}</script>
+    <script id="empty-translation-msgids-json" type="application/json">{{ empty_translation_msgids | tojson | safe }}</script>
+    <script id="all-translation-msgids-json" type="application/json">{{ active_translation_msgids | tojson | safe }}</script>
+    <script id="i18n-json" type="application/json">{{ {
+        'searchTranslations': _('Search translations:'),
+        'lengthMenu': _('Show _MENU_ translations per page'),
+        'info': _('Showing _START_ to _END_ of _TOTAL_ translations'),
+        'infoEmpty': _('Showing 0 to 0 of 0 translations'),
+        'infoFilteredText': _('(filtered from _MAX_ total translations)'),
+        'emptyTable': _('No translations available'),
+        'zeroRecords': _('No matching translations found'),
+        'searchMessageId': _('Search Message ID...'),
+        'searchActions': _('Search Actions...'),
+        'searchWord': _('Search'),
+        'clearAllFiltersTitle': _('Clear all filters'),
+        'clearAll': _('Clear all')
+    } | tojson | safe }}</script>
+
+    {# Edit Translation Modal JavaScript #}
+    <script nonce="{{ csp_nonce() }}">
+    (function() {
+        const modal = document.getElementById('edit-translation-modal');
+        const closeBtns = document.querySelectorAll('.close-edit-translation-modal');
+        const form = document.getElementById('edit-translation-form');
+        const saveBtn = document.getElementById('edit-translation-save-btn');
+        const saveBtnText = document.getElementById('edit-translation-save-btn-text');
+        const languages = {{ (languages or []) | tojson | safe }};
+        const languageNames = {{ (language_names or {}) | tojson | safe }};
+        const allLanguageNames = {{ (ALL_LANGUAGES_DISPLAY_NAMES or {}) | tojson | safe }};
+
+        // Helper to get language display name
+        function getLangDisplayName(code) {
+            return languageNames[code] || allLanguageNames[code] || code.toUpperCase();
+        }
+
+        // Helper to check if language is RTL
+        function isRTL(code) {
+            return ['ar', 'fa', 'he', 'ur'].includes(code);
+        }
+
+        // Extract placeholders from a string
+        function extractPlaceholders(str) {
+            if (!str) return [];
+            const placeholders = [];
+            const namedMatches = str.match(/%\([^)]+\)[sd]/g) || [];
+            placeholders.push(...namedMatches);
+            const simpleMatches = str.match(/(?<!%\([^)]*)\%(?:[sd]|\.\d+[fd])/g) || [];
+            placeholders.push(...simpleMatches);
+            return [...new Set(placeholders)].sort();
+        }
+
+        // Validate placeholders
+        function validatePlaceholders(sourceText, translationText) {
+            const sourcePlaceholders = extractPlaceholders(sourceText);
+            if (sourcePlaceholders.length === 0) return { valid: true };
+
+            const translationPlaceholders = extractPlaceholders(translationText);
+            const missing = sourcePlaceholders.filter(p => !translationPlaceholders.includes(p));
+
+            if (missing.length > 0) {
+                return {
+                    valid: false,
+                    message: '{{ _("Missing placeholders") }}: ' + missing.join(', ') + '. {{ _("All placeholders from the original text must be preserved.") }}'
+                };
+            }
+            return { valid: true };
+        }
+
+        // Open modal and load translation data
+        function openEditModal(msgid) {
+            if (!msgid) return;
+
+            // Set msgid in form
+            document.getElementById('edit-translation-msgid').value = msgid;
+            document.getElementById('edit-translation-msgid-display').value = msgid;
+
+            // Check for placeholders
+            const placeholders = extractPlaceholders(msgid);
+            const warningDiv = document.getElementById('edit-translation-placeholder-warning');
+            if (placeholders.length > 0) {
+                warningDiv.classList.remove('hidden');
+                document.getElementById('edit-translation-placeholder-text').textContent = msgid;
+            } else {
+                warningDiv.classList.add('hidden');
+            }
+
+            // Load translation data (base64 encode msgid to avoid WAF false positives on HTML/SQL-like gettext strings)
+            var msgidB64 = btoa(unescape(encodeURIComponent(msgid)));
+            fetch('{{ url_for("utilities.edit_translation") }}?msgid_b64=' + encodeURIComponent(msgidB64), {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Extract translations from JSON response
+                const translations = (data && data.translations) || {};
+
+                // Build translation fields
+                const container = document.getElementById('edit-translation-fields-container');
+                container.innerHTML = '';
+
+                languages.forEach(langCode => {
+                    const langBase = langCode.toLowerCase().split('_')[0];
+                    const fieldId = 'msgstr_' + langBase;
+                    const value = translations[langBase] || translations[langCode] || '';
+                    const langDisplay = getLangDisplayName(langBase);
+                    const rtl = isRTL(langBase);
+
+                    const fieldDiv = document.createElement('div');
+
+                    const label = document.createElement('label');
+                    label.setAttribute('for', fieldId);
+                    label.className = 'block text-sm font-medium text-gray-700 mb-2';
+                    label.textContent = langDisplay + ' {{ _("Translation") }}';
+
+                    const textarea = document.createElement('textarea');
+                    textarea.id = fieldId;
+                    textarea.name = fieldId;
+                    textarea.className = 'w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500';
+                    textarea.rows = 4;
+                    if (rtl) {
+                        textarea.dir = 'rtl';
+                        textarea.style.fontFamily = "'Tajawal', Arial, sans-serif";
+                    }
+                    textarea.value = value || '';
+
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'placeholder-error mt-1 text-xs text-red-600 hidden';
+
+                    fieldDiv.appendChild(label);
+                    fieldDiv.appendChild(textarea);
+                    fieldDiv.appendChild(errorDiv);
+                    container.appendChild(fieldDiv);
+                });
+
+                // Show modal
+                modal.classList.remove('hidden');
+            })
+            .catch(error => {
+                console.error('Error loading translation:', error);
+                if (window.showAlert) window.showAlert('{{ _("Failed to load translation data") }}', 'error');
+                else console.error('Failed to load translation data');
+            });
+        }
+
+        function setEditModalSaving(isSaving) {
+            if (!saveBtn) return;
+            saveBtn.disabled = isSaving;
+            saveBtn.classList.toggle('btn-loading', isSaving);
+            saveBtn.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+            if (saveBtnText) {
+                if (isSaving) {
+                    if (!saveBtnText.dataset.originalSaveLabel) {
+                        saveBtnText.dataset.originalSaveLabel = saveBtnText.textContent;
+                    }
+                    saveBtnText.textContent = {{ _('Saving...') | tojson }};
+                } else if (saveBtnText.dataset.originalSaveLabel) {
+                    saveBtnText.textContent = saveBtnText.dataset.originalSaveLabel;
+                    delete saveBtnText.dataset.originalSaveLabel;
+                }
+            }
+            modal.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+            document.querySelectorAll('#edit-translation-modal .close-edit-translation-modal').forEach(function(b) {
+                b.disabled = isSaving;
+            });
+            var autoB = document.getElementById('modal-auto-translate-btn');
+            var clearB = document.getElementById('modal-clear-translations-btn');
+            if (autoB) autoB.disabled = isSaving;
+            if (clearB) clearB.disabled = isSaving;
+        }
+
+        // Close modal
+        function closeEditModal() {
+            if (modal.getAttribute('aria-busy') === 'true') return;
+            modal.classList.add('hidden');
+            form.reset();
+            document.getElementById('edit-translation-fields-container').innerHTML = '';
+        }
+
+        // Event listeners
+        closeBtns.forEach(btn => {
+            btn.addEventListener('click', closeEditModal);
+        });
+
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal && modal.getAttribute('aria-busy') !== 'true') closeEditModal();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden') && modal.getAttribute('aria-busy') !== 'true') {
+                closeEditModal();
+            }
+        });
+
+        // Handle edit button clicks (delegated event)
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.edit-translation-btn')) {
+                e.preventDefault();
+                const btn = e.target.closest('.edit-translation-btn');
+                const msgid = decodeURIComponent(btn.getAttribute('data-msgid') || '');
+                if (msgid) {
+                    openEditModal(msgid);
+                }
+            }
+        });
+
+        function performDeleteRemovedTranslation(msgid) {
+            const csrfMeta = document.querySelector('meta[name=csrf-token]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            const payloadObj = { msgid: msgid, csrf_token: csrfToken };
+            var payloadB64;
+            try {
+                payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
+            } catch (err) {
+                console.error('delete-removed: encode payload failed', err);
+                if (window.showAlert) window.showAlert('{{ _("Could not prepare delete request") }}', 'error');
+                return;
+            }
+            var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+            fetchFn('{{ url_for("utilities.delete_removed_translation") }}', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ payload: payloadB64 })
+            })
+            .then(function(response) { return response.json().then(function(data) { return { ok: response.ok, data: data }; }); })
+            .then(function(result) {
+                if (result.ok && result.data && result.data.success) {
+                    if (window.showAlert) window.showAlert(result.data.message || '{{ _("Removed obsolete entries") }}', 'success');
+                    window.location.reload();
+                    return;
+                }
+                var errMsg = (result.data && result.data.message) ? result.data.message : '{{ _("Delete failed") }}';
+                throw new Error(errMsg);
+            })
+            .catch(function(error) {
+                console.error('delete-removed translation:', error);
+                if (window.showAlert) window.showAlert(error.message || '{{ _("Delete failed") }}', 'error');
+            });
+        }
+
+        document.addEventListener('click', function(e) {
+            var delBtn = e.target.closest('.delete-removed-translation-btn');
+            if (!delBtn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var msgid = decodeURIComponent(delBtn.getAttribute('data-msgid') || '');
+            if (!msgid) return;
+            var confirmMsg = '{{ _("This permanently deletes the obsolete (#~) entry for this message from every locale .po file. Active strings are not affected. Continue?") }}';
+            var confirmTitle = '{{ _("Delete removed string?") }}';
+            var doDelete = function() { performDeleteRemovedTranslation(msgid); };
+            if (window.showDangerConfirmation) {
+                window.showDangerConfirmation(confirmMsg, doDelete, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', confirmTitle);
+            } else if (window.showConfirmation) {
+                window.showConfirmation(confirmMsg, doDelete, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', confirmTitle);
+            } else if (window.confirm(confirmMsg)) {
+                doDelete();
+            }
+        });
+
+        // Form submission
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const msgid = document.getElementById('edit-translation-msgid').value;
+            const sourcePlaceholders = extractPlaceholders(msgid);
+
+            // Validate placeholders
+            if (sourcePlaceholders.length > 0) {
+                const translationFields = document.querySelectorAll('#edit-translation-modal [id^="msgstr_"]');
+                let hasErrors = false;
+                const errors = [];
+
+                translationFields.forEach(field => {
+                    const translationText = field.value.trim();
+                    if (translationText) {
+                        const validation = validatePlaceholders(msgid, translationText);
+                        if (!validation.valid) {
+                            hasErrors = true;
+                            const langCode = field.id.replace('msgstr_', '');
+                            errors.push(langCode.toUpperCase() + ': ' + validation.message);
+                            field.classList.add('border-red-500');
+                            const errorDiv = field.parentElement.querySelector('.placeholder-error');
+                            if (errorDiv) {
+                                errorDiv.textContent = validation.message;
+                                errorDiv.classList.remove('hidden');
+                            }
+                        } else {
+                            field.classList.remove('border-red-500');
+                            const errorDiv = field.parentElement.querySelector('.placeholder-error');
+                            if (errorDiv) errorDiv.classList.add('hidden');
+                        }
+                    }
+                });
+
+                if (hasErrors) {
+                    var m = '{{ _("Translation Validation Error") }}\n\n' + errors.join('\n\n') + '\n\n{{ _("Please fix these errors before saving.") }}';
+                    if (window.showAlert) window.showAlert(m, 'error');
+                    else console.error(m);
+                    return false;
+                }
+            }
+
+            // Submit form using a base64-wrapped payload to avoid WAF false positives on msgid/msgstr content.
+            var payloadObj = window.formDataToJson ? window.formDataToJson(form) : null;
+            if (!payloadObj) throw new Error('JSON payload helper is not available');
+            var csrfToken = (payloadObj && payloadObj.csrf_token) ? String(payloadObj.csrf_token) : '';
+            var payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
+            var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+            var willReloadPage = false;
+
+            setEditModalSaving(true);
+            fetchFn('{{ url_for("utilities.edit_translation") }}', {
+                method: 'POST',
+                body: JSON.stringify({ payload: payloadB64 }),
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('{{ _("Failed to save translation") }}');
+            })
+            .then(data => {
+                if (data.success) {
+                    // Refresh grid data
+                    if (window.gridApi) {
+                        willReloadPage = true;
+                        window.location.reload();
+                    } else {
+                        setEditModalSaving(false);
+                        closeEditModal();
+                        if (window.showAlert) window.showAlert(data.message || '{{ _("Translation saved successfully") }}', 'success');
+                    }
+                } else {
+                    throw new Error(data.message || '{{ _("Failed to save translation") }}');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving translation:', error);
+                var m = '{{ _("Failed to save translation") }}: ' + error.message;
+                if (window.showAlert) window.showAlert(m, 'error');
+                else console.error(m);
+            })
+            .finally(function() {
+                if (!willReloadPage) setEditModalSaving(false);
+            });
+        });
+
+        // Auto-translate button
+        const autoTranslateBtn = document.getElementById('modal-auto-translate-btn');
+        if (autoTranslateBtn) {
+            autoTranslateBtn.addEventListener('click', async function() {
+                try {
+                    const icon = document.getElementById('modal-auto-translate-icon');
+                    const spinner = document.getElementById('modal-auto-translate-spinner');
+                    const textEl = document.getElementById('modal-auto-translate-text');
+
+                    autoTranslateBtn.disabled = true;
+                    autoTranslateBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                    if (icon) icon.classList.add('hidden');
+                    if (spinner) spinner.classList.remove('hidden');
+                    if (textEl) {
+                        textEl.dataset.original = textEl.textContent;
+                        textEl.textContent = '{{ _("Translating...") }}';
+                    }
+
+                    const msgid = document.getElementById('edit-translation-msgid').value;
+                    const englishEl = document.getElementById('msgstr_en');
+                    let baseText = (englishEl && englishEl.value.trim()) || msgid || '';
+
+                    if (!baseText) {
+                        if (window.showAlert) window.showAlert('{{ _("Please ensure English or Message ID has text to translate from.") }}', 'warning');
+                        return;
+                    }
+
+                    const targetLanguages = Array.from(document.querySelectorAll('#edit-translation-modal [id^="msgstr_"]'))
+                        .map(el => el.id.replace(/^msgstr_/, '').trim())
+                        .filter(code => code && code !== 'en')
+                        .filter((code, idx, arr) => arr.indexOf(code) === idx)
+                        .filter(code => {
+                            const el = document.getElementById('msgstr_' + code);
+                            return el && !el.value.trim();
+                        });
+
+                    if (!targetLanguages.length) {
+                        if (window.showAlert) window.showAlert('{{ _("Nothing to translate — all enabled language fields already have values.") }}', 'info');
+                        return;
+                    }
+
+                    const data = await window.AutoTranslateService.translate({
+                        type: 'section_name',
+                        permission_context: 'translations',
+                        permission_code: 'admin.translations.manage',
+                        text: baseText,
+                        target_languages: targetLanguages,
+                        translation_service: 'ifrc'
+                    });
+
+                    if (data.translations) {
+                        Object.entries(data.translations).forEach(([code, value]) => {
+                            const field = document.getElementById('msgstr_' + code);
+                            if (field && !field.value.trim()) {
+                                field.value = value || '';
+                                if (isRTL(code)) {
+                                    field.setAttribute('dir', 'rtl');
+                                }
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error(e);
+                    var m = '{{ _("Auto-translate failed.") }} ' + (e && e.message ? e.message : '');
+                    if (window.showAlert) window.showAlert(m, 'error');
+                    else console.error(m);
+                } finally {
+                    const icon = document.getElementById('modal-auto-translate-icon');
+                    const spinner = document.getElementById('modal-auto-translate-spinner');
+                    const textEl = document.getElementById('modal-auto-translate-text');
+                    if (spinner) spinner.classList.add('hidden');
+                    if (icon) icon.classList.remove('hidden');
+                    if (textEl && textEl.dataset.original) textEl.textContent = textEl.dataset.original;
+                    autoTranslateBtn.disabled = false;
+                    autoTranslateBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                }
+            });
+        }
+
+        // Clear translations button
+        const clearBtn = document.getElementById('modal-clear-translations-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                const msg = '{{ _("Are you sure you want to clear all translation fields except English? This action cannot be undone.") }}';
+                function doClear() {
+                    const translationFields = document.querySelectorAll('#edit-translation-modal textarea[id^="msgstr_"], #edit-translation-modal input[id^="msgstr_"]');
+                    let clearedCount = 0;
+
+                    translationFields.forEach(field => {
+                        const fieldId = field.id;
+                        if (fieldId === 'msgstr_en' || fieldId.startsWith('msgstr_en_')) return;
+
+                        if (field.value && field.value.trim() !== '') {
+                            field.value = '';
+                            clearedCount++;
+                            field.classList.remove('border-red-500', 'border-2', 'border-yellow-500');
+                            const errorDiv = field.parentElement.querySelector('.placeholder-error');
+                            if (errorDiv) errorDiv.remove();
+                        }
+                    });
+
+                    if (clearedCount > 0) {
+                        var m = clearedCount === 1
+                            ? '{{ _("Cleared 1 translation field.") }}'
+                            : '{{ _("Cleared") }} ' + clearedCount + ' {{ _("translation fields.") }}';
+                        if (window.showAlert) window.showAlert(m, 'success');
+                    } else {
+                        if (window.showAlert) window.showAlert('{{ _("No translation fields to clear.") }}', 'info');
+                    }
+                }
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(msg, doClear, null, '{{ _("Clear") }}', '{{ _("Cancel") }}', '{{ _("Clear Translations?") }}');
+                } else if (window.showConfirmation) {
+                    window.showConfirmation(msg, doClear, null, '{{ _("Clear") }}', '{{ _("Cancel") }}', '{{ _("Clear Translations?") }}');
+                } else {
+                    doClear();
+                }
+            });
+        }
+
+        // Real-time placeholder validation
+        document.addEventListener('blur', function(e) {
+            if (e.target.matches('#edit-translation-modal [id^="msgstr_"]')) {
+                const msgid = document.getElementById('edit-translation-msgid').value;
+                const sourcePlaceholders = extractPlaceholders(msgid);
+                if (sourcePlaceholders.length > 0) {
+                    const translationText = e.target.value.trim();
+                    if (translationText) {
+                        const validation = validatePlaceholders(msgid, translationText);
+                        if (!validation.valid) {
+                            e.target.classList.add('border-red-500', 'border-2');
+                            const errorDiv = e.target.parentElement.querySelector('.placeholder-error');
+                            if (errorDiv) {
+                                errorDiv.textContent = validation.message;
+                                errorDiv.classList.remove('hidden');
+                            }
+                        } else {
+                            e.target.classList.remove('border-red-500', 'border-2');
+                            const errorDiv = e.target.parentElement.querySelector('.placeholder-error');
+                            if (errorDiv) errorDiv.classList.add('hidden');
+                        }
+                    }
+                }
+            }
+        }, true);
+    })();
+    </script>
+{% endblock %}

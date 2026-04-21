@@ -1,0 +1,196 @@
+Draft User Requirements IFRC Network Data Portal
+HLR → Epics Backbone + Epic Template Blocks (Placeholders)
+Scope / Out of scope (for this draft)
+In scope (MVP conceptual):
+Structured data collection for Unified Mid-Year Reporting 2025.
+Multiple user roles across IFRC and National Societies (contributors, validators, admins, consumers).
+End-to-end flow: configuration → data entry → review/validation approach → access/use (exports).
+Secure authentication, role-based access, and auditability.
+Out of scope (for this draft; can be added later):
+Detailed phase roadmap (Phase 1/2/3) and future-release planning.
+Full migration/sunsetting of all legacy systems beyond the MVP process.
+Advanced analytics/self-service reporting and AI document intelligence (unless already implemented and required for MVP).
+Public-facing portal publishing requirements (unless required for Mid-Year Reporting 2025).
+Note: This box is intended to prevent scope confusion during review; adjust as needed.
+Table of Contents
+Draft User Requirements IFRC Network Data Portal1
+Table of Contents1
+Glossary2
+1) MVP Scope Note (Mid-Year Reporting 2026)3
+2) Product Scope & Positioning (Context-Setting)3
+2.1 Product Positioning3
+2.2 In-Scope for MVP (Conceptual)4
+3) Primary User Groups (Condensed Personas)4
+3.1 Data Contributors4
+3.2 Data Coordinators & Validators4
+3.3 Data Consumers4
+3.4 System Administrators4
+4) Core User Journeys (System-Level)5
+Journey 1: Configure a Data Collection Process5
+Journey 2: Submit Data5
+Journey 3: Review, Validate, and Coordinate5
+Journey 4: Access and Use Data5
+5) High-Level Requirements (HLRs) and Epics6
+HLR-01 — Unified platform to run federation-wide data collection processes6
+HLR-02 — Configurable form/template design for structured data collection6
+HLR-03 — Assignment, workflow, and task management for reporting cycles6
+HLR-04 — User-friendly data entry experience for focal points and partners6
+HLR-05 — Data quality, validation, and sign-off are built into the workflow7
+HLR-06 — Standardisation through the Indicator Bank and shared definitions7
+HLR-07 — Data access, export, analytics, and integration for reuse7
+HLR-08 — Identity, access control, and security compliance7
+HLR-09 — Adoption: guidance, multilingual support, documentation, and training7
+6) Non-Functional (Cross-Cutting) Requirements8
+6.1 Usability & Adoption8
+6.2 Scalability & Performance8
+6.3 Security & Access8
+6.4 Reliability & Continuity8
+6.5 Interoperability8
+Glossary
+Acceptance Criteria: Testable conditions that must be met for a user story to be considered done (often written as Given/When/Then).
+Data Contributor: User role responsible for entering or updating data (e.g., National Society focal points; IFRC country/cluster delegates acting on behalf of NSs).
+Data Coordinator / Validator: User role responsible for oversight, completeness checks, data review, and coordinating clarifications/corrections. (Fed-wide Data Systems team members)
+Data Consumer: User role that accesses and reuses submitted data for analysis, reporting, coordination, or visibility.
+Epic: A large body of work that groups multiple related features and user stories to deliver a significant capability.
+Feature: A distinct capability of the system that delivers user value; typically decomposed into one or more user stories.
+HLR (High-Level Requirement): A stable, outcome-focused requirement that describes what must be true at product level (not how it is implemented).
+MVP (Minimum Viable Product): The smallest set of capabilities needed to run the targeted use case end-to-end and learn from real use (here: Unified Mid-Year Reporting 2025).
+Non-Functional Requirements: Cross-cutting requirements such as usability, performance, security, reliability, and interoperability.
+System Administrator: User role responsible for configuring and managing the platform (e.g., building forms, assignments, permissions).
+User Journey: A stable end-to-end flow that describes how a user completes a goal across the system (e.g., configure → submit → review → use).
+User Story: A small, user-centered requirement written as: As a…, I want…, so that….
+1) MVP Scope Note (Mid-Year Reporting 2026)
+This draft user requirements structure documents the IFRC Network Data Portal MVP focused on Unified Mid-Year Reporting 2025. The immediate aim is to run the reporting round end-to-end through the platform: admins configure templates and assignments; focal points enter and submit data; IFRC teams track progress and export/use collected data; with secure access and auditability.
+2) Product Scope & Positioning (Context-Setting)
+2.1 Product Positioning
+The IFRC Network Data Portal is a federation-wide data collection and management platform designed to:
+Replace fragmented, process-specific data collection tools (Excel, Kobo, ad hoc systems).
+Support multiple IFRC network data collection processes through a single configurable system.
+Enable standardisation through shared indicators, structures, and governance.
+2.2 In-Scope for MVP (Conceptual)
+At MVP level, the platform must support:
+Structured data collection for at least one federation-wide process (Unified Mid-Year Reporting 2026).
+Multiple user roles across IFRC and National Societies.
+End-to-end flow: configuration → data entry → review/validation approach → access/use.
+3) Primary User Groups (Condensed Personas)
+3.1 Data Contributors
+Users responsible for entering or updating data. Examples:
+National Society focal points.
+IFRC country / cluster delegates (acting on behalf of NSs).
+Partner contributors where applicable.
+3.2 Data Coordinators & Validators
+Users responsible for oversight, quality, and process coordination. Examples:
+FDS team members
+IFRC regional PMER officers.
+IFRC Geneva technical focal points.
+3.3 Data Consumers
+Users who access, analyse, or reuse submitted data. Examples:
+IFRC global teams (PMER, PRD, Strategy).
+Analysts and reporting teams.
+External audiences (where applicable, via other platforms/outputs).
+3.4 System Administrators
+Users who configure and manage the system. Examples:
+Federation-wide Data Systems team.
+Designated IFRC technical administrators.
+4) Core User Journeys (System-Level)
+Journey 1: Configure a Data Collection Process
+Actor: System Administrator
+Goal: Prepare the system to collect structured data for a defined process and period.
+High-level needs:
+Define what data is collected.
+Define who reports, when, and under what rules.
+Ensure consistency and reuse of standards.
+Journey 2: Submit Data
+Actor: Data Contributor
+Goal: Provide required data with clarity, minimal duplication, and guidance.
+High-level needs:
+Understand what is requested and why.
+Enter data efficiently.
+Save, review, and update data during the reporting window.
+Journey 3: Review, Validate, and Coordinate
+Actor: Data Coordinator / Validator
+Goal: Ensure completeness, consistency, and quality of submitted data.
+High-level needs:
+Track submission status.
+Review data across contributors.
+Support clarification, correction, and iteration.
+Journey 4: Access and Use Data
+Actor: Data Consumer
+Goal: Use collected data for reporting, analysis, coordination, or visibility.
+High-level needs:
+Access structured datasets.
+Understand context and limitations of the data.
+Reuse data across outputs and platforms.
+5) High-Level Requirements (HLRs) and Epics
+This section is the core of the document. It provides a stable HLR → Epic backbone. You will later add Features and User Stories (with acceptance criteria) per Epic as you inspect the MVP/code.
+HLR-01 — Unified platform to run federation-wide data collection processes
+Epics:
+E01.1 Process setup & lifecycle management (create cycle, timeline, participation list, governance).
+E01.2 Consolidation of tools & reduced duplication (reduce reliance on Excel/Kobo and eliminate parallel processes where possible).
+E01.3 Shared entry point & navigation (“one place to go”) (consistent access point; portal home with tasks/quick links).
+HLR-02 — Configurable form/template design for structured data collection
+Epics:
+E02.1 Form builder (questions, tables, sections/pages).
+E02.2 Indicator Bank integration inside form design (select indicators with unit/type/definition).
+E02.3 Reusable libraries (lists/picklists/reusable elements).
+E02.4 Versioning & governance of templates (ownership, controlled updates, traceability).
+HLR-03 — Assignment, workflow, and task management for reporting cycles
+Epics:
+E03.1 Assignment creation (who reports what, when) (country/NS, reporting period, form set).
+E03.2 Notifications & reminders (reduce manual chasing; support timeline challenges).
+E03.3 Status tracking & dashboards (draft/submitted/reviewed; progress monitoring).
+E03.4 External/public link submission (optional) (no-login submission where appropriate).
+HLR-04 — User-friendly data entry experience for focal points and partners
+Epics:
+E04.1 Guided entry UI with section/page navigation.
+E04.2 Attachments and supporting documentation at field level.
+E04.3 Collaboration signals (presence/lock notices when multiple users edit).
+E04.4 Import/export to/from Excel + export to PDF (transition support; offline use where needed).
+E04.5 Contextual help (indicator definitions/tooltips; reduce jargon/confusion).
+HLR-05 — Data quality, validation, and sign-off are built into the workflow
+Epics:
+E05.1 Field-level validation rules & required fields.
+E05.2 Skip logic / conditional visibility to reduce burden and improve relevance.
+E05.3 Review workflow + comments (feedback, correction, resubmission loop).
+E05.4 “Estimate vs confirmed” handling + revisions (support iterative updates where needed).
+E05.5 Audit trail of changes for accountability.
+HLR-06 — Standardisation through the Indicator Bank and shared definitions
+Epics:
+E06.1 Indicator metadata surfaced in entry UI (definition/unit/type/examples).
+E06.2 Indicator Bank management in the same tool (reduce platform sprawl).
+E06.3 Cross-process mapping/reuse (common indicators across processes).
+HLR-07 — Data access, export, analytics, and integration for reuse
+Epics:
+E07.1 Data exports and dataset downloads.
+E07.2 Self-service reporting (users create/download visuals and datasets).
+E07.3 API access / integrations (connect to other IFRC tools).
+E07.4 Publishing/feeding the frontend/public portal (where in scope).
+HLR-08 — Identity, access control, and security compliance
+Epics:
+E08.1 Authentication integration and onboarding.
+E08.2 Role-based access control (NS focal point, IFRC country/region/HQ, admins).
+E08.3 Audit logs and security monitoring.
+E08.4 Security validation lifecycle (pen test, code review, go-live readiness).
+HLR-09 — Adoption: guidance, multilingual support, documentation, and training
+Epics:
+E09.1 In-product guidance & transparency (“what is this for?”).
+E09.2 Multilingual support + template translation.
+E09.3 Training guides + onboarding sessions.
+E09.4 Support model + operational handover (L1/L2/L3 clarity).
+6) Non-Functional (Cross-Cutting) Requirements
+6.1 Usability & Adoption
+The system shall minimise reporting burden compared to legacy tools.
+The system shall be usable by non-technical users across regions.
+The system shall provide clear guidance and reduce jargon/confusion.
+The system shall offer a consistent entry point to reduce user confusion.
+6.2 Scalability & Performance
+The system shall support federation-wide scale.
+The system shall support multiple concurrent data collection processes over time.
+6.3 Security & Access
+The system shall protect sensitive data according to IFRC policies.
+The system shall support secure authentication and role-based access control.
+The system shall provide auditability and traceability without increasing reporting burden.
+6.4 Reliability & Continuity
+The system shall be reliable during reporting windows and prevent data loss through centralised storage.
+6.5 Interoperability
+The system shall enable data reuse via exports and/or APIs for downstream analysis and reporting.

@@ -1,0 +1,11 @@
+# Gitleaks configuration (see https://github.com/gitleaks/gitleaks)
+title = "Humanitarian Databank"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Env templates and docs — placeholders only, no live credentials"
+paths = [
+    '''Backoffice/env.example''',
+]

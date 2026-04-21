@@ -1,0 +1,638 @@
+{
+  "sectors": [
+    {
+      "id": 4,
+      "name": "Cash and voucher assistance (CVA)",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 8,
+          "name": "Cash and voucher assistance (CVA)",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 6,
+          "name": "Conditional cash",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 4,
+          "name": "Unconditional cash",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 7,
+          "name": "Voucher assistance",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Climate and environment",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 20,
+          "name": "Climate change adaptation",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 25,
+          "name": "Environmental sustainability",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Community Engagement and Accountability (CEA)",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 19,
+          "name": "Community Engagement and Accountability (CEA)",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Coordination and cooperation",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 35,
+          "name": "External coordination",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 33,
+          "name": "Membership coordination",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 38,
+          "name": "Movement cooperation",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Cross-cutting",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 29,
+          "name": "Cross-cutting",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Digital transformation",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 34,
+          "name": "Digital transformation",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Disaster law and legal frameworks",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 42,
+          "name": "Disaster Law",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Disaster risk reduction",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 14,
+          "name": "Disaster risk reduction",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Education",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 9,
+          "name": "Education",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Food security and livelihoods",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 21,
+          "name": "Food security",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 5,
+          "name": "Livelihoods",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Health",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 46,
+          "name": "Ambulance services",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 31,
+          "name": "Blood services",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 44,
+          "name": "Care for persistent infections",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 47,
+          "name": "Disability equipment and rehabilitation",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 17,
+          "name": "Emergency health services",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 28,
+          "name": "Epidemic preparedness and response",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 27,
+          "name": "First aid",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 45,
+          "name": "Harm reduction and drug use",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 22,
+          "name": "Health promotion services",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 39,
+          "name": "Health services",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 13,
+          "name": "Health strategy, policy and advocacy",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 40,
+          "name": "Immunization",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 10,
+          "name": "Mental Health and Psychosocial Support (MHPSS)",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 49,
+          "name": "MHPSS",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 48,
+          "name": "Nutrition",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 43,
+          "name": "Social care",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Humanitarian diplomacy and communication",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 41,
+          "name": "Humanitarian diplomacy and communication",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Innovation",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 36,
+          "name": "Innovation",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Integrity and accountability",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 16,
+          "name": "Integrity and accountability",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Migration",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 24,
+          "name": "Migration (assistance)",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 32,
+          "name": "Migration (NS capacity)",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "National Society development",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 12,
+          "name": "National Society development",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "National Society disaster management capacity",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 30,
+          "name": "NS disaster management capacity",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Protection, Gender and Inclusion (PGI)",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 23,
+          "name": "Inclusion",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 11,
+          "name": "Protection, Gender and Inclusion (PGI)",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 26,
+          "name": "Restoring family links",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 15,
+          "name": "Sexual and Gender Based Violence (SGBV) and child protection",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Relief and recovery",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 2,
+          "name": "Relief and recovery",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Shelter",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 1,
+          "name": "Shelter",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Volunteering and youth",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 37,
+          "name": "Volunteering and youth",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "WASH",
+      "description": null,
+      "display_order": 0,
+      "logo_url": null,
+      "icon_class": null,
+      "multilingual_names": {},
+      "subsectors": [
+        {
+          "id": 18,
+          "name": "WASH",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        },
+        {
+          "id": 3,
+          "name": "WASH in emergencies",
+          "description": null,
+          "display_order": 0,
+          "logo_url": null,
+          "multilingual_names": {}
+        }
+      ]
+    }
+  ]
+}

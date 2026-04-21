@@ -1,0 +1,50 @@
+{
+  "api_keys": {
+    "google_maps": "",
+    "mapbox": "",
+    "openstreetmap": ""
+  },
+  "global_settings": {
+    "default_map_provider": "mapbox",
+    "default_zoom_level": 10,
+    "max_markers_per_field": 10,
+    "allow_marker_editing": true,
+    "geocoding_service": "nominatim",
+    "geocoding_api_key": "",
+    "enable_caching": true,
+    "cache_duration": 3600,
+    "max_file_size": 10485760,
+    "allowed_file_types": [
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".svg"
+    ],
+    "enable_logging": true,
+    "log_level": "INFO"
+  },
+  "map_providers": {
+    "openstreetmap": {
+      "enabled": true,
+      "requires_api_key": false,
+      "base_url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "attribution": "\u00a9 OpenStreetMap contributors",
+      "max_zoom": 19
+    },
+    "google_maps": {
+      "enabled": false,
+      "requires_api_key": true,
+      "base_url": "https://maps.googleapis.com/maps/api/js",
+      "attribution": "\u00a9 Google Maps",
+      "max_zoom": 21
+    },
+    "mapbox": {
+      "enabled": true,
+      "requires_api_key": true,
+      "base_url": "https://api.mapbox.com/styles/v1/go-ifrc/ckrfe16ru4c8718phmckdfjh0/tiles/{z}/{x}/{y}",
+      "attribution": "\u00a9 Mapbox \u00a9 OpenStreetMap",
+      "max_zoom": 22
+    }
+  }
+}

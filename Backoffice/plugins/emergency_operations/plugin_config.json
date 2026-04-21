@@ -1,0 +1,29 @@
+{
+  "api": {
+    "base_url": "https://goadmin.ifrc.org/api/v2/appeal/",
+    "timeout": 10
+  },
+  "query_defaults": {
+    "end_date_gt": "2023-12-31",
+    "limit": 1000
+  },
+  "display_defaults": {
+    "max_items": 10,
+    "show_funded_amount": true,
+    "show_requested_amount": true,
+    "show_coverage": "on",
+    "show_closed_operations": "on",
+    "operation_types": [
+      "Emergency Appeal",
+      "DREF",
+      "All"
+    ]
+  },
+  "caching": {
+    "cache_duration": 3600
+  },
+  "data_cache": {
+    "use_file_cache": true,
+    "schedule": "monthly"
+  }
+}

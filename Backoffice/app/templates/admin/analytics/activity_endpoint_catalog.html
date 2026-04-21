@@ -1,0 +1,83 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ _('Activity endpoint catalog') }} - {{ _('Admin Panel') }}{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+    {{ page_header(
+        title=_('Activity endpoint catalog'),
+        icon='fas fa-book',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Analytics'), 'url': url_for('analytics.analytics_dashboard')},
+            {'name': _('Audit Trail'), 'url': url_for('analytics.audit_trail')},
+            {'name': _('Activity endpoint catalog')}
+        ],
+        info_tooltip=_('Maps (HTTP method, Flask endpoint) to descriptions and badge keys for automatic UserActivityLog rows. GET navigations are not listed here — they are reflected in session page_views, not the activity log.')
+    ) }}
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
+        <form method="get" action="{{ url_for('analytics.activity_endpoint_catalog') }}" class="flex flex-col sm:flex-row flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[12rem]">
+                <label for="aec_q" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Search') }}</label>
+                <input type="search" name="q" id="aec_q" value="{{ q }}"
+                       class="form-input w-full border-gray-300 rounded-md text-sm font-mono"
+                       placeholder="{{ _('method, endpoint, description, activity type') }}"
+                       autocomplete="off">
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search mr-2"></i>{{ _('Apply') }}
+                </button>
+                <a href="{{ url_for('analytics.activity_endpoint_catalog') }}" class="btn btn-secondary">{{ _('Clear') }}</a>
+                <a href="{{ url_for('analytics.activity_endpoint_catalog', q=q, export='csv') }}" class="btn btn-success">
+                    <i class="fas fa-file-csv mr-2"></i>{{ _('Export CSV') }}
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
+        <p class="text-sm text-gray-600 mb-4">
+            <span class="font-semibold text-gray-800">{{ filtered_count }}</span>
+            {{ _('rows') }}
+            {% if q %}
+            <span class="text-gray-400">·</span>
+            {{ _('filtered from') }} <span class="font-semibold text-gray-800">{{ total_catalog }}</span> {{ _('total') }}
+            {% else %}
+            <span class="text-gray-400">·</span>
+            {{ _('total catalog size') }} <span class="font-semibold text-gray-800">{{ total_catalog }}</span>
+            {% endif %}
+        </p>
+
+        <div class="overflow-x-auto border border-gray-200 rounded-md">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 w-24">{{ _('Method') }}</th>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700">{{ _('Endpoint') }}</th>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700">{{ _('Description') }}</th>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 w-44">{{ _('Activity type') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for row in rows %}
+                    <tr class="hover:bg-gray-50 align-top">
+                        <td class="px-3 py-2 font-mono text-xs text-gray-900 whitespace-nowrap">{{ row.method }}</td>
+                        <td class="px-3 py-2 font-mono text-xs text-gray-900 break-all">{{ row.endpoint }}</td>
+                        <td class="px-3 py-2 text-gray-800">{{ row.description }}</td>
+                        <td class="px-3 py-2 font-mono text-xs text-gray-700 break-all">{{ row.activity_type or '—' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-500">{{ _('No rows match this search.') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

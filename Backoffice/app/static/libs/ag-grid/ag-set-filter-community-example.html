@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AG Grid Community Set Filter - Example</title>
+
+    <!-- AG Grid CSS -->
+    <link rel="stylesheet" href="ag-grid.css">
+    <link rel="stylesheet" href="ag-theme-alpine.css">
+
+    <!-- Custom Set Filter CSS -->
+    <link rel="stylesheet" href="ag-set-filter-community.css">
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .example-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        #myGrid {
+            height: 600px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="example-container">
+        <h1>AG Grid Community Set Filter Example</h1>
+        <div class="description">
+            This example demonstrates the custom Set Filter component for AG Grid Community edition.
+            Click on the filter icon in any column header to see the Excel-like filter with unique values.
+        </div>
+
+        <div id="myGrid" class="ag-theme-alpine"></div>
+    </div>
+
+    <!-- AG Grid JavaScript -->
+    <script src="ag-grid-community.min.js"></script>
+
+    <!-- Custom Set Filter JavaScript -->
+    <script src="ag-set-filter-community.js"></script>
+
+    <script>
+        // Sample data
+        const rowData = [
+            { id: 1, name: 'John Doe', department: 'Sales', status: 'Active', country: 'USA', priority: 'High' },
+            { id: 2, name: 'Jane Smith', department: 'Marketing', status: 'Active', country: 'UK', priority: 'Medium' },
+            { id: 3, name: 'Bob Johnson', department: 'Sales', status: 'Inactive', country: 'USA', priority: 'Low' },
+            { id: 4, name: 'Alice Brown', department: 'IT', status: 'Active', country: 'Canada', priority: 'High' },
+            { id: 5, name: 'Charlie Wilson', department: 'Sales', status: 'Active', country: 'USA', priority: 'Medium' },
+            { id: 6, name: 'Diana Prince', department: 'HR', status: 'Active', country: 'UK', priority: 'High' },
+            { id: 7, name: 'Edward Lee', department: 'IT', status: 'Inactive', country: 'Canada', priority: 'Low' },
+            { id: 8, name: 'Fiona Green', department: 'Marketing', status: 'Active', country: 'USA', priority: 'Medium' },
+            { id: 9, name: 'George White', department: 'Sales', status: 'Active', country: 'UK', priority: 'High' },
+            { id: 10, name: 'Helen Black', department: 'IT', status: 'Active', country: 'USA', priority: 'Low' },
+        ];
+
+        // Column definitions with custom set filter
+        const columnDefs = [
+            {
+                field: 'id',
+                headerName: 'ID',
+                width: 80,
+                filter: false // No filter for ID
+            },
+            {
+                field: 'name',
+                headerName: 'Name',
+                width: 150,
+                filter: 'agTextColumnFilter' // Use text filter for names
+            },
+            {
+                field: 'department',
+                headerName: 'Department',
+                width: 150,
+                filter: 'customSetFilter' // Use our custom set filter
+            },
+            {
+                field: 'status',
+                headerName: 'Status',
+                width: 120,
+                filter: 'customSetFilter' // Use our custom set filter
+            },
+            {
+                field: 'country',
+                headerName: 'Country',
+                width: 120,
+                filter: 'customSetFilter' // Use our custom set filter
+            },
+            {
+                field: 'priority',
+                headerName: 'Priority',
+                width: 120,
+                filter: 'customSetFilter' // Use our custom set filter
+            }
+        ];
+
+        // Grid options
+        const gridOptions = {
+            columnDefs: columnDefs,
+            rowData: rowData,
+            defaultColDef: {
+                sortable: true,
+                resizable: true,
+                filter: true
+            },
+            components: {
+                customSetFilter: CustomSetFilter
+            },
+            animateRows: true,
+            pagination: true,
+            paginationPageSize: 10
+        };
+
+        // Initialize the grid
+        document.addEventListener('DOMContentLoaded', function() {
+            const gridDiv = document.querySelector('#myGrid');
+            new agGrid.Grid(gridDiv, gridOptions);
+        });
+    </script>
+</body>
+</html>

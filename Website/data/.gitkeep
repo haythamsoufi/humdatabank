@@ -1,0 +1,2 @@
+# This directory stores synced data from the backend API
+# Files in this directory are gitignored except for this .gitkeep file

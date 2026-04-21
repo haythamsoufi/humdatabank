@@ -1,0 +1,140 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "macros/empty_state.html" import empty_state %}
+
+{% block title %}{{ _('Access Rules') }}{% endblock %}
+
+{% block content %}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+
+{{ page_header(
+    title=_('Roles & Permissions'),
+    icon='fas fa-user-lock',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('User Management'), 'url': url_for('user_management.manage_users')},
+        {'name': _('Roles & Permissions')}
+    ],
+    actions=(
+        [
+            {
+                'type': 'link',
+                'text': _('Create Rule'),
+                'url': url_for('rbac_management.new_grant'),
+                'icon': 'fas fa-plus',
+                'classes': 'professional-action-btn professional-action-btn-green'
+            }
+        ] if current_is_system_manager else []
+    ),
+    subtitle=_('Manage roles, permissions, and access rules.')
+) }}
+
+{% set active_tab = 'access_rules' %}
+{% include "admin/rbac/_rbac_tabs.html" %}
+
+<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+    <div class="mb-4 p-3 rounded-md border border-blue-200 bg-blue-50 text-blue-900 text-sm">
+        <i class="fas fa-info-circle mr-2"></i>
+        {{ _('Access rules let you allow or deny specific permissions for a user or role, optionally scoped (e.g., only for one template or assignment).') }}
+    </div>
+
+    {% if grants %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Principal') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Permission') }}</th>
+                        <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Effect') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Scope') }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Created') }}</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for grant in grants %}
+                    {% set perm = perms_by_id.get(grant.permission_id) %}
+                    {% set principal_user = users_by_id.get(grant.principal_id) if grant.principal_type == 'user' else None %}
+                    {% set principal_role = roles_by_id.get(grant.principal_id) if grant.principal_type == 'role' else None %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                            {% if grant.principal_type == 'user' %}
+                                <i class="fas fa-user text-blue-600 mr-1"></i>
+                                {{ principal_user.email if principal_user else ('User #' ~ grant.principal_id) }}
+                            {% else %}
+                                <i class="fas fa-users text-green-600 mr-1"></i>
+                                {% if principal_role %}
+                                    {{ principal_role.name }}
+                                    <span class="text-xs text-gray-500">({{ principal_role.code }})</span>
+                                {% else %}
+                                    {{ 'Role #' ~ grant.principal_id }}
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm">
+                            <div class="text-xs">
+                                <code class="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                                    {{ perm.code if perm else grant.permission_id }}
+                                </code>
+                            </div>
+                            {% if perm and perm.name and perm.name != perm.code %}
+                                <div class="text-xs text-gray-600 mt-1">{{ perm.name }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-center">
+                            {% set effect = (grant.effect or 'allow') %}
+                            {% if effect == 'deny' %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                    {{ _('deny') }}
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                    {{ _('allow') }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-xs text-gray-700">
+                            {% if grant.scope_kind == 'global' %}
+                                <span class="text-gray-600">{{ _('Global') }}</span>
+                            {% elif grant.scope_kind == 'entity' %}
+                                {{ _('Entity') }}: <span class="font-mono">{{ grant.entity_type }}</span> #{{ grant.entity_id }}
+                            {% elif grant.scope_kind == 'template' %}
+                                {% set t = templates_by_id.get(grant.template_id) %}
+                                {{ _('Template') }}:
+                                {% if t and hasattr(t, 'name') and t.name %}
+                                    {{ t.name }}
+                                {% else %}
+                                    #{{ grant.template_id }}
+                                {% endif %}
+                            {% elif grant.scope_kind == 'assignment' %}
+                                {{ _('Assignment') }} #{{ grant.assigned_form_id }}
+                            {% else %}
+                                {{ grant.scope_kind }}
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-xs text-gray-500">
+                            {{ grant.created_at.strftime('%Y-%m-%d') if grant.created_at else '-' }}
+                        </td>
+                        <td class="px-4 py-3 text-sm">
+                            <div class="flex items-center justify-end">
+                                <form method="POST"
+                                      action="{{ url_for('rbac_management.delete_grant', grant_id=grant.id) }}"
+                                      class="inline-block"
+                                      data-confirm="{{ _('Delete this grant?') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-900" title="{{ _('Delete') }}">
+                                        <i class="fas fa-trash fa-fw"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        {{ empty_state(icon="fas fa-inbox", title=_('No access rules defined yet.')) }}
+    {% endif %}
+</div>
+{% endblock %}

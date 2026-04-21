@@ -1,0 +1,247 @@
+{% macro items_table_header() %}
+<tr>
+    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/16">{{ _('Order') }}</th>
+    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">{{ _('Label') }}</th>
+    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">{{ _('Properties') }}</th>
+    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/8">{{ _('Actions') }}</th>
+  </tr>
+{% endmacro %}
+
+{# Properties cell content reused across main and sub tables #}
+{% macro item_properties(item_type, item_instance) %}
+  {% if item_type == 'indicator' %}
+    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ item_instance.type_display }}</p>
+    {% if item_instance.unit %}<p class="mb-1"><strong>{{ _('Unit') }}:</strong> {{ item_instance.unit_display }}</p>{% endif %}
+    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+    {% if item_instance.supports_disaggregation %}
+      <p class="mb-1"><strong>Disagg:</strong>
+        {% if item_instance.allowed_disaggregation_options %}
+          {{ item_instance.disaggregation_options_display | join(', ') }}
+        {% else %}
+          Total Only
+        {% endif %}
+      </p>
+    {% endif %}
+    {% if item_instance.age_groups_config and item_instance.age_groups_config != 'Default' %}
+      <p class="mb-1"><strong>{{ _('Age') }}:</strong> {{ item_instance.age_groups_config }}</p>
+    {% endif %}
+    {% if item_instance.indicator_bank %}
+      {% set _has_custom_label = item_instance.label and item_instance.label != item_instance.indicator_bank.name %}
+      {% set _has_custom_definition = item_instance.definition and item_instance.definition != (item_instance.indicator_bank.definition | default('', true)) %}
+      {% if _has_custom_label or _has_custom_definition %}
+        <p class="mb-1"><strong>{{ _('Custom') }}:</strong> {{ _('Label') if _has_custom_label }}{{ ', ' if _has_custom_label and _has_custom_definition }}{{ _('Definition') if _has_custom_definition }}</p>
+      {% endif %}
+    {% endif %}
+  {% elif item_type == 'question' %}
+    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ item_instance.question_type.value | replace('_', ' ') | title }}</p>
+    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+    {% if item_instance.lookup_list_id %}
+      <p class="mb-1"><strong>Options:</strong> {{ item_instance.lookup_list.name }}/{{ item_instance.list_display_column }}</p>
+      {% if item_instance.list_filters_json and item_instance.list_filters_json != '[]' %}
+        {% set filters = item_instance.list_filters_json | fromjson %}
+        {% for filter in filters %}
+          <p class="mb-1 ml-4 text-gray-600">{{ filter.field }} {{ filter.condition | default('=') }} {{ filter.value }}</p>
+        {% endfor %}
+      {% endif %}
+    {% elif item_instance.options %}
+      <p class="mb-1"><strong>{{ _('Options') }}:</strong> {{ item_instance.options | join(', ') if item_instance.options | length <= 3 else (item_instance.options[:3] | join(', ') + '...') }}</p>
+    {% endif %}
+  {% elif item_type == 'document' %}
+    <p class="mb-1"><strong>{{ _('Type') }}:</strong> Document Upload</p>
+    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+    {% if item_instance.description %}
+      <p class="mb-1"><strong>{{ _('Description') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
+    {% endif %}
+  {% elif item_type == 'matrix' %}
+    <p class="mb-1"><strong>{{ _('Type') }}:</strong> Matrix Table</p>
+    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+    {% if item_instance.description %}
+      <p class="mb-1"><strong>{{ _('Description') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
+    {% endif %}
+    {% if item_instance.config and item_instance.config.matrix_config %}
+      {% set matrix_config = item_instance.config.matrix_config %}
+      {% if matrix_config.rows and matrix_config.columns %}
+        <p class="mb-1"><strong>{{ _('Matrix') }}:</strong> {{ matrix_config.rows | length }} {{ _('rows') }} × {{ matrix_config.columns | length }} {{ _('columns') }}</p>
+      {% endif %}
+    {% endif %}
+  {% elif item_type == 'plugin' %}
+    {% set plugin_type = item_instance.item_type.replace('plugin_', '') %}
+    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ plugin_type.replace('_', ' ') | title }} Plugin</p>
+    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+    {% if item_instance.description %}
+      <p class="mb-1"><strong>{{ _('Description') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
+    {% endif %}
+    {% if item_instance.config and item_instance.config.plugin_config %}
+      <p class="mb-1"><strong>Plugin Config:</strong> Configured</p>
+    {% endif %}
+  {% endif %}
+
+  {# Indirect Reach #}
+  {% if item_instance.indirect_reach %}
+    <p class="mb-1"><strong>{{ _('Indirect Reach') }}:</strong> {{ _('Yes') }}</p>
+  {% endif %}
+
+  {# Layout summary #}
+  {% if hasattr(item_instance, 'layout_column_width') and item_instance.layout_column_width != 12 and item_instance.layout_column_width != '12' %}
+    <p class="mb-1"><strong>{{ _('Layout') }}:</strong> {{ item_instance.layout_column_width }}/12 {{ _('width') }}{% if item_instance.layout_break_after %}, {{ _('Break after') }}{% endif %}</p>
+  {% elif hasattr(item_instance, 'layout_break_after') and item_instance.layout_break_after %}
+    <p class="mb-1"><strong>{{ _('Layout') }}:</strong> {{ _('Break after') }}</p>
+  {% endif %}
+
+  {# Rule summaries #}
+  {% set relevance_obj = item_instance.relevance_condition if item_instance.relevance_condition is mapping else (item_instance.relevance_condition | fromjson if item_instance.relevance_condition else {}) %}
+  {% if relevance_obj and relevance_obj != {} and relevance_obj.get('conditions', []) | length > 0 %}
+    <p class="mb-1"><strong>{{ _('Relevance') }}:</strong> <span class="rule-display text-blue-700" data-rule-json="{{ item_instance.relevance_condition if item_instance.relevance_condition is string else (item_instance.relevance_condition | tojson | e) }}" data-rule-type="relevance">{{ _('Loading...') }}</span></p>
+  {% endif %}
+  {% set validation_obj = item_instance.validation_condition if item_instance.validation_condition is mapping else (item_instance.validation_condition | fromjson if item_instance.validation_condition else {}) %}
+  {% if item_type != 'document' and validation_obj and validation_obj != {} and validation_obj.get('conditions', []) | length > 0 %}
+    <p class="mb-1"><strong>{{ _('Validation') }}:</strong> <span class="rule-display text-red-700" data-rule-json="{{ item_instance.validation_condition if item_instance.validation_condition is string else (item_instance.validation_condition | tojson | e) }}" data-rule-type="validation">{{ _('Loading...') }}</span></p>
+  {% endif %}
+{% endmacro %}
+
+{# Actions cell content reused across main and sub tables #}
+{% macro item_actions(item_type, item_instance, current_section_id, section_form) %}
+  {% if item_type == 'indicator' %}
+    <button type="button" class="edit-indicator-btn text-purple-600 hover:text-purple-800 transition duration-150 ease-in-out p-1" title="Edit Indicator"
+      data-indicator-id="{{ item_instance.id }}"
+      data-indicator-order="{{ item_instance.order }}"
+      data-indicator-bank-id="{{ item_instance.indicator_bank_id }}"
+      data-indicator-bank-label="{{ item_instance.indicator_bank.name | default('', true) | e if item_instance.indicator_bank else '' }}"
+      data-indicator-bank-definition="{{ item_instance.indicator_bank.definition | default('', true) | e if item_instance.indicator_bank and item_instance.indicator_bank.definition else '' }}"
+      data-current-section-id="{{ current_section_id }}"
+      data-is-required="{{ 'true' if item_instance.is_required else 'false' }}"
+      data-allowed-disaggregation-options="{{ item_instance.allowed_disaggregation_options|join(',') if item_instance.allowed_disaggregation_options else 'total' }}"
+      data-age-groups-config="{{ item_instance.age_groups_config | default('', true) | e }}"
+      data-indicator-unit="{{ item_instance.unit if item_instance.unit else '' }}"
+      data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+      data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
+      data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+      data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
+      data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+      data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
+      data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+      data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+      data-indicator-label="{{ item_instance.label | e }}"
+      data-indicator-definition="{{ item_instance.definition | default('', true) | e }}"
+      data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+      data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+      data-definition-translations='{{ (item_instance.definition_translations | tojson | e) if item_instance.definition_translations else "{}" }}'>
+      <i class="fas fa-pen w-4 h-4"></i>
+    </button>
+    <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-indicator-form" data-confirm="Are you sure you want to delete this indicator instance?">
+      <input id="section-csrf_token-indicator-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+      <button type="submit" class="text-red-600 hover:text-red-800 transition duration-150 ease-in-out p-1" title="Remove Indicator">
+        <i class="fas fa-times w-4 h-4"></i>
+      </button>
+    </form>
+  {% elif item_type == 'question' %}
+    <button type="button" class="edit-question-btn text-green-600 hover:text-green-800 transition duration-150 ease-in-out p-1" title="Edit Question"
+      data-question-id="{{ item_instance.id }}"
+      data-question-order="{{ item_instance.order }}"
+      data-current-section-id="{{ current_section_id }}"
+      data-question-type="{{ item_instance.question_type.value }}"
+      data-question-label="{{ item_instance.label | e }}"
+      data-question-definition="{{ item_instance.definition | default('', true) | e }}"
+      data-question-unit="{{ item_instance.unit | default('', true) | e }}"
+      data-question-type-field="{{ item_instance.type | default('', true) | e }}"
+      data-question-options='{{ (item_instance.options | tojson | e) if item_instance.options else "[]" }}'
+      data-is-required="{{ 'true' if item_instance.is_required else 'false' }}"
+      data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+      data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
+      data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+      data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
+      data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+      data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
+      data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+      data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+      data-options-source="{{ 'calculated' if item_instance.lookup_list_id else 'manual' }}"
+      data-lookup-list-id="{{ item_instance.lookup_list_id or '' }}"
+      data-display-column="{{ item_instance.list_display_column or '' }}"
+      data-filters-json='{{ item_instance.list_filters_json or "[]" }}'
+      data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+      data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+      data-definition-translations='{{ (item_instance.definition_translations | tojson | e) if item_instance.definition_translations else "{}" }}'
+      data-options-translations='{{ (item_instance.options_translations | tojson | e) if item_instance.options_translations else "[]" }}'>
+      <i class="fas fa-pen w-4 h-4"></i>
+    </button>
+    <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-question-form" data-confirm="Are you sure you want to delete this question?">
+      <input id="section-csrf_token-question-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+      <button type="submit" class="text-red-600 hover:text-red-800 transition duration-150 ease-in-out p-1" title="Remove Question">
+        <i class="fas fa-times w-4 h-4"></i>
+      </button>
+    </form>
+  {% elif item_type == 'document' %}
+    <button type="button" class="edit-document-field-btn text-blue-600 hover:text-blue-800 transition duration-150 ease-in-out p-1" title="Edit Document Field"
+      data-document-field-id="{{ item_instance.id }}"
+      data-document-field-label="{{ item_instance.label | e }}"
+      data-document-field-order="{{ item_instance.order }}"
+      data-document-field-required="{{ 'true' if item_instance.is_required else 'false' }}"
+      data-document-field-description="{{ item_instance.description | default('', true) | e }}"
+      data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+      data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+      data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+      data-current-section-id="{{ item_instance.section_id if item_instance.section_id else current_section_id }}"
+      data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+      data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+      data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'
+      data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'>
+      <i class="fas fa-pen w-4 h-4"></i>
+    </button>
+    <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-document-field-form" data-confirm="Are you sure you want to delete this document field and any associated uploaded documents?">
+      <input id="section-csrf_token-document-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+      <button type="submit" class="text-red-600 hover:text-red-800 transition duration-150 ease-in-out p-1" title="Remove Document Field">
+        <i class="fas fa-times w-4 h-4"></i>
+      </button>
+    </form>
+  {% elif item_type == 'matrix' %}
+    <button type="button" class="edit-matrix-item-btn text-orange-600 hover:text-orange-800 transition duration-150 ease-in-out p-1" title="Edit Matrix"
+      data-matrix-item-id="{{ item_instance.item_id }}"
+      data-matrix-item-label="{{ item_instance.label | e }}"
+      data-matrix-item-description="{{ item_instance.description | default('', true) | e }}"
+      data-matrix-item-order="{{ item_instance.order }}"
+      data-matrix-item-required="{{ 'true' if item_instance.is_required else 'false' }}"
+      data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+      data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+      data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+      data-current-section-id="{{ item_instance.section_id }}"
+      data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+      data-matrix-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{\"type\": \"matrix\", \"rows\": [], \"columns\": []}" }}'
+      data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+      data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'>
+      <i class="fas fa-pen w-4 h-4"></i>
+    </button>
+    <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.item_id) }}" method="POST" class="inline-block delete-matrix-item-form" data-confirm="Are you sure you want to delete this matrix table?">
+      <input id="section-csrf_token-matrix-{{ item_instance.item_id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+      <button type="submit" class="text-red-600 hover:text-red-800 transition duration-150 ease-in-out p-1" title="Remove Matrix">
+        <i class="fas fa-times w-4 h-4"></i>
+      </button>
+    </form>
+  {% elif item_type == 'plugin' %}
+    <button type="button" class="edit-plugin-item-btn text-orange-600 hover:text-orange-800 transition duration-150 ease-in-out p-1" title="Edit Plugin Item"
+      data-plugin-item-id="{{ item_instance.item_id }}"
+      data-plugin-item-type="{{ item_instance.item_type }}"
+      data-plugin-item-label="{{ item_instance.label | e }}"
+      data-plugin-item-description="{{ item_instance.description | default('', true) | e }}"
+      data-plugin-item-order="{{ item_instance.order }}"
+      data-plugin-item-required="{{ 'true' if item_instance.is_required else 'false' }}"
+      data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+      data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
+      data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+      data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
+      data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+      data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
+      data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+      data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+      data-current-section-id="{{ item_instance.section_id }}"
+      data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+      data-plugin-config='{{ (item_instance.config.plugin_config | tojson | e) if item_instance.config and item_instance.config.plugin_config else "{}" }}'>
+      <i class="fas fa-pen w-4 h-4"></i>
+    </button>
+    <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.item_id) }}" method="POST" class="inline-block delete-plugin-item-form" data-confirm="Are you sure you want to delete this plugin item?">
+      <input id="section-csrf_token-plugin-{{ item_instance.item_id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+      <button type="submit" class="text-red-600 hover:text-red-800 transition duration-150 ease-in-out p-1" title="Remove Plugin Item">
+        <i class="fas fa-times w-4 h-4"></i>
+      </button>
+    </form>
+  {% endif %}
+{% endmacro %}

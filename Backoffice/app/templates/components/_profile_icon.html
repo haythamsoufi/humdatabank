@@ -1,0 +1,88 @@
+{#
+Profile Icon Component - Reusable across the application
+
+Usage Examples:
+
+1. Basic profile icon with name:
+   {{ profile_icon(user, 'md', true, true, false) }}
+
+2. Profile icon button (clickable):
+   {{ profile_icon_button(current_user, 'md', '', 'text-white hover:text-gray-200') }}
+
+3. Profile icon with tooltip:
+   {{ profile_icon_tooltip(user, 'md') }}
+
+4. Profile icon without text (just the circle):
+   {{ profile_icon(user, 'md', false, false, false) }}
+
+Parameters:
+- user: User object with name, email, and title properties
+- size: 'sm', 'md', 'lg' (affects icon size)
+- show_name: boolean to show user name
+- show_email: boolean to show user email (if no name)
+- show_title: boolean to show user title
+- class: additional CSS classes
+- button_class: CSS classes for button styling (for profile_icon_button)
+#}
+{% macro profile_icon(user, size='md', show_name=true, show_email=true, show_title=true, class='') %}
+    {% if user %}
+        {# Extract shadow classes from the class parameter to apply to inner circle #}
+        {% set class_list = class.split() if class else [] %}
+        {% set shadow_classes = [] %}
+        {% set container_classes = [] %}
+        {% for cls in class_list %}
+            {% if cls.startswith('shadow-') %}
+                {% set __ = shadow_classes.append(cls) %}
+            {% else %}
+                {% set __ = container_classes.append(cls) %}
+            {% endif %}
+        {% endfor %}
+        {% set shadow_class_str = shadow_classes | join(' ') %}
+        {% set container_class_str = container_classes | join(' ') %}
+        <div class="flex items-center profile-icon {{ container_class_str }}">
+            {% set profile_color = user.profile_color if user.profile_color and user.profile_color != '#3B82F6' else user.generate_profile_color() %}
+            {% set size_classes = {'xs': 'w-5 h-5 text-xs', 'sm': 'w-6 h-6 text-xs', 'md': 'w-8 h-8 text-xs', 'lg': 'w-12 h-12 text-sm'} %}
+            {% set icon_size = size_classes.get(size, 'w-8 h-8 text-xs') %}
+            <div class="{{ icon_size }} rounded-full text-white font-semibold flex items-center justify-center mr-2 flex-shrink-0 profile-icon-circle {{ shadow_class_str }}" style="background-color: {{ profile_color }};">
+                {% if user.name %}
+                    {{ user.name.split() | map('first') | join('') | upper | truncate(2, true, '') }}
+                {% else %}
+                    {{ user.email.split('@')[0] | upper | truncate(2, true, '') }}
+                {% endif %}
+            </div>
+            {% if show_name or show_email or show_title %}
+                <div class="flex flex-col min-w-0">
+                    {% if show_name and user.name %}
+                        <span class="text-sm font-medium text-gray-900 truncate">{{ user.name }}</span>
+                    {% elif show_email %}
+                        <span class="text-sm font-medium text-gray-900 truncate">{{ user.email }}</span>
+                    {% endif %}
+                    {% if show_title and user.title %}
+                        <span class="text-xs text-gray-500 truncate">{{ user.title }}</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="flex items-center {{ class }}">
+            <div class="w-8 h-8 rounded-full bg-gray-400 text-white text-xs font-semibold flex items-center justify-center mr-2 flex-shrink-0">
+                ?
+            </div>
+            <span class="text-gray-400 text-sm">Unknown</span>
+        </div>
+    {% endif %}
+{% endmacro %}
+
+{# Profile Icon Button - For clickable profile icons #}
+{% macro profile_icon_button(user, size='md', class='', button_class='') %}
+    <button class="profile-icon-button {{ button_class }}" aria-label="{{ _('User Profile') }}">
+        {{ profile_icon(user, size, false, false, false, class) }}
+    </button>
+{% endmacro %}
+
+{# Profile Icon with Tooltip - For hover tooltips #}
+{% macro profile_icon_tooltip(user, size='md', class='') %}
+    <div class="profile-icon-tooltip-container relative inline-block {{ class }}" title="{{ user.name or user.email if user else 'Unknown' }}">
+        {{ profile_icon(user, size, false, false, false) }}
+    </div>
+{% endmacro %}

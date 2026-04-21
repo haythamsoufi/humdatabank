@@ -1,0 +1,158 @@
+# Secrets and credentials
+/FLY_DEPLOYMENT.md
+
+# Mobile app binaries (too large for git)
+*.apk
+*.ipa
+*.aab
+
+# Website (Next.js)
+Website/node_modules/
+Website/out/
+Website/.next/
+Website/.vercel/
+Website/.vercel/output/
+Website/.turbo/
+Website/public/geoboundaries
+
+Backoffice/node_modules/
+node_modules/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors/IDEs
+.vscode/
+.idea/
+.history/
+
+# Python / Flask
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Virtual environments
+env/
+venv/
+.venv/
+.direnv/
+.envrc
+# Environment files (do not commit secrets)
+.env
+Backoffice/.env
+.env.*
+.flaskenv
+
+# Firebase service account JSON (contains sensitive credentials)
+**/firebase-adminsdk-*.json
+**/*-firebase-adminsdk-*.json
+
+# Local data and databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and dumps
+*.log
+#*.dump
+*.sql
+*.backup
+*.backup.*
+database_dump.backup
+Backoffice/test_results.xml
+test_results.xml
+
+# Backoffice runtime cache/state (generated at runtime)
+Backoffice/instance/
+Backoffice/test_results.log
+
+# Compiled translation catalogs (generated from .po files)
+*.mo
+# Translation backup files (created by extraction scripts)
+*.po.bak
+*.po.bak.*
+# Dockerfile baseline copy (not needed outside Docker)
+Backoffice/translations_base/
+
+# Upload directories
+**/uploads/
+Backoffice/instance/uploads/
+
+# Archives and exports
+Archive/
+
+# Local UPR training docs (PDFs/cases) - keep out of git
+UPR training docs/
+
+# Node logs
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local tool/config files (do not track)
+.cursorignore
+.dockerignore
+.gitattributes
+.claude/
+/CLAUDE.md
+# Playwright MCP: keep screenshots/traces under here (see .cursor/mcp.json --output-dir)
+.playwright-mcp/
+
+# GitHub metadata (ignore workflows/config)
+# Allow .github/workflows/ but ignore other GitHub files
+.github/*
+!.github/workflows/
+!.github/workflows/**/*.yml
+!.github/workflows/**/*.yaml
+!.github/PULL_REQUEST_TEMPLATE.md
+!.github/ISSUE_TEMPLATE/
+!.github/dependabot.yml
+!.github/ruleset-protect-main.json
+!.github/codeql/
+
+# Root helper scripts (local only)
+/scripts/
+
+*.docx
+*.xlsx
+*.toml
+# Exceptions — project-level config files that must be committed
+!pyproject.toml
+!.gitleaks.toml
+/*.bat
+*.csv
+/*.py
+/*.ps1
+/*.png
+
+# Accidental files
+/hell -NoProfile -Command git status -sb
+/app.db
+*.zip
+
+# Windows-specific problematic files
+nul
+*.nul
+
+MobileApp/android/key.properties
+
+# Emergency Operations plugin — server-side data cache (can be large, regenerated via admin refresh)
+Backoffice/plugins/emergency_operations/data/appeals_cache.json
+Backoffice/plugins/emergency_operations/data/appeals_cache.tmp

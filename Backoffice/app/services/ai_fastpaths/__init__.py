@@ -1,0 +1,1 @@
+"""AI fast-path modules."""

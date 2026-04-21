@@ -1,0 +1,338 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_manage_public = current_is_system_manager or has_permission('admin.assignments.public_submissions.manage') %}
+{% set can_create_assignment = current_is_system_manager or has_permission('admin.assignments.create') %}
+{% set can_edit_assignment = current_is_system_manager or has_permission('admin.assignments.edit') %}
+{% set can_delete_assignment = current_is_system_manager or has_permission('admin.assignments.delete') %}
+
+{% block title %}{{ _('Manage Assignments') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set header_actions = namespace(items=[]) %}
+{% set __ = header_actions.items.append({
+    'type': 'link',
+    'text': _('Timeline View'),
+    'icon': 'fas fa-chart-gantt',
+    'url': url_for('assignment_management.assignments_gantt'),
+    'classes': 'professional-action-btn professional-action-btn-purple',
+    'attributes': {'title': _('View assignments on timeline')}
+}) %}
+{% if can_manage_public %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('View All Public Submissions'),
+        'icon': 'fas fa-clipboard-list',
+        'url': url_for('assignment_management.list_public_submissions'),
+        'classes': 'professional-action-btn professional-action-btn-orange',
+        'attributes': {'title': _('View all public submissions')}
+    }) %}
+{% endif %}
+{% if can_create_assignment %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Create New Assignment'),
+        'icon': 'fas fa-plus-circle',
+        'url': url_for('assignment_management.new_assignment'),
+        'classes': 'professional-action-btn professional-action-btn-green',
+        'attributes': {'title': _('Create a new assignment')}
+    }) %}
+{% endif %}
+
+{{ page_header(
+    title=_('Manage Assignments'),
+    icon='fas fa-tasks',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Assignment Management')}
+    ],
+    info_tooltip=_('Create and manage data collection assignments that distribute form templates to specific periods and organizations. Assignments control when forms are available, who can access them, and how data is collected. Use this to organize your reporting cycles, enable public submissions, and track completion status across different time periods and regions.'),
+    actions=header_actions.items
+) }}
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Main Table Card -->
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+        {% if assignments %}
+            {{ ag_grid_container('assignmentsGrid', loading_text=_('Loading assignments data...'), grid_height='600px', include_card=false) }}
+        {% else %}
+            <p class="text-gray-700">{{ _('No form assignments found.') }}</p>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- Include utils for flash messages -->
+    <script src="{{ static_url('js/form_builder/modules/utils.js') }}"></script>
+
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // UI permissions for this screen (do not rely on client-side gating for security)
+    const UI_PERMS = {
+        canManagePublic: {{ can_manage_public|default(false)|tojson|safe }},
+        canEditAssignment: {{ can_edit_assignment|default(false)|tojson|safe }},
+        canDeleteAssignment: {{ can_delete_assignment|default(false)|tojson|safe }}
+    };
+
+    // Transform assignments data for ag-grid
+    const assignmentsData = [
+        {% for assignment in assignments %}
+        {
+            id: {{ assignment.id }},
+            period_name: {{ (assignment.period_name or '')|tojson|safe }},
+            template_name: {{ (assignment.template.name if assignment.template else _('Template Missing'))|tojson|safe }},
+            data_owner_user_id: {{ (assignment.data_owner_user.id if assignment.data_owner_user else None)|tojson|safe }},
+            data_owner_name: {{ (assignment.data_owner_user.name if assignment.data_owner_user else '')|tojson|safe }},
+            data_owner_email: {{ (assignment.data_owner_user.email if assignment.data_owner_user else '')|tojson|safe }},
+            data_owner_title: {{ (assignment.data_owner_user.title if assignment.data_owner_user else '')|tojson|safe }},
+            data_owner_active: {{ (assignment.data_owner_user.active if assignment.data_owner_user else True)|tojson|safe }},
+            data_owner_profile_color: {{ ((assignment.data_owner_user.profile_color if assignment.data_owner_user and assignment.data_owner_user.profile_color else '') or '')|tojson|safe }},
+            due_date: {{ (assignment.earliest_due_date.strftime('%Y-%m-%d') if assignment.earliest_due_date else '')|tojson|safe }},
+            expiry_date: {{ (assignment.expiry_date.strftime('%Y-%m-%d') if assignment.expiry_date else '')|tojson|safe }},
+            is_active: {{ (assignment.is_active if hasattr(assignment, 'is_active') else True)|tojson|safe }},
+            is_closed: {{ (assignment.is_effectively_closed if hasattr(assignment, 'is_effectively_closed') else (assignment.is_closed if hasattr(assignment, 'is_closed') else False))|tojson|safe }},
+            has_public_url: {{ assignment.has_public_url()|tojson|safe }},
+            is_public_active: {{ assignment.is_public_active|tojson|safe }},
+            public_url: {{ ((assignment.get_public_url() if assignment.has_public_url() else '') if can_manage_public else '')|tojson|safe }},
+            toggle_url: "{{ url_for('assignment_management.toggle_public_access', assignment_id=assignment.id) if can_manage_public else '' }}",
+            toggle_active_url: "{{ url_for('assignment_management.toggle_assignment_active', assignment_id=assignment.id) if can_edit_assignment else '' }}",
+            close_url: "{{ url_for('assignment_management.close_assignment', assignment_id=assignment.id) if can_edit_assignment else '' }}",
+            reopen_closed_url: "{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=assignment.id) if can_edit_assignment else '' }}",
+            generate_url: "{{ url_for('assignment_management.generate_public_url', assignment_id=assignment.id) if can_manage_public else '' }}",
+            view_submissions_url: "{{ url_for('assignment_management.view_public_submissions', assignment_id=assignment.id) if can_manage_public else '' }}",
+            edit_url: "{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if can_edit_assignment else '' }}",
+            delete_url: "{{ url_for('assignment_management.delete_assignment', assignment_id=assignment.id) if can_delete_assignment else '' }}",
+            delete_confirm: {{ _('Are you sure you want to delete this assignment and all its associated country statuses and data?')|tojson|safe }},
+            close_confirm: {{ _('Close this assignment? It can be reopened later by an admin.')|tojson|safe }},
+            copy_success: {{ _('Public URL copied to clipboard!')|tojson|safe }},
+            copy_error: {{ _('Failed to copy URL. Please try again.')|tojson|safe }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        {
+            field: 'period_name',
+            headerName: '{{ _("Period") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const name = params.value || '';
+                const escapedName = name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const editUrl = params.data.edit_url || '';
+                const isActive = params.data.is_active !== false;
+                const nameHtml = editUrl
+                    ? '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">' + escapedName + '</a>'
+                    : escapedName;
+                if (!isActive) {
+                    return '<span class="text-gray-500">' + (editUrl ? '<a href="' + editUrl + '" class="text-gray-500 hover:text-gray-700 hover:underline">' + escapedName + '</a>' : escapedName) + '</span> <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">{{ _("Inactive") }}</span>';
+                }
+                return nameHtml;
+            }
+        },
+        {
+            field: 'template_name',
+            headerName: '{{ _("Template") }}',
+            width: 350,
+            minWidth: 250,
+            maxWidth: 500,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const name = (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                if (params.data.has_public_url && params.data.is_public_active) {
+                    return '<span class="inline-flex items-center gap-1.5"><i class="fas fa-globe text-green-500" title="{{ _("Public URL active") }}"></i>' + name + '</span>';
+                }
+                return name;
+            }
+        },
+        {
+            field: 'data_owner_name',
+            headerName: '{{ _("Data Owner") }}',
+            width: 180,
+            minWidth: 120,
+            maxWidth: 280,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'data_owner_user_id',
+                    nameField: 'data_owner_name',
+                    emailField: 'data_owner_email',
+                    titleField: 'data_owner_title',
+                    activeField: 'data_owner_active',
+                    profileColorField: 'data_owner_profile_color',
+                    fallbackLabel: '{{ _("Not assigned") }}',
+                    showEmail: false
+                });
+            }
+        },
+        {
+            field: 'due_date',
+            headerName: '{{ _("Due Date") }}',
+            width: 140,
+            minWidth: 110,
+            maxWidth: 180,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            comparator: AgGridRenderers.safeStringComparator,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400 italic text-xs">{{ _("Not set") }}</span>';
+                const d = new Date(params.value + 'T00:00:00');
+                return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+        },
+        {
+            field: 'expiry_date',
+            headerName: '{{ _("Expiry Date") }}',
+            width: 140,
+            minWidth: 110,
+            maxWidth: 180,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            comparator: AgGridRenderers.safeStringComparator,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400 italic text-xs">{{ _("Not set") }}</span>';
+                const d = new Date(params.value + 'T00:00:00');
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const label = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                if (d < today) return '<span class="text-red-600 font-medium">' + label + '</span>';
+                return label;
+            }
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            pinned: 'right',
+            lockPinned: true,
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || '';
+                const toggleActiveUrl = params.data.toggle_active_url || '';
+                const closeUrl = params.data.close_url || '';
+                const reopenClosedUrl = params.data.reopen_closed_url || '';
+                const isActive = params.data.is_active !== false;
+                const isClosed = params.data.is_closed === true;
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (isClosed && reopenClosedUrl) {
+                    html += '<form action="' + reopenClosedUrl + '" method="POST" class="inline-block">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" class="text-orange-600 hover:text-orange-900" title="{{ _("Reopen") }}" data-loading-text=""><i class="fas fa-fw fa-undo"></i></button>';
+                    html += '</form>';
+                } else {
+                    if (toggleActiveUrl) {
+                        html += '<form action="' + toggleActiveUrl + '" method="POST" class="inline-block">';
+                        html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                        html += '<button type="submit" class="' + (isActive ? 'text-amber-600 hover:text-amber-900' : 'text-green-600 hover:text-green-900') + '" title="' + (isActive ? '{{ _("Deactivate") }}' : '{{ _("Activate") }}') + '" data-loading-text=""><i class="fas fa-fw ' + (isActive ? 'fa-pause-circle' : 'fa-play-circle') + '"></i></button>';
+                        html += '</form>';
+                    }
+                    if (closeUrl) {
+                        const closeConfirm = (params.data.close_confirm || '').replace(/'/g, "\\'");
+                        html += '<form action="' + closeUrl + '" method="POST" class="inline-block close-assignment-form" data-confirm="' + closeConfirm + '">';
+                        html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                        html += '<button type="submit" class="close-assignment-btn text-slate-600 hover:text-slate-900" title="{{ _("Close") }}" data-loading-text=""><i class="fas fa-fw fa-lock"></i></button>';
+                        html += '</form>';
+                    }
+                }
+                if (editUrl) {
+                    html += '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-900" title="{{ _("Edit") }}"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (deleteUrl) {
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '" data-confirm-danger="true">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" class="text-red-600 hover:text-red-900 delete-assignment-btn" title="{{ _("Delete") }}" data-loading-text="" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        var result = AgGridHelper.create('assignmentsGrid', 'assignments', columnDefs, assignmentsData, {
+            onReady: function(api, helper) {
+                AgGridHelper.pinActionsColumn(api);
+
+                // Apply pre-filter from URL query params (e.g. ?no_data_owner=1)
+                var urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('no_data_owner') === '1' && api) {
+                    var ownerCol = api.getColumn('data_owner_name');
+                    if (ownerCol) {
+                        api.setFilterModel({
+                            data_owner_name: { filterType: 'text', type: 'blank' }
+                        });
+                        api.onFilterChanged();
+                    }
+                }
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+
+    // Handle copy URL functionality using event delegation
+    $(document).on('click', '.copy-url-btn', function() {
+        const url = $(this).data('copy-url');
+        const successMessage = $(this).data('success-message') || '{{ _("Public URL copied to clipboard!") }}';
+        const errorMessage = $(this).data('error-message') || '{{ _("Failed to copy URL. Please try again.") }}';
+
+        navigator.clipboard.writeText(url).then(function() {
+            if (typeof Utils !== 'undefined' && Utils.showSuccess) {
+                Utils.showSuccess(successMessage);
+            } else if (window.showAlert) {
+                window.showAlert(successMessage, 'success');
+            } else {
+                window.__clientLog && window.__clientLog(successMessage);
+            }
+        }).catch(function(err) {
+            console.error('Failed to copy text: ', err);
+            if (typeof Utils !== 'undefined' && Utils.showError) {
+                Utils.showError(errorMessage);
+            } else if (window.showAlert) {
+                window.showAlert(errorMessage, 'error');
+            } else {
+                console.error(errorMessage);
+            }
+        });
+    });
+    </script>
+{% endblock %}

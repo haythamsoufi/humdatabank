@@ -1,0 +1,827 @@
+{# Existing Sections and their Items (Indicators, Document Fields, or Questions) #}
+<div id="sections-container" class="space-y-6">
+    {# Group sections hierarchically - only show main sections, sub-sections will be nested #}
+    {% set main_sections = [] %}
+    {% set sub_sections_by_parent = {} %}
+
+    {# First, separate main sections from sub-sections #}
+    {% for item_s_f in sections_with_items %}
+        {% if item_s_f.section.parent_section_id is none %}
+            {% set __ignore = main_sections.append(item_s_f) %}
+        {% else %}
+            {% set parent_id = item_s_f.section.parent_section_id %}
+            {% if parent_id not in sub_sections_by_parent %}
+                {% set __ignore = sub_sections_by_parent.update({parent_id: []}) %}
+            {% endif %}
+            {% set __ignore = sub_sections_by_parent[parent_id].append(item_s_f) %}
+        {% endif %}
+    {% endfor %}
+
+
+    {# Group sections by page for better organization #}
+    {% set sections_by_page = {} %}
+    {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+    {% set is_paginated = selected_version.get_effective_is_paginated() if selected_version else (fallback_version.is_paginated if fallback_version else False) %}
+    {% for item_s_f in main_sections %}
+        {% if is_paginated and item_s_f.section.page_id %}
+            {% set page_id = item_s_f.section.page_id %}
+        {% else %}
+            {% set page_id = 'default' %}
+        {% endif %}
+        {% if page_id not in sections_by_page %}
+            {% set __ignore = sections_by_page.update({page_id: []}) %}
+        {% endif %}
+        {% set __ignore = sections_by_page[page_id].append(item_s_f) %}
+    {% endfor %}
+
+    {# Sort sections by page order (only if paginated) or section order (if not paginated) #}
+    {% set sorted_page_items = [] %}
+    {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+    {% set is_paginated = selected_version.get_effective_is_paginated() if selected_version else (fallback_version.is_paginated if fallback_version else False) %}
+        {% if is_paginated %}
+        {# For paginated templates: Sort pages by their order, then sections within each page #}
+        {% set sorted_pages = draft_pages | sort(attribute='order') %}
+        {% for page in sorted_pages %}
+            {% set page_id = page.id %}
+            {% if page_id in sections_by_page %}
+                {% set page_sections = sections_by_page[page_id] %}
+                {# Sort sections within this page by their order #}
+                {% set sorted_sections = page_sections | sort(attribute='section.order') %}
+                {% set __ignore = sorted_page_items.append({'page_id': page_id, 'page': page, 'sections': sorted_sections}) %}
+            {% endif %}
+        {% endfor %}
+
+        {# Handle default page (for paginated templates with sections not assigned to pages) #}
+        {% if 'default' in sections_by_page %}
+            {% set default_sections = sections_by_page['default'] | sort(attribute='section.order') %}
+            {% set __ignore = sorted_page_items.append({'page_id': 'default', 'page': None, 'sections': default_sections}) %}
+        {% endif %}
+    {% else %}
+        {# For non-paginated templates: Just sort all sections by their order #}
+        {% set all_sections_sorted = main_sections | sort(attribute='order') %}
+        {% set __ignore = sorted_page_items.append({'page_id': 'default', 'page': None, 'sections': all_sections_sorted}) %}
+    {% endif %}
+
+    {# Now render sections grouped by page in correct order #}
+    {% for page_item in sorted_page_items %}
+        {% set page_id = page_item.page_id %}
+        {% set page = page_item.page %}
+        {% set page_sections = page_item.sections %}
+        {# Display page name header if paginated #}
+        {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+    {% set is_paginated = selected_version.get_effective_is_paginated() if selected_version else (fallback_version.is_paginated if fallback_version else False) %}
+        {% if is_paginated and page_id != 'default' and page %}
+            <div class="border-l-4 border-amber-500 rounded-lg shadow-sm mb-6 mt-8 page-banner-wrapper" style="background: linear-gradient(to right, #fefce8, #fef3c7);">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between page-banner-row cursor-pointer">
+                        <div class="flex items-center">
+                            <i class="fas fa-file-alt fa-2x text-amber-600 mr-3"></i>
+                            <h2 class="text-xl font-bold text-amber-800">{{ _('Page') }} {{ page.order }}. {{ page.name }}</h2>
+                            <span class="ml-3 text-sm text-amber-600 px-3 py-1 rounded-full" style="background-color: #fde68a;">
+                                {{ page_sections|length }} {{ _('section') if page_sections|length == 1 else _('sections') }}
+                            </span>
+                        </div>
+                        <button type="button"
+                                class="page-toggle-btn btn btn-secondary btn-sm inline-flex items-center gap-2 text-amber-800 border-amber-300"
+                                data-page-id="{{ page_id }}"
+                                title="{{ _('Toggle sections visibility') }}">
+                            <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
+                            <span class="ml-2 text-sm font-medium">{{ _('Hide Sections') }}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {# Render sections for this page #}
+        <div class="page-sections-container" data-page-id="{{ page_id }}" style="transition: all 0.3s ease-in-out;">
+        {% for item_s_f in page_sections %}
+    {% set is_section_archived = item_s_f.section.archived if hasattr(item_s_f.section, 'archived') and item_s_f.section.archived else False %}
+    <div class="bg-white rounded-lg shadow-md border border-gray-200 section-item mb-6 archived-section-container {% if is_section_archived %}opacity-60 bg-gray-100{% endif %}" data-section-id="{{ item_s_f.section.id }}" {% if is_section_archived %}data-archived="true"{% endif %}>
+        <div class="p-6">
+            <div class="section-header-row flex justify-between items-center mb-4 pb-4 border-b">
+                <div class="flex items-center section-header-banner cursor-pointer flex-1 min-w-0">
+                    <button type="button" class="section-toggle btn btn-icon btn-sm btn-secondary flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse section') }}">
+                        <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
+                    </button>
+                    <div class="flex items-center">
+                    <i class="fas fa-layer-group w-5 h-5 mr-2 text-gray-500"></i>
+                    {# Avoid decimal-style display; show integer section position #}
+                    <span class="text-lg font-semibold text-gray-800 mr-1">{{ item_s_f.section.display_order.split('.')[0] }}.</span>
+                        <h3 class="text-lg font-semibold text-gray-800 {{ 'text-gray-500' if is_section_archived else '' }}">{{ item_s_f.section.name }}</h3>
+                    </div>
+                    {% if is_section_archived %}
+                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-400 text-white">
+                            <i class="fas fa-archive w-3 h-3 mr-1"></i>
+                            {{ _('Archived') }}
+                        </span>
+                    {% endif %}
+                    {# NEW: Section Type Badge #}
+                    {% if item_s_f.section.section_type_enum.value == 'Dynamic Indicators' %}
+                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            <i class="fas fa-magic w-3 h-3 mr-1"></i>
+                            {{ _('Dynamic Indicators') }}
+                        </span>
+                    {% elif item_s_f.section.section_type_enum.value == 'Repeat' %}
+                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <i class="fas fa-plus-circle w-3 h-3 mr-1"></i>
+                            {{ _('Repeat Group') }}
+                        </span>
+                    {% else %}
+                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            <i class="fas fa-list w-3 h-3 mr-1"></i>
+                            {{ _('Standard') }}
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="space-x-2 flex items-center">
+                    {% if is_section_archived %}
+                        {# Show unarchive button for archived sections #}
+                        <form action="{{ url_for('form_builder.unarchive_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block">
+                            <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                            <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                            <button type="submit" class="btn btn-icon btn-sm btn-success" title="{{ _('Unarchive Section') }}">
+                                <i class="fas fa-undo w-4 h-4"></i>
+                            </button>
+                        </form>
+                    {% else %}
+                    <button type="button" class="add-item-to-section-btn btn btn-icon btn-sm btn-success" title="{{ _('Add Item') }}"
+                            data-section-id="{{ item_s_f.section.id }}"
+                            data-section-name="{{ item_s_f.section.name | e }}">
+                        <i class="fas fa-plus w-4 h-4"></i>
+                    </button>
+                    <button type="button" class="add-subsection-btn btn btn-icon btn-sm btn-primary" title="{{ _('Add Subsection') }}"
+                            data-section-id="{{ item_s_f.section.id }}"
+                            data-section-order="{{ item_s_f.section.order }}"
+                            data-page-id="{{ item_s_f.section.page_id or '' }}">
+                        <i class="fas fa-indent w-4 h-4"></i>
+                    </button>
+                    <button type="button" class="edit-section-btn btn btn-icon btn-sm btn-primary" title="{{ _('Edit Section') }}"
+                            data-section-id="{{ item_s_f.section.id }}"
+                            data-section-name="{{ item_s_f.section.name | e }}"
+                            data-section-order="{{ item_s_f.section.order }}"
+                            data-parent-section-id="{{ item_s_f.section.parent_section_id or '' }}"
+                            data-section-type="{{ item_s_f.section.section_type_enum.value }}"
+                            data-page-id="{{ item_s_f.section.page_id or '1' }}"
+                            data-max-dynamic-indicators="{{ item_s_f.section.max_dynamic_indicators or '' }}"
+                              data-allowed-sectors="{{ item_s_f.section.allowed_sectors or '' }}"
+                              data-add-indicator-note="{{ item_s_f.section.add_indicator_note or '' }}"
+                              data-max-entries="{{ item_s_f.section.max_entries or '' }}"
+                              data-name-translations='{{ (item_s_f.section.name_translations | tojson | e) if item_s_f.section.name_translations else "{}" }}'
+                              data-relevance-condition='{{ (item_s_f.section.relevance_condition | tojson | e) if item_s_f.section.relevance_condition else "" }}'>
+                        <i class="fas fa-pen w-4 h-4"></i>
+                    </button>
+                    <form action="{{ url_for('form_builder.duplicate_template_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block duplicate-section-form" data-confirm-message="{{ _('Duplicate this section? This will copy the section, all sub-sections, and their items.') }}">
+                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                        <button type="submit" class="btn btn-icon btn-sm btn-purple" title="{{ _('Duplicate Section') }}">
+                            <i class="fas fa-copy w-4 h-4"></i>
+                        </button>
+                    </form>
+                    {% set current_section_id = item_s_f.section.id %}
+                   {% set _sec_count = section_data_counts.get(current_section_id, 0) if section_data_counts is defined else 0 %}
+                   {% set _has_child_sections = current_section_id in sub_sections_by_parent %}
+                   {% set _child_sections_count = sub_sections_by_parent[current_section_id]|length if _has_child_sections else 0 %}
+                   <form action="{{ url_for('form_builder.delete_template_section', section_id=current_section_id) }}" method="POST" class="inline-block delete-section-form" data-data-count="{{ _sec_count }}" data-item-type="section" data-confirm-message="{% if _sec_count > 0 %}{{ _('This section contains %(count)s saved data entries.', count=_sec_count) }}{% else %}{{ _('Are you sure you want to delete this section and all its contents?') }}{% endif %}"{% if _has_child_sections %} data-has-child-sections="true" data-child-sections-count="{{ _child_sections_count }}"{% endif %}>
+                        <input id="section-csrf_token-{{ current_section_id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                        <input type="hidden" name="delete_data" value="true">
+                        <button type="submit" class="btn btn-icon btn-sm btn-danger" title="{{ _('Delete Section') }}">
+                            <i class="fas fa-trash-alt w-4 h-4"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="section-body">
+            {# Dynamic configuration will be shown after the items table #}
+            <div class="mb-4 space-x-2 hidden">
+                <button type="button" class="add-item-to-section-btn btn btn-icon btn-sm btn-success" title="Add Item"
+                        data-section-id="{{ item_s_f.section.id }}"
+                        data-section-name="{{ item_s_f.section.name | e }}">
+                    <i class="fas fa-plus w-4 h-4"></i>
+                </button>
+            </div>
+
+            {# NEW: Combined Table for Indicators, Questions, and Document Fields #}
+            {% if item_s_f.indicators_with_forms or item_s_f.questions_with_forms or item_s_f.document_fields_with_forms or item_s_f.form_items_with_forms or (item_s_f.section.id in sub_sections_by_parent) %}
+            <div class="overflow-x-auto border rounded-md">
+            <table class="min-w-full divide-y divide-gray-200 table-fixed">
+                <thead class="bg-gray-50">
+                    {{ items_table_header() }}
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+            {# Build display list without decimal-based interleaving. #}
+            {# Main section items render first, then each subsection (by its own integer order) and its items. #}
+            {% set sorted_all_items = [] %}
+
+            {# Add main section items (already sorted within the section) #}
+            {% for item_data in item_s_f.combined_sorted_items %}
+                {% set __ignore = sorted_all_items.append(item_data) %}
+            {% endfor %}
+
+            {# Add subsections and their items (sorted by child order) #}
+            {% if item_s_f.section.id in sub_sections_by_parent %}
+                {% set _sub_items_with_keys = [] %}
+                {% for _sub in sub_sections_by_parent[item_s_f.section.id] %}
+                    {% set _raw = _sub.section.order %}
+                    {% set _key = _raw | int %}
+                    {# Legacy support: if stored as a float like 4.1, take the fractional (child) part. #}
+                    {% if _raw is not none and _raw != (_raw | int) %}
+                        {% set _key = ((_raw - (_raw | int)) * 10) | round(0, 'common') | int %}
+                    {% endif %}
+                    {% set __ignore = _sub_items_with_keys.append({'sub': _sub, 'key': _key}) %}
+                {% endfor %}
+
+                {% set _sub_items_sorted = _sub_items_with_keys | sort(attribute='key') %}
+                {% for _wrap in _sub_items_sorted %}
+                    {% set sub_item_s_f = _wrap.sub %}
+
+                    {# Add subsection header as a special item #}
+                    {% set subsection_header = {
+                        'type': 'subsection',
+                        'item': sub_item_s_f.section,
+                        'form': None,
+                        'is_subsection': True
+                    } %}
+                    {% set __ignore = sorted_all_items.append(subsection_header) %}
+
+                    {# Add subsection items immediately after the header #}
+                    {% for sub_item_data in sub_item_s_f.combined_sorted_items %}
+                        {% set subsection_item_data = {
+                            'type': sub_item_data.type,
+                            'item': sub_item_data.item,
+                            'form': sub_item_data.form,
+                            'is_subsection_item': True,
+                            'parent_subsection_id': sub_item_s_f.section.id
+                        } %}
+                        {% set __ignore = sorted_all_items.append(subsection_item_data) %}
+                    {% endfor %}
+                {% endfor %}
+            {% endif %}
+
+            {# Display items with hierarchical indentation #}
+            {% for item_data in sorted_all_items %}
+                        {% set item_instance = item_data.item %}
+                        {% set item_type = item_data.type %}
+                        {% set is_sub_item = item_instance.is_sub_item %}
+                {% set is_subsection = item_data.get('is_subsection', False) %}
+                {% set is_subsection_item = item_data.get('is_subsection_item', False) %}
+                {% if not item_instance %}
+                <script nonce="{{ csp_nonce() }}">
+                console.error('FormBuilder: Missing item_instance in sorted_all_items entry', {
+                  templateId: {{ template.id }},
+                  sectionId: {{ item_s_f.section.id }},
+                  itemData: {{ item_data | tojson | safe }}
+                });
+                </script>
+                {% endif %}
+
+                {% if is_subsection %}
+                    {% set is_subsection_archived = item_instance.archived if hasattr(item_instance, 'archived') and item_instance.archived else False %}
+                    {# Render subsection header row #}
+                    <tr class="subsection-header-row bg-teal-50 border-t-2 border-teal-200 subsection-header-banner cursor-pointer {% if is_subsection_archived %}opacity-60 archived-item-row{% endif %}"
+                        data-subsection-id="{{ item_instance.id }}"
+                        data-parent-section-id="{{ item_instance.parent_section_id }}"
+                        data-subsection-order="{{ item_instance.order }}"
+                        {% if is_subsection_archived %}data-archived="true"{% endif %}>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 w-1/16 subsection-header-banner-cell">
+                            <div class="flex items-center">
+                                <button type="button" class="subsection-toggle btn btn-icon btn-sm btn-primary flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse subsection') }}">
+                                    <i class="fas fa-chevron-down w-3 h-3 transition-transform duration-200"></i>
+                                </button>
+                                <i class="fas fa-indent w-4 h-4 mr-2 text-teal-600"></i>
+                                <span class="font-semibold text-teal-700">{{ item_instance.display_order.split('.')[-1] }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2">
+                            {% if is_subsection_archived %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-400 text-white mr-2">
+                                    <i class="fas fa-archive w-3 h-3 mr-1"></i>
+                                    {{ _('Archived') }}
+                                </span>
+                            {% endif %}
+                            <span class="font-semibold text-teal-700 {{ 'text-gray-500' if is_subsection_archived else '' }}">{{ item_instance.name }}</span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">
+                            {# Show relevance conditions if present #}
+                            {% set relevance_obj = item_instance.relevance_condition if item_instance.relevance_condition is mapping else (item_instance.relevance_condition | fromjson if item_instance.relevance_condition else {}) %}
+                            {% if relevance_obj is mapping and relevance_obj.get('conditions', []) | length > 0 %}
+                                <p class="mb-1"><strong>{{ _('Relevance') }}:</strong> <span class="rule-display text-blue-700" data-rule-json="{{ item_instance.relevance_condition if item_instance.relevance_condition is string else (item_instance.relevance_condition | tojson | e) }}" data-rule-type="relevance">{{ _('Loading...') }}</span></p>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
+                            <div class="space-x-2 flex items-center">
+                                {% if is_subsection_archived %}
+                                    {# Show unarchive button for archived subsections #}
+                                    <form action="{{ url_for('form_builder.unarchive_section', section_id=item_instance.id) }}" method="POST" class="inline-block">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-success" title="{{ _('Unarchive Sub-section') }}">
+                                            <i class="fas fa-undo w-3 h-3"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                <button type="button" class="add-item-to-section-btn btn btn-icon btn-sm btn-success" title="{{ _('Add Item to Sub-section') }}"
+                                        data-section-id="{{ item_instance.id }}"
+                                        data-section-name="{{ item_instance.name | e }}">
+                                    <i class="fas fa-plus w-3 h-3"></i>
+                                </button>
+                                <button type="button" class="edit-section-btn btn btn-icon btn-sm btn-primary" title="{{ _('Edit Sub-section') }}"
+                                        data-section-id="{{ item_instance.id }}"
+                                        data-section-name="{{ item_instance.name | e }}"
+                                        data-section-order="{{ item_instance.order }}"
+                                        data-parent-section-id="{{ item_instance.parent_section_id or '' }}"
+                                        data-parent-page-id="{{ item_instance.parent_section.page_id if item_instance.parent_section else '' }}"
+                                        data-section-type="{{ item_instance.section_type_enum.value }}"
+                                        data-page-id="{{ (item_instance.page_id or (item_instance.parent_section.page_id if item_instance.parent_section else '')) or '' }}"
+                                        data-max-dynamic-indicators="{{ item_instance.max_dynamic_indicators or '' }}"
+                                          data-allowed-sectors="{{ item_instance.allowed_sectors or '' }}"
+                                          data-add-indicator-note="{{ item_instance.add_indicator_note or '' }}"
+                                          data-max-entries="{{ item_instance.max_entries or '' }}"
+                                          data-name-translations='{{ (item_instance.name_translations | tojson | e) if item_instance.name_translations else "{}" }}'
+                                          data-relevance-condition='{{ (item_instance.relevance_condition | tojson | e) if item_instance.relevance_condition else "" }}'>
+                                    <i class="fas fa-pencil-alt w-3 h-3"></i>
+                                </button>
+                                <form action="{{ url_for('form_builder.duplicate_template_section', section_id=item_instance.id) }}" method="POST" class="inline-block duplicate-section-form" data-confirm-message="{{ _('Duplicate this sub-section? This will copy the sub-section along with all of its items.') }}">
+                                    <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                    <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                    <button type="submit" class="btn btn-icon btn-sm btn-purple" title="{{ _('Duplicate Sub-section') }}">
+                                        <i class="fas fa-copy w-3 h-3"></i>
+                                    </button>
+                                </form>
+                                {% set _sub_sec_count = section_data_counts.get(item_instance.id, 0) if section_data_counts is defined else 0 %}
+                                <form action="{{ url_for('form_builder.delete_template_section', section_id=item_instance.id) }}" method="POST" class="inline-block delete-section-form" data-data-count="{{ _sub_sec_count }}" data-item-type="sub-section" data-confirm-message="{% if _sub_sec_count > 0 %}{{ _('This sub-section contains %(count)s saved data entries.', count=_sub_sec_count) }}{% else %}{{ _('Are you sure you want to delete this sub-section and all its contents?') }}{% endif %}">
+                                    <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                    <input type="hidden" name="delete_data" value="true">
+                                    <button type="submit" class="btn btn-icon btn-sm btn-danger" title="{{ _('Delete Sub-section') }}">
+                                        <i class="fas fa-trash w-3 h-3"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% if item_instance.section_type_enum.value == 'Dynamic Indicators' %}
+                        {# Add dynamic configuration row for dynamic subsections #}
+                        <tr class="subsection-content-row bg-indigo-50" data-parent-subsection-id="{{ item_instance.id }}">
+                            <td colspan="4" class="px-4 py-3">
+                                <form id="configure-dynamic-subsection-form-{{ item_instance.id }}" method="POST" action="{{ url_for('form_builder.configure_dynamic_section', section_id=item_instance.id) }}" class="configure-dynamic-section-form">
+                                    <input id="section-csrf_token-dynamic-subsection-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                    <input type="hidden" name="version_id" value="{{ active_version_id }}">
+
+                                    {# Use reusable template for dynamic section configuration #}
+                                    {% set section_id = item_instance.id %}
+                                    {% set max_dynamic_indicators = item_instance.max_dynamic_indicators %}
+                                    {% set add_indicator_note = item_instance.add_indicator_note %}
+                                    {% set existing_filters = item_instance.indicator_filters_list or [] %}
+                                    {% set section_data = item_instance %}
+                                    {% include 'forms/form_builder/partials/dynamic_section_config.html' %}
+                                </form>
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% else %}
+                    {# Render regular item row #}
+                    {% if not item_type or not item_instance %}
+                    <script nonce="{{ csp_nonce() }}">
+                    console.error('FormBuilder: Skipping render due to missing type or instance', {
+                      templateId: {{ template.id }},
+                      sectionId: {{ item_s_f.section.id }},
+                      itemType: {{ (item_type or '') | tojson }},
+                      itemId: {{ (item_instance.id if item_instance else '') | tojson }}
+                    });
+                    </script>
+                    {% endif %}
+                    {% set is_archived = item_instance.archived if hasattr(item_instance, 'archived') and item_instance.archived else False %}
+                    <tr class="{{ 'bg-gray-50' if is_sub_item or is_subsection_item else '' }} {{ 'opacity-60 bg-gray-100' if is_archived else '' }} archived-item-row {% if is_subsection_item %}subsection-content-row{% endif %}" {% if is_archived %}data-archived="true"{% endif %}{% if is_subsection_item %} data-parent-subsection-id="{{ item_data.parent_subsection_id }}"{% endif %}>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 w-1/16">
+                                {% if is_sub_item %}
+                                    <span class="ml-6">&#8627; {{ item_instance.display_order }}</span>
+                                {% elif is_subsection_item %}
+                                    <span class="ml-6">&#8627; {{ item_instance.display_order }}</span>
+                                {% else %}
+                                    {{ item_instance.display_order }}
+                                {% endif %}
+                            </td>
+                            {% set _display_item_id = item_instance.id %}
+                            <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2" title="{{ _('Item ID') }}: {{ _display_item_id }}">
+                            {% set _item_type_icon = {
+                                'indicator': 'fas fa-chart-bar text-purple-600',
+                                'question': 'fas fa-question-circle text-green-600',
+                                'document': 'fas fa-file-alt text-blue-600',
+                                'matrix': 'fas fa-table text-orange-600',
+                                'plugin': 'fas fa-puzzle-piece text-teal-600'
+                            }.get(item_type, 'fas fa-circle text-gray-400') %}
+                            {% if is_sub_item or is_subsection_item %}
+                                    <span class="ml-6 flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="text-gray-600">{{ item_instance.label }}</span></span>
+                                {% else %}
+                                    <span class="flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="font-medium {{ 'text-gray-500' if is_archived else '' }}">{{ item_instance.label }}</span></span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">
+                                {% if is_archived %}
+                                    <p class="mb-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-400 text-white">
+                                            <i class="fas fa-archive w-3 h-3 mr-1"></i>
+                                            {{ _('Archived') }}
+                                        </span>
+                                    </p>
+                                {% endif %}
+                                {% if item_type == 'indicator' %}
+                                    {# Import/Integrity issue display: indicator without valid IndicatorBank reference #}
+                                    {% set _cfg = item_instance.config if item_instance.config is mapping else (item_instance.config | fromjson if item_instance.config else {}) %}
+                                    {% set _import_issues = _cfg.get('_import_issues', []) if _cfg else [] %}
+                                    {% if not item_instance.indicator_bank_id %}
+                                        <p class="mb-2">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                                <i class="fas fa-exclamation-triangle w-3 h-3 mr-1"></i>
+                                                {{ _('Issue: Missing/invalid indicator reference') }}
+                                            </span>
+                                        </p>
+                                        {% if _import_issues and _import_issues is iterable %}
+                                            {# Show first issue message if present #}
+                                            {% set _first_issue = _import_issues[0] if _import_issues|length > 0 else None %}
+                                            {% if _first_issue and _first_issue.get('message') %}
+                                                <p class="text-xs text-red-700 mb-1">{{ _first_issue.get('message') }}</p>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ item_instance.type_display }}</p>
+                                    {% if item_instance.unit %}<p class="mb-1"><strong>{{ _('Unit') }}:</strong> {{ item_instance.unit_display }}</p>{% endif %}
+                                    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+                                    {% if item_instance.supports_disaggregation %}
+                                        <p class="mb-1"><strong>{{ _('Disaggregation') }}:</strong>
+                                            {% if item_instance.allowed_disaggregation_options %}
+                                                {{ item_instance.disaggregation_options_display | join(', ') }}
+                                            {% else %}
+                                                {{ _('Total Only') }}
+                                            {% endif %}
+                                        </p>
+                                    {% endif %}
+                                    {% if item_instance.age_groups_config and item_instance.age_groups_config != 'Default' %}
+                                        <p class="mb-1"><strong>{{ _('Age') }}:</strong> {{ item_instance.age_groups_config }}</p>
+                                    {% endif %}
+                                    {% if item_instance.indicator_bank %}
+                                        {% set _has_custom_label = item_instance.label and item_instance.label != item_instance.indicator_bank.name %}
+                                        {% set _has_custom_definition = item_instance.definition and item_instance.definition != (item_instance.indicator_bank.definition | default('', true)) %}
+                                        {% if _has_custom_label or _has_custom_definition %}
+                                            <p class="mb-1"><strong>{{ _('Custom') }}:</strong> {{ _('Label') if _has_custom_label }}{{ ', ' if _has_custom_label and _has_custom_definition }}{{ _('Definition') if _has_custom_definition }}</p>
+                                        {% endif %}
+                                    {% endif %}
+                                {% elif item_type == 'question' %}
+                                    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ item_instance.question_type.value | replace('_', ' ') | title }}</p>
+                                    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+                                    {% if item_instance.lookup_list_id %}
+                                        <p class="mb-1"><strong>{{ _('Options') }}:</strong> {{ item_instance.lookup_list.name }}/{{ item_instance.list_display_column }}</p>
+                                        {% if item_instance.list_filters_json and item_instance.list_filters_json != '[]' %}
+                                            {% set filters = item_instance.list_filters_json | fromjson %}
+                                            {% for filter in filters %}
+                                                <p class="mb-1 ml-4 text-gray-600">{{ filter.field }} {{ filter.condition | default('=') }} {{ filter.value }}</p>
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% elif item_instance.options %}
+                                        <p class="mb-1"><strong>{{ _('Options') }}:</strong> {{ item_instance.options | join(', ') if item_instance.options | length <= 3 else (item_instance.options[:3] | join(', ') + '...') }}</p>
+                                    {% endif %}
+                                {% elif item_type == 'document' %}
+                                    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ _('Document Upload') }}</p>
+                                    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+                                    {% if item_instance.description %}
+                                        <p class="mb-1"><strong>{{ _('Description') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
+                                    {% endif %}
+                                {% elif item_type == 'matrix' %}
+                                    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ _('Matrix Table') }}</p>
+                                    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+                                    {% if item_instance.description %}
+                                        <p class="mb-1"><strong>{{ _('Description') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
+                                    {% endif %}
+                                    {% if item_instance.config %}
+                                        {# Handle config as dict or JSON string #}
+                                        {% set config_dict = item_instance.config if item_instance.config is mapping else (item_instance.config | fromjson if item_instance.config else {}) %}
+                                        {% if config_dict.get('matrix_config') %}
+                                            {% set matrix_config = config_dict.matrix_config %}
+                                            {% if matrix_config.get('rows') and matrix_config.get('columns') %}
+                                                <p class="mb-1">
+                                                    <strong>{{ _('Matrix') }}:</strong>
+                                                    {{ matrix_config.rows | length }} {{ _('rows') }} &times; {{ matrix_config.columns | length }} {{ _('columns') }}
+                                                </p>
+                                            {% endif %}
+                                            {# Extract and display variables from matrix columns #}
+                                            {% set matrix_variables = [] %}
+                                            {% if matrix_config.get('columns') %}
+                                                {% for column in matrix_config.columns %}
+                                                    {% set is_var = column.get('is_variable') %}
+                                                    {% if is_var == True or (is_var is string and is_var.lower() == 'true') or is_var == 1 %}
+                                                        {% set var_name = column.get('variable') or column.get('variable_name') %}
+                                                        {% if var_name and var_name not in matrix_variables %}
+                                                            {% set __ = matrix_variables.append(var_name) %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endif %}
+                                            {% if matrix_variables %}
+                                                <p class="mb-1"><strong>{{ _('Variables') }}:</strong>
+                                                    {% for var_name in matrix_variables %}
+                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 font-medium text-xs mr-1 variable-formatted">
+                                                            <i class="fas fa-bolt w-2.5 h-2.5 mr-0.5"></i>
+                                                            <span>[{{ var_name }}]</span>
+                                                        </span>
+                                                    {% endfor %}
+                                                </p>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                    {# Variables used in matrix config will be displayed by JavaScript #}
+                                    <div class="matrix-variables-container mb-1" data-item-id="{{ item_instance.id }}" style="display: none;">
+                                        <p class="mb-1"><strong>{{ _('Variables') }}:</strong></p>
+                                        <ul class="list-disc list-inside ml-2 space-y-0.5 matrix-variables-list"></ul>
+                                    </div>
+                                {% elif item_type == 'plugin' %}
+                                    {% set plugin_type = item_instance.item_type.replace('plugin_', '') %}
+                                    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ plugin_type.replace('_', ' ') | title }} {{ _('Plugin') }}</p>
+                                    {% if item_instance.is_required %}<p class="mb-1"><strong>{{ _('Required') }}:</strong> {{ _('Yes') }}</p>{% endif %}
+                                    {% if item_instance.description %}
+                                        <p class="mb-1"><strong>{{ _('Description') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
+                                    {% endif %}
+                                    {% if item_instance.config and item_instance.config.plugin_config %}
+                                        <p class="mb-1"><strong>{{ _('Plugin Config') }}:</strong> {{ _('Configured') }}</p>
+                                    {% endif %}
+                                {% endif %}
+
+                                {# Indirect Reach #}
+                                {% if item_instance.indirect_reach %}
+                                    <p class="mb-1"><strong>{{ _('Indirect Reach') }}:</strong> {{ _('Yes') }}</p>
+                                {% endif %}
+
+                                {# Show layout configuration for all item types - only when different from default #}
+                                {% if hasattr(item_instance, 'layout_column_width') and item_instance.layout_column_width != 12 and item_instance.layout_column_width != '12' %}
+                                    <p class="mb-1"><strong>{{ _('Layout') }}:</strong> {{ item_instance.layout_column_width }}/12 {{ _('width') }}{% if item_instance.layout_break_after %}, {{ _('Break after') }}{% endif %}</p>
+                                {% elif hasattr(item_instance, 'layout_break_after') and item_instance.layout_break_after %}
+                                    <p class="mb-1"><strong>{{ _('Layout') }}:</strong> {{ _('Break after') }}</p>
+                                {% endif %}
+
+                                {# Show relevance/validation rules if present #}
+                                {% set relevance_obj = item_instance.relevance_condition if item_instance.relevance_condition is mapping else (item_instance.relevance_condition | fromjson if item_instance.relevance_condition else {}) %}
+                                {% if relevance_obj is mapping and relevance_obj.get('conditions', []) | length > 0 %}
+                                    <p class="mb-1"><strong>{{ _('Relevance') }}:</strong> <span class="rule-display text-blue-700" data-rule-json="{{ item_instance.relevance_condition if item_instance.relevance_condition is string else (item_instance.relevance_condition | tojson | e) }}" data-rule-type="relevance">{{ _('Loading...') }}</span></p>
+                                {% endif %}
+                                {% set validation_obj = item_instance.validation_condition if item_instance.validation_condition is mapping else (item_instance.validation_condition | fromjson if item_instance.validation_condition else {}) %}
+                                {% if item_type != 'document' and validation_obj is mapping and validation_obj.get('conditions', []) | length > 0 %}
+                                    <p class="mb-1"><strong>{{ _('Validation') }}:</strong> <span class="rule-display text-red-700" data-rule-json="{{ item_instance.validation_condition if item_instance.validation_condition is string else (item_instance.validation_condition | tojson | e) }}" data-rule-type="validation">{{ _('Loading...') }}</span></p>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
+                                {% if is_archived %}
+                                    {# Show unarchive button for archived items #}
+                                    <form action="{{ url_for('form_builder.unarchive_item', item_id=item_instance.id) }}" method="POST" class="inline-block">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-success" title="{{ _('Unarchive Item') }}">
+                                            <i class="fas fa-undo w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                {% elif item_type == 'indicator' %}
+                                    <button type="button" class="edit-indicator-btn btn btn-icon btn-sm btn-purple" title="{{ _('Edit Indicator') }}"
+                                            data-indicator-id="{{ item_instance.id }}"
+                                            data-indicator-order="{{ item_instance.order }}"
+                                            data-indicator-bank-id="{{ item_instance.indicator_bank_id }}"
+                                            data-indicator-bank-label="{{ item_instance.indicator_bank.name | default('', true) | e if item_instance.indicator_bank else '' }}"
+                                            data-indicator-bank-definition="{{ item_instance.indicator_bank.definition | default('', true) | e if item_instance.indicator_bank and item_instance.indicator_bank.definition else '' }}"
+                                            data-current-section-id="{{ item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id }}"
+                                            data-is-required="{{ 'true' if item_instance.is_required else 'false' }}"
+                                            data-allowed-disaggregation-options="{{ item_instance.allowed_disaggregation_options|join(',') if item_instance.allowed_disaggregation_options else 'total' }}"
+                                            data-age-groups-config="{{ item_instance.age_groups_config | default('', true) | e }}"
+                                            data-indicator-unit="{{ item_instance.unit if item_instance.unit else '' }}"
+                                            data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+                                            data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
+                                            data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+                                            data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
+                                            data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+                                            data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
+                                            data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+                                            data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+                                            data-indicator-label="{{ item_instance.label | e }}"
+                                            data-indicator-definition="{{ item_instance.definition | default('', true) | e }}"
+                                            data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+                                            data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+                                            data-definition-translations='{{ (item_instance.definition_translations | tojson | e) if item_instance.definition_translations else "{}" }}'
+                                            data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'>
+                                        <i class="fas fa-pen w-4 h-4"></i>
+                                    </button>
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this indicator? This will create a copy with the same calculations and settings.') }}">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-purple" title="{{ _('Duplicate Indicator') }}">
+                                            <i class="fas fa-copy w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                   {% set _del_item_id = item_instance.id %}
+                                   {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-indicator-form" data-data-count="{{ _item_count }}" data-item-type="indicator" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this indicator instance?') }}{% endif %}">
+                                        <input id="section-csrf_token-indicator-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="delete_data" value="true">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-danger" title="{{ _('Remove Indicator') }}">
+                                            <i class="fas fa-times w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                {% elif item_type == 'question' %}
+                                    <button type="button" class="edit-question-btn btn btn-icon btn-sm btn-success" title="{{ _('Edit Question') }}"
+                                            data-question-id="{{ item_instance.id }}"
+                                            data-question-order="{{ item_instance.order }}"
+                                            data-current-section-id="{{ item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id }}"
+                                            data-question-type="{{ item_instance.question_type.value }}"
+                                            data-question-label="{{ item_instance.label | e }}"
+                                            data-question-definition="{{ item_instance.definition | default('', true) | e }}"
+                                            data-question-unit="{{ item_instance.unit | default('', true) | e }}"
+                                            data-question-type-field="{{ item_instance.type | default('', true) | e }}"
+                                            data-question-options='{{ (item_instance.options | tojson | e) if item_instance.options else "[]" }}'
+                                            data-is-required="{{ 'true' if item_instance.is_required else 'false' }}"
+                                            data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+                                            data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
+                                            data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+                                            data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
+                                            data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+                                            data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
+                                            data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+                                            data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+                                            data-options-source="{{ 'calculated' if item_instance.lookup_list_id else 'manual' }}"
+                                            data-lookup-list-id="{{ item_instance.lookup_list_id or '' }}"
+                                            data-display-column="{{ item_instance.list_display_column or '' }}"
+                                            data-filters-json='{{ (item_instance.list_filters_json|tojson|e) if item_instance.list_filters_json else "[]" }}'
+                                            data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+                                            data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+                                            data-definition-translations='{{ (item_instance.definition_translations | tojson | e) if item_instance.definition_translations else "{}" }}'
+                                            data-options-translations='{{ (item_instance.options_translations | tojson | e) if item_instance.options_translations else "[]" }}'
+                                            data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'>
+                                        <i class="fas fa-pen w-4 h-4"></i>
+                                    </button>
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this question? This will copy its options, logic, and translations.') }}">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-purple" title="{{ _('Duplicate Question') }}">
+                                            <i class="fas fa-copy w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                   {% set _del_item_id = item_instance.id %}
+                                   {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-question-form" data-data-count="{{ _item_count }}" data-item-type="question" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this question?') }}{% endif %}">
+                                        <input id="section-csrf_token-question-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="delete_data" value="true">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-danger" title="{{ _('Remove Question') }}">
+                                            <i class="fas fa-times w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                {% elif item_type == 'document' %}
+                                    <button type="button" class="edit-document-field-btn btn btn-icon btn-sm btn-primary" title="{{ _('Edit Document Field') }}"
+                                            data-document-field-id="{{ item_instance.id }}"
+                                            data-document-field-label="{{ item_instance.label | e }}"
+                                            data-document-field-order="{{ item_instance.order }}"
+                                            data-document-field-required="{{ 'true' if item_instance.is_required else 'false' }}"
+                                            data-document-field-description="{{ item_instance.description | default('', true) | e }}"
+                                            data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+                                            data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+                                            data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+                                            data-current-section-id="{{ item_instance.section_id if item_instance.section_id else (item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id) }}"
+                                            data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+                                            data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+                                            data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'
+                                            data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'>
+                                        <i class="fas fa-pen w-4 h-4"></i>
+                                    </button>
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this document field? This will copy its upload configuration and permissions.') }}">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-purple" title="{{ _('Duplicate Document Field') }}">
+                                            <i class="fas fa-copy w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                   {% set _del_item_id = item_instance.id %}
+                                   {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-document-field-form" data-data-count="{{ _item_count }}" data-item-type="document field" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this document field and any associated uploaded documents?') }}{% endif %}">
+                                        <input id="section-csrf_token-document-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="delete_data" value="true">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-danger" title="{{ _('Remove Document Field') }}">
+                                            <i class="fas fa-times w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                {% elif item_type == 'matrix' %}
+                                    <button type="button" class="edit-matrix-item-btn btn btn-icon btn-sm btn-warning" title="{{ _('Edit Matrix') }}"
+                                            data-matrix-item-id="{{ item_instance.id }}"
+                                            data-matrix-item-label="{{ item_instance.label | e }}"
+                                            data-matrix-item-description="{{ item_instance.description | default('', true) | e }}"
+                                            data-matrix-item-order="{{ item_instance.order }}"
+                                            data-matrix-item-required="{{ 'true' if item_instance.is_required else 'false' }}"
+                                            data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+                                            data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+                                            data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+                                            data-current-section-id="{{ item_instance.section_id if item_instance.section_id else (item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id) }}"
+                                            data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+                                            data-matrix-config='{{ (item_instance.config.matrix_config | tojson | e) if item_instance.config and item_instance.config.matrix_config else "{\"type\": \"matrix\", \"rows\": [], \"columns\": []}" }}'
+                                            data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+                                            data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'>
+                                        <i class="fas fa-pen w-4 h-4"></i>
+                                    </button>
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this matrix? This will copy all rows, columns, and validation rules.') }}">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-purple" title="{{ _('Duplicate Matrix') }}">
+                                            <i class="fas fa-copy w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                   {% set _del_item_id = item_instance.id %}
+                                   {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-matrix-item-form" data-data-count="{{ _item_count }}" data-item-type="matrix" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this matrix table?') }}{% endif %}">
+                                        <input id="section-csrf_token-matrix-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="delete_data" value="true">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-danger" title="{{ _('Remove Matrix') }}">
+                                            <i class="fas fa-times w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                {% elif item_type == 'plugin' %}
+                                    <button type="button" class="edit-plugin-item-btn btn btn-icon btn-sm btn-warning" title="{{ _('Edit Plugin Item') }}"
+                                            data-plugin-item-id="{{ item_instance.id }}"
+                                            data-plugin-item-type="{{ item_instance.item_type }}"
+                                            data-plugin-item-label="{{ item_instance.label | e }}"
+                                            data-plugin-item-description="{{ item_instance.description | default('', true) | e }}"
+                                            data-plugin-item-order="{{ item_instance.order }}"
+                                            data-plugin-item-required="{{ 'true' if item_instance.is_required else 'false' }}"
+                                            data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+                                            data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
+                                            data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+                                            data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
+                                            data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+                                            data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
+                                            data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+                                            data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+                                            data-current-section-id="{{ item_instance.section_id if item_instance.section_id else (item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id) }}"
+                                            data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
+                                            data-plugin-config='{{ (item_instance.config.plugin_config | tojson | e) if item_instance.config and item_instance.config.plugin_config else "{}" }}'>
+                                        <i class="fas fa-pen w-4 h-4"></i>
+                                    </button>
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this plugin item? This will copy its configuration and logic.') }}">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-purple" title="{{ _('Duplicate Plugin Item') }}">
+                                            <i class="fas fa-copy w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                   {% set _del_item_id = item_instance.id %}
+                                   {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-plugin-item-form" data-data-count="{{ _item_count }}" data-item-type="plugin item" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this plugin item?') }}{% endif %}">
+                                        <input id="section-csrf_token-plugin-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="delete_data" value="true">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-danger" title="{{ _('Remove Plugin Item') }}">
+                                            <i class="fas fa-times w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% endif %} {# End of combined table #}
+
+            {# Dynamic configuration for main dynamic sections #}
+            {% if item_s_f.section.section_type_enum.value == 'Dynamic Indicators' %}
+                <div class="mt-4">
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                       <form id="configure-dynamic-section-form-{{ item_s_f.section.id }}" method="POST" action="{{ url_for('form_builder.configure_dynamic_section', section_id=item_s_f.section.id) }}" class="configure-dynamic-section-form">
+                            <input id="section-csrf_token-dynamic-{{ item_s_f.section.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                            <input type="hidden" name="version_id" value="{{ active_version_id }}">
+
+                            {# Use reusable template for dynamic section configuration #}
+                            {% set section_id = item_s_f.section.id %}
+                            {% set max_dynamic_indicators = item_s_f.section.max_dynamic_indicators %}
+                            {% set add_indicator_note = item_s_f.section.add_indicator_note %}
+                            {% set existing_filters = item_s_f.section.indicator_filters_list or [] %}
+                            {% set section_data = item_s_f.section %}
+                            {% include 'forms/form_builder/partials/dynamic_section_config.html' %}
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+
+
+            {# Check if the section is empty of any item type AND has no sub-sections AND is not a dynamic section #}
+            {% if not item_s_f.indicators_with_forms and not item_s_f.document_fields_with_forms and not item_s_f.questions_with_forms and not item_s_f.form_items_with_forms and item_s_f.section.id not in sub_sections_by_parent and item_s_f.section.section_type_enum.value != 'Dynamic Indicators' %}
+                 <p class="text-sm text-gray-500 mt-2 italic">{{ _('This section is empty. Add items or document fields.') }}</p>
+            {% endif %}
+            </div>{# /.section-body #}
+        </div>
+
+
+    </div>
+        {% endfor %}
+        </div>
+    {% endfor %}
+    {% if not sections_with_items %}
+        <div class="text-center py-8 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <i class="far fa-folder-open fa-3x mx-auto text-gray-400 mb-2"></i>
+            <p class="mt-2 text-sm font-medium text-gray-600">{{ _('No sections added to this template yet.') }}</p>
+            <p class="text-xs text-gray-500">{{ _('Click "Add Section" to get started.') }}</p>
+        </div>
+    {% endif %}
+    </div>

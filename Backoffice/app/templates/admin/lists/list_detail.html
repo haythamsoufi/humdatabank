@@ -1,0 +1,273 @@
+{% extends "core/layout.html" %}
+{% from "macros/modal_shell.html" import modal_shell %}
+
+{% block content %}
+<style nonce="{{ csp_style_nonce() }}">
+    .drag-handle {
+        cursor: move;
+        user-select: none;
+    }
+
+    .drop-above {
+        border-top: 2px solid #3b82f6;
+    }
+
+    .drop-below {
+        border-bottom: 2px solid #3b82f6;
+    }
+
+    tr[draggable="true"] {
+        cursor: move;
+    }
+
+    tr[draggable="true"]:hover .drag-handle {
+        color: #6b7280;
+    }
+
+    tr.bg-blue-50 {
+        background-color: #eff6ff;
+    }
+</style>
+
+{% from "components/_page_header.html" import page_header %}
+
+{% set page_actions = [
+    {
+        'type': 'link',
+        'text': _('Back to Lists'),
+        'url': url_for('system_admin.manage_lists'),
+        'classes': 'professional-action-btn'
+    }
+] %}
+
+{% if not lookup_list.is_system_list %}
+    {% set __ = page_actions.append({
+        'type': 'button',
+        'text': _('Import Data'),
+        'classes': 'professional-action-btn professional-action-btn-blue',
+        'attributes': {'onclick': 'openImportDataModal()'}
+    }) %}
+    {% set __ = page_actions.append({
+        'type': 'link',
+        'text': _('Export Data'),
+        'url': url_for('system_admin.export_lookup_list', list_id=lookup_list.id),
+        'classes': 'professional-action-btn professional-action-btn-green'
+    }) %}
+{% endif %}
+
+{{ page_header(
+    title=lookup_list.name,
+    subtitle=lookup_list.description if lookup_list.description else None,
+    icon='fas fa-list',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Template Management'), 'url': url_for('form_builder.manage_templates')},
+        {'name': _('Lists'), 'url': url_for('system_admin.manage_lists')},
+        {'name': lookup_list.name}
+    ],
+    actions=page_actions
+) }}
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-medium text-gray-900">List Data
+                    {% if lookup_list.is_system_list %}
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">System List (Read-Only)</span>
+                    {% endif %}
+                </h2>
+                {% if lookup_list.columns_config and rows and not lookup_list.is_system_list %}
+                <button type="button" id="add-row-at-end-btn"
+                        class="btn btn-success leading-4">
+                    <i class="fas fa-plus mr-2"></i>
+                    Add Row
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if lookup_list.columns_config %}
+            {% if rows %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            {% if not lookup_list.is_system_list %}
+                            <th class="w-10 px-2 py-3"></th>
+                            {% endif %}
+                            {% for col in lookup_list.columns_config %}
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{ col.name }}
+                            </th>
+                            {% endfor %}
+                            {% if not lookup_list.is_system_list %}
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="table-body">
+                        {% for row in rows %}
+                        <tr data-row-id="{{ row.id }}" data-order="{{ row.order }}" class="hover:bg-gray-50" {% if not lookup_list.is_system_list %}draggable="true"{% endif %}>
+                            {% if not lookup_list.is_system_list %}
+                            <td class="w-10 px-2 py-4 cursor-move drag-handle">
+                                <i class="fas fa-grip-vertical text-gray-400"></i>
+                            </td>
+                            {% endif %}
+                            {% for col in lookup_list.columns_config %}
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 {% if not lookup_list.is_system_list %}editable hover:bg-blue-50 cursor-pointer{% endif %}"
+                                {% if not lookup_list.is_system_list %}
+                                data-column="{{ col.name }}"
+                                title="Click to edit"
+                                {% endif %}>
+                                {% if row.data is mapping %}
+                                    {{ row.data.get(col.name, '') }}
+                                {% else %}
+                                    {{ row.data }}
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                            {% if not lookup_list.is_system_list %}
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                <button type="button" class="add-row-btn text-green-600 hover:text-green-800 p-1" title="Add Row Below">
+                                    <i class="fas fa-plus w-4 h-4"></i>
+                                </button>
+                                <button type="button" data-delete-row="{{ row.id }}" class="text-red-400 hover:text-red-600 p-1" title="Delete Row">
+                                    <i class="fas fa-trash w-4 h-4"></i>
+                                </button>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No data rows</h3>
+                <p class="mt-1 text-sm text-gray-500">This list has columns configured but no data rows yet.</p>
+                {% if not lookup_list.is_system_list %}
+                <div class="mt-4 space-x-3">
+                    <button type="button" id="add-first-row-btn"
+                            class="btn btn-success">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add First Row
+                    </button>
+                    <button type="button" id="open-import-data-modal-btn"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-upload mr-2"></i>
+                        Import Data
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No columns configured</h3>
+            <p class="mt-1 text-sm text-gray-500">This list has no columns configured.</p>
+            <div class="mt-4">
+                <a href="{{ url_for('system_admin.manage_lists') }}"
+                   class="btn btn-primary">
+                    <i class="fas fa-pen mr-2"></i>
+                    Edit List Configuration
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Import Data Modal (only for non-system lists) -->
+{% if not lookup_list.is_system_list %}
+{% call modal_shell('importDataModal', 'Import Data', max_width='max-w-lg', close_id='close-import-data-modal-btn') %}
+        <form action="{{ url_for('system_admin.import_into_lookup_list', list_id=lookup_list.id) }}" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Select Mode</label>
+                <div class="flex items-center gap-6">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="mode" value="append" class="form-radio h-4 w-4 text-blue-600" checked>
+                        <span class="ml-2 text-sm text-gray-700">Append to Existing</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="mode" value="replace" class="form-radio h-4 w-4 text-red-600">
+                        <span class="ml-2 text-sm text-gray-700">Replace Existing</span>
+                    </label>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label for="import_data_file" class="block text-sm font-medium text-gray-700">File (CSV, XLS, XLSX)</label>
+                <input type="file" id="import_data_file" name="file" accept=".csv,.xls,.xlsx" required
+                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" id="close-import-data-modal-btn"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="btn btn-primary">
+                    Import
+                </button>
+            </div>
+        </form>
+{% endcall %}
+{% endif %}
+
+<script nonce="{{ csp_nonce() }}">
+// Pass the lookup list ID to JavaScript
+{% if lookup_list.is_system_list %}
+const lookupListId = "{{ lookup_list.id }}";
+const isSystemList = true;
+{% else %}
+const lookupListId = parseInt("{{ lookup_list.id }}");
+const isSystemList = false;
+{% endif %}
+
+// Include the list detail JavaScript only for non-system lists
+{% if not lookup_list.is_system_list %}
+</script>
+<script src="{{ static_url('js/lists/list-detail.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+{% endif %}
+{% if not lookup_list.is_system_list %}
+function openImportDataModal() {
+    document.getElementById('importDataModal').classList.remove('hidden');
+}
+function closeImportDataModal() {
+    document.getElementById('importDataModal').classList.add('hidden');
+}
+
+// Event listeners for buttons
+document.addEventListener('DOMContentLoaded', function() {
+    const addRowAtEndBtn = document.getElementById('add-row-at-end-btn');
+    if (addRowAtEndBtn && typeof addRowAtEnd === 'function') {
+        addRowAtEndBtn.addEventListener('click', addRowAtEnd);
+    }
+
+    const addFirstRowBtn = document.getElementById('add-first-row-btn');
+    if (addFirstRowBtn && typeof addFirstRow === 'function') {
+        addFirstRowBtn.addEventListener('click', addFirstRow);
+    }
+
+    const openImportBtn = document.getElementById('open-import-data-modal-btn');
+    if (openImportBtn) {
+        openImportBtn.addEventListener('click', openImportDataModal);
+    }
+
+    const closeImportBtn = document.getElementById('close-import-data-modal-btn');
+    if (closeImportBtn) {
+        closeImportBtn.addEventListener('click', closeImportDataModal);
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

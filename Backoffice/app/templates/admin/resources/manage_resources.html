@@ -1,0 +1,190 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/pagination.html" import render_pagination %}
+
+{% block title %}Manage Resources{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+    // Optional: JS for clearing search
+    function clearSearch() {
+        document.getElementById('search_query_input').value = '';
+        document.getElementById('searchForm').submit();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const clearBtn = document.getElementById('clear-search-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                clearSearch();
+            });
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_manage_resources = current_is_system_manager or has_permission('admin.resources.manage') %}
+
+{{ page_header(
+    title='Manage Resources',
+    icon='fas fa-folder-open',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'Resource Management'}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': 'Upload New Resource',
+            'url': url_for('content_management.new_resource'),
+            'icon': 'fas fa-plus',
+            'classes': 'professional-action-btn professional-action-btn-green',
+            'attributes': {'title': 'Upload a new resource'}
+        } if can_manage_resources else None
+    ]
+    | reject('none') | list
+) }}
+
+<div>
+
+    <form method="GET" action="{{ url_for('content_management.manage_resources') }}" id="searchForm" class="mb-6">
+        <div class="flex flex-col sm:flex-row gap-2">
+            <input type="text" name="search" id="search_query_input" value="{{ search_query or '' }}" placeholder="Search by title..." class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            <button type="submit" class="btn btn-dark">Search</button>
+            {% if search_query %}
+            <button type="button" id="clear-search-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-lg shadow text-sm whitespace-nowrap">Clear</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if resources and resources.items %}
+    <div class="overflow-x-auto bg-white shadow-md border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subcategory</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Languages</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Publication Date</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Description</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for resource in resources.items %}
+                <tr>
+                    <td class="px-6 py-4 text-sm text-gray-900 align-top">{{ resource.default_title }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 align-top">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if resource.resource_type == 'publication' %}bg-blue-100 text-blue-800{% else %}bg-green-100 text-green-800{% endif %}">
+                            {{ resource.resource_type.title() }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-700 align-top">
+                        {% if resource.resource_subcategory %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-800 border border-purple-100">
+                                {{ resource.resource_subcategory.name }}
+                            </span>
+                        {% else %}
+                            <span class="text-gray-400 text-xs">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900 align-top">
+                        {% set available_languages = resource.get_available_languages() %}
+                        {% if available_languages %}
+                            <div class="flex flex-wrap gap-1">
+                                {% for lang in available_languages %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                        {{ lang.upper() }}
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <span class="text-gray-500 text-xs">No translations</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 align-top">{{ resource.publication_date|datetime_local('date') if resource.publication_date else '-' }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700 align-top">{{ resource.default_description | truncate(100, true) if resource.default_description else '-' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2 align-top">
+                        {% if can_manage_resources %}
+                            <a href="{{ url_for('content_management.edit_resource', resource_id=resource.id) }}" class="text-indigo-600 hover:text-indigo-900" title="Edit {{ resource.default_title }}"><i class="fas fa-pen"></i></a>
+                            <form action="{{ url_for('content_management.delete_resource', resource_id=resource.id) }}" method="POST" class="inline-block" data-confirm="Are you sure you want to delete '{{ resource.default_title|e }}'? This action cannot be undone." data-confirm-danger="true">
+                                {{ delete_form.csrf_token }}
+                                <button type="submit" class="text-red-600 hover:text-red-900" title="Delete {{ resource.default_title }}"><i class="fas fa-trash-alt"></i></button>
+                            </form>
+                        {% endif %}
+                        {% if available_languages %}
+                            <div class="inline-block">
+                                <button type="button" class="text-green-600 hover:text-green-900 toggle-downloads-btn" data-target="downloads-{{ resource.id }}" title="Download files">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <div id="downloads-{{ resource.id }}" class="hidden absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg mt-1">
+                                    {% for lang in available_languages %}
+                                        {% set translation = resource.get_translation(lang) %}
+                                        {% if translation and translation.has_uploaded_document %}
+                                            <a href="{{ url_for('content_management.download_resource_file_admin', resource_id=resource.id, language=lang) if can_manage_resources else '#' }}"
+                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                {{ lang.upper() }}: {{ translation.document_display_name }}
+                                            </a>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {{ render_pagination(resources) }}
+
+    {% else %}
+    <div class="text-center py-8 bg-white p-6 shadow-md border border-gray-200">
+        <i class="far fa-file-alt fa-3x mx-auto text-gray-400 mb-2"></i>
+        <p class="mt-2 text-sm font-medium text-gray-600">No resources found.</p>
+        {% if search_query %}
+             <p class="text-xs text-gray-500">Try adjusting your search terms or <a href="{{ url_for('content_management.manage_resources') }}" class="text-blue-600 hover:underline">clear the search</a>.</p>
+        {% else %}
+            <p class="text-xs text-gray-500">Click "Upload New Resource" to add one.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+function toggleDownloads(elementId) {
+    const element = document.getElementById(elementId);
+    element.classList.toggle('hidden');
+
+    // Close other open download menus
+    document.querySelectorAll('[id^="downloads-"]').forEach(menu => {
+        if (menu.id !== elementId) {
+            menu.classList.add('hidden');
+        }
+    });
+}
+
+// Close download menus when clicking outside
+document.addEventListener('click', function(event) {
+    const toggleBtn = event.target.closest('.toggle-downloads-btn');
+    if (toggleBtn) {
+        const targetId = toggleBtn.getAttribute('data-target');
+        if (targetId) toggleDownloads(targetId);
+        return;
+    }
+    {
+        document.querySelectorAll('[id^="downloads-"]').forEach(menu => {
+            menu.classList.add('hidden');
+        });
+    }
+});
+</script>
+{% endblock %}

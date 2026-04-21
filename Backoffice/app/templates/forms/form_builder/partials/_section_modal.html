@@ -1,0 +1,135 @@
+{# Section Modal - Handles both Add and Edit modes #}
+<div id="section-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center px-4" role="dialog" aria-labelledby="section-modal-title" aria-modal="true">
+    <div class="relative p-6 border w-full max-w-xl shadow-xl rounded-lg bg-white transition-all duration-300" id="section-modal-content">
+        <button type="button" class="absolute top-3 right-3 btn btn-close-icon close-modal" aria-label="{{ _('Close modal') }}"><i class="fas fa-times w-6 h-6"></i></button>
+        <h3 id="section-modal-title" class="text-xl font-semibold mb-5 text-gray-800 flex items-center">
+            <i id="section-modal-icon" class="fas w-6 h-6 mr-2"></i>
+            <span id="section-modal-text">Section</span>
+        </h3>
+        <form id="section-form" method="POST" action="">
+            {{ section_form.hidden_tag() }} {# For CSRF from section_form #}
+            <input type="hidden" name="version_id" value="{{ active_version_id }}">
+            <div class="mb-4">
+                <label for="section-parent-section-id" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Parent Section') }}</label>
+                <select name="parent_section_id" id="section-parent-section-id" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" aria-label="{{ _('Parent Section') }}" data-none-text="{{ _('No parent (top-level section)') }}">
+                    <option value="">{{ _('No parent (top-level section)') }}</option>
+                    {# Options are populated by JS to mirror item modal behavior #}
+                </select>
+                <p class="mt-1 text-xs text-gray-600">
+                    {{ _('If set, this section will be nested under the selected parent section.') }}
+                </p>
+            </div>
+
+            {# Grid container for two halves - becomes two columns when rules are shown #}
+            <div class="grid grid-cols-1 gap-6 modal-grid-container">
+                {# Left Half: Basic Section Details #}
+                <div class="modal-left-half">
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="section-name-input" class="block text-gray-700 text-sm font-semibold">{{ _('Section Name') }}</label>
+                            <button type="button" id="section-name-translations-btn" class="btn btn-primary btn-sm" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                {{ _('Translations') }}
+                            </button>
+                        </div>
+                        <input type="text" name="{{ section_form.name.name }}" id="section-name-input" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" required aria-label="{{ _('Section Name') }}">
+                        <input type="hidden" name="name_translations" id="section-name-translations" value="{}">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="section-order-input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Order') }}</label>
+                        <input type="text"
+                               name="{{ section_form.order.name }}"
+                               id="section-order-input"
+                               class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                               inputmode="numeric"
+                               pattern="[0-9]*"
+                               autocomplete="off"
+                               required
+                               aria-label="{{ _('Order') }}">
+                    </div>
+
+                    {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+                    {% set is_paginated = selected_version.get_effective_is_paginated() if selected_version else (fallback_version.is_paginated if fallback_version else False) %}
+                    {% if is_paginated %}
+                    <div class="mb-4" id="section-page-field-wrapper">
+                        <label for="section-page-id-input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Page') }}</label>
+                        <select name="{{ section_form.page_id.name }}" id="section-page-id-input" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" required aria-label="{{ _('Page') }}">
+                            {% for page in draft_pages %}
+                                <option value="{{ page.id }}">{{ page.display_name or page.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <p id="section-page-inherited-hint" class="mt-1 text-xs text-gray-500 hidden" role="status">{{ _('Page is inherited from the parent section.') }}</p>
+                    </div>
+                    {% endif %}
+
+                    {# Section Type Selection #}
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Section Type') }}</label>
+                        <div class="space-y-3" role="radiogroup" aria-label="{{ _('Section Type') }}">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="{{ section_form.section_type.name }}" value="standard" id="section-type-standard" class="form-radio text-blue-600 focus:ring-blue-500" checked aria-label="{{ _('Standard Section') }}">
+                                <span class="ml-2 text-gray-700">
+                                    <strong>{{ _('Standard Section') }}</strong><br>
+                                    <span class="text-xs text-gray-500">{{ _('Regular section with predefined indicators/questions') }}</span>
+                                </span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="{{ section_form.section_type.name }}" value="dynamic_indicators" id="section-type-dynamic" class="form-radio text-indigo-600 focus:ring-indigo-500" aria-label="{{ _('Dynamic Indicators') }}">
+                                <span class="ml-2 text-gray-700">
+                                    <strong>{{ _('Dynamic Indicators') }}</strong><br>
+                                    <span class="text-xs text-gray-500">{{ _('Focal points can add indicators from the indicator bank') }}</span>
+                                </span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="{{ section_form.section_type.name }}" value="repeat" id="section-type-repeat" class="form-radio text-green-600 focus:ring-green-500" aria-label="{{ _('Repeat Group') }}">
+                                <span class="ml-2 text-gray-700">
+                                    <strong>{{ _('Repeat Group') }}</strong><br>
+                                    <span class="text-xs text-gray-500">{{ _('Fields can be repeated multiple times (like Kobo repeat groups)') }}</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {# Repeat Group Configuration - Shown only when repeat type is selected #}
+                    <div id="repeat-group-config" class="mb-4 hidden">
+                        <label for="section-max-entries-input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Max Number of Entries') }}</label>
+                        <input type="number" name="max_entries" id="section-max-entries-input"
+                               class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                               min="1" placeholder="{{ _('No limit') }}" aria-label="{{ _('Max Number of Entries') }}">
+                        <p class="mt-1 text-xs text-gray-500">{{ _('Maximum number of repeat entries that can be added. Leave empty for no limit.') }}</p>
+                    </div>
+
+                    {# Rules Section - Below Section Type Selection #}
+                    <div class="mt-6 pt-4 border-t border-gray-100">
+                        <div class="flex flex-wrap gap-4">
+                            <button type="button" class="btn btn-ghost btn-sm toggle-rule-builder" data-target="#section-relevance-rule-section" aria-label="{{ _('Add Relevance Rule') }}">
+                                <i class="fas fa-plus-circle mr-1"></i> {{ _('Add Relevance Rule') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {# End Left Half #}
+
+                {# Right Half: Rules (Initially Hidden) #}
+                <div class="modal-right-half hidden">
+                    {# Relevance Rule Section #}
+                    <div id="section-relevance-rule-section" class="hidden border p-4 rounded-md bg-gray-50">
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Relevance Rule') }}</label>
+                        <div id="section-relevance-rule-builder" role="group" aria-label="{{ _('Relevance Rule Builder') }}">
+                            {# Rule builder UI will be generated here by JS #}
+                        </div>
+                        <input type="hidden" name="relevance_condition" id="section-relevance-condition">
+                    </div>
+                </div>
+                {# End Right Half #}
+            </div>
+            {# End Grid Container #}
+
+            <div class="flex justify-end space-x-3">
+                <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
+                <button type="submit" id="section-submit-btn" name="{{ section_form.submit.name }}" class="btn btn-success">{{ _('Add Section') }}</button>
+            </div>
+        </form>
+    </div>
+</div>

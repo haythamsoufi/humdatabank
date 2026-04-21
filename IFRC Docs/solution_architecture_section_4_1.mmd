@@ -1,0 +1,26 @@
+%% Section 4.1 — Solution structure (simplified: front / back / DB / blob)
+%% For Word: https://mermaid.live → export PNG/SVG
+
+flowchart TB
+  subgraph frontend["Frontend"]
+    FE["Browser UI\nJinja2 templates · TailwindCSS · JavaScript\nforms, admin, dashboards"]
+  end
+
+  subgraph backend["Backend"]
+    BE["IFRC Network Data Portal — Flask application\nHTTP routes · business logic · services\nauth (incl. B2C) · REST API · notifications · AI (optional)"]
+  end
+
+  subgraph database["Database"]
+    DB[("PostgreSQL\napplication data · optional pgvector")]
+  end
+
+  subgraph blob["Blob storage"]
+    BS["Azure Blob Storage\n(or local fallback)\nfile uploads & generated artefacts"]
+  end
+
+  U["Users\n(IFRC & National Societies)"]
+
+  U --> FE
+  FE --> BE
+  BE --> DB
+  BE --> BS

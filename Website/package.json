@@ -1,0 +1,45 @@
+{
+  "name": "public-portal-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:safe": "node scripts/dev-safe.js",
+    "build": "next build",
+    "build:optimized": "node scripts/build-optimized.js",
+    "start": "next start",
+    "lint": "next lint",
+    "dev:reset": "node scripts/dev-reset.js",
+    "dev:restart": "node scripts/restart-dev.js",
+    "sync:data": "node scripts/sync-data.js",
+    "sync:indicators": "node scripts/sync-indicators.js",
+    "sync:sectors": "node scripts/sync-sectors.js"
+  },
+  "dependencies": {
+    "critters": "^0.0.23",
+    "framer-motion": "^10.16.4",
+    "html2canvas": "^1.4.1",
+    "i18next": "^25.3.2",
+    "leaflet": "^1.9.4",
+    "mapbox-gl": "^3.15.0",
+    "next": "^15.5.15",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-i18next": "^15.6.1",
+    "react-leaflet": "^4.2.1",
+    "sharp": "^0.33.4",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@tailwindcss/forms": "^0.5.7",
+    "@tailwindcss/line-clamp": "^0.4.4",
+    "@tailwindcss/typography": "^0.5.13",
+    "autoprefixer": "^10.4.19",
+    "dotenv": "^16.4.5",
+    "eslint": "^8",
+    "eslint-config-next": "^15.5.15",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3"
+  }
+}

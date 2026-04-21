@@ -1,0 +1,46 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Permissions') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Roles & Permissions'),
+    icon='fas fa-key',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('User Management'), 'url': url_for('user_management.manage_users')},
+        {'name': _('Roles & Permissions')}
+    ],
+    subtitle=_('Manage roles, permissions, and access rules.')
+) }}
+
+{% set active_tab = 'permissions' %}
+{% include "admin/rbac/_rbac_tabs.html" %}
+
+<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+    {% for module, perms in permissions_by_module.items() %}
+        <div class="{% if not loop.first %}mt-8{% endif %}">
+            <div class="flex items-center justify-between border-b border-gray-200 pb-2 mb-4">
+                <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wider">
+                    {{ module }}
+                </h3>
+                <span class="text-xs text-gray-500">{{ perms|length }} {{ _('permissions') }}</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% for perm in perms %}
+                <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+                    <div class="text-xs mb-1">
+                        <code class="bg-white border border-gray-200 px-2 py-1 rounded">{{ perm.code }}</code>
+                    </div>
+                    <div class="text-sm font-semibold text-gray-900">{{ perm.name }}</div>
+                    {% if perm.description and perm.description != perm.name %}
+                    <div class="text-xs text-gray-600 mt-1">{{ perm.description }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+{# Reusable thumbnail upload component #}
+{# Usage: {% include "components/thumbnail_upload.html" with context %} #}
+
+{# Parameters:
+   - field_name: Name of the form field for thumbnail upload
+   - field_id: ID of the form field
+   - current_thumbnail_url: URL to current thumbnail (if exists)
+   - current_thumbnail_filename: Original filename of current thumbnail
+   - entity_id: ID of the entity (resource_id or document_id)
+   - entity_type: Type of entity ('resource' or 'document')
+   - language_code: Language code for the thumbnail
+   - can_generate: Whether auto-generation is available (requires PDF file)
+   - generate_endpoint: Endpoint for thumbnail generation
+   - delete_endpoint: Endpoint for thumbnail deletion
+   - csrf_token: CSRF token for forms
+#}
+
+<div class="thumbnail-upload-container"
+     data-entity-id="{{ entity_id }}"
+     data-entity-type="{{ entity_type }}"
+     data-language-code="{{ language_code }}"
+     data-i18n-generating="{{ _('Generating...') }}"
+     data-i18n-generating-thumb="{{ _('Generating thumbnail...') }}"
+     data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail') }}"
+     data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail') }}"
+     data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.') }}"
+     data-i18n-deleting="{{ _('Deleting...') }}"
+     data-i18n-deleting-thumb="{{ _('Deleting thumbnail...') }}"
+     data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!') }}"
+     data-i18n-generated-success="{{ _('Thumbnail generated successfully!') }}"
+     data-i18n-error-prefix="{{ _('Error:') }}"
+     data-i18n-network-error="{{ _('Network error occurred') }}"
+     data-i18n-generated-automatically="{{ _('Generated automatically') }}"
+     data-i18n-current-thumbnail="{{ _('Current thumbnail:') }}"
+     data-i18n-delete-label="{{ _('Delete') }}"
+     data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.') }}">
+    <label for="{{ field_id }}" class="block text-sm font-medium text-gray-700 mb-1">
+        {{ _('Thumbnail Image') }}
+    </label>
+
+    {% if current_thumbnail_url %}
+        <div class="mb-3">
+            <div class="flex justify-between items-start mb-1">
+                <p class="text-sm text-gray-600">{{ _('Current thumbnail:') }}</p>
+                <button type="button"
+                        data-action="thumbnail:delete"
+                        data-entity-id="{{ entity_id }}"
+                        data-entity-type="{{ entity_type }}"
+                        data-language-code="{{ language_code }}"
+                        id="delete-thumb-btn-{{ language_code }}"
+                        class="inline-flex items-center px-2 py-1 border border-red-300 shadow-sm text-xs leading-4 font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        title="{{ _('Delete thumbnail') }}">
+                    <i class="fas fa-trash mr-1"></i>
+                    <span id="delete-thumb-text-{{ language_code }}">{{ _('Delete') }}</span>
+                </button>
+            </div>
+            <img src="{{ current_thumbnail_url }}"
+                 alt="{{ _('Current thumbnail') }}"
+                 data-thumbnail-preview="true"
+                 class="max-w-xs max-h-48 border rounded-md shadow-sm">
+            {% if current_thumbnail_filename %}
+                <p class="text-xs text-gray-500 mt-1" data-thumbnail-filename="true">{{ _('Original name:') }} {{ current_thumbnail_filename }}</p>
+            {% endif %}
+            <div id="delete-thumb-status-{{ language_code }}" class="mt-2 text-sm"></div>
+        </div>
+        <p class="text-xs text-gray-500 mb-1">{{ _('To replace the current thumbnail, choose a new image below.') }}</p>
+    {% else %}
+        <p class="text-xs text-gray-500 mb-1">{{ _('Upload an image to serve as the thumbnail (optional).') }}</p>
+    {% endif %}
+
+    <input type="file"
+           name="{{ field_name }}"
+           id="{{ field_id }}"
+           accept="image/*"
+           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-100 file:text-green-700 hover:file:bg-green-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+
+    {% if can_generate %}
+        <div class="mt-3">
+            <button type="button"
+                    data-action="thumbnail:generate"
+                    data-entity-id="{{ entity_id }}"
+                    data-entity-type="{{ entity_type }}"
+                    data-language-code="{{ language_code }}"
+                    id="generate-btn-{{ language_code }}"
+                    class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <i class="fas fa-image mr-2"></i>
+                <span id="generate-text-{{ language_code }}">{{ _('Generate PDF Thumbnail') }}</span>
+            </button>
+            <div id="generate-status-{{ language_code }}" class="mt-2 text-sm"></div>
+        </div>
+    {% endif %}
+</div>

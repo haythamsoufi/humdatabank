@@ -1,0 +1,357 @@
+Project/Program Charter (PCH)
+<The Project/Program Charter (PCH) is the key and mandatory document to start a project. It formally authorizes the project manager to start the program or project work. It aims at formalizing the DTD customer expectations, defining the expected benefits of the project as well as providing a first estimation of project costs, time, risks. The Program Charter defines the shared benefit that the program aims to achieve as well as the list of projects included in the program.>
+Project identification
+Project
+IFRC Network Data Portal
+Date
+Project request: <Date of project request>
+Project request approval: <Date of project request's approval>
+Costs
+<Development costs range>
+þ  Existing Core Budget
+o Project budget
+o Requires new funding
+Requested by
+Strategic Planning
+Effort
+Medium <High, medium, low> (see appendix for evaluation)
+Brief description
+The IFRC Network Databank Portal is a unified digital platform for managing federation-wide data collection processes. It provides a backend system for designing forms, assigning reporting tasks, and managing indicators. The platform consolidates multiple fragmented data collection tools into a single standardized system.
+Project’s value to business
+<Is it really what we need? What will change from the current situation?>
+IFRC business outcomes
+<Give 2 to 5 high level IFRC outcomes using bullet point format.>
+Improved federation-wide data standardization and governance.
+Increased transparency and accessibility of National Society data across the network.
+Reduced operational costs by consolidating multiple data systems.
+Enhanced decision-making through integrated analytics and reporting capabilities.
+Strengthened collaboration between IFRC Secretariat and National Societies through a shared data platform.
+Project / Department outcomes
+<List how the project delivers outcomes that lead to IFRC business outcomes. Give also department or cross departments business outcomes.>
+Centralized platform to manage IFRC data collection processes (FDRS, Unified Planning, Unified Reporting).
+Standardized use of the Indicator Bank across all reporting exercises.
+Improved collaboration between FDS, PMER, regional teams and National Societies.
+Reduced administrative workload associated with manual data management.
+Improve quality of data and make it more accessible to the other departments through API connections and Excel exports.
+Project benefits
+The project will deliver operational efficiency, improved data quality and reduced costs through consolidation of data collection systems.
+Goal/Objective (with measurable indicator if possible)
+Current value
+Target future value
+Number of platforms used for IFRC network data collection
+Multiple systems (Kobo, Excel, FDRS, etc.)
+Single unified platform
+Data accessibility
+Limited access across teams
+Federation-wide access
+Data collection duplication
+Frequent duplicate requests
+Significant reduction
+System development cost
+High cost for new systems
+Minimal cost AI-assisted development
+Reporting speed
+Slow manual consolidation
+Faster automated analytics
+Rejection risk
+IFRC will continue relying on fragmented tools and manual data collection processes.
+Duplicate reporting requests to National Societies will persist.
+Data standardization through the Indicator Bank will remain difficult to enforce.
+Valuable datasets will remain underutilized.
+Costs and inefficiencies associated with maintaining multiple systems will continue.
+Project’s scope
+< Is the project feasible? Is it related to another project? Does it need other software, services?>
+Scope definition
+In Scope:
+<List here all important component / output that define the scope. For Programs, list here the program activities ans components (projects)>
+Who will be affected in a positive or negative way by this project?
+IFRC Secretariat and National Societies PMER and data teams.
+What is the training effort requested in term of HR (in Geneva/ elsewhere)?
+Onboarding IFRC admins and focal points in both HQ and regional offices, and focal points from IFRC country offices and NSs through regional focused online demo sessions.
+What is the impact of the roll-out in term of HR and infrastructure? HR: Expected reduction in time wasted on repetitive tasks due to system automation and less human errors (automated comms, reminders, excel breaking).
+Infrastructure: reduction of resources used for Power Platform, and proper storage for data which currently is floating everywhere with huge loss risks.
+What processes need to be redesigned?
+Unified Planning and Reporting data collection.
+Out of Scope:
+Full migration of historical legacy systems at initial launch.
+Scope uncertainty:
+Some functionalities (AI document processing, advanced integrations) will evolve after initial deployment.
+Dependencies
+Code review and security validation by DTD
+Hosting infrastructure and cloud deployment
+Integration with Indicator Bank
+Participation of National Societies in pilot testing
+B2C Authentication
+Penetration testing findings
+Time Frame
+Phase 1:
+Development (Q4 2025)
+Infrastructure Hosting & Authentication (Q4 2025/ Q1 2026)
+Testing with PMER and National Societies (Q1 2026)
+Penetration testing (March 2026)
+Training manual & conduct trainings (Q1/Q2 2026)
+IT code review (March-April 2026)
+Documentation (Mar-Apr 2026)
+Launch:
+Rollout before the Unified Mid-Year Reporting data collection (April-May 2026)
+Project’s strategic alignment
+<What strategy does the project meet?>
+Links to strategy
+<Give direct links between project and strategies if any. Give references with pages or quotes to strategies such as: Published Secretariat strategy / Decision of Directors / Internal Division or Department strategy / Management policies / Budget / Plan.>
+The project aligns with IFRC priorities to improve data management, transparency and accountability across the Federation network.
+IT/Cloud Strategy alignment:
+The system is hosted on IFRC Azure app services.
+<Please describe how the project aligns with the cloud roadmap; if an interim move, what components may be discarded in a future cloud-based phase and at what cost; how the cloud roadmap will impact this system; and how this system impacts the cloud roadmap.  The Cloud Migration plans are predicated on each ISD project contributing to the migration as part of ISD normal course of project business. So it is imperative that each project contribute to the roadmap.>
+IT and Organization Risks addressed /mitigated by the project delivery:
+<Please list here the IT risks that the project will close or partially address once project will be completed. Please go through the IT risk register in the DTD Team Site. Also consider the top 9 enterprise risks in Appendix B of this document to check the list of known risks>
+No
+Risk Description
+How project will address it? To what extend?
+1
+Fragmented data systems across IFRC
+Consolidates multiple tools (Kobo, Excel, separate platforms) into a unified system.
+2
+Inconsistent indicators and reporting standards
+Integrates the Indicator Bank to enforce standardized indicators and definitions
+3
+Data loss and limited data reuse
+Centralized database preserves data and makes it accessible for analysis and reporting.
+4
+Limited transparency and accountability
+Audit trail tracks all actions performed by admins and focal points.
+5
+High operational costs from maintaining multiple systems
+Consolidation reduces maintenance and development costs.
+6
+Poor data accessibility across IFRC teams
+Self-service reporting and APIs allow broader data access and analytics.
+Key roles and responsibilities
+<Who are the main project stakeholders and what are their key responsibilities and accountabilities?>
+Business Owner
+Rania Alereksoussi, Manager, Federation-Wide RBM & Data Systems
+Defines Product Vision & Goals;
+Is ultimately accountable for project success;
+Ensures key decisions are performed through PSC (Project Steering Committee);
+Approves and signs-off on the project delivery;
+DT Sponsor
+Juriaan Lahr, Director, DTD
+Provides directions to Project Steering Committee
+Strategic-level products decisions taken at the Product Steerco
+Business Sponsor
+Pascale Meige, Director, Strategic Planning
+Strategic-level products decisions taken at the Product Steerco
+DT Product Unit Manager
+Emmanuelle Menard-Marchand, Manager, Digital Unit
+Approves handover of DIT solutions to DIT Services;
+Supports and maintains project delivery after its hand-over.
+Dev Team
+Zoltan Szabo/ Szabolcs Gajer, Application Support
+Development support;
+Prepare Production Environment;
+Implement monitoring & alerting;
+Code Review (AI Scanning);
+Solution Architecture review;
+Provide support (based on agreement & SteerCo decision);
+Assessing AI product quality.
+Infra Team
+Gabor Palatinus, Team Leader, Infra Support
+Infrastructure & IT Security related tasks
+Penetration testing
+Part of the Product SteerCo
+DT EA Strategy & Planning Manager
+Alvaro Alvarez, Manager, EA, Strategy & Planning
+EA & Planning Support
+Part of the Product SteerCo
+DT PMO
+Isabelle Noverraz, Senior Officer, Planning, PMO & Oversight
+Defining project control levels based on project tailoring assessment;
+Performs regular bi-weekly project reviews;
+Provides guidance to PMs, related to project management activities and actions;
+Collects and merges status reports from all projects individually and submits consolidated version to DIT SC.
+DT Project Manager
+Marie-France Shakour, Project Manager
+Ensures project success;
+Organizes and facilitates PSC;
+Performs project decisions within limits set by PSC;
+Reports on project status;
+Implements agreed tailored project controls;
+ARB & Release Planning.
+Product Owner
+Carlota Tarazona, Senior Officer, Federation-Wide Data Analyst
+Conduct user research, interviews, surveys, usability tests;
+Map stakeholder needs and pain points;
+Translate user needs into backlog items;
+Prioritize backlog items;
+Training material preparation.
+Business Owner/ Dev Team
+Haytham Al Soufi, Senior Officer, Federation-Wide Data Analysis
+AI-Assisted Development and integration
+Solution Architecture preparation
+Vulnerabilities remediation
+Document learnings from AI-assisted development
+Exploring other AI-assisted activities
+AI Lead
+Stefano Ongarello, Manager, Data & AI Unit Manager
+Advise on AI assisted Activities
+AI Learnings and best practices
+Solution Architect
+Rajesh Nair
+Architecture Support and decisions
+Project’s risk evaluation
+<Is the project feasible? Will we get the expected results?>
+Risks
+<Indicate the main high-level risks that have already been identified.>
+Delivery Risks
+B2C Authentication Readiness
+Capability of IT to perform code review (leverage AI)
+Availability of resources to fix pentest vulnerabilities
+Availability of a resource for Support
+Complexity of the documentation to the team which may induce delays
+Operational
+Users confusion during to B2C login
+Project’s development cost
+Cost type
+Amount in CHF
+Details / Assumptions
+HR Costs
+0
+Project Management (ext)
+0
+Hardware
+0
+Software: Licenses / Service fees
+0
+Consulting services
+0
+0 days * 0 CHF/day
+Training & documentation
+0
+Travel and expenses
+0
+Training / Communication
+0
+External costs total
+CHF 0  ± 0 %
+estimated variance
+Project Management (int)
+0
+0.25 man months
+Sponsoring Dept resources
+0
+1. man months (officer level) Requir. &  Implem
+ISD resources
+0
+0.75 man months (officer level) Requir. &  Implem
+<2014 internal costs: Manager=255’240;Sr Officer=186’240;Officer=153’240;Sr Assistant=141’240>
+Funding
+Indicate if project is programme funded, core funded or other
+Project’s outcome future operational cost
+<Amount can be additional cost or savings. Is there an increase or decrease in operational cost due to the project delivery?>
+Cost type
+Amount
+Details
+Infrastructure costs
+0
+Project within architecture: 10% of development cost
+Project outside architecture: 20% of development cost
+Current cost
+0
+Cost for features suppressed / replaced by this project
+Difference
+0
+Amount can be additional cost or savings
+On going cost outside ITD
+0
+Approval section
+Role
+Name and Title
+Signature
+Date
+Project sponsor
+<Usually a Under Secretary General>
+Business champion
+<Business champion - usually a Director Of Department>
+DT Director
+<Head of ISD>
+PMO
+<Head of PMO>
+<Stakeholder to be defined>
+<OPTIONAL - A second  stakeholder might approve the project>
+PCH Manager
+<Who has been appointed as the project charter manager?>
+Decision: <Project approved by IT-SC on xyz or by the sign-off of this PCH>
+Document History
+Version number
+Date
+Author
+Details / Comments
+0.0
+2013-03-28
+Licensed user
+< << <<< END OF DOCUMENT >>> >> >
+Appendix A – IFRC top 9 Enterprise risks
+Enterprise Risks
+Risk that the IFRC is not recognised worldwide as the leading humanitarian network of national organisations, resulting in the organisation not being able to operate effectively  in disaster and crisis situations with global dimensions
+Risk that there would be an imbalance between funds available and funding required delivering appropriate and timely services to members and beneficiaries.
+Risk of ineffective or incoherent governance that prevents a Federation-wide harmonized approach to planning, performance management, risk management and accountability, which could adversely impact the consistency and the quality of services.
+Risk that people management is not addressed appropriately and timely, which could lead to adversely affecting the delivery and quality of services.
+Risk that National Societies and the Secretariat do not speak with one voice on key issues concerning all, resulting in adversely impacting the functionality and image of the organisation.
+Risk of non-compliance with international/local regulations or legal obligations may adversely affect the image and reputation of the organisation.
+Risk that services delivered by the IFRC do not meet the expectations and needs of National Societies and beneficiaries, which could adversely affect market share and credibility of the organisation.
+Risk that Global trends are not sufficiently monitored and considered in shaping the organisation and preparing it for future needs, resulting in an adverse impact on its effectiveness and credibility.
+Risk that the recruitment, training, and retention of volunteers is declining or not expanding to meet the needs of the organisation, which could adversely affect the delivery and quality of services.
+Appendix B – Help section to fill-in the PCH
+A - Project Effort Definition
+The project effort is based on the effort requested by the three main actors: The project manager, staff from the department sponsoring the project and ISD staff.
+For each actor, the time that will be dedicated to the project has to be defined.
+Project effort is then defined by the highest effort among the three actors’ efforts.
+Low effort project must requiredless than 1 man month project manager time,less than 0.5 man month sponsoring department resources time,and less than 0.5 man month ISD resources time.Medium effort project must requiredless 6  man month project manager time,less 3 man month sponsoring department resources time,and less 3 man month ISD resources time.High effort project has one of the actors that will spendmore 6  man month for project manager,more 3 man month for sponsoring department resources,or more 3 man month for ISD resources.Low effort project must requiredless than 1 man month project manager time,less than 0.5 man month sponsoring department resources time,and less than 0.5 man month ISD resources time.Medium effort project must requiredless 6  man month project manager time,less 3 man month sponsoring department resources time,and less 3 man month ISD resources time.High effort project has one of the actors that will spendmore 6  man month for project manager,more 3 man month for sponsoring department resources,or more 3 man month for ISD resources.
+Low effort project must required
+less than 1 man month project manager time,
+less than 0.5 man month sponsoring department resources time,
+and less than 0.5 man month ISD resources time.
+Medium effort project must required
+less 6  man month project manager time,
+less 3 man month sponsoring department resources time,
+and less 3 man month ISD resources time.
+High effort project has one of the actors that will spend
+more 6  man month for project manager,
+more 3 man month for sponsoring department resources,
+or more 3 man month for ISD resources.
+Low effort project must required
+less than 1 man month project manager time,
+less than 0.5 man month sponsoring department resources time,
+and less than 0.5 man month ISD resources time.
+Medium effort project must required
+less 6  man month project manager time,
+less 3 man month sponsoring department resources time,
+and less 3 man month ISD resources time.
+High effort project has one of the actors that will spend
+more 6  man month for project manager,
+more 3 man month for sponsoring department resources,
+or more 3 man month for ISD resources.
+HIGHHIGH 3 man month  3 man month 3 man month3 man monthMEDIUMMEDIUMProject Manager Time (Manage project)Project Manager Time (Manage project)ISD Resources Time (Provide technical information and work on the project)ISD Resources Time (Provide technical information and work on the project)Sponsoring Department Resources Time (Define requirements)Sponsoring Department Resources Time (Define requirements)0.5 man month0.5 man month0.5 man month0.5 man month1 man month1 man month6 man month6 man monthLOWLOW
+HIGH
+HIGH
+3 man month
+3 man month
+3 man month
+3 man month
+MEDIUM
+MEDIUM
+Project Manager Time (Manage project)
+Project Manager Time (Manage project)
+ISD Resources Time (Provide technical information and work on the project)
+ISD Resources Time (Provide technical information and work on the project)
+Sponsoring Department Resources Time (Define requirements)
+Sponsoring Department Resources Time (Define requirements)
+0.5 man month
+0.5 man month
+0.5 man month
+0.5 man month
+1 man month
+1 man month
+6 man month
+6 man month
+LOW
+LOW

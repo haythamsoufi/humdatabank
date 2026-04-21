@@ -1,0 +1,437 @@
+{# Print-optimized HTML for assignment PDF export #}
+<!DOCTYPE html>
+{% set _lang_raw = session.get('language', 'en') %}
+{% set _lang_norm = (_lang_raw|string|lower|replace('-', '_')) %}
+{% set _lang = (_lang_norm.split('_')[0] if _lang_norm else 'en') %}
+<html lang="{{ _lang }}" dir="{{ 'rtl' if _lang == 'ar' else 'ltr' }}">
+<head>
+    <meta charset="utf-8">
+    {% set _assignment_name = assignment_display_name or (assignment.template.name if assignment and assignment.template else _('Assignment')) %}
+    {% set _country_name = country_display_name or (country.name if country else '') %}
+    <title>{{ _assignment_name }} - {{ _country_name }}</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    {% if _lang == 'ar' %}
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    {% endif %}
+</head>
+<body>
+    <header>
+        <h1>{{ _assignment_name }}</h1>
+        <div class="meta">
+            <div><strong>{{ _('Country:') }}</strong> {{ _country_name if _country_name else '-' }}</div>
+            <div><strong>{{ _('Period:') }}</strong> {{ assignment.period_name if assignment else '-' }}</div>
+            <div><strong>{{ _('Status:') }}</strong> {{ _(aes.status) if aes else '-' }}</div>
+            <div><strong>{{ _('Generated:') }}</strong> {{ generated_at|datetime_local('datetime') if generated_at else '' }}</div>
+        </div>
+    </header>
+
+    {% macro render_section(section, level=0, root_heading='h3') %}
+        <section class="section {{ 'subsection' if level > 0 else '' }}">
+            {% if level == 0 %}
+                {% if root_heading == 'h2' %}
+                    <h2>{{ section.display_name }}</h2>
+                {% else %}
+                    <h3>{{ section.display_name }}</h3>
+                {% endif %}
+            {% else %}
+                <h4>{{ section.display_name }}</h4>
+            {% endif %}
+
+            {% for field in section.fields_ordered %}
+                {% set item_key = 'form_item_' ~ field.id %}
+                {% set value = existing_data.get(item_key) %}
+                {% if field.kind == 'note' %}
+                    {% set _raw = value.get('values', {}).get('value') if (value is mapping) else (value if value is not none else '') %}
+                    {% set note_text = (_raw|string|trim) if (_raw is not none and _raw|string|trim != '') else (field.display_label|trim if field.display_label else '') %}
+                    {% if note_text %}
+                        <div class="form-note">{{ note_text }}</div>
+                    {% endif %}
+                {% else %}
+                {% set is_empty = false %}
+                {% if value is none %}
+                    {% set is_empty = true %}
+                {% elif value is mapping %}
+                    {% if field.kind == 'matrix' %}
+                        {# Use namespace so updates inside loops persist (Jinja scoping). #}
+                        {% set ns = namespace(has_any_value=false) %}
+                        {% for k, v in value.items() %}
+                            {# Matrix values may contain system metadata like "_table"; ignore for emptiness #}
+                            {% if not (k is string and k.startswith('_')) %}
+                                {% if v is mapping and (v.get('modified') is not none or v.get('original') is not none) %}
+                                    {% set dv = v.get('modified') if v.get('modified') is not none else v.get('original') %}
+                                {% else %}
+                                    {% set dv = v %}
+                                {% endif %}
+                                {% if dv is not none and dv|string|trim != '' %}
+                                    {% set ns.has_any_value = true %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set is_empty = not ns.has_any_value %}
+                    {% elif value.get('values', {}) %}
+                        {% set values_dict = value.get('values', {}) %}
+                        {% if values_dict.get('total') is not none %}
+                            {% set is_empty = false %}
+                        {% else %}
+                            {% set ns = namespace(has_any_value=false) %}
+                            {% for k, v in values_dict.items() %}
+                                {% if v is not none and v != '' %}
+                                    {% set ns.has_any_value = true %}
+                                {% endif %}
+                            {% endfor %}
+                            {% set is_empty = not ns.has_any_value %}
+                        {% endif %}
+                    {% else %}
+                        {% set is_empty = true %}
+                    {% endif %}
+                {% elif value is iterable and value is not string %}
+                    {% set is_empty = value|length == 0 %}
+                {% else %}
+                    {% set is_empty = value == '' or value|string|trim == '' %}
+                {% endif %}
+                {# Normalize "required" to a real boolean (it may come through as bool/int/string depending on source). #}
+                {% set required_raw = (
+                    field.model.is_required_for_js
+                    if field.model is defined and field.model
+                    else (field.is_required_for_js if field.is_required_for_js is defined else (field.is_required if field.is_required is defined else false))
+                ) %}
+                {% if required_raw is string %}
+                    {% set is_required = required_raw|lower in ['true', '1', 'yes', 'y', 'on'] %}
+                {% elif required_raw is number %}
+                    {% set is_required = required_raw != 0 %}
+                {% else %}
+                    {% set is_required = true if required_raw else false %}
+                {% endif %}
+
+                <div class="field-box {{ 'field-empty-required' if (is_empty and is_required) else ('field-empty-optional' if is_empty else 'field-filled') }}{{ ' field-box-matrix' if field.kind == 'matrix' else '' }}">
+                    <div class="field-header">
+                        <span class="field-label">{{ field.display_label }}</span>
+                    </div>
+                    <div class="field-content">
+                        {# For matrices, always render the table structure (even when empty) #}
+                        {% if field.kind == 'matrix' %}
+                            {% if is_empty %}
+                                <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
+                            {% endif %}
+                            {% set _tk = (session.get('language','en') or 'en') %}
+                            {% if _tk is string %}
+                                {% set translation_key = _tk.split('_', 1)[0] %}
+                            {% else %}
+                                {% set translation_key = 'en' %}
+                            {% endif %}
+                            {% set matrix_rows = field.matrix_rows if field.matrix_rows is defined else [] %}
+                            {% set matrix_columns = field.matrix_columns if field.matrix_columns is defined else [] %}
+                            {% set matrix_data = value if value is mapping else {} %}
+                            {% set row_labels = field.matrix_row_labels if field.matrix_row_labels is defined else {} %}
+                            {% set matrix_config = field.matrix_config if field.matrix_config is defined else {} %}
+                            {% set show_row_totals = matrix_config.get('show_row_totals', true) %}
+                            {% set show_column_totals = matrix_config.get('show_column_totals', true) %}
+                            {# Sort rows A–Z by display label (case-insensitive), matching matrix-handler.js #}
+                            {% set ns = namespace(rows_for_sort=[]) %}
+                            {% for r in matrix_rows %}
+                                {% set _ = ns.rows_for_sort.append({'row': r, 'sort_label': (row_labels.get(r, r) | string | trim | lower)}) %}
+                            {% endfor %}
+                            {% set sorted_matrix_rows = ns.rows_for_sort | sort(attribute='sort_label', case_sensitive=False) %}
+                            {% if matrix_columns %}
+                                {# Precompute column totals (and grand total) for the totals row, matching matrix-handler.js #}
+                                {% set ns_ct = namespace(col_totals=[], grand_total=0) %}
+                                {% for col in matrix_columns %}
+                                    {% set col_name = col.get('name') if col is mapping and col.get('name') else col %}
+                                    {% set col_type = col.get('type') if col is mapping and col.get('type') else 'number' %}
+                                    {% set ns = namespace(col_total=0) %}
+                                    {% for item in sorted_matrix_rows %}
+                                        {% set row = item.row %}
+                                        {% set cell_key = row ~ '_' ~ col_name %}
+                                        {% set cell_value = matrix_data.get(cell_key) if matrix_data else none %}
+                                        {% if cell_value is mapping and (cell_value.get('modified') is not none or cell_value.get('original') is not none) %}
+                                            {% set display_cell = cell_value.get('modified') if cell_value.get('modified') is not none else cell_value.get('original') %}
+                                        {% else %}
+                                            {% set display_cell = cell_value %}
+                                        {% endif %}
+                                        {% if col_type == 'tick' %}
+                                            {% set add = 1 if display_cell in [1, '1', true, 'true', 'True'] else 0 %}
+                                        {% else %}
+                                            {% set add = 0 %}
+                                            {% if display_cell is not none and display_cell != '' and (display_cell|string|trim) != '' %}
+                                                {% set add = (display_cell | to_number) | round(0, 'common') %}
+                                            {% endif %}
+                                        {% endif %}
+                                        {% set ns.col_total = ns.col_total + add %}
+                                    {% endfor %}
+                                    {% set _ = ns_ct.col_totals.append(ns.col_total) %}
+                                    {% set ns_ct.grand_total = ns_ct.grand_total + ns.col_total %}
+                                {% endfor %}
+                                {% set _wide_matrix = (matrix_columns|length) > 10 %}
+                                {% if _wide_matrix %}
+                                <div class="wide-matrix wide-matrix-{{ wide_matrix_strategy|default('scale') }}">
+                                {% endif %}
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            {% for col in matrix_columns %}
+                                                {% if col is mapping %}
+                                                    {% set col_name = col.get('name') if col.get('name') else col %}
+                                                    {% set col_display = col_name %}
+                                                    {% if col.get('name_translations') %}
+                                                        {% set _cand = col.get('name_translations', {}).get(translation_key) or col.get('name_translations', {}).get('en') %}
+                                                        {% if _cand and _cand|string|trim %}{% set col_display = _cand %}{% endif %}
+                                                    {% endif %}
+                                                {% else %}
+                                                    {% set col_name = col %}
+                                                    {% set col_display = col_name %}
+                                                {% endif %}
+                                                <th>{{ col_display }}</th>
+                                            {% endfor %}
+                                            {% if show_row_totals %}
+                                                <th>{{ _('Total') }}</th>
+                                            {% endif %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if not matrix_rows %}
+                                            <tr>
+                                                <td><strong>{{ _('No rows added') }}</strong></td>
+                                                {% for col in matrix_columns %}
+                                                    <td></td>
+                                                {% endfor %}
+                                                {% if show_row_totals %}
+                                                    <td></td>
+                                                {% endif %}
+                                            </tr>
+                                        {% endif %}
+                                        {% for item in sorted_matrix_rows %}
+                                            {% set row = item.row %}
+                                            {# Row total: sum of cell values for this row (matching matrix-handler.js) #}
+                                            {% set ns_rt = namespace(row_total=0) %}
+                                            {% for col in matrix_columns %}
+                                                {% if col is mapping %}
+                                                    {% set col_name = col.get('name') if col.get('name') else col %}
+                                                    {% set col_type = col.get('type') if col.get('type') else 'number' %}
+                                                {% else %}
+                                                    {% set col_name = col %}
+                                                    {% set col_type = 'number' %}
+                                                {% endif %}
+                                                {% set cell_key = row ~ '_' ~ col_name %}
+                                                {% set cell_value = matrix_data.get(cell_key) if matrix_data else none %}
+                                                {% if cell_value is mapping and (cell_value.get('modified') is not none or cell_value.get('original') is not none) %}
+                                                    {% set display_cell = cell_value.get('modified') if cell_value.get('modified') is not none else cell_value.get('original') %}
+                                                {% else %}
+                                                    {% set display_cell = cell_value %}
+                                                {% endif %}
+                                                {% if col_type == 'tick' %}
+                                                    {% set add = 1 if display_cell in [1, '1', true, 'true', 'True'] else 0 %}
+                                                {% else %}
+                                                    {% set add = 0 %}
+                                                    {% if display_cell is not none and display_cell != '' and (display_cell|string|trim) != '' %}
+                                                        {% set add = (display_cell | to_number) | round(0, 'common') %}
+                                                    {% endif %}
+                                                {% endif %}
+                                                {% set ns_rt.row_total = ns_rt.row_total + add %}
+                                            {% endfor %}
+                                            <tr>
+                                                <td><strong>{{ row_labels.get(row, row) }}</strong></td>
+                                                {% for col in matrix_columns %}
+                                                    {% if col is mapping %}
+                                                        {% set col_name = col.get('name') if col.get('name') else col %}
+                                                        {% set col_type = col.get('type') if col.get('type') else 'number' %}
+                                                    {% else %}
+                                                        {% set col_name = col %}
+                                                        {% set col_type = 'number' %}
+                                                    {% endif %}
+                                                    {% set cell_key = row ~ '_' ~ col_name %}
+                                                    {% set cell_value = matrix_data.get(cell_key) if matrix_data else none %}
+                                                    {% if cell_value is mapping and (cell_value.get('modified') is not none or cell_value.get('original') is not none) %}
+                                                        {% set display_cell = cell_value.get('modified') if cell_value.get('modified') is not none else cell_value.get('original') %}
+                                                    {% else %}
+                                                        {% set display_cell = cell_value %}
+                                                    {% endif %}
+                                                    <td{% if col_type == 'tick' %} class="cell-tick"{% endif %}>
+                                                        {% if col_type == 'tick' %}
+                                                            {% if display_cell in [1, '1', true, 'true', 'True'] %}✓{% else %}-{% endif %}
+                                                        {% else %}
+                                                            {{ (display_cell | format_number) if display_cell is not none and display_cell|string|trim != '' else '' }}
+                                                        {% endif %}
+                                                    </td>
+                                                {% endfor %}
+                                                {% if show_row_totals %}
+                                                    <td class="matrix-row-total-cell"><strong>{{ ns_rt.row_total | format_number }}</strong></td>
+                                                {% endif %}
+                                            </tr>
+                                        {% endfor %}
+                                        {% if show_column_totals %}
+                                            <tr class="matrix-totals-row">
+                                                <td><strong>{{ _('Total') }}</strong></td>
+                                                {% for col_total in ns_ct.col_totals %}
+                                                    <td class="matrix-column-total-cell"><strong>{{ col_total | format_number }}</strong></td>
+                                                {% endfor %}
+                                                {% if show_row_totals %}
+                                                    <td class="matrix-grand-total-cell"><strong>{{ ns_ct.grand_total | format_number }}</strong></td>
+                                                {% endif %}
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                                {% if _wide_matrix %}
+                                </div>
+                                {% endif %}
+                            {% elif matrix_data and not (matrix_data|length == 1 and matrix_data.get('_table')) %}
+                                {# Fallback if config missing: show raw key/value pairs #}
+                                <table class="table">
+                                    <thead>
+                                        <tr><th>{{ _('Key') }}</th><th>{{ _('Value') }}</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for k, v in matrix_data.items() %}
+                                            {% if v is mapping and (v.get('modified') is not none or v.get('original') is not none) %}
+                                                {% set dv = v.get('modified') if v.get('modified') is not none else v.get('original') %}
+                                            {% else %}
+                                                {% set dv = v %}
+                                            {% endif %}
+                                            <tr><td>{{ k }}</td><td>{{ (dv | format_number) if dv is not none and dv|string|trim != '' else '-' }}</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% endif %}
+                        {% elif is_empty %}
+                            <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
+                        {% elif field.kind == 'indicator' %}
+                            {% if value is mapping %}
+                                {% set values_dict = value.get('values', {}) %}
+                                {% set mode = value.get('mode', 'total') %}
+                                {# Disaggregation data: may be under values.direct or flat under values #}
+                                {% set direct_or_flat = values_dict.get('direct') if values_dict.get('direct') is mapping else values_dict %}
+                                {% set total_val = values_dict.get('total') if values_dict.get('total') is not none else (values_dict.get('direct') if values_dict.get('direct') is not mapping and values_dict.get('direct') is not none else none) %}
+                                {% set sex_cats = field.model.effective_sex_categories if (field.model is defined and field.model) else (config.DEFAULT_SEX_CATEGORIES or []) %}
+                                {% set age_grps = field.model.effective_age_groups if (field.model is defined and field.model) else (config.DEFAULT_AGE_GROUPS or []) %}
+                                {% if mode == 'total' and total_val is not none %}
+                                    <span class="field-value">{{ total_val | format_number }}</span>
+                                {% elif mode == 'sex' and sex_cats %}
+                                    <p class="disaggregation-caption">{{ _('By Sex:') }}</p>
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                {% for sex_cat in sex_cats %}
+                                                    <th>{{ _(sex_cat) }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                {% for sex_cat in sex_cats %}
+                                                    {% set sex_slug = sex_cat|lower|replace(' ', '_')|replace('-', '_') %}
+                                                    <td>{{ (direct_or_flat.get(sex_slug) | format_number) if direct_or_flat.get(sex_slug) is not none and direct_or_flat.get(sex_slug)|string|trim != '' else '-' }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                {% elif mode == 'age' and age_grps %}
+                                    <p class="disaggregation-caption">{{ _('By Age:') }}</p>
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                {% for age_group in age_grps %}
+                                                    <th>{{ _(age_group) }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                {% for age_group in age_grps %}
+                                                    {% set age_slug = slugify_age_group(age_group) %}
+                                                    <td>{{ (direct_or_flat.get(age_slug) | format_number) if direct_or_flat.get(age_slug) is not none and direct_or_flat.get(age_slug)|string|trim != '' else '-' }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                {% elif mode == 'sex_age' and sex_cats and age_grps %}
+                                    <p class="disaggregation-caption">{{ _('By Sex and Age:') }}</p>
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>{{ _('Sex') }}</th>
+                                                {% for age_group in age_grps %}
+                                                    <th>{{ _(age_group) }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for sex_cat in sex_cats %}
+                                                {% set sex_slug = sex_cat|lower|replace(' ', '_')|replace('-', '_') %}
+                                                <tr>
+                                                    <td><strong>{{ _(sex_cat) }}</strong></td>
+                                                    {% for age_group in age_grps %}
+                                                        {% set age_slug = slugify_age_group(age_group) %}
+                                                        {% set cell_key = sex_slug ~ '_' ~ age_slug %}
+                                                        <td>{{ (direct_or_flat.get(cell_key) | format_number) if direct_or_flat.get(cell_key) is not none and direct_or_flat.get(cell_key)|string|trim != '' else '-' }}</td>
+                                                    {% endfor %}
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% elif total_val is not none %}
+                                    <span class="field-value">{{ total_val | format_number }}</span>
+                                {% elif direct_or_flat and direct_or_flat is mapping %}
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                {% for k in direct_or_flat.keys() %}
+                                                    <th>{{ k }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                {% for k, v in direct_or_flat.items() %}
+                                                    <td>{{ (v | format_number) if v is not none and v|string|trim != '' else '-' }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                {% else %}
+                                    <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="field-value">{{ value | format_number }}</span>
+                            {% endif %}
+                        {% elif field.kind == 'question' %}
+                            <span class="field-value">{{ value | format_number }}</span>
+                        {% elif field.kind == 'document' %}
+                            <span class="field-value document-note">{{ _('See documents in the web interface') }}</span>
+                        {% else %}
+                            <span class="field-value">{{ value | format_number }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+
+            {% set _fields = section.fields_ordered or [] %}
+            {% set _subs = section.get('subsections', []) or [] %}
+            {% if _fields|length == 0 and _subs|length == 0 %}
+                <p class="section-empty-note">{{ _('No indicators added.') }}</p>
+            {% endif %}
+
+            {% for child in _subs %}
+                {{ render_section(child, level + 1, root_heading) }}
+            {% endfor %}
+        </section>
+    {% endmacro %}
+
+    {# Iterate pages if available; otherwise single section list #}
+    {% set default_page_id = 0 %}
+    {% if pages and pages|length > 0 and pages[0] is not none %}
+        {% for page in pages %}
+            <h2 class="form-page-title">{{ get_localized_page_name(page) }}</h2>
+            {% for section in sections_by_page.get(page.id, []) %}
+                {{ render_section(section, 0) }}
+            {% endfor %}
+            {% if not loop.last %}<div class="page-break"></div>{% endif %}
+        {% endfor %}
+    {% else %}
+        {% for section in sections_by_page.get(default_page_id, []) %}
+            {{ render_section(section, 0, 'h2') }}
+        {% endfor %}
+    {% endif %}
+</body>
+</html>

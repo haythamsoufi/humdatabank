@@ -1,0 +1,31 @@
+{#
+Loading Indicator Component
+============================
+A centralized loading indicator component that overlays content areas to prevent layout shifts.
+
+Usage:
+  {% from "components/loading_indicator.html" import loading_indicator %}
+
+  <div class="bg-white p-4 relative">
+      {{ loading_indicator('table-loading', _('Loading data...')) }}
+      <!-- Your content here -->
+  </div>
+
+Parameters:
+  - element_id: The ID for the loading indicator element (required)
+  - loading_text: Text to show while loading (optional, defaults to 'Loading...')
+  - spinner_color: Spinner border color (optional, default 'blue-600')
+  - initial_display: Whether to show initially (optional, default 'none' for hidden)
+#}
+
+{% macro loading_indicator(element_id, loading_text=none, spinner_color='blue-600', initial_display='none') %}
+{% set loading_msg = loading_text if loading_text else _('Loading...') %}
+{% set display_style = 'display: flex;' if initial_display == 'flex' else 'display: none;' %}
+<!-- Loading indicator -->
+<div id="{{ element_id }}" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="{{ display_style }}">
+    <div class="flex items-center space-x-3">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-{{ spinner_color }}"></div>
+        <span class="text-gray-700 font-medium text-base">{{ loading_msg }}</span>
+    </div>
+</div>
+{% endmacro %}

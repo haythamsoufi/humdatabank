@@ -1,0 +1,185 @@
+# Security Scanning Workflow
+# Runs secret detection and security analysis manually
+
+name: Security Scan
+
+on:
+  # Manual triggering only - go to Actions tab and click "Run workflow"
+  workflow_dispatch:
+
+# Opt into Node.js 24 now to avoid forced migration warnings on actions/checkout,
+# actions/setup-python, actions/setup-node, and actions/upload-artifact.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # Secret Detection with Gitleaks
+  gitleaks:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          # Scan the checked-out tree only (avoids failing on historical commits that predate secret hygiene).
+          fetch-depth: 1
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Optional: for enterprise features
+
+  # Python Security with Bandit
+  bandit:
+    name: Bandit Python Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit
+        run: |
+          # Use pyproject.toml config if it is present; fall back to no config so
+          # the job never fails simply because the config file is missing.
+          if [ -f pyproject.toml ]; then
+            CFG="-c pyproject.toml"
+          else
+            echo "::warning::pyproject.toml not found — running Bandit without config"
+            CFG=""
+          fi
+          # shellcheck disable=SC2086
+          bandit $CFG -r Backoffice/app -f json -o bandit-results.json || true
+          # shellcheck disable=SC2086
+          bandit $CFG -r Backoffice/app -ll --exit-zero
+
+      - name: Upload Bandit Results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: bandit-results
+          path: bandit-results.json
+
+  # Custom Secret Scanner
+  custom-scan:
+    name: Custom Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Block __consoleSaved.* in Jinja templates
+        run: python Backoffice/scripts/check_no_console_saved_bypass.py
+
+      - name: Run Custom Scanner
+        run: |
+          python Backoffice/scripts/scan_secrets.py --path . --fail-on critical --json > scan-results.json || exit_code=$?
+          python Backoffice/scripts/scan_secrets.py --path . --fix
+          exit ${exit_code:-0}
+
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: secret-scan-results
+          path: scan-results.json
+
+  # Dependency Security Check
+  dependency-check:
+    name: Dependency Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        working-directory: Backoffice
+        run: |
+          # Suppress known-unresolvable langgraph CVEs that require a LangChain 1.x
+          # migration (incompatible with current langchain 0.3.x family).
+          KNOWN_IGNORE=(
+            "--ignore-vuln" "CVE-2026-28277"
+            "--ignore-vuln" "CVE-2025-64439"
+            "--ignore-vuln" "CVE-2026-27794"
+          )
+          pip-audit -r requirements.txt "${KNOWN_IGNORE[@]}" --format json --output pip-audit-results.json || true
+          pip-audit -r requirements.txt "${KNOWN_IGNORE[@]}"
+
+      - name: Upload pip-audit Results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pip-audit-results
+          path: Backoffice/pip-audit-results.json
+
+  # Node.js dependency check for Website
+  npm-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run npm audit (Website)
+        working-directory: Website
+        run: |
+          npm ci --ignore-scripts
+          npm audit --json > npm-audit-results.json || true
+          npm audit || true
+
+      - name: Upload npm audit Results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: npm-audit-results
+          path: Website/npm-audit-results.json
+
+  # Summary job that requires all scans to pass
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [gitleaks, bandit, custom-scan, dependency-check, npm-audit]
+    if: always()
+    steps:
+      - name: Check scan results
+        run: |
+          if [[ "${{ needs.gitleaks.result }}" == "failure" ]]; then
+            echo "❌ Gitleaks detected secrets!"
+            exit 1
+          fi
+          if [[ "${{ needs.custom-scan.result }}" == "failure" ]]; then
+            echo "❌ Custom scanner detected critical secrets!"
+            exit 1
+          fi
+          echo "✅ All security scans passed or reported warnings only"

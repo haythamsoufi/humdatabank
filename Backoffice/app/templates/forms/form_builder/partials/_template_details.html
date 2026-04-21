@@ -1,0 +1,289 @@
+{# Template Details Section #}
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+    <div class="flex justify-between items-center">
+        <h2 class="text-xl font-semibold text-gray-700 flex items-center">
+            <i class="fas fa-file-alt w-6 h-6 mr-2 text-gray-500"></i>
+            {{ _('Template Details') }}
+        </h2>
+        <div class="flex space-x-2">
+            <button type="submit" id="save-template-details-top-btn" form="template-details-form" class="btn btn-success hidden">
+                <i class="fas fa-save w-4 h-4 mr-2"></i>
+                {{ _('Save') }}
+            </button>
+            <button type="button" id="edit-template-details-btn" class="btn btn-primary">
+                <i class="fas fa-pen w-4 h-4 mr-2"></i>
+                {{ _('Edit Details') }}
+            </button>
+        </div>
+    </div>
+    {# Updated display section with grid for columns #}
+    <div id="template-details-display" class="mt-4 grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {# Template Name #}
+        <div>
+            <p class="text-gray-700 text-sm font-semibold mb-1">{{ _('Template Name') }}:</p>
+            <p class="text-gray-900 text-lg">
+                {% if selected_version %}
+                    {{ get_localized_template_name(template, version=selected_version) }}
+                {% else %}
+                    {{ get_localized_template_name(template) }}
+                {% endif %}
+            </p>
+        </div>
+
+        {# Allow Self-Reporting #}
+        <div>
+            <p class="block text-gray-700 text-sm font-semibold mb-1 mt-3 lg:mt-0">{{ _('Allow Self-Reporting') }}:</p>
+            <p class="text-gray-900 text-lg">
+                {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+                {% set add_to_self_report = selected_version.get_effective_add_to_self_report() if selected_version else (fallback_version.add_to_self_report if fallback_version else False) %}
+                {% if add_to_self_report %}
+                    <i class="fas fa-check-circle text-green-500 mr-1"></i> {{ _('Yes') }}
+                {% else %}
+                    <i class="fas fa-times-circle text-red-500 mr-1"></i> {{ _('No') }}
+                {% endif %}
+            </p>
+        </div>
+
+        {# Display Order Numbers #}
+        <div>
+            <p class="block text-gray-700 text-sm font-semibold mb-1 mt-3 lg:mt-0">{{ _('Display Order Numbers') }}:</p>
+            <p class="text-gray-900 text-lg">
+                {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+                {% set display_order_visible = selected_version.get_effective_display_order_visible() if selected_version else (fallback_version.display_order_visible if fallback_version else True) %}
+                {% if display_order_visible %}
+                    <i class="fas fa-check-circle text-green-500 mr-1"></i> {{ _('Yes') }}
+                {% else %}
+                    <i class="fas fa-times-circle text-red-500 mr-1"></i> {{ _('No') }}
+                {% endif %}
+            </p>
+        </div>
+
+        {# Paginated Template #}
+        <div>
+            <p class="block text-gray-700 text-sm font-semibold mb-1 mt-3 lg:mt-0">{{ _('Paginated Template') }}:</p>
+            <p class="text-gray-900 text-lg">
+                {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+                {% set is_paginated = selected_version.get_effective_is_paginated() if selected_version else (fallback_version.is_paginated if fallback_version else False) %}
+                {% if is_paginated %}
+                    <i class="fas fa-check-circle text-green-500 mr-1"></i> {{ _('Yes') }}
+                {% else %}
+                    <i class="fas fa-times-circle text-red-500 mr-1"></i> {{ _('No') }}
+                {% endif %}
+            </p>
+        </div>
+
+        {# Template Owner #}
+        <div>
+            <p class="block text-gray-700 text-sm font-semibold mb-1 mt-3 lg:mt-0">{{ _('Template Owner') }}:</p>
+            <p class="text-gray-900 text-lg">
+                {{ profile_icon(template.owned_by_user, 'md', true, true, false) }}
+            </p>
+        </div>
+
+        {# Description - Spans across columns #}
+        <div class="md:col-span-2 lg:col-span-1">
+            <p class="block text-gray-700 text-sm font-semibold mb-1 mt-3 lg:mt-0">{{ _('Description') }}:</p>
+            {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+            <p class="text-gray-900">{{ (selected_version.get_effective_description() if selected_version else (fallback_version.description if fallback_version else None)) or _('No description provided.') }}</p>
+        </div>
+    </div>
+
+    {# Edit Template Details Form (remains hidden by default) #}
+    <div id="edit-template-details-form-container" class="hidden mt-6 border-t border-gray-200 pt-6">
+       <form method="POST" action="{{ url_for('form_builder.edit_template', template_id=template.id) }}" class="mb-0" id="template-details-form">
+            {{ form.csrf_token }}
+            <input type="hidden" name="submit" value="Save Template">
+            <input type="hidden" name="version_id" value="{{ active_version_id }}">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {# Left Column #}
+                <div>
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="{{ form.name.id }}" class="block text-gray-700 text-sm font-semibold">{{ form.name.label.text }}</label>
+                            <button type="button" id="template-name-translations-btn" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium" title="{{ _('Edit template name translations') }}">
+                                <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                {{ _('Translations') }}
+                            </button>
+                        </div>
+                        {{ form.name(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                        <!-- Hidden fields for template name translations -->
+                        <input type="hidden" name="name_translations" id="template-name-translations" value="{}" data-existing-translations="{{ (template.name_translations|tojson|e) if template.name_translations else '{}' }}">
+
+                        <!-- Individual translation fields that the backend expects - using language codes directly -->
+                        {% for code in SUPPORTED_LANGUAGES %}
+                            {% if code != 'en' %}
+                                <input type="hidden" name="name_{{ code }}" value="{{ template.name_translations.get(code, '') if template.name_translations else '' }}">
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+
+                    <!-- Template Access Management -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Template Access') }}</label>
+                        <button type="button" id="template-access-btn" class="w-full py-2 px-3 text-left bg-white border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm hover:bg-gray-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <svg class="h-5 w-5 text-blue-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                                    </svg>
+                                    <span id="template-access-summary">{{ _('Manage template access...') }}</span>
+                                </div>
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </div>
+                        </button>
+
+                        <!-- Hidden form fields for actual data -->
+                        <input type="hidden" id="template-owner-field" name="{{ form.owned_by.name }}" value="{{ form.owned_by.data or template.owned_by or '' }}">
+                        <div id="template-shared-fields">
+                            {% for value in form.shared_with_admins.data or [] %}
+                                <input type="hidden" name="{{ form.shared_with_admins.name }}" value="{{ value }}">
+                            {% endfor %}
+                        </div>
+
+                        {% if form.owned_by.errors %}
+                            {% for error in form.owned_by.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                        {% if form.shared_with_admins.errors %}
+                            {% for error in form.shared_with_admins.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        {{ render_field(form.description, rows="3") }}
+                    </div>
+                </div>
+
+                {# Right Column - Template Options #}
+                <div>
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.add_to_self_report(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.add_to_self_report.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                        </div>
+                        {% if form.add_to_self_report.errors %}
+                            {% for error in form.add_to_self_report.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.display_order_visible(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.display_order_visible.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                        </div>
+                        {% if form.display_order_visible.errors %}
+                            {% for error in form.display_order_visible.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.is_paginated(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.is_paginated.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                        </div>
+                        {% if form.is_paginated.errors %}
+                            {% for error in form.is_paginated.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.enable_export_pdf(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.enable_export_pdf.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                        </div>
+                        {% if form.enable_export_pdf.errors %}
+                            {% for error in form.enable_export_pdf.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.enable_export_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=true) }}
+                            {{ form.enable_export_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold opacity-50") }}
+                        </div>
+                        <input type="hidden" name="{{ form.enable_export_excel.name }}" value="">
+                        <p class="mt-1 text-xs text-gray-500 italic">{{ _('Coming soon') }}</p>
+                        {% if form.enable_export_excel.errors %}
+                            {% for error in form.enable_export_excel.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.enable_import_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=true) }}
+                            {{ form.enable_import_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold opacity-50") }}
+                        </div>
+                        <input type="hidden" name="{{ form.enable_import_excel.name }}" value="">
+                        <p class="mt-1 text-xs text-gray-500 italic">{{ _('Coming soon') }}</p>
+                        {% if form.enable_import_excel.errors %}
+                            {% for error in form.enable_import_excel.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.enable_ai_validation(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.enable_ai_validation.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                        </div>
+                        {% if form.enable_ai_validation.errors %}
+                            {% for error in form.enable_ai_validation.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    {# Manage Pages UI - shown when paginated is checked #}
+                    <div id="manage-pages-fields-container" class="hidden">
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">{{ _('Manage Pages') }}</label>
+                                <button type="button" id="page-translations-matrix-btn" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium" title="{{ _('Manage page translations') }}">
+                                    <i class="fas fa-language w-4 h-4 mr-1"></i>
+                                    {{ _('Translations') }}
+                                </button>
+                            </div>
+                            <div id="pages-list-container" class="space-y-2">
+                                {% for page in draft_pages %}
+                                <div class="flex items-center space-x-2 page-row bg-white p-2 rounded" draggable="true" data-page-id="{{ page.id }}" data-order="{{ page.order }}">
+                                    <div class="drag-handle cursor-move text-gray-400 hover:text-gray-600">
+                                        <i class="fas fa-grip-vertical"></i>
+                                    </div>
+                                    <input type="hidden" name="page_ids" value="{{ page.id }}">
+                                    <input type="text" name="page_names" value="{{ page.name }}" placeholder="{{ _('Page name') }}" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 w-full text-sm border-gray-300 rounded-md">
+                                    <input type="hidden" name="page_orders" value="{{ page.order }}">
+                                    <input type="hidden" name="page_name_translations" value="{{ page.name_translations|safe_json_attr if page.name_translations else '{}' }}" data-translations="{{ page.name_translations|safe_json_attr if page.name_translations else '{}' }}" data-page-name="{{ page.name }}">
+                                    <button type="button" class="move-up-btn text-gray-600 hover:text-gray-800 p-1" title="{{ _('Move Up') }}"><i class="fas fa-chevron-up w-4 h-4"></i></button>
+                                    <button type="button" class="move-down-btn text-gray-600 hover:text-gray-800 p-1" title="{{ _('Move Down') }}"><i class="fas fa-chevron-down w-4 h-4"></i></button>
+                                    <button type="button" class="remove-page-btn text-red-600 hover:text-red-800 p-1" title="{{ _('Remove Page') }}"><i class="fas fa-trash w-4 h-4"></i></button>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="mt-2 flex items-center space-x-3">
+                                <button type="button" id="add-page-btn" class="inline-flex items-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-1 px-3 text-xs">
+                                    <i class="fas fa-plus w-3 h-3 mr-1"></i> {{ _('Add Page') }}
+                                </button>
+                                <span class="text-xs text-gray-500">{{ _('Drag and drop pages to reorder them.') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="template-details-bottom-buttons" class="flex items-center justify-end space-x-3 mt-4">
+                <button type="button" id="cancel-edit-template-details" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
+                <button type="submit" name="submit" value="Save Template" class="btn btn-success">{{ _('Save Template') }}</button>
+            </div>
+        </form>
+    </div>
+</div>

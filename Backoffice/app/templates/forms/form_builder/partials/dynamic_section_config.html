@@ -1,0 +1,195 @@
+{# Reusable template for Dynamic Indicators Configuration #}
+{# Usage: {% include 'forms/form_builder/partials/dynamic_section_config.html' with context %} #}
+{# Variables expected: section_id, csrf_token, max_dynamic_indicators, add_indicator_note, existing_filters, section_data #}
+
+<div id="dynamic-indicators-config-{{ section_id }}" class="dynamic-indicators-config bg-indigo-50 border border-indigo-200 rounded-lg">
+    <!-- Collapsible Header -->
+    <div class="dynamic-config-header flex items-center justify-between p-4 cursor-pointer hover:bg-indigo-100 transition-colors" data-section-id="{{ section_id }}">
+        <div class="flex items-center space-x-3">
+            <h4 class="text-sm font-medium text-indigo-800">Dynamic Indicators Configuration</h4>
+            <div id="dynamic-config-summary-{{ section_id }}" class="dynamic-config-summary text-xs text-gray-600 hidden bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                <!-- Summary will be populated by JavaScript -->
+            </div>
+        </div>
+        <i id="dynamic-config-icon-{{ section_id }}" class="fas fa-chevron-down text-indigo-600 transition-transform duration-200"></i>
+    </div>
+
+    <!-- Collapsible Content -->
+    <div id="dynamic-config-content-{{ section_id }}" class="dynamic-config-content hidden p-4 pt-0">
+        <div class="space-y-4">
+        <div>
+            <label for="max_dynamic_indicators_{{ section_id }}" class="block text-sm font-medium text-gray-700 mb-1">Max Dynamic Indicators</label>
+            <input type="number" name="max_dynamic_indicators" id="max_dynamic_indicators_{{ section_id }}"
+                   class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 w-24 px-2 py-1 text-sm border-gray-300 rounded-md"
+                   min="1" placeholder="No limit" value="{{ max_dynamic_indicators or '' }}">
+            <p class="mt-1 text-xs text-gray-500">Leave empty for no limit</p>
+        </div>
+
+        <div>
+            <label for="add_indicator_note_{{ section_id }}" class="block text-sm font-medium text-gray-700 mb-1">Add Indicator Note</label>
+            <textarea name="add_indicator_note" id="add_indicator_note_{{ section_id }}"
+                      rows="3"
+                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full text-sm border-gray-300 rounded-md"
+                      placeholder="Optional note to display beside the 'Add Indicator' button">{{ add_indicator_note or '' }}</textarea>
+            <p class="mt-1 text-xs text-gray-500">This note will appear to the left of the "Add Indicator" button</p>
+        </div>
+
+        {# Indicator count display #}
+        <div class="mb-2">
+            <div id="indicator-count-display-{{ section_id }}" class="text-sm text-gray-700">
+                <span class="font-medium">All indicators from the bank will be included</span>
+            </div>
+        </div>
+
+        {# Header with add filter button #}
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+                <label class="text-sm text-gray-600 whitespace-nowrap">
+                    Filter indicators:
+                </label>
+            </div>
+            <button type="button" class="add-filter-btn inline-flex items-center bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-medium py-1 px-3 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    data-section-id="{{ section_id }}">
+                <i class="fas fa-plus w-3 h-3 mr-1"></i>
+                Add Filter
+            </button>
+        </div>
+
+        {# Filters container #}
+        <div id="filters-container-{{ section_id }}" class="space-y-2 mb-3">
+            {# Existing filters will be populated by JavaScript #}
+            {% if existing_filters %}
+                {% for filter in existing_filters %}
+                    <div class="filter-row border border-gray-200 rounded-lg p-3 bg-gray-50" data-filter-index="{{ loop.index0 }}">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <select name="filter_field_{{ section_id }}[]" class="filter-field-select shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-40 sm:text-sm border-gray-300 rounded-md">
+                                <option value="">Select Field</option>
+                                {# Field options will be populated by JavaScript #}
+                            </select>
+                            <button type="button" class="remove-filter-btn text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50">
+                                <i class="fas fa-trash w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div class="filter-values-container">
+                            {# Filter values will be populated by JavaScript #}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        {# Additional Dynamic Section Configuration Options #}
+        <div class="border-t border-gray-200 pt-3 mt-3">
+
+            {# Data Availability Options #}
+            <div class="mb-3">
+                <div class="flex flex-wrap items-center gap-4">
+                    <span class="text-sm font-medium text-gray-700">Data Availability Options:</span>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="allow_data_not_available" value="1"
+                               class="form-checkbox h-4 w-4 text-amber-500 border-gray-300 rounded focus:ring-amber-500"
+                               {% if section_data and section_data.allow_data_not_available %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Allow "Data not available"</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="allow_not_applicable" value="1"
+                               class="form-checkbox h-4 w-4 text-gray-500 border-gray-300 rounded focus:ring-gray-500"
+                               {% if section_data and section_data.allow_not_applicable %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Allow "Not applicable"</span>
+                    </label>
+                </div>
+            </div>
+
+            {# Disaggregation Options #}
+            <div class="mb-3">
+                <label class="text-sm font-medium text-gray-700 mb-2 block">Default Disaggregation Options:</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                    {% set current_disagg_options = section_data.allowed_disaggregation_options_config if section_data and section_data.allowed_disaggregation_options_config else [] %}
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="allowed_disaggregation_options" value="total"
+                               class="form-checkbox h-4 w-4 text-indigo-500 border-gray-300 rounded focus:ring-indigo-500"
+                               {% if 'total' in current_disagg_options %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Total</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="allowed_disaggregation_options" value="sex"
+                               class="form-checkbox h-4 w-4 text-indigo-500 border-gray-300 rounded focus:ring-indigo-500"
+                               {% if 'sex' in current_disagg_options %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">By Sex</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="allowed_disaggregation_options" value="age"
+                               class="form-checkbox h-4 w-4 text-indigo-500 border-gray-300 rounded focus:ring-indigo-500"
+                               {% if 'age' in current_disagg_options %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">By Age</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="allowed_disaggregation_options" value="sex_age"
+                               class="form-checkbox h-4 w-4 text-indigo-500 border-gray-300 rounded focus:ring-indigo-500"
+                               {% if 'sex_age' in current_disagg_options %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">By Sex and Age</span>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Note: Disaggregation options only apply to Number-type indicators with units of People, Staff, or Volunteers</p>
+            </div>
+
+            {# Dynamic Filter Display Options #}
+            <div class="mb-3 border-t border-gray-300 pt-3">
+                <label class="text-sm font-medium text-gray-700 mb-2 block">Filter Fields for Data Entry Form:</label>
+                <p class="text-xs text-gray-500 mb-3">Select which filter fields should be displayed to users when adding indicators in the data entry form. These filters help users find relevant indicators more easily.</p>
+
+                {% set current_display_filters = section_data.data_entry_display_filters_list if section_data and section_data.data_entry_display_filters_list else [] %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="data_entry_display_filters" value="sector"
+                               class="form-checkbox h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
+                               {% if 'sector' in current_display_filters %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Sector</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="data_entry_display_filters" value="subsector"
+                               class="form-checkbox h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
+                               {% if 'subsector' in current_display_filters %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Sub-Sector</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="data_entry_display_filters" value="type"
+                               class="form-checkbox h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
+                               {% if 'type' in current_display_filters %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Type</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="data_entry_display_filters" value="unit"
+                               class="form-checkbox h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
+                               {% if 'unit' in current_display_filters %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Unit</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="data_entry_display_filters" value="related_programs"
+                               class="form-checkbox h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
+                               {% if 'related_programs' in current_display_filters %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Related Programs</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="data_entry_display_filters" value="emergency"
+                               class="form-checkbox h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
+                               {% if 'emergency' in current_display_filters %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Emergency</span>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Select which filter fields should be displayed in the data entry form. If no filters are selected, no filter dropdowns will be shown.
+                </p>
+            </div>
+        </div>
+
+        {# Save button for inline configuration #}
+        <div class="flex justify-end">
+            <button type="button" class="btn btn-primary btn-sm save-dynamic-config-btn">
+                Save Configuration
+            </button>
+        </div>
+        </div>
+    </div>
+</div>

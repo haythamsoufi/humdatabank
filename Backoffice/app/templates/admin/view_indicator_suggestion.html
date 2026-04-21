@@ -1,0 +1,273 @@
+{% extends "core/layout.html" %}
+
+{% block title %}View Suggestion - Admin{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=_('Indicator Suggestion Details'),
+    icon='fas fa-lightbulb',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Suggestions'), 'url': url_for('utilities.manage_indicator_suggestions')},
+        {'name': _('Suggestion Details')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Back to Suggestions'),
+            'url': url_for('utilities.manage_indicator_suggestions'),
+            'classes': 'professional-action-btn'
+        }
+    ]
+) }}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Suggestion Information -->
+            <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-xl font-semibold text-ifrc-navy">Suggestion Information</h2>
+                    <div class="flex gap-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if suggestion.suggestion_type == 'new_indicator' %}bg-blue-100 text-blue-800
+                            {% elif suggestion.suggestion_type == 'correction' %}bg-yellow-100 text-yellow-800
+                            {% elif suggestion.suggestion_type == 'improvement' %}bg-green-100 text-green-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ suggestion.suggestion_type_display }}
+                        </span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if suggestion.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                            {% elif suggestion.status == 'reviewed' %}bg-blue-100 text-blue-800
+                            {% elif suggestion.status == 'approved' %}bg-green-100 text-green-800
+                            {% elif suggestion.status == 'rejected' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ suggestion.status_display }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Submitted By</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.submitter_name }}</p>
+                        <p class="text-sm text-ifrc-gray-500">{{ suggestion.submitter_email }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Submitted At</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.submitted_at|datetime_local('datetime') }}</p>
+                    </div>
+                </div>
+
+                {% if suggestion.reviewed_at %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Reviewed By</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.reviewed_by.name if suggestion.reviewed_by else 'Unknown' }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Reviewed At</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.reviewed_at|datetime_local('datetime') }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if suggestion.indicator_id %}
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-ifrc-gray-700">Related Indicator</label>
+                    <p class="mt-1 text-sm text-ifrc-gray-900">
+                        <a href="{{ url_for('system_admin.view_indicator_bank', id=suggestion.indicator_id) }}"
+                           class="text-ifrc-red hover:text-ifrc-red-dark transition-colors duration-150">
+                            View existing indicator
+                        </a>
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Suggested Indicator Data -->
+            <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-ifrc-navy mb-4">Suggested Indicator Data</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Indicator Name</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.indicator_name }}</p>
+                    </div>
+
+                    {% if suggestion.definition %}
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Definition</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.definition }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {% if suggestion.type %}
+                        <div>
+                            <label class="block text-sm font-medium text-ifrc-gray-700">Type</label>
+                            <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.type }}</p>
+                        </div>
+                        {% endif %}
+
+                        {% if suggestion.unit %}
+                        <div>
+                            <label class="block text-sm font-medium text-ifrc-gray-700">Unit of Measurement</label>
+                            <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.unit }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {% if suggestion.sector %}
+                        <div>
+                            <label class="block text-sm font-medium text-ifrc-gray-700">Sector Classification</label>
+                            <div class="mt-1 text-sm text-ifrc-gray-900">
+                                {% if suggestion.sector is mapping %}
+                                    {% if suggestion.sector.primary %}
+                                        <div><strong>Primary:</strong> {{ suggestion.sector.primary }}</div>
+                                    {% endif %}
+                                    {% if suggestion.sector.secondary %}
+                                        <div><strong>Secondary:</strong> {{ suggestion.sector.secondary }}</div>
+                                    {% endif %}
+                                    {% if suggestion.sector.tertiary %}
+                                        <div><strong>Tertiary:</strong> {{ suggestion.sector.tertiary }}</div>
+                                    {% endif %}
+                                {% else %}
+                                    {{ suggestion.sector }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if suggestion.sub_sector %}
+                        <div>
+                            <label class="block text-sm font-medium text-ifrc-gray-700">Sub-Sector Classification</label>
+                            <div class="mt-1 text-sm text-ifrc-gray-900">
+                                {% if suggestion.sub_sector is mapping %}
+                                    {% if suggestion.sub_sector.primary %}
+                                        <div><strong>Primary:</strong> {{ suggestion.sub_sector.primary }}</div>
+                                    {% endif %}
+                                    {% if suggestion.sub_sector.secondary %}
+                                        <div><strong>Secondary:</strong> {{ suggestion.sub_sector.secondary }}</div>
+                                    {% endif %}
+                                    {% if suggestion.sub_sector.tertiary %}
+                                        <div><strong>Tertiary:</strong> {{ suggestion.sub_sector.tertiary }}</div>
+                                    {% endif %}
+                                {% else %}
+                                    {{ suggestion.sub_sector }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if suggestion.emergency %}
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Emergency Context</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">Yes</p>
+                    </div>
+                    {% endif %}
+
+                    {% if suggestion.related_programs %}
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Related Programs</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.related_programs }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Reason and Notes -->
+            <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-ifrc-navy mb-4">Reason and Notes</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Reason for Change</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.reason }}</p>
+                    </div>
+
+                    {% if suggestion.additional_notes %}
+                    <div>
+                        <label class="block text-sm font-medium text-ifrc-gray-700">Additional Notes</label>
+                        <p class="mt-1 text-sm text-ifrc-gray-900">{{ suggestion.additional_notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Status Update -->
+            <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6">
+                <h3 class="text-lg font-semibold text-ifrc-navy mb-4">Update Status</h3>
+
+                <form method="POST" action="{{ url_for('utilities.update_indicator_suggestion_status', suggestion_id=suggestion.id) }}">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="status" class="block text-sm font-medium text-ifrc-gray-700 mb-1">New Status</label>
+                            <select name="status" id="status" required class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md focus:ring-2 focus:ring-ifrc-red focus:border-ifrc-red">
+                                <option value="Pending" {% if suggestion.status == 'Pending' %}selected{% endif %}>Pending Review</option>
+                                <option value="reviewed" {% if suggestion.status == 'reviewed' %}selected{% endif %}>Under Review</option>
+                                <option value="approved" {% if suggestion.status == 'approved' %}selected{% endif %}>Approved</option>
+                                <option value="rejected" {% if suggestion.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="admin_notes" class="block text-sm font-medium text-ifrc-gray-700 mb-1">Admin Notes</label>
+                            <textarea name="admin_notes" id="admin_notes" rows="4"
+                                      class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md focus:ring-2 focus:ring-ifrc-red focus:border-ifrc-red"
+                                      placeholder="Add any notes about this suggestion...">{{ suggestion.admin_notes or '' }}</textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger w-full">
+                            Update Status
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Actions -->
+            <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6">
+                <h3 class="text-lg font-semibold text-ifrc-navy mb-4">Actions</h3>
+
+                <div class="space-y-3">
+                    {% if suggestion.status == 'approved' and suggestion.suggestion_type == 'new_indicator' %}
+                    <a href="{{ url_for('system_admin.add_indicator_bank') }}?from_suggestion={{ suggestion.id }}"
+                       class="btn btn-success w-full text-center block">
+                        Create New Indicator
+                    </a>
+                    {% endif %}
+
+                    {% if suggestion.status == 'approved' and suggestion.indicator_id %}
+                    <a href="{{ url_for('system_admin.edit_indicator_bank', id=suggestion.indicator_id) }}?from_suggestion={{ suggestion.id }}"
+                       class="btn btn-primary w-full text-center block">
+                        Update Existing Indicator
+                    </a>
+                    {% endif %}
+
+                    <form method="POST" action="{{ url_for('utilities.delete_indicator_suggestion', suggestion_id=suggestion.id) }}"
+                          data-confirm="Are you sure you want to delete this suggestion? This action cannot be undone." data-confirm-danger="true">
+                        <button type="submit" class="btn btn-danger w-full">
+                            Delete Suggestion
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Admin Notes -->
+            {% if suggestion.admin_notes %}
+            <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6">
+                <h3 class="text-lg font-semibold text-ifrc-navy mb-4">Admin Notes</h3>
+                <p class="text-sm text-ifrc-gray-900">{{ suggestion.admin_notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

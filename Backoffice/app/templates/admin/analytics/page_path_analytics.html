@@ -1,0 +1,138 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ _('Page path analytics') }} - {{ _('Admin Panel') }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style nonce="{{ csp_style_nonce() }}">
+    .multiselect-dropdown::-webkit-scrollbar { width: 6px; }
+    .multiselect-dropdown::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+    .multiselect-dropdown::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+    {{ page_header(
+        title=_('Page path analytics'),
+        icon='fas fa-route',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Analytics'), 'url': url_for('analytics.analytics_dashboard')},
+            {'name': _('Page path analytics')}
+        ],
+        info_tooltip=_('Counts come from session page-view histograms (same source as Session Logs path breakdown). They include bulk web navigation. The activity-log “popular pages” chart can differ because many navigations are not stored in the audit trail.')
+    ) }}
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
+        <form method="get" action="{{ url_for('analytics.page_path_analytics') }}" id="page-path-analytics-form" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div>
+                <label for="ppa_days" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Time range') }}</label>
+                <select name="days" id="ppa_days" class="form-input w-full border-gray-300 rounded-md text-sm">
+                    <option value="7" {% if filters.days == 7 %}selected{% endif %}>{{ _('Last 7 days') }}</option>
+                    <option value="30" {% if filters.days == 30 %}selected{% endif %}>{{ _('Last 30 days') }}</option>
+                    <option value="90" {% if filters.days == 90 %}selected{% endif %}>{{ _('Last 90 days') }}</option>
+                    <option value="365" {% if filters.days == 365 %}selected{% endif %}>{{ _('Last year') }}</option>
+                </select>
+            </div>
+            <div class="md:col-span-1 lg:col-span-1 min-w-0">
+                <span class="block text-sm font-medium text-gray-700 mb-1">{{ _('User (optional)') }}</span>
+                <div id="ppa-user-multiselect-container" class="w-full"></div>
+            </div>
+            <div>
+                <label for="ppa_prefix" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Path prefix (optional)') }}</label>
+                <input type="text" name="path_prefix" id="ppa_prefix" value="{{ filters.path_prefix or '' }}"
+                       class="form-input w-full border-gray-300 rounded-md text-sm font-mono text-xs"
+                       placeholder="{{ _('e.g. /admin') }}" autocomplete="off">
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter mr-2"></i>{{ _('Apply') }}
+                </button>
+                <a href="{{ url_for('analytics.page_path_analytics') }}" class="btn btn-secondary">{{ _('Clear') }}</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div class="text-sm text-gray-600">
+                <span class="font-semibold text-gray-800">{{ histogram_data.sessions_in_scope }}</span> {{ _('sessions in period') }} ·
+                <span class="font-semibold text-gray-800">{{ paths_total_count }}</span> {{ _('distinct paths') }}
+                {% if histogram_data.period %}
+                <span class="text-gray-400">·</span>
+                {{ histogram_data.period.from_iso[:10] }} → {{ histogram_data.period.to_iso[:10] }}
+                {% endif %}
+            </div>
+            <a href="{{ export_csv_url }}" class="btn btn-success btn-sm">
+                <i class="fas fa-file-csv mr-2"></i>{{ _('Export CSV') }}
+            </a>
+        </div>
+        {% if paths_truncated %}
+        <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 mb-4">
+            {{ _('Showing the first %(limit)s rows by total views. CSV export includes all paths.', limit=histogram_data.display_limit) }}
+            <span class="tabular-nums">({{ paths_total_count }} {{ _('total') }})</span>
+        </p>
+        {% endif %}
+
+        <div class="overflow-x-auto border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700">{{ _('Path') }}</th>
+                        <th scope="col" class="px-4 py-2 text-right font-semibold text-gray-700 w-32">{{ _('Total views') }}</th>
+                        <th scope="col" class="px-4 py-2 text-right font-semibold text-gray-700 w-40" title="{{ _('Sessions where this path had at least one hit') }}">{{ _('Sessions with path') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for row in paths_display %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 font-mono text-xs text-gray-900 break-all">{{ row.path }}</td>
+                        <td class="px-4 py-2 text-right tabular-nums text-gray-900">{{ row.total_views }}</td>
+                        <td class="px-4 py-2 text-right tabular-nums text-gray-700">{{ row.session_hits }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="px-4 py-8 text-center text-gray-500">{{ _('No path data for these filters.') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <p class="text-xs text-gray-500">
+        <a href="{{ url_for('analytics.session_logs') }}" class="text-teal-700 hover:underline">{{ _('Session logs') }}</a>
+        ·
+        <a href="{{ url_for('analytics.analytics_dashboard') }}" class="text-teal-700 hover:underline">{{ _('Analytics dashboard') }}</a>
+    </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/components/multiselect-dropdown.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    var userData = {{ ppa_users|tojson|safe }};
+    var selectedEmail = {{ (filters.user or '')|tojson|safe }};
+    var selectedUsers = selectedEmail ? [selectedEmail] : [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof MultiselectDropdown === 'undefined') return;
+        new MultiselectDropdown({
+            containerId: 'ppa-user-multiselect-container',
+            name: 'user',
+            placeholder: {{ _('All users')|tojson }},
+            searchPlaceholder: {{ _('Search users…')|tojson }},
+            data: userData,
+            selectedValues: selectedUsers,
+            searchable: true,
+            singleSelect: true,
+            showSelectAll: false
+        });
+    });
+})();
+</script>
+{% endblock %}

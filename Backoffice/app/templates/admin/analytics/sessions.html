@@ -1,0 +1,155 @@
+{% extends "core/layout.html" %}
+{% from "macros/filter_card.html" import filter_card %}
+{% from "components/ag_grid_includes.html" import ag_grid_loading %}
+
+{% block title %}{{ _('Session Logs') }} - {{ _('Admin Panel') }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style nonce="{{ csp_style_nonce() }}">
+    .ag-row.session-log-row--active {
+        background-color: #ecfdf5 !important;
+    }
+    .admin-sessions-logs-wrap .relative {
+        min-height: 600px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=_('Session Logs'),
+    icon='fas fa-history',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Analytics'), 'url': url_for('analytics.analytics_dashboard')},
+        {'name': _('Session Logs')}
+    ],
+    info_tooltip=_('Review user sessions, device types, and activity. Route-level page view counts and paths come from session data (use Page views in the grid); the audit trail focuses on actions and hides page views by default. Filters and column visibility apply to the grid below.')
+) }}
+
+<div class="container mx-auto px-4 py-6">
+    {% if filters.session_id %}
+    <div class="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900 flex flex-wrap items-center gap-2">
+        <span>{{ _('Filtered to session:') }}</span>
+        <code class="text-xs break-all">{{ filters.session_id }}</code>
+        <a href="{{ url_for('analytics.session_logs') }}" class="text-blue-800 underline font-medium">{{ _('Show all sessions') }}</a>
+    </div>
+    {% endif %}
+    {% call filter_card(title=_('Filters'), grid_cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3") %}
+        {% if filters.session_id %}
+        <input type="hidden" name="session_id" value="{{ filters.session_id }}">
+        {% endif %}
+        <div>
+            <label for="user" class="block text-sm font-medium text-gray-700 mb-1">{{ _('User email') }}</label>
+            <input type="text" class="form-input w-full" id="user" name="user"
+                   value="{{ filters.user or '' }}" placeholder="{{ _('Search by email') }}">
+        </div>
+        <div>
+            <label for="min_duration" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Min minutes (session length or active time)') }}</label>
+            <input type="number" class="form-input w-full" id="min_duration" name="min_duration"
+                   value="{{ filters.min_duration or '' }}" placeholder="{{ _('e.g. 10') }}" min="0"
+                   title="{{ _('Include rows where wall-clock session length or active time (start to last activity) is at least this many minutes, or the session is still active and has been open at least this long.') }}">
+        </div>
+        <div class="flex items-center pt-7">
+            <input class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" type="checkbox" id="active_only"
+                   name="active_only" value="1" {% if filters.active_only %}checked{% endif %}>
+            <label class="text-sm font-medium text-gray-700" for="active_only">{{ _('Active sessions only') }}</label>
+        </div>
+        <div class="col-span-1 sm:col-span-2 lg:col-span-3 flex flex-col sm:flex-row gap-3 sm:items-end justify-start pt-2">
+            <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                <i class="fas fa-filter mr-2"></i>{{ _('Filter') }}
+            </button>
+            <a href="{{ url_for('analytics.session_logs') }}" class="btn btn-secondary w-full sm:w-auto inline-flex items-center justify-center">
+                {{ _('Clear filters') }}
+            </a>
+        </div>
+    {% endcall %}
+
+    <div class="admin-sessions-logs-container bg-white shadow-md border border-gray-200 admin-sessions-logs-wrap">
+        <div class="p-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
+                <div class="min-w-0 flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('User sessions') }}</label>
+                    <p class="text-xs text-gray-500">
+                        {{ _('Browse sessions with sortable columns and filters. Pagination matches your current filter query.') }}
+                    </p>
+                </div>
+                <div class="flex flex-shrink-0 justify-end sm:pt-0.5">
+                    <div id="session-logs-column-visibility-placeholder"></div>
+                </div>
+            </div>
+
+            <div class="relative">
+                {{ ag_grid_loading('sessionLogs', loading_text=_('Loading sessions…')) }}
+                <div id="sessionLogsGrid" class="ag-theme-alpine" style="width: 100%; height: 600px;"
+                     data-placeholder-id="session-logs-column-visibility-placeholder"></div>
+            </div>
+
+            <div id="session-logs-pagination" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 pt-4">
+                <button type="button" id="session-logs-page-prev" class="btn btn-secondary btn-sm order-2 sm:order-1">
+                    <i class="fas fa-chevron-left mr-1"></i>{{ _('Previous') }}
+                </button>
+                <span id="session-logs-page-label" class="text-sm text-gray-600 order-1 sm:order-2 text-center"></span>
+                <button type="button" id="session-logs-page-next" class="btn btn-secondary btn-sm order-3">
+                    {{ _('Next') }}<i class="fas fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% from "components/ag_grid_includes.html" import ag_grid_js %}
+{{ ag_grid_js() }}
+<script src="{{ static_url('js/admin/session-logs-grid.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    window.sessionLogsGridConfig = {
+        apiUrl: {{ url_for('admin_analytics_api.session_logs_list_api')|tojson }},
+        perPage: 50,
+        endSessionUrlTemplate: {{ url_for('analytics.end_session', session_id='SESSION_ID_PLACEHOLDER')|tojson }},
+        confirmForceLogout: {{ _('Are you sure you want to force logout this user? They will be logged out on their next request.')|tojson }},
+        auditTrailUrl: {{ url_for('analytics.audit_trail')|tojson }},
+        initialSessionId: {{ (filters.session_id or '')|tojson }}
+    };
+    window.SESSION_LOGS_TRANSLATIONS = {
+        shortSessionId: {{ _('ID')|tojson }},
+        user: {{ _('User')|tojson }},
+        unknownUser: {{ _('Unknown user')|tojson }},
+        deviceType: {{ _('Device')|tojson }},
+        operatingSystem: {{ _('OS')|tojson }},
+        sessionStart: {{ _('Session start')|tojson }},
+        duration: {{ _('Session length')|tojson }},
+        activeDuration: {{ _('Active time')|tojson }},
+        minutesShort: {{ _('min')|tojson }},
+        pageViews: {{ _('Page views')|tojson }},
+        distinctPaths: {{ _('Distinct paths')|tojson }},
+        activities: {{ _('Activities')|tojson }},
+        status: {{ _('Status')|tojson }},
+        active: {{ _('Active')|tojson }},
+        ended: {{ _('Ended')|tojson }},
+        lastActivity: {{ _('Last activity')|tojson }},
+        noActivity: {{ _('No activity')|tojson }},
+        ipAddress: {{ _('IP address')|tojson }},
+        actions: {{ _('Actions')|tojson }},
+        forceLogout: {{ _('Force logout')|tojson }},
+        sessionEnded: {{ _('Session ended')|tojson }},
+        pageOfTotal: {{ _('Page {page} of {pages} ({total} total)')|tojson }},
+        noRows: {{ _('No sessions')|tojson }},
+        loadError: {{ _('Could not load session logs.')|tojson }},
+        openActivitiesInAudit: {{ _('Open activities in audit trail')|tojson }},
+        viewPathBreakdown: {{ _('View path breakdown')|tojson }},
+        pathBreakdownTitle: {{ _('Page views by path')|tojson }},
+        pathBreakdownEmpty: {{ _('No path breakdown recorded for this session.')|tojson }},
+        pathBucketOther: {{ _('Other paths (aggregated)')|tojson }},
+        pathColumn: {{ _('Path')|tojson }},
+        viewCount: {{ _('Count')|tojson }},
+        close: {{ _('Close')|tojson }}
+    };
+})();
+</script>
+{% endblock %}

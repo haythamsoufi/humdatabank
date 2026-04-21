@@ -1,0 +1,49 @@
+plugins {
+    // Add the dependency for the Google services Gradle plugin
+    id 'com.google.gms.google-services' version '4.4.4' apply false
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    project.evaluationDependsOn(':app')
+}
+
+// Android SDK + Kotlin jvmTarget (register before evaluation finishes; see below for javac).
+gradle.beforeProject { project ->
+    if (project != rootProject) {
+        project.afterEvaluate { p ->
+            if (p.hasProperty('android')) {
+                p.android {
+                    compileSdk 36
+                    compileSdkVersion 36
+                    compileOptions {
+                        sourceCompatibility JavaVersion.VERSION_17
+                        targetCompatibility JavaVersion.VERSION_17
+                    }
+                }
+            }
+            p.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                kotlinOptions {
+                    jvmTarget = '17'
+                }
+            }
+        }
+    }
+}
+
+// Remaining javac "deprecated API" / "unchecked operations" Notes come from
+// flutter_local_notifications (<21.x) and flutter_inappwebview plugin Java code.
+// Firebase Notes were resolved by upgrading to firebase_core 4.x / firebase_messaging 16.x.
+// flutter_local_notifications 21.x (Dart 3.10+) will clear the rest once CI Flutter is updated.
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}

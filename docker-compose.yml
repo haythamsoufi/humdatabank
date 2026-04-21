@@ -1,0 +1,123 @@
+name: hum-databank-ecosystem
+
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: databank-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-hum_databank}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: "no"
+
+  db-test:
+    image: pgvector/pgvector:pg15
+    container_name: databank-postgres-test
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB_TEST:-hum_databank_test}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB_TEST:-hum_databank_test}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: "no"
+
+  # LibreTranslate is optional. Start it with:
+  #   docker compose --profile translate up -d
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: libretranslate
+    profiles: ["translate"]
+    ports:
+      - "9000:5000"
+    volumes:
+      - libretranslate_data:/app/data
+    environment:
+      - LT_UPDATE_MODELS=true
+      - LT_LOAD_ONLY=en,fr,es,ar,zh,ru,hi
+    restart: unless-stopped
+
+  backoffice:
+    build: ./Backoffice
+    container_name: databank-backoffice
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_CONFIG=${BACKOFFICE_FLASK_CONFIG:-development}
+      - SECRET_KEY=${SECRET_KEY:-vxE-FbviIoGmGoivz1-cmqDhLqGsLv_e9BJ0RP0YNcE}
+      - DATABASE_URL=postgresql+psycopg2://app:app@db:5432/hum_databank
+      - DEV_DATABASE_URL=postgresql+psycopg2://app:app@db:5432/hum_databank
+      - TEST_DATABASE_URL=postgresql+psycopg2://app:app@db-test:5432/hum_databank_test
+      - API_KEY=${API_KEY:-databank2026}
+      - APP_VERSION=1.0.0
+      - LOG_LEVEL=INFO
+      # Push notifications (optional): mount your Firebase JSON under Backoffice/ and set these in .env
+      - FCM_SERVICE_ACCOUNT_PATH=${FCM_SERVICE_ACCOUNT_PATH:-}
+      - FCM_PROJECT_ID=${FCM_PROJECT_ID:-}
+      - SSE_ENABLED=false  # Disable SSE by default (set to true to enable)
+      - RBAC_SEED_ON_STARTUP=true  # Seed RBAC roles/permissions on first boot
+      - SEED_TEST_DATA=true  # Seed test users on first boot (development only)
+      # Test user passwords (enables quick-login buttons on the login page)
+      - TEST_ADMIN_PASSWORD=${TEST_ADMIN_PASSWORD:-test123}
+      - TEST_FOCAL_PASSWORD=${TEST_FOCAL_PASSWORD:-test123}
+      - TEST_SYS_MANAGER_PASSWORD=${TEST_SYS_MANAGER_PASSWORD:-test123}
+      # Optional: Uncomment and set these if you need email/translation services
+      # - EMAIL_API_KEY=${EMAIL_API_KEY:-}
+      # - EMAIL_API_KEY_STG=${EMAIL_API_KEY_STG:-}
+      # - IFRC_TRANSLATE_API_KEY=${IFRC_TRANSLATE_API_KEY:-}  # optional hosted translation (env name retained)
+      # - LIBRE_TRANSLATE_URL=http://libretranslate:5000  # Uncomment when using: docker compose --profile translate up -d
+      - TRANSLATIONS_PERSISTENT_PATH=/app/translations  # persist translations across rebuilds
+    volumes:
+      - ./Backoffice/app:/app/app
+      - ./Backoffice/scripts:/app/scripts
+      - translations_data:/app/translations  # persistent translations volume (outside app/ bind mount)
+      - ./Backoffice/plugins:/app/plugins
+      - ./Backoffice/migrations:/app/migrations  # To be able to modify migrations if needed
+      - ./Backoffice/tests:/app/tests  # Bind-mount tests for live iteration
+      - ./Backoffice/instance:/app/instance
+      - ./Backoffice/uploads:/data/uploads
+      - ./Backoffice/logs:/var/log/databank
+      - ./Backoffice/run.py:/app/run.py
+      - ./Backoffice/requirements.txt:/app/requirements.txt
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  website:
+    build:
+      context: ./Website
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5000
+    container_name: databank-website
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_INTERNAL_API_URL=http://backoffice:5000
+    depends_on:
+      backoffice:
+        condition: service_started
+    restart: "no"
+
+volumes:
+  pgdata:
+  pgdata_test:
+  libretranslate_data:
+  translations_data:

@@ -1,0 +1,26 @@
+%% IFRC Network Data Portal — Backoffice only (for Word / SA doc)
+%% Paste into https://mermaid.live → Export PNG/SVG → insert in document.
+
+flowchart TB
+  subgraph users["Users"]
+    NS["National Society focal points"]
+    SEC["IFRC Secretariat & field offices\n(admins, PMER, FDS)"]
+  end
+
+  AUTH["Sign-in\nMicrosoft Entra ID B2C\n(and local accounts if enabled)"]
+
+  BO["IFRC Network Data Portal\nBackoffice only\nAzure App Service · Flask application"]
+
+  subgraph azure["Data on Azure"]
+    DB[("PostgreSQL")]
+    BLOB["Blob Storage\n(files & uploads)"]
+  end
+
+  SVC["Other services the Backoffice calls\nIFRC Email · translation · optional KoBo import · optional AI APIs"]
+
+  NS --> AUTH
+  SEC --> AUTH
+  AUTH --> BO
+  BO --> DB
+  BO --> BLOB
+  BO --> SVC

@@ -1,0 +1,125 @@
+{# Reusable pagination component #}
+{# Usage: {% from "components/pagination.html" import render_pagination %} #}
+{#        {{ render_pagination(pagination) }} #}
+
+{% macro render_pagination(pagination, endpoint=None, extra_args={}) %}
+{% if pagination and pagination.pages > 1 %}
+{# Use current endpoint if not specified #}
+{% set target_endpoint = endpoint or request.endpoint %}
+{# Merge request args with extra_args, preferring extra_args #}
+{% set base_args = request.view_args.copy() if request.view_args else {} %}
+{% for key, value in request.args.items() %}
+    {% if key != 'page' %}
+        {% set __ = base_args.update({key: value}) %}
+    {% endif %}
+{% endfor %}
+{% for key, value in extra_args.items() %}
+    {% set __ = base_args.update({key: value}) %}
+{% endfor %}
+
+<div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+    <div class="flex items-center justify-between">
+        {# Mobile pagination #}
+        <div class="flex-1 flex justify-between sm:hidden">
+            {% if pagination.has_prev %}
+            <a href="{{ url_for(target_endpoint, page=pagination.prev_num, **base_args) }}"
+               class="btn btn-secondary btn-sm relative">
+                {{ _('Previous') }}
+            </a>
+            {% else %}
+            <span class="btn btn-secondary btn-sm relative btn-disabled opacity-50 cursor-not-allowed pointer-events-none">
+                {{ _('Previous') }}
+            </span>
+            {% endif %}
+
+            <span class="text-sm text-gray-700 self-center">
+                {{ pagination.page }} / {{ pagination.pages }}
+            </span>
+
+            {% if pagination.has_next %}
+            <a href="{{ url_for(target_endpoint, page=pagination.next_num, **base_args) }}"
+               class="btn btn-secondary btn-sm relative ml-3">
+                {{ _('Next') }}
+            </a>
+            {% else %}
+            <span class="btn btn-secondary btn-sm relative ml-3 btn-disabled opacity-50 cursor-not-allowed pointer-events-none">
+                {{ _('Next') }}
+            </span>
+            {% endif %}
+        </div>
+
+        {# Desktop pagination #}
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    {{ _('Showing') }}
+                    <span class="font-medium">{{ ((pagination.page - 1) * pagination.per_page) + 1 }}</span>
+                    {{ _('to') }}
+                    <span class="font-medium">{{ [pagination.page * pagination.per_page, pagination.total] | min }}</span>
+                    {{ _('of') }}
+                    <span class="font-medium">{{ pagination.total }}</span>
+                    {{ _('results') }}
+                </p>
+            </div>
+            <div>
+                <nav class="btn-group relative z-0 inline-flex shadow-sm" aria-label="Pagination">
+                    {# Previous button #}
+                    {% if pagination.has_prev %}
+                    <a href="{{ url_for(target_endpoint, page=pagination.prev_num, **base_args) }}"
+                       class="btn btn-secondary btn-sm relative px-2"
+                       title="{{ _('Previous') }}">
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% else %}
+                    <span class="btn btn-secondary btn-sm relative px-2 btn-disabled opacity-50 cursor-not-allowed pointer-events-none">
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                    {% endif %}
+
+                    {# Page numbers #}
+                    {% for page_num in pagination.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <a href="{{ url_for(target_endpoint, page=page_num, **base_args) }}"
+                               class="btn btn-secondary btn-sm relative z-10">
+                                {{ page_num }}
+                            </a>
+                            {% else %}
+                            <span class="btn btn-primary btn-sm relative z-10">
+                                {{ page_num }}
+                            </span>
+                            {% endif %}
+                        {% else %}
+                        <span class="btn btn-secondary btn-sm relative text-gray-500">
+                            ...
+                        </span>
+                        {% endif %}
+                    {% endfor %}
+
+                    {# Next button #}
+                    {% if pagination.has_next %}
+                    <a href="{{ url_for(target_endpoint, page=pagination.next_num, **base_args) }}"
+                       class="btn btn-secondary btn-sm relative px-2"
+                       title="{{ _('Next') }}">
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% else %}
+                    <span class="btn btn-secondary btn-sm relative px-2 btn-disabled opacity-50 cursor-not-allowed pointer-events-none">
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                    {% endif %}
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}

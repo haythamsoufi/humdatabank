@@ -1,0 +1,29 @@
+Gmail Filter Setup Instructions
+==============================
+
+To prevent Humanitarian Databank emails from going to spam:
+
+1. Open Gmail in your browser
+2. Click the gear icon (Settings) in the top right
+3. Click "See all settings"
+4. Go to the "Filters and Blocked Addresses" tab
+5. Click "Create a new filter"
+
+Filter Settings:
+- From: haythamsoufi4@gmail.com
+- Subject: contains "IFRC" OR "Indicator Suggestion"
+- Click "Create filter"
+
+Filter Actions:
+☑️ Never send it to Spam
+☑️ Always mark it as important
+☑️ Apply the label: "IFRC Databank" (create this label)
+☑️ Also apply filter to matching conversations
+
+Click "Create filter"
+
+This will ensure all platform emails go directly to your inbox and are marked as important.
+
+Alternative Quick Fix:
+- Simply mark the emails as "Not spam" when you receive them
+- Gmail will learn and stop sending them to spam after a few times

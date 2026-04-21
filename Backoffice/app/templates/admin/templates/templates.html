@@ -1,0 +1,293 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_profile_icon.html" import profile_icon %}
+{# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_create_template = current_is_system_manager or has_permission('admin.templates.create') %}
+{% set can_edit_template = current_is_system_manager or has_permission('admin.templates.edit') %}
+{% set can_delete_template = current_is_system_manager or has_permission('admin.templates.delete') %}
+{% set can_duplicate_template = current_is_system_manager or has_permission('admin.templates.duplicate') %}
+{# Lookup Lists are protected only by admin gate today; we keep UI conservative and show only to template editors. #}
+{% set can_manage_lists = can_edit_template %}
+
+{% block title %}{{ _('Manage Templates') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set header_actions = namespace(items=[]) %}
+{% if can_create_template %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Create New Template'),
+        'icon': 'fas fa-plus-circle',
+        'url': url_for('form_builder.new_template'),
+        'classes': 'professional-action-btn professional-action-btn-green',
+        'attributes': {'title': _('Create a new template')}
+    }) %}
+{% endif %}
+{% if can_manage_lists %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Manage Lists'),
+        'icon': 'fas fa-list',
+        'url': url_for('system_admin.manage_lists'),
+        'classes': 'professional-action-btn professional-action-btn-blue',
+        'attributes': {'title': _('Open List Library')}
+    }) %}
+{% endif %}
+
+{{ page_header(
+    title=_('Manage Templates'),
+    icon='fas fa-file-alt',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Template Management')}
+    ],
+    info_tooltip=_('Create and manage form templates that define the structure and fields for data collection. Templates serve as blueprints for assignments and can include various field types, validation rules, and conditional logic. Use templates to standardize data collection across different periods and ensure consistency in your reporting workflows.'),
+    actions=header_actions.items
+) }}
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Main Table Card -->
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+        {% if templates %}
+            {{ ag_grid_container('templatesGrid', loading_text=_('Loading templates data...'), include_card=false) }}
+        {% else %}
+            <p class="text-gray-700">{{ _('No form templates found.') }}</p>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // UI permissions for this screen (do not rely on client-side gating for security)
+    const UI_PERMS = {
+        canCreateTemplate: {{ can_create_template|default(false)|tojson|safe }},
+        canEditTemplate: {{ can_edit_template|default(false)|tojson|safe }},
+        canDeleteTemplate: {{ can_delete_template|default(false)|tojson|safe }},
+        canDuplicateTemplate: {{ can_duplicate_template|default(false)|tojson|safe }}
+    };
+
+    // Duplicate template names set (for showing IDs)
+    const duplicateTemplateNames = new Set({{ (duplicate_template_names if duplicate_template_names is defined else [])|tojson|safe }});
+
+    // Transform templates data for ag-grid
+    const templatesData = [
+        {% for template in templates %}
+        {% set version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+        {% set version_count = template_version_counts.get(template.id, 0) if template_version_counts is defined else 0 %}
+        {% set is_deployed = template.published_version is not none %}
+        {% set localized_name = get_localized_template_name(template) %}
+        {
+            id: {{ template.id }},
+            name: {{ localized_name|tojson|safe }},
+            add_to_self_report: {{ (version.add_to_self_report if version else False)|tojson|safe }},
+            version_count: {{ version_count }},
+            status: {{ (_('Deployed') if is_deployed else _('Not Yet'))|tojson|safe }},
+            is_deployed: {{ is_deployed|tojson|safe }},
+            owner: {
+                id: {{ (template.owned_by_user.id if template.owned_by_user else None)|tojson|safe }},
+                name: {{ (template.owned_by_user.name if template.owned_by_user else '')|tojson|safe }},
+                email: {{ (template.owned_by_user.email if template.owned_by_user else '')|tojson|safe }},
+                title: {{ (template.owned_by_user.title if template.owned_by_user else '')|tojson|safe }},
+                active: {{ (template.owned_by_user.active if template.owned_by_user else True)|tojson|safe }},
+                profile_color: {{ ((template.owned_by_user.profile_color if template.owned_by_user.profile_color and template.owned_by_user.profile_color != '#3B82F6' else template.owned_by_user.generate_profile_color()) if template.owned_by_user else '#3B82F6')|tojson|safe }}
+            },
+            created_at: {{ template.created_at|datetime_iso|tojson|safe }},
+            edit_url: "{{ url_for('form_builder.edit_template', template_id=template.id) if can_edit_template else '' }}",
+            duplicate_url: "{{ url_for('form_builder.duplicate_template', template_id=template.id) if can_duplicate_template else '' }}",
+            preview_url: "{{ url_for('forms.preview_template', template_id=template.id) }}",
+            special_url: {{ (url_for('template_special.special_template_view', template_id=template.id) if template.id == 21 else '')|tojson|safe }},
+            delete_url: "{{ url_for('form_builder.delete_template', template_id=template.id) if can_delete_template else '' }}",
+            delete_info_url: "{{ url_for('form_builder.get_template_delete_info', template_id=template.id) if can_delete_template else '' }}",
+            data_count: {{ template_data_counts.get(template.id, 0) if template_data_counts is defined else 0 }},
+            delete_confirm: {{ (_('This template has %(count)s saved data entries that will be permanently deleted. Continue?', count=template_data_counts.get(template.id, 0)) if template_data_counts is defined and template_data_counts.get(template.id, 0) > 0 else _('Are you sure you want to delete this template?'))|tojson|safe }},
+            duplicate_confirm: {{ _('Duplicate this template?')|tojson|safe }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        {
+            field: 'name',
+            headerName: '{{ _("Name") }}',
+            width: 300,
+            minWidth: 200,
+            maxWidth: 500,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellRenderer: function(params) {
+                if (!params.value) return '';
+                let name = params.value;
+                // If this name appears multiple times, append the ID
+                if (duplicateTemplateNames.has(name)) {
+                    name = name + ' (id:' + params.data.id + ')';
+                }
+                const editUrl = params.data.edit_url || '';
+                if (editUrl) {
+                    return '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-900 hover:underline" title="{{ _("Edit Template") }}">' + name + '</a>';
+                }
+                return '<span class="text-gray-900">' + name + '</span>';
+            }
+        },
+        {
+            field: 'add_to_self_report',
+            headerName: '{{ _("Self-Report") }}',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            hide: true,
+            cellRenderer: AgGridRenderers.booleanAllowed,
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'version_count',
+            headerName: '{{ _("Versions") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'status',
+            headerName: '{{ _("Status") }}',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.deployedStatus,
+            cellStyle: { 'text-align': 'center', 'white-space': 'nowrap' }
+        },
+        {
+            field: 'owner',
+            headerName: '{{ _("Owner") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            valueGetter: function(params) {
+                return params.data.owner ? (params.data.owner.name || params.data.owner.email || '') : '';
+            },
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    sourceField: 'owner',
+                    showEmail: false
+                });
+            },
+            cellStyle: { 'white-space': 'normal', 'line-height': '1.4' }
+        },
+        {
+            field: 'created_at',
+            headerName: '{{ _("Created At") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateTime
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 250,
+            pinned: 'right',
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const data = params.data;
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (data.edit_url) {
+                    html += '<a href="' + data.edit_url + '" class="text-blue-600 hover:text-blue-900" title="{{ _("Edit") }}"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (data.duplicate_url) {
+                    html += '<form action="' + data.duplicate_url + '" method="POST" class="inline-block" data-confirm="' + data.duplicate_confirm.replace(/'/g, "\\'") + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" class="text-gray-600 hover:text-gray-900" title="{{ _("Duplicate") }}"><i class="fas fa-copy fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '<a href="' + data.preview_url + '" target="_blank" class="text-green-600 hover:text-green-900" title="{{ _("Preview Template") }}"><i class="fas fa-eye fa-fw"></i></a>';
+                if (data.special_url) {
+                    html += '<a href="' + data.special_url + '" class="text-purple-600 hover:text-purple-900" title="Special View"><i class="fas fa-magic fa-fw"></i></a>';
+                }
+                if (data.delete_url && data.delete_info_url) {
+                    html += '<button type="button" class="text-red-600 hover:text-red-900 delete-template-btn" title="{{ _("Delete") }}" data-template-id="' + data.id + '" data-template-name="' + (data.name || '').replace(/'/g, "\\'") + '" data-delete-url="' + data.delete_url + '" data-delete-info-url="' + data.delete_info_url + '"><i class="fas fa-trash fa-fw"></i></button>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        if (!templatesData || templatesData.length === 0) return;
+
+        var result = AgGridHelper.create('templatesGrid', 'templates', columnDefs, templatesData, {
+            onReady: function(api) {
+                AgGridHelper.pinActionsColumn(api, ['name', 'type', 'add_to_self_report', 'version_count', 'status', 'owner', 'created_at', 'actions']);
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initializeGrid, 100);
+        });
+    } else {
+        setTimeout(initializeGrid, 100);
+    }
+    </script>
+
+    <!-- Template Delete Modal -->
+    <script src="{{ static_url('js/admin/template-delete-modal.js') }}"></script>
+
+    <script nonce="{{ csp_nonce() }}">
+    // Set translation data attributes on body for the template delete modal
+    document.body.setAttribute('data-trans-delete-template', {{ _('Delete Template')|tojson|safe }});
+    document.body.setAttribute('data-trans-warning', {{ _('Warning: This action cannot be undone!')|tojson|safe }});
+    document.body.setAttribute('data-trans-all-will-be-deleted', {{ _('All of the following will be permanently deleted:')|tojson|safe }});
+    document.body.setAttribute('data-trans-assignments', {{ _('Assignments')|tojson|safe }});
+    document.body.setAttribute('data-trans-data-entries', {{ _('Data Entries')|tojson|safe }});
+    document.body.setAttribute('data-trans-form-data-entries', {{ _('form data entries')|tojson|safe }});
+    document.body.setAttribute('data-trans-repeat-data-entries', {{ _('repeat group data entries')|tojson|safe }});
+    document.body.setAttribute('data-trans-dynamic-data-entries', {{ _('dynamic indicator data entries')|tojson|safe }});
+    document.body.setAttribute('data-trans-template-structure', {{ _('Template Structure')|tojson|safe }});
+    document.body.setAttribute('data-trans-versions', {{ _('Versions')|tojson|safe }});
+    document.body.setAttribute('data-trans-pages', {{ _('page(s)')|tojson|safe }});
+    document.body.setAttribute('data-trans-sections', {{ _('section(s)')|tojson|safe }});
+    document.body.setAttribute('data-trans-items', {{ _('item(s)')|tojson|safe }});
+    document.body.setAttribute('data-trans-cancel', {{ _('Cancel')|tojson|safe }});
+    document.body.setAttribute('data-trans-error-loading', {{ _('Error loading deletion information. Please try again.')|tojson|safe }});
+    </script>
+{% endblock %}

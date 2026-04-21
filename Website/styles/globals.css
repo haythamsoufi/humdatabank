@@ -1,0 +1,534 @@
+/* Import Tailwind CSS layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Inter font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Import Tajawal font for Arabic */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap');
+
+/* Mapbox GL CSS (used for country-scope maps in demo/national deployments) */
+@import url('mapbox-gl/dist/mapbox-gl.css');
+
+/* Hide Mapbox logo */
+.mapboxgl-ctrl-logo {
+  display: none !important;
+}
+
+/* Leaflet CSS overrides for better integration */
+.leaflet-container {
+  font-family: 'Inter', sans-serif;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px;
+}
+
+.leaflet-control-zoom {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.leaflet-control-zoom a {
+  background-color: white;
+  color: #374151;
+  border: none;
+  border-radius: 4px;
+  margin: 2px;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #f3f4f6;
+  color: #ef4444;
+}
+
+.leaflet-control-zoom a.leaflet-control-zoom-in,
+.leaflet-control-zoom a.leaflet-control-zoom-out {
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* Enhanced Leaflet control styling */
+.info-control {
+  padding: 6px 8px;
+  font: 14px/16px Arial, Helvetica, sans-serif;
+  background: white;
+  background: rgba(255,255,255,0.95);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  border-radius: 12px;
+  min-width: 150px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.info-control h4 {
+  margin: 0 0 5px;
+  color: #777;
+}
+
+.legend-control {
+  line-height: 18px;
+  color: #555;
+  font-family: 'Inter', sans-serif;
+}
+
+.legend-control i {
+  width: 18px;
+  height: 18px;
+  float: left;
+  margin-right: 8px;
+  opacity: 0.8;
+  border: 1px solid #374151;
+}
+
+/* Enhanced country polygon styling */
+.country-polygon {
+  transition: all 0.2s ease-in-out;
+  stroke-width: 1px;
+  stroke: #d1d5db;
+}
+
+.country-polygon:hover {
+  filter: brightness(1.1);
+  stroke-width: 2px;
+  stroke: #ef4444;
+}
+
+/* Ensure country borders are visible (scope to country polygons only).
+   NOTE: Do NOT style all `.leaflet-interactive` elements globally, because it
+   breaks other interactive layers (e.g. international flow hover targets). */
+.country-polygon.leaflet-interactive {
+  stroke: #d1d5db !important;
+  stroke-width: 1px !important;
+  stroke-opacity: 1 !important;
+}
+
+.country-polygon.leaflet-interactive:hover {
+  stroke: #ef4444 !important;
+  stroke-width: 2px !important;
+}
+
+/* Leaflet popup styling for flow tooltips */
+.leaflet-popup.humdb-flow-tooltip .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.leaflet-popup.humdb-flow-tooltip .leaflet-popup-content {
+  margin: 12px !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  color: #374151 !important;
+  min-width: 150px !important;
+}
+
+.leaflet-popup.humdb-flow-tooltip .leaflet-popup-tip {
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Flow line classes (color only; width is controlled by JS for zoom scaling) */
+path.humdb-flow-line {
+  stroke: #ff0000 !important;
+}
+
+path.humdb-flow-hover {
+  stroke: #ff0000 !important;
+}
+
+/* Custom map controls */
+.leaflet-control-zoom {
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+  overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #374151 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+}
+
+.leaflet-control-zoom a.leaflet-control-zoom-in,
+.leaflet-control-zoom a.leaflet-control-zoom-out {
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  font-size: 20px !important;
+  font-weight: bold !important;
+}
+
+/* Attribution styling */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-radius: 8px !important;
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  backdrop-filter: blur(10px);
+}
+
+/* Basic body styling */
+body {
+  @apply font-sans text-humdb-gray-800 bg-humdb-white antialiased; /* Changed default text color, bg to white */
+  line-height: 1.6;
+}
+
+/* Custom scrollbar for a more modern look (optional) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Light gray track */
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #A0AEC0; /* humdb-gray-500 */
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #718096; /* humdb-gray-600 */
+}
+
+/* Container utility */
+.container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Ensure links have a default style */
+a {
+  @apply text-humdb-red hover:text-humdb-red-dark transition-colors duration-150;
+}
+
+/* Prose adjustments for dark text on light background */
+.prose {
+    @apply text-humdb-gray-700;
+}
+.prose h1, .prose h2, .prose h3, .prose h4 {
+    @apply text-humdb-navy;
+}
+.prose a {
+    @apply text-humdb-red;
+}
+.prose strong {
+    @apply text-humdb-gray-900;
+}
+/* Add other prose overrides if needed */
+
+/* RTL Support for Arabic */
+.rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+.rtl .text-left {
+  text-align: right;
+}
+
+.rtl .text-right {
+  text-align: left;
+}
+
+.rtl .text-center {
+  text-align: center;
+}
+
+/* RTL specific adjustments for flexbox */
+.rtl .flex-row {
+  flex-direction: row-reverse;
+}
+
+.rtl .flex-row-reverse {
+  flex-direction: row;
+}
+
+/* RTL specific adjustments for margins and padding */
+.rtl .ml-auto {
+  margin-left: unset;
+  margin-right: auto;
+}
+
+.rtl .mr-auto {
+  margin-right: unset;
+  margin-left: auto;
+}
+
+/* RTL specific adjustments for positioning */
+.rtl .left-0 {
+  left: unset;
+  right: 0;
+}
+
+.rtl .right-0 {
+  right: unset;
+  left: 0;
+}
+
+/* RTL specific adjustments for borders */
+.rtl .border-l {
+  border-left: unset;
+  border-right: 1px solid;
+}
+
+.rtl .border-r {
+  border-right: unset;
+  border-left: 1px solid;
+}
+
+/* RTL specific adjustments for rounded corners */
+.rtl .rounded-l {
+  border-top-left-radius: unset;
+  border-bottom-left-radius: unset;
+  border-top-right-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.rtl .rounded-r {
+  border-top-right-radius: unset;
+  border-bottom-right-radius: unset;
+  border-top-left-radius: 0.25rem;
+  border-bottom-left-radius: 0.25rem;
+}
+
+/* RTL specific adjustments for tables */
+.rtl table {
+  direction: rtl !important;
+}
+
+.rtl th,
+.rtl td {
+  text-align: right !important;
+}
+
+/* Ensure table headers are properly RTL */
+.rtl table thead th {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Ensure table content flows RTL */
+.rtl table tbody tr td,
+.rtl table thead tr th {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Ensure table body cells are properly RTL */
+.rtl table tbody td {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* RTL table container and overflow */
+.rtl .overflow-x-auto {
+  direction: rtl !important;
+}
+
+.rtl .overflow-x-auto table {
+  direction: rtl !important;
+}
+
+/* Force RTL direction on all table elements */
+.rtl table * {
+  direction: rtl !important;
+}
+
+/* Ensure links in tables are RTL */
+.rtl table a {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* RTL specific adjustments for form inputs */
+.rtl input,
+.rtl textarea,
+.rtl select {
+  text-align: right;
+}
+
+/* RTL specific adjustments for table content */
+.rtl table a,
+.rtl table span,
+.rtl table div {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Specific RTL rules for indicator bank table */
+.rtl .bg-white.rounded-lg.shadow-sm.overflow-hidden table {
+  direction: rtl !important;
+}
+
+.rtl .bg-white.rounded-lg.shadow-sm.overflow-hidden table th,
+.rtl .bg-white.rounded-lg.shadow-sm.overflow-hidden table td {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Override any Tailwind text alignment classes in RTL */
+.rtl .text-left {
+  text-align: right !important;
+}
+
+.rtl .text-right {
+  text-align: left !important;
+}
+
+/* Force RTL on specific table elements */
+.rtl table[dir="rtl"] {
+  direction: rtl !important;
+}
+
+.rtl table[dir="rtl"] th,
+.rtl table[dir="rtl"] td {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Override any conflicting Tailwind classes */
+.rtl .px-6.py-3.text-xs.font-medium.text-humdb-gray-500.uppercase.tracking-wider {
+  text-align: right !important;
+}
+
+.rtl .px-6.py-4.text-sm.text-humdb-gray-600 {
+  text-align: right !important;
+}
+
+/* RTL specific adjustments for buttons */
+.rtl button {
+  text-align: center;
+}
+
+/* RTL specific adjustments for icons and emojis */
+.rtl .emoji,
+.rtl .icon {
+  direction: ltr;
+  unicode-bidi: bidi-override;
+}
+
+/* Arabic font support */
+.rtl {
+  font-family: 'Tajawal', 'Inter', sans-serif;
+}
+
+/* Ensure Arabic text uses Tajawal font */
+.rtl h1,
+.rtl h2,
+.rtl h3,
+.rtl h4,
+.rtl h5,
+.rtl h6,
+.rtl p,
+.rtl span,
+.rtl div,
+.rtl input,
+.rtl textarea,
+.rtl select,
+.rtl button,
+.rtl label,
+.rtl th,
+.rtl td {
+  font-family: 'Tajawal', 'Inter', sans-serif;
+}
+
+/* Arabic font optimization */
+.rtl {
+  font-feature-settings: 'kern' 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure proper Arabic text rendering */
+.rtl * {
+  font-family: inherit;
+}
+
+/* Enhanced Flag Icons - Matching backend layout.html */
+.flag-icon {
+  display: inline-block;
+  width: 20px;
+  height: 15px;
+  background-color: white;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.flag-icon-gb {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30"><rect width="60" height="30" fill="%23012169"/><path d="M0 0l60 30m0-30L0 30" stroke="%23fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="%23C8102E" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="%23fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="%23C8102E" stroke-width="6"/></svg>');
+}
+
+.flag-icon-fr {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2"><rect width="3" height="2" fill="white"/><rect width="1" height="2" fill="%23002395"/><rect width="1" height="2" x="1" fill="%23fff"/><rect width="1" height="2" x="2" fill="%23ED2939"/></svg>');
+}
+
+.flag-icon-es {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500"><rect width="750" height="500" fill="white"/><rect width="750" height="500" fill="%23c60b1e"/><rect width="750" height="250" y="125" fill="%23ffc400"/></svg>');
+}
+
+.flag-icon-sa {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="%23006c35"/><path d="M200 250l300 50l-300 50" stroke="%23fff" stroke-width="25" fill="none" stroke-linecap="round"/><circle cx="450" cy="300" r="60" fill="%23fff"/></svg>');
+}
+
+.flag-icon-ru {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 6"><rect width="9" height="6" fill="%23fff"/><rect width="9" height="4" y="2" fill="%23005aa6"/><rect width="9" height="2" y="4" fill="%23d52b1e"/></svg>');
+}
+
+.flag-icon-cn {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="%23de2910"/><path d="M0 0l180 120L0 240z" fill="%23ffde00"/><path d="M60 60l15 45h45l-37.5 27.5L90 150l-37.5-27.5L15 105h45z" fill="%23ffde00"/><path d="M0 0l60 40L0 80z" fill="%23ffde00"/><path d="M0 0l30 20L0 40z" fill="%23ffde00"/><path d="M0 0l15 10L0 20z" fill="%23ffde00"/></svg>');
+}
+
+.flag-icon-in {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="%23ff9933"/><rect width="900" height="300" y="150" fill="%23ffffff"/><rect width="900" height="300" y="450" fill="%23008800"/><circle cx="450" cy="300" r="60" fill="%23000088"/><circle cx="450" cy="300" r="48" fill="%23ffffff"/><circle cx="450" cy="300" r="36" fill="%23000088"/><circle cx="450" cy="300" r="24" fill="%23ffffff"/><circle cx="450" cy="300" r="12" fill="%23000088"/></svg>');
+}
+
+/* Mobile full width dropdown override */
+@media (max-width: 640px) {
+  .mobile-full-width {
+    position: fixed !important;
+    top: 8rem !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem) !important;
+    transform: none !important;
+    z-index: 9999 !important;
+  }
+}
+
+/* Desktop dropdown positioning */
+@media (min-width: 641px) {
+  .mobile-full-width {
+    position: absolute !important;
+    top: 100% !important;
+    left: -8rem !important;
+    right: auto !important;
+    width: 50rem !important;
+    max-width: 50rem !important;
+    transform: none !important;
+    z-index: 50 !important;
+  }
+}

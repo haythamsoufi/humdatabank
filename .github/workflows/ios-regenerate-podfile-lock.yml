@@ -1,0 +1,109 @@
+# Regenerate MobileApp/ios/Podfile.lock on a macOS runner (CocoaPods is not available on Windows).
+#
+# Usage:
+# 1. Actions → "Regenerate iOS Podfile.lock" → Run workflow
+# 2. When the job finishes, open the run → Artifacts → download `ios-podfile-lock`
+#    → replace MobileApp/ios/Podfile.lock (and commit)
+# 3. Or enable "Open a pull request" to have the bot commit and open a PR for you.
+#
+# Typical triggers: after bumping firebase_* or other plugins in pubspec.yaml, or when
+# CI reports a CocoaPods version conflict with the committed lockfile.
+name: iOS Regenerate Podfile.lock
+
+on:
+  workflow_dispatch:
+    inputs:
+      open_pull_request:
+        description: 'Open a PR with updated Podfile.lock (requires repo write token)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pod-lock:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          cache: false
+
+      - name: Determine Flutter project path
+        id: flutter_path
+        run: |
+          if [ -f "MobileApp/pubspec.yaml" ]; then
+            echo "path=MobileApp" >> "$GITHUB_OUTPUT"
+          elif [ -f "pubspec.yaml" ]; then
+            echo "path=." >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not find Flutter project (pubspec.yaml)"
+            exit 1
+          fi
+
+      - name: Prepare Firebase iOS config (placeholder)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          if [ -f ios/Runner/GoogleService-Info.plist.example ]; then
+            cp ios/Runner/GoogleService-Info.plist.example ios/Runner/GoogleService-Info.plist
+          fi
+
+      - name: Get Flutter dependencies
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: flutter pub get
+
+      - name: Install CocoaPods and resolve iOS pods
+        working-directory: ${{ steps.flutter_path.outputs.path }}/ios
+        run: |
+          sudo gem install cocoapods
+          rm -f Podfile.lock
+          pod install --repo-update
+
+      - name: Show lockfile diff (if any)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          git diff -- ios/Podfile.lock || true
+          git status --short ios/Podfile.lock
+
+      - name: Podfile.lock path for PR
+        id: lockfile
+        run: |
+          ROOT="${{ steps.flutter_path.outputs.path }}"
+          echo "path=${ROOT}/ios/Podfile.lock" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Podfile.lock artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-podfile-lock
+          path: ${{ steps.flutter_path.outputs.path }}/ios/Podfile.lock
+          if-no-files-found: error
+
+      - name: Create Pull Request
+        if: ${{ inputs.open_pull_request }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'chore(ios): regenerate Podfile.lock'
+          title: 'chore(ios): regenerate Podfile.lock'
+          body: |
+            Automated update from [Regenerate iOS Podfile.lock](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) workflow.
+
+            - `flutter pub get`
+            - `pod install --repo-update`
+
+            Download **ios-podfile-lock** artifact from that run if you need a local copy without merging this PR.
+          branch: chore/ios-podfile-lock-${{ github.run_id }}
+          delete-branch: true
+          add-paths: ${{ steps.lockfile.outputs.path }}

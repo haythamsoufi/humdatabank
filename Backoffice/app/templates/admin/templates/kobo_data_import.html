@@ -1,0 +1,1690 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_css %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+
+{% block title %}Import KoBo Data{% endblock %}
+
+{% block head %}
+{{ super() }}
+{{ ag_grid_css() }}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<style nonce="{{ csp_nonce() }}">
+.wizard-step { transition: all 0.2s ease; }
+.wizard-step.active { color: #2563eb; border-color: #2563eb; }
+.wizard-step.completed { color: #059669; border-color: #059669; }
+.wizard-step-navigable { cursor: pointer; }
+.wizard-step-navigable:hover { filter: brightness(0.92); }
+.wizard-step-navigable:focus { outline: 2px solid #2563eb; outline-offset: 3px; }
+.wizard-step-navigable:focus:not(:focus-visible) { outline: none; }
+.wizard-step-reachable-ahead { color: #64748b; border-color: #94a3b8; }
+.wizard-step-reachable-ahead.wizard-step-navigable:hover { filter: brightness(0.92); }
+.configure-tabs .configure-tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: transparent;
+    cursor: pointer;
+}
+.configure-tabs .configure-tab:hover { color: #374151; }
+.configure-tabs .configure-tab.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+}
+.wizard-step-connector { height: 2px; flex: 1; }
+.wizard-step-connector.completed { background: #059669; }
+.wizard-step-connector.active { background: #2563eb; }
+.group-card { transition: all 0.15s ease; }
+.group-card:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.entity-match { transition: background 0.15s; }
+.entity-match:hover { background: #f9fafb; }
+.fade-in { animation: fadeIn 0.25s ease-in; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+/* Preview grid: compact wrapped rows; break long tokens (URLs, codes) */
+#previewGrid.ag-theme-alpine {
+    --ag-line-height: 1.3;
+    --ag-cell-horizontal-padding: 8px;
+}
+#previewGrid.ag-theme-alpine .ag-cell {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+}
+#previewGrid.ag-theme-alpine .ag-cell-wrapper {
+    align-items: flex-start;
+}
+#previewGrid.ag-theme-alpine .ag-cell-value {
+    line-height: 1.3;
+}
+#previewGrid.ag-theme-alpine .ag-header-cell-label,
+#previewGrid.ag-theme-alpine .ag-header-cell-text-container,
+#previewGrid.ag-theme-alpine .ag-header-group-cell .ag-header-group-text {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    line-height: 1.35;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+#previewGrid.ag-theme-alpine .ag-header-cell,
+#previewGrid.ag-theme-alpine .ag-header-group-cell {
+    align-items: flex-start;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title='Import KoBo Data',
+    icon='fas fa-database',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'Import KoBo Data'}
+    ]
+) }}
+
+<div class="max-w-6xl mx-auto">
+    <!-- Wizard Step Indicators -->
+    <div class="flex items-center mb-8 px-4" id="wizard-steps">
+        {% for label in ['Upload', 'Review', 'Configure', 'Preview', 'Import'] %}
+        {% set n = loop.index %}
+        <div class="wizard-step {{ 'active' if n == 1 else '' }} flex flex-col items-center select-none {{ 'text-gray-400' if n > 1 else '' }}" data-step="{{ n }}" data-step-label="{{ label }}">
+            <div class="wizard-step-circle w-10 h-10 rounded-full border-2 border-current flex items-center justify-center font-bold text-sm mb-1" id="step-circle-{{ n }}">{{ n }}</div>
+            <span class="text-xs font-medium">{{ label }}</span>
+        </div>
+        {% if not loop.last %}
+        <div class="wizard-step-connector bg-gray-300" id="connector-{{ n }}-{{ n + 1 }}"></div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- ===== Step 1: Upload ===== -->
+    <div id="step-1-content" class="step-content bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-800 mb-2">Upload KoBo Data Export</h2>
+        <p class="text-sm text-gray-600 mb-4">Upload an Excel file exported from KoBoToolbox. The wizard will detect the form structure, questions, and data types automatically.</p>
+
+        <!-- Template mode selection -->
+        <div class="mb-5 border border-gray-200 rounded-lg overflow-hidden">
+            <div class="flex">
+                <label class="flex-1 flex items-center gap-3 p-4 cursor-pointer border-r border-gray-200 transition-colors" id="mode-new-label"
+                       style="background: #eff6ff;">
+                    <input type="radio" name="template_mode" value="new" checked
+                           class="form-radio h-4 w-4 text-blue-600" id="mode-new">
+                    <div>
+                        <span class="font-medium text-sm text-gray-800">Create New Template</span>
+                        <p class="text-xs text-gray-500 mt-0.5">Build a new template from the KoBo data structure</p>
+                    </div>
+                </label>
+                <label class="flex-1 flex items-center gap-3 p-4 cursor-pointer transition-colors" id="mode-existing-label">
+                    <input type="radio" name="template_mode" value="existing"
+                           class="form-radio h-4 w-4 text-blue-600" id="mode-existing">
+                    <div>
+                        <span class="font-medium text-sm text-gray-800">Use Existing Template</span>
+                        <p class="text-xs text-gray-500 mt-0.5">Map KoBo columns to an existing template's items</p>
+                    </div>
+                </label>
+            </div>
+            <div id="existing-template-picker" class="hidden border-t border-gray-200 bg-gray-50 p-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Select Template</label>
+                <select id="existing-template-select" class="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">-- Choose a template --</option>
+                    {% for t in template_choices %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+            <div class="flex items-start">
+                <i class="fas fa-info-circle text-blue-600 mt-0.5 mr-2"></i>
+                <div class="text-sm text-blue-800">
+                    <p class="font-semibold mb-1">How to export data from KoBo:</p>
+                    <ol class="list-decimal ml-4 space-y-0.5">
+                        <li>Open your form in KoBoToolbox</li>
+                        <li>Go to <strong>Data</strong> &rarr; <strong>Downloads</strong></li>
+                        <li>Select <strong>XLS</strong> format and click <strong>Export</strong></li>
+                        <li>Download the generated file and upload it here</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        {# min-height: abs-positioned children do not expand the box; h-48 may be missing if Tailwind was not rebuilt #}
+        <div class="file-upload-wrapper relative border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors" id="upload-zone" style="min-height: 12rem;">
+            <input type="file" id="kobo-data-file" accept=".xlsx,.xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="Select KoBo Excel file">
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" id="upload-placeholder">
+                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                <p class="text-sm text-gray-600 font-medium">Click or drag an Excel file here</p>
+                <p class="text-xs text-gray-400 mt-1">.xlsx or .xls (max 50 MB)</p>
+            </div>
+            <div class="absolute inset-0 flex flex-col items-center justify-center hidden" id="upload-progress">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                <p class="text-sm text-gray-600">Analyzing file structure...</p>
+            </div>
+        </div>
+        <div id="upload-error" class="mt-3 text-sm text-red-600 hidden"></div>
+    </div>
+
+    <!-- ===== Step 2: Review Structure ===== -->
+    <div id="step-2-content" class="step-content bg-white p-6 rounded-lg shadow-md border border-gray-200 hidden">
+        <h2 class="text-lg font-semibold text-gray-800 mb-1">Review Detected Structure</h2>
+        <p class="text-sm text-gray-600 mb-4" id="analysis-summary"></p>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+            <label class="block text-sm font-semibold text-amber-800 mb-2">
+                <i class="fas fa-user-tag mr-1"></i> Entity Identifier Column
+            </label>
+            <p class="text-xs text-amber-700 mb-2">Select the column that identifies each entity (e.g., National Society name). Each unique value will become a separate assignment.</p>
+            <select id="entity-column-select" class="w-full border border-amber-300 rounded-md py-2 px-3 text-sm focus:ring-amber-500 focus:border-amber-500">
+                <option value="">-- Select entity identifier column --</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <div class="flex items-start justify-between gap-4 mb-2">
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-gray-700">Data Columns</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">All columns that contain data are selected by default. Purple tags mark KoBo sex/age breakdown fields; uncheck a whole group if you only need totals.</p>
+                </div>
+                <div class="flex gap-2 shrink-0">
+                    <button type="button" id="select-all-cols" class="btn btn-primary btn-xs">{{ _('Select All') }}</button>
+                    <span class="text-gray-300">|</span>
+                    <button type="button" id="deselect-all-cols" class="btn btn-secondary btn-xs">{{ _('Deselect All') }}</button>
+                </div>
+            </div>
+            <div id="groups-container" class="space-y-3"></div>
+        </div>
+
+        <details class="mb-4">
+            <summary class="text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700">
+                <i class="fas fa-eye-slash mr-1"></i> Skipped Columns (<span id="skipped-count">0</span>)
+            </summary>
+            <div id="skipped-container" class="mt-2 max-h-48 overflow-y-auto bg-gray-50 rounded-md p-3 text-xs text-gray-500 space-y-1"></div>
+        </details>
+
+        <div class="flex justify-between mt-6">
+            <button type="button" id="back-to-1" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left mr-1"></i> Back
+            </button>
+            <button type="button" id="go-to-3" class="btn btn-primary" disabled>
+                Next: Configure <i class="fas fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== Step 3: Configure ===== -->
+    <div id="step-3-content" class="step-content bg-white p-6 rounded-lg shadow-md border border-gray-200 hidden">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Configure Import</h2>
+
+        {% call scroll_tab_bar(wrapper_class='configure-tabs mb-1', aria_label='Configure import sections', inner_class='gap-1') %}
+                <button type="button" class="configure-tab btn btn-ghost btn-sm active" id="configure-tab-item" role="tab" aria-selected="true" aria-controls="configure-panel-item" data-configure-tab="item">Item Mapping</button>
+                <button type="button" class="configure-tab btn btn-ghost btn-sm" id="configure-tab-country" role="tab" aria-selected="false" aria-controls="configure-panel-country" data-configure-tab="country">Country Matching</button>
+                <button type="button" class="configure-tab btn btn-ghost btn-sm" id="configure-tab-options" role="tab" aria-selected="false" aria-controls="configure-panel-options" data-configure-tab="options">Period &amp; duplicates</button>
+        {% endcall %}
+
+        <!-- Tab: Item Mapping -->
+        <div id="configure-panel-item" class="configure-tab-panel pt-4" role="tabpanel" aria-labelledby="configure-tab-item">
+            <!-- New-template fields (hidden when using existing) -->
+            <div id="new-template-fields">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
+                    <input type="text" id="import-template-name" class="w-full max-w-xl border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="KoBo Import - ...">
+                </div>
+
+                <div class="flex flex-wrap items-center gap-4 mb-2">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="import-create-template" checked class="form-checkbox h-4 w-4 text-blue-600 rounded">
+                        Create template from structure
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="import-data" checked class="form-checkbox h-4 w-4 text-blue-600 rounded">
+                        Import submission data
+                    </label>
+                </div>
+            </div>
+
+            <!-- Existing-template fields (hidden when creating new) -->
+            <div id="existing-template-fields" class="hidden">
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                    <div class="flex items-center gap-2 text-sm text-blue-800">
+                        <i class="fas fa-layer-group text-blue-600"></i>
+                        <span>Importing into: <strong id="existing-tpl-name"></strong></span>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700">
+                                <i class="fas fa-exchange-alt mr-1"></i> Column &rarr; Item Mapping
+                            </h3>
+                            <p class="text-xs text-gray-500 mt-0.5">Each KoBo column is auto-matched to the closest template item. For indicators with sex / age / sex×age breakdowns, use the second dropdown to choose the exact cell (e.g. Male — 0–17) that column should fill.</p>
+                        </div>
+                        <span class="text-xs text-gray-500" id="mapping-summary"></span>
+                    </div>
+                    <div id="mapping-loading" class="flex items-center justify-center py-6 text-gray-400">
+                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
+                        Auto-mapping columns...
+                    </div>
+                    <div id="mapping-container" class="hidden border border-gray-200 rounded-md divide-y divide-gray-100 max-h-96 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Country Matching -->
+        <div id="configure-panel-country" class="configure-tab-panel hidden pt-4" role="tabpanel" aria-labelledby="configure-tab-country">
+            <div id="entity-matching-section" class="mb-2 hidden">
+                <p class="text-xs text-gray-500 mb-3">Match each entity to a country. Unmatched entities will be skipped during data import.</p>
+                <div id="entity-matching-loading" class="flex items-center justify-center py-4 text-gray-400">
+                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
+                    Auto-matching entities...
+                </div>
+                <div id="entity-matching-container" class="hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500" id="match-summary"></span>
+                    </div>
+                    <div class="border border-gray-200 rounded-md divide-y divide-gray-100 max-h-80 overflow-y-auto" id="entity-match-list"></div>
+                </div>
+            </div>
+            <div id="entity-matching-placeholder" class="hidden text-sm text-gray-500 py-6 text-center border border-dashed border-gray-200 rounded-md">
+                <i class="fas fa-info-circle text-gray-400 mb-2"></i>
+                <p>Turn on <strong>Import submission data</strong> in Item Mapping to match entities to countries.</p>
+            </div>
+        </div>
+
+        <!-- Tab: Period & duplicates -->
+        <div id="configure-panel-options" class="configure-tab-panel hidden pt-4" role="tabpanel" aria-labelledby="configure-tab-options">
+            <div id="configure-period-new-wrap" class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Period / Reporting Cycle</label>
+                <input type="text" id="import-period-name" class="w-full max-w-xl border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 2024 Q4">
+            </div>
+            <div id="configure-period-existing-wrap" class="mb-4 hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Period / Reporting Cycle</label>
+                <input type="text" id="import-period-name-existing" class="w-full max-w-xl border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 2024 Q4">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Submissions to include</label>
+                <select id="import-submission-filter" class="w-full max-w-xl border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">All rows (no validation filter; then apply duplicate rule below)</option>
+                    <option value="approved_only">Approved only</option>
+                    <option value="approved_or_on_hold">Approved or on hold</option>
+                    <option value="exclude_rejected">All except rejected / flagged for removal</option>
+                    <option value="not_validated_only">Not validated or pending only (awaiting review)</option>
+                    <option value="on_hold_only">On hold only</option>
+                    <option value="draft_only">Draft only</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1" id="import-submission-filter-hint">
+                    Filters use KoBo&rsquo;s <code class="bg-gray-100 px-1 rounded">_validation_status</code> column (XLS export).
+                    We map common labels to buckets: <strong>approved</strong>, <strong>on hold</strong>, <strong>not validated</strong>,
+                    <strong>pending</strong>, <strong>draft</strong>, <strong>rejected</strong> (incl. not approved / flagged for removal), plus empty or unrecognized text as <strong>unknown</strong>.
+                    Any filter except &ldquo;All rows&rdquo; requires that column in the file.
+                </p>
+            </div>
+            <div class="mb-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Duplicate Submissions (per entity)</label>
+                <select id="import-dup-strategy" class="w-full max-w-xl border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="latest">Keep latest submission (by submission time)</option>
+                    <option value="latest_approved">Keep latest approved submission; if none approved, keep latest overall</option>
+                    <option value="first">Keep first submission (by submission time)</option>
+                    <option value="first_approved">Keep first approved submission; if none approved, keep first overall</option>
+                    <option value="all">Import all submissions (one row per submission in the export)</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">When the same entity appears more than once, choose which row to import. Approval-aware options require <code class="bg-gray-100 px-1 rounded">_validation_status</code> in the file.</p>
+            </div>
+        </div>
+
+        <div class="flex justify-between mt-6">
+            <button type="button" id="back-to-2" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left mr-1"></i> Back
+            </button>
+            <button type="button" id="go-to-4" class="btn btn-primary">
+                Next: Preview Data <i class="fas fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== Step 4: Preview (AG Grid) ===== -->
+    <div id="step-4-content" class="step-content bg-white p-6 rounded-lg shadow-md border border-gray-200 hidden">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800">Preview Import Data</h2>
+                <p class="text-sm text-gray-500" id="preview-summary"></p>
+            </div>
+        </div>
+
+        <!-- Duplicate details panel -->
+        <div id="preview-dedup-section" class="hidden mb-4">
+            <details class="border border-amber-200 rounded-md bg-amber-50">
+                <summary class="px-4 py-2.5 cursor-pointer flex items-center justify-between text-sm font-medium text-amber-800 hover:bg-amber-100 transition-colors">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-copy text-amber-600"></i>
+                        <span><span id="preview-dedup-count"></span> duplicate submissions removed</span>
+                    </div>
+                    <span class="text-xs text-amber-600">Click for details</span>
+                </summary>
+                <div class="border-t border-amber-200 px-4 py-3">
+                    <p class="text-xs text-amber-700 mb-2" id="dedup-strategy-label"></p>
+                    <div class="max-h-64 overflow-y-auto">
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="text-left text-amber-700 border-b border-amber-200">
+                                    <th class="py-1.5 pr-3 font-semibold">Entity</th>
+                                    <th class="py-1.5 pr-3 font-semibold text-center">Submissions</th>
+                                    <th class="py-1.5 pr-3 font-semibold text-center">Removed</th>
+                                    <th class="py-1.5 pr-3 font-semibold">Kept (Excel row)</th>
+                                    <th class="py-1.5 font-semibold">All rows in Excel</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dedup-details-body" class="divide-y divide-amber-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <div id="preview-loading" class="flex items-center justify-center py-12 text-gray-400">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+            Loading preview...
+        </div>
+
+        <div id="preview-grid-wrapper" class="hidden">
+            <div id="previewGrid" class="ag-theme-alpine" style="width: 100%; height: 480px;"></div>
+        </div>
+
+        <div id="preview-error" class="hidden text-sm text-red-600 py-4"></div>
+
+        <div class="flex justify-between mt-6">
+            <button type="button" id="back-to-3" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left mr-1"></i> Back to Configure
+            </button>
+            <button type="button" id="execute-import" class="btn btn-success">
+                <i class="fas fa-file-import mr-1"></i> Confirm &amp; Import
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== Step 5: Results ===== -->
+    <div id="step-5-content" class="step-content bg-white p-6 rounded-lg shadow-md border border-gray-200 hidden">
+        <div id="import-running" class="flex flex-col items-center py-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <p class="text-sm text-gray-600 font-medium">Importing data...</p>
+            <p class="text-xs text-gray-400 mt-1">This may take a moment for large files.</p>
+        </div>
+        <div id="import-results" class="hidden fade-in">
+            <div id="import-success" class="hidden">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mr-4">
+                        <i class="fas fa-check text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-green-800">Import Successful</h2>
+                        <p class="text-sm text-gray-600" id="import-message"></p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="import-stats"></div>
+                <div id="import-warnings" class="hidden mb-4">
+                    <h4 class="text-sm font-medium text-amber-700 mb-1"><i class="fas fa-exclamation-triangle mr-1"></i> Warnings</h4>
+                    <ul class="text-xs text-amber-600 space-y-0.5 list-disc ml-4" id="import-warnings-list"></ul>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <a id="link-edit-template" href="#" class="btn btn-primary">
+                        <i class="fas fa-edit mr-1"></i> Edit Template
+                    </a>
+                    <a href="{{ url_for('form_builder.manage_templates') }}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-list mr-1"></i> All Templates
+                    </a>
+                    <button type="button" id="import-another" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-redo mr-1"></i> Import Another
+                    </button>
+                </div>
+            </div>
+            <div id="import-failure" class="hidden">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mr-4">
+                        <i class="fas fa-times text-red-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-red-800">Import Failed</h2>
+                        <p class="text-sm text-red-600" id="import-error-message"></p>
+                    </div>
+                </div>
+                <button type="button" id="retry-import" class="btn btn-primary">
+                    <i class="fas fa-arrow-left mr-1"></i> Back to Preview
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ ag_grid_js() }}
+
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function() {
+    const ANALYZE_URL       = {{ url_for('form_builder.kobo_data_import_analyze') | tojson | safe }};
+    const MATCH_URL         = {{ url_for('form_builder.kobo_data_import_match') | tojson | safe }};
+    const PREVIEW_URL       = {{ url_for('form_builder.kobo_data_import_preview') | tojson | safe }};
+    const EXECUTE_URL       = {{ url_for('form_builder.kobo_data_import_execute') | tojson | safe }};
+    const TPL_STRUCTURE_URL = {{ url_for('form_builder.kobo_data_import_template_structure') | tojson | safe }};
+    const MAP_COLUMNS_URL   = {{ url_for('form_builder.kobo_data_import_map_columns') | tojson | safe }};
+    const EDIT_TPL_URL      = {{ url_for('form_builder.edit_template', template_id=0) | tojson | safe }};
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+    let analysisData = null;
+    let fileId = null;
+    let entityMapping = {};
+    let allCountries = [];
+    let previewGridApi = null;
+
+    var templateMode = 'new';
+    var existingTemplateId = null;
+    var existingTemplateStructure = null;
+    var columnItemMappings = [];
+    var templateItemById = {};
+    /** When this matches current inputs, item mapping UI can be reused (avoid reset when returning from Preview). */
+    var columnMappingCacheKey = null;
+    /** When this matches fileId + entity column, country matching can skip refetch. */
+    var entityMatchingCacheKey = null;
+
+    const TOTAL_STEPS = 5;
+    const WIZARD_STEP_LABELS = ['Upload', 'Review', 'Configure', 'Preview', 'Import'];
+    let currentStep = 1;
+    let maxReachedStep = 1;
+
+    function canNavigateToStep(target) {
+        if (target < 1 || target > TOTAL_STEPS) return false;
+        if (target === currentStep) return false;
+
+        var step2Ok = !!(analysisData && fileId);
+        var step3Ok = step2Ok && !!document.getElementById('entity-column-select').value;
+
+        if (target < currentStep) {
+            if (target > maxReachedStep) return false;
+            if (target === 2) return step2Ok;
+            if (target === 3) return step3Ok;
+            return true;
+        }
+
+        if (target <= maxReachedStep) {
+            if (target === 2) return step2Ok;
+            if (target === 3) return step3Ok;
+            return true;
+        }
+
+        if (target !== currentStep + 1) return false;
+        if (target === 2) return step2Ok;
+        if (target === 3) return step3Ok;
+        if (target === 4) return step3Ok;
+        if (target === 5) return false;
+        return true;
+    }
+
+    // ── Wizard step management ──────────────────────────────────────────
+    function setStep(step) {
+        maxReachedStep = Math.max(maxReachedStep, step);
+        currentStep = step;
+        for (let s = 1; s <= TOTAL_STEPS; s++) {
+            const el = document.querySelector('[data-step="' + s + '"]');
+            const content = document.getElementById('step-' + s + '-content');
+            const circle = document.getElementById('step-circle-' + s);
+            if (content) content.classList.toggle('hidden', s !== step);
+            if (!el) continue;
+            el.classList.remove('active', 'completed', 'text-gray-400', 'wizard-step-navigable', 'wizard-step-reachable-ahead');
+            if (s < step) {
+                el.classList.add('completed');
+                circle.innerHTML = '<i class="fas fa-check text-xs"></i>';
+            } else if (s === step) {
+                el.classList.add('active');
+                circle.textContent = s;
+            } else {
+                circle.textContent = s;
+                var aheadClickable = canNavigateToStep(s);
+                if (s <= maxReachedStep || aheadClickable) {
+                    el.classList.add('wizard-step-reachable-ahead');
+                } else {
+                    el.classList.add('text-gray-400');
+                }
+            }
+
+            const navigable = canNavigateToStep(s);
+            if (navigable) {
+                el.classList.add('wizard-step-navigable');
+                el.setAttribute('tabindex', '0');
+                el.setAttribute('role', 'button');
+                var lbl = el.getAttribute('data-step-label') || WIZARD_STEP_LABELS[s - 1] || ('Step ' + s);
+                var dir = s < step ? 'Go back to ' : 'Go forward to ';
+                el.setAttribute('aria-label', dir + lbl);
+            } else {
+                el.setAttribute('tabindex', '-1');
+                el.removeAttribute('role');
+                el.removeAttribute('aria-label');
+            }
+        }
+        for (let i = 1; i < TOTAL_STEPS; i++) {
+            const conn = document.getElementById('connector-' + i + '-' + (i + 1));
+            if (!conn) continue;
+            conn.className = 'wizard-step-connector ' + (i < step ? 'completed' : i === step - 1 ? 'active' : 'bg-gray-300');
+        }
+    }
+
+    function enterConfigureStep() {
+        if (isExistingMode()) {
+            document.getElementById('new-template-fields').classList.add('hidden');
+            document.getElementById('existing-template-fields').classList.remove('hidden');
+
+            var mapKey = getColumnMappingCacheKey();
+            var tplId = existingTemplateStructure && existingTemplateStructure.template_id;
+            var canReuseMap = mapKey &&
+                columnMappingCacheKey === mapKey &&
+                columnItemMappings.length > 0 &&
+                existingTemplateStructure &&
+                parseInt(tplId, 10) === parseInt(existingTemplateId, 10);
+
+            if (canReuseMap) {
+                document.getElementById('mapping-loading').classList.add('hidden');
+                document.getElementById('mapping-container').classList.remove('hidden');
+                rebuildTemplateItemLookup();
+                renderMappingUI();
+            } else {
+                loadTemplateStructureAndMap();
+            }
+        } else {
+            document.getElementById('new-template-fields').classList.remove('hidden');
+            document.getElementById('existing-template-fields').classList.add('hidden');
+        }
+        syncConfigurePeriodWraps();
+        setConfigureTab('item');
+
+        var entityColIdx = parseInt(document.getElementById('entity-column-select').value, 10);
+        var importData = isExistingMode() ? true : document.getElementById('import-data').checked;
+        var emKey = entityMatchCacheKeyParts();
+        var section = document.getElementById('entity-matching-section');
+        var placeholder = document.getElementById('entity-matching-placeholder');
+
+        if (!importData || isNaN(entityColIdx)) {
+            if (section) section.classList.add('hidden');
+            if (placeholder && !isExistingMode()) placeholder.classList.remove('hidden');
+            return;
+        }
+        if (placeholder) placeholder.classList.add('hidden');
+        if (section) section.classList.remove('hidden');
+
+        if (emKey && entityMatchingCacheKey === emKey && Object.keys(entityMapping).length > 0 && allCountries.length > 0) {
+            document.getElementById('entity-matching-loading').classList.add('hidden');
+            document.getElementById('entity-matching-container').classList.remove('hidden');
+            renderEntityMatching();
+        } else {
+            startEntityMatching();
+        }
+    }
+
+    /** Jump to any reached step from the stepper (back or forward within progress). */
+    function goToWizardStep(target) {
+        if (!canNavigateToStep(target)) return;
+        if (target === 1 && currentStep > 1) {
+            uploadPlaceholder.classList.remove('hidden');
+            uploadProgress.classList.add('hidden');
+            fileInput.value = '';
+        }
+        setStep(target);
+        if (target === 3) enterConfigureStep();
+        else if (target === 4) loadPreview();
+        else if (target === 5) {
+            document.getElementById('import-running').classList.add('hidden');
+            document.getElementById('import-results').classList.remove('hidden');
+        }
+    }
+
+    document.getElementById('wizard-steps').addEventListener('click', function(e) {
+        var stepEl = e.target.closest('[data-step]');
+        if (!stepEl || !stepEl.classList.contains('wizard-step-navigable')) return;
+        var target = parseInt(stepEl.getAttribute('data-step'), 10);
+        if (isNaN(target)) return;
+        goToWizardStep(target);
+    });
+
+    document.getElementById('wizard-steps').addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var stepEl = e.target.closest('[data-step]');
+        if (!stepEl || !stepEl.classList.contains('wizard-step-navigable')) return;
+        e.preventDefault();
+        var target = parseInt(stepEl.getAttribute('data-step'), 10);
+        if (isNaN(target)) return;
+        goToWizardStep(target);
+    });
+
+    function postJSON(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(body),
+        }).then(function(r) { return r.json(); });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function rebuildTemplateItemLookup() {
+        templateItemById = {};
+        if (!existingTemplateStructure) return;
+        (existingTemplateStructure.sections || []).forEach(function(sec) {
+            (sec.items || []).forEach(function(it) {
+                templateItemById[it.id] = it;
+            });
+        });
+    }
+
+    function slugifySexCat(s) {
+        return String(s || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+    }
+
+    function slugifyAgeGroup(s) {
+        return String(s || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    }
+
+    function defaultDisaggForItem(it) {
+        if (!it || !it.show_disagg_mapping) return null;
+        var opts = it.allowed_disaggregation_options || [];
+        if (opts.indexOf('total') !== -1) return { mode: 'total', key: null };
+        if (opts.indexOf('sex_age') !== -1 && it.effective_sex_categories && it.effective_age_groups &&
+            it.effective_sex_categories.length && it.effective_age_groups.length) {
+            var sx = slugifySexCat(it.effective_sex_categories[0]);
+            var ag = slugifyAgeGroup(it.effective_age_groups[0]);
+            return { mode: 'sex_age', key: sx + '_' + ag };
+        }
+        if (opts.indexOf('sex') !== -1 && it.effective_sex_categories && it.effective_sex_categories.length) {
+            return { mode: 'sex', key: slugifySexCat(it.effective_sex_categories[0]) };
+        }
+        if (opts.indexOf('age') !== -1 && it.effective_age_groups && it.effective_age_groups.length) {
+            return { mode: 'age', key: slugifyAgeGroup(it.effective_age_groups[0]) };
+        }
+        return { mode: 'total', key: null };
+    }
+
+    function buildDisaggSelectOptionsHtml(it) {
+        var opts = it.allowed_disaggregation_options || [];
+        var html = '';
+        if (opts.indexOf('total') !== -1) {
+            html += '<option value="total">Total / single value</option>';
+        }
+        if (opts.indexOf('sex') !== -1) {
+            (it.effective_sex_categories || []).forEach(function(s) {
+                html += '<option value="sex:' + slugifySexCat(s) + '">' + escapeHtml(s) + '</option>';
+            });
+        }
+        if (opts.indexOf('age') !== -1) {
+            (it.effective_age_groups || []).forEach(function(a) {
+                html += '<option value="age:' + slugifyAgeGroup(a) + '">' + escapeHtml(a) + '</option>';
+            });
+        }
+        if (opts.indexOf('sex_age') !== -1) {
+            (it.effective_sex_categories || []).forEach(function(s) {
+                var sx = slugifySexCat(s);
+                (it.effective_age_groups || []).forEach(function(a) {
+                    var ag = slugifyAgeGroup(a);
+                    html += '<option value="sex_age:' + sx + '_' + ag + '">' +
+                        escapeHtml(s) + ' — ' + escapeHtml(a) + '</option>';
+                });
+            });
+        }
+        return html || '<option value="total">Total / single value</option>';
+    }
+
+    function encodeDisaggValue(d) {
+        if (!d || !d.mode || d.mode === 'total') return 'total';
+        if (d.mode === 'sex') return 'sex:' + (d.key || '');
+        if (d.mode === 'age') return 'age:' + (d.key || '');
+        if (d.mode === 'sex_age') return 'sex_age:' + (d.key || '');
+        return 'total';
+    }
+
+    function parseDisaggValue(v) {
+        if (!v || v === 'total') return { mode: 'total', key: null };
+        var p = String(v).indexOf(':');
+        if (p < 0) return { mode: 'total', key: null };
+        var mode = String(v).slice(0, p);
+        var key = String(v).slice(p + 1) || null;
+        return { mode: mode, key: key };
+    }
+
+    function getColumnMappingCacheKey() {
+        if (!isExistingMode() || !existingTemplateId || !fileId || !analysisData) return null;
+        var selectedCols = [];
+        document.querySelectorAll('.col-checkbox:checked').forEach(function(cb) {
+            selectedCols.push(parseInt(cb.dataset.colIndex, 10));
+        });
+        selectedCols.sort(function(a, b) { return a - b; });
+        return String(existingTemplateId) + '|' + String(fileId) + '|' + selectedCols.join(',');
+    }
+
+    function invalidateColumnMappingCache() {
+        columnMappingCacheKey = null;
+    }
+
+    function invalidateEntityMatchingCache() {
+        entityMatchingCacheKey = null;
+    }
+
+    function syncApprovalFilterControls() {
+        var hasVal = analysisData && analysisData.validation_status_column_index != null;
+        var subSel = document.getElementById('import-submission-filter');
+        Array.prototype.forEach.call(subSel.options, function(o) {
+            if (o.value !== 'all') o.disabled = !hasVal;
+        });
+        if (!hasVal && subSel.value !== 'all') subSel.value = 'all';
+        var dupSel = document.getElementById('import-dup-strategy');
+        ['latest_approved', 'first_approved'].forEach(function(v) {
+            var o = dupSel.querySelector('option[value="' + v + '"]');
+            if (o) o.disabled = !hasVal;
+        });
+        if (!hasVal && (dupSel.value === 'latest_approved' || dupSel.value === 'first_approved')) {
+            dupSel.value = 'latest';
+        }
+        var hint = document.getElementById('import-submission-filter-hint');
+        if (hint) {
+            if (!analysisData) {
+                hint.classList.remove('text-amber-700');
+                hint.classList.add('text-gray-500');
+            } else {
+                hint.classList.toggle('text-amber-700', !hasVal);
+                hint.classList.toggle('text-gray-500', hasVal);
+            }
+        }
+    }
+
+    function entityMatchCacheKeyParts() {
+        var entityColIdx = parseInt(document.getElementById('entity-column-select').value, 10);
+        var subF = document.getElementById('import-submission-filter').value;
+        if (!fileId || isNaN(entityColIdx)) return null;
+        return String(fileId) + '|' + String(entityColIdx) + '|' + subF;
+    }
+
+    // ── Template mode toggle ────────────────────────────────────────────
+    document.querySelectorAll('input[name="template_mode"]').forEach(function(r) {
+        r.addEventListener('change', function() {
+            templateMode = this.value;
+            var pickerEl = document.getElementById('existing-template-picker');
+            var newLabel = document.getElementById('mode-new-label');
+            var existLabel = document.getElementById('mode-existing-label');
+            if (templateMode === 'existing') {
+                pickerEl.classList.remove('hidden');
+                newLabel.style.background = '';
+                existLabel.style.background = '#eff6ff';
+            } else {
+                pickerEl.classList.add('hidden');
+                existingTemplateId = null;
+                existingTemplateStructure = null;
+                columnItemMappings = [];
+                invalidateColumnMappingCache();
+                newLabel.style.background = '#eff6ff';
+                existLabel.style.background = '';
+            }
+            if (currentStep === 3) {
+                syncConfigurePeriodWraps();
+                enterConfigureStep();
+            }
+        });
+    });
+
+    document.getElementById('existing-template-select').addEventListener('change', function() {
+        existingTemplateId = this.value ? parseInt(this.value, 10) : null;
+        invalidateColumnMappingCache();
+        columnItemMappings = [];
+        existingTemplateStructure = null;
+        templateItemById = {};
+        if (currentStep === 3) {
+            syncConfigurePeriodWraps();
+            enterConfigureStep();
+        }
+    });
+
+    function isExistingMode() {
+        return templateMode === 'existing' && existingTemplateId;
+    }
+
+    function syncConfigurePeriodWraps() {
+        var newWrap = document.getElementById('configure-period-new-wrap');
+        var exWrap = document.getElementById('configure-period-existing-wrap');
+        if (!newWrap || !exWrap) return;
+        if (isExistingMode()) {
+            newWrap.classList.add('hidden');
+            exWrap.classList.remove('hidden');
+        } else {
+            newWrap.classList.remove('hidden');
+            exWrap.classList.add('hidden');
+        }
+    }
+
+    function setConfigureTab(tab) {
+        var keys = ['item', 'country', 'options'];
+        keys.forEach(function(t) {
+            var btn = document.getElementById('configure-tab-' + t);
+            var panel = document.getElementById('configure-panel-' + t);
+            var on = t === tab;
+            if (btn) {
+                btn.classList.toggle('active', on);
+                btn.setAttribute('aria-selected', on ? 'true' : 'false');
+            }
+            if (panel) panel.classList.toggle('hidden', !on);
+        });
+    }
+
+    document.querySelectorAll('[data-configure-tab]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            setConfigureTab(this.getAttribute('data-configure-tab'));
+        });
+    });
+
+    function loadTemplateStructureAndMap() {
+        if (!isExistingMode()) return;
+
+        document.getElementById('new-template-fields').classList.add('hidden');
+        document.getElementById('existing-template-fields').classList.remove('hidden');
+        document.getElementById('mapping-loading').classList.remove('hidden');
+        document.getElementById('mapping-container').classList.add('hidden');
+
+        postJSON(TPL_STRUCTURE_URL, { template_id: existingTemplateId })
+        .then(function(data) {
+            if (!data.success) {
+                invalidateColumnMappingCache();
+                document.getElementById('mapping-loading').innerHTML =
+                    '<span class="text-red-500 text-sm">' + escapeHtml(data.message) + '</span>';
+                return;
+            }
+
+            existingTemplateStructure = data;
+            rebuildTemplateItemLookup();
+            document.getElementById('existing-tpl-name').textContent = data.template_name || 'Template #' + data.template_id;
+
+            var selectedCols = [];
+            document.querySelectorAll('.col-checkbox:checked').forEach(function(cb) {
+                selectedCols.push(parseInt(cb.dataset.colIndex));
+            });
+
+            var koboColumns = [];
+            var allGroups = (analysisData.groups || []);
+            if (analysisData.ungrouped_columns) allGroups = allGroups.concat([{name: '(Ungrouped)', columns: analysisData.ungrouped_columns}]);
+            allGroups.forEach(function(g) {
+                g.columns.forEach(function(col) {
+                    if (selectedCols.indexOf(col.index) !== -1) {
+                        koboColumns.push({
+                            index: col.index,
+                            header: col.header,
+                            label: col.label,
+                            group: col.group || g.name,
+                            detected_type: col.detected_type,
+                        });
+                    }
+                });
+            });
+
+            return postJSON(MAP_COLUMNS_URL, {
+                kobo_columns: koboColumns,
+                template_items: data.items,
+            });
+        })
+        .then(function(mapData) {
+            if (!mapData) return;
+            document.getElementById('mapping-loading').classList.add('hidden');
+            document.getElementById('mapping-container').classList.remove('hidden');
+
+            if (!mapData.success) {
+                invalidateColumnMappingCache();
+                document.getElementById('mapping-container').innerHTML =
+                    '<div class="p-4 text-sm text-red-500">' + escapeHtml(mapData.message) + '</div>';
+                return;
+            }
+
+            columnItemMappings = mapData.mappings;
+            columnItemMappings.forEach(function(m) {
+                if (m.item_id && templateItemById[m.item_id] && templateItemById[m.item_id].show_disagg_mapping) {
+                    m.disagg = defaultDisaggForItem(templateItemById[m.item_id]);
+                } else {
+                    m.disagg = null;
+                }
+            });
+            renderMappingUI();
+            columnMappingCacheKey = getColumnMappingCacheKey();
+        })
+        .catch(function(err) {
+            invalidateColumnMappingCache();
+            document.getElementById('mapping-loading').innerHTML =
+                '<span class="text-red-500 text-sm">Error: ' + escapeHtml(err.message) + '</span>';
+        });
+    }
+
+    function renderMappingUI() {
+        var container = document.getElementById('mapping-container');
+        container.innerHTML = '';
+
+        var itemOptions = '';
+        if (existingTemplateStructure) {
+            (existingTemplateStructure.sections || []).forEach(function(sec) {
+                itemOptions += '<optgroup label="' + escapeHtml(sec.name) + '">';
+                (sec.items || []).forEach(function(it) {
+                    itemOptions += '<option value="' + it.id + '">' + escapeHtml(it.label || 'Item #' + it.id) + '</option>';
+                });
+                itemOptions += '</optgroup>';
+            });
+        }
+
+        var matched = 0;
+        columnItemMappings.forEach(function(m, idx) {
+            var row = document.createElement('div');
+            row.className = 'flex items-start gap-3 px-3 py-2';
+            var confBadge = '';
+            if (m.item_id) {
+                matched++;
+                var confPct = Math.round(m.confidence * 100);
+                var confColor = confPct >= 80 ? 'green' : confPct >= 60 ? 'amber' : 'gray';
+                confBadge = '<span class="text-[10px] px-1.5 py-0.5 rounded bg-' + confColor + '-100 text-' + confColor + '-700">' + confPct + '%</span>';
+            }
+
+            row.innerHTML =
+                '<div class="flex-1 min-w-0">' +
+                    '<div class="text-sm truncate font-medium" title="' + escapeHtml(m.col_label) + '">' + escapeHtml(m.col_label) + '</div>' +
+                    '<div class="text-[10px] text-gray-400 truncate">' + escapeHtml(m.col_group || '') + '</div>' +
+                '</div>' +
+                '<i class="fas fa-long-arrow-alt-right text-gray-300 shrink-0 mt-2"></i>' +
+                '<div class="flex flex-col items-end gap-1 shrink-0" style="max-width: 280px;">' +
+                    '<div class="flex items-center gap-1">' +
+                        confBadge +
+                        '<select class="mapping-item-select border border-gray-200 rounded text-xs py-1 px-2 focus:ring-blue-500" style="max-width: 220px;" data-map-idx="' + idx + '">' +
+                            '<option value="">-- Skip --</option>' +
+                            itemOptions +
+                        '</select>' +
+                    '</div>' +
+                    '<select class="mapping-disagg-select hidden w-full border border-gray-200 rounded text-xs py-1 px-2 focus:ring-blue-500" data-map-idx="' + idx + '" title="Target disaggregation cell">' +
+                    '</select>' +
+                '</div>';
+
+            var itemSel = row.querySelector('.mapping-item-select');
+            var disSel = row.querySelector('.mapping-disagg-select');
+            if (m.item_id) itemSel.value = m.item_id;
+
+            function syncDisaggSelect() {
+                var mm = columnItemMappings[idx];
+                var it = mm.item_id ? templateItemById[mm.item_id] : null;
+                if (it && it.show_disagg_mapping) {
+                    disSel.classList.remove('hidden');
+                    disSel.innerHTML = buildDisaggSelectOptionsHtml(it);
+                    if (!mm.disagg) mm.disagg = defaultDisaggForItem(it);
+                    var enc = encodeDisaggValue(mm.disagg);
+                    if (Array.prototype.some.call(disSel.options, function(o) { return o.value === enc; })) {
+                        disSel.value = enc;
+                    } else {
+                        disSel.selectedIndex = 0;
+                        mm.disagg = parseDisaggValue(disSel.value);
+                    }
+                } else {
+                    disSel.classList.add('hidden');
+                    disSel.innerHTML = '';
+                    mm.disagg = null;
+                }
+            }
+
+            itemSel.addEventListener('change', function() {
+                var val = parseInt(this.value, 10);
+                columnItemMappings[idx].item_id = val || null;
+                if (!columnItemMappings[idx].item_id) {
+                    columnItemMappings[idx].disagg = null;
+                } else if (templateItemById[val] && templateItemById[val].show_disagg_mapping) {
+                    columnItemMappings[idx].disagg = defaultDisaggForItem(templateItemById[val]);
+                } else {
+                    columnItemMappings[idx].disagg = null;
+                }
+                syncDisaggSelect();
+                updateMappingSummary();
+            });
+
+            disSel.addEventListener('change', function() {
+                columnItemMappings[idx].disagg = parseDisaggValue(this.value);
+            });
+
+            syncDisaggSelect();
+            container.appendChild(row);
+        });
+
+        updateMappingSummary();
+    }
+
+    function updateMappingSummary() {
+        var total = columnItemMappings.length;
+        var mapped = columnItemMappings.filter(function(m) { return m.item_id; }).length;
+        document.getElementById('mapping-summary').textContent = mapped + ' of ' + total + ' columns mapped';
+    }
+
+    // ── Helper: collect current wizard config ───────────────────────────
+    function gatherConfig() {
+        var selectedCols = [];
+        document.querySelectorAll('.col-checkbox:checked').forEach(function(cb) {
+            selectedCols.push(parseInt(cb.dataset.colIndex));
+        });
+
+        var entityColIdx = parseInt(document.getElementById('entity-column-select').value);
+        if (!isNaN(entityColIdx) && selectedCols.indexOf(entityColIdx) === -1) {
+            selectedCols.push(entityColIdx);
+        }
+
+        var subTimeIdx = null;
+        (analysisData.skipped_columns || []).forEach(function(sc) {
+            if (sc.header === '_submission_time') subTimeIdx = sc.index;
+        });
+
+        var fullMapping = {};
+        Object.keys(entityMapping).forEach(function(name) {
+            if (entityMapping[name].matched) {
+                fullMapping[name] = {
+                    country_id: entityMapping[name].country_id,
+                    country_name: entityMapping[name].country_name,
+                    matched: true,
+                };
+            }
+        });
+
+        var vsIdx = (analysisData && analysisData.validation_status_column_index != null)
+            ? analysisData.validation_status_column_index
+            : null;
+
+        var cfg = {
+            file_id: fileId,
+            entity_column_index: entityColIdx,
+            columns_to_import: selectedCols,
+            entity_mapping: fullMapping,
+            duplicate_strategy: document.getElementById('import-dup-strategy').value,
+            submission_time_column_index: subTimeIdx,
+            submission_filter: document.getElementById('import-submission-filter').value,
+            validation_status_column_index: vsIdx,
+        };
+
+        if (isExistingMode()) {
+            cfg.existing_template_id = existingTemplateId;
+            cfg.create_template = false;
+            cfg.import_data = true;
+            cfg.template_name = '';
+            cfg.period_name = document.getElementById('import-period-name-existing').value || 'Imported';
+
+            var colItemMap = {};
+            columnItemMappings.forEach(function(m) {
+                if (!m.item_id) return;
+                var it = templateItemById[m.item_id];
+                if (it && it.show_disagg_mapping) {
+                    var d = m.disagg || defaultDisaggForItem(it) || { mode: 'total', key: null };
+                    colItemMap[String(m.col_index)] = { item_id: m.item_id, disagg: d };
+                } else {
+                    colItemMap[String(m.col_index)] = m.item_id;
+                }
+            });
+            cfg.column_to_item_mapping = colItemMap;
+        } else {
+            cfg.create_template = document.getElementById('import-create-template').checked;
+            cfg.import_data = document.getElementById('import-data').checked;
+            cfg.template_name = document.getElementById('import-template-name').value || 'KoBo Data Import';
+            cfg.period_name = document.getElementById('import-period-name').value || 'Imported';
+        }
+
+        return cfg;
+    }
+
+    // ── Step 1: Upload & Analyze ────────────────────────────────────────
+    var fileInput = document.getElementById('kobo-data-file');
+    var uploadZone = document.getElementById('upload-zone');
+    var uploadPlaceholder = document.getElementById('upload-placeholder');
+    var uploadProgress = document.getElementById('upload-progress');
+    var uploadError = document.getElementById('upload-error');
+
+    ['dragenter', 'dragover'].forEach(function(e) {
+        uploadZone.addEventListener(e, function(ev) { ev.preventDefault(); uploadZone.classList.add('border-blue-500', 'bg-blue-50'); });
+    });
+    ['dragleave', 'drop'].forEach(function(e) {
+        uploadZone.addEventListener(e, function(ev) { ev.preventDefault(); uploadZone.classList.remove('border-blue-500', 'bg-blue-50'); });
+    });
+    uploadZone.addEventListener('drop', function(e) {
+        var file = e.dataTransfer.files[0];
+        if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+            var dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files;
+            analyzeFile(file);
+        }
+    });
+    fileInput.addEventListener('change', function() { if (this.files.length > 0) analyzeFile(this.files[0]); });
+
+    function analyzeFile(file) {
+        if (templateMode === 'existing' && !existingTemplateId) {
+            uploadError.textContent = 'Please select an existing template first.';
+            uploadError.classList.remove('hidden');
+            return;
+        }
+        uploadPlaceholder.classList.add('hidden');
+        uploadProgress.classList.remove('hidden');
+        uploadError.classList.add('hidden');
+
+        var fd = new FormData(); fd.append('file', file);
+
+        fetch(ANALYZE_URL, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            uploadProgress.classList.add('hidden');
+            if (!data.success) {
+                uploadPlaceholder.classList.remove('hidden');
+                uploadError.textContent = data.message || 'Analysis failed';
+                uploadError.classList.remove('hidden');
+                return;
+            }
+            analysisData = data;
+            fileId = data.file_id;
+            invalidateColumnMappingCache();
+            invalidateEntityMatchingCache();
+            columnItemMappings = [];
+            existingTemplateStructure = null;
+            templateItemById = {};
+            if (!isExistingMode()) {
+                document.getElementById('import-template-name').value =
+                    file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').substring(0, 60);
+            }
+            renderAnalysis(data);
+            syncApprovalFilterControls();
+            setStep(2);
+        })
+        .catch(function(err) {
+            uploadProgress.classList.add('hidden');
+            uploadPlaceholder.classList.remove('hidden');
+            uploadError.textContent = 'Upload failed: ' + err.message;
+            uploadError.classList.remove('hidden');
+        });
+    }
+
+    // ── Step 2: Render analysis ─────────────────────────────────────────
+    function renderAnalysis(data) {
+        document.getElementById('analysis-summary').textContent =
+            'Detected ' + data.data_column_count + ' data columns in ' + data.groups.length + ' groups, ' +
+            data.total_rows + ' submissions, ' + data.skipped_column_count + ' auto-skipped columns.';
+
+        var entitySelect = document.getElementById('entity-column-select');
+        entitySelect.innerHTML = '<option value="">-- Select entity identifier column --</option>';
+        (data.entity_candidates || []).forEach(function(c) {
+            var opt = document.createElement('option');
+            opt.value = c.index;
+            opt.textContent = c.label + ' (' + c.unique_count + ' unique values)';
+            entitySelect.appendChild(opt);
+        });
+        if (data.entity_candidates && data.entity_candidates.length > 0) {
+            entitySelect.value = data.entity_candidates[0].index;
+            updateNextButton();
+        }
+
+        var container = document.getElementById('groups-container');
+        container.innerHTML = '';
+
+        function renderGroup(group) {
+            var div = document.createElement('div');
+            div.className = 'group-card border border-gray-200 rounded-md';
+            var includedCount = group.columns.filter(function(c) { return c.include; }).length;
+            var totalCount = group.columns.length;
+            div.innerHTML =
+                '<div class="flex items-center justify-between px-4 py-2 bg-gray-50 cursor-pointer rounded-t-md group-header" data-group="' + escapeHtml(group.name) + '">' +
+                    '<div class="flex items-center gap-2">' +
+                        '<i class="fas fa-chevron-right text-gray-400 text-xs transition-transform group-chevron"></i>' +
+                        '<span class="font-medium text-sm text-gray-700">' + escapeHtml(group.name) + '</span>' +
+                        '<span class="text-xs text-gray-400">' + includedCount + '/' + totalCount + ' columns</span>' +
+                    '</div>' +
+                    '<label class="flex items-center gap-1 text-xs" onclick="event.stopPropagation()">' +
+                        '<input type="checkbox" class="group-toggle form-checkbox h-3.5 w-3.5 text-blue-600 rounded" ' + (includedCount > 0 ? 'checked' : '') + ' data-group="' + escapeHtml(group.name) + '">' +
+                        'Include' +
+                    '</label>' +
+                '</div>' +
+                '<div class="group-columns hidden px-4 py-2 space-y-1">' +
+                    group.columns.map(function(col) {
+                        return '<div class="flex items-center justify-between py-1 text-xs border-b border-gray-50">' +
+                            '<label class="flex items-center gap-2 flex-1 min-w-0">' +
+                                '<input type="checkbox" class="col-checkbox form-checkbox h-3.5 w-3.5 text-blue-600 rounded" data-col-index="' + col.index + '" ' + (col.include ? 'checked' : '') + '>' +
+                                '<span class="truncate" title="' + escapeHtml(col.header) + '">' + escapeHtml(col.label) + '</span>' +
+                            '</label>' +
+                            '<div class="flex items-center gap-2 ml-2 shrink-0">' +
+                                (col.disagg_type ? '<span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px]">' + escapeHtml(col.disagg_type) + '</span>' : '') +
+                                '<span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px]">' + escapeHtml(col.detected_type) + '</span>' +
+                                '<span class="text-gray-400" title="' + col.non_null_count + ' values">' + col.non_null_count + '/' + data.total_rows + '</span>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('') +
+                '</div>';
+            container.appendChild(div);
+        }
+
+        (data.groups || []).forEach(renderGroup);
+        if (data.ungrouped_columns && data.ungrouped_columns.length > 0)
+            renderGroup({ name: '(Ungrouped)', columns: data.ungrouped_columns });
+
+        container.addEventListener('click', function(e) {
+            var header = e.target.closest('.group-header');
+            if (header && !e.target.closest('input')) {
+                var cols = header.nextElementSibling;
+                var chevron = header.querySelector('.group-chevron');
+                cols.classList.toggle('hidden');
+                chevron.style.transform = cols.classList.contains('hidden') ? '' : 'rotate(90deg)';
+            }
+        });
+        container.addEventListener('change', function(e) {
+            if (e.target.classList.contains('group-toggle')) {
+                var card = e.target.closest('.group-card');
+                var checked = e.target.checked;
+                card.querySelectorAll('.col-checkbox').forEach(function(cb) { cb.checked = checked; });
+                invalidateColumnMappingCache();
+            }
+            if (e.target.classList.contains('col-checkbox')) {
+                invalidateColumnMappingCache();
+            }
+        });
+
+        var skippedContainer = document.getElementById('skipped-container');
+        skippedContainer.innerHTML = '';
+        document.getElementById('skipped-count').textContent = (data.skipped_columns || []).length;
+        (data.skipped_columns || []).forEach(function(sc) {
+            var d = document.createElement('div');
+            d.textContent = '[' + sc.category + '] ' + (sc.header || '(empty)') + ' — ' + sc.reason;
+            skippedContainer.appendChild(d);
+        });
+
+        document.getElementById('select-all-cols').onclick = function() {
+            container.querySelectorAll('.col-checkbox').forEach(function(cb) { cb.checked = true; });
+            container.querySelectorAll('.group-toggle').forEach(function(cb) { cb.checked = true; });
+            invalidateColumnMappingCache();
+        };
+        document.getElementById('deselect-all-cols').onclick = function() {
+            container.querySelectorAll('.col-checkbox').forEach(function(cb) { cb.checked = false; });
+            container.querySelectorAll('.group-toggle').forEach(function(cb) { cb.checked = false; });
+            invalidateColumnMappingCache();
+        };
+    }
+
+    function updateNextButton() {
+        document.getElementById('go-to-3').disabled = !document.getElementById('entity-column-select').value;
+        if (currentStep >= 2) setStep(currentStep);
+    }
+    document.getElementById('entity-column-select').addEventListener('change', function() {
+        invalidateEntityMatchingCache();
+        updateNextButton();
+    });
+
+    // ── Step 3: Entity matching ─────────────────────────────────────────
+    function startEntityMatching() {
+        var entityColIdx = parseInt(document.getElementById('entity-column-select').value);
+        var importData = isExistingMode() ? true : document.getElementById('import-data').checked;
+        var section = document.getElementById('entity-matching-section');
+        var placeholder = document.getElementById('entity-matching-placeholder');
+        if (!importData || isNaN(entityColIdx)) {
+            section.classList.add('hidden');
+            if (placeholder && !isExistingMode()) placeholder.classList.remove('hidden');
+            return;
+        }
+        if (placeholder) placeholder.classList.add('hidden');
+        section.classList.remove('hidden');
+        document.getElementById('entity-matching-loading').classList.remove('hidden');
+        document.getElementById('entity-matching-container').classList.add('hidden');
+
+        postJSON(MATCH_URL, {
+            entity_column_index: entityColIdx,
+            submission_filter: document.getElementById('import-submission-filter').value,
+            validation_status_column_index: analysisData ? analysisData.validation_status_column_index : null,
+        })
+        .then(function(data) {
+            document.getElementById('entity-matching-loading').classList.add('hidden');
+            document.getElementById('entity-matching-container').classList.remove('hidden');
+            if (!data.success) return;
+            entityMapping = data.entity_mapping || {};
+            allCountries = data.countries || [];
+            renderEntityMatching();
+            var ek = entityMatchCacheKeyParts();
+            if (ek) entityMatchingCacheKey = ek;
+        })
+        .catch(function() {
+            document.getElementById('entity-matching-loading').classList.add('hidden');
+        });
+    }
+
+    function renderEntityMatching() {
+        var list = document.getElementById('entity-match-list');
+        list.innerHTML = '';
+        var names = Object.keys(entityMapping);
+
+        var countryOptions = allCountries.map(function(c) {
+            return '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>';
+        }).join('');
+
+        names.forEach(function(name) {
+            var info = entityMapping[name];
+            var row = document.createElement('div');
+            row.className = 'entity-match flex items-center justify-between px-3 py-2';
+            row.innerHTML =
+                '<div class="flex items-center gap-2 text-sm flex-1 min-w-0">' +
+                    '<i class="fas ' + (info.matched ? 'fa-check-circle text-green-500' : 'fa-question-circle text-amber-400') + '"></i>' +
+                    '<span class="truncate font-medium">' + escapeHtml(name) + '</span>' +
+                    (info.matched ? '<span class="text-xs text-gray-400">&rarr;</span><span class="text-xs text-green-700">' + escapeHtml(info.country_name) + '</span>' : '') +
+                '</div>' +
+                '<div class="shrink-0 ml-2">' +
+                    '<select class="entity-country-select border border-gray-200 rounded text-xs py-1 px-2 focus:ring-blue-500" data-entity="' + escapeHtml(name) + '">' +
+                        '<option value="">-- Skip --</option>' + countryOptions +
+                    '</select>' +
+                '</div>';
+            var sel = row.querySelector('.entity-country-select');
+            if (info.country_id) sel.value = info.country_id;
+            sel.addEventListener('change', function() {
+                var cid = parseInt(this.value);
+                var cobj = allCountries.find(function(c) { return c.id === cid; });
+                entityMapping[name] = { country_id: cid || null, country_name: cobj ? cobj.name : null, matched: !!cid };
+                renderMatchSummary();
+            });
+            list.appendChild(row);
+        });
+        renderMatchSummary();
+    }
+
+    function renderMatchSummary() {
+        var names = Object.keys(entityMapping);
+        var matched = names.filter(function(n) { return entityMapping[n].matched; }).length;
+        document.getElementById('match-summary').textContent = matched + ' of ' + names.length + ' entities matched to countries';
+    }
+
+    document.getElementById('import-data').addEventListener('change', function() {
+        invalidateEntityMatchingCache();
+        if (this.checked) {
+            startEntityMatching();
+        } else {
+            document.getElementById('entity-matching-section').classList.add('hidden');
+            var ph = document.getElementById('entity-matching-placeholder');
+            if (ph) ph.classList.remove('hidden');
+        }
+    });
+
+    document.getElementById('import-submission-filter').addEventListener('change', function() {
+        invalidateEntityMatchingCache();
+        if (currentStep === 3) {
+            var importData = isExistingMode() ? true : document.getElementById('import-data').checked;
+            if (importData) startEntityMatching();
+        }
+    });
+
+    // ── Step 4: Preview (AG Grid) ───────────────────────────────────────
+    function loadPreview() {
+        document.getElementById('preview-loading').classList.remove('hidden');
+        document.getElementById('preview-grid-wrapper').classList.add('hidden');
+        document.getElementById('preview-error').classList.add('hidden');
+
+        var cfg = gatherConfig();
+        cfg.max_rows = 100;
+
+        postJSON(PREVIEW_URL, cfg)
+        .then(function(data) {
+            document.getElementById('preview-loading').classList.add('hidden');
+            if (!data.success) {
+                document.getElementById('preview-error').textContent = data.message || 'Preview failed';
+                document.getElementById('preview-error').classList.remove('hidden');
+                return;
+            }
+
+            var prevParts = [
+                'Showing ' + data.preview_rows + ' of ' + data.after_dedup + ' rows',
+                (data.after_dedup < data.total_rows ? ' (' + data.total_rows + ' total in file before filters)' : ''),
+                '.',
+            ];
+            var rx = data.rows_excluded_by_submission_filter != null
+                ? data.rows_excluded_by_submission_filter
+                : data.rows_excluded_not_approved;
+            if (rx > 0) {
+                prevParts.push(' ' + rx + ' row(s) excluded by submission filter.');
+            }
+            document.getElementById('preview-summary').textContent = prevParts.join('');
+
+            var dedupSection = document.getElementById('preview-dedup-section');
+            var hasDedupDetails = data.duplicates_removed > 0 && data.duplicate_details && data.duplicate_details.length > 0;
+            if (hasDedupDetails) {
+                dedupSection.classList.remove('hidden');
+                document.getElementById('preview-dedup-count').textContent = data.duplicates_removed;
+
+                var strategyLabel = {
+                    latest: 'Strategy: keeping the latest submission per entity (by submission time).',
+                    latest_approved: 'Strategy: among duplicates, keep the latest approved row; if none are approved, keep the latest overall.',
+                    first:  'Strategy: keeping the first submission per entity.',
+                    first_approved: 'Strategy: among duplicates, keep the earliest approved row; if none are approved, keep the first overall.',
+                    all:    'Strategy: keeping all submissions.',
+                };
+                var dupStrategy = document.getElementById('import-dup-strategy').value;
+                var subF = document.getElementById('import-submission-filter').value;
+                var filterNote = subF === 'approved_only' ? ' Only approved rows are included before deduplication.' : '';
+                document.getElementById('dedup-strategy-label').textContent =
+                    (strategyLabel[dupStrategy] || '') + filterNote +
+                    ' Entities with duplicates: ' + data.duplicate_details.length + '.';
+
+                var tbody = document.getElementById('dedup-details-body');
+                tbody.innerHTML = '';
+                data.duplicate_details.forEach(function(d) {
+                    var tr = document.createElement('tr');
+                    var keptInfo = 'Row ' + d.kept_row;
+                    if (d.kept_timestamp) keptInfo += ' (' + d.kept_timestamp.replace('T', ' ').substring(0, 19) + ')';
+                    if (d.fallback_unapproved) keptInfo += ' <span class="text-amber-700">(no approved duplicate; used time order only)</span>';
+
+                    var allRowsText = d.all_rows.map(function(r) {
+                        return r === d.kept_row ? '<strong>' + r + '</strong>' : '' + r;
+                    }).join(', ');
+
+                    tr.innerHTML =
+                        '<td class="py-1.5 pr-3 font-medium text-gray-800">' + escapeHtml(d.entity) + '</td>' +
+                        '<td class="py-1.5 pr-3 text-center">' + d.total_submissions + '</td>' +
+                        '<td class="py-1.5 pr-3 text-center text-amber-700 font-semibold">' + d.removed + '</td>' +
+                        '<td class="py-1.5 pr-3 text-green-700">' + keptInfo + '</td>' +
+                        '<td class="py-1.5 text-gray-500">' + allRowsText + '</td>';
+                    tbody.appendChild(tr);
+                });
+            } else {
+                dedupSection.classList.add('hidden');
+            }
+
+            document.getElementById('preview-grid-wrapper').classList.remove('hidden');
+            renderPreviewGrid(data.columns, data.rows);
+        })
+        .catch(function(err) {
+            document.getElementById('preview-loading').classList.add('hidden');
+            document.getElementById('preview-error').textContent = 'Preview request failed: ' + err.message;
+            document.getElementById('preview-error').classList.remove('hidden');
+        });
+    }
+
+    function renderPreviewGrid(columnDefs, rowData) {
+        if (previewGridApi) {
+            try { previewGridApi.destroy(); } catch(e) {}
+            previewGridApi = null;
+        }
+
+        var wrapCell = { wrapText: true, autoHeight: true };
+        /* Fixed header heights + wrap; long titles scroll inside the header (no unbounded row growth). */
+        var wrapHeader = { wrapHeaderText: true, autoHeaderHeight: false };
+
+        var processedDefs = columnDefs.map(function(cd) {
+            if (cd.children) {
+                return Object.assign({
+                    headerName: cd.headerName,
+                    children: cd.children.map(function(child) {
+                        return Object.assign({
+                            sortable: true,
+                            filter: true,
+                            resizable: true,
+                            minWidth: 120,
+                            tooltipField: child.field,
+                        }, wrapCell, wrapHeader, child);
+                    }),
+                }, wrapHeader);
+            }
+            return Object.assign({
+                sortable: true,
+                filter: true,
+                resizable: true,
+                minWidth: 120,
+                tooltipField: cd.field,
+            }, wrapCell, wrapHeader, cd);
+        });
+
+        // Cell style for unmatched entities
+        var countryCellStyle = function(params) {
+            if (params.value === '(unmatched)') return { color: '#b45309', fontStyle: 'italic' };
+            return null;
+        };
+        processedDefs.forEach(function(cd) {
+            if (cd.field === '_country') cd.cellStyle = countryCellStyle;
+        });
+
+        var gridEl = document.getElementById('previewGrid');
+
+        function schedulePreviewRowHeightRefresh(api) {
+            if (!api || typeof api.resetRowHeights !== 'function') return;
+            requestAnimationFrame(function() {
+                try { api.resetRowHeights(); } catch (e) {}
+            });
+        }
+
+        var gridOptions = {
+            columnDefs: processedDefs,
+            rowData: rowData,
+            headerHeight: 72,
+            groupHeaderHeight: 56,
+            defaultColDef: {
+                sortable: true,
+                filter: true,
+                resizable: true,
+                wrapText: true,
+                autoHeight: true,
+                wrapHeaderText: true,
+                autoHeaderHeight: false,
+            },
+            domLayout: 'normal',
+            enableBrowserTooltips: true,
+            suppressColumnVirtualisation: false,
+            animateRows: true,
+            pagination: true,
+            paginationPageSize: 25,
+            paginationPageSizeSelector: [10, 25, 50, 100],
+            /* autoHeight does not always shrink rows after column width changes */
+            onColumnResized: function(ev) {
+                if (ev && ev.finished) schedulePreviewRowHeightRefresh(ev.api);
+            },
+            onGridSizeChanged: function(ev) {
+                schedulePreviewRowHeightRefresh(ev.api);
+            },
+            onFirstDataRendered: function(ev) {
+                schedulePreviewRowHeightRefresh(ev.api);
+            },
+        };
+
+        previewGridApi = agGrid.createGrid(gridEl, gridOptions);
+    }
+
+    // ── Navigation ──────────────────────────────────────────────────────
+    document.getElementById('back-to-1').onclick = function() {
+        goToWizardStep(1);
+    };
+    document.getElementById('go-to-3').onclick = function() {
+        setStep(3);
+        enterConfigureStep();
+    };
+    document.getElementById('back-to-2').onclick = function() { setStep(2); };
+    document.getElementById('go-to-4').onclick = function() { setStep(4); loadPreview(); };
+    document.getElementById('back-to-3').onclick = function() { setStep(3); };
+
+    // ── Step 5: Execute Import ───────────────────────────────────────────
+    document.getElementById('execute-import').onclick = function() {
+        setStep(5);
+        document.getElementById('import-running').classList.remove('hidden');
+        document.getElementById('import-results').classList.add('hidden');
+
+        postJSON(EXECUTE_URL, gatherConfig())
+        .then(function(data) {
+            document.getElementById('import-running').classList.add('hidden');
+            document.getElementById('import-results').classList.remove('hidden');
+            if (data.success) {
+                document.getElementById('import-success').classList.remove('hidden');
+                document.getElementById('import-failure').classList.add('hidden');
+                document.getElementById('import-message').textContent = data.message;
+
+                var c = data.counts || {};
+                var isExisting = isExistingMode();
+                var sectionLabel = isExisting ? 'Mapped Items' : 'Sections';
+                var itemLabel = isExisting ? 'Columns Used' : 'Questions';
+                var sectionVal = isExisting ? (c.items || 0) : (c.sections || 0);
+                var itemVal = isExisting ? (c.items || 0) : (c.items || 0);
+                document.getElementById('import-stats').innerHTML =
+                    '<div class="bg-blue-50 rounded-md p-3 text-center"><i class="fas fa-layer-group text-blue-600 mb-1"></i><div class="text-xl font-bold text-blue-700">' + sectionVal + '</div><div class="text-xs text-blue-600">' + sectionLabel + '</div></div>' +
+                    '<div class="bg-blue-50 rounded-md p-3 text-center"><i class="fas fa-question-circle text-blue-600 mb-1"></i><div class="text-xl font-bold text-blue-700">' + itemVal + '</div><div class="text-xs text-blue-600">' + itemLabel + '</div></div>' +
+                    '<div class="bg-green-50 rounded-md p-3 text-center"><i class="fas fa-globe text-green-600 mb-1"></i><div class="text-xl font-bold text-green-700">' + (c.assignments || 0) + '</div><div class="text-xs text-green-600">Entities</div></div>' +
+                    '<div class="bg-green-50 rounded-md p-3 text-center"><i class="fas fa-database text-green-600 mb-1"></i><div class="text-xl font-bold text-green-700">' + (c.data_entries || 0) + '</div><div class="text-xs text-green-600">Data Entries</div></div>';
+
+                var warnList = document.getElementById('import-warnings-list');
+                warnList.innerHTML = '';
+                var rxImp = c.rows_excluded_by_submission_filter != null
+                    ? c.rows_excluded_by_submission_filter
+                    : (c.rows_excluded_not_approved || 0);
+                if ((data.warnings || []).length > 0 || c.skipped_entities > 0 || c.duplicate_rows_skipped > 0 || rxImp > 0) {
+                    document.getElementById('import-warnings').classList.remove('hidden');
+                    (data.warnings || []).slice(0, 20).forEach(function(w) { warnList.innerHTML += '<li>' + escapeHtml(w) + '</li>'; });
+                    if (c.duplicate_rows_skipped > 0) warnList.innerHTML += '<li>' + c.duplicate_rows_skipped + ' duplicate submission rows were skipped.</li>';
+                    if (rxImp > 0) {
+                        warnList.innerHTML += '<li>' + rxImp + ' row(s) excluded by the submission filter (validation status).</li>';
+                    }
+                }
+
+                var tplId = data.template_id || (isExistingMode() ? existingTemplateId : null);
+                if (tplId) {
+                    // Do not use .replace('0', id): the first "0" may be in the host:port (e.g. :5000), not template_id.
+                    document.getElementById('link-edit-template').href = EDIT_TPL_URL.replace(
+                        /(\/templates\/edit\/)\d+(?=[?#/]|$)/,
+                        '$1' + String(tplId)
+                    );
+                }
+            } else {
+                document.getElementById('import-success').classList.add('hidden');
+                document.getElementById('import-failure').classList.remove('hidden');
+                document.getElementById('import-error-message').textContent = data.message || 'Unknown error';
+            }
+        })
+        .catch(function(err) {
+            document.getElementById('import-running').classList.add('hidden');
+            document.getElementById('import-results').classList.remove('hidden');
+            document.getElementById('import-success').classList.add('hidden');
+            document.getElementById('import-failure').classList.remove('hidden');
+            document.getElementById('import-error-message').textContent = 'Request failed: ' + err.message;
+        });
+    };
+
+    document.getElementById('retry-import').onclick = function() { setStep(4); loadPreview(); };
+
+    document.getElementById('import-another').onclick = function() {
+        analysisData = null; fileId = null; entityMapping = {};
+        existingTemplateStructure = null; columnItemMappings = [];
+        invalidateColumnMappingCache();
+        invalidateEntityMatchingCache();
+        templateItemById = {};
+        document.getElementById('import-submission-filter').value = 'all';
+        document.getElementById('import-dup-strategy').value = 'latest';
+        fileInput.value = '';
+        uploadPlaceholder.classList.remove('hidden');
+        uploadError.classList.add('hidden');
+        document.getElementById('import-results').classList.add('hidden');
+        document.getElementById('import-success').classList.add('hidden');
+        document.getElementById('import-failure').classList.add('hidden');
+        document.getElementById('import-warnings').classList.add('hidden');
+        if (previewGridApi) { try { previewGridApi.destroy(); } catch(e) {} previewGridApi = null; }
+        maxReachedStep = 1;
+        setStep(1);
+    };
+});
+</script>
+{% endblock %}

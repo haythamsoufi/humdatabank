@@ -1,0 +1,1026 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style nonce="{{ csp_style_nonce() }}">
+    /* ── layout ── */
+    .emb-page { position: relative; }
+    .emb-page.fullscreen {
+        width: 100vw; height: 100vh; padding: 0 !important;
+        background: var(--emb-bg); overflow: hidden;
+        display: flex; flex-direction: column;
+    }
+    .emb-page.fullscreen .emb-header-area { display: none; }
+    .emb-page.fullscreen .emb-toolbar { border-radius: 0; margin: 0; border-left: 0; border-right: 0; flex-shrink: 0; }
+    .emb-page.fullscreen .emb-legend { margin: 0 0.75rem; flex-shrink: 0; }
+    .emb-page.fullscreen .emb-viewport { border-radius: 0; flex: 1; height: auto; min-height: 0; }
+    .emb-page.fullscreen .emb-status { margin: 0 1rem; flex-shrink: 0; }
+
+    /* ── theme vars ── */
+    .emb-page {
+        --emb-bg: #fff; --emb-border: #e5e7eb; --emb-text: #374151; --emb-text2: #6b7280;
+        --emb-surface: #fff; --emb-surface2: #f9fafb;
+        --emb-vp-bg: radial-gradient(ellipse at center, #0f172a 0%, #020617 100%);
+        --emb-vp-clear: 0x020617; --emb-grid1: 0x1e293b; --emb-grid2: 0x0f172a; --emb-fog: 0x020617;
+        --emb-tt-bg: rgba(15,23,42,0.95); --emb-tt-text: #f1f5f9; --emb-tt-border: rgba(99,102,241,0.3);
+        --emb-panel-bg: rgba(15,23,42,0.96); --emb-panel-border: rgba(99,102,241,0.25); --emb-panel-text: #e2e8f0;
+        --emb-panel-heading: #c7d2fe; --emb-panel-meta: #94a3b8; --emb-panel-link: #818cf8;
+        --emb-hint-color: rgba(255,255,255,0.4); --emb-hud-color: rgba(255,255,255,0.6);
+        --emb-2d-bg: #fafbfc; --emb-2d-text: #111827; --emb-2d-grid: #e5e7eb;
+    }
+    .emb-page.theme-light {
+        --emb-vp-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        --emb-vp-clear: 0xf1f5f9; --emb-grid1: 0xdde3ea; --emb-grid2: 0xeef2f6; --emb-fog: 0xf1f5f9;
+        --emb-tt-bg: rgba(255,255,255,0.96); --emb-tt-text: #1e293b; --emb-tt-border: rgba(0,0,0,0.1);
+        --emb-panel-bg: rgba(255,255,255,0.97); --emb-panel-border: rgba(0,0,0,0.08); --emb-panel-text: #334155;
+        --emb-panel-heading: #1e293b; --emb-panel-meta: #64748b; --emb-panel-link: #4f46e5;
+        --emb-hint-color: rgba(0,0,0,0.35); --emb-hud-color: rgba(0,0,0,0.45);
+        --emb-2d-bg: #fff; --emb-2d-text: #111827; --emb-2d-grid: #f1f5f9;
+    }
+
+    .emb-viewport {
+        width: 100%; height: calc(100vh - 240px); min-height: 500px;
+        border-radius: 12px; overflow: hidden; position: relative;
+        background: var(--emb-vp-bg);
+        box-shadow: 0 4px 24px rgba(0,0,0,0.15); border: 1px solid var(--emb-border);
+    }
+    .emb-viewport canvas { display: block; width: 100%; height: 100%; }
+
+    /* ── toolbar ── */
+    .emb-toolbar {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+        margin-bottom: 0.5rem; padding: 0.5rem 0.75rem;
+        background: var(--emb-surface); border: 1px solid var(--emb-border); border-radius: 8px;
+    }
+    .emb-toolbar label { font-weight: 600; font-size: 0.75rem; color: var(--emb-text); white-space: nowrap; }
+    .emb-toolbar select, .emb-toolbar input[type=text] {
+        padding: 0.25rem 0.5rem; border: 1px solid var(--emb-border); border-radius: 6px; font-size: 0.75rem; background: var(--emb-surface2);
+    }
+    .emb-toolbar input[type=text] { width: 160px; }
+    .emb-sep { width: 1px; height: 22px; background: var(--emb-border); margin: 0 0.15rem; }
+    .emb-btn { padding: 0.3rem 0.7rem; border: none; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .emb-btn-primary { background: #dc2626; color: #fff; }
+    .emb-btn-primary:hover { background: #b91c1c; }
+    .emb-btn-icon { background: transparent; color: var(--emb-text2); border: 1px solid var(--emb-border); width: 30px; height: 30px; padding: 0; justify-content: center; }
+    .emb-btn-icon:hover { background: var(--emb-surface2); }
+    .emb-btn-icon.active { background: #eef2ff; color: #4f46e5; border-color: #a5b4fc; }
+    .emb-toggle-group { display: inline-flex; border: 1px solid var(--emb-border); border-radius: 6px; overflow: hidden; }
+    .emb-toggle-group button { border: none; background: var(--emb-surface2); color: var(--emb-text2); padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.12s; }
+    .emb-toggle-group button.active { background: #4f46e5; color: #fff; }
+    .emb-toggle-group button:not(:last-child) { border-right: 1px solid var(--emb-border); }
+
+    /* ── legend ── */
+    .emb-legend { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem; font-size: 0.7rem; color: var(--emb-text2); }
+    .emb-legend-item { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; padding: 1px 6px; border-radius: 4px; transition: opacity 0.15s; }
+    .emb-legend-item:hover { background: var(--emb-surface2); }
+    .emb-legend-item.dimmed { opacity: 0.2; }
+    .emb-legend-toggle { font-weight: 600; color: var(--emb-text); border: 1px solid var(--emb-border); border-radius: 4px; padding: 1px 8px; }
+    .emb-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── overlays inside viewport ── */
+    .emb-controls-hint { position: absolute; top: 10px; left: 10px; z-index: 20; color: var(--emb-hint-color); font-size: 0.65rem; pointer-events: none; line-height: 1.5; }
+    .emb-hud { position: absolute; bottom: 12px; left: 12px; z-index: 20; color: var(--emb-hud-color); font-size: 0.7rem; pointer-events: none; }
+
+    .emb-tooltip {
+        position: absolute; z-index: 50; pointer-events: none;
+        background: var(--emb-tt-bg); color: var(--emb-tt-text); padding: 10px 14px;
+        border-radius: 10px; font-size: 0.78rem; line-height: 1.45;
+        max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+        border: 1px solid var(--emb-tt-border);
+        opacity: 0; transition: opacity 0.1s; backdrop-filter: blur(8px);
+    }
+    .emb-tooltip.visible { opacity: 1; }
+    .emb-tooltip .tt-name { font-weight: 700; font-size: 0.84rem; margin-bottom: 3px; }
+    .emb-tooltip .tt-meta { opacity: 0.7; font-size: 0.72rem; }
+    .emb-tooltip .tt-def { margin-top: 3px; opacity: 0.6; font-size: 0.7rem; }
+
+    .emb-detail {
+        position: absolute; top: 10px; right: 10px; z-index: 40;
+        width: 290px; max-height: calc(100% - 20px); overflow-y: auto;
+        background: var(--emb-panel-bg); border: 1px solid var(--emb-panel-border);
+        border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        color: var(--emb-panel-text); font-size: 0.78rem; display: none;
+        backdrop-filter: blur(12px);
+    }
+    .emb-detail.open { display: block; }
+    .emb-detail-header { padding: 10px 14px; border-bottom: 1px solid var(--emb-panel-border); display: flex; justify-content: space-between; align-items: start; }
+    .emb-detail-header h3 { font-weight: 700; font-size: 0.85rem; margin: 0; color: var(--emb-panel-heading); }
+    .emb-detail-close { background: none; border: none; cursor: pointer; color: var(--emb-panel-meta); font-size: 1.1rem; padding: 0; line-height: 1; }
+    .emb-detail-close:hover { color: var(--emb-panel-text); }
+    .emb-detail-body { padding: 10px 14px; }
+    .emb-detail-body .meta-row { margin-bottom: 2px; color: var(--emb-panel-meta); }
+    .emb-detail-body .meta-label { font-weight: 600; color: var(--emb-panel-heading); }
+    .emb-nbr-list { list-style: none; padding: 0; margin: 6px 0 0 0; }
+    .emb-nbr-list li { padding: 4px 6px; margin-bottom: 1px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; }
+    .emb-nbr-list li:hover { background: rgba(99,102,241,0.12); }
+    .emb-nbr-sim { font-size: 0.65rem; font-weight: 600; padding: 1px 5px; border-radius: 4px; background: rgba(99,102,241,0.15); color: var(--emb-panel-link); }
+
+    .emb-status { font-size: 0.75rem; color: var(--emb-text2); margin-top: 0.35rem; }
+    .emb-status.error { color: #b91c1c; }
+
+    .emb-loader {
+        position: absolute; inset: 0; z-index: 60;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: rgba(2,6,23,0.8); backdrop-filter: blur(6px);
+        opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    }
+    .emb-page.theme-light .emb-loader { background: rgba(241,245,249,0.85); }
+    .emb-loader.visible { opacity: 1; pointer-events: auto; }
+    .emb-loader-spinner {
+        width: 36px; height: 36px; border: 3px solid rgba(99,102,241,0.2);
+        border-top-color: #6366f1; border-radius: 50%;
+        animation: emb-spin 0.8s linear infinite;
+    }
+    .emb-loader-text {
+        margin-top: 12px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em;
+        color: rgba(255,255,255,0.7);
+    }
+    .emb-page.theme-light .emb-loader-text { color: rgba(30,41,59,0.7); }
+    @keyframes emb-spin { to { transform: rotate(360deg); } }
+</style>
+
+<div class="container mx-auto px-4 py-3 emb-page" id="emb-page">
+    <div class="emb-header-area">
+    {% from "components/_page_header.html" import page_header %}
+    {{ page_header(
+        title=title,
+        icon='fas fa-project-diagram',
+        info_tooltip='Visualise all Indicator Bank entries as AI-generated vector embeddings. Indicators with similar meaning cluster together, helping you spot duplicates, find gaps, and explore thematic groupings across sectors and programmes.',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+            {'name': title}
+        ],
+        actions=[
+            {
+                'type': 'link',
+                'text': _('Back to Indicator Bank'),
+                'url': url_for('system_admin.manage_indicator_bank'),
+                'icon': 'fas fa-arrow-left',
+                'classes': 'professional-action-btn'
+            }
+        ]
+    ) }}
+    </div>
+
+    <div class="emb-toolbar" id="emb-toolbar">
+        {# ── dimension toggle ── #}
+        <div class="emb-toggle-group" id="emb-dim-toggle">
+            <button data-dim="2d">2D</button>
+            <button data-dim="3d" class="active">3D</button>
+        </div>
+        <div class="emb-sep"></div>
+        <label title="{{ _('How to project high-dimensional embeddings onto the screen') }}">{{ _('Projection') }}</label>
+        <select id="emb-method" title="{{ _('PCA: fast overview preserving overall spread. t-SNE: slower but groups similar indicators closer together.') }}"><option value="pca" selected title="{{ _('Fast overview — preserves the overall spread of indicators') }}">PCA</option><option value="tsne" title="{{ _('Slower but groups similar indicators closer together — better for spotting clusters') }}">t-SNE</option></select>
+        <div class="emb-sep"></div>
+        <label>{{ _('Search') }}</label>
+        <input type="text" id="emb-search" placeholder="{{ _('Filter…') }}">
+        <div class="emb-sep"></div>
+        <label>{{ _('Probe') }}</label>
+        <input type="text" id="emb-probe-input" placeholder="{{ _('Test a query…') }}" style="width:180px">
+        <button type="button" id="emb-probe-btn" class="emb-btn emb-btn-icon" title="{{ _('Embed query and place on map') }}" style="width:auto;padding:0.25rem 0.5rem"><i class="fas fa-crosshairs"></i></button>
+        <button type="button" id="emb-probe-clear" class="emb-btn emb-btn-icon" title="{{ _('Clear probe') }}" style="display:none;width:auto;padding:0.25rem 0.5rem"><i class="fas fa-times"></i></button>
+        <div class="emb-sep"></div>
+        <label>{{ _('Color') }}</label>
+        <select id="emb-color-by">
+            <option value="group" selected>{{ _('Type') }}</option>
+            <option value="sector">{{ _('Sector') }}</option>
+            <option value="sub_sector">{{ _('Sub-sector') }}</option>
+            <option value="unit">{{ _('Unit') }}</option>
+            <option value="program">{{ _('Programme') }}</option>
+            <option value="emergency_label">{{ _('Emergency') }}</option>
+            <option value="kpi_code">{{ _('FDRS KPI Code') }}</option>
+        </select>
+        <div class="emb-sep"></div>
+        <button type="button" id="emb-load" class="emb-btn emb-btn-primary">{{ _('Load') }}</button>
+        {# ── icon buttons ── #}
+        <button type="button" id="emb-reset" class="emb-btn emb-btn-icon" title="{{ _('Reset camera') }}"><i class="fas fa-sync-alt"></i></button>
+        <button type="button" id="emb-auto-rotate" class="emb-btn emb-btn-icon active" title="{{ _('Auto-rotate (3D)') }}"><i class="fas fa-redo"></i></button>
+        <div class="emb-sep"></div>
+        {# ── theme toggle ── #}
+        <div class="emb-toggle-group" id="emb-theme-toggle">
+            <button data-theme="dark" class="active"><i class="fas fa-moon"></i></button>
+            <button data-theme="light"><i class="fas fa-sun"></i></button>
+        </div>
+        {# ── fullscreen ── #}
+        <button type="button" id="emb-fullscreen" class="emb-btn emb-btn-icon" title="{{ _('Fullscreen') }}"><i class="fas fa-expand"></i></button>
+        <div class="emb-sep"></div>
+        {# ── guide ── #}
+        <button type="button" id="emb-guide-btn" class="emb-btn" style="font-size:0.7rem;gap:0.25rem" title="{{ _('How does this work?') }}"><i class="fas fa-question-circle"></i> {{ _('How does this work?') }}</button>
+    </div>
+
+    <div class="emb-guide" id="emb-guide" style="display:none;margin-bottom:0.5rem;padding:1rem 1.25rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:0.82rem;color:#334155;line-height:1.65">
+        <style nonce="{{ csp_style_nonce() }}">.emb-guide.open{display:block!important} .emb-guide h4{font-weight:700;font-size:0.88rem;color:#1e293b;margin:0 0 0.4rem 0} .emb-guide h5{font-weight:700;font-size:0.82rem;color:#334155;margin:0.8rem 0 0.25rem 0} .emb-guide ul{margin:0.2rem 0 0.5rem 1.2rem;padding:0} .emb-guide li{margin-bottom:0.2rem} .emb-guide .emb-guide-cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem} @media(max-width:768px){.emb-guide .emb-guide-cols{grid-template-columns:1fr}}</style>
+        <h4><i class="fas fa-project-diagram" style="color:#4f46e5;margin-right:0.3rem"></i> {{ _('Indicators Neural Map Guide') }}</h4>
+        <p>{{ _('Each dot represents one indicator from the Indicator Bank. Indicators are positioned based on their <strong>AI-generated vector embeddings</strong> — numerical representations of their name and definition produced by a language model. Indicators that are semantically similar are placed closer together.') }}</p>
+        <div class="emb-guide-cols">
+            <div>
+                <h5><i class="fas fa-lightbulb" style="color:#d97706"></i> {{ _('What you can do') }}</h5>
+                <ul>
+                    <li>{{ _('<strong>Discover duplicates</strong> — indicators clustered tightly may overlap in meaning') }}</li>
+                    <li>{{ _('<strong>Find gaps</strong> — sparse areas may indicate missing coverage') }}</li>
+                    <li>{{ _('<strong>Explore clusters</strong> — colour by sector, programme, or type to see how indicators group') }}</li>
+                    <li>{{ _('<strong>Check similarity</strong> — click any dot to see its top semantically similar indicators with similarity scores') }}</li>
+                </ul>
+                <h5><i class="fas fa-mouse-pointer" style="color:#2563eb"></i> {{ _('Controls') }}</h5>
+                <ul>
+                    <li><strong>{{ _('Click') }}</strong> {{ _('a dot to select it and see similar indicators') }}</li>
+                    <li><strong>{{ _('Double-click') }}</strong> {{ _('to open the indicator detail page') }}</li>
+                    <li><strong>{{ _('Drag') }}</strong> {{ _('to rotate (3D) or pan (2D)') }}</li>
+                    <li><strong>{{ _('Scroll') }}</strong> {{ _('to zoom in/out') }}</li>
+                    <li><strong>{{ _('Legend') }}</strong> {{ _('— click categories to show/hide; use All/None for bulk control') }}</li>
+                    <li><strong>{{ _('Search') }}</strong> {{ _('— type to filter and dim non-matching indicators') }}</li>
+                </ul>
+            </div>
+            <div>
+                <h5><i class="fas fa-cog" style="color:#059669"></i> {{ _('Toolbar options') }}</h5>
+                <ul>
+                    <li><strong>2D / 3D</strong> {{ _('— switch between a flat canvas and an interactive 3D scene') }}</li>
+                    <li><strong>PCA</strong> {{ _('— fast projection that preserves overall spread. Good for a quick overview') }}</li>
+                    <li><strong>t-SNE</strong> {{ _('— slower projection that preserves local neighborhoods. Better for seeing tight clusters') }}</li>
+                    <li><strong>{{ _('Colour') }}</strong> {{ _('— change colouring to Type, Sector, Sub-sector, Unit, Programme, Emergency, or KPI Code') }}</li>
+                    <li><strong>{{ _('Probe') }}</strong> {{ _('— type any text, click <i class="fas fa-crosshairs"></i> to embed it and see where it would land among existing indicators. Useful for testing whether a new indicator already has close matches') }}</li>
+                </ul>
+                <h5><i class="fas fa-exclamation-triangle" style="color:#dc2626"></i> {{ _('Why do similar indicators sometimes appear far apart?') }}</h5>
+                <p>{{ _('Embeddings live in a <strong>1,536-dimensional</strong> space. Projecting that down to 2 or 3 dimensions inevitably loses information — like flattening a globe into a 2D map where some distances get distorted. Two indicators may be very close in the original space but end up far apart in the projection. The <strong>similarity scores</strong> shown in the detail panel are always calculated in the full-dimensional space, so they are accurate regardless of where dots appear on screen.') }}</p>
+                <p>{{ _('<strong>Tip:</strong> Switch to <em>t-SNE</em> for better local grouping — it specifically optimises for keeping neighbours together, reducing the "distant but similar" effect.') }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="emb-legend" id="emb-legend"></div>
+
+    <div class="emb-viewport" id="emb-viewport">
+        <div class="emb-controls-hint" id="emb-hint"></div>
+        <div class="emb-tooltip" id="emb-tooltip"></div>
+        <div class="emb-detail" id="emb-detail">
+            <div class="emb-detail-header">
+                <h3 id="emb-detail-title"></h3>
+                <button class="emb-detail-close" id="emb-detail-close">&times;</button>
+            </div>
+            <div class="emb-detail-body" id="emb-detail-body"></div>
+        </div>
+        <div class="emb-hud" id="emb-hud"></div>
+        <div class="emb-loader" id="emb-loader">
+            <div class="emb-loader-spinner"></div>
+            <div class="emb-loader-text" id="emb-loader-text">Loading…</div>
+        </div>
+    </div>
+    <p class="emb-status" id="emb-status"></p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('libs/three.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    /* ═══════════ REFS ═══════════ */
+    var page     = document.getElementById('emb-page');
+    var viewport = document.getElementById('emb-viewport');
+    var tooltip  = document.getElementById('emb-tooltip');
+    var statusEl = document.getElementById('emb-status');
+    var legendEl = document.getElementById('emb-legend');
+    var hudEl    = document.getElementById('emb-hud');
+    var hintEl   = document.getElementById('emb-hint');
+    var detail   = document.getElementById('emb-detail');
+    var detailTitle = document.getElementById('emb-detail-title');
+    var detailBody  = document.getElementById('emb-detail-body');
+    var searchInput = document.getElementById('emb-search');
+    var loaderEl   = document.getElementById('emb-loader');
+    var loaderText = document.getElementById('emb-loader-text');
+    var DATA_URL = '{{ url_for("system_admin.indicator_bank_neural_map_data") }}';
+    var VIEW_URL = '{{ url_for("system_admin.view_indicator_bank", id=0) }}';
+    var PROBE_URL = '{{ url_for("system_admin.indicator_bank_neural_map_probe") }}';
+    var probeInput = document.getElementById('emb-probe-input');
+    var probeBtn   = document.getElementById('emb-probe-btn');
+    var probeClear = document.getElementById('emb-probe-clear');
+
+    /* ═══════════ STATE ═══════════ */
+    var nodes = [], nodeById = {};
+    var palette3D_dark  = [0xf87171,0x60a5fa,0x34d399,0xfbbf24,0xa78bfa,0x22d3ee,0xa3e635,0xf472b6,0x818cf8,0x2dd4bf,0xfb923c,0xc084fc];
+    var palette3D_light = [0xdc2626,0x2563eb,0x059669,0xd97706,0x7c3aed,0x0891b2,0x65a30d,0xbe185d,0x4338ca,0x0d9488,0xea580c,0x6d28d9];
+    var palette3D  = palette3D_dark;
+    var paletteCSS_dark  = ['#f87171','#60a5fa','#34d399','#fbbf24','#a78bfa','#22d3ee','#a3e635','#f472b6','#818cf8','#2dd4bf','#fb923c','#c084fc'];
+    var paletteCSS_light = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed','#0891b2','#65a30d','#be185d','#4338ca','#0d9488','#ea580c','#6d28d9'];
+    var paletteCSS = paletteCSS_dark;
+    var groupColors = {}, groupColorIdx = {};
+    var selectedId = null, hoveredIdx = -1, highlightedNbrId = null;
+    var hiddenGroups = {}, colorBy = 'group';
+    var mode = '3d';          // '2d' | '3d'
+    var theme = 'dark';       // 'dark' | 'light'
+    var autoRotate = true;
+    var isFullscreen = false;
+    var probeActive = false;
+    var probeNeighbors = [];   // [{id, similarity}]
+    var probeLabel = '';
+    var probePos = null;       // {x, y, z?} computed as weighted centroid
+
+    /* ═══════════ THEME ═══════════ */
+    function applyTheme(t) {
+        theme = t;
+        palette3D = t === 'light' ? palette3D_light : palette3D_dark;
+        paletteCSS = t === 'light' ? paletteCSS_light : paletteCSS_dark;
+        page.classList.toggle('theme-light', t === 'light');
+        document.querySelectorAll('#emb-theme-toggle button').forEach(function(b) { b.classList.toggle('active', b.dataset.theme === t); });
+        if (nodes.length) { buildGroupColors(); buildLegend(); }
+        if (mode === '3d' && renderer) {
+            var cc = t === 'light' ? 0xf1f5f9 : 0x020617;
+            renderer.setClearColor(cc);
+            if (scene.fog) scene.fog.color.set(cc);
+            rebuildGrid();
+            if (nodes.length) buildScene3D();
+        }
+        if (mode === '2d') draw2D();
+    }
+    document.querySelectorAll('#emb-theme-toggle button').forEach(function(b) {
+        b.addEventListener('click', function() { applyTheme(this.dataset.theme); });
+    });
+
+    /* ═══════════ FULLSCREEN ═══════════ */
+    var fsBtn = document.getElementById('emb-fullscreen');
+    function syncFullscreenState() {
+        var active = !!document.fullscreenElement;
+        isFullscreen = active;
+        page.classList.toggle('fullscreen', active);
+        fsBtn.querySelector('i').className = active ? 'fas fa-compress' : 'fas fa-expand';
+        setTimeout(function() { if (mode === '3d') onResize3D(); else resize2D(); }, 80);
+    }
+    fsBtn.addEventListener('click', function() {
+        if (!document.fullscreenElement) {
+            page.requestFullscreen().catch(function() {});
+        } else {
+            document.exitFullscreen().catch(function() {});
+        }
+    });
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+
+    /* ═══════════ DIMENSION TOGGLE ═══════════ */
+    document.querySelectorAll('#emb-dim-toggle button').forEach(function(b) {
+        b.addEventListener('click', function() {
+            var newMode = this.dataset.dim;
+            if (newMode === mode) return;
+            document.querySelectorAll('#emb-dim-toggle button').forEach(function(x) { x.classList.toggle('active', x.dataset.dim === newMode); });
+            mode = newMode;
+            switchMode();
+        });
+    });
+    function switchMode() {
+        hideDetail(); hideTooltip();
+        updateHint();
+        document.getElementById('emb-auto-rotate').style.display = mode === '3d' ? '' : 'none';
+        if (nodes.length) loadData();
+    }
+    function updateHint() {
+        var common = '<br><i class="fas fa-external-link-alt"></i> Double-click: open indicator';
+        if (mode === '3d') hintEl.innerHTML = '<i class="fas fa-mouse-pointer"></i> Click: select &amp; show similar<br><i class="fas fa-arrows-alt"></i> Drag: rotate<br><i class="fas fa-search-plus"></i> Scroll: zoom' + common;
+        else hintEl.innerHTML = '<i class="fas fa-mouse-pointer"></i> Click: select &amp; show similar<br><i class="fas fa-hand-paper"></i> Drag: pan<br><i class="fas fa-search-plus"></i> Scroll: zoom' + common;
+    }
+    updateHint();
+
+    /* ═════════════════════════════════════════
+       ██  3D ENGINE (THREE.JS)
+       ═════════════════════════════════════════ */
+    var scene, camera, renderer, pointsMesh, glowMesh, edgeLines, gridHelper;
+    var raycaster = new THREE.Raycaster(); raycaster.params.Points.threshold = 2.0;
+    var mouse3D = new THREE.Vector2();
+    var orbit = { theta: 0.8, phi: 0.9, radius: 140, target: new THREE.Vector3() };
+    var orbitDrag = { active: false, prevX: 0, prevY: 0 };
+    var threeInited = false;
+
+    function initThree() {
+        if (threeInited) return;
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(theme === 'light' ? 0xf1f5f9 : 0x020617, 0.0015);
+        camera = new THREE.PerspectiveCamera(60, viewport.clientWidth / viewport.clientHeight, 0.1, 2000);
+        updateCameraFromOrbit();
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setClearColor(theme === 'light' ? 0xf1f5f9 : 0x020617);
+        scene.add(new THREE.AmbientLight(0x334155, 0.5));
+        rebuildGrid();
+        threeInited = true;
+        animate3D();
+    }
+    function rebuildGrid() {
+        if (gridHelper) scene.remove(gridHelper);
+        var c1 = theme === 'light' ? 0xdde3ea : 0x1e293b;
+        var c2 = theme === 'light' ? 0xeef2f6 : 0x0f172a;
+        gridHelper = new THREE.GridHelper(300, 30, c1, c2);
+        gridHelper.position.y = -80;
+        scene.add(gridHelper);
+    }
+    function show3D() {
+        initThree();
+        var old2d = viewport.querySelector('.emb-2d-canvas');
+        if (old2d) old2d.remove();
+        /* sync theme to renderer */
+        var cc = theme === 'light' ? 0xf1f5f9 : 0x020617;
+        renderer.setClearColor(cc);
+        if (scene.fog) scene.fog.color.set(cc);
+        rebuildGrid();
+        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+        if (!viewport.contains(renderer.domElement)) viewport.insertBefore(renderer.domElement, viewport.firstChild);
+        renderer.domElement.style.display = '';
+        onResize3D();
+    }
+    function hide3D() { if (renderer && renderer.domElement) renderer.domElement.style.display = 'none'; }
+    function updateCameraFromOrbit() {
+        if (!camera) return;
+        camera.position.set(
+            orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta),
+            orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+            orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta));
+        camera.lookAt(orbit.target);
+    }
+    function onResize3D() {
+        if (!renderer) return;
+        var w = viewport.clientWidth, h = viewport.clientHeight;
+        camera.aspect = w / h; camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+    }
+    var clock3D = new THREE.Clock();
+    function animate3D() {
+        requestAnimationFrame(animate3D);
+        if (mode !== '3d') return;
+        if (autoRotate) { orbit.theta += (hoveredIdx >= 0 ? 0.0003 : 0.002); updateCameraFromOrbit(); }
+        var t = clock3D.getElapsedTime();
+        if (pointsMesh && pointsMesh.material.uniforms.uTime) pointsMesh.material.uniforms.uTime.value = t;
+        if (glowMesh && glowMesh.material.uniforms.uTime) glowMesh.material.uniforms.uTime.value = t;
+        if (renderer && scene && camera) renderer.render(scene, camera);
+    }
+    function buildScene3D() {
+        if (pointsMesh) { scene.remove(pointsMesh); pointsMesh.geometry.dispose(); pointsMesh.material.dispose(); pointsMesh = null; }
+        if (glowMesh) { scene.remove(glowMesh); glowMesh.geometry.dispose(); glowMesh.material.dispose(); glowMesh = null; }
+        if (edgeLines) { scene.remove(edgeLines); edgeLines.geometry.dispose(); edgeLines.material.dispose(); edgeLines = null; }
+        if (!nodes.length) return;
+        var n = nodes.length;
+        var pos = new Float32Array(n*3), col = new Float32Array(n*3), sz = new Float32Array(n);
+        var search = (searchInput.value||'').toLowerCase();
+        for (var i=0;i<n;i++) {
+            var nd = nodes[i];
+            pos[i*3]=nd.x; pos[i*3+1]=nd.y; pos[i*3+2]=nd.z||0;
+            var grp = nd[colorBy]||'other', ci = groupColorIdx[grp]||0;
+            var c = new THREE.Color(palette3D[ci%palette3D.length]);
+            var h = !!hiddenGroups[grp], dm = search && nd.label.toLowerCase().indexOf(search)<0;
+            if (h) { c.setScalar(0); sz[i]=0; } else if (dm) { c.multiplyScalar(0.15); sz[i]=2.5; } else { sz[i]=6; }
+            col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+        }
+        var geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+        geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+        geo.setAttribute('size', new THREE.BufferAttribute(sz,1));
+        var isLight = theme === 'light';
+        var pr = Math.min(window.devicePixelRatio,2);
+        var mat = new THREE.ShaderMaterial({
+            uniforms: { uPixelRatio: { value: pr }, uTime: { value: 0.0 } },
+            vertexShader: [
+                'attribute float size; varying vec3 vColor; uniform float uPixelRatio; uniform float uTime;',
+                'void main(){',
+                '  vColor=color;',
+                '  float pulse = 1.0 + 0.08 * sin(uTime * 1.8 + position.x * 0.15 + position.z * 0.1);',
+                '  vec4 mv=modelViewMatrix*vec4(position,1.0);',
+                '  gl_PointSize=size*pulse*uPixelRatio*(250.0/-mv.z);',
+                '  gl_PointSize=max(gl_PointSize,0.0);',
+                '  gl_Position=projectionMatrix*mv;',
+                '}'
+            ].join('\n'),
+            fragmentShader: isLight
+                ? 'varying vec3 vColor; void main(){ float d=length(gl_PointCoord-vec2(0.5)); if(d>0.5) discard; float a=smoothstep(0.5,0.05,d); gl_FragColor=vec4(vColor,a*0.92); }'
+                : 'varying vec3 vColor; void main(){ float d=length(gl_PointCoord-vec2(0.5)); if(d>0.5) discard; float a=smoothstep(0.5,0.05,d); gl_FragColor=vec4(vColor, a); }',
+            vertexColors:true, transparent:true, depthWrite:false,
+            blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending
+        });
+        pointsMesh = new THREE.Points(geo, mat);
+        scene.add(pointsMesh);
+
+        /* glow layer: larger, softer copy behind the main particles (dark mode only) */
+        if (!isLight) {
+            var glowMat = new THREE.ShaderMaterial({
+                uniforms: { uPixelRatio: { value: pr }, uTime: { value: 0.0 } },
+                vertexShader: [
+                    'attribute float size; varying vec3 vColor; uniform float uPixelRatio; uniform float uTime;',
+                    'void main(){',
+                    '  vColor=color;',
+                    '  float pulse = 1.0 + 0.08 * sin(uTime * 1.8 + position.x * 0.15 + position.z * 0.1);',
+                    '  vec4 mv=modelViewMatrix*vec4(position,1.0);',
+                    '  gl_PointSize=size*pulse*1.8*uPixelRatio*(250.0/-mv.z);',
+                    '  gl_PointSize=max(gl_PointSize,0.0);',
+                    '  gl_Position=projectionMatrix*mv;',
+                    '}'
+                ].join('\n'),
+                fragmentShader: 'varying vec3 vColor; void main(){ float d=length(gl_PointCoord-vec2(0.5)); if(d>0.5) discard; float a=smoothstep(0.5,0.35,d)*0.18; gl_FragColor=vec4(vColor, a); }',
+                vertexColors:true, transparent:true, depthWrite:false,
+                blending: THREE.AdditiveBlending
+            });
+            glowMesh = new THREE.Points(geo, glowMat);
+            scene.add(glowMesh);
+        }
+    }
+    function updatePoints3D() {
+        if (!pointsMesh) return;
+        var szA = pointsMesh.geometry.attributes.size, colA = pointsMesh.geometry.attributes.color;
+        var search = (searchInput.value||'').toLowerCase();
+        var pNbrSet = {};
+        if (probeActive) probeNeighbors.forEach(function(nb) { pNbrSet[nb.id] = true; });
+        for (var i=0;i<nodes.length;i++) {
+            var nd=nodes[i], grp=nd[colorBy]||'other', h=!!hiddenGroups[grp];
+            var dm=search&&nd.label.toLowerCase().indexOf(search)<0;
+            var isSel=nd.id===selectedId, isNbr=selectedId!==null&&nodeById[selectedId]&&nodeById[selectedId]._nbrSet&&nodeById[selectedId]._nbrSet[nd.id];
+            var isHighNbr=highlightedNbrId!==null&&nd.id===highlightedNbrId;
+            var isProbeNbr=probeActive&&!!pNbrSet[nd.id];
+            var isHov=i===hoveredIdx, ci=groupColorIdx[grp]||0;
+            var c = new THREE.Color(palette3D[ci%palette3D.length]);
+            var isLt = theme === 'light';
+            if (h){szA.array[i]=0;c.setScalar(0);}
+            else if(isHighNbr){szA.array[i]=14;c.set(isLt?0xfbbf24:0xfbbf24);}
+            else if(isSel){szA.array[i]=11;c.set(isLt?0x111827:0xffffff);}
+            else if(isHov){szA.array[i]=8;}
+            else if(isNbr){szA.array[i]=8;c.set(isLt?0x4338ca:0xa5b4fc);}
+            else if(isProbeNbr){szA.array[i]=9;c.set(isLt?0x059669:0x4ade80);}
+            else if(selectedId!==null&&!isNbr){szA.array[i]=2;c.multiplyScalar(isLt?0.35:0.2);}
+            else if(probeActive&&!isProbeNbr&&selectedId===null){szA.array[i]=2.5;c.multiplyScalar(isLt?0.3:0.18);}
+            else if(dm){szA.array[i]=2.5;c.multiplyScalar(isLt?0.25:0.15);}
+            else{szA.array[i]=6;}
+            colA.array[i*3]=c.r;colA.array[i*3+1]=c.g;colA.array[i*3+2]=c.b;
+        }
+        szA.needsUpdate=true; colA.needsUpdate=true;
+    }
+    function drawEdges3D() {
+        if (edgeLines){scene.remove(edgeLines);edgeLines.geometry.dispose();edgeLines.material.dispose();edgeLines=null;}
+        if (selectedId===null||!nodeById[selectedId]) return;
+        var sel=nodeById[selectedId], nbrs=sel.neighbors||[]; if(!nbrs.length) return;
+        var p=[],ca=[];
+        var isLt = theme === 'light';
+        nbrs.forEach(function(nb){var t=nodeById[nb.id];if(!t)return;p.push(sel.x,sel.y,sel.z||0,t.x,t.y,t.z||0);var a=nb.similarity;if(isLt){ca.push(0.26*a,0.22*a,0.8,0.26*a,0.22*a,0.8);}else{ca.push(0.65,0.65,1,0.65*a,0.65*a,a);}});
+        var geo=new THREE.BufferGeometry();
+        geo.setAttribute('position',new THREE.Float32BufferAttribute(p,3));
+        geo.setAttribute('color',new THREE.Float32BufferAttribute(ca,3));
+        edgeLines=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:isLt?0.8:0.6,blending:isLt?THREE.NormalBlending:THREE.AdditiveBlending,depthWrite:false}));
+        scene.add(edgeLines);
+    }
+
+    /* 3D mouse events */
+    var mouseDownPos3D = { x: 0, y: 0 };
+    viewport.addEventListener('mousedown', function(e) {
+        if (mode!=='3d'||e.target.closest('.emb-detail')) return;
+        orbitDrag.active=true; orbitDrag.prevX=e.clientX; orbitDrag.prevY=e.clientY;
+        mouseDownPos3D.x = e.clientX; mouseDownPos3D.y = e.clientY;
+    });
+    window.addEventListener('mousemove', function(e) {
+        if (mode!=='3d'||!orbitDrag.active) return;
+        orbit.theta-=(e.clientX-orbitDrag.prevX)*0.005;
+        orbit.phi=Math.max(0.15,Math.min(Math.PI-0.15,orbit.phi+(e.clientY-orbitDrag.prevY)*0.005));
+        orbitDrag.prevX=e.clientX; orbitDrag.prevY=e.clientY; updateCameraFromOrbit();
+    });
+    window.addEventListener('mouseup', function(){ orbitDrag.active=false; });
+
+    /* ═════════════════════════════════════════
+       ██  2D ENGINE (CANVAS)
+       ═════════════════════════════════════════ */
+    var canvas2d, ctx2d;
+    var cam2d = { x: 0, y: 0, zoom: 1 };
+    var drag2d = { active: false, sx: 0, sy: 0, cx: 0, cy: 0 };
+
+    function init2D() {
+        if (renderer && renderer.domElement) renderer.domElement.style.display = 'none';
+        canvas2d = viewport.querySelector('.emb-2d-canvas');
+        if (!canvas2d) {
+            canvas2d = document.createElement('canvas');
+            canvas2d.className = 'emb-2d-canvas';
+            viewport.insertBefore(canvas2d, viewport.firstChild);
+        }
+        canvas2d.style.display = '';
+        ctx2d = canvas2d.getContext('2d');
+        resize2D();
+        /* events */
+        canvas2d.onmousemove = on2Dmove;
+        canvas2d.onmousedown = on2Ddown;
+        canvas2d.onmouseup = function() { drag2d.active = false; };
+        canvas2d.onmouseleave = function() { drag2d.active = false; hideTooltip(); hoveredIdx = -1; draw2D(); };
+        canvas2d.onwheel = function(e) { e.preventDefault(); cam2d.zoom = Math.max(0.15, Math.min(12, cam2d.zoom * (e.deltaY < 0 ? 1.12 : 0.89))); draw2D(); };
+        canvas2d.ondblclick = function(e) { var n = hit2D(e.offsetX, e.offsetY); if (n) window.location.href = VIEW_URL.replace(/\/0$/, '/' + n.id); };
+    }
+    function resize2D() {
+        if (!canvas2d) return;
+        var r = window.devicePixelRatio || 1, w = viewport.clientWidth, h = viewport.clientHeight;
+        canvas2d.width = w * r; canvas2d.height = h * r;
+        canvas2d.style.width = w + 'px'; canvas2d.style.height = h + 'px';
+        ctx2d.setTransform(r, 0, 0, r, 0, 0);
+        draw2D();
+    }
+    function w2s(wx, wy) { return { x: (wx - cam2d.x) * cam2d.zoom + viewport.clientWidth / 2, y: (wy - cam2d.y) * cam2d.zoom + viewport.clientHeight / 2 }; }
+    function draw2D() {
+        if (!ctx2d) return;
+        var w = viewport.clientWidth, h = viewport.clientHeight;
+        var isLight = theme === 'light';
+        ctx2d.fillStyle = isLight ? '#ffffff' : '#0f172a';
+        ctx2d.fillRect(0, 0, w, h);
+        /* grid */
+        ctx2d.strokeStyle = isLight ? '#f1f5f9' : '#1e293b';
+        ctx2d.lineWidth = 0.5;
+        var gs = 50 * cam2d.zoom; if (gs > 8) { for (var gx = -cam2d.x * cam2d.zoom % gs + w / 2 % gs; gx < w; gx += gs) { ctx2d.beginPath(); ctx2d.moveTo(gx, 0); ctx2d.lineTo(gx, h); ctx2d.stroke(); } for (var gy = -cam2d.y * cam2d.zoom % gs + h / 2 % gs; gy < h; gy += gs) { ctx2d.beginPath(); ctx2d.moveTo(0, gy); ctx2d.lineTo(w, gy); ctx2d.stroke(); } }
+
+        var search = (searchInput.value || '').toLowerCase();
+        /* edges */
+        if (selectedId !== null && nodeById[selectedId]) {
+            var sel = nodeById[selectedId], sp = w2s(sel.x, sel.y);
+            (sel.neighbors || []).forEach(function(nb) {
+                var t = nodeById[nb.id]; if (!t || hiddenGroups[t[colorBy]]) return;
+                var tp = w2s(t.x, t.y);
+                ctx2d.beginPath(); ctx2d.moveTo(sp.x, sp.y); ctx2d.lineTo(tp.x, tp.y);
+                ctx2d.strokeStyle = isLight ? 'rgba(67,56,202,' + (nb.similarity * 0.7 + 0.15) + ')' : 'rgba(165,180,252,' + nb.similarity * 0.6 + ')';
+                ctx2d.lineWidth = Math.max(1, nb.similarity * (isLight ? 3.5 : 3)); ctx2d.stroke();
+                var mx = (sp.x + tp.x) / 2, my = (sp.y + tp.y) / 2;
+                ctx2d.font = '10px Inter,sans-serif'; ctx2d.fillStyle = isLight ? '#4f46e5' : '#a5b4fc';
+                ctx2d.fillText((nb.similarity * 100).toFixed(0) + '%', mx + 3, my - 3);
+            });
+        }
+        /* probe neighbor lookup */
+        var probeNbrSet = {};
+        if (probeActive) probeNeighbors.forEach(function(nb) { probeNbrSet[nb.id] = true; });
+        /* nodes */
+        for (var i = 0; i < nodes.length; i++) {
+            var nd = nodes[i], grp = nd[colorBy] || 'other';
+            if (hiddenGroups[grp]) continue;
+            var p = w2s(nd.x, nd.y);
+            if (p.x < -30 || p.x > w + 30 || p.y < -30 || p.y > h + 30) continue;
+            var isSel = nd.id === selectedId, isNbr = selectedId !== null && nodeById[selectedId] && nodeById[selectedId]._nbrSet && nodeById[selectedId]._nbrSet[nd.id];
+            var isHighNbr = highlightedNbrId !== null && nd.id === highlightedNbrId;
+            var isProbeNbr = probeActive && probeNbrSet[nd.id];
+            var isHov = i === hoveredIdx, matchS = !search || nd.label.toLowerCase().indexOf(search) >= 0;
+            var rad = isHighNbr ? 10 : isSel ? 8 : isNbr ? 7 : isProbeNbr ? 7 : isHov ? 6 : 5;
+            var alpha = 1;
+            if (search && !matchS) alpha = 0.08;
+            else if (selectedId !== null && !isSel && !isNbr && !isHighNbr) alpha = (isLight ? 0.18 : 0.12);
+            else if (probeActive && !isProbeNbr && selectedId === null) alpha = (isLight ? 0.2 : 0.15);
+            var ci = groupColorIdx[grp] || 0;
+            ctx2d.globalAlpha = alpha;
+            ctx2d.beginPath(); ctx2d.arc(p.x, p.y, rad, 0, Math.PI * 2);
+            ctx2d.fillStyle = isHighNbr ? '#fbbf24' : isSel ? (isLight ? '#111827' : '#ffffff') : isNbr ? (isLight ? '#4338ca' : '#6366f1') : isProbeNbr ? (isLight ? '#059669' : '#4ade80') : paletteCSS[ci % paletteCSS.length];
+            ctx2d.fill();
+            if (isHighNbr) { ctx2d.strokeStyle = '#f59e0b'; ctx2d.lineWidth = 3; ctx2d.stroke(); }
+            if (isProbeNbr && !isSel && !isNbr && !isHighNbr) { ctx2d.strokeStyle = isLight ? '#064e3b' : '#bbf7d0'; ctx2d.lineWidth = 2.5; ctx2d.stroke(); }
+            if (isNbr && !isHighNbr) { ctx2d.strokeStyle = isLight ? '#312e81' : '#a5b4fc'; ctx2d.lineWidth = 2.5; ctx2d.stroke(); }
+            if (isSel) { ctx2d.strokeStyle = isLight ? '#111827' : '#fff'; ctx2d.lineWidth = 3; ctx2d.stroke(); }
+            if (isHov && !isSel && !isHighNbr) { ctx2d.strokeStyle = isLight ? '#111827' : '#fff'; ctx2d.lineWidth = 2; ctx2d.stroke(); }
+            var showLabel = isSel || isHov || isNbr || isHighNbr || isProbeNbr || cam2d.zoom > 12;
+            if (showLabel) {
+                ctx2d.font = (isSel ? 'bold 12px' : '11px') + ' Inter,sans-serif';
+                ctx2d.fillStyle = isLight ? '#111827' : '#e2e8f0';
+                ctx2d.fillText(nd.label, p.x + rad + 4, p.y + 4);
+            }
+            ctx2d.globalAlpha = 1;
+        }
+        drawProbe2D();
+    }
+    function hit2D(sx, sy) {
+        var best = null, bd = Infinity, search = (searchInput.value || '').toLowerCase();
+        for (var i = 0; i < nodes.length; i++) {
+            var nd = nodes[i]; if (hiddenGroups[nd[colorBy]]) continue;
+            if (search && nd.label.toLowerCase().indexOf(search) < 0) continue;
+            var p = w2s(nd.x, nd.y), d = Math.hypot(p.x - sx, p.y - sy);
+            if (d < 20 && d < bd) { best = nd; bd = d; }
+        }
+        return best;
+    }
+    function on2Dmove(e) {
+        if (drag2d.active) { cam2d.x = drag2d.cx - (e.offsetX - drag2d.sx) / cam2d.zoom; cam2d.y = drag2d.cy - (e.offsetY - drag2d.sy) / cam2d.zoom; draw2D(); hideTooltip(); return; }
+        var nd = hit2D(e.offsetX, e.offsetY);
+        if (nd) { hoveredIdx = nodes.indexOf(nd); canvas2d.style.cursor = 'pointer'; showTooltip(nd, e.offsetX, e.offsetY); }
+        else { hoveredIdx = -1; canvas2d.style.cursor = 'grab'; hideTooltip(); }
+        draw2D();
+    }
+    function on2Ddown(e) {
+        var nd = hit2D(e.offsetX, e.offsetY);
+        if (nd) { showDetail(nd); return; }
+        drag2d.active = true; drag2d.sx = e.offsetX; drag2d.sy = e.offsetY; drag2d.cx = cam2d.x; drag2d.cy = cam2d.y;
+    }
+    function resetView2D() {
+        if (!nodes.length) return;
+        var mx=Infinity,Mx=-Infinity,my=Infinity,My=-Infinity;
+        nodes.forEach(function(n){mx=Math.min(mx,n.x);Mx=Math.max(Mx,n.x);my=Math.min(my,n.y);My=Math.max(My,n.y);});
+        cam2d.x=(mx+Mx)/2; cam2d.y=(my+My)/2;
+        cam2d.zoom=Math.max(0.15,Math.min(12,Math.min(viewport.clientWidth/((Mx-mx||100)*1.15),viewport.clientHeight/((My-my||100)*1.15))));
+        draw2D();
+    }
+
+    /* ═══════════ SHARED UI ═══════════ */
+    /* tooltip */
+    function showTooltip(n, x, y) {
+        var ttH = '<div class="tt-name">' + esc(n.label) + '</div>';
+        ttH += '<div class="tt-meta">Type: ' + esc(n.group) + (n.unit ? ' · ' + esc(n.unit) : '') + '</div>';
+        if (n.sector) ttH += '<div class="tt-meta">Sector: ' + esc(n.sector) + '</div>';
+        if (n.sub_sector) ttH += '<div class="tt-meta">Sub-sector: ' + esc(n.sub_sector) + '</div>';
+        if (n.program) ttH += '<div class="tt-meta">Programme: ' + esc(n.program) + '</div>';
+        if (n.emergency) ttH += '<div class="tt-meta" style="color:#ef4444">Emergency</div>';
+        if (n.kpi_code) ttH += '<div class="tt-meta">KPI: ' + esc(n.kpi_code) + '</div>';
+        if (n.definition) ttH += '<div class="tt-def">' + esc(n.definition) + '</div>';
+        tooltip.innerHTML = ttH;
+        tooltip.classList.add('visible');
+        var tx = x + 16, ty = y - 10; if (tx + 320 > viewport.clientWidth) tx = x - 330; if (ty < 0) ty = 10;
+        tooltip.style.left = tx + 'px'; tooltip.style.top = ty + 'px';
+    }
+    function hideTooltip() { tooltip.classList.remove('visible'); }
+
+    /* detail panel */
+    function showDetail(n) {
+        selectedId = n.id; detailTitle.textContent = n.label;
+        var h = '<div class="meta-row"><span class="meta-label">Type: </span>' + esc(n.group) + '</div>';
+        if (n.unit) h += '<div class="meta-row"><span class="meta-label">Unit: </span>' + esc(n.unit) + '</div>';
+        if (n.sector) h += '<div class="meta-row"><span class="meta-label">Sector: </span>' + esc(n.sector) + '</div>';
+        if (n.sub_sector) h += '<div class="meta-row"><span class="meta-label">Sub-sector: </span>' + esc(n.sub_sector) + '</div>';
+        if (n.program) h += '<div class="meta-row"><span class="meta-label">Programme: </span>' + esc(n.program) + '</div>';
+        if (n.emergency) h += '<div class="meta-row" style="color:#ef4444"><span class="meta-label">Emergency</span></div>';
+        if (n.kpi_code) h += '<div class="meta-row"><span class="meta-label">KPI: </span>' + esc(n.kpi_code) + '</div>';
+        if (n.definition) h += '<div class="meta-row" style="margin-top:5px">' + esc(n.definition) + '</div>';
+        h += '<div style="margin-top:8px;font-weight:600;color:var(--emb-panel-link)">Semantically similar indicators</div>';
+        h += '<div style="font-size:0.68rem;opacity:0.6;margin-bottom:4px">Ranked by cosine similarity of AI embeddings. Highlighted nodes may appear distant in the projection but are close in meaning.</div>';
+        h += '<ul class="emb-nbr-list">';
+        (n.neighbors || []).forEach(function(nb) { var t = nodeById[nb.id]; var safeId = parseInt(nb.id, 10) || 0; h += '<li data-id="' + safeId + '"><span>' + esc(t ? t.label : 'ID ' + safeId) + '</span><span class="emb-nbr-sim">' + (nb.similarity * 100).toFixed(1) + '%</span></li>'; });
+        h += '</ul><div style="margin-top:8px"><a href="' + VIEW_URL.replace(/\/0$/, '/' + n.id) + '" style="color:var(--emb-panel-link);text-decoration:none;font-weight:600;font-size:0.78rem">View details →</a></div>';
+        detailBody.innerHTML = h; detail.classList.add('open');
+        detailBody.querySelectorAll('.emb-nbr-list li').forEach(function(li) {
+            li.addEventListener('click', function() { var id = parseInt(this.dataset.id); if (nodeById[id]) showDetail(nodeById[id]); });
+            li.addEventListener('mouseenter', function() { highlightedNbrId = parseInt(this.dataset.id); if (mode === '3d') updatePoints3D(); else draw2D(); });
+            li.addEventListener('mouseleave', function() { highlightedNbrId = null; if (mode === '3d') updatePoints3D(); else draw2D(); });
+        });
+        if (mode === '3d') { updatePoints3D(); drawEdges3D(); } else draw2D();
+    }
+    function hideDetail() { detail.classList.remove('open'); selectedId = null; highlightedNbrId = null; if (mode === '3d') { updatePoints3D(); drawEdges3D(); } else draw2D(); }
+    document.getElementById('emb-detail-close').addEventListener('click', hideDetail);
+
+    /* prevent viewport zoom when scrolling the detail panel */
+    detail.addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
+
+    /* 3D hover/click via viewport mousemove */
+    viewport.addEventListener('mousemove', function(e) {
+        if (mode !== '3d' || orbitDrag.active) { if (mode === '3d') hideTooltip(); return; }
+        var rect = viewport.getBoundingClientRect();
+        mouse3D.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse3D.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse3D, camera);
+        var ints = pointsMesh ? raycaster.intersectObject(pointsMesh) : [];
+        if (ints.length) { var idx = ints[0].index; hoveredIdx = idx; viewport.style.cursor = 'pointer'; showTooltip(nodes[idx], e.clientX - rect.left, e.clientY - rect.top); }
+        else { hoveredIdx = -1; hideTooltip(); viewport.style.cursor = 'grab'; }
+        updatePoints3D();
+    });
+    viewport.addEventListener('click', function(e) {
+        if (mode !== '3d' || e.target.closest('.emb-detail')) return;
+        var dx = e.clientX - mouseDownPos3D.x, dy = e.clientY - mouseDownPos3D.y;
+        if (dx * dx + dy * dy > 25) return;
+        var rect = viewport.getBoundingClientRect();
+        mouse3D.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse3D.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse3D, camera);
+        var ints = pointsMesh ? raycaster.intersectObject(pointsMesh) : [];
+        if (ints.length) showDetail(nodes[ints[0].index]); else hideDetail();
+    });
+    viewport.addEventListener('dblclick', function(e) {
+        if (mode !== '3d') return;
+        var dx = e.clientX - mouseDownPos3D.x, dy = e.clientY - mouseDownPos3D.y;
+        if (dx * dx + dy * dy > 25) return;
+        var rect = viewport.getBoundingClientRect();
+        mouse3D.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse3D.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse3D, camera);
+        var ints = pointsMesh ? raycaster.intersectObject(pointsMesh) : [];
+        if (ints.length) window.location.href = VIEW_URL.replace(/\/0$/, '/' + nodes[ints[0].index].id);
+    });
+    viewport.addEventListener('wheel', function(e) {
+        if (mode !== '3d' || e.target.closest('.emb-detail')) return;
+        e.preventDefault(); orbit.radius = Math.max(5, Math.min(600, orbit.radius * (e.deltaY > 0 ? 1.08 : 0.92))); updateCameraFromOrbit();
+    }, { passive: false });
+
+    /* legend */
+    function buildGroupColors() {
+        groupColors = {}; groupColorIdx = {};
+        var keys = {}; nodes.forEach(function(n) { keys[n[colorBy] || 'other'] = true; });
+        Object.keys(keys).sort().forEach(function(k, i) { groupColors[k] = paletteCSS[i % paletteCSS.length]; groupColorIdx[k] = i; });
+    }
+    function buildLegend() {
+        hiddenGroups = {};
+        var html = '<span class="emb-legend-item emb-legend-toggle" data-action="all" title="Select all"><i class="fas fa-check-double" style="font-size:0.65rem"></i> All</span>';
+        html += '<span class="emb-legend-item emb-legend-toggle" data-action="none" title="Deselect all"><i class="fas fa-times" style="font-size:0.65rem"></i> None</span>';
+        html += Object.keys(groupColors).sort().map(function(g) { return '<span class="emb-legend-item" data-group="' + esc(g) + '"><span class="emb-legend-dot" style="background:' + groupColors[g] + '"></span>' + esc(g || 'other') + '</span>'; }).join('');
+        legendEl.innerHTML = html;
+        legendEl.querySelectorAll('.emb-legend-item[data-group]').forEach(function(el) {
+            el.addEventListener('click', function() { var g = this.dataset.group; hiddenGroups[g] = !hiddenGroups[g]; this.classList.toggle('dimmed', !!hiddenGroups[g]); if (mode === '3d') updatePoints3D(); else draw2D(); });
+        });
+        legendEl.querySelectorAll('.emb-legend-toggle').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var show = this.dataset.action === 'all';
+                Object.keys(groupColors).forEach(function(g) { hiddenGroups[g] = !show; });
+                legendEl.querySelectorAll('.emb-legend-item[data-group]').forEach(function(it) { it.classList.toggle('dimmed', !show); });
+                if (mode === '3d') updatePoints3D(); else draw2D();
+            });
+        });
+    }
+
+    /* search */
+    searchInput.addEventListener('input', function() { if (mode === '3d') updatePoints3D(); else draw2D(); });
+    /* color-by */
+    document.getElementById('emb-color-by').addEventListener('change', function() {
+        colorBy = this.value; buildGroupColors(); buildLegend();
+        if (mode === '3d') buildScene3D(); else draw2D();
+    });
+    /* reset */
+    document.getElementById('emb-reset').addEventListener('click', function() {
+        if (mode === '3d') { orbit = { theta: 0.8, phi: 0.9, radius: 140, target: new THREE.Vector3() }; updateCameraFromOrbit(); }
+        else resetView2D();
+    });
+    /* auto rotate */
+    var arBtn = document.getElementById('emb-auto-rotate');
+    arBtn.addEventListener('click', function() { autoRotate = !autoRotate; this.classList.toggle('active', autoRotate); });
+
+    /* resize */
+    window.addEventListener('resize', function() { if (mode === '3d') onResize3D(); else resize2D(); });
+
+    /* ═══════════ LOAD DATA ═══════════ */
+    function setStatus(m, e) { statusEl.textContent = m; statusEl.className = 'emb-status' + (e ? ' error' : ''); }
+    function showLoader(msg) { loaderText.textContent = msg || 'Loading…'; loaderEl.classList.add('visible'); }
+    function hideLoader() { loaderEl.classList.remove('visible'); }
+
+    function loadData() {
+        var method = document.getElementById('emb-method').value;
+        var dims = mode === '3d' ? 3 : 2;
+        showLoader(method === 'tsne' ? 'Computing t-SNE projection…' : 'Loading…');
+        setStatus(''); hideDetail();
+        fetch(DATA_URL + '?method=' + method + '&dimensions=' + dims + '&max_nodes=5000&neighbors=8', { headers: { Accept: 'application/json' } })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                hideLoader();
+                if (data.error) { setStatus(data.error, true); return; }
+                nodes = data.nodes || []; nodeById = {};
+                nodes.forEach(function(n) {
+                    nodeById[n.id] = n;
+                    n._nbrSet = {};
+                    (n.neighbors || []).forEach(function(nb) { n._nbrSet[nb.id] = true; });
+                    n.emergency_label = n.emergency ? 'Emergency' : 'Non-emergency';
+                });
+                if (!nodes.length) { setStatus('No embeddings. Run: flask sync-indicator-embeddings', true); return; }
+                setStatus(nodes.length + ' indicators (' + method.toUpperCase() + ' ' + (mode === '3d' ? '3D' : '2D') + ')');
+                hudEl.textContent = nodes.length + ' indicators';
+                buildGroupColors(); buildLegend();
+                if (probeActive) computeProbePos();
+                if (mode === '3d') { show3D(); buildScene3D(); if (probeActive) drawProbe3D(); }
+                else { hide3D(); init2D(); draw2D(); resetView2D(); }
+            })
+            .catch(function(err) { hideLoader(); setStatus(err.message || 'Failed', true); });
+    }
+
+    document.getElementById('emb-load').addEventListener('click', loadData);
+    function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+    /* ═══════════ GUIDE TOGGLE ═══════════ */
+    document.getElementById('emb-guide-btn').addEventListener('click', function() {
+        document.getElementById('emb-guide').classList.toggle('open');
+        var chev = this.querySelector('.fa-chevron-right, .fa-chevron-down');
+        if (chev) { chev.classList.toggle('fa-chevron-right'); chev.classList.toggle('fa-chevron-down'); }
+    });
+
+    /* ═══════════ PROBE ═══════════ */
+    function computeProbePos() {
+        if (!probeNeighbors.length) { probePos = null; return; }
+        var wx = 0, wy = 0, wz = 0, wt = 0;
+        probeNeighbors.forEach(function(nb) {
+            var n = nodeById[nb.id]; if (!n) return;
+            var w = nb.similarity * nb.similarity;
+            wx += n.x * w; wy += n.y * w;
+            if (mode === '3d') wz += (n.z || 0) * w;
+            wt += w;
+        });
+        if (wt === 0) { probePos = null; return; }
+        probePos = { x: wx / wt, y: wy / wt };
+        if (mode === '3d') probePos.z = wz / wt;
+    }
+
+    function clearProbe() {
+        probeActive = false; probeNeighbors = []; probeLabel = ''; probePos = null;
+        probeClear.style.display = 'none';
+        probeInput.value = '';
+        if (mode === '3d') { updatePoints3D(); drawEdges3D(); removeProbe3D(); }
+        else draw2D();
+    }
+
+    var probeMesh3D = null, probeEdges3D = null;
+    function removeProbe3D() {
+        if (probeMesh3D) { scene.remove(probeMesh3D); probeMesh3D.geometry.dispose(); probeMesh3D.material.dispose(); probeMesh3D = null; }
+        if (probeEdges3D) { scene.remove(probeEdges3D); probeEdges3D.geometry.dispose(); probeEdges3D.material.dispose(); probeEdges3D = null; }
+    }
+    function drawProbe3D() {
+        removeProbe3D();
+        if (!probeActive || !probePos) return;
+        var isLt = theme === 'light';
+        var geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute([probePos.x, probePos.y, probePos.z || 0], 3));
+        geo.setAttribute('size', new THREE.Float32BufferAttribute([16], 1));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(isLt ? [0.07, 0.72, 0.3] : [0.2, 1.0, 0.4], 3));
+        probeMesh3D = new THREE.Points(geo, pointsMesh.material);
+        scene.add(probeMesh3D);
+        var p = [], ca = [];
+        probeNeighbors.forEach(function(nb) {
+            var t = nodeById[nb.id]; if (!t) return;
+            p.push(probePos.x, probePos.y, probePos.z || 0, t.x, t.y, t.z || 0);
+            var a = nb.similarity;
+            if (isLt) { ca.push(0.07*a, 0.6*a, 0.25, 0.07*a, 0.6*a, 0.25); }
+            else { ca.push(0.2, 1.0*a, 0.4, 0.2, 1.0*a, 0.4*a); }
+        });
+        if (p.length) {
+            var eg = new THREE.BufferGeometry();
+            eg.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+            eg.setAttribute('color', new THREE.Float32BufferAttribute(ca, 3));
+            probeEdges3D = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:isLt?0.7:0.5, blending:isLt?THREE.NormalBlending:THREE.AdditiveBlending, depthWrite:false}));
+            scene.add(probeEdges3D);
+        }
+    }
+
+    function drawProbe2D() {
+        if (!probeActive || !probePos || !ctx2d) return;
+        var isLight = theme === 'light';
+        var w = viewport.clientWidth, h = viewport.clientHeight;
+        var sp = w2s(probePos.x, probePos.y);
+        probeNeighbors.forEach(function(nb) {
+            var t = nodeById[nb.id]; if (!t) return;
+            var tp = w2s(t.x, t.y);
+            ctx2d.beginPath(); ctx2d.moveTo(sp.x, sp.y); ctx2d.lineTo(tp.x, tp.y);
+            ctx2d.strokeStyle = isLight ? 'rgba(5,150,105,' + (nb.similarity * 0.6 + 0.2) + ')' : 'rgba(74,222,128,' + (nb.similarity * 0.5 + 0.15) + ')';
+            ctx2d.lineWidth = Math.max(1, nb.similarity * 3);
+            ctx2d.stroke();
+            var mx = (sp.x + tp.x) / 2, my = (sp.y + tp.y) / 2;
+            ctx2d.font = '10px Inter,sans-serif'; ctx2d.fillStyle = isLight ? '#059669' : '#4ade80';
+            ctx2d.fillText((nb.similarity * 100).toFixed(1) + '%', mx + 4, my - 4);
+        });
+        /* probe marker: diamond */
+        ctx2d.save();
+        ctx2d.translate(sp.x, sp.y);
+        ctx2d.rotate(Math.PI / 4);
+        ctx2d.fillStyle = isLight ? '#059669' : '#4ade80';
+        ctx2d.fillRect(-7, -7, 14, 14);
+        ctx2d.strokeStyle = isLight ? '#064e3b' : '#bbf7d0';
+        ctx2d.lineWidth = 2.5;
+        ctx2d.strokeRect(-7, -7, 14, 14);
+        ctx2d.restore();
+        /* label */
+        ctx2d.font = 'bold 12px Inter,sans-serif';
+        ctx2d.fillStyle = isLight ? '#064e3b' : '#bbf7d0';
+        ctx2d.fillText(probeLabel, sp.x + 14, sp.y + 4);
+    }
+
+    function runProbe() {
+        var q = (probeInput.value || '').trim();
+        if (!q || !nodes.length) return;
+        probeBtn.disabled = true;
+        probeBtn.querySelector('i').className = 'fas fa-spinner fa-spin';
+        showLoader('Embedding query…');
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+        var headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+        if (csrf) headers['X-CSRFToken'] = csrf.getAttribute('content');
+        fetch(PROBE_URL, { method: 'POST', headers: headers, body: JSON.stringify({ query: q }) })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                hideLoader();
+                probeBtn.disabled = false;
+                probeBtn.querySelector('i').className = 'fas fa-crosshairs';
+                if (data.error) { setStatus('Probe: ' + data.error, true); return; }
+                probeNeighbors = data.neighbors || [];
+                probeLabel = q.length > 50 ? q.substring(0, 47) + '…' : q;
+                probeActive = true;
+                probeClear.style.display = '';
+                computeProbePos();
+                hideDetail(); selectedId = null;
+                /* show probe detail panel */
+                detailTitle.textContent = '🔍 ' + probeLabel;
+                var h = '<div style="margin-bottom:6px;font-weight:600;color:var(--emb-panel-link)">Nearest indicators</div>';
+                h += '<ul class="emb-nbr-list">';
+                probeNeighbors.forEach(function(nb) {
+                    var t = nodeById[nb.id]; var safeId = parseInt(nb.id, 10) || 0;
+                    h += '<li data-id="' + safeId + '"><span>' + esc(t ? t.label : 'ID ' + safeId) + '</span><span class="emb-nbr-sim">' + (nb.similarity * 100).toFixed(1) + '%</span></li>';
+                });
+                h += '</ul>';
+                detailBody.innerHTML = h;
+                detail.classList.add('open');
+                detailBody.querySelectorAll('.emb-nbr-list li').forEach(function(li) {
+                    li.addEventListener('click', function() { var id = parseInt(this.dataset.id); if (nodeById[id]) showDetail(nodeById[id]); });
+                });
+                if (mode === '3d') { updatePoints3D(); drawProbe3D(); }
+                else draw2D();
+                setStatus('Probe placed — ' + probeNeighbors.length + ' nearest indicators');
+            })
+            .catch(function(err) {
+                hideLoader();
+                probeBtn.disabled = false;
+                probeBtn.querySelector('i').className = 'fas fa-crosshairs';
+                setStatus('Probe failed: ' + (err.message || err), true);
+            });
+    }
+
+    probeBtn.addEventListener('click', runProbe);
+    probeInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); runProbe(); } });
+    probeClear.addEventListener('click', clearProbe);
+
+    /* ═══════════ INIT ═══════════ */
+    loadData();
+})();
+</script>
+{% endblock %}

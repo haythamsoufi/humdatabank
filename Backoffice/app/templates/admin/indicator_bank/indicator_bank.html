@@ -1,0 +1,2333 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_review_suggestions = current_is_system_manager or has_permission('admin.indicator_bank.suggestions.review') %}
+{% set can_create_indicators = current_is_system_manager or has_permission('admin.indicator_bank.create') %}
+{% set can_edit_indicators = current_is_system_manager or has_permission('admin.indicator_bank.edit') %}
+{% set can_archive_indicators = current_is_system_manager or has_permission('admin.indicator_bank.archive') %}
+{% set can_view_audit = current_is_system_manager or has_permission('admin.audit.view') %}
+{% set can_manage_org = current_is_system_manager or has_permission('admin.organization.manage') %}
+{# Actions dropdown is only relevant when the user can do something beyond read-only viewing. #}
+{% set can_see_actions_dropdown = can_create_indicators or can_edit_indicators or can_archive_indicators or can_review_suggestions or can_view_audit or can_manage_org %}
+
+{% block title %}{{ _('Indicator Bank') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <!-- Custom Styles for the page -->
+    <style nonce="{{ csp_style_nonce() }}">
+        /* Ensuring a consistent font, fallback to sans-serif */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Sector/Sub-Sector display styling */
+        .sector-items div {
+            display: block;
+            margin-bottom: 2px;
+            font-size: 0.875em;
+            line-height: 1.4;
+        }
+        .sector-items div:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Filter Modal Styles */
+        #filter-modal-content {
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #filter-modal-list {
+            overflow-y: auto;
+            max-height: 300px;
+        }
+
+        #filter-modal-search {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        #filter-modal-search:focus {
+            outline: none;
+            border-color: #dc2626;
+            box-shadow: 0 0 0 1px #dc2626;
+        }
+
+        /* Grid container styling */
+        #indicatorBankTable-container {
+            overflow-x: auto;
+        }
+
+        /* Loading spinner animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* File upload styles */
+        .file-upload-wrapper {
+            position: relative;
+            width: 100%;
+            height: 60px;
+        }
+
+        /* Disabled state for file upload */
+        .file-upload-wrapper.upload-disabled {
+            opacity: 0.7;
+        }
+
+        /* Disable only the file input, not the entire wrapper */
+        .file-upload-wrapper.upload-disabled input[type="file"] {
+            pointer-events: none;
+        }
+
+        /* Ensure buttons are clickable */
+        .file-upload-box button {
+            position: relative;
+            z-index: 50;
+            pointer-events: auto;
+        }
+
+        /* Page-header action dropdown (match "Build & Apply" styling) */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .action-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
+            min-width: 256px;
+            z-index: 200;
+        }
+        .action-dropdown-menu.hidden {
+            display: none;
+        }
+        .action-dropdown-divider {
+            border-top: 1px solid #e5e7eb;
+            margin: 2px 0;
+        }
+        .action-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 9px 16px;
+            text-align: left;
+            font-size: 13px;
+            color: #374151;
+            background: none;
+            border: none;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit;
+            line-height: 1.4;
+            text-decoration: none;
+        }
+        .action-dropdown-item:hover {
+            background: #f3f4f6;
+            color: #111827;
+        }
+        .action-dropdown-item i {
+            width: 14px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .file-upload-wrapper input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-upload-box {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            border: 2px dashed #e5e7eb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f9fafb;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-wrapper:hover .file-upload-box {
+            border-color: #dc2626;
+            background-color: #fef2f2;
+        }
+
+        /* Column Visibility Modal Styles */
+        .column-group {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .column-group:hover {
+            border-color: #d1d5db;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .column-group h4 {
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+
+        .group-select-all, .group-deselect-all {
+            font-size: 12px !important;
+            padding: 6px 12px !important;
+            border-radius: 6px !important;
+            transition: all 0.2s ease !important;
+            font-weight: 500 !important;
+            border: none !important;
+            cursor: pointer !important;
+            display: inline-block !important;
+            text-decoration: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+        .group-select-all {
+            background-color: #dbeafe !important;
+            color: #1d4ed8 !important;
+        }
+
+        .group-select-all:hover {
+            background-color: #bfdbfe !important;
+            color: #1e40af !important;
+            transform: none !important;
+        }
+
+        .group-deselect-all {
+            background-color: #f3f4f6 !important;
+            color: #374151 !important;
+        }
+
+        .group-deselect-all:hover {
+            background-color: #e5e7eb !important;
+            color: #1f2937 !important;
+            transform: none !important;
+        }
+
+        .group-status {
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: normal;
+            padding: 2px 6px;
+            background-color: #f3f4f6;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+        }
+
+        /* Sectors/Subsectors Management Styles */
+        .sector-item, .subsector-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .sector-item:hover, .subsector-item:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+
+        .sector-item.editing, .subsector-item.editing {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .item-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .item-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .item-icon {
+            width: 20px;
+            text-align: center;
+            color: #6b7280;
+        }
+
+        .item-name {
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .sector-item:hover .item-actions,
+        .subsector-item:hover .item-actions {
+            opacity: 1;
+        }
+
+        .item-actions button {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .edit-btn {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .edit-btn:hover {
+            background: #bfdbfe;
+        }
+
+        .delete-btn {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .delete-btn:hover {
+            background: #fecaca;
+        }
+
+        #icon-preview {
+            min-width: 16px;
+            min-height: 16px;
+        }
+
+        /* Column visibility toolbar: ag-column-visibility-manager.css */
+        /* Additional template-specific overrides can be added here if needed */
+    </style>
+{% endblock %}
+
+
+{% block content %}
+<!-- Hidden elements for JavaScript translations -->
+<div id="export-message" data-message="{{ _('Please select at least one indicator to export.') }}" style="display: none;"></div>
+<div id="js-translations" style="display: none;"
+     data-enter-name="{{ _('Please enter a name.') }}"
+     data-save-success="{{ _('Sectors and subsectors have been saved successfully!') }}"
+     data-extract-error="{{ _('Error: Could not extract indicator IDs. Please try again or contact support.') }}"
+     data-upload-excel="{{ _('Please upload an Excel file (.xlsx or .xls)') }}"
+     data-file-input-changed="{{ _('File input changed') }}"
+     data-no-file-selected="{{ _('No file selected') }}"
+     data-starting-import="{{ _('Starting import...') }}"
+     data-adding-drag-highlight="{{ _('Adding drag highlight') }}"
+     data-removing-drag-highlight="{{ _('Removing drag highlight') }}"
+     data-file-dropped="{{ _('File dropped') }}"
+     data-invalid-file-type="{{ _('Invalid file type dropped') }}"
+     data-form-created="{{ _('Form created and appended, submitting...') }}"
+     data-form-cleaned="{{ _('Form cleaned up') }}"
+     data-click-drag-import="{{ _('Click or drag Excel file here to import') }}"
+     data-importing="{{ _('Importing') }}"
+     data-import-success="{{ _('Import successful!') }}"
+     data-import-failed="{{ _('Import failed:') }}"
+     data-unknown-error="{{ _('Unknown error') }}"
+     data-health="{{ _('Health') }}"
+     data-education="{{ _('Education') }}"
+     data-water-sanitation="{{ _('Water & Sanitation') }}"
+     data-shelter="{{ _('Shelter') }}"
+     data-food-security="{{ _('Food Security') }}"
+     data-primary-healthcare="{{ _('Primary Healthcare') }}"
+     data-mental-health="{{ _('Mental Health') }}"
+     data-basic-education="{{ _('Basic Education') }}"
+     data-adult-literacy="{{ _('Adult Literacy') }}"
+     data-water-quality="{{ _('Water Quality') }}"
+     data-hygiene-promotion="{{ _('Hygiene Promotion') }}"
+     data-new-sector="{{ _('New Sector') }}"
+     data-new-subsector="{{ _('New Subsector') }}"
+     data-edit="{{ _('Edit') }}"
+     data-delete="{{ _('Delete') }}"
+     data-are-you-sure-delete="{{ _('Are you sure you want to delete this') }}"
+     data-sector="{{ _('sector') }}"
+     data-subsector="{{ _('subsector') }}"
+     data-question-mark="{{ _('?') }}"
+     data-id="{{ _('ID') }}"
+     data-search="{{ _('Search') }}"
+     data-search-definition="{{ _('Search Definition') }}"
+     data-refresh-page="{{ _('Refresh Page') }}"
+     data-try-again="{{ _('Try Again') }}">
+</div>
+
+{% from "components/_page_header.html" import page_header %}
+{% set pending_suggestions_count = pending_suggestions_count | default(0) %}
+{% set has_pending_suggestions = pending_suggestions_count > 0 %}
+{% set indicator_suggestions_classes = (
+    'inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
+    if has_pending_suggestions else
+    'inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-500 bg-gray-100 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300'
+) %}
+
+{% set header_actions = namespace(items=[]) %}
+{% if can_review_suggestions %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Indicator Suggestions') ~ ' (' ~ pending_suggestions_count ~ ')',
+        'url': url_for('utilities.manage_indicator_suggestions'),
+        'icon': 'fas fa-lightbulb',
+        'classes': indicator_suggestions_classes,
+        'attributes': {'title': _('View indicator suggestions')}
+    }) %}
+{% endif %}
+{% if can_see_actions_dropdown %}
+{% set actions_dropdown %}
+<div class="action-dropdown" id="actions-dropdown-wrapper">
+    <button type="button"
+            class="professional-action-btn professional-action-btn-blue"
+            id="actions-dropdown-btn"
+            title="{{ _('Additional actions') }}"
+            aria-haspopup="true"
+            aria-expanded="false">
+        <i class="fas fa-cogs"></i>
+        <span>{{ _('Actions') }}</span>
+        <i class="fas fa-chevron-down" style="font-size:10px;margin-left:4px;"></i>
+    </button>
+    <div class="action-dropdown-menu hidden" id="actions-dropdown-menu" role="menu">
+        {% if can_create_indicators %}
+            <a href="{{ url_for('system_admin.add_indicator_bank') }}" class="action-dropdown-item" role="menuitem">
+                <i class="fas fa-plus text-red-600"></i>
+                <span>{{ _('Add New Indicator') }}</span>
+            </a>
+        {% endif %}
+        {% if can_view_audit %}
+            <a href="{{ url_for('utilities.indicator_change_history') }}" class="action-dropdown-item" role="menuitem">
+                <i class="fas fa-history text-blue-600"></i>
+                <span>{{ _('View Change History') }}</span>
+            </a>
+        {% endif %}
+        <a href="{{ url_for('system_admin.indicator_bank_neural_map') }}" class="action-dropdown-item" role="menuitem">
+            <i class="fas fa-project-diagram text-purple-600"></i>
+            <span>{{ _('Neural Map') }}</span>
+        </a>
+        <button type="button" id="export-import-btn" class="action-dropdown-item" role="menuitem">
+            <i class="fas fa-file-excel text-green-600"></i>
+            <span>{{ _('Export/Import') }}</span>
+        </button>
+        {% if can_edit_indicators %}
+            <div class="action-dropdown-divider"></div>
+            <button type="button" id="sync-remote-indicatorbank-btn" class="action-dropdown-item" role="menuitem"
+                    title="{{ _('Sync indicators from the external IFRC Indicator Bank') }}">
+                <i class="fas fa-sync-alt text-gray-600"></i>
+                <span>{{ _('Sync from IFRC Indicator Bank') }}</span>
+            </button>
+        {% endif %}
+        {% if can_manage_org %}
+            <div class="action-dropdown-divider"></div>
+            <a href="{{ url_for('system_admin.manage_sectors_subsectors') }}" class="action-dropdown-item" role="menuitem">
+                <i class="fas fa-layer-group text-purple-600"></i>
+                <span>{{ _('Sectors/Subsectors') }}</span>
+            </a>
+        {% endif %}
+        {% if can_edit_indicators %}
+            <a href="{{ url_for('system_admin.manage_common_words') }}" class="action-dropdown-item" role="menuitem">
+                <i class="fas fa-book text-indigo-600"></i>
+                <span>{{ _('Common Words') }}</span>
+            </a>
+            <button type="button" id="auto-translate-all-btn" class="action-dropdown-item" role="menuitem"
+                    title="{{ _('Auto-translate all blank indicator names to all languages') }}">
+                <i class="fas fa-magic text-indigo-600"></i>
+                <span>{{ _('Auto Translate All') }}</span>
+            </button>
+        {% endif %}
+    </div>
+</div>
+{% endset %}
+{% set __ = header_actions.items.append({
+    'type': 'custom',
+    'content': actions_dropdown
+}) %}
+{% else %}
+{# View-only users: surface both accessible actions directly in the header. #}
+{% set __ = header_actions.items.append({
+    'type': 'link',
+    'text': _('Neural Map'),
+    'url': url_for('system_admin.indicator_bank_neural_map'),
+    'icon': 'fas fa-project-diagram',
+    'classes': 'professional-action-btn',
+    'attributes': {'title': _('Indicator neural map')}
+}) %}
+{# Reuses the same id so the existing JS click handler opens the modal without changes. #}
+{% set __ = header_actions.items.append({
+    'type': 'button',
+    'text': _('Export'),
+    'icon': 'fas fa-file-excel',
+    'classes': 'professional-action-btn',
+    'attributes': {'id': 'export-import-btn', 'title': _('Export indicators to Excel')}
+}) %}
+{% endif %}
+
+{{ page_header(
+    title=_('Indicator Bank'),
+    icon='fas fa-database',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank')}
+    ],
+    info_tooltip=_('Manage the central repository of indicators used throughout the') + ' ' + ORG_NAME + '. ' + _('The indicator bank contains standardized metrics for measuring humanitarian impact, organized by sectors and subsectors. Add new indicators, translate them into multiple languages, organize by sectors, and track their usage across forms and templates. This bank ensures consistency in data collection and reporting across all operations.'),
+    actions=header_actions.items
+) }}
+
+    {# Actions dropdown menu is rendered inside the page header action button (see header_actions) #}
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Main Table Card -->
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+        {% if indicators %}
+            {{ ag_grid_container('indicatorBankGrid', loading_text=_('Loading indicators...'), grid_height='600px', include_card=false) }}
+        {% else %}
+            <p class="text-gray-700">{{ _('No indicators found in the bank.') }}</p>
+        {% endif %}
+    </div>
+
+<!-- Export/Import Modal -->
+<div id="export-import-modal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl transform transition-all">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-semibold text-gray-800">{{ _('Export/Import Indicators') }}</h3>
+            <button id="close-export-import-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+        </div>
+        <div class="grid {% if can_edit_indicators %}grid-cols-2 divide-x divide-gray-200{% else %}grid-cols-1{% endif %}">
+            <!-- Export Section -->
+            <div class="p-6 space-y-4">
+                <h4 class="text-lg font-medium text-gray-700 mb-4">{{ _('Export Options') }}</h4>
+                <div class="text-center mb-4">
+                    <i class="fas fa-cloud-download-alt text-3xl text-gray-400 mb-2"></i>
+                </div>
+                <div class="flex gap-3">
+                    <button id="export-all-btn" class="btn btn-success flex-1">
+                        <i class="fas fa-download mr-2"></i>{{ _('All Indicators') }}
+                    </button>
+                    <button id="export-selected-btn" class="btn btn-success flex-1">
+                        <i class="fas fa-check-square mr-2"></i>{{ _('Selected Indicators') }}
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-4">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    {{ _('"All Indicators" exports the complete indicator bank. "Selected Indicators" exports only the indicators you have selected.') }}
+                </p>
+            </div>
+
+            <!-- Import Section -->
+            {% if can_edit_indicators %}
+                <div class="p-6 space-y-4">
+                    <h4 class="text-lg font-medium text-gray-700 mb-4">{{ _('Import Indicators') }}</h4>
+                    <div class="space-y-4">
+                        <div class="file-upload-wrapper relative h-40 border-2 border-dashed border-gray-300 rounded-lg">
+                            <input type="file"
+                                   id="import-file"
+                                   name="file"
+                                   accept=".xlsx,.xls"
+                                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
+                                <div class="text-center">
+                                    <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                    <p class="text-sm text-gray-500">{{ _('Click or drag Excel file here to import') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            {{ _('Supported formats: .xlsx, .xls') }}
+                        </p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="p-6 space-y-4">
+                    <h4 class="text-lg font-medium text-gray-700 mb-4">{{ _('Import Indicators') }}</h4>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
+                        <i class="fas fa-lock mr-2 text-gray-500"></i>
+                        {{ _('You do not have permission to import indicators.') }}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Styled Confirm/Alert Modal (consistent with entry form modals) -->
+<div id="styled-message-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center px-4">
+    <div class="relative mx-auto w-full max-w-lg bg-white rounded-lg shadow-xl">
+        <button type="button" id="styled-message-close" class="absolute top-3 right-3 btn-close-icon text-gray-400 hover:text-gray-600" aria-label="{{ _('Close modal') }}">
+            <i class="fas fa-times w-6 h-6"></i>
+        </button>
+        <div class="px-6 pt-6 pb-4">
+            <div class="flex items-start gap-3">
+                <div id="styled-message-icon" class="mt-0.5 text-gray-500">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 id="styled-message-title" class="text-lg font-semibold text-gray-900">{{ _('Message') }}</h3>
+                    <div id="styled-message-body" class="mt-2 text-sm text-gray-700 whitespace-pre-line"></div>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 pb-6 flex justify-end gap-3">
+            <button type="button" id="styled-message-cancel" class="hidden btn btn-secondary">
+                {{ _('Cancel') }}
+            </button>
+            <button type="button" id="styled-message-ok" class="btn btn-danger">
+                {{ _('OK') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div id="styled-toast" class="fixed top-4 right-4 z-[10000] hidden max-w-sm">
+    <div id="styled-toast-inner" class="rounded-lg shadow-lg border px-4 py-3 text-sm"></div>
+</div>
+
+<!-- Sectors/Subsectors Management Modal -->
+{% if can_manage_org %}
+<div id="sectors-modal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl transform transition-all max-h-[90vh] overflow-hidden">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-semibold text-gray-800">{{ _('Manage Sectors & Subsectors') }}</h3>
+            <button id="close-sectors-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+        </div>
+        <div class="grid grid-cols-2 divide-x divide-gray-200 h-full overflow-hidden">
+            <!-- Sectors Section -->
+            <div class="p-6 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="text-lg font-medium text-gray-700">{{ _('Sectors') }}</h4>
+                    <button id="add-sector-btn" class="btn btn-purple">
+                        <i class="fas fa-plus mr-1"></i>{{ _('Add Sector') }}
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                    <div id="sectors-list" class="space-y-2">
+                        <!-- Sectors will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subsectors Section -->
+            <div class="p-6 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="text-lg font-medium text-gray-700">{{ _('Subsectors') }}</h4>
+                    <button id="add-subsector-btn" class="btn btn-success">
+                        <i class="fas fa-plus mr-1"></i>{{ _('Add Subsector') }}
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                    <div id="subsectors-list" class="space-y-2">
+                        <!-- Subsectors will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 border-t flex justify-end gap-3 bg-gray-50">
+            <button id="sectors-cancel-btn" class="btn btn-secondary">{{ _('Cancel') }}</button>
+            <button id="sectors-save-btn" class="btn btn-success">{{ _('Save Changes') }}</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Sector/Subsector Edit Modal -->
+{% if can_manage_org %}
+<div id="edit-item-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 id="edit-item-title" class="text-xl font-semibold text-gray-800">{{ _('Edit Item') }}</h3>
+            <button id="close-edit-item-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label for="item-name" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                <input type="text" id="item-name" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" placeholder="{{ _('Enter name') }}">
+            </div>
+            <div>
+                <label for="item-icon" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon (FontAwesome class)') }}</label>
+                <div class="flex">
+                    <input type="text" id="item-icon" class="flex-1 p-2 border border-gray-300 rounded-l-md focus:ring-purple-500 focus:border-purple-500" placeholder="{{ _('e.g., fas fa-heart') }}">
+                    <div class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md flex items-center">
+                        <i id="icon-preview" class="text-gray-400"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">{{ _('Use FontAwesome class names (e.g., "fas fa-heart", "fas fa-home")') }}</p>
+            </div>
+        </div>
+        <div class="p-4 border-t flex justify-end gap-3 bg-gray-50">
+            <button id="edit-item-cancel-btn" class="btn btn-secondary">{{ _('Cancel') }}</button>
+            <button id="edit-item-save-btn" class="btn btn-success">{{ _('Save') }}</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Auto-Translate Modal Configuration #}
+{% if can_edit_indicators %}
+    {% set auto_translate_config = {
+        'title': _('Auto-Translate All Indicators'),
+        'description': _('Translate all blank indicator names to all languages'),
+        'endpoint': url_for('utilities.api_auto_translate'),
+        'item_type': 'indicators',
+        'permission_context': 'indicator_bank',
+        'permission_code': 'admin.indicator_bank.edit'
+    } %}
+
+    <script nonce="{{ csp_nonce() }}">
+    // Make auto_translate_config available globally
+    window.autoTranslateConfigFromTemplate = {{ auto_translate_config | tojson }};
+    </script>
+
+    {# Include centralized auto-translate modal #}
+    {% include "components/auto_translate_modal.html" with context %}
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+    {# Include centralized auto-translate modal JavaScript #}
+    {% if can_edit_indicators %}
+        {% include "components/auto_translate_modal_js.html" with context %}
+    {% endif %}
+
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // UI permissions for this screen (routes remain authoritative)
+    const UI_PERMS = {
+        canCreateIndicators: {{ can_create_indicators|default(false)|tojson|safe }},
+        canEditIndicators: {{ can_edit_indicators|default(false)|tojson|safe }},
+        canArchiveIndicators: {{ can_archive_indicators|default(false)|tojson|safe }},
+        canManageOrg: {{ can_manage_org|default(false)|tojson|safe }}
+    };
+
+    // Transform indicators data for ag-grid
+    const indicatorsData = [
+        {% for indicator in indicators %}
+        {
+            id: {{ indicator.id }},
+            name: {{ (indicator.name or '')|tojson|safe }},
+            {% set _nt = indicator.name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            name_{{ code }}: {{ ((_nt.get(code) if _nt and _nt.get(code) else '') or '')|tojson|safe }},
+            {% endfor %}
+            type: {{ (indicator.type or '')|tojson|safe }},
+            unit: {{ (indicator.unit or '')|tojson|safe }},
+            fdrs_kpi_code: {{ (indicator.fdrs_kpi_code or '')|tojson|safe }},
+            definition: {{ (indicator.definition or '')|tojson|safe }},
+            {% set _dt = indicator.definition_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            definition_{{ code }}: {{ ((_dt.get(code) if _dt and _dt.get(code) else '') or '')|tojson|safe }},
+            {% endfor %}
+            related_programs_list: {{ (indicator.related_programs_list or [])|tojson|safe }},
+            sector_primary: {{ (indicator.get_sector_name_by_level('primary') or '')|tojson|safe }},
+            sector_secondary: {{ (indicator.get_sector_name_by_level('secondary') or '')|tojson|safe }},
+            sector_tertiary: {{ (indicator.get_sector_name_by_level('tertiary') or '')|tojson|safe }},
+            subsector_primary: {{ (indicator.get_subsector_name_by_level('primary') or '')|tojson|safe }},
+            subsector_secondary: {{ (indicator.get_subsector_name_by_level('secondary') or '')|tojson|safe }},
+            subsector_tertiary: {{ (indicator.get_subsector_name_by_level('tertiary') or '')|tojson|safe }},
+            archived: {{ indicator.archived|tojson|safe }},
+            emergency: {{ indicator.emergency|tojson|safe }},
+            comments: {{ (indicator.comments or '')|tojson|safe }},
+            usage_count: {{ indicator.usage_count|default(0)|tojson|safe }},
+            view_url: "{{ url_for('system_admin.view_indicator_bank', id=indicator.id) }}",
+            edit_url: "{{ url_for('system_admin.edit_indicator_bank', id=indicator.id) if can_edit_indicators else '' }}",
+            delete_url: "{{ url_for('system_admin.delete_indicator_bank', id=indicator.id) if can_edit_indicators else '' }}",
+            delete_confirm: {{ _('Are you sure you want to delete this indicator?')|js }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for ag-grid
+    // Order: ID, all name columns (name + name_*), all definition columns (definition + definition_*), other columns, actions (pinned last)
+    const columnDefs = [
+        {
+            field: 'id',
+            headerName: {{ _("ID")|js }},
+            width: 80,
+            minWidth: 80,
+            maxWidth: 120,
+            lockVisible: true,
+            cellRenderer: function(params) {
+                var base = {{ (INDICATOR_BANK_PUBLIC_BASE or '')|tojson }};
+                var id = params.value;
+                if (base && String(base).trim()) {
+                    var b = String(base).replace(/\/+$/, '');
+                    return '<a href="' + b + '/IndicatorDetail/' + id + '" target="_blank" class="hover:underline font-medium text-blue-600">' + id + '</a>';
+                }
+                return '<span class="font-medium text-gray-800">' + id + '</span>';
+            },
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        // All name columns grouped together
+        {
+            field: 'name',
+            headerName: {{ _("Name")|js }},
+            width: 280,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'name_{{ code }}',
+            headerName: {{ (_('Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 280,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // All definition columns grouped together
+        {
+            field: 'definition',
+            headerName: {{ _("Definition")|js }},
+            width: 300,
+            minWidth: 250,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '-';
+                return '<span>' + (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'definition_{{ code }}',
+            headerName: {{ (_('Definition') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 300,
+            minWidth: 250,
+            maxWidth: 400,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '-';
+                {% if code in ['ar','fa','he','ur'] %}
+                const truncated = params.value.length > 100 ? params.value.substring(0, 100) + '...' : params.value;
+                return '<span title="' + (params.value || '').replace(/"/g, '&quot;') + '">' + truncated + '</span>';
+                {% else %}
+                return '<span>' + (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+                {% endif %}
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // Other columns
+        {
+            field: 'type',
+            headerName: {{ _("Type")|js }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            }
+        },
+        {
+            field: 'unit',
+            headerName: {{ _("Unit")|js }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            }
+        },
+        {
+            field: 'fdrs_kpi_code',
+            headerName: {{ _("FDRS KPI Code")|js }},
+            width: 130,
+            minWidth: 100,
+            maxWidth: 200,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            }
+        },
+        {
+            field: 'related_programs_list',
+            headerName: {{ _("Programs")|js }},
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: false,
+            valueFormatter: function(params) {
+                // Return empty string for valueFormatter to suppress warning
+                return '';
+            },
+            cellRenderer: function(params) {
+                if (!params.value || !Array.isArray(params.value) || params.value.length === 0) {
+                    return '<span class="text-gray-400">-</span>';
+                }
+                let html = '<div class="flex flex-wrap gap-1">';
+                const programs = params.value.slice(0, 3);
+                programs.forEach(function(program) {
+                    html += '<span class="bg-gray-200 text-gray-700 text-xs font-medium px-2 py-0.5 rounded">' + (program || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+                });
+                if (params.value.length > 3) {
+                    html += '<span class="text-gray-400 text-xs">+' + (params.value.length - 3) + ' ' + {{ _("more")|js }} + '</span>';
+                }
+                html += '</div>';
+                return html;
+            }
+        },
+        {
+            field: 'sector',
+            headerName: {{ _("Sector")|js }},
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: false,
+            valueGetter: function(params) {
+                const parts = [];
+                if (params.data.sector_primary) parts.push(params.data.sector_primary);
+                if (params.data.sector_secondary) parts.push(params.data.sector_secondary);
+                if (params.data.sector_tertiary) parts.push(params.data.sector_tertiary);
+                return parts.join(' / ');
+            },
+            valueFormatter: function(params) {
+                // Return string value for valueFormatter
+                const parts = [];
+                if (params.data && params.data.sector_primary) parts.push(params.data.sector_primary);
+                if (params.data && params.data.sector_secondary) parts.push(params.data.sector_secondary);
+                if (params.data && params.data.sector_tertiary) parts.push(params.data.sector_tertiary);
+                return parts.length > 0 ? parts.join(' / ') : '';
+            },
+            cellRenderer: function(params) {
+                const parts = [];
+                if (params.data.sector_primary) parts.push(params.data.sector_primary);
+                if (params.data.sector_secondary) parts.push(params.data.sector_secondary);
+                if (params.data.sector_tertiary) parts.push(params.data.sector_tertiary);
+                if (parts.length === 0) {
+                    return '<span class="text-gray-400">-</span>';
+                }
+                let html = '<div class="sector-items">';
+                parts.forEach(function(part) {
+                    html += '<div>' + (part || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                });
+                html += '</div>';
+                return html;
+            }
+        },
+        {
+            field: 'subsector',
+            headerName: {{ _("Sub-Sector")|js }},
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: false,
+            valueGetter: function(params) {
+                const parts = [];
+                if (params.data.subsector_primary) parts.push(params.data.subsector_primary);
+                if (params.data.subsector_secondary) parts.push(params.data.subsector_secondary);
+                if (params.data.subsector_tertiary) parts.push(params.data.subsector_tertiary);
+                return parts.join(' / ');
+            },
+            valueFormatter: function(params) {
+                // Return string value for valueFormatter
+                const parts = [];
+                if (params.data && params.data.subsector_primary) parts.push(params.data.subsector_primary);
+                if (params.data && params.data.subsector_secondary) parts.push(params.data.subsector_secondary);
+                if (params.data && params.data.subsector_tertiary) parts.push(params.data.subsector_tertiary);
+                return parts.length > 0 ? parts.join(' / ') : '';
+            },
+            cellRenderer: function(params) {
+                const parts = [];
+                if (params.data.subsector_primary) parts.push(params.data.subsector_primary);
+                if (params.data.subsector_secondary) parts.push(params.data.subsector_secondary);
+                if (params.data.subsector_tertiary) parts.push(params.data.subsector_tertiary);
+                if (parts.length === 0) {
+                    return '<span class="text-gray-400">-</span>';
+                }
+                let html = '<div class="sector-items">';
+                parts.forEach(function(part) {
+                    html += '<div>' + (part || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                });
+                html += '</div>';
+                return html;
+            }
+        },
+        {
+            field: 'archived',
+            headerName: {{ _("Status")|js }},
+            width: 120,
+            minWidth: 110,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.archivedStatus,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'emergency',
+            headerName: {{ _("Emergency")|js }},
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.emergencyBadge,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'comments',
+            headerName: {{ _("Comments")|js }},
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '-';
+                return '<span>' + (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'usage_count',
+            headerName: {{ _("Usage Count")|js }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.usageCount,
+            cellStyle: { 'text-align': 'center', 'white-space': 'nowrap' }
+        },
+        {
+            field: 'actions',
+            headerName: {{ _("Actions")|js }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const viewUrl = params.data.view_url || '';
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || {{ _("Are you sure you want to delete this indicator?")|js }};
+
+                var escapeHtmlAttr = AgGridRenderers.escapeHtmlAttr;
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (viewUrl) {
+                    html += '<a href="' + viewUrl + '" title="' + escapeHtmlAttr({{ _("View")|js }}) + '" class="text-gray-500 hover:text-green-600 transition-colors"><i class="fas fa-eye fa-fw"></i></a>';
+                }
+                if (editUrl) {
+                    html += '<a href="' + editUrl + '" title="' + escapeHtmlAttr({{ _("Edit")|js }}) + '" class="text-gray-500 hover:text-blue-600 transition-colors"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (deleteUrl) {
+                    const safeConfirm = String(deleteConfirm || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block delete-indicator-form" data-confirm="' + safeConfirm + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" title="' + escapeHtmlAttr({{ _("Delete")|js }}) + '" class="text-gray-500 hover:text-red-600 transition-colors"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        // Initialize grid with helper
+        var nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+        var definitionColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'definition_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+        var desiredOrder = ['id', 'name']
+            .concat(nameColumns)
+            .concat(['definition'])
+            .concat(definitionColumns)
+            .concat(['type', 'unit', 'fdrs_kpi_code', 'related_programs_list', 'sector', 'subsector', 'archived', 'emergency', 'comments', 'usage_count', 'actions']);
+
+        var result = AgGridHelper.create('indicatorBankGrid', 'indicator-bank', columnDefs, indicatorsData, {
+            onReady: function(api) {
+                AgGridHelper.pinActionsColumn(api, desiredOrder);
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+        window.columnVisibilityManager = gridHelper.columnVisibilityManager;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+
+    // Indicator-specific auto-translate implementation (edit permission required)
+    if (UI_PERMS.canEditIndicators) {
+        // Wait for ag-grid to be initialized
+        function waitForGridApi() {
+            if (!window.gridApi) {
+                setTimeout(waitForGridApi, 50);
+                return;
+            }
+            initializeAutoTranslate();
+        }
+
+        // Start checking for grid API when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            waitForGridApi();
+        });
+    }
+
+    function initializeAutoTranslate() {
+    // Helper function to get language field name
+    function getLanguageFieldName(lang) {
+        return lang ? `name_${lang}` : null;
+    }
+
+    // Helper function to get definition field name
+    function getDefinitionFieldName(lang) {
+        return lang ? `definition_${lang}` : null;
+    }
+
+    // Get row data to use for translation: selected rows if any, otherwise all rows
+    function getRowDataForTranslation() {
+        if (!window.gridApi) return [];
+        if (window.gridHelper) {
+            const selected = window.gridHelper.getSelectedRows();
+            if (selected && selected.length > 0) return selected;
+        }
+        const rowData = [];
+        window.gridApi.forEachNode(function(node) {
+            if (node.data) rowData.push(node.data);
+        });
+        return rowData;
+    }
+
+    // Function to get translation counts for the modal
+    // overwriteExisting: when true, count all items with English text (including already translated); when false, only count missing translations
+    // selectedMsgids: ignored on indicator bank (used by manage_translations page)
+    window.getPageSpecificTranslationCounts = function(overwriteExisting, selectedMsgids) {
+        overwriteExisting = !!overwriteExisting;
+        const counts = {};
+        {% for lang_code in TRANSLATABLE_LANGUAGES %}
+        counts['{{ lang_code }}'] = 0;
+        {% endfor %}
+
+        try {
+            if (!window.gridApi) {
+                return counts;
+            }
+
+            const rowData = getRowDataForTranslation();
+
+            rowData.forEach(function(indicator) {
+                if (!indicator || !indicator.id) return;
+
+                const englishName = indicator.name || '';
+                const englishDefinition = indicator.definition || '';
+                const hasEnglishName = englishName && englishName !== '' && englishName !== '-';
+                const hasEnglishDefinition = englishDefinition && englishDefinition !== '' && englishDefinition !== '-';
+
+                Object.keys(counts).forEach(lang => {
+                    const nameField = getLanguageFieldName(lang);
+                    const definitionField = getDefinitionFieldName(lang);
+
+                    if (nameField && definitionField) {
+                        if (overwriteExisting) {
+                            if (hasEnglishName || hasEnglishDefinition) {
+                                counts[lang]++;
+                            }
+                        } else {
+                            const nameValue = indicator[nameField] || '';
+                            const definitionValue = indicator[definitionField] || '';
+                            const hasNameTranslation = nameValue && nameValue !== '' && nameValue !== '-';
+                            const hasDefinitionTranslation = definitionValue && definitionValue !== '' && definitionValue !== '-';
+                            const needsNameTranslation = hasEnglishName && !hasNameTranslation;
+                            const needsDefinitionTranslation = hasEnglishDefinition && !hasDefinitionTranslation;
+                            if (needsNameTranslation || needsDefinitionTranslation) {
+                                counts[lang]++;
+                            }
+                        }
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Error calculating translation counts:', error);
+        }
+
+        return counts;
+    };
+
+    // Override the generic translation function with indicator-specific logic
+    window.performPageSpecificTranslation = function(selectedLanguages, selectedService) {
+        const overwriteExisting = jQuery('#overwrite-existing-translations').is(':checked');
+        const indicatorsToTranslate = [];
+
+        const counts = window.getPageSpecificTranslationCounts(overwriteExisting);
+        const languagesNeedingTranslation = overwriteExisting
+            ? selectedLanguages
+            : selectedLanguages.filter(lang => counts[lang] > 0);
+
+        if (!window.gridApi) {
+            window.autoTranslateModal.logProgress({{ _("Grid not initialized")|js }}, 'error');
+            return;
+        }
+
+        const rowData = getRowDataForTranslation();
+
+        rowData.forEach(function(indicator) {
+            if (!indicator || !indicator.id) return;
+
+            const englishName = indicator.name || '';
+            const englishDefinition = indicator.definition || '';
+            const hasEnglishName = englishName && englishName !== '' && englishName !== '-';
+            const hasEnglishDefinition = englishDefinition && englishDefinition !== '' && englishDefinition !== '-';
+
+            if (!hasEnglishName && !hasEnglishDefinition) {
+                return;
+            }
+
+            languagesNeedingTranslation.forEach(lang => {
+                const nameField = getLanguageFieldName(lang);
+                const definitionField = getDefinitionFieldName(lang);
+
+                if (nameField && definitionField) {
+                    let needsNameTranslation, needsDefinitionTranslation;
+                    if (overwriteExisting) {
+                        needsNameTranslation = hasEnglishName;
+                        needsDefinitionTranslation = hasEnglishDefinition;
+                    } else {
+                        const nameValue = indicator[nameField] || '';
+                        const definitionValue = indicator[definitionField] || '';
+                        const hasNameTranslation = nameValue && nameValue !== '' && nameValue !== '-';
+                        const hasDefinitionTranslation = definitionValue && definitionValue !== '' && definitionValue !== '-';
+                        needsNameTranslation = hasEnglishName && !hasNameTranslation;
+                        needsDefinitionTranslation = hasEnglishDefinition && !hasDefinitionTranslation;
+                    }
+
+                    if (needsNameTranslation || needsDefinitionTranslation) {
+                        indicatorsToTranslate.push({
+                            id: indicator.id,
+                            text: englishName,
+                            definition: englishDefinition || '',
+                            language: lang,
+                            type: 'form_item',
+                            needsNameTranslation: needsNameTranslation,
+                            needsDefinitionTranslation: needsDefinitionTranslation
+                        });
+                    }
+                }
+            });
+        });
+
+
+
+        if (indicatorsToTranslate.length === 0) {
+            window.autoTranslateModal.logProgress({{ _("No indicators found that need translation")|js }}, 'info');
+            window.autoTranslateModal.translationState.isRunning = false;
+            jQuery('#auto-translate-pause-btn').addClass('hidden');
+            jQuery('#auto-translate-resume-btn').addClass('hidden');
+            jQuery('#auto-translate-stop-btn').addClass('hidden');
+            jQuery('#auto-translate-close-btn').removeClass('hidden');
+            return;
+        }
+
+        window.autoTranslateModal.translationState.totalItems = indicatorsToTranslate.length;
+        window.autoTranslateModal.updateProgress();
+
+        // Log the start of the translation process
+        window.autoTranslateModal.logProgress(`{{ _("Starting") }} ${indicatorsToTranslate.length} {{ _("translations...") }}`, 'info');
+
+        // Process indicators one by one
+        processNextIndicator(indicatorsToTranslate, 0, languagesNeedingTranslation, selectedService);
+    };
+
+    function processNextIndicator(indicators, index, selectedLanguages, selectedService) {
+        if (index >= indicators.length || window.autoTranslateModal.translationState.shouldStop) {
+            window.autoTranslateModal.translationState.isRunning = false;
+            window.autoTranslateModal.logProgress({{ _("Translation completed!")|js }}, 'success');
+            jQuery('#auto-translate-pause-btn').addClass('hidden');
+            jQuery('#auto-translate-resume-btn').addClass('hidden');
+            jQuery('#auto-translate-stop-btn').addClass('hidden');
+            jQuery('#auto-translate-close-btn').removeClass('hidden');
+            if (window.autoTranslateModal.notifyCompletion) {
+                window.autoTranslateModal.notifyCompletion();
+            }
+            return;
+        }
+
+        // Check if translation is paused
+        if (window.autoTranslateModal.translationState.isPaused) {
+            // Wait a bit and check again
+            setTimeout(() => processNextIndicator(indicators, index, selectedLanguages, selectedService), 500);
+            return;
+        }
+
+        const indicator = indicators[index];
+                const service = selectedService || 'ifrc';
+
+        // Call the translation API
+        const translationPayload = {
+            type: 'form_item', // Use 'form_item' type for translation API (same as edit template)
+            permission_context: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_context) ? window.autoTranslateModal.config.permission_context : 'indicator_bank',
+            permission_code: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_code) ? window.autoTranslateModal.config.permission_code : 'admin.indicator_bank.edit',
+            text: indicator.text,
+            definition: indicator.definition,
+            target_languages: [indicator.language],
+            translation_service: service
+        };
+
+
+        // Encode payload to avoid WAF false positives on indicator text/definitions.
+        // Backend (api_auto_translate) already supports { payload: b64 }.
+        const _ibPayloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(translationPayload))));
+        ((window.getFetch && window.getFetch()) || fetch)(window.autoTranslateModal.config.endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': jQuery('meta[name=csrf-token]').attr('content')
+            },
+            body: JSON.stringify({ payload: _ibPayloadB64 })
+        })
+        .then(response => {
+            return response.json();
+        })
+        .then(data => {
+            window.autoTranslateModal.translationState.processedItems++;
+
+            // Update progress after receiving response
+            window.autoTranslateModal.updateProgress();
+
+            if (data.success && data.translations) {
+
+                // Prepare the indicator update structure
+                // For indicators in the indicator bank, we need to use the correct type and field mapping
+                const indicatorToUpdate = {
+                    id: indicator.id,
+                    type: 'indicator', // Use 'indicator' type for the save API (indicators are stored differently than form items)
+                    translations: {}
+                };
+
+                // Map the translations from the API response
+                // For indicators, we need to map to the correct IndicatorBank field names
+                let hasTranslations = false;
+
+                if (data.translations.label_translations && data.translations.label_translations[indicator.language]) {
+                    // Map to the correct indicator field name based on language
+                    const fieldName = `name_${indicator.language}`;
+                    indicatorToUpdate.translations[fieldName] = data.translations.label_translations[indicator.language];
+                    hasTranslations = true;
+                }
+
+                if (data.translations.definition_translations && data.translations.definition_translations[indicator.language]) {
+                    // Map to the correct indicator definition field name based on language
+                    const fieldName = `definition_${indicator.language}`;
+                    indicatorToUpdate.translations[fieldName] = data.translations.definition_translations[indicator.language];
+                    hasTranslations = true;
+                }
+
+                // Check if we have any translations to save
+                if (!hasTranslations) {
+                    window.autoTranslateModal.translationState.errorCount++;
+                    window.autoTranslateModal.logProgress(`No translations received for indicator ${indicator.id}`, 'error');
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(() => processNextIndicator(indicators, index + 1, selectedLanguages, selectedService), 100);
+                    return;
+                }
+
+                // Save to database via direct indicator update endpoint
+
+                // Build the update payload directly from the translations
+                const updatePayload = {};
+
+                // Add all translations to the payload
+                Object.keys(indicatorToUpdate.translations).forEach(fieldName => {
+                    updatePayload[fieldName] = indicatorToUpdate.translations[fieldName];
+                });
+
+                const saveUrl = '{{ url_for("system_admin.edit_indicator_bank", id=0) }}'.replace('/0', `/${indicator.id}`);
+
+                ((window.getFetch && window.getFetch()) || fetch)(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': jQuery('meta[name=csrf-token]').attr('content')
+                    },
+                    body: JSON.stringify(updatePayload)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    return response.json();
+                })
+                .then(saveData => {
+
+                    // For direct indicator update, success is indicated by HTTP 200/204 and valid response
+                    if (saveData && (saveData.success !== false)) {
+                        window.autoTranslateModal.translationState.successCount++;
+
+                        // Create a descriptive message showing what was translated
+                        let translationTypes = [];
+                        if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
+                        if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+
+                        const translationTypeText = translationTypes.join(' + ');
+                        window.autoTranslateModal.logProgress(`{{ _("✓") }} ${indicator.id} → ${indicator.language} (${translationTypeText})`, 'success');
+                    } else {
+                        window.autoTranslateModal.translationState.errorCount++;
+
+                        // Create a descriptive error message showing what was being translated
+                        let translationTypes = [];
+                        if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
+                        if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+
+                        const translationTypeText = translationTypes.join(' + ');
+                        const errorMsg = `{{ _("Failed to save") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveData.message || 'Unknown error'}`;
+                        window.autoTranslateModal.translationState.errors.push(errorMsg);
+                        window.autoTranslateModal.logProgress(errorMsg, 'error');
+                    }
+
+                    // Update progress immediately after success/error
+                    window.autoTranslateModal.updateProgress();
+
+                    // Refresh grid data to show updated translations
+                    if (window.gridApi) {
+                        // Find and update the row in the grid
+                        window.gridApi.forEachNode(function(node) {
+                            if (node.data && node.data.id == indicator.id) {
+                                // Update the translated fields
+                                if (indicator.needsNameTranslation && data.translations && data.translations.label_translations && data.translations.label_translations[indicator.language]) {
+                                    node.setDataValue(`name_${indicator.language}`, data.translations.label_translations[indicator.language]);
+                                }
+                                if (indicator.needsDefinitionTranslation && data.translations && data.translations.definition_translations && data.translations.definition_translations[indicator.language]) {
+                                    node.setDataValue(`definition_${indicator.language}`, data.translations.definition_translations[indicator.language]);
+                                }
+                            }
+                        });
+                    }
+
+                    // Process next indicator after a short delay (increased to make progress more visible)
+                    setTimeout(() => processNextIndicator(indicators, index + 1, selectedLanguages, selectedService), 300);
+                })
+                .catch(saveError => {
+                    window.autoTranslateModal.translationState.errorCount++;
+
+                    // Create a descriptive error message showing what was being translated
+                    let translationTypes = [];
+                    if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
+                    if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+
+                    const translationTypeText = translationTypes.join(' + ');
+                    const errorMsg = `{{ _("Network error saving") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveError.message}`;
+                    window.autoTranslateModal.translationState.errors.push(errorMsg);
+                    window.autoTranslateModal.logProgress(errorMsg, 'error');
+                    window.autoTranslateModal.updateProgress();
+                    // Process next indicator after a short delay (increased to make progress more visible)
+                    setTimeout(() => processNextIndicator(indicators, index + 1, selectedLanguages, selectedService), 300);
+                });
+            } else {
+                window.autoTranslateModal.translationState.errorCount++;
+
+                // Create a descriptive error message showing what was being translated
+                let translationTypes = [];
+                if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
+                if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+
+                const translationTypeText = translationTypes.join(' + ');
+                const errorMsg = `{{ _("Failed to translate") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${data.message || 'Unknown error'}`;
+                window.autoTranslateModal.translationState.errors.push(errorMsg);
+                window.autoTranslateModal.logProgress(errorMsg, 'error');
+                window.autoTranslateModal.updateProgress();
+                // Process next indicator after a short delay (increased to make progress more visible)
+                setTimeout(() => processNextIndicator(indicators, index + 1, selectedLanguages, selectedService), 300);
+            }
+        })
+        .catch(error => {
+            window.autoTranslateModal.translationState.processedItems++;
+            window.autoTranslateModal.translationState.errorCount++;
+
+            // Create a descriptive error message showing what was being translated
+            let translationTypes = [];
+            if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
+            if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+
+            const translationTypeText = translationTypes.join(' + ');
+            const errorMsg = `{{ _("Network error") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${error.message}`;
+            window.autoTranslateModal.translationState.errors.push(errorMsg);
+            window.autoTranslateModal.logProgress(errorMsg, 'error');
+            window.autoTranslateModal.updateProgress();
+
+            // Continue with next indicator even on error
+            setTimeout(() => processNextIndicator(indicators, index + 1, selectedLanguages, selectedService), 300);
+        });
+    }
+    }
+    </script>
+
+
+    <script nonce="{{ csp_nonce() }}">
+        // Wait for jQuery to be available and DOM to be ready
+        function waitForjQuery() {
+            if (typeof jQuery === 'undefined') {
+                setTimeout(waitForjQuery, 10);
+                return;
+            }
+            jQuery(document).ready(function ($) {
+            // Get CSRF token from meta tag
+            const csrfToken = jQuery('meta[name="csrf-token"]').attr('content');
+
+            var escapeHtml = AgGridRenderers.escapeHtml;
+
+            // ------------------------------------------------------------------
+            // Styled alerts / confirmations (avoid native alert/confirm)
+            // ------------------------------------------------------------------
+            const $msgModal = jQuery('#styled-message-modal');
+            const $msgTitle = jQuery('#styled-message-title');
+            const $msgBody = jQuery('#styled-message-body');
+            const $msgIcon = jQuery('#styled-message-icon');
+            const $btnOk = jQuery('#styled-message-ok');
+            const $btnCancel = jQuery('#styled-message-cancel');
+            const $btnClose = jQuery('#styled-message-close');
+
+            const $toast = jQuery('#styled-toast');
+            const $toastInner = jQuery('#styled-toast-inner');
+            let toastTimer = null;
+
+            function showToast(message, type = 'info', timeoutMs = 4000) {
+                if (toastTimer) {
+                    clearTimeout(toastTimer);
+                    toastTimer = null;
+                }
+                const stylesByType = {
+                    success: 'bg-green-50 border-green-200 text-green-800',
+                    error: 'bg-red-50 border-red-200 text-red-800',
+                    warning: 'bg-amber-50 border-amber-200 text-amber-900',
+                    info: 'bg-blue-50 border-blue-200 text-blue-800'
+                };
+                $toastInner
+                    .attr('class', `rounded-lg shadow-lg border px-4 py-3 text-sm ${stylesByType[type] || stylesByType.info}`)
+                    .text(String(message || ''));
+                $toast.removeClass('hidden');
+                toastTimer = setTimeout(() => $toast.addClass('hidden'), timeoutMs);
+            }
+
+            let pendingModal = null;
+            let modalLocked = false; // when true: prevent closing (used for long-running ops)
+            function showModal({ title, message, variant = 'info', confirmText = null, cancelText = null, onConfirm = null, onCancel = null, closeOnConfirm = true, lock = false }) {
+                pendingModal = { onConfirm, onCancel, closeOnConfirm };
+                modalLocked = !!lock;
+                const iconByVariant = {
+                    success: 'fa-check-circle text-green-600',
+                    error: 'fa-exclamation-triangle text-red-600',
+                    warning: 'fa-exclamation-circle text-amber-600',
+                    info: 'fa-info-circle text-blue-600'
+                };
+                const iconClass = iconByVariant[variant] || iconByVariant.info;
+                $msgIcon.html(`<i class="fas ${iconClass}"></i>`);
+
+                $msgTitle.text(title || {{ _('Message')|tojson|safe }});
+                $msgBody.text(message || '');
+
+                if (cancelText) {
+                    $btnCancel.removeClass('hidden').text(cancelText);
+                } else {
+                    $btnCancel.addClass('hidden');
+                }
+                $btnOk.text(confirmText || {{ _('OK')|tojson|safe }});
+                // When locked, hide close button and cancel (non-closable progress modal)
+                if (modalLocked) {
+                    $btnClose.addClass('hidden');
+                    $btnCancel.addClass('hidden');
+                } else {
+                    $btnClose.removeClass('hidden');
+                }
+                $msgModal.removeClass('hidden');
+            }
+
+            function closeModal() {
+                if (modalLocked) return;
+                $msgModal.addClass('hidden');
+                pendingModal = null;
+            }
+
+            $btnClose.on('click', closeModal);
+            $btnCancel.on('click', function() {
+                if (modalLocked) return;
+                const cb = pendingModal?.onCancel;
+                closeModal();
+                if (typeof cb === 'function') cb();
+            });
+            $btnOk.on('click', function() {
+                const cb = pendingModal?.onConfirm;
+                const shouldClose = pendingModal?.closeOnConfirm !== false;
+                if (typeof cb === 'function') cb();
+                if (shouldClose) closeModal();
+            });
+            $msgModal.on('click', function(e) {
+                if (e.target && e.target.id === 'styled-message-modal') closeModal();
+            });
+
+            function setModalLocked(locked) {
+                modalLocked = !!locked;
+                if (modalLocked) {
+                    $btnClose.addClass('hidden');
+                    $btnCancel.addClass('hidden');
+                } else {
+                    $btnClose.removeClass('hidden');
+                }
+            }
+
+            function updateModalContent({ title, message, variant = 'info', confirmText = null, cancelText = null }) {
+                const iconByVariant = {
+                    success: 'fa-check-circle text-green-600',
+                    error: 'fa-exclamation-triangle text-red-600',
+                    warning: 'fa-exclamation-circle text-amber-600',
+                    info: 'fa-info-circle text-blue-600',
+                    loading: 'fa-spinner fa-spin text-gray-600'
+                };
+                const iconClass = iconByVariant[variant] || iconByVariant.info;
+                $msgIcon.html(`<i class="fas ${iconClass}"></i>`);
+                if (title !== undefined) $msgTitle.text(title || {{ _('Message')|tojson|safe }});
+                if (message !== undefined) $msgBody.text(message || '');
+                if (cancelText) {
+                    $btnCancel.removeClass('hidden').text(cancelText);
+                } else {
+                    $btnCancel.addClass('hidden');
+                }
+                if (confirmText) {
+                    $btnOk.text(confirmText);
+                }
+            }
+
+            // Get translations from data attributes
+            const translations = document.getElementById('js-translations');
+            // Make getTranslation function globally accessible with fallback
+            window.getTranslation = (key) => {
+                if (translations) {
+                    const value = translations.getAttribute(`data-${key}`);
+                    return value;
+                } else {
+                    return key; // Fallback to key name
+                }
+            };
+
+
+            // Table is now a simple HTML table, no initialization needed
+
+
+
+
+
+
+            // --- Sectors/Subsectors Management Modal Logic ---
+            const sectorsModal = jQuery('#sectors-modal');
+            const editItemModal = jQuery('#edit-item-modal');
+            let currentEditItem = null;
+            let currentEditType = null; // 'sector' or 'subsector'
+            let sectorsData = [];
+            let subsectorsData = [];
+
+            jQuery('#close-sectors-modal-btn, #sectors-modal').on('click', (e) => {
+                if (e.target.id === 'sectors-modal' || e.target.id === 'close-sectors-modal-btn') {
+                    sectorsModal.addClass('hidden');
+                }
+            });
+
+            jQuery('#sectors-cancel-btn').on('click', () => {
+                sectorsModal.addClass('hidden');
+            });
+
+            // Load sectors and subsectors data
+            function loadSectorsData() {
+                // Note: Currently using sample data - replace with actual API calls when backend endpoint is available
+                sectorsData = [
+                    { id: 1, name: getTranslation('health'), icon: 'fas fa-heartbeat' },
+                    { id: 2, name: getTranslation('education'), icon: 'fas fa-graduation-cap' },
+                    { id: 3, name: getTranslation('water-sanitation'), icon: 'fas fa-tint' },
+                    { id: 4, name: getTranslation('shelter'), icon: 'fas fa-home' },
+                    { id: 5, name: getTranslation('food-security'), icon: 'fas fa-utensils' }
+                ];
+
+                subsectorsData = [
+                    { id: 1, name: getTranslation('primary-healthcare'), icon: 'fas fa-stethoscope' },
+                    { id: 2, name: getTranslation('mental-health'), icon: 'fas fa-brain' },
+                    { id: 3, name: getTranslation('basic-education'), icon: 'fas fa-book' },
+                    { id: 4, name: getTranslation('adult-literacy'), icon: 'fas fa-spell-check' },
+                    { id: 5, name: getTranslation('water-quality'), icon: 'fas fa-flask' },
+                    { id: 6, name: getTranslation('hygiene-promotion'), icon: 'fas fa-hands-wash' }
+                ];
+
+                renderSectorsList();
+                renderSubsectorsList();
+            }
+
+            function renderSectorsList() {
+                const container = jQuery('#sectors-list');
+                container.empty();
+
+                sectorsData.forEach(sector => {
+                    const item = createItemElement(sector, 'sector');
+                    container.append(item);
+                });
+            }
+
+            function renderSubsectorsList() {
+                const container = jQuery('#subsectors-list');
+                container.empty();
+
+                subsectorsData.forEach(subsector => {
+                    const item = createItemElement(subsector, 'subsector');
+                    container.append(item);
+                });
+            }
+
+            function createItemElement(item, type) {
+                const iconHtml = item.icon ? `<i class="${item.icon} item-icon"></i>` : '<i class="fas fa-circle item-icon"></i>';
+
+                return $(`
+                    <div class="${type}-item" data-id="${item.id}">
+                        <div class="item-content">
+                            <div class="item-info">
+                                ${iconHtml}
+                                <span class="item-name">${item.name}</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="edit-btn" data-action="edit-item" data-item-id="${item.id}" data-item-type="${type}">
+                                    <i class="fas fa-pen"></i> ${getTranslation('edit')}
+                                </button>
+                                <button class="delete-btn" data-action="delete-item" data-item-id="${item.id}" data-item-type="${type}">
+                                    <i class="fas fa-trash"></i> ${getTranslation('delete')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            }
+
+            // Add new sector/subsector
+            jQuery('#add-sector-btn').on('click', () => {
+                const newId = Math.max(...sectorsData.map(s => s.id), 0) + 1;
+                const newSector = { id: newId, name: getTranslation('new-sector'), icon: 'fas fa-circle' };
+                sectorsData.push(newSector);
+                renderSectorsList();
+                editItem(newId, 'sector');
+            });
+
+            jQuery('#add-subsector-btn').on('click', () => {
+                const newId = Math.max(...subsectorsData.map(s => s.id), 0) + 1;
+                const newSubsector = { id: newId, name: getTranslation('new-subsector'), icon: 'fas fa-circle' };
+                subsectorsData.push(newSubsector);
+                renderSubsectorsList();
+                editItem(newId, 'subsector');
+            });
+
+            // Global functions for edit and delete (called from dynamically created buttons)
+            window.editItem = function(id, type) {
+                const data = type === 'sector' ? sectorsData : subsectorsData;
+                const item = data.find(i => i.id === id);
+                if (!item) return;
+
+                currentEditItem = item;
+                currentEditType = type;
+
+                jQuery('#edit-item-title').text(`Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`);
+                jQuery('#item-name').val(item.name);
+                jQuery('#item-icon').val(item.icon || '');
+                updateIconPreview();
+
+                // Highlight the item being edited
+                $(`.${type}-item[data-id="${id}"]`).addClass('editing');
+
+                editItemModal.removeClass('hidden');
+            };
+
+            window.deleteItem = function(id, type) {
+                showModal({
+                    title: getTranslation('delete'),
+                    message: `${getTranslation('are-you-sure-delete')} ${getTranslation(type)}${getTranslation('question-mark')}`,
+                    variant: 'warning',
+                    confirmText: getTranslation('delete'),
+                    cancelText: {{ _('Cancel')|tojson|safe }},
+                    onConfirm: function() {
+                        if (type === 'sector') {
+                            sectorsData = sectorsData.filter(s => s.id !== id);
+                            renderSectorsList();
+                        } else {
+                            subsectorsData = subsectorsData.filter(s => s.id !== id);
+                            renderSubsectorsList();
+                        }
+                    }
+                });
+            };
+
+            // Edit item modal logic
+            jQuery('#close-edit-item-modal-btn, #edit-item-modal').on('click', (e) => {
+                if (e.target.id === 'edit-item-modal' || e.target.id === 'close-edit-item-modal-btn') {
+                    closeEditModal();
+                }
+            });
+
+            jQuery('#edit-item-cancel-btn').on('click', () => {
+                closeEditModal();
+            });
+
+            function closeEditModal() {
+                // Remove editing highlight
+                jQuery('.sector-item, .subsector-item').removeClass('editing');
+                editItemModal.addClass('hidden');
+                currentEditItem = null;
+                currentEditType = null;
+            }
+
+            jQuery('#edit-item-save-btn').on('click', () => {
+                if (!currentEditItem) return;
+
+                const newName = jQuery('#item-name').val().trim();
+                const newIcon = jQuery('#item-icon').val().trim();
+
+                if (!newName) {
+                    showToast(getTranslation('enter-name'), 'warning');
+                    return;
+                }
+
+                currentEditItem.name = newName;
+                currentEditItem.icon = newIcon;
+
+                if (currentEditType === 'sector') {
+                    renderSectorsList();
+                } else {
+                    renderSubsectorsList();
+                }
+
+                closeEditModal();
+            });
+
+            // Icon preview functionality
+            jQuery('#item-icon').on('input', updateIconPreview);
+
+            function updateIconPreview() {
+                const iconClass = jQuery('#item-icon').val().trim();
+                const preview = jQuery('#icon-preview');
+                preview.removeClass().addClass('text-gray-400');
+
+                if (iconClass) {
+                    preview.addClass(iconClass);
+                } else {
+                    preview.addClass('fas fa-circle');
+                }
+            }
+
+            // Save all changes
+            jQuery('#sectors-save-btn').on('click', () => {
+                // Note: Currently shows success message - implement API call to save sectors and subsectors data when backend endpoint is available
+                showToast(getTranslation('save-success'), 'success');
+                sectorsModal.addClass('hidden');
+            });
+
+            // Export/Import Modal Logic
+
+
+            // Export/Import Modal Logic
+            const exportImportModal = jQuery('#export-import-modal');
+            const importFile = jQuery('#import-file');
+
+            // Remote sync (Indicator Bank platform) - triggers backend background job
+            jQuery('#sync-remote-indicatorbank-btn').on('click', function() {
+                const btn = jQuery(this);
+                showModal({
+                    title: {{ _('Sync from IFRC Indicator Bank')|tojson|safe }},
+                    message: {{ _("Start sync from external IFRC Indicator Bank now? This may take a few minutes.")|tojson|safe }},
+                    variant: 'info',
+                    confirmText: {{ _('Start Sync')|tojson|safe }},
+                    cancelText: {{ _('Cancel')|tojson|safe }},
+                    closeOnConfirm: false,
+                    onConfirm: function() {
+                        // Keep modal open, show spinner, and prevent closing until finished
+                        setModalLocked(true);
+                        updateModalContent({
+                            title: {{ _('Syncing…')|tojson|safe }},
+                            message: {{ _('Sync in progress. Please keep this window open until it completes.')|tojson|safe }},
+                            variant: 'loading',
+                            confirmText: {{ _('Syncing…')|tojson|safe }},
+                            cancelText: null
+                        });
+                        $btnOk.prop('disabled', true).addClass('opacity-60 cursor-not-allowed');
+
+                // UI feedback
+                btn.prop('disabled', true).addClass('opacity-60 cursor-not-allowed');
+                const icon = btn.find('i.fas');
+                icon.removeClass('fa-sync-alt').addClass('fa-spinner fa-spin');
+
+                function restoreBtn() {
+                    btn.prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+                    icon.removeClass('fa-spinner fa-spin').addClass('fa-sync-alt');
+                }
+
+                $.ajax({
+                    url: "{{ url_for('system_admin.sync_indicator_bank_remote') }}",
+                    type: 'POST',
+                    data: { csrf_token: csrfToken },
+                    success: function(resp) {
+                        if (!resp || !resp.success) {
+                            showToast(resp?.message || {{ _("Failed to start sync.")|tojson|safe }}, 'error', 6000);
+                            restoreBtn();
+                            setModalLocked(false);
+                            $btnOk.prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+                            closeModal();
+                            return;
+                        }
+
+                        // Poll status until finished
+                        const statusUrl = "{{ url_for('system_admin.sync_indicator_bank_remote_status') }}";
+                        const poll = setInterval(function() {
+                            $.ajax({
+                                url: statusUrl,
+                                type: 'GET',
+                                success: function(s) {
+                                    const state = s?.state || {};
+                                    if (state.running) return;
+                                    clearInterval(poll);
+                                    restoreBtn();
+                                    setModalLocked(false);
+                                    $btnOk.prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+                                    if (state.last_error) {
+                                        updateModalContent({
+                                            title: {{ _('Sync finished with error')|tojson|safe }},
+                                            message: String(state.last_error || ''),
+                                            variant: 'error',
+                                            confirmText: {{ _('Close')|tojson|safe }},
+                                            cancelText: null
+                                        });
+                                        // Allow user to close now
+                                        $btnOk.text({{ _('Close')|tojson|safe }}).prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+                                        pendingModal = { onConfirm: closeModal, onCancel: null, closeOnConfirm: true };
+                                        return;
+                                    }
+                                    const r = state.last_result || {};
+                                    const summary =
+                                        {{ _("Sync completed.")|tojson|safe }} + "\n" +
+                                        {{ _("Sectors created:")|tojson|safe }} + " " + (r.sectors_created ?? 0) + "\n" +
+                                        {{ _("Subsectors created:")|tojson|safe }} + " " + (r.subsectors_created ?? 0) + "\n" +
+                                        {{ _("Indicators created:")|tojson|safe }} + " " + (r.indicators_created ?? 0) + "\n" +
+                                        {{ _("Indicators updated:")|tojson|safe }} + " " + (r.indicators_updated ?? 0) + "\n" +
+                                        {{ _("Name translations cleared:")|tojson|safe }} + " " + (r.name_translations_cleared ?? 0) + "\n" +
+                                        {{ _("Definition translations cleared:")|tojson|safe }} + " " + (r.definition_translations_cleared ?? 0) + "\n" +
+                                        {{ _("Name/ID mismatches merged by name:")|tojson|safe }} + " " + (r.name_id_mismatches ?? 0) + "\n" +
+                                        {{ _("Skipped:")|tojson|safe }} + " " + (r.skipped ?? 0);
+                                    updateModalContent({
+                                        title: {{ _('Sync completed')|tojson|safe }},
+                                        message: summary,
+                                        variant: 'success',
+                                        confirmText: {{ _('Refresh Page')|tojson|safe }},
+                                        cancelText: {{ _('Close')|tojson|safe }}
+                                    });
+                                    // Re-enable buttons and allow close
+                                    $btnCancel.removeClass('hidden').text({{ _('Close')|tojson|safe }});
+                                    $btnOk.prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+                                    pendingModal = {
+                                        onConfirm: function() { window.location.reload(); },
+                                        onCancel: function() { closeModal(); },
+                                        closeOnConfirm: true
+                                    };
+                                },
+                                error: function() {
+                                    // Stop polling and allow user to retry
+                                    clearInterval(poll);
+                                    restoreBtn();
+                                    setModalLocked(false);
+                                    $btnOk.prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+                                    showToast({{ _("Could not fetch sync status.")|tojson|safe }}, 'error', 6000);
+                                    closeModal();
+                                }
+                            });
+                        }, 2000);
+                    },
+                    error: function(xhr) {
+                        const msg = xhr.responseJSON?.message || {{ _("Failed to start sync.")|tojson|safe }};
+                        showToast(msg, 'error', 6000);
+                        restoreBtn();
+                        setModalLocked(false);
+                        $btnOk.prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+                        closeModal();
+                    }
+                });
+                    }
+                });
+            });
+
+            // Show modal
+            jQuery('#export-import-btn').on('click', () => exportImportModal.removeClass('hidden'));
+
+            // Close modal
+            jQuery('#close-export-import-modal-btn, #export-import-modal').on('click', (e) => {
+                if (e.target.id === 'export-import-modal' || e.target.id === 'close-export-import-modal-btn') {
+                    exportImportModal.addClass('hidden');
+                }
+            });
+
+            // Export all indicators
+            jQuery('#export-all-btn').on('click', function() {
+                // Export all indicators without considering filters
+                submitExportForm();
+            });
+
+            // Export selected indicators
+            jQuery('#export-selected-btn').on('click', function() {
+                if (!window.gridHelper) {
+                    showToast({{ _("Grid not initialized. Please use Export All instead.")|tojson|safe }}, 'warning', 6000);
+                    return;
+                }
+                const selectedIds = window.gridHelper.getSelectedRowIds('id');
+                if (selectedIds.length === 0) {
+                    showToast({{ _("Please select at least one indicator to export.")|tojson|safe }}, 'warning', 6000);
+                    return;
+                }
+                submitExportForm(selectedIds);
+            });
+
+            // Function to create and submit export form
+            function submitExportForm(selectedIds = null) {
+                // Create a form element
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = "{{ url_for('system_admin.export_indicators') }}";
+                form.style.display = 'none';
+
+                // Add CSRF token
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+
+                // Add selected IDs if provided
+                if (selectedIds && selectedIds.length > 0) {
+                    const selectedIdsInput = document.createElement('input');
+                    selectedIdsInput.type = 'hidden';
+                    selectedIdsInput.name = 'selected_ids';
+                    selectedIdsInput.value = selectedIds.join(',');
+                    form.appendChild(selectedIdsInput);
+                }
+
+                // Add form to body and submit
+                document.body.appendChild(form);
+                form.submit();
+
+                // Clean up the form after submission
+                setTimeout(() => {
+                    document.body.removeChild(form);
+                }, 1000);
+            }
+
+            // File upload handling
+            $(document).on('change', '#import-file', function(e) {
+                const file = this.files[0];
+                if (!file) {
+                    jQuery('.file-upload-box p').text(getTranslation('click-drag-import'));
+                    return;
+                }
+
+                jQuery('.file-upload-box p').text(getTranslation('importing') + ' ' + file.name + '...');
+                jQuery('.file-upload-box i').removeClass('fa-cloud-upload-alt').addClass('fa-spinner fa-spin');
+
+                // Start the import process immediately
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('csrf_token', csrfToken);
+
+                // Disable file input during upload process
+                jQuery('#import-file').prop('disabled', true);
+                jQuery('.file-upload-wrapper').addClass('upload-disabled');
+
+                $.ajax({
+                   url: "{{ url_for('utilities.import_indicators') }}",
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        if (response.success) {
+                            jQuery('.file-upload-box i').removeClass('fa-spinner fa-spin').addClass('fa-check text-green-500');
+
+                            // Disable file input to prevent interference with buttons
+                            jQuery('#import-file').prop('disabled', true);
+                            jQuery('.file-upload-wrapper').addClass('upload-disabled');
+
+                            // Show detailed summary message (escape user/API content)
+                            let summaryMessage = response.message || getTranslation('import-success');
+                            jQuery('.file-upload-box p').html(
+                                '<div class="text-center">' +
+                                    '<div class="text-green-600 font-semibold mb-2">' + escapeHtml(summaryMessage) + '</div>' +
+                                    '<button class="btn btn-success refresh-page-btn">' +
+                                        escapeHtml(getTranslation('refresh-page') || 'Refresh') +
+                                    '</button>' +
+                                '</div>'
+                            );
+                        } else {
+                            jQuery('.file-upload-box i').removeClass('fa-spinner fa-spin').addClass('fa-times text-red-500');
+
+                            // Disable file input to prevent interference with buttons
+                            jQuery('#import-file').prop('disabled', true);
+                            jQuery('.file-upload-wrapper').addClass('upload-disabled');
+
+                            jQuery('.file-upload-box p').html(
+                                '<div class="text-center">' +
+                                    '<div class="text-red-600 font-semibold mb-2">' + escapeHtml(response.message || getTranslation('import-failed') || 'Import failed') + '</div>' +
+                                    '<button class="btn btn-danger reset-file-upload-btn">' +
+                                        escapeHtml(getTranslation('try-again') || 'Try again') +
+                                    '</button>' +
+                                '</div>'
+                            );
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        jQuery('.file-upload-box i').removeClass('fa-spinner fa-spin').addClass('fa-times text-red-500');
+
+                        // Disable file input to prevent interference with buttons
+                        jQuery('#import-file').prop('disabled', true);
+                        jQuery('.file-upload-wrapper').addClass('upload-disabled');
+
+                        const errorMessage = xhr.responseJSON?.message || error || getTranslation('unknown-error');
+                        jQuery('.file-upload-box p').html(
+                            '<div class="text-center">' +
+                                '<div class="text-red-600 font-semibold mb-2">' + escapeHtml(getTranslation('import-failed') || 'Import failed') + ' ' + escapeHtml(String(errorMessage || '')) + '</div>' +
+                                '<button type="button" class="btn btn-danger reset-file-upload-btn">' +
+                                    escapeHtml(getTranslation('try-again') || 'Try again') +
+                                '</button>' +
+                            '</div>'
+                        );
+                    }
+                });
+            });
+
+            // Drag and drop handling
+            const dropZone = jQuery('.file-upload-wrapper')[0];
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, function() {
+                    jQuery('.file-upload-wrapper').addClass('border-blue-500 bg-blue-50');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, function() {
+                    jQuery('.file-upload-wrapper').removeClass('border-blue-500 bg-blue-50');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', function(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+
+                if (file && (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                            file.type === 'application/vnd.ms-excel')) {
+                    const fileInput = jQuery('#import-file')[0];
+                    fileInput.files = dt.files;
+                    $(fileInput).trigger('change');
+                } else {
+                    showToast(getTranslation('upload-excel'), 'warning', 6000);
+                }
+            }, false);
+
+            // Usage count sorting is now handled by ag-grid (built-in column sorting)
+
+            // Function to reset file upload area
+            window.resetFileUpload = function() {
+                jQuery('.file-upload-box i').removeClass('fa-check text-green-500 fa-times text-red-500 fa-spinner fa-spin').addClass('fa-cloud-upload-alt text-gray-400');
+                jQuery('.file-upload-box p').text(getTranslation('click-drag-import'));
+                jQuery('#import-file').val(''); // Clear the file input
+
+                // Re-enable file input and remove upload-disabled class
+                jQuery('#import-file').prop('disabled', false);
+                jQuery('.file-upload-wrapper').removeClass('upload-disabled');
+            };
+
+            // Actions Dropdown - ensure it works
+            function initializeActionsDropdown() {
+                const actionsDropdownBtn = jQuery('#actions-dropdown-btn');
+                const actionsDropdownMenu = jQuery('#actions-dropdown-menu');
+                const actionsDropdownWrapper = jQuery('#actions-dropdown-wrapper');
+
+                // Check if elements exist
+                if (!actionsDropdownBtn.length || !actionsDropdownMenu.length) {
+                    return; // Elements not ready yet
+                }
+
+                // Remove any existing handlers to avoid duplicates
+                actionsDropdownBtn.off('click');
+
+                actionsDropdownBtn.on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const isOpen = !actionsDropdownMenu.hasClass('hidden');
+                    actionsDropdownMenu.toggleClass('hidden', isOpen);
+                    actionsDropdownBtn.attr('aria-expanded', String(!isOpen));
+                });
+
+                // Close dropdown when clicking on any action link/button
+                actionsDropdownMenu.on('click', 'a, button', function(e) {
+                    // Don't close if clicking the auto-translate button (it has its own modal)
+                    if (!jQuery(e.target).closest('#auto-translate-all-btn').length) {
+                        actionsDropdownMenu.addClass('hidden');
+                        actionsDropdownBtn.attr('aria-expanded', 'false');
+                    }
+                });
+
+                // Close dropdown when clicking outside
+                jQuery(document).on('click.actionsDropdown', function(e) {
+                    const $t = jQuery(e.target);
+                    if (!actionsDropdownWrapper.length) {
+                        return;
+                    }
+                    if (!$t.closest('#actions-dropdown-wrapper').length) {
+                        actionsDropdownMenu.addClass('hidden');
+                        actionsDropdownBtn.attr('aria-expanded', 'false');
+                    }
+                });
+
+                // Close dropdown on Escape
+                jQuery(document).on('keydown', function(e) {
+                    if (e.key === 'Escape' && !actionsDropdownMenu.hasClass('hidden')) {
+                        actionsDropdownMenu.addClass('hidden');
+                        actionsDropdownBtn.attr('aria-expanded', 'false');
+                    }
+                });
+            }
+
+            // Initialize actions dropdown - try immediately and also after a short delay
+            initializeActionsDropdown();
+
+            // Also try after a short delay in case elements are rendered dynamically
+            setTimeout(function() {
+                initializeActionsDropdown();
+            }, 100);
+
+            // Confirm before deleting indicators (POST form)
+            $(document).on('submit', '.delete-indicator-form', function(e) {
+                const msg = $(this).data('confirm') || {{ _("Are you sure you want to delete this indicator?")|js }};
+                const $form = $(this);
+                if ($form.data('confirmed') === true) {
+                    return true;
+                }
+                e.preventDefault();
+                showModal({
+                    title: {{ _('Delete')|tojson|safe }},
+                    message: String(msg || ''),
+                    variant: 'warning',
+                    confirmText: {{ _('Delete')|tojson|safe }},
+                    cancelText: {{ _('Cancel')|tojson|safe }},
+                    onConfirm: function() {
+                        $form.data('confirmed', true);
+                        $form.trigger('submit');
+                    }
+                });
+                return false;
+            });
+
+            // Event delegation for edit/delete item buttons
+            $(document).on('click', '[data-action="edit-item"]', function() {
+                const itemId = $(this).data('item-id');
+                const itemType = $(this).data('item-type');
+                if (typeof editItem === 'function') {
+                    editItem(itemId, itemType);
+                }
+            });
+
+            $(document).on('click', '[data-action="delete-item"]', function() {
+                const itemId = $(this).data('item-id');
+                const itemType = $(this).data('item-type');
+                if (typeof deleteItem === 'function') {
+                    deleteItem(itemId, itemType);
+                }
+            });
+
+            // Event delegation for refresh page button
+            $(document).on('click', '.refresh-page-btn', function() {
+                window.location.reload();
+            });
+
+            // Event delegation for reset file upload button
+            $(document).on('click', '.reset-file-upload-btn', function() {
+                if (typeof resetFileUpload === 'function') {
+                    resetFileUpload();
+                }
+            });
+        }); // End of jQuery(document).ready
+        } // End of waitForjQuery function
+        waitForjQuery(); // Start checking for jQuery
+    </script>
+
+{% endblock %}

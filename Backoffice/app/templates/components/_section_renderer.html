@@ -1,0 +1,82 @@
+{# Unified Section Renderer for consistent main and sub-section handling #}
+
+{% macro render_section_container(section, is_subsection=false, parent_section_order='') %}
+{% set section_classes = {
+    'main': 'bg-gray-50 p-6 rounded-lg border border-gray-200 mb-6 scroll-mt-20',
+    'sub': 'pt-6 border-t border-gray-300 mt-6 scroll-mt-20'
+} %}
+
+<div id="section-container-{{ section.id }}"
+     class="{{ section_classes.sub if is_subsection else section_classes.main }}"
+     data-section-type="{{ section.section_type }}"
+     data-page-number="{{ section.page_id if section.page_id else 1 }}"
+     data-page-name="{{ section.page.display_name if section.page and section.page.display_name else (section.page.name if section.page else 'Page 1') }}"
+     {% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}
+     data-aes-id="{{ assignment_status.id }}"
+     {% if is_subsection %}data-parent-section-id="{{ section.parent_section_id }}"{% endif %}>
+
+    {{ render_section_header(section, is_subsection, parent_section_order) }}
+
+    <div class="{{ 'space-y-4 pl-6' if is_subsection else 'space-y-6' }}">
+        {{ render_section_content(section, is_subsection) }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro render_section_header(section, is_subsection, parent_section_order='') %}
+{% set header_tag = 'h4' if is_subsection else 'h3' %}
+{% set header_classes = {
+    'main': 'text-xl font-semibold mb-4 pb-4 border-b text-gray-700 flex items-center',
+    'sub': 'text-lg font-semibold mb-4 text-gray-700 flex items-center'
+} %}
+{% set icon_class = 'fas fa-indent w-4 h-4 mr-3 text-gray-500' if is_subsection else 'fas fa-layer-group w-5 h-5 mr-2 text-gray-500' %}
+
+<{{ header_tag }} class="{{ header_classes.sub if is_subsection else header_classes.main }}">
+    <i class="{{ icon_class }}"></i>
+    {% if template_structure.display_order_visible %}
+        <span class="text-xl font-semibold text-gray-700 mr-1">
+            {% if is_subsection and parent_section_order %}
+                {{ parent_section_order }}.{{ section.display_order }}.
+            {% else %}
+                {{ section.display_order }}.
+            {% endif %}
+        </span>
+    {% endif %}
+    {% if is_subsection %}
+        <span class="text-gray-600 font-medium">↳ {{ section.display_name }}</span>
+    {% else %}
+        {{ section.display_name }}
+    {% endif %}
+</{{ header_tag }}>
+{% endmacro %}
+
+{% macro render_section_content(section, is_subsection) %}
+{# Check if section has fields or is a dynamic indicators section #}
+{% set has_fields = section.fields_ordered and section.fields_ordered|length > 0 %}
+{% set is_dynamic_indicators = section.section_type == 'dynamic_indicators' %}
+
+{% if has_fields %}
+    {# Render existing fields #}
+    {% for field in section.fields_ordered %}
+        {{ render_form_item(field, section.display_order, is_subsection) }}
+    {% endfor %}
+{% elif not is_dynamic_indicators %}
+    {# Only show "no fields" message if this is NOT a dynamic indicators section #}
+    <p class="text-sm text-gray-500 italic">
+        {% if is_subsection %}
+            {{ _('This sub-section has no fields.') }}
+        {% else %}
+            {{ _('This section has no fields.') }}
+        {% endif %}
+    </p>
+{% endif %}
+
+{# Always include dynamic indicators interface for dynamic indicator sections #}
+{% if is_dynamic_indicators %}
+    {% set section_id = section.id %}
+    {% include 'forms/entry_form/partials/dynamic_indicators_interface.html' %}
+{% endif %}
+{% endmacro %}
+
+{# Note: This macro depends on render_form_item being available from _form_item_renderer.html #}
+{% from "components/_form_item_renderer.html" import render_form_item %}

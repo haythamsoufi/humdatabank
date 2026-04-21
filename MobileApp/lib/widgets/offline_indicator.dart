@@ -138,13 +138,12 @@ class OfflineIndicator extends StatelessWidget {
   }
 }
 
-/// Banner widget to display offline / server status at the top of the screen.
+/// Banner widget to display offline / server status above the bottom nav.
 ///
-/// When [floatOverContent] is true (recommended for tab shell and login), the
-/// banner is laid out in a [Stack] so it does not push the body down; it uses
-/// a compact strip and softer colours instead of a full error block.
+/// When [floatOverContent] is true (tab shell and login), the host should anchor
+/// this widget to the bottom of a [Stack] body so it sits above [Scaffold.bottomNavigationBar].
 class OfflineBanner extends StatelessWidget {
-  /// If true, wrap in [SafeArea] (top) and add a light shadow — for [Stack] overlay.
+  /// If true, pad for safe areas and draw as a compact chip above the bottom bar.
   final bool floatOverContent;
 
   const OfflineBanner({super.key, this.floatOverContent = true});
@@ -219,12 +218,13 @@ class OfflineBanner extends StatelessWidget {
         }
 
         return SafeArea(
-          bottom: false,
+          top: false,
+          bottom: true,
           left: false,
           right: false,
           minimum: EdgeInsets.zero,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
             child: column,
           ),
         );
@@ -272,17 +272,10 @@ class _OfflineBannerStrip extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: scheme.outline.withValues(alpha: 0.32),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(12),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: scheme.outline),
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: horizontal, vertical: vertical),
@@ -331,13 +324,13 @@ class _OfflineBannerStrip extends StatelessWidget {
             onPressed: onDismiss,
             tooltip: dismissTooltip,
             style: IconButton.styleFrom(
-              foregroundColor: foreground.withValues(alpha: 0.75),
+              foregroundColor: foreground,
               visualDensity: VisualDensity.compact,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               minimumSize: const Size(32, 32),
               padding: EdgeInsets.zero,
             ),
-            icon: Icon(Icons.close_rounded, size: 20, color: foreground.withValues(alpha: 0.72)),
+            icon: Icon(Icons.close_rounded, size: 20, color: foreground),
           ),
         ],
       ],

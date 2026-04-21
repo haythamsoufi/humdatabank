@@ -176,13 +176,11 @@ extension OfflineStatusColors on BuildContext {
       ? Colors.green.shade200
       : Colors.green.shade800;
 
-  /// Offline / no-radio — warning tone (not [error]) so it is not read as a hard failure strip.
-  Color get offlineDisconnectedInlineBackground => isDarkTheme
-      ? Colors.amber.shade900.withValues(alpha: 0.42)
-      : Colors.amber.shade50;
+  /// Offline / no-radio — solid warning tones (fully opaque).
+  Color get offlineDisconnectedInlineBackground =>
+      isDarkTheme ? const Color(0xFF422006) : const Color(0xFFFFF7ED);
 
-  Color get offlineDisconnectedInlineForeground => isDarkTheme
-      ? Colors.amber.shade100
-      : Colors.amber.shade900;
+  Color get offlineDisconnectedInlineForeground =>
+      isDarkTheme ? const Color(0xFFFDE68A) : const Color(0xFF9A3412);
 }
 

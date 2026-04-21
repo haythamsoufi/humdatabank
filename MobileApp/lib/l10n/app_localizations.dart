@@ -236,6 +236,7 @@ class AppLocalizations {
       'home_landing_global_map_legend_high': 'High',
       'home_landing_global_map_country_no_data': 'No data for this indicator',
       'home_landing_global_map_value_label': 'Value',
+      'home_landing_global_map_country_trend': 'By reporting period',
       'home_landing_global_map_filters_title': 'Map options',
       'loading_page': 'Loading page...',
       'loading_preferences': 'Loading preferences...',
@@ -714,6 +715,12 @@ class AppLocalizations {
           'Plans, mid-year reports, and annual reports from IFRC GO (loaded in the app).',
       'unified_planning_empty': 'No unified planning documents match your search.',
       'unified_planning_fresh_badge': 'Fresh',
+      'unified_planning_sort_by': 'Sort by',
+      'unified_planning_sort_date_newest': 'Publish date: newest first',
+      'unified_planning_sort_date_oldest': 'Publish date: oldest first',
+      'unified_planning_sort_country_az': 'Country: A–Z',
+      'unified_planning_sort_country_za': 'Country: Z–A',
+      'unified_planning_filter_all_countries': 'All Countries',
       'unified_error_config':
           'Could not load unified planning settings from the server. Try again later.',
       'unified_error_credentials':
@@ -755,8 +762,9 @@ class AppLocalizations {
       'unified_planning_participation_sheet_full': 'Full participation',
       'unified_planning_participation_sheet_partial': 'Partial participation',
       'unified_planning_participation_sheet_none': 'No coverage for these slots',
-      'unified_planning_participation_legend_low': 'Fewer slots covered',
-      'unified_planning_participation_legend_high': 'All slots covered',
+      'unified_planning_participation_legend_full': 'Full participation',
+      'unified_planning_participation_legend_partial': 'Partial participation',
+      'unified_planning_participation_legend_no_data': 'No coverage',
       'no_plugins_found': 'No plugins found',
       'no_translations_found': 'No translations found',
       'no_documents_found': 'No documents found',
@@ -1369,6 +1377,7 @@ class AppLocalizations {
       'home_landing_global_map_country_no_data':
           'Sin datos para este indicador',
       'home_landing_global_map_value_label': 'Valor',
+      'home_landing_global_map_country_trend': 'Por período de reporte',
       'home_landing_global_map_filters_title': 'Opciones del mapa',
       'loading_page': 'Cargando página...',
       'loading_preferences': 'Cargando preferencias...',
@@ -1824,6 +1833,12 @@ class AppLocalizations {
       'unified_planning_empty':
           'Ningún documento de planificación unificada coincide con su búsqueda.',
       'unified_planning_fresh_badge': 'Reciente',
+      'unified_planning_sort_by': 'Ordenar por',
+      'unified_planning_sort_date_newest': 'Fecha: más reciente primero',
+      'unified_planning_sort_date_oldest': 'Fecha: más antiguo primero',
+      'unified_planning_sort_country_az': 'País: A–Z',
+      'unified_planning_sort_country_za': 'País: Z–A',
+      'unified_planning_filter_all_countries': 'Todos los países',
       'unified_error_config':
           'No se pudieron cargar los ajustes de planificación unificada desde el servidor. Inténtelo más tarde.',
       'unified_error_credentials':
@@ -2331,6 +2346,7 @@ class AppLocalizations {
       'home_landing_global_map_country_no_data':
           'Aucune donnée pour cet indicateur',
       'home_landing_global_map_value_label': 'Valeur',
+      'home_landing_global_map_country_trend': 'Par période de déclaration',
       'home_landing_global_map_filters_title': 'Options de la carte',
       'loading_page': 'Chargement de la page...',
       'loading_preferences': 'Chargement des préférences...',
@@ -2789,6 +2805,12 @@ class AppLocalizations {
       'unified_planning_empty':
           'Aucun document de planification unifiée ne correspond à votre recherche.',
       'unified_planning_fresh_badge': 'Récent',
+      'unified_planning_sort_by': 'Trier par',
+      'unified_planning_sort_date_newest': 'Date de publication : plus récent d’abord',
+      'unified_planning_sort_date_oldest': 'Date de publication : plus ancien d’abord',
+      'unified_planning_sort_country_az': 'Pays : A–Z',
+      'unified_planning_sort_country_za': 'Pays : Z–A',
+      'unified_planning_filter_all_countries': 'Tous les pays',
       'unified_error_config':
           'Impossible de charger les paramètres de planification unifiée depuis le serveur. Réessayez plus tard.',
       'unified_error_credentials':
@@ -3740,6 +3762,7 @@ class AppLocalizations {
           'خطط وتقارير منتصف العام والتقارير السنوية من IFRC GO (يتم تحميلها في التطبيق).',
       'unified_planning_empty': 'لا توجد وثائق تخطيط موحدة تطابق بحثك.',
       'unified_planning_fresh_badge': 'جديد',
+      'unified_planning_filter_all_countries': 'جميع الدول',
       'unified_error_config':
           'تعذر تحميل إعدادات التخطيط الموحد من الخادم. حاول مرة أخرى لاحقًا.',
       'unified_error_credentials':
@@ -4230,6 +4253,7 @@ class AppLocalizations {
       'home_landing_global_map_country_no_data':
           'इस संकेतक के लिए कोई डेटा नहीं',
       'home_landing_global_map_value_label': 'मान',
+      'home_landing_global_map_country_trend': 'रिपोर्टिंग अवधि के अनुसार',
       'home_landing_global_map_filters_title': 'मानचित्र विकल्प',
       'loading_page': 'पृष्ठ लोड हो रहा है...',
       'loading_preferences': 'प्राथमिकताएं लोड हो रही हैं...',
@@ -4680,6 +4704,12 @@ class AppLocalizations {
       'unified_planning_empty':
           'आपकी खोज से मेल खाने वाली कोई एकीकृत योजना दस्तावेज़ नहीं।',
       'unified_planning_fresh_badge': 'ताज़ा',
+      'unified_planning_sort_by': 'क्रमबद्ध करें',
+      'unified_planning_sort_date_newest': 'प्रकाशन तिथि: पहले नवीनतम',
+      'unified_planning_sort_date_oldest': 'प्रकाशन तिथि: पहले सबसे पुराना',
+      'unified_planning_sort_country_az': 'देश: A–Z',
+      'unified_planning_sort_country_za': 'देश: Z–A',
+      'unified_planning_filter_all_countries': 'सभी देश',
       'unified_error_config':
           'सर्वर से एकीकृत योजना सेटिंग लोड नहीं हो सकीं। बाद में पुनः प्रयास करें।',
       'unified_error_credentials':
@@ -5183,6 +5213,7 @@ class AppLocalizations {
       'home_landing_global_map_legend_high': 'Высок.',
       'home_landing_global_map_country_no_data': 'Нет данных по показателю',
       'home_landing_global_map_value_label': 'Значение',
+      'home_landing_global_map_country_trend': 'По отчётным периодам',
       'home_landing_global_map_filters_title': 'Параметры карты',
       'loading_page': 'Загрузка страницы...',
       'loading_preferences': 'Загрузка настроек...',
@@ -5637,6 +5668,12 @@ class AppLocalizations {
       'unified_planning_empty':
           'Нет документов единого планирования по вашему запросу.',
       'unified_planning_fresh_badge': 'Свежее',
+      'unified_planning_sort_by': 'Сортировка',
+      'unified_planning_sort_date_newest': 'Дата: сначала новые',
+      'unified_planning_sort_date_oldest': 'Дата: сначала старые',
+      'unified_planning_sort_country_az': 'Страна: А–Я',
+      'unified_planning_sort_country_za': 'Страна: Я–А',
+      'unified_planning_filter_all_countries': 'Все страны',
       'unified_error_config':
           'Не удалось загрузить настройки единого планирования с сервера. Попробуйте позже.',
       'unified_error_credentials':
@@ -6137,6 +6174,7 @@ class AppLocalizations {
       'home_landing_global_map_legend_high': '高',
       'home_landing_global_map_country_no_data': '该指标暂无数据',
       'home_landing_global_map_value_label': '数值',
+      'home_landing_global_map_country_trend': '按报告期',
       'home_landing_global_map_filters_title': '地图选项',
       'loading_page': '加载页面...',
       'loading_preferences': '加载首选项...',
@@ -6562,6 +6600,12 @@ class AppLocalizations {
           '来自 IFRC GO 的计划、年中报告和年度报告（在应用中加载）。',
       'unified_planning_empty': '没有符合您搜索条件的统一规划文件。',
       'unified_planning_fresh_badge': '最新',
+      'unified_planning_sort_by': '排序',
+      'unified_planning_sort_date_newest': '发布日期：由新到旧',
+      'unified_planning_sort_date_oldest': '发布日期：由旧到新',
+      'unified_planning_sort_country_az': '国家/地区：A–Z',
+      'unified_planning_sort_country_za': '国家/地区：Z–A',
+      'unified_planning_filter_all_countries': '所有国家/地区',
       'unified_error_config': '无法从服务器加载统一规划设置。请稍后重试。',
       'unified_error_credentials':
           '此应用无法使用 IFRC 文档。请联系管理员。',
@@ -7156,6 +7200,8 @@ class AppLocalizations {
       translate('home_landing_global_map_country_no_data');
   String get homeLandingGlobalMapValueLabel =>
       translate('home_landing_global_map_value_label');
+  String get homeLandingGlobalMapCountryTrend =>
+      translate('home_landing_global_map_country_trend');
   String get homeLandingGlobalMapFiltersTitle =>
       translate('home_landing_global_map_filters_title');
 
@@ -7812,6 +7858,17 @@ class AppLocalizations {
   String get unifiedPlanningEmpty => translate('unified_planning_empty');
   String get unifiedPlanningFreshBadge =>
       translate('unified_planning_fresh_badge');
+  String get unifiedPlanningSortBy => translate('unified_planning_sort_by');
+  String get unifiedPlanningSortDateNewest =>
+      translate('unified_planning_sort_date_newest');
+  String get unifiedPlanningSortDateOldest =>
+      translate('unified_planning_sort_date_oldest');
+  String get unifiedPlanningSortCountryAz =>
+      translate('unified_planning_sort_country_az');
+  String get unifiedPlanningSortCountryZa =>
+      translate('unified_planning_sort_country_za');
+  String get unifiedPlanningFilterAllCountries =>
+      translate('unified_planning_filter_all_countries');
   String get unifiedPlanningErrorConfig => translate('unified_error_config');
   String get unifiedPlanningErrorCredentials =>
       translate('unified_error_credentials');
@@ -7890,10 +7947,12 @@ class AppLocalizations {
       translate('unified_planning_participation_sheet_partial');
   String get unifiedPlanningParticipationSheetNone =>
       translate('unified_planning_participation_sheet_none');
-  String get unifiedPlanningParticipationLegendLow =>
-      translate('unified_planning_participation_legend_low');
-  String get unifiedPlanningParticipationLegendHigh =>
-      translate('unified_planning_participation_legend_high');
+  String get unifiedPlanningParticipationLegendFull =>
+      translate('unified_planning_participation_legend_full');
+  String get unifiedPlanningParticipationLegendPartial =>
+      translate('unified_planning_participation_legend_partial');
+  String get unifiedPlanningParticipationLegendNoData =>
+      translate('unified_planning_participation_legend_no_data');
   String get noPluginsFound => translate('no_plugins_found');
   String get noTranslationsFound => translate('no_translations_found');
   String get noDocumentsFound => translate('no_documents_found');

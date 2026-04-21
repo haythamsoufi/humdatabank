@@ -13,6 +13,7 @@ import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/countries_widget.dart';
 import '../../widgets/ios_button.dart';
 import '../../widgets/home_landing/landing_ai_entry_card.dart';
+import '../../widgets/home_landing/fdrs_world_map.dart';
 import '../../widgets/home_landing/landing_get_started_section.dart';
 import '../../widgets/home_landing/landing_hero_sliver.dart';
 import '../../widgets/home_landing/landing_quick_prompts.dart';
@@ -37,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen>
   final ScrollController _scrollController = ScrollController();
   int _getStartedEpoch = 0;
   bool _chatExpanded = false;
+  int _embeddedFdrsMapPointers = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -252,13 +254,22 @@ class _HomeScreenState extends State<HomeScreen>
                           const Duration(milliseconds: 400),
                         );
                       },
-                      child: CustomScrollView(
-                        controller: _scrollController,
-                        physics: _chatExpanded
-                            ? const NeverScrollableScrollPhysics()
-                            : const AlwaysScrollableScrollPhysics(),
-                        clipBehavior: Clip.none,
-                        slivers: [
+                      child: NotificationListener<FdrsEmbeddedMapPointerNotification>(
+                        onNotification: (n) {
+                          setState(() {
+                            _embeddedFdrsMapPointers = n.activePointerCount;
+                          });
+                          return true;
+                        },
+                        child: CustomScrollView(
+                          controller: _scrollController,
+                          physics: _chatExpanded
+                              ? const NeverScrollableScrollPhysics()
+                              : (_embeddedFdrsMapPointers > 0
+                                  ? const NeverScrollableScrollPhysics()
+                                  : const AlwaysScrollableScrollPhysics()),
+                          clipBehavior: Clip.none,
+                          slivers: [
                           LandingHeroSliver(
                             title: localizations.appName,
                             description:
@@ -293,6 +304,7 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           ),
                         ],
+                        ),
                       ),
                     ),
                     // Dim & block interaction with content below the hero (Get Started, etc.).

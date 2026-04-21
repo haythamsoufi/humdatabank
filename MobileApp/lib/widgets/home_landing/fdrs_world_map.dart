@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../config/app_config.dart';
 import '../../config/fdrs_constants.dart';
+import '../../di/service_locator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/global_overview_data_service.dart';
 import '../../utils/constants.dart';
@@ -17,6 +19,65 @@ import 'world_geojson_cache.dart';
 
 /// Bubble markers vs filled country polygons (choropleth).
 enum FdrsMapVisualMode { bubble, choropleth }
+
+/// Bubbles up while pointers are active on the embedded home map so a parent
+/// [CustomScrollView] can pause vertical scrolling and let [FlutterMap] handle
+/// pan/pinch.
+class FdrsEmbeddedMapPointerNotification extends Notification {
+  FdrsEmbeddedMapPointerNotification({required this.activePointerCount});
+  final int activePointerCount;
+}
+
+class FdrsEmbeddedMapPointerNotifier extends StatefulWidget {
+  const FdrsEmbeddedMapPointerNotifier({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<FdrsEmbeddedMapPointerNotifier> createState() =>
+      _FdrsEmbeddedMapPointerNotifierState();
+}
+
+class _FdrsEmbeddedMapPointerNotifierState
+    extends State<FdrsEmbeddedMapPointerNotifier> {
+  int _count = 0;
+
+  void _dispatch() {
+    FdrsEmbeddedMapPointerNotification(activePointerCount: _count)
+        .dispatch(context);
+  }
+
+  @override
+  void dispose() {
+    final was = _count;
+    _count = 0;
+    if (was != 0 && context.mounted) {
+      FdrsEmbeddedMapPointerNotification(activePointerCount: 0)
+          .dispatch(context);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.deferToChild,
+      onPointerDown: (_) {
+        _count++;
+        _dispatch();
+      },
+      onPointerUp: (_) {
+        _count = (_count - 1).clamp(0, 64);
+        _dispatch();
+      },
+      onPointerCancel: (_) {
+        _count = (_count - 1).clamp(0, 64);
+        _dispatch();
+      },
+      child: widget.child,
+    );
+  }
+}
 
 /// Returned from fullscreen so the home section can stay in sync.
 class FdrsMapSessionSnapshot {
@@ -167,18 +228,22 @@ void showFdrsCountryInsightSheet({
   required GlobalOverviewDataset data,
   required String iso2,
   required String indicatorLabel,
+  required int indicatorBankId,
+  required List<String> periodOptions,
 }) {
   final theme = Theme.of(context);
   final name = countryNameForIso2(data, iso2.toUpperCase()) ?? iso2;
-  final v = valueForIso2(data, iso2.toUpperCase());
+  final countryId = countryIdForIso2(data, iso2.toUpperCase());
 
   showModalBottomSheet<void>(
     context: context,
     backgroundColor: theme.colorScheme.surface,
     showDragHandle: true,
+    isScrollControlled: true,
     builder: (ctx) {
+      final bottomInset = MediaQuery.viewPaddingOf(ctx).bottom;
       return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: EdgeInsets.fromLTRB(20, 8, 20, 24 + bottomInset),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,38 +262,284 @@ void showFdrsCountryInsightSheet({
               ),
             ),
             const SizedBox(height: 16),
-            if (v != null)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '${l10n.homeLandingGlobalMapValueLabel}: ',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    formatFdrsOverviewValue(v, locale),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.secondary,
-                    ),
-                  ),
-                ],
-              )
-            else
+            if (countryId == null)
               Text(
                 l10n.homeLandingGlobalMapCountryNoData,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+              )
+            else
+              _FdrsCountryTrendLoader(
+                l10n: l10n,
+                locale: locale,
+                theme: theme,
+                indicatorBankId: indicatorBankId,
+                periodOptions: periodOptions,
+                countryId: countryId,
               ),
           ],
         ),
       );
     },
   );
+}
+
+class _FdrsCountryTrendLoader extends StatefulWidget {
+  const _FdrsCountryTrendLoader({
+    required this.l10n,
+    required this.locale,
+    required this.theme,
+    required this.indicatorBankId,
+    required this.periodOptions,
+    required this.countryId,
+  });
+
+  final AppLocalizations l10n;
+  final String locale;
+  final ThemeData theme;
+  final int indicatorBankId;
+  final List<String> periodOptions;
+  final int countryId;
+
+  @override
+  State<_FdrsCountryTrendLoader> createState() =>
+      _FdrsCountryTrendLoaderState();
+}
+
+class _FdrsCountryTrendLoaderState extends State<_FdrsCountryTrendLoader> {
+  final GlobalOverviewDataService _service = sl<GlobalOverviewDataService>();
+  late Future<List<({String period, double? value})>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<List<({String period, double? value})>> _load() async {
+    var periods = widget.periodOptions;
+    if (periods.isEmpty) {
+      periods = await _service.listFdrsPeriods();
+    }
+    if (periods.isEmpty) return [];
+    final chrono = periods.reversed.toList();
+    return _service.loadCountryIndicatorSeries(
+      indicatorBankId: widget.indicatorBankId,
+      locale: widget.locale,
+      countryId: widget.countryId,
+      periods: chrono,
+    );
+  }
+
+  void _retry() {
+    setState(() {
+      _future = _load();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = widget.theme;
+    final l10n = widget.l10n;
+
+    return FutureBuilder<List<({String period, double? value})>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            height: 220,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: theme.colorScheme.secondary,
+              ),
+            ),
+          );
+        }
+        if (snap.hasError) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.homeLandingGlobalLoadError,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _retry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(l10n.retry),
+              ),
+            ],
+          );
+        }
+        final raw = snap.data ?? [];
+        final withData = raw
+            .where((e) => e.value != null && e.value! > 0)
+            .toList();
+        if (withData.isEmpty) {
+          return Text(
+            l10n.homeLandingGlobalMapCountryNoData,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          );
+        }
+
+        final maxY = withData
+            .map((e) => e.value!)
+            .reduce(math.max);
+        final gridColor = theme.colorScheme.outlineVariant.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.35 : 0.45,
+        );
+        final lineColor = Color(AppConstants.ifrcRed);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.homeLandingGlobalMapCountryTrend,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 220,
+              child: LineChart(
+                LineChartData(
+                  minX: 0,
+                  maxX: (withData.length - 1).toDouble(),
+                  minY: 0,
+                  maxY: maxY > 0 ? maxY * 1.12 : 1,
+                  clipData: const FlClipData.all(),
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((s) {
+                          final i =
+                              s.x.round().clamp(0, withData.length - 1);
+                          final p = withData[i];
+                          return LineTooltipItem(
+                            '${p.period}\n'
+                            '${formatFdrsOverviewValue(s.y, widget.locale)}',
+                            TextStyle(
+                              color: theme.colorScheme.onInverseSurface,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval:
+                        maxY > 0 ? (maxY / 4).clamp(1, double.infinity) : 1,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: gridColor,
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 44,
+                        interval: maxY > 0
+                            ? (maxY / 3).clamp(1, double.infinity)
+                            : 1,
+                        getTitlesWidget: (value, meta) {
+                          if (value < 0 || value > meta.max) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text(
+                              formatFdrsOverviewValue(value, widget.locale),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.end,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 32,
+                        getTitlesWidget: (value, meta) {
+                          final i = value.toInt();
+                          if (i < 0 || i >= withData.length) {
+                            return const SizedBox.shrink();
+                          }
+                          var label = withData[i].period;
+                          if (label.length > 10) {
+                            label = '${label.substring(0, 9)}…';
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              label,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      color: lineColor,
+                      barWidth: 3,
+                      isStrokeCapRound: true,
+                      dotData: FlDotData(
+                        show: true,
+                        getDotPainter: (spot, percent, bar, index) {
+                          return FlDotCirclePainter(
+                            radius: 4,
+                            color: lineColor,
+                            strokeWidth: 1,
+                            strokeColor: theme.colorScheme.surface,
+                          );
+                        },
+                      ),
+                      spots: [
+                        for (var i = 0; i < withData.length; i++)
+                          FlSpot(
+                            i.toDouble(),
+                            withData[i].value!,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 /// Map stack: tiles + hit-tested bubble or choropleth layer.
@@ -244,6 +555,7 @@ class FdrsOverviewMap extends StatefulWidget {
     this.maxZoom = 22,
     this.polygonSimplification = 0,
     this.onCountryIso2Tapped,
+    this.notifyParentScrollWhilePointersDown = false,
   });
 
   final ThemeData theme;
@@ -255,6 +567,10 @@ class FdrsOverviewMap extends StatefulWidget {
   final double maxZoom;
   final double polygonSimplification;
   final void Function(String iso2)? onCountryIso2Tapped;
+
+  /// When true (embedded home map only), pointer events on the map notify
+  /// ancestors so the page scroll view can yield to map pan/pinch.
+  final bool notifyParentScrollWhilePointersDown;
 
   @override
   State<FdrsOverviewMap> createState() => _FdrsOverviewMapState();
@@ -269,16 +585,9 @@ class _FdrsOverviewMapState extends State<FdrsOverviewMap> {
     super.dispose();
   }
 
-  void _handleInteractTap() {
-    final hit = _hitNotifier.value;
-    if (hit == null || hit.hitValues.isEmpty) return;
-    HapticFeedback.selectionClick();
-    widget.onCountryIso2Tapped?.call(hit.hitValues.first);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
+    Widget map = ClipRect(
       clipBehavior: Clip.hardEdge,
       child: FlutterMap(
         mapController: widget.mapController,
@@ -286,29 +595,38 @@ class _FdrsOverviewMapState extends State<FdrsOverviewMap> {
           widget.theme,
           widget.initialFit,
           maxZoom: widget.maxZoom,
+          onTap: widget.onCountryIso2Tapped == null
+              ? null
+              : (_, __) {
+                  final hit = _hitNotifier.value;
+                  if (hit == null || hit.hitValues.isEmpty) return;
+                  HapticFeedback.selectionClick();
+                  widget.onCountryIso2Tapped!(hit.hitValues.first);
+                },
         ),
         children: [
           ...fdrsWorldMapTiles(widget.theme),
-          GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _handleInteractTap,
-            child: widget.visualMode == FdrsMapVisualMode.bubble
-                ? CircleLayer<String>(
-                    hitNotifier: _hitNotifier,
-                    circles: widget.circles,
-                  )
-                : PolygonLayer<String>(
-                    hitNotifier: _hitNotifier,
-                    simplificationTolerance: widget.polygonSimplification,
-                    drawInSingleWorld: true,
-                    polygons: widget.choroplethPolygons,
-                    drawLabelsLast: false,
-                    polygonLabels: false,
-                  ),
-          ),
+          widget.visualMode == FdrsMapVisualMode.bubble
+              ? CircleLayer<String>(
+                  hitNotifier: _hitNotifier,
+                  circles: widget.circles,
+                )
+              : PolygonLayer<String>(
+                  hitNotifier: _hitNotifier,
+                  simplificationTolerance: widget.polygonSimplification,
+                  drawInSingleWorld: true,
+                  polygons: widget.choroplethPolygons,
+                  drawLabelsLast: false,
+                  polygonLabels: false,
+                ),
         ],
       ),
     );
+
+    if (widget.notifyParentScrollWhilePointersDown) {
+      map = FdrsEmbeddedMapPointerNotifier(child: map);
+    }
+    return map;
   }
 }
 
@@ -946,6 +1264,8 @@ class _FdrsWorldMapFullscreenPageState
                         data: data,
                         iso2: iso2,
                         indicatorLabel: indicatorLabel,
+                        indicatorBankId: _indicatorBankId,
+                        periodOptions: widget.periodOptions,
                       );
                     },
                   ),

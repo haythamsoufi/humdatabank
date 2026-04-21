@@ -331,8 +331,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
           primary: false,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           resizeToAvoidBottomInset: !onAiChatPage,
-          // [OfflineBanner] is the second child so it paints above the tab [PageView]
-          // without participating in the page layout (no vertical "push").
+          // [OfflineBanner] sits above [bottomNavigationBar] (anchored to body bottom).
           body: Stack(
             fit: StackFit.expand,
             clipBehavior: Clip.none,
@@ -351,9 +350,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                 ),
               ),
               const Positioned(
-                top: 0,
                 left: 0,
                 right: 0,
+                bottom: 0,
                 child: OfflineBanner(),
               ),
             ],

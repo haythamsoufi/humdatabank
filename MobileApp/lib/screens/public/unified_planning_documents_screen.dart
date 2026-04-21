@@ -13,6 +13,21 @@ import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
 
+/// Client-side list ordering for [UnifiedPlanningDocumentsScreen].
+enum UnifiedPlanningListSort {
+  /// [UnifiedPlanningDocument.publishedAt] descending; missing dates last.
+  dateNewestFirst,
+
+  /// [UnifiedPlanningDocument.publishedAt] ascending; missing dates last.
+  dateOldestFirst,
+
+  /// [UnifiedPlanningDocument.countryName] A→Z, then title.
+  countryNameAz,
+
+  /// [UnifiedPlanningDocument.countryName] Z→A, then title.
+  countryNameZa,
+}
+
 /// IFRC GO unified planning PDFs (PublicSiteAppeals) — opened from [ResourcesScreen].
 ///
 /// The IFRC list API returns the full set in one response; we paginate in the UI
@@ -42,6 +57,9 @@ class _UnifiedPlanningDocumentsScreenState
 
   /// Document year; null = all.
   int? _filterYear;
+
+  /// Sort order (applied after search + attribute filters).
+  UnifiedPlanningListSort _sortMode = UnifiedPlanningListSort.dateNewestFirst;
 
   @override
   void initState() {
@@ -104,6 +122,88 @@ class _UnifiedPlanningDocumentsScreenState
     }).toList(growable: false);
   }
 
+  static int _titleCompare(UnifiedPlanningDocument a, UnifiedPlanningDocument b) {
+    return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  }
+
+  /// Stable ordering after attribute filter + search; does not mutate [list].
+  List<UnifiedPlanningDocument> _sortedCopy(
+    List<UnifiedPlanningDocument> list,
+    UnifiedPlanningListSort mode,
+  ) {
+    int comparePublishedAscending(UnifiedPlanningDocument a, UnifiedPlanningDocument b) {
+      final da = a.publishedAt;
+      final db = b.publishedAt;
+      if (da == null && db == null) return _titleCompare(a, b);
+      if (da == null) return 1;
+      if (db == null) return -1;
+      final c = da.compareTo(db);
+      if (c != 0) return c;
+      return _titleCompare(a, b);
+    }
+
+    int compareCountryThenTitle(UnifiedPlanningDocument a, UnifiedPlanningDocument b) {
+      final ca = (a.countryName ?? '').trim().toLowerCase();
+      final cb = (b.countryName ?? '').trim().toLowerCase();
+      if (ca.isEmpty && cb.isEmpty) return _titleCompare(a, b);
+      if (ca.isEmpty) return 1;
+      if (cb.isEmpty) return -1;
+      final c = ca.compareTo(cb);
+      if (c != 0) return c;
+      return _titleCompare(a, b);
+    }
+
+    int compareCountryThenTitleReverse(UnifiedPlanningDocument a, UnifiedPlanningDocument b) {
+      final ca = (a.countryName ?? '').trim().toLowerCase();
+      final cb = (b.countryName ?? '').trim().toLowerCase();
+      if (ca.isEmpty && cb.isEmpty) return _titleCompare(a, b);
+      if (ca.isEmpty) return 1;
+      if (cb.isEmpty) return -1;
+      final c = cb.compareTo(ca);
+      if (c != 0) return c;
+      return _titleCompare(a, b);
+    }
+
+    final out = list.toList();
+    switch (mode) {
+      case UnifiedPlanningListSort.dateNewestFirst:
+        out.sort((a, b) {
+          final da = a.publishedAt;
+          final db = b.publishedAt;
+          if (da == null && db == null) return _titleCompare(a, b);
+          if (da == null) return 1;
+          if (db == null) return -1;
+          final c = -da.compareTo(db);
+          if (c != 0) return c;
+          return _titleCompare(a, b);
+        });
+        break;
+      case UnifiedPlanningListSort.dateOldestFirst:
+        out.sort(comparePublishedAscending);
+        break;
+      case UnifiedPlanningListSort.countryNameAz:
+        out.sort(compareCountryThenTitle);
+        break;
+      case UnifiedPlanningListSort.countryNameZa:
+        out.sort(compareCountryThenTitleReverse);
+        break;
+    }
+    return out;
+  }
+
+  String _sortModeLabel(AppLocalizations loc, UnifiedPlanningListSort mode) {
+    switch (mode) {
+      case UnifiedPlanningListSort.dateNewestFirst:
+        return loc.unifiedPlanningSortDateNewest;
+      case UnifiedPlanningListSort.dateOldestFirst:
+        return loc.unifiedPlanningSortDateOldest;
+      case UnifiedPlanningListSort.countryNameAz:
+        return loc.unifiedPlanningSortCountryAz;
+      case UnifiedPlanningListSort.countryNameZa:
+        return loc.unifiedPlanningSortCountryZa;
+    }
+  }
+
   List<String> _distinctCountryNames(List<UnifiedPlanningDocument> all) {
     final set = <String>{};
     for (final d in all) {
@@ -164,7 +264,10 @@ class _UnifiedPlanningDocumentsScreenState
   }
 
   bool get _hasActiveFilters =>
-      _filterCountryName != null || _filterTypeId != null || _filterYear != null;
+      _filterCountryName != null ||
+      _filterTypeId != null ||
+      _filterYear != null ||
+      _sortMode != UnifiedPlanningListSort.dateNewestFirst;
 
   Future<void> _openFiltersSheet(
     BuildContext context,
@@ -178,6 +281,7 @@ class _UnifiedPlanningDocumentsScreenState
     String? tempCountry = _filterCountryName;
     int? tempType = _filterTypeId;
     int? tempYear = _filterYear;
+    var tempSort = _sortMode;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -196,6 +300,7 @@ class _UnifiedPlanningDocumentsScreenState
           ),
           child: StatefulBuilder(
             builder: (context, setModalState) {
+              final menuMaxH = _filterSheetMenuMaxHeight(context);
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -210,19 +315,49 @@ class _UnifiedPlanningDocumentsScreenState
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
+                      loc.unifiedPlanningSortBy,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<UnifiedPlanningListSort>(
+                    value: tempSort,
+                    isExpanded: true,
+                    menuMaxHeight: menuMaxH,
+                    decoration: _filterFieldDecoration(context),
+                    items: [
+                      for (final m in UnifiedPlanningListSort.values)
+                        DropdownMenuItem<UnifiedPlanningListSort>(
+                          value: m,
+                          child: Text(
+                            _sortModeLabel(loc, m),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setModalState(() => tempSort = v);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
                       loc.countries,
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String?>(
-                    initialValue: tempCountry,
+                    value: tempCountry,
                     isExpanded: true,
+                    menuMaxHeight: menuMaxH,
                     decoration: _filterFieldDecoration(context),
                     items: [
                       DropdownMenuItem<String?>(
                         value: null,
-                        child: Text(loc.allCategories),
+                        child: Text(loc.unifiedPlanningFilterAllCountries),
                       ),
                       ...countries.map(
                         (c) => DropdownMenuItem<String?>(
@@ -243,8 +378,9 @@ class _UnifiedPlanningDocumentsScreenState
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int?>(
-                    initialValue: tempType,
+                    value: tempType,
                     isExpanded: true,
+                    menuMaxHeight: menuMaxH,
                     decoration: _filterFieldDecoration(context),
                     items: [
                       DropdownMenuItem<int?>(
@@ -270,13 +406,14 @@ class _UnifiedPlanningDocumentsScreenState
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int?>(
-                    initialValue: tempYear,
+                    value: tempYear,
                     isExpanded: true,
+                    menuMaxHeight: menuMaxH,
                     decoration: _filterFieldDecoration(context),
                     items: [
                       DropdownMenuItem<int?>(
                         value: null,
-                        child: Text(loc.allCategories),
+                        child: Text(loc.allYears),
                       ),
                       ...years.map(
                         (y) => DropdownMenuItem<int?>(
@@ -293,11 +430,14 @@ class _UnifiedPlanningDocumentsScreenState
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
-                            setModalState(() {
-                              tempCountry = null;
-                              tempType = null;
-                              tempYear = null;
+                            setState(() {
+                              _filterCountryName = null;
+                              _filterTypeId = null;
+                              _filterYear = null;
+                              _sortMode = UnifiedPlanningListSort.dateNewestFirst;
+                              _resetPagination();
                             });
+                            Navigator.pop(ctx);
                           },
                           child: Text(loc.adminFiltersClear),
                         ),
@@ -313,6 +453,7 @@ class _UnifiedPlanningDocumentsScreenState
                               _filterCountryName = tempCountry;
                               _filterTypeId = tempType;
                               _filterYear = tempYear;
+                              _sortMode = tempSort;
                               _resetPagination();
                             });
                             Navigator.pop(ctx);
@@ -341,6 +482,12 @@ class _UnifiedPlanningDocumentsScreenState
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     );
+  }
+
+  /// Keeps [DropdownButton] menus from using the full screen height; reads as in-sheet.
+  static double _filterSheetMenuMaxHeight(BuildContext context) {
+    final h = MediaQuery.sizeOf(context).height;
+    return (h * 0.36).clamp(200.0, 300.0);
   }
 
   @override
@@ -391,7 +538,8 @@ class _UnifiedPlanningDocumentsScreenState
         builder: (context, provider, _) {
           final all = provider.unifiedPlanningDocuments;
           final searched = _searchFiltered(all, _searchController.text);
-          final filtered = _attributeFiltered(searched);
+          final filtered =
+              _sortedCopy(_attributeFiltered(searched), _sortMode);
           final visible = filtered.take(_visibleCount).toList(growable: false);
           final hasMore = _visibleCount < filtered.length;
           final err = _errorMessage(loc, provider.unifiedPlanningErrorCode);
@@ -755,10 +903,10 @@ class _UnifiedPlanningDocCardState extends State<_UnifiedPlanningDocCard>
                 ),
               ),
               if (d.isPublishedWithinLastThreeDays)
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: _FreshPillBadge(label: loc.unifiedPlanningFreshBadge),
+                Positioned.fill(
+                  child: _FreshCenterStripe(
+                    label: loc.unifiedPlanningFreshBadge,
+                  ),
                 ),
               Positioned(
                 top: 10,
@@ -861,65 +1009,77 @@ class _UnifiedPlanningDocCardState extends State<_UnifiedPlanningDocCard>
   }
 }
 
-/// Retail "NEW"–style pill using organization / IFRC brand reds (dynamic from config).
-class _FreshPillBadge extends StatelessWidget {
+/// Full-width red band centered on the card; light opacity pulse (no hit capture).
+class _FreshCenterStripe extends StatefulWidget {
   final String label;
 
-  const _FreshPillBadge({required this.label});
+  const _FreshCenterStripe({required this.label});
+
+  @override
+  State<_FreshCenterStripe> createState() => _FreshCenterStripeState();
+}
+
+class _FreshCenterStripeState extends State<_FreshCenterStripe>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _opacity;
+
+  static const double _kStripeHeight = 22;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.55, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final dark = Color(AppConstants.ifrcDarkRed);
     final red = Color(AppConstants.ifrcRed);
-    final highlight = Color.lerp(red, Colors.white, 0.14)!;
-    final glow = red.withValues(alpha: 0.48);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [dark, red, highlight],
-          stops: const [0.0, 0.5, 1.0],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: glow,
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.15,
-            height: 1,
-            shadows: [
-              Shadow(
-                color: Color(0x73000000),
-                blurRadius: 2,
-                offset: Offset(0, 1),
+    return IgnorePointer(
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _opacity,
+          builder: (context, child) {
+            return Opacity(
+              opacity: _opacity.value,
+              child: child,
+            );
+          },
+          child: SizedBox(
+            height: _kStripeHeight,
+            width: double.infinity,
+            child: ColoredBox(
+              color: red,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      height: 1,
+                    ),
+                  ),
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),

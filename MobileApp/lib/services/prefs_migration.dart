@@ -10,6 +10,11 @@ Future<void> migrateLegacySharedPreferencesKeys(StorageService storage) async {
   await storage.init();
 
   Future<void> migrateString(String legacy, String canonical) async {
+    // Production uses an empty [_storagePrefix], so legacy and canonical are
+    // the same string. Removing "legacy" would delete the live preference
+    // every cold start — skip when there is nothing to migrate.
+    if (legacy == canonical) return;
+
     final hasNew = await storage.getString(canonical);
     if (hasNew != null) {
       await storage.remove(legacy);

@@ -434,13 +434,13 @@ class _OverviewTopCountriesBar extends StatelessWidget {
         .withValues(alpha: theme.brightness == Brightness.dark ? 0.35 : 0.45);
 
     String shortLabel(int countryId) {
+      final name = data.countryNames[countryId];
+      if (name != null && name.isNotEmpty) {
+        return name.length <= 12 ? name : '${name.substring(0, 11)}…';
+      }
       final iso = data.countryIso2[countryId];
       if (iso != null && iso.isNotEmpty) {
         return iso.toUpperCase();
-      }
-      final name = data.countryNames[countryId];
-      if (name != null && name.isNotEmpty) {
-        return name.length <= 10 ? name : '${name.substring(0, 9)}…';
       }
       return '#$countryId';
     }
@@ -502,7 +502,7 @@ class _OverviewTopCountriesBar extends StatelessWidget {
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 28,
+                    reservedSize: 34,
                     getTitlesWidget: (value, meta) {
                       final i = value.toInt();
                       if (i < 0 || i >= top.length) {
@@ -688,6 +688,7 @@ class _OverviewBody extends StatelessWidget {
                     choroplethPolygons: polys,
                     initialFit: initialFit,
                     maxZoom: 22,
+                    notifyParentScrollWhilePointersDown: true,
                     onCountryIso2Tapped: (iso2) {
                       showFdrsCountryInsightSheet(
                         context: context,
@@ -696,6 +697,8 @@ class _OverviewBody extends StatelessWidget {
                         data: data,
                         iso2: iso2,
                         indicatorLabel: indicatorLabel,
+                        indicatorBankId: indicatorBankId,
+                        periodOptions: periodOptions,
                       );
                     },
                   ),

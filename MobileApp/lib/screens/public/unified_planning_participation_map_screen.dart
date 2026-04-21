@@ -297,16 +297,18 @@ class _UnifiedPlanningParticipationMapScreenState
     final noData = theme.colorScheme.surfaceContainerHighest.withValues(
       alpha: isDark ? 0.35 : 0.5,
     );
-    final low = Color(AppConstants.ifrcRed).withValues(alpha: 0.14);
-    final high = Color(AppConstants.ifrcRed).withValues(alpha: 0.82);
+    final fillFull = isDark
+        ? Color(AppConstants.semanticSuccessOnDarkSoft)
+        : Color(AppConstants.semanticSuccessOnLightStrong);
+    final fillPartial = isDark
+        ? Color(AppConstants.semanticNotificationOrangeDarkUnread)
+        : Color(AppConstants.semanticNotificationOrangeTextStrongLight);
 
-    final polys = WorldGeoJsonCache.instance.buildChoroplethPolygons(
+    final polys = _discreteParticipationPolygons(
+      model: model,
       fillNoData: noData,
-      fillLow: low,
-      fillHigh: high,
-      valueByIso2Upper: model.valueByIso2Upper,
-      maxValue: model.maxValue,
-      borderStrokeWidth: 0.5,
+      fillFull: fillFull,
+      fillPartial: fillPartial,
       borderColor: border,
     );
 
@@ -428,12 +430,14 @@ class _UnifiedPlanningParticipationMapScreenState
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-            child: FdrsChoroplethLegend(
-              l10n: loc,
-              lowColor: low,
-              highColor: high,
-              lowLabel: loc.unifiedPlanningParticipationLegendLow,
-              highLabel: loc.unifiedPlanningParticipationLegendHigh,
+            child: _ParticipationMapLegend(
+              theme: theme,
+              fullColor: fillFull,
+              partialColor: fillPartial,
+              noDataColor: noData,
+              fullLabel: loc.unifiedPlanningParticipationLegendFull,
+              partialLabel: loc.unifiedPlanningParticipationLegendPartial,
+              noDataLabel: loc.unifiedPlanningParticipationLegendNoData,
             ),
           ),
           SizedBox(height: bottomPad > 0 ? bottomPad : 8),
@@ -467,6 +471,117 @@ class _ParticipationModel {
   final Map<String, String> nameByIso2Upper;
   final Set<String> expectedKeys;
   final Map<String, Set<String>> byIsoSlots;
+}
+
+List<Polygon<String>> _discreteParticipationPolygons({
+  required _ParticipationModel model,
+  required Color fillNoData,
+  required Color fillFull,
+  required Color fillPartial,
+  required Color borderColor,
+  double borderStrokeWidth = 0.5,
+}) {
+  final expected = model.expectedSlotCount;
+  final polys = <Polygon<String>>[];
+  for (final s in WorldGeoJsonCache.instance.shells) {
+    final v = model.valueByIso2Upper[s.iso2];
+    final Color fill;
+    if (expected <= 0 || v == null || v <= 0) {
+      fill = fillNoData;
+    } else if (v >= expected) {
+      fill = fillFull;
+    } else {
+      fill = fillPartial;
+    }
+    polys.add(
+      Polygon<String>(
+        points: s.outer,
+        holePointsList: s.holes.isEmpty ? null : s.holes,
+        color: fill,
+        borderStrokeWidth: borderStrokeWidth,
+        borderColor: borderColor,
+        hitValue: s.iso2,
+      ),
+    );
+  }
+  return polys;
+}
+
+class _ParticipationMapLegend extends StatelessWidget {
+  const _ParticipationMapLegend({
+    required this.theme,
+    required this.fullColor,
+    required this.partialColor,
+    required this.noDataColor,
+    required this.fullLabel,
+    required this.partialLabel,
+    required this.noDataLabel,
+  });
+
+  final ThemeData theme;
+  final Color fullColor;
+  final Color partialColor;
+  final Color noDataColor;
+  final String fullLabel;
+  final String partialLabel;
+  final String noDataLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = theme.brightness == Brightness.dark;
+    final border = theme.colorScheme.outlineVariant.withValues(
+      alpha: isDark ? 0.55 : 0.4,
+    );
+    return Material(
+      color: theme.colorScheme.surface.withValues(alpha: 0.92),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(side: BorderSide(color: border)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _legendItem(color: fullColor, label: fullLabel, border: border),
+            _legendItem(
+              color: partialColor,
+              label: partialLabel,
+              border: border,
+            ),
+            _legendItem(color: noDataColor, label: noDataLabel, border: border),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legendItem({
+    required Color color,
+    required String label,
+    required Color border,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            border: Border.all(color: border, width: 0.5),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ParticipationMapFilterSheet extends StatefulWidget {

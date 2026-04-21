@@ -381,9 +381,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
       const Positioned(
-        top: 0,
         left: 0,
         right: 0,
+        bottom: 0,
         child: OfflineBanner(),
       ),
     ],

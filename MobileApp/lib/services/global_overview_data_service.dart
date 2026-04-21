@@ -171,6 +171,29 @@ class GlobalOverviewDataService {
       countryIso2: countryIso2,
     );
   }
+
+  /// Loads [indicatorBankId] for [countryId] across each period in [periods]
+  /// (parallel requests). [periods] should be ordered oldest → newest for charts.
+  Future<List<({String period, double? value})>> loadCountryIndicatorSeries({
+    required int indicatorBankId,
+    required String locale,
+    required int countryId,
+    required List<String> periods,
+  }) async {
+    if (periods.isEmpty) return [];
+    final futures = periods.map(
+      (p) => loadOverview(
+        indicatorBankId: indicatorBankId,
+        locale: locale,
+        periodName: p,
+      ),
+    );
+    final datasets = await Future.wait(futures);
+    return List.generate(periods.length, (i) {
+      final v = datasets[i].byCountryId[countryId];
+      return (period: periods[i], value: v);
+    });
+  }
 }
 
 class OverviewLoadException implements Exception {

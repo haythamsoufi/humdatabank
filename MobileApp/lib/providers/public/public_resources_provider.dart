@@ -8,7 +8,9 @@ import '../../models/shared/resource.dart';
 import '../../models/shared/resource_list_section.dart';
 import '../../models/shared/resource_subcategory.dart';
 import '../../services/api_service.dart';
+import '../../services/storage_service.dart';
 import '../../services/ifrc_unified_planning_service.dart';
+import '../../services/unified_planning_documents_cache.dart';
 import '../../services/unified_planning_pdf_thumbnail_cache.dart';
 import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
@@ -17,6 +19,8 @@ import '../../di/service_locator.dart';
 class PublicResourcesProvider with ChangeNotifier {
   final ApiService _api = sl<ApiService>();
   final IfrcUnifiedPlanningService _ifrcUnified = IfrcUnifiedPlanningService.instance;
+  late final UnifiedPlanningDocumentsCache _unifiedPlanningDiskCache =
+      UnifiedPlanningDocumentsCache(sl<StorageService>());
 
   List<Resource> _resources = [];
   List<ResourceListSection> _sections = [];
@@ -240,8 +244,15 @@ class PublicResourcesProvider with ChangeNotifier {
 
   Future<void> _loadUnifiedPlanningDocuments() async {
     if (shouldDeferRemoteFetch) {
+      await UnifiedPlanningPdfThumbnailCache.instance.warmCacheDirectory();
+      final snap = await _unifiedPlanningDiskCache.load();
+      if (snap != null && snap.documents.isNotEmpty) {
+        _unifiedPlanningDocuments = snap.documents;
+        UnifiedPlanningPdfThumbnailCache.instance.serverThumbnailsEnabled =
+            snap.pdfThumbnailEnabled;
+        _unifiedPlanningErrorCode = null;
+      }
       _unifiedPlanningLoading = false;
-      _unifiedPlanningErrorCode = null;
       notifyListeners();
       return;
     }
@@ -255,25 +266,32 @@ class PublicResourcesProvider with ChangeNotifier {
       UnifiedPlanningPdfThumbnailCache.instance.serverThumbnailsEnabled = true;
       final config = await _ifrcUnified.fetchConfig();
       if (config == null) {
-        _unifiedPlanningDocuments = [];
-        _unifiedPlanningErrorCode = 'unified_error_config';
+        if (!await _hydrateUnifiedPlanningFromDiskCache()) {
+          _unifiedPlanningDocuments = [];
+          _unifiedPlanningErrorCode = 'unified_error_config';
+        }
         return;
       }
 
       final thumbFlag = config['pdf_thumbnail_enabled'];
+      final pdfThumbsEnabled = thumbFlag is bool ? thumbFlag : true;
       UnifiedPlanningPdfThumbnailCache.instance.serverThumbnailsEnabled =
-          thumbFlag is bool ? thumbFlag : true;
+          pdfThumbsEnabled;
 
       final listUrl = (config['ifrc_public_site_appeals_url'] as String?)?.trim();
       if (listUrl == null || listUrl.isEmpty) {
-        _unifiedPlanningDocuments = [];
-        _unifiedPlanningErrorCode = 'unified_error_config';
+        if (!await _hydrateUnifiedPlanningFromDiskCache()) {
+          _unifiedPlanningDocuments = [];
+          _unifiedPlanningErrorCode = 'unified_error_config';
+        }
         return;
       }
 
       if (AppConfig.ifrcApiUser.isEmpty || AppConfig.ifrcApiPassword.isEmpty) {
-        _unifiedPlanningDocuments = [];
-        _unifiedPlanningErrorCode = 'unified_error_credentials';
+        if (!await _hydrateUnifiedPlanningFromDiskCache()) {
+          _unifiedPlanningDocuments = [];
+          _unifiedPlanningErrorCode = 'unified_error_credentials';
+        }
         return;
       }
 
@@ -283,27 +301,46 @@ class PublicResourcesProvider with ChangeNotifier {
         typeLabels: labels,
       );
       _unifiedPlanningErrorCode = null;
+      await _unifiedPlanningDiskCache.save(
+        documents: _unifiedPlanningDocuments,
+        pdfThumbnailEnabled: pdfThumbsEnabled,
+      );
     } on StateError catch (e) {
-      _unifiedPlanningDocuments = [];
-      switch (e.message) {
-        case 'missing_credentials':
-          _unifiedPlanningErrorCode = 'unified_error_credentials';
-          break;
-        case 'ifrc_auth_failed':
-          _unifiedPlanningErrorCode = 'unified_error_ifrc_auth';
-          break;
-        default:
-          _unifiedPlanningErrorCode = 'unified_error_ifrc';
+      if (!await _hydrateUnifiedPlanningFromDiskCache()) {
+        _unifiedPlanningDocuments = [];
+        switch (e.message) {
+          case 'missing_credentials':
+            _unifiedPlanningErrorCode = 'unified_error_credentials';
+            break;
+          case 'ifrc_auth_failed':
+            _unifiedPlanningErrorCode = 'unified_error_ifrc_auth';
+            break;
+          default:
+            _unifiedPlanningErrorCode = 'unified_error_ifrc';
+        }
       }
       DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Unified planning IFRC: $e');
     } catch (e) {
-      _unifiedPlanningDocuments = [];
-      _unifiedPlanningErrorCode = 'unified_error_ifrc';
+      if (!await _hydrateUnifiedPlanningFromDiskCache()) {
+        _unifiedPlanningDocuments = [];
+        _unifiedPlanningErrorCode = 'unified_error_ifrc';
+      }
       DebugLogger.logErrorWithTag('PUBLIC_RESOURCES', 'Unified planning IFRC: $e');
     } finally {
       _unifiedPlanningLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Applies last persisted unified planning snapshot when live IFRC/config fetch fails.
+  Future<bool> _hydrateUnifiedPlanningFromDiskCache() async {
+    final snap = await _unifiedPlanningDiskCache.load();
+    if (snap == null || snap.documents.isEmpty) return false;
+    _unifiedPlanningDocuments = snap.documents;
+    UnifiedPlanningPdfThumbnailCache.instance.serverThumbnailsEnabled =
+        snap.pdfThumbnailEnabled;
+    _unifiedPlanningErrorCode = null;
+    return true;
   }
 
   void clearError() {

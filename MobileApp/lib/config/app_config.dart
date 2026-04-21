@@ -413,6 +413,10 @@ class AppConfig {
   static String get unifiedPlanningAnalyticsFiltersKey =>
       '${_storagePrefix}unified_planning_analytics_filters';
 
+  /// Last successful unified planning IFRC document list + thumbnail flag (offline).
+  static String get cachedUnifiedPlanningSnapshotKey =>
+      '${_storagePrefix}cached_unified_planning_snapshot';
+
   // App Configuration (dynamic, loaded from organization config)
   static String get appName {
     try {

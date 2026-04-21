@@ -28,6 +28,49 @@ class UnifiedPlanningDocument {
     this.publishedAt,
   });
 
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'title': title,
+        if (countryCode != null) 'countryCode': countryCode,
+        if (countryName != null) 'countryName': countryName,
+        if (appealsTypeId != null) 'appealsTypeId': appealsTypeId,
+        if (documentTypeLabel != null) 'documentTypeLabel': documentTypeLabel,
+        if (year != null) 'year': year,
+        if (publishedAt != null) 'publishedAt': publishedAt!.toUtc().toIso8601String(),
+      };
+
+  factory UnifiedPlanningDocument.fromJson(Map<String, dynamic> json) {
+    DateTime? published;
+    final rawPub = json['publishedAt'];
+    if (rawPub is String && rawPub.trim().isNotEmpty) {
+      published = DateTime.tryParse(rawPub.trim());
+    }
+    final tid = json['appealsTypeId'];
+    int? appealsId;
+    if (tid is int) {
+      appealsId = tid;
+    } else if (tid is num) {
+      appealsId = tid.toInt();
+    }
+    final y = json['year'];
+    int? yearVal;
+    if (y is int) {
+      yearVal = y;
+    } else if (y is num) {
+      yearVal = y.toInt();
+    }
+    return UnifiedPlanningDocument(
+      url: (json['url'] as String?)?.trim() ?? '',
+      title: (json['title'] as String?)?.trim() ?? '',
+      countryCode: json['countryCode'] as String?,
+      countryName: json['countryName'] as String?,
+      appealsTypeId: appealsId,
+      documentTypeLabel: json['documentTypeLabel'] as String?,
+      year: yearVal,
+      publishedAt: published,
+    );
+  }
+
   /// Distinct country for analytics: ISO2 code if set, else normalized display name.
   static String? countryIdentityKey(UnifiedPlanningDocument d) {
     final code = (d.countryCode ?? '').trim().toUpperCase();

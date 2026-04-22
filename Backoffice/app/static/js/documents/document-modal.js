@@ -430,7 +430,12 @@ class DocumentModalManager {
         if (window.isAdmin) {
             statusSection?.classList.remove('hidden');
             const statusSelect = document.getElementById('status');
-            if (statusSelect) statusSelect.value = docData.status || 'Pending';
+            if (statusSelect) {
+                const s = (docData.status != null ? String(docData.status) : '').trim().toLowerCase();
+                if (s === 'approved') statusSelect.value = 'Approved';
+                else if (s === 'rejected') statusSelect.value = 'Rejected';
+                else statusSelect.value = 'Pending';
+            }
         } else {
             statusSection?.classList.add('hidden');
         }

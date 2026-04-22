@@ -421,16 +421,24 @@ class _BarChartView extends StatelessWidget {
           color: muted,
         ) ??
         TextStyle(fontSize: 10, height: 1.15, color: muted);
-    final rodWidth = math.max(10.0, math.min(20.0, 220.0 / math.max(vals.length, 1)));
+    final n = vals.length;
+    final rodWidth = math.max(8.0, math.min(22.0, 280.0 / math.max(n, 1)));
+    // Many categories → each bar+label would get ~0px width and labels stack one char per line.
+    // Give the chart a minimum width and scroll horizontally (matches Backoffice "wide" bar lists).
+    const kScrollThreshold = 12;
+    final chartHeight = math.min(320.0, 56.0 + math.min(n, 18) * 12.0);
 
-    return SizedBox(
-      height: math.min(292.0, 52.0 + cats.length * 30.0),
-      child: Padding(
-        padding: const EdgeInsets.only(top: 2, right: 2),
-        child: BarChart(
-          BarChartData(
+    Widget buildChart(double viewWidth) {
+      final minW = math.max(viewWidth, n * 28.0 + 52.0);
+      return SizedBox(
+        width: n > kScrollThreshold ? minW : viewWidth,
+        height: chartHeight,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 2, right: 2),
+          child: BarChart(
+            BarChartData(
             alignment: BarChartAlignment.spaceAround,
-            groupsSpace: 10,
+            groupsSpace: n > 24 ? 4 : 10,
             maxY: maxY <= 0 ? 1 : maxY * 1.12,
             gridData: FlGridData(
               show: true,
@@ -519,7 +527,27 @@ class _BarChartView extends StatelessWidget {
             }),
           ),
         ),
-      ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final core = buildChart(w);
+        if (n > kScrollThreshold) {
+          return Scrollbar(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              primary: false,
+              child: core,
+            ),
+          );
+        }
+        return core;
+      },
     );
   }
 }
@@ -564,6 +592,7 @@ class _PieChartView extends StatelessWidget {
     );
 
     return SizedBox(
+      width: double.infinity,
       height: 228,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -657,6 +686,11 @@ class _WorldMapWebViewState extends State<_WorldMapWebView> {
     final bg = _cssHex(cs.surface);
     final fg = _cssHex(cs.onSurfaceVariant);
     final stroke = _cssHex(cs.outline);
+    final isDark = cs.brightness == Brightness.dark;
+    final mapboxToken = AppConfig.mapboxAccessToken.trim();
+    final mapboxTokenJson = jsonEncode(mapboxToken);
+    final isDarkJson = isDark ? 'true' : 'false';
+    // Mapbox raster URL matches `fdrs_world_map.fdrsWorldMapTiles` (MAPBOX_ACCESS_TOKEN in .env).
     return '''
 <!DOCTYPE html>
 <html><head>
@@ -666,18 +700,26 @@ class _WorldMapWebViewState extends State<_WorldMapWebView> {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 html,body{margin:0;padding:0;height:100%;background:$bg;}
-#map{height:280px;width:100%;touch-action:none;}
-.info{font:12px/1.35 system-ui;padding:6px 8px;color:$fg;}
+#map{height:280px;width:100%;min-width:100%;touch-action:none;box-sizing:border-box;}
+.info{font:12px/1.35 system-ui;padding:6px 8px;color:$fg;max-width:100%;word-wrap:break-word;}
+.leaflet-popup-content{font:12px/1.35 system-ui;max-width:220px;}
 </style>
 </head><body>
 <div class="info" id="t"></div>
 <div id="map"></div>
 <script>
 const spec = $specJson;
+const MAPBOX_TOKEN = $mapboxTokenJson;
+const DARK = $isDarkJson;
 document.getElementById('t').textContent = (spec.metric || 'value') + ' — ' + (spec.countries||[]).length + ' countries';
 const valueByIso = {};
+const labelByIso = {};
 (spec.countries||[]).forEach(function(c){
-  if (c && c.iso3) valueByIso[String(c.iso3).toUpperCase()] = Number(c.value);
+  if (c && c.iso3) {
+    var u = String(c.iso3).toUpperCase();
+    valueByIso[u] = Number(c.value);
+    if (c.label) labelByIso[u] = String(c.label);
+  }
 });
 const vals = Object.values(valueByIso).filter(function(v){return isFinite(v);});
 const vmin = vals.length ? Math.min.apply(null, vals) : 0;
@@ -695,10 +737,19 @@ window.__humdbMap = map;
 window.__humdbInvalidateMap = function(){
   try { map.invalidateSize(true); } catch (e) {}
 };
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 8,
-  attribution: '&copy; OpenStreetMap'
-}).addTo(map);
+if (MAPBOX_TOKEN && MAPBOX_TOKEN.length > 0) {
+  var style = DARK ? 'mapbox/dark-v11' : 'mapbox/light-v11';
+  L.tileLayer('https://api.mapbox.com/styles/v1/' + style + '/tiles/{z}/{x}/{y}?access_token=' + encodeURIComponent(MAPBOX_TOKEN), {
+    maxZoom: 8,
+    tileSize: 256,
+    attribution: '© <a href="https://www.mapbox.com/" target="_blank" rel="noopener">Mapbox</a> © OpenStreetMap'
+  }).addTo(map);
+} else {
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 8,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+  }).addTo(map);
+}
 function loadWorldGeoJson(){
   var urls = [
     'https://cdn.jsdelivr.net/gh/datasets/geo-countries@master/data/countries.geojson',
@@ -724,6 +775,15 @@ function loadWorldGeoJson(){
           color: '$stroke',
           fillOpacity: 0.75
         };
+      },
+      onEachFeature: function(feature, layer){
+        var p = feature.properties || {};
+        var iso = (p.ISO_A3 || p.iso_a3 || p.ISO_A3_EH || '').toString().toUpperCase();
+        var v = valueByIso[iso];
+        var name = (labelByIso[iso] || p.NAME || p.name || p.ADMIN || iso);
+        var line = name + (isFinite(v) ? ' — ' + (Math.abs(v) >= 1000 ? v.toLocaleString() : v) : ': no data');
+        layer.bindPopup(line);
+        layer.on('click', function(){ layer.openPopup(); });
       }
     }).addTo(map);
     setTimeout(function(){ window.__humdbInvalidateMap(); }, 100);

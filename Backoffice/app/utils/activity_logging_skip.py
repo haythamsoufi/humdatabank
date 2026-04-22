@@ -35,6 +35,7 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "forms.search_matrix_rows",
         "main.load_more_activities",
         "forms_api.api_render_pending_dynamic_indicator",
+        "ai_v2.chat",
         "ai_v2.chat_stream",
         "ai_v2.list_conversations",
         "ai_v2.issue_token",

@@ -343,10 +343,6 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: Theme.of(context).dividerColor,
-                      width: 1,
-                    ),
                   ),
                   child: InkWell(
                     onTap: () {

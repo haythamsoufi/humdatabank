@@ -8,7 +8,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, TextAreaField, SubmitField, SelectField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Optional, Length, ValidationError
-from app.models import IndicatorBank, Sector, SubSector
+from app.models import IndicatorBank, Sector, SubSector, IndicatorBankType, IndicatorBankUnit
 from ..base import BaseForm, MultilingualFieldsMixin, FileUploadForm, CommonValidators, int_or_none
 
 
@@ -16,15 +16,9 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
     """Form for adding or editing an IndicatorBank entry."""
 
     name = StringField("Indicator Name", validators=[DataRequired(), Length(max=255)])
-    type = SelectField("Type", choices=[
-        ('Number', 'Number'),
-        ('Percentage', 'Percentage'),
-        ('Text', 'Text'),
-        ('YesNo', 'Yes/No'),
-        ('Date', 'Date')
-    ], validators=[DataRequired()])
-    unit = StringField("Unit", validators=[Optional(), Length(max=50)],
-                      render_kw={"placeholder": "e.g., People, %, Items"})
+    # Central catalog IDs (see IndicatorBankType / IndicatorBankUnit)
+    type = SelectField("Type", coerce=int, validators=[DataRequired()])
+    unit = SelectField("Unit", coerce=int_or_none, validators=[Optional()])
     fdrs_kpi_code = StringField("FDRS KPI Code", validators=[Optional(), Length(max=50)],
                                 render_kw={"placeholder": "e.g., FDRS KPI code"})
     definition = TextAreaField("Definition", validators=[Optional()],
@@ -64,14 +58,18 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         try:
             from app.routes.admin.shared import get_localized_sector_name, get_localized_subsector_name
 
-            # Ensure Type field choices are set
-            self.type.choices = [
-                ('Number', 'Number'),
-                ('Percentage', 'Percentage'),
-                ('Text', 'Text'),
-                ('YesNo', 'Yes/No'),
-                ('Date', 'Date')
-            ]
+            mtypes = (
+                IndicatorBankType.query.filter_by(is_active=True)
+                .order_by(IndicatorBankType.sort_order, IndicatorBankType.name)
+                .all()
+            )
+            self.type.choices = [(t.id, t.name) for t in mtypes]
+            munits = (
+                IndicatorBankUnit.query.filter_by(is_active=True)
+                .order_by(IndicatorBankUnit.sort_order, IndicatorBankUnit.name)
+                .all()
+            )
+            self.unit.choices = [(None, "-- No unit --")] + [(u.id, u.name) for u in munits]
 
             # Get active sectors
             sectors = Sector.query.filter_by(is_active=True).order_by(Sector.display_order, Sector.name).all()
@@ -111,9 +109,20 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         # Ensure choices are populated before setting data
         self._populate_choices()
 
+        from app.services.indicator_measurement_sync import (
+            resolve_type_id_for_legacy_string,
+            resolve_unit_id_for_legacy_string,
+        )
+
         self.name.data = indicator_bank.name
-        self.type.data = indicator_bank.type
-        self.unit.data = indicator_bank.unit
+        tid = indicator_bank.indicator_type_id
+        if not tid and indicator_bank.type:
+            tid = resolve_type_id_for_legacy_string(indicator_bank.type)
+        self.type.data = tid
+        uid = indicator_bank.indicator_unit_id
+        if not uid and indicator_bank.unit:
+            uid = resolve_unit_id_for_legacy_string(indicator_bank.unit)
+        self.unit.data = uid
         self.fdrs_kpi_code.data = getattr(indicator_bank, 'fdrs_kpi_code', None) or ''
         self.definition.data = indicator_bank.definition
 
@@ -152,8 +161,9 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
     def populate_indicator_bank(self, indicator_bank):
         """Populates an IndicatorBank instance from the form data."""
         indicator_bank.name = self.name.data
-        indicator_bank.type = self.type.data
-        indicator_bank.unit = self.unit.data
+        indicator_bank.indicator_type_id = self.type.data
+        indicator_bank.indicator_unit_id = self.unit.data
+        indicator_bank.sync_type_unit_string_columns()
         indicator_bank.fdrs_kpi_code = (self.fdrs_kpi_code.data or '').strip() or None
         indicator_bank.definition = self.definition.data
 

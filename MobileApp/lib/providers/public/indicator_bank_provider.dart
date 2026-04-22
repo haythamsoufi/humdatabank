@@ -120,7 +120,11 @@ class IndicatorBankProvider with ChangeNotifier {
 
     if (!forceRefresh) {
       if (_allIndicators.isEmpty && _sectors.isEmpty) {
-        await _restoreFromDiskSnapshotIfFresh(locale);
+        if (shouldDeferRemoteFetch) {
+          await _restoreFromDiskSnapshotAnyAge(locale);
+        } else {
+          await _restoreFromDiskSnapshotIfFresh(locale);
+        }
       }
       // If we already have fresh data for this locale and refresh is not forced, reuse it
       if (_hasFreshDataForLocale(locale)) {
@@ -169,7 +173,7 @@ class IndicatorBankProvider with ChangeNotifier {
     if (shouldDeferRemoteFetch) {
       _isLoading = false;
       if (_allIndicators.isEmpty && _sectors.isEmpty) {
-        await _restoreFromDiskSnapshotIfFresh(locale);
+        await _restoreFromDiskSnapshotAnyAge(locale);
       }
       if (_allIndicators.isNotEmpty) {
         _error = null;
@@ -224,6 +228,12 @@ class IndicatorBankProvider with ChangeNotifier {
         'INDICATOR_BANK',
         'Rate limit while loading indicators: ${e.retryAfter ?? 'unknown retry window'}',
       );
+      if (_allIndicators.isEmpty) {
+        await _restoreFromDiskSnapshotAnyAge(locale);
+        if (_allIndicators.isNotEmpty) {
+          _error = null;
+        }
+      }
       if (_allIndicators.isNotEmpty) {
         _applyFilters();
       }
@@ -235,6 +245,12 @@ class IndicatorBankProvider with ChangeNotifier {
       );
       _error = error.getUserMessage();
       _errorHandler.logError(error);
+      if (_allIndicators.isEmpty) {
+        await _restoreFromDiskSnapshotAnyAge(locale);
+        if (_allIndicators.isNotEmpty) {
+          _error = null;
+        }
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -561,6 +577,20 @@ class IndicatorBankProvider with ChangeNotifier {
       maxAge: _cacheDuration,
     );
     if (snap == null) return;
+    _applySnapshot(snap);
+  }
+
+  /// Last successful download, even if older than [_cacheDuration] (offline).
+  Future<void> _restoreFromDiskSnapshotAnyAge(String locale) async {
+    final snap = await IndicatorBankSnapshotStore.loadIfValid(
+      locale: locale,
+      maxAge: null,
+    );
+    if (snap == null) return;
+    _applySnapshot(snap);
+  }
+
+  void _applySnapshot(IndicatorBankSnapshotPayload snap) {
     _sectors = snap.sectors;
     _allIndicators = snap.indicators;
     _filteredIndicators = List<Indicator>.from(snap.indicators);
@@ -924,6 +954,60 @@ class IndicatorBankProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  String? _primaryEnglishSector(Indicator ind) {
+    if (ind.sector == null) return null;
+    if (ind.sector is String) return ind.sector as String;
+    if (ind.sector is Map) {
+      return (ind.sector as Map<String, dynamic>)['primary'] as String?;
+    }
+    return null;
+  }
+
+  String? _primaryEnglishSubSector(Indicator ind) {
+    if (ind.subSector == null) return null;
+    if (ind.subSector is String) return ind.subSector as String;
+    if (ind.subSector is Map) {
+      return (ind.subSector as Map<String, dynamic>)['primary'] as String?;
+    }
+    return null;
+  }
+
+  /// Re-applies type/sector/sub/emergency/archived on [allIndicators] when the
+  /// network is unavailable (mirrors the usual server-side filter call).
+  void _rebuildFilteredFromAllIndicatorsOffline() {
+    var list = List<Indicator>.from(_allIndicators);
+    if (_selectedType.isNotEmpty) {
+      list = list
+          .where((i) => (i.type ?? '').toLowerCase() == _selectedType.toLowerCase())
+          .toList();
+    }
+    if (_selectedSector.isNotEmpty) {
+      list = list
+          .where((i) => _primaryEnglishSector(i) == _selectedSector)
+          .toList();
+    }
+    if (_selectedSubSector.isNotEmpty) {
+      list = list
+          .where((i) => _primaryEnglishSubSector(i) == _selectedSubSector)
+          .toList();
+    }
+    if (_selectedEmergency.isNotEmpty) {
+      final q = _selectedEmergency.toLowerCase();
+      list = list.where((i) {
+        final e = i.emergency;
+        if (e != null) {
+          if (q == 'true' || q == '1' || q == 'yes') return e == true;
+          if (q == 'false' || q == '0' || q == 'no') return e == false;
+        }
+        return (e?.toString() ?? '').toLowerCase().contains(q);
+      }).toList();
+    }
+    if (!_archived) {
+      list = list.where((i) => !i.archived).toList();
+    }
+    _filteredIndicators = list;
+  }
+
   void _applyFilters() {
     // Client-side: search only. Sector/sub-sector filtering is server-side (any level).
     var filtered = _filteredIndicators;
@@ -946,6 +1030,25 @@ class IndicatorBankProvider with ChangeNotifier {
       _error = _rateLimitMessage ??
           'Indicator Bank is temporarily unavailable. Please try again soon.';
       notifyListeners();
+      return;
+    }
+
+    if (shouldDeferRemoteFetch) {
+      if (_allIndicators.isEmpty) {
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+      try {
+        _rebuildFilteredFromAllIndicatorsOffline();
+        _applyFilters();
+      } finally {
+        _isLoading = false;
+        notifyListeners();
+      }
       return;
     }
 

@@ -1009,7 +1009,7 @@ class _UnifiedPlanningDocCardState extends State<_UnifiedPlanningDocCard>
   }
 }
 
-/// Full-width red band centered on the card; light opacity pulse (no hit capture).
+/// Full-width red band, centered; “Fresh” text scrolls in a news-ticker loop.
 class _FreshCenterStripe extends StatefulWidget {
   final String label;
 
@@ -1021,66 +1021,156 @@ class _FreshCenterStripe extends StatefulWidget {
 
 class _FreshCenterStripeState extends State<_FreshCenterStripe>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _opacity;
-
+  late final AnimationController _marquee;
   static const double _kStripeHeight = 22;
+  static const double _scrollPxPerSec = 38;
+
+  /// Width of one repeating cell (`  label  ·  `).
+  double _unitW = 0;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _marquee = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
-    _opacity = Tween<double>(begin: 0.55, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+      duration: const Duration(milliseconds: 5000),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureTickerUnit());
+  }
+
+  @override
+  void didUpdateWidget(covariant _FreshCenterStripe oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.label != widget.label) {
+      _marquee
+        ..stop()
+        ..reset();
+      setState(() => _unitW = 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measureTickerUnit());
+    }
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _marquee.dispose();
     super.dispose();
+  }
+
+  String _tickerCell() => '  ${widget.label}  ·  ';
+
+  void _measureTickerUnit() {
+    if (!mounted) return;
+    final style = const TextStyle(
+      color: Colors.white,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      height: 1,
+    );
+    final tp = TextPainter(
+      text: TextSpan(text: _tickerCell(), style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final w = tp.width;
+    if (w <= 0) return;
+    if ((w - _unitW).abs() < 0.5) {
+      if (_unitW > 0 && !_marquee.isAnimating) {
+        _marquee.repeat();
+      }
+      return;
+    }
+    final ms = (w / _scrollPxPerSec * 1000).round().clamp(4000, 20000);
+    setState(() {
+      _unitW = w;
+      _marquee
+        ..duration = Duration(milliseconds: ms)
+        ..reset()
+        ..repeat();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_unitW <= 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measureTickerUnit());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final red = Color(AppConstants.ifrcRed);
-    return IgnorePointer(
-      child: Center(
-        child: AnimatedBuilder(
-          animation: _opacity,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _opacity.value,
-              child: child,
-            );
-          },
+    const style = TextStyle(
+      color: Colors.white,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      height: 1,
+    );
+
+    if (_unitW <= 0) {
+      return IgnorePointer(
+        child: Center(
           child: SizedBox(
             height: _kStripeHeight,
             width: double.infinity,
             child: ColoredBox(
               color: red,
               child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      height: 1,
-                    ),
-                  ),
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
                 ),
               ),
             ),
           ),
+        ),
+      );
+    }
+
+    return IgnorePointer(
+      child: Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final copies = w <= 0
+                ? 4
+                : (w / _unitW).ceil() + 2;
+            return SizedBox(
+              height: _kStripeHeight,
+              width: double.infinity,
+              child: ClipRect(
+                child: ColoredBox(
+                  color: red,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedBuilder(
+                      animation: _marquee,
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: Offset(-_unitW * _marquee.value, 0),
+                          child: child,
+                        );
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List<Widget>.generate(
+                          copies.clamp(3, 24),
+                          (_) => Text(
+                            _tickerCell(),
+                            maxLines: 1,
+                            style: style,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

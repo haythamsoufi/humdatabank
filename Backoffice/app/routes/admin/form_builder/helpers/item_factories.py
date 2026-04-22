@@ -76,8 +76,10 @@ def _create_indicator_form_item(template, section, form_data, default_order):
         template_id=template.id,  # Add template_id
         version_id=section.version_id,
         label=(get_field_value('label', '') or (indicator_bank.name if indicator_bank else 'Indicator')),
-        type=indicator_bank.type if indicator_bank else 'number', # Use indicator bank type
-        unit=indicator_bank.unit if indicator_bank else '', # Use indicator bank unit
+        type=indicator_bank.type if indicator_bank else 'number',
+        unit=indicator_bank.unit if indicator_bank else '',
+        indicator_type_id=indicator_bank.indicator_type_id if indicator_bank else None,
+        indicator_unit_id=indicator_bank.indicator_unit_id if indicator_bank else None,
         order=order,
         definition=_custom_def_val,
         indicator_bank_id=indicator_bank_id_int if indicator_bank_id_int else None

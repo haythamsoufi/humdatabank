@@ -278,6 +278,31 @@ class AiChatPersistenceService {
           final createdAtStr = m['created_at']?.toString();
           final createdAt = createdAtStr != null ? DateTime.tryParse(createdAtStr) : null;
           final clientMessageId = m['client_message_id']?.toString();
+          // Preserve full server message meta (map_payload / chart_payload / table_payload, trace_id, …)
+          // so charts/maps resolve after re-opening a conversation. Previously only
+          // client_message_id was stored, so structured UI disappeared after sync.
+          var metaMap = <String, dynamic>{};
+          final rawMeta = m['meta'];
+          if (rawMeta is Map && rawMeta.isNotEmpty) {
+            try {
+              final decoded = jsonDecode(jsonEncode(rawMeta));
+              if (decoded is Map) {
+                metaMap = Map<String, dynamic>.from(decoded as Map);
+              }
+            } catch (_) {
+              metaMap = {};
+            }
+          } else if (rawMeta is String && rawMeta.trim().isNotEmpty) {
+            try {
+              final decoded = jsonDecode(rawMeta);
+              if (decoded is Map) {
+                metaMap = Map<String, dynamic>.from(decoded as Map);
+              }
+            } catch (_) {}
+          }
+          if (clientMessageId != null && clientMessageId.isNotEmpty) {
+            metaMap['client_message_id'] = clientMessageId;
+          }
           await txn.insert(
             'ai_messages',
             {
@@ -289,9 +314,7 @@ class AiChatPersistenceService {
               'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
               'synced_at': DateTime.now().toIso8601String(),
               'sync_state': syncStateServer,
-              'meta': (clientMessageId != null && clientMessageId.isNotEmpty)
-                  ? jsonEncode({'client_message_id': clientMessageId})
-                  : null,
+              'meta': metaMap.isNotEmpty ? jsonEncode(metaMap) : null,
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );

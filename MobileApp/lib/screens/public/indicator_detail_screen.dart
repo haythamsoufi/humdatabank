@@ -47,6 +47,11 @@ class _IndicatorDetailScreenState extends State<IndicatorDetailScreen> {
           Provider.of<IndicatorBankProvider>(context, listen: false);
       final languageProvider =
           Provider.of<LanguageProvider>(context, listen: false);
+      await provider.loadData(
+        locale: languageProvider.currentLanguage,
+        forceRefresh: false,
+      );
+      if (!mounted) return;
       final indicators = provider.allIndicators;
 
       // Try to find indicator in cached list first

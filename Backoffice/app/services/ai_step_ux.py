@@ -136,11 +136,21 @@ def format_tool_args_detail(tool_name: str, tool_args: Dict[str, Any]) -> str:
     return ", ".join(parts) if parts else ""
 
 
-def format_plan_for_step(plan: Optional[Any]) -> str:
+def format_plan_for_step(plan: Optional[Any], query: Optional[str] = None) -> str:
     """One-line user-facing summary for the planning step detail."""
     if plan is None:
-        return _("Analyzing your question step by step.")
+        q = (query or "").strip()
+        if len(q) > 160:
+            q = q[:157] + "…"
+        if q:
+            return _(
+                "No single-tool shortcut for this request — reviewing: %(snippet)s",
+                snippet=q,
+            )
+        return _(
+            "No single-tool shortcut; using the full planning and reasoning path."
+        )
     msg = step_display_message(plan.tool_name, plan.tool_args or {})
     if getattr(plan, "output_hint", None) and plan.output_hint != "text":
-        return _("Direct approach: %(step)s", step=msg)
-    return _("Direct approach: %(step)s", step=msg)
+        return _("Planned first step: %(step)s", step=msg)
+    return _("Planned first step: %(step)s", step=msg)

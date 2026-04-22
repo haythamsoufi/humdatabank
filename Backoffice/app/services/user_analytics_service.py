@@ -394,6 +394,7 @@ _SKIP_USER_ACTIVITY_LOG_ENDPOINTS = frozenset({
     'user_management.get_ns_hierarchy',
     'user_management.get_secretariat_hierarchy',
     'user_management.get_secretariat_regions_hierarchy',
+    'ai_v2.chat',
     'ai_v2.issue_token',
     'ai_documents.list_ifrc_api_documents',
     'ai_documents.list_ifrc_api_types',

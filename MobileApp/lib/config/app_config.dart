@@ -523,6 +523,13 @@ class AppConfig {
       'https://fonts.googleapis.com',
       'https://fonts.gstatic.com',
       'https://nominatim.openstreetmap.org',
+      // AI chat embedded map (Leaflet): Mapbox raster tiles when MAPBOX_ACCESS_TOKEN is set;
+      // otherwise OSM tiles (must be allowlisted for release WebView subresource loads).
+      'https://api.mapbox.com',
+      'https://*.tile.openstreetmap.org',
+      'https://a.tile.openstreetmap.org',
+      'https://b.tile.openstreetmap.org',
+      'https://c.tile.openstreetmap.org',
       'https://ipapi.co',
       'https://app.powerbi.com',
       'https://app.powerbigov.us',

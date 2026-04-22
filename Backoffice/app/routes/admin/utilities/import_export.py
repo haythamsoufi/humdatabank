@@ -27,6 +27,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.file_parsing import EXCEL_EXTENSIONS
 from app.utils.transactions import request_transaction_rollback
+from app.services.indicator_measurement_sync import backfill_fk_from_strings_bank
 
 logger = logging.getLogger(__name__)
 
@@ -480,6 +481,8 @@ def _process_indicator_import(file_path):
                         existing.name_translations = name_translations or {}
                         existing.definition_translations = definition_translations or {}
 
+                        backfill_fk_from_strings_bank(existing)
+
                         # Create history record (minimal but consistent)
                         history = IndicatorBankHistory(
                             indicator_bank_id=existing.id,
@@ -630,6 +633,8 @@ def _process_indicator_import(file_path):
                     if sub_sector_json is not None:
                         existing.sub_sector = sub_sector_json
 
+                    backfill_fk_from_strings_bank(existing)
+
                     change_description = "; ".join(changes) if changes else "Indicator updated via import (no specific changes detected)"
 
                     history = IndicatorBankHistory(
@@ -673,6 +678,7 @@ def _process_indicator_import(file_path):
                         new_indicator.sub_sector = sub_sector_json
                     db.session.add(new_indicator)
                     db.session.flush()
+                    backfill_fk_from_strings_bank(new_indicator)
 
                     history = IndicatorBankHistory(
                         indicator_bank_id=new_indicator.id,
@@ -726,6 +732,7 @@ def _create_indicator_from_suggestion(suggestion):
 
         db.session.add(new_indicator)
         db.session.flush()  # Get the ID
+        backfill_fk_from_strings_bank(new_indicator)
 
         # Create history record
         history = IndicatorBankHistory(

@@ -458,6 +458,10 @@
                 <i class="fas fa-book text-indigo-600"></i>
                 <span>{{ _('Common Words') }}</span>
             </a>
+            <a href="{{ url_for('system_admin.manage_measurement_lookups') }}" class="action-dropdown-item" role="menuitem">
+                <i class="fas fa-ruler-combined text-teal-600"></i>
+                <span>{{ _('Types & units') }}</span>
+            </a>
             <button type="button" id="auto-translate-all-btn" class="action-dropdown-item" role="menuitem"
                     title="{{ _('Auto-translate all blank indicator names to all languages') }}">
                 <i class="fas fa-magic text-indigo-600"></i>

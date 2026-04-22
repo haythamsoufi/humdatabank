@@ -5742,6 +5742,26 @@ class HumDatabankChatbot {
     _formatChatResponseSources(container) {
         if (!container || typeof container.querySelector !== 'function') return;
         this._normalizeSourcesSection(container);
+        const isAnswerVerificationCaveatText = (plain) => {
+            const t = (plain || '')
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (!t) {
+                return false;
+            }
+            if (t.includes('could not be verified against the available sources')) {
+                return true;
+            }
+            if (t.startsWith('note:') && t.includes('could not be verified')) {
+                return true;
+            }
+            if (t.startsWith('> note:') && t.includes('could not be verified')) {
+                return true;
+            }
+            return false;
+        };
+        const countProbe = document.createElement('div');
         const sourcesBlocks = container.querySelectorAll('.chat-response-sources');
         sourcesBlocks.forEach((detailsEl) => {
             const bodyEl = detailsEl.querySelector('.chat-response-sources-body');
@@ -5755,12 +5775,20 @@ class HumDatabankChatbot {
                 if (fromList.length > segments.length) segments = fromList;
             }
             if (!segments.length) return;
+            let sourceCountForLabel = 0;
+            for (const segment of segments) {
+                countProbe.innerHTML = segment;
+                const p = (countProbe.textContent || '').replace(/\s+/g, ' ').trim();
+                if (p && !isAnswerVerificationCaveatText(p)) {
+                    sourceCountForLabel += 1;
+                }
+            }
             let summaryEl = detailsEl.querySelector('summary');
             if (!summaryEl) {
                 summaryEl = document.createElement('summary');
                 detailsEl.insertBefore(summaryEl, bodyEl);
             }
-            summaryEl.textContent = 'Sources (' + segments.length + ')';
+            summaryEl.textContent = 'Sources (' + sourceCountForLabel + ')';
             const resolveSourceIcon = (segmentHtml, plainText) => {
                 const probe = document.createElement('div');
                 probe.innerHTML = segmentHtml;

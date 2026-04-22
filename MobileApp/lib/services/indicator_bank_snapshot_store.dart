@@ -83,9 +83,13 @@ class IndicatorBankSnapshotStore {
     }
   }
 
+  /// Loads the last saved snapshot for [locale].
+  ///
+  /// When [maxAge] is null, the file is accepted regardless of age (offline /
+  /// last-resort hydrate, same idea as [UnifiedPlanningDocumentsCache]).
   static Future<IndicatorBankSnapshotPayload?> loadIfValid({
     required String locale,
-    required Duration maxAge,
+    Duration? maxAge,
   }) async {
     try {
       final f = await _file();
@@ -94,7 +98,10 @@ class IndicatorBankSnapshotStore {
       final payload = IndicatorBankSnapshotPayload.tryParse(raw);
       if (payload == null) return null;
       if (payload.locale != locale) return null;
-      if (DateTime.now().difference(payload.savedAt) > maxAge) return null;
+      if (maxAge != null &&
+          DateTime.now().difference(payload.savedAt) > maxAge) {
+        return null;
+      }
       return payload;
     } catch (e, st) {
       DebugLogger.logWarn('INDICATOR_BANK_SNAPSHOT', 'load failed: $e\n$st');

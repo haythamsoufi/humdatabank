@@ -11,13 +11,93 @@ from app.utils.datetime_helpers import utcnow
 from .form_items import FormItem
 
 
+class IndicatorBankType(db.Model):
+    """Central catalog: indicator measurement data types (Number, Percentage, …)."""
+
+    __tablename__ = "indicator_bank_type"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    name_translations = db.Column(JSONB, nullable=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    def get_name_translation(self, language: str):
+        lang = (language or "").strip().lower().split("_", 1)[0].split("-", 1)[0]
+        if self.name_translations and isinstance(self.name_translations, dict):
+            val = self.name_translations.get(lang)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return self.name
+
+    def set_name_translation(self, language: str, text: str):
+        lang = (language or "").strip().lower().split("_", 1)[0].split("-", 1)[0]
+        if not lang or lang == "en":
+            return
+        if not self.name_translations or not isinstance(self.name_translations, dict):
+            self.name_translations = {}
+        value = (text or "").strip()
+        if value:
+            self.name_translations[lang] = value
+        else:
+            self.name_translations.pop(lang, None)
+
+    def __repr__(self):
+        return f"<IndicatorBankType {self.code}>"
+
+
+class IndicatorBankUnit(db.Model):
+    """Central catalog: units of measure; indicators reference rows here."""
+
+    __tablename__ = "indicator_bank_unit"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    name_translations = db.Column(JSONB, nullable=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    allows_disaggregation = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    def get_name_translation(self, language: str):
+        lang = (language or "").strip().lower().split("_", 1)[0].split("-", 1)[0]
+        if self.name_translations and isinstance(self.name_translations, dict):
+            val = self.name_translations.get(lang)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return self.name
+
+    def set_name_translation(self, language: str, text: str):
+        lang = (language or "").strip().lower().split("_", 1)[0].split("-", 1)[0]
+        if not lang or lang == "en":
+            return
+        if not self.name_translations or not isinstance(self.name_translations, dict):
+            self.name_translations = {}
+        value = (text or "").strip()
+        if value:
+            self.name_translations[lang] = value
+        else:
+            self.name_translations.pop(lang, None)
+
+    def __repr__(self):
+        return f"<IndicatorBankUnit {self.code}>"
+
+
 class IndicatorBank(db.Model):
     __tablename__ = 'indicator_bank'
     id = db.Column(db.Integer, primary_key=True)
     # Changed to Text to remove 255-char limit for long indicator names
     name = db.Column(db.Text, nullable=False, unique=True)
-    type = db.Column(db.String(50), nullable=False) # e.g., 'number', 'percentage'
-    unit = db.Column(db.String(50), nullable=True) # e.g., 'people', '%'
+    # Canonical codes (kept in sync with indicator_bank_type / indicator_bank_unit for APIs & filters)
+    type = db.Column(db.String(50), nullable=False)  # e.g., 'number', 'percentage'
+    unit = db.Column(db.String(50), nullable=True)  # e.g., 'people'
+    indicator_type_id = db.Column(db.Integer, db.ForeignKey("indicator_bank_type.id"), nullable=True, index=True)
+    indicator_unit_id = db.Column(db.Integer, db.ForeignKey("indicator_bank_unit.id"), nullable=True, index=True)
     fdrs_kpi_code = db.Column(db.String(50), nullable=True)  # FDRS KPI Code
     definition = db.Column(db.Text, nullable=True)  # Changed from 'description' to 'definition'
 
@@ -44,6 +124,8 @@ class IndicatorBank(db.Model):
 
     # Legacy template_instances relationship removed - now handled via FormItem
     history = db.relationship('IndicatorBankHistory', backref='indicator', lazy='dynamic', order_by='desc(IndicatorBankHistory.created_at)')
+    measurement_type = db.relationship('IndicatorBankType', foreign_keys=[indicator_type_id], lazy='select')
+    measurement_unit = db.relationship('IndicatorBankUnit', foreign_keys=[indicator_unit_id], lazy='select')
 
     __table_args__ = (
         db.Index('ix_indicator_bank_type_unit', 'type', 'unit'),
@@ -175,6 +257,15 @@ class IndicatorBank(db.Model):
             delattr(self, '_cached_subsectors')
         if hasattr(self, '_cached_programs_list'):
             delattr(self, '_cached_programs_list')
+
+    def sync_type_unit_string_columns(self):
+        """Keep denormalized type/unit string columns aligned with central lookup rows."""
+        if self.measurement_type is not None:
+            self.type = (self.measurement_type.code or "")[:50]
+        if self.indicator_unit_id and self.measurement_unit is not None:
+            self.unit = (self.measurement_unit.code or "")[:50]
+        elif not self.indicator_unit_id:
+            self.unit = None
 
     @property
     def template_instances(self):

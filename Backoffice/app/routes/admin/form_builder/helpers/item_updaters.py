@@ -39,6 +39,8 @@ def _update_indicator_fields(indicator, form, request_form):
             indicator.label = new_bank_indicator.name
             indicator.type = new_bank_indicator.type
             indicator.unit = new_bank_indicator.unit
+            indicator.indicator_type_id = new_bank_indicator.indicator_type_id
+            indicator.indicator_unit_id = new_bank_indicator.indicator_unit_id
             indicator.indicator_bank_id = new_bank_indicator.id
 
     # Optional overrides: label and definition

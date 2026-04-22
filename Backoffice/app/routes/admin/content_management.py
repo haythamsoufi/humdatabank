@@ -1003,7 +1003,7 @@ def manage_documents():
     # PublicSubmission doesn't have a submitted_by field, it has submitter_name and submitter_email
     public_docs_query = db.session.query(
         SubmittedDocument,
-        PublicSubmission.status.label('status'),
+        SubmittedDocument.status.label('status'),
         Country,
         PublicSubmission.submitter_name.label('user_name'),
         PublicSubmission.submitted_at.label('uploaded_at'),

@@ -509,6 +509,130 @@ def delete_resource(resource_id):
 # Indicator Bank
 # ---------------------------------------------------------------------------
 
+def _indicator_level_ids_from_json(raw):
+    """Parse primary/secondary/tertiary int IDs from a JSON dict (mobile edit)."""
+    if not raw or not isinstance(raw, dict):
+        return None
+    out = {}
+    for key in ('primary', 'secondary', 'tertiary'):
+        if key not in raw:
+            continue
+        v = raw.get(key)
+        if v is None or v == '':
+            continue
+        try:
+            iv = int(v)
+        except (TypeError, ValueError):
+            continue
+        if iv > 0:
+            out[key] = iv
+    return out if out else None
+
+
+def _apply_indicator_edit_from_mobile_json(indicator, data, can_archive):
+    """
+    Full-field update for IndicatorBank from mobile JSON.
+    Partial updates: only keys present in ``data`` are applied.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+    from app.models import Sector, SubSector
+
+    def _ok_sector_id(sid):
+        if not sid:
+            return False
+        return Sector.query.get(sid) is not None
+
+    def _ok_subsector_id(sid):
+        if not sid:
+            return False
+        return SubSector.query.get(sid) is not None
+
+    if 'name' in data:
+        indicator.name = (data.get('name') or '').strip()
+        if not indicator.name:
+            return 'name is required', False
+
+    if 'definition' in data:
+        indicator.definition = data.get('definition')
+    if 'type' in data and data.get('type') is not None:
+        indicator.type = (data.get('type') or '').strip()
+    if 'unit' in data:
+        indicator.unit = (data.get('unit') or '').strip() or None
+    if 'fdrs_kpi_code' in data:
+        raw = (data.get('fdrs_kpi_code') or '').strip()
+        indicator.fdrs_kpi_code = raw or None
+    if 'emergency' in data:
+        indicator.emergency = bool(data.get('emergency'))
+    if 'comments' in data:
+        indicator.comments = data.get('comments')
+    if 'related_programs' in data:
+        indicator.related_programs = data.get('related_programs')
+
+    if 'archived' in data:
+        if not can_archive:
+            pass  # keep existing (same as web when user cannot archive)
+        else:
+            indicator.archived = bool(data.get('archived'))
+
+    if 'name_translations' in data and data.get('name_translations') is not None:
+        nt = data.get('name_translations')
+        if not isinstance(nt, dict):
+            return 'name_translations must be an object', False
+        for lang, text in nt.items():
+            if lang is None:
+                continue
+            code = str(lang).strip().lower()
+            if not code:
+                continue
+            val = text if text is None else str(text)
+            indicator.set_name_translation(code, val or '')
+        flag_modified(indicator, 'name_translations')
+
+    if 'definition_translations' in data and data.get('definition_translations') is not None:
+        dt = data.get('definition_translations')
+        if not isinstance(dt, dict):
+            return 'definition_translations must be an object', False
+        for lang, text in dt.items():
+            if lang is None:
+                continue
+            code = str(lang).strip().lower()
+            if not code:
+                continue
+            val = text if text is None else str(text)
+            indicator.set_definition_translation(code, val or '')
+        flag_modified(indicator, 'definition_translations')
+
+    if 'sector' in data:
+        raw = data.get('sector')
+        if raw is None:
+            indicator.sector = None
+            flag_modified(indicator, 'sector')
+        else:
+            sl = _indicator_level_ids_from_json(raw) if isinstance(raw, dict) else None
+            if sl:
+                for _k, vid in list(sl.items()):
+                    if not _ok_sector_id(vid):
+                        return f'Invalid sector id: {vid}', False
+            indicator.sector = sl
+            flag_modified(indicator, 'sector')
+
+    if 'sub_sector' in data:
+        raw = data.get('sub_sector')
+        if raw is None:
+            indicator.sub_sector = None
+            flag_modified(indicator, 'sub_sector')
+        else:
+            sl = _indicator_level_ids_from_json(raw) if isinstance(raw, dict) else None
+            if sl:
+                for _k, vid in list(sl.items()):
+                    if not _ok_subsector_id(vid):
+                        return f'Invalid sub_sector id: {vid}', False
+            indicator.sub_sector = sl
+            flag_modified(indicator, 'sub_sector')
+
+    return None, True
+
+
 @mobile_bp.route('/admin/content/indicator-bank', methods=['GET'])
 @mobile_auth_required(permission='admin.indicator_bank.view')
 def list_indicators():
@@ -583,6 +707,21 @@ def get_indicator(indicator_id):
     if not indicator:
         return mobile_not_found('Indicator not found')
 
+    langs = list(current_app.config.get('TRANSLATABLE_LANGUAGES') or [])
+
+    nt = indicator.name_translations if isinstance(
+        getattr(indicator, 'name_translations', None), dict) else None
+    dt = indicator.definition_translations if isinstance(
+        getattr(indicator, 'definition_translations', None), dict) else None
+
+    from app.services.authorization_service import AuthorizationService
+    can_archive = (
+        AuthorizationService.is_system_manager(current_user)
+        or AuthorizationService.has_rbac_permission(
+            current_user, 'admin.indicator_bank.archive',
+        )
+    )
+
     return mobile_ok(data={
         'indicator': {
             'id': indicator.id,
@@ -595,6 +734,12 @@ def get_indicator(indicator_id):
             'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
             'emergency': getattr(indicator, 'emergency', False),
             'archived': bool(getattr(indicator, 'archived', False)),
+            'comments': getattr(indicator, 'comments', None),
+            'related_programs': getattr(indicator, 'related_programs', None),
+            'name_translations': dict(nt) if nt else {},
+            'definition_translations': dict(dt) if dt else {},
+            'translatable_languages': langs,
+            'can_archive': can_archive,
         },
     })
 
@@ -602,25 +747,40 @@ def get_indicator(indicator_id):
 @mobile_bp.route('/admin/content/indicator-bank/<int:indicator_id>/edit', methods=['POST'])
 @mobile_auth_required(permission='admin.indicator_bank.edit')
 def edit_indicator(indicator_id):
-    """Update an indicator."""
+    """Update an indicator (full parity with web: translations, sector levels, FDRS, etc.)."""
     from app.models import IndicatorBank
+    from app.services.authorization_service import AuthorizationService
 
     indicator = IndicatorBank.query.get(indicator_id)
     if not indicator:
         return mobile_not_found('Indicator not found')
 
     data = get_json_safe()
-    if 'name' in data:
-        indicator.name = data['name']
-    if 'definition' in data:
-        indicator.definition = data['definition']
-    if 'type' in data:
-        indicator.type = data['type']
-    if 'unit' in data:
-        indicator.unit = data['unit']
+    if not isinstance(data, dict):
+        return mobile_bad_request('JSON body required')
+
+    can_archive = (
+        AuthorizationService.is_system_manager(current_user)
+        or AuthorizationService.has_rbac_permission(
+            current_user, 'admin.indicator_bank.archive',
+        )
+    )
+
+    err, ok = _apply_indicator_edit_from_mobile_json(indicator, data, can_archive)
+    if not ok:
+        return mobile_bad_request(err or 'Invalid data')
 
     try:
+        db.session.add(indicator)
         db.session.flush()
+        from app.services.user_analytics_service import log_admin_action
+        log_admin_action(
+            action_type='update_indicator',
+            description=f'Updated indicator "{indicator.name}" (id {indicator_id}) via mobile API',
+            target_type='indicator',
+            target_id=indicator_id,
+            risk_level='medium',
+        )
         return mobile_ok(message='Indicator updated')
     except Exception as e:
         current_app.logger.error("edit_indicator: %s", e, exc_info=True)

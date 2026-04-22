@@ -351,8 +351,8 @@ It features a full-bleed card layout with a clean header and a responsive table.
                                             <label for="status" class="block text-sm font-medium text-gray-700">{{ _('Document Status') }}</label>
                                             <select id="status" name="status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
                                                 <option value="Pending">{{ _('Pending Review') }}</option>
-                                                <option value="approved">{{ _('Approved') }}</option>
-                                                <option value="rejected">{{ _('Rejected') }}</option>
+                                                <option value="Approved">{{ _('Approved') }}</option>
+                                                <option value="Rejected">{{ _('Rejected') }}</option>
                                             </select>
                                             <p class="mt-1 text-sm text-gray-500">{{ _('Change the approval status of this document') }}</p>
                                         </div>
@@ -753,7 +753,8 @@ It features a full-bleed card layout with a clean header and a responsive table.
             filter: 'customSetFilter',
             sortable: true,
             cellRenderer: function(params) {
-                const status = params.data.status || '';
+                const statusRaw = (params.data && params.data.status) ? String(params.data.status) : '';
+                const status = statusRaw.trim().toLowerCase();
                 if (status === 'approved') {
                     return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>{{ _("Approved") }}</span>';
                 } else if (status === 'rejected') {

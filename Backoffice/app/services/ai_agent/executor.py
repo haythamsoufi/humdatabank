@@ -890,7 +890,7 @@ class AIAgentExecutor:
                     logger.info("Query planner: no simple plan; using full ReAct (no simple plan).")
                 if callable(on_step_callback):
                     try:
-                        plan_detail = _format_plan_for_step(plan)
+                        plan_detail = _format_plan_for_step(plan, query=query)
                         on_step_callback(_("Planning approach…"), plan_detail)
                     except TypeError:
                         on_step_callback(_("Planning approach…"))

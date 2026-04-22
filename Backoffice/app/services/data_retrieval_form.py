@@ -34,6 +34,7 @@ from app.utils.constants import DEFAULT_LIMIT_PERIODS, MAX_LIMIT_PERIODS
 from app.utils.datetime_helpers import utcnow
 from app.services.app_settings_service import get_organization_name
 from app.utils.sql_utils import safe_ilike_pattern
+from flask_babel import gettext as _
 
 from .data_retrieval_shared import (
     get_effective_request_user,
@@ -86,13 +87,17 @@ def get_indicator_timeseries(
         if not ident:
             return service_error("indicator_identifier is required", series=[])
 
-        _progress("Resolving indicator…")
         primary_id = resolve_indicator_to_primary_id(ident, country_id=country_id)
         if not primary_id:
             return service_error("Indicator not found", series=[])
         indicator = db.session.get(IndicatorBank, int(primary_id))
         if not indicator:
             return service_error("Indicator not found", series=[])
+
+        _nm = ((indicator.name or str(primary_id)).strip() or str(primary_id))
+        if len(_nm) > 200:
+            _nm = _nm[:197] + "…"
+        _progress(_("Selected indicator: %(name)s", name=_nm))
 
         # RBAC: ensure the caller can access this country (same rule as other tools)
         try:
@@ -1608,7 +1613,6 @@ def get_indicator_values_for_all_countries(
             return service_error("Indicator name is required", rows=[], count=0)
 
         # -------- Resolve candidate indicators (vector + keyword merged) --------
-        _progress("Resolving indicator…")
         candidates: List[IndicatorBank] = []
         similarity_map: Dict[int, float] = {}
         if ident.isdigit():
@@ -1638,7 +1642,6 @@ def get_indicator_values_for_all_countries(
         has_vector_scores = bool(similarity_map)
         candidate_ids = [int(c.id) for c in candidates]
 
-        _progress("Selecting indicator…")
         # Compute a combined relevance score per candidate.  When vector
         # similarity is available it dominates; keyword relevance is a
         # lightweight secondary signal (tiebreaker / fallback).
@@ -1737,6 +1740,11 @@ def get_indicator_values_for_all_countries(
                 resolved_indicator_name = str(next((c.name for c in candidates if int(c.id) == resolved_indicator_id), resolved_indicator_name))
             except Exception as exc:
                 logger.debug("resolved_indicator_name fallback failed: %s", exc)
+
+        _ri_name = (resolved_indicator_name or "").strip() or str(resolved_indicator_id)
+        if len(_ri_name) > 200:
+            _ri_name = _ri_name[:197] + "…"
+        _progress(_("Selected indicator: %(name)s", name=_ri_name))
 
         # Determine point-indicator behavior for the resolved indicator.
         try:

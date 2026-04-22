@@ -1,0 +1,105 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Indicator types & units') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Indicator types & units'),
+    icon='fas fa-ruler-combined',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+        {'name': _('Types & units')}
+    ],
+    info_tooltip=_('Define measurement data types and units once. Indicators in the bank link to these rows; the stored type/unit codes stay aligned for APIs and forms.'),
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Indicator bank'),
+            'url': url_for('system_admin.manage_indicator_bank'),
+            'icon': 'fas fa-list',
+            'classes': 'professional-action-btn',
+        }
+    ]
+) }}
+
+<div class="max-w-6xl mx-auto px-4 py-6 space-y-8">
+  <p class="text-sm text-gray-600">
+    <a class="text-blue-600 hover:underline" href="{{ url_for('system_admin.new_measurement_type') }}">{{ _('Add type') }}</a>
+    &nbsp;|&nbsp;
+    <a class="text-blue-600 hover:underline" href="{{ url_for('system_admin.new_measurement_unit') }}">{{ _('Add unit') }}</a>
+  </p>
+
+  <section>
+    <h2 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">{{ _('Measurement types') }}</h2>
+    <div class="overflow-x-auto border border-gray-200 rounded">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-left text-gray-600">
+          <tr>
+            <th class="px-3 py-2 font-medium">{{ _('Code') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Label') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Order') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Active') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Usage') }}</th>
+            <th class="px-3 py-2 font-medium w-32"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for t in types %}
+          <tr>
+            <td class="px-3 py-2 font-mono text-xs">{{ t.code }}</td>
+            <td class="px-3 py-2">{{ t.name }}</td>
+            <td class="px-3 py-2">{{ t.sort_order }}</td>
+            <td class="px-3 py-2">{% if t.is_active %}<span class="text-green-700">{{ _('Yes') }}</span>{% else %}<span class="text-red-700">{{ _('No') }}</span>{% endif %}</td>
+            <td class="px-3 py-2 text-gray-600">{{ type_usage.get(t.id, 0) }}</td>
+            <td class="px-3 py-2">
+              <a class="btn btn-sm btn-primary" href="{{ url_for('system_admin.edit_measurement_type', tid=t.id) }}">{{ _('Edit') }}</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="px-3 py-4 text-gray-500">{{ _('No types found. Run database migrations, then refresh.') }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">{{ _('Units') }}</h2>
+    <div class="overflow-x-auto border border-gray-200 rounded">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-left text-gray-600">
+          <tr>
+            <th class="px-3 py-2 font-medium">{{ _('Code') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Label') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Order') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Disagg') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Active') }}</th>
+            <th class="px-3 py-2 font-medium">{{ _('Usage') }}</th>
+            <th class="px-3 py-2 font-medium w-32"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for u in units %}
+          <tr>
+            <td class="px-3 py-2 font-mono text-xs">{{ u.code }}</td>
+            <td class="px-3 py-2">{{ u.name }}</td>
+            <td class="px-3 py-2">{{ u.sort_order }}</td>
+            <td class="px-3 py-2">{% if u.allows_disaggregation %}<span class="text-green-700">{{ _('Yes') }}</span>{% else %}<span class="text-gray-500">{{ _('No') }}</span>{% endif %}</td>
+            <td class="px-3 py-2">{% if u.is_active %}<span class="text-green-700">{{ _('Yes') }}</span>{% else %}<span class="text-red-700">{{ _('No') }}</span>{% endif %}</td>
+            <td class="px-3 py-2 text-gray-600">{{ unit_usage.get(u.id, 0) }}</td>
+            <td class="px-3 py-2">
+              <a class="btn btn-sm btn-primary" href="{{ url_for('system_admin.edit_measurement_unit', uid=u.id) }}">{{ _('Edit') }}</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="px-3 py-4 text-gray-500">{{ _('No units found. Run database migrations, then refresh.') }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

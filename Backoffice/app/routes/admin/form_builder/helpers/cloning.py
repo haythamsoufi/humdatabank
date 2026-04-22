@@ -203,6 +203,8 @@ def _clone_template_structure(template_id: int, source_version_id: int, target_v
             indicator_bank_id=it.indicator_bank_id,
             type=it.type,
             unit=it.unit,
+            indicator_type_id=it.indicator_type_id,
+            indicator_unit_id=it.indicator_unit_id,
             validation_condition=None,  # Will be set after remapping
             validation_message=it.validation_message,
             definition=it.definition,
@@ -392,6 +394,8 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
             indicator_bank_id=it.indicator_bank_id,
             type=it.type,
             unit=it.unit,
+            indicator_type_id=it.indicator_type_id,
+            indicator_unit_id=it.indicator_unit_id,
             validation_condition=None,  # Will be set after remapping
             validation_message=it.validation_message,
             definition=it.definition,

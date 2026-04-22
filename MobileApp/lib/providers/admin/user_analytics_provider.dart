@@ -17,10 +17,8 @@ class UserAnalyticsProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> loadAnalytics({
-    String? timeRange,
-    String? metricFilter,
-  }) async {
+  /// Loads dashboard stats and the recent activity feed (same sources as admin dashboard).
+  Future<void> loadAnalytics() async {
     if (shouldDeferRemoteFetch) {
       _isLoading = false;
       notifyListeners();
@@ -31,36 +29,40 @@ class UserAnalyticsProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final queryParams = <String, String>{};
-      if (timeRange != null && timeRange.isNotEmpty) {
-        queryParams['time_range'] = timeRange;
-      }
-      if (metricFilter != null && metricFilter.isNotEmpty) {
-        queryParams['metric'] = metricFilter;
-      }
-
-      final response = await _api.get(
+      final statsResponse = await _api.get(
         AppConfig.mobileDashboardStatsEndpoint,
-        queryParams: queryParams.isNotEmpty ? queryParams : null,
       );
 
-      if (response.statusCode == 200) {
-        final decoded = decodeJsonObject(response.body);
+      if (statsResponse.statusCode == 200) {
+        final decoded = decodeJsonObject(statsResponse.body);
         if (mobileResponseIsSuccess(decoded)) {
           final data = unwrapMobileDataMap(decoded) ?? {};
-          _analyticsData = {
-            ...data,
-            'total_users': data['user_count'],
-            'total_submissions': data['public_submission_count'],
-          };
+          _analyticsData = Map<String, dynamic>.from(data);
           _error = null;
         } else {
           _error = decoded['message']?.toString() ?? 'Failed to load analytics';
           _analyticsData = null;
         }
       } else {
-        _error = 'Failed to load analytics: ${response.statusCode}';
+        _error = 'Failed to load analytics: ${statsResponse.statusCode}';
         _analyticsData = null;
+      }
+
+      if (_analyticsData != null) {
+        try {
+          final activityResponse = await _api.get(
+            AppConfig.mobileDashboardActivityEndpoint,
+          );
+          if (activityResponse.statusCode == 200) {
+            final actDecoded = decodeJsonObject(activityResponse.body);
+            if (mobileResponseIsSuccess(actDecoded)) {
+              final activityPayload = unwrapMobileDataMap(actDecoded) ?? {};
+              _analyticsData!['activity'] = activityPayload;
+            }
+          }
+        } catch (e) {
+          DebugLogger.logErrorWithTag('ANALYTICS', 'Activity feed: $e');
+        }
       }
     } catch (e) {
       _error = 'Error loading analytics: $e';
@@ -69,35 +71,6 @@ class UserAnalyticsProvider with ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
-    }
-  }
-
-  Future<void> loadActivityData({String? timeRange}) async {
-    if (shouldDeferRemoteFetch) {
-      return;
-    }
-    try {
-      final queryParams = <String, String>{};
-      if (timeRange != null && timeRange.isNotEmpty) {
-        queryParams['time_range'] = timeRange;
-      }
-
-      final response = await _api.get(
-        AppConfig.mobileDashboardActivityEndpoint,
-        queryParams: queryParams.isNotEmpty ? queryParams : null,
-      );
-
-      if (response.statusCode == 200) {
-        final decoded = decodeJsonObject(response.body);
-        if (mobileResponseIsSuccess(decoded)) {
-          final activityPayload = unwrapMobileDataMap(decoded) ?? {};
-          _analyticsData ??= {};
-          _analyticsData!['activity'] = activityPayload;
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      DebugLogger.logErrorWithTag('ANALYTICS', 'Error loading activity: $e');
     }
   }
 

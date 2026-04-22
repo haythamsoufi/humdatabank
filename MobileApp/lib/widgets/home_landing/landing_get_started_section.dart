@@ -436,7 +436,10 @@ class _OverviewTopCountriesBar extends StatelessWidget {
     String shortLabel(int countryId) {
       final name = data.countryNames[countryId];
       if (name != null && name.isNotEmpty) {
-        return name.length <= 12 ? name : '${name.substring(0, 11)}…';
+        const maxChars = 18;
+        return name.length <= maxChars
+            ? name
+            : '${name.substring(0, maxChars - 1)}…';
       }
       final iso = data.countryIso2[countryId];
       if (iso != null && iso.isNotEmpty) {
@@ -463,7 +466,7 @@ class _OverviewTopCountriesBar extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 200,
+          height: 232,
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
@@ -502,20 +505,28 @@ class _OverviewTopCountriesBar extends StatelessWidget {
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 34,
+                    reservedSize: 68,
                     getTitlesWidget: (value, meta) {
                       final i = value.toInt();
                       if (i < 0 || i >= top.length) {
                         return const SizedBox.shrink();
                       }
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                      final labelStyle = theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      );
+                      return SideTitleWidget(
+                        meta: meta,
+                        space: 2,
+                        angle: -math.pi / 4,
+                        fitInside: SideTitleFitInsideData.fromTitleMeta(
+                          meta,
+                          distanceFromEdge: 4,
+                        ),
                         child: Text(
                           shortLabel(top[i].key),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                          style: labelStyle,
                           maxLines: 1,
+                          softWrap: false,
                           overflow: TextOverflow.ellipsis,
                         ),
                       );

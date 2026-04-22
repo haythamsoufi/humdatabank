@@ -285,8 +285,9 @@ def add_indicator_bank():
             new_indicator = IndicatorBank(
                 name=form.name.data,
                 definition=form.definition.data,
-                type=form.type.data,
-                unit=form.unit.data,
+                # Placeholder; populate_indicator_bank sets FKs and syncs canonical type/unit strings
+                type="number",
+                unit=None,
                 fdrs_kpi_code=(form.fdrs_kpi_code.data or '').strip() or None,
                 emergency=form.emergency.data,
                 related_programs=form.related_programs.data,

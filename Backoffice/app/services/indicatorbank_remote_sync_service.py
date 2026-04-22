@@ -103,6 +103,7 @@ def sync_remote_indicator_bank(
 
     from app.extensions import db
     from app.models import IndicatorBank, Sector, SubSector
+    from app.services.indicator_measurement_sync import backfill_fk_from_strings_bank
     from app.utils.transactions import atomic
 
     if not api_url:
@@ -325,6 +326,7 @@ def sync_remote_indicator_bank(
                         db.session.add(existing)
                         # Flush inside savepoint to surface uniqueness problems per row.
                         db.session.flush()
+                        backfill_fk_from_strings_bank(existing)
                         stats["indicators_created"] += 1
                     else:
                         if not apply:
@@ -364,6 +366,7 @@ def sync_remote_indicator_bank(
                         existing.sub_sector = subsector_json
                         existing.comments = remote_comments
                         db.session.flush()
+                        backfill_fk_from_strings_bank(existing)
                         stats["indicators_updated"] += 1
                 except Exception as e:
                     logger.debug("Skipping indicator item during sync: %s", e)

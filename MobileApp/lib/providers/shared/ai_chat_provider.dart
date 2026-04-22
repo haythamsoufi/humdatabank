@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -29,6 +30,10 @@ class AiChatProvider with ChangeNotifier {
 
   List<AiChatMessage> _messages = [];
   List<AiConversationSummary> _conversations = [];
+  /// Last auth identity for which [loadConversations] reset in-memory state. When unchanged,
+  /// a repeated load (e.g. AiChatScreen re-mounted after switching tabs) only refreshes the
+  /// conversation list and preserves [conversationId] / [messages].
+  String? _conversationsListSessionKey;
   /// Local-only: pinned conversations surface at the top of the list (drawer / chats).
   Set<String> _pinnedConversationIds = {};
 
@@ -71,8 +76,59 @@ class AiChatProvider with ChangeNotifier {
   bool _inflightRestoreActive = false;
   int _inflightPollEpoch = 0;
 
+  /// Categorize HTTP/WS transport failures for user-facing [AiChatMessage.errorType].
+  static String? _inferChatErrorType(Object e, String lower) {
+    if (lower.contains('quota') || lower.contains('429') || lower.contains('rate limit')) {
+      return 'quota_exceeded';
+    }
+    if (e is SocketException) {
+      return 'network_error';
+    }
+    if (lower.contains('socketexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('host lookup') ||
+        lower.contains('nodename nor servname') ||
+        lower.contains('network is unreachable') ||
+        lower.contains('no address associated with hostname') ||
+        lower.contains('no internet') ||
+        lower.contains('connection refused') ||
+        lower.contains('connection reset') ||
+        lower.contains('connection closed') ||
+        (lower.contains('clientexception') &&
+            (lower.contains('socket') || lower.contains('closed') || lower.contains('lookup')))) {
+      return 'network_error';
+    }
+    if (lower.contains('timeoutexception') ||
+        lower.contains('read timed out') ||
+        lower.contains('connection timed out') ||
+        lower.contains('time out while waiting') ||
+        (lower.contains('http') && lower.contains('timeout'))) {
+      return 'timeout_error';
+    }
+    return 'server_error';
+  }
+
   static const _preparingQueryLabel = 'Preparing query…';
   static final RegExp _progressTickRe = RegExp(r'^(.+?):\s*(\d+)\s*/\s*(\d+)\s*$');
+
+  /// Sub-step lines from [Backoffice] databank tools (`data_retrieval_form` progress)
+  /// and similar: update the same detail line in the UI instead of stacking six lines.
+  /// Matches English msgids; other locales may append until patterns are extended.
+  static final RegExp _pipelineProgressDetailRe = RegExp(
+    r'^(Loading countries|Resolving indicator|Selecting indicator|Querying form data|Building results|Scanning your access|Preparing the databank query)\b',
+    caseSensitive: false,
+  );
+
+  static bool _isPipelineProgressDetailLine(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return false;
+    if (_pipelineProgressDetailRe.hasMatch(t)) return true;
+    // UPR / document search “fetching / scanning” style (English)
+    if (RegExp(r'^Retrieving up to\b', caseSensitive: false).hasMatch(t)) {
+      return true;
+    }
+    return false;
+  }
 
   bool get isLoading => _isLoading;
   bool get isStreaming => _isStreaming;
@@ -248,6 +304,42 @@ class AiChatProvider with ChangeNotifier {
     }
   }
 
+  String _truncateConversationTitle(String? text) {
+    final t = (text ?? '').trim();
+    if (t.isEmpty) return '';
+    if (t.length > 80) return '${t.substring(0, 80)}...';
+    return t;
+  }
+
+  /// When the server streams a "Preparing query…" [detail] (raw then rewritten), update the
+  /// app bar and drawer to match [Backoffice] `chat-immersive` + `chatbot-optimistic-title`.
+  void _applyLiveTitleFromPreparingQueryDetail(String detail) {
+    final t = _truncateConversationTitle(detail);
+    if (t.isEmpty) return;
+    final cid = _conversationId;
+    if (cid == null || cid.isEmpty) return;
+    final now = DateTime.now();
+    final idx = _conversations.indexWhere((c) => c.id == cid);
+    final prev = idx >= 0 ? _conversations[idx] : null;
+    final convo = AiConversationSummary(
+      id: cid,
+      title: t,
+      updatedAt: now,
+      lastMessageAt: prev?.lastMessageAt ?? prev?.updatedAt ?? now,
+    );
+    if (idx >= 0) {
+      _conversations[idx] = convo;
+    } else {
+      _conversations.insert(0, convo);
+      _conversations.sort((a, b) {
+        final aTime = a.lastMessageAt ?? a.updatedAt ?? DateTime(0);
+        final bTime = b.lastMessageAt ?? b.updatedAt ?? DateTime(0);
+        return bTime.compareTo(aTime);
+      });
+    }
+    unawaited(_persistence.saveConversation(convo));
+  }
+
   List<String> _sourcesForPayload() {
     if (_sourcesSelected.isEmpty) {
       return ['historical', 'system_documents', 'upr_documents'];
@@ -309,9 +401,33 @@ class AiChatProvider with ChangeNotifier {
     final lines = List<String>.from(step.detailLines);
     if (lines.isNotEmpty && lines.last.trim() == trimmed) return;
 
+    if (lines.isNotEmpty) {
+      final lastLine = lines.last.trim();
+      final lastPipe = _isPipelineProgressDetailLine(lastLine);
+      final newPipe = _isPipelineProgressDetailLine(trimmed);
+      // In-place: pipeline phase replaces pipeline phase.
+      if (newPipe && lastPipe) {
+        lines[lines.length - 1] = trimmed;
+        _agentSteps[idx] = step.copyWith(detailLines: lines);
+        return;
+      }
+      // Milestone (e.g. “Selected indicator: …”) drops the in-flight spinner line.
+      if (!newPipe && lastPipe) {
+        lines[lines.length - 1] = trimmed;
+        _agentSteps[idx] = step.copyWith(detailLines: lines);
+        return;
+      }
+      // In-flight status after a milestone is a new line.
+      if (newPipe && !lastPipe) {
+        lines.add(trimmed);
+        _agentSteps[idx] = step.copyWith(detailLines: lines);
+        return;
+      }
+    }
+
     final newP = _progressTickRe.firstMatch(trimmed);
-    final lastLine = lines.isNotEmpty ? lines.last.trim() : '';
-    final lastP = _progressTickRe.firstMatch(lastLine);
+    final lastLine2 = lines.isNotEmpty ? lines.last.trim() : '';
+    final lastP = _progressTickRe.firstMatch(lastLine2);
     if (newP != null &&
         lastP != null &&
         newP.group(1)!.trim().isNotEmpty &&
@@ -329,7 +445,9 @@ class AiChatProvider with ChangeNotifier {
     _initAgentProgressIfNeeded();
 
     if (trimmed == _preparingQueryLabel && detail != null && detail.trim().isNotEmpty) {
-      _lastPreparingQueryDetail = detail.trim();
+      final d = detail.trim();
+      _lastPreparingQueryDetail = d;
+      _applyLiveTitleFromPreparingQueryDetail(d);
     }
 
     final last = _agentSteps.isNotEmpty ? _agentSteps.last : null;
@@ -337,7 +455,16 @@ class AiChatProvider with ChangeNotifier {
 
     if (last != null && lastLabel.trim() == trimmed) {
       if (detail != null && detail.trim().isNotEmpty) {
-        _appendDetailOnStep(_agentSteps.length - 1, detail.trim());
+        // Server emits "Preparing query…" twice: first with the raw user text (so the
+        // row is not empty while rewrite runs), then again with the rewritten query when
+        // it differs. Replace detail instead of appending so we do not show both.
+        if (trimmed == _preparingQueryLabel) {
+          final idx = _agentSteps.length - 1;
+          _agentSteps[idx] =
+              _agentSteps[idx].copyWith(detailLines: [detail.trim()]);
+        } else {
+          _appendDetailOnStep(_agentSteps.length - 1, detail.trim());
+        }
       }
       return;
     }
@@ -465,9 +592,22 @@ class AiChatProvider with ChangeNotifier {
     if (inflight == null) return;
     _inflightRestoreActive = true;
     _applyInflightSnapshot(inflight);
+    // Match the in-thread layout used while streaming: a trailing empty assistant row
+    // holds the progress panel. Without it, [user] is last and the UI only has the
+    // column-level inflight bar — which renders *above* the message list.
+    _ensurePlaceholderAssistantForInflight();
     _inflightPollEpoch++;
     final epoch = _inflightPollEpoch;
     unawaited(_pollServerInflight(conversationId, epoch, isAuthenticated));
+  }
+
+  void _ensurePlaceholderAssistantForInflight() {
+    if (_messages.isEmpty) return;
+    final last = _messages.last;
+    if (last.role == 'assistant' && last.content.isEmpty) return;
+    if (last.role == 'user') {
+      _messages = [..._messages, AiChatMessage(role: 'assistant', content: '')];
+    }
   }
 
   Future<void> _pollServerInflight(String conversationId, int epoch, bool isAuthenticated) async {
@@ -545,10 +685,21 @@ class AiChatProvider with ChangeNotifier {
       if (cid != null && cid.isNotEmpty && cid != _conversationId) {
         _conversationId = cid;
 
-        final firstUser = (_messages.isNotEmpty && _messages.first.role == 'user') ? _messages.first.content : null;
-        final title = firstUser == null
-            ? null
-            : (firstUser.length > 80 ? '${firstUser.substring(0, 80)}...' : firstUser);
+        // Prefer server `initial_conversation_title` (same as web WS meta) over truncating
+        // the first user message locally; both are typically the un-rewritten prompt for now.
+        final serverTitle = _truncateConversationTitle(
+          data['initial_conversation_title']?.toString(),
+        );
+        String? title = serverTitle.isNotEmpty ? serverTitle : null;
+        if (title == null) {
+          final firstUser = (_messages.isNotEmpty && _messages.first.role == 'user')
+              ? _messages.first.content
+              : null;
+          if (firstUser != null) {
+            title = _truncateConversationTitle(firstUser);
+            if (title.isEmpty) title = null;
+          }
+        }
 
         final convo = AiConversationSummary(
           id: cid,
@@ -843,16 +994,35 @@ class AiChatProvider with ChangeNotifier {
     await _service.fetchAndCacheToken();
   }
 
-  Future<void> loadConversations({required bool isAuthenticated}) async {
-    await _detachStreamForNavigation();
-    // Always wipe in-memory state first so stale conversations from a previous
-    // user session are never shown while the async load is in progress.
-    _conversations = [];
-    _conversationId = null;
-    _messages = [];
-    _pinnedConversationIds = {};
-    _error = null;
-    notifyListeners();
+  /// Refreshes the conversation drawer from local DB (and server when online).
+  ///
+  /// [sessionUserId] should be a stable per-account id (e.g. [User.id]) when [isAuthenticated] is
+  /// true. Pass it so we only full-reset when the user actually changed — not on every
+  /// [AiChatScreen] rebuild when switching bottom-nav tabs.
+  Future<void> loadConversations({
+    required bool isAuthenticated,
+    String? sessionUserId,
+  }) async {
+    if (isAuthenticated && (sessionUserId == null || sessionUserId.isEmpty)) {
+      return;
+    }
+    final nextKey = isAuthenticated ? sessionUserId! : 'anon';
+    final shouldResetSession = _conversationsListSessionKey == null ||
+        _conversationsListSessionKey != nextKey;
+    _conversationsListSessionKey = nextKey;
+
+    if (shouldResetSession) {
+      await _detachStreamForNavigation();
+      // Wipe in-memory state when switching user / auth mode so a previous
+      // account's chat never flashes while the new list is loading.
+      _conversations = [];
+      _conversationId = null;
+      _messages = [];
+      _pinnedConversationIds = {};
+      _error = null;
+      _detachedAgentStepsByConversationId.clear();
+      notifyListeners();
+    }
 
     if (!isAuthenticated) {
       // Logged-out: show locally cached/offline conversations
@@ -1379,35 +1549,28 @@ class AiChatProvider with ChangeNotifier {
       }
       _isStreaming = false; // Stop streaming immediately on error
 
-      // Extract error message
+      // Keep raw string for logging / edge cases; [errorType] drives user-facing copy in the UI.
       String errorMessage = e.toString();
-      // Remove "Exception: " prefix if present
       if (errorMessage.startsWith('Exception: ')) {
         errorMessage = errorMessage.substring(11);
       }
 
       _error = errorMessage;
 
-      // Check if it's a quota error from HTTP response
       final errorStr = errorMessage.toLowerCase();
-      String? errorType;
-      if (errorStr.contains('quota') || errorStr.contains('429') || errorStr.contains('rate limit')) {
+      String? errorType = _inferChatErrorType(e, errorStr);
+      if (errorType == 'quota_exceeded' ||
+          errorStr.contains('quota') ||
+          errorStr.contains('429') ||
+          errorStr.contains('rate limit')) {
         errorType = 'quota_exceeded';
         _errorType = 'quota_exceeded';
-        // Store the last user message for retry if it exists
         final userMessages = _messages.where((m) => m.role == 'user').toList();
         if (userMessages.isNotEmpty) {
           _failedMessage = userMessages.last.content;
         }
-      } else if (errorStr.contains('timeout')) {
-        errorType = 'timeout_error';
-        _errorType = 'timeout_error';
-      } else if (errorStr.contains('connection') || errorStr.contains('network')) {
-        errorType = 'network_error';
-        _errorType = 'network_error';
       } else {
-        errorType = 'server_error';
-        _errorType = 'server_error';
+        _errorType = errorType;
       }
 
       // Remove the assistant placeholder if it exists
@@ -1415,7 +1578,7 @@ class AiChatProvider with ChangeNotifier {
         _messages.removeLast();
       }
 
-      // Add error message bubble to the conversation
+      // Bubble text is resolved in the UI from [errorType] for network/timeout/server.
       _messages.add(AiChatMessage(
         role: 'error',
         content: errorMessage,

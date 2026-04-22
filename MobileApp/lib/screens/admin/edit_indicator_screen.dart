@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/admin/indicator_bank_admin_provider.dart';
+
+import '../../config/app_config.dart';
+import '../../config/routes.dart';
+import '../../di/service_locator.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/shared/indicator.dart';
+import '../../models/shared/indicator_level_ids.dart';
+import '../../providers/admin/indicator_bank_admin_provider.dart';
+import '../../services/api_service.dart';
+import '../../utils/admin_screen_view_logging_mixin.dart';
+import '../../utils/constants.dart';
+import '../../utils/mobile_api_json.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_checkbox_list_tile.dart';
-import '../../utils/constants.dart';
-import '../../l10n/app_localizations.dart';
-import '../../config/routes.dart';
-import '../../utils/admin_screen_view_logging_mixin.dart';
 
 class EditIndicatorScreen extends StatefulWidget {
   final int indicatorId;
@@ -22,6 +28,25 @@ class EditIndicatorScreen extends StatefulWidget {
   State<EditIndicatorScreen> createState() => _EditIndicatorScreenState();
 }
 
+class _SubsectorRow {
+  _SubsectorRow({
+    required this.id,
+    required this.name,
+    required this.sectorId,
+  });
+
+  final int id;
+  final String name;
+  final int sectorId;
+}
+
+class _SectorRow {
+  _SectorRow({required this.id, required this.name});
+
+  final int id;
+  final String name;
+}
+
 class _EditIndicatorScreenState extends State<EditIndicatorScreen>
     with AdminScreenViewLoggingMixin {
   @override
@@ -29,21 +54,39 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
       AppRoutes.editIndicator(widget.indicatorId);
 
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _typeController;
-  late TextEditingController _unitController;
-  late TextEditingController _definitionController;
-  late TextEditingController _sectorController;
-  late TextEditingController _subSectorController;
-  late TextEditingController _commentsController;
-  late TextEditingController _relatedProgramsController;
+  final _nameController = TextEditingController();
+  final _typeController = TextEditingController();
+  final _unitController = TextEditingController();
+  final _fdrsController = TextEditingController();
+  final _definitionController = TextEditingController();
+  final _commentsController = TextEditingController();
+  final _relatedProgramsController = TextEditingController();
+
+  final Map<String, TextEditingController> _nameI18nControllers = {};
 
   bool _emergency = false;
   bool _archived = false;
+  bool _canArchive = true;
   bool _isLoading = false;
+  bool _isLoadingSectors = false;
+  bool _detailReady = false;
   Indicator? _indicator;
 
-  final List<String> _typeOptions = [
+  List<String> _translatableLangs = [];
+
+  int? _sectorP;
+  int? _sectorS;
+  int? _sectorT;
+  int? _subP;
+  int? _subS;
+  int? _subT;
+
+  List<_SectorRow> _sectors = [];
+  List<_SubsectorRow> _subsectors = [];
+
+  static const _rtlLangs = {'ar', 'fa', 'he', 'ur'};
+
+  final List<String> _typeOptions = const [
     'Number',
     'Percentage',
     'Text',
@@ -54,15 +97,7 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _typeController = TextEditingController();
-    _unitController = TextEditingController();
-    _definitionController = TextEditingController();
-    _sectorController = TextEditingController();
-    _subSectorController = TextEditingController();
-    _commentsController = TextEditingController();
-    _relatedProgramsController = TextEditingController();
-    _loadIndicator();
+    _load();
   }
 
   @override
@@ -70,15 +105,68 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
     _nameController.dispose();
     _typeController.dispose();
     _unitController.dispose();
+    _fdrsController.dispose();
     _definitionController.dispose();
-    _sectorController.dispose();
-    _subSectorController.dispose();
     _commentsController.dispose();
     _relatedProgramsController.dispose();
+    for (final c in _nameI18nControllers.values) {
+      c.dispose();
+    }
+    _nameI18nControllers.clear();
     super.dispose();
   }
 
-  Future<void> _loadIndicator() async {
+  void _disposeI18nControllers() {
+    for (final c in _nameI18nControllers.values) {
+      c.dispose();
+    }
+    _nameI18nControllers.clear();
+  }
+
+  void _applyIndicatorToForm(Indicator ind) {
+    _disposeI18nControllers();
+    _nameController.text = ind.name ?? '';
+    _typeController.text = ind.type ?? '';
+    _unitController.text = ind.unit ?? '';
+    _fdrsController.text = ind.fdrsKpiCode ?? '';
+    _definitionController.text = ind.description ?? '';
+    _commentsController.text = ind.comments ?? '';
+    _relatedProgramsController.text = ind.relatedPrograms ?? '';
+    _emergency = ind.isEmergency;
+    _archived = ind.isArchived;
+    _canArchive = ind.canArchive;
+
+    _translatableLangs = List<String>.from(ind.translatableLanguages);
+    for (final code in _translatableLangs) {
+      final lc = code.toLowerCase();
+      if (lc == 'en') {
+        continue;
+      }
+      _nameI18nControllers[lc] = TextEditingController(
+        text: ind.nameTranslations[lc] ?? '',
+      );
+    }
+
+    final sl = ind.sectorLevels;
+    if (sl != null) {
+      _sectorP = sl.primary;
+      _sectorS = sl.secondary;
+      _sectorT = sl.tertiary;
+    } else {
+      _sectorP = _sectorS = _sectorT = null;
+    }
+
+    final sub = ind.subSectorLevels;
+    if (sub != null) {
+      _subP = sub.primary;
+      _subS = sub.secondary;
+      _subT = sub.tertiary;
+    } else {
+      _subP = _subS = _subT = null;
+    }
+  }
+
+  Future<void> _load() async {
     setState(() {
       _isLoading = true;
     });
@@ -86,23 +174,172 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
     final provider =
         Provider.of<IndicatorBankAdminProvider>(context, listen: false);
     final indicator = await provider.getIndicatorById(widget.indicatorId);
+    if (!mounted) {
+      return;
+    }
 
-    if (mounted) {
+    if (indicator != null) {
+      _applyIndicatorToForm(indicator);
       setState(() {
+        _indicator = indicator;
+        _detailReady = true;
         _isLoading = false;
-        if (indicator != null) {
-          _indicator = indicator;
-          _nameController.text = indicator.name ?? '';
-          _typeController.text = indicator.type ?? '';
-          _unitController.text = indicator.unit ?? '';
-          _definitionController.text = indicator.description ?? '';
-          _sectorController.text = indicator.sector ?? '';
-          _subSectorController.text = indicator.subSector ?? '';
-          _emergency = indicator.isEmergency;
-          _archived = indicator.isArchived;
-        }
+      });
+      await _loadSectors();
+    } else {
+      setState(() {
+        _indicator = null;
+        _detailReady = true;
+        _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadSectors() async {
+    setState(() {
+      _isLoadingSectors = true;
+    });
+    final api = sl<ApiService>();
+    try {
+      final res = await api.get(AppConfig.mobileSectorsSubsectorsEndpoint);
+      if (!mounted) return;
+      if (res.statusCode != 200) {
+        setState(() => _isLoadingSectors = false);
+        return;
+      }
+      final root = decodeJsonObject(res.body);
+      if (!mobileResponseIsSuccess(root)) {
+        setState(() => _isLoadingSectors = false);
+        return;
+      }
+      final data = root['data'];
+      if (data is! Map<String, dynamic>) {
+        setState(() => _isLoadingSectors = false);
+        return;
+      }
+      final list = data['sectors'];
+      if (list is! List) {
+        setState(() => _isLoadingSectors = false);
+        return;
+      }
+      final sectors = <_SectorRow>[];
+      final subsectors = <_SubsectorRow>[];
+      for (final raw in list) {
+        if (raw is! Map) continue;
+        final m = Map<String, dynamic>.from(raw);
+        final sid = m['id'];
+        final sectorId = sid is int ? sid : int.tryParse('$sid');
+        final name = m['name'] as String? ?? '';
+        if (sectorId == null) continue;
+        sectors.add(_SectorRow(id: sectorId, name: name));
+        final subs = m['subsectors'];
+        if (subs is! List) continue;
+        for (final sraw in subs) {
+          if (sraw is! Map) continue;
+          final sm = Map<String, dynamic>.from(sraw);
+          final suid = sm['id'];
+          final subId = suid is int ? suid : int.tryParse('$suid');
+          if (subId == null) continue;
+          subsectors.add(
+            _SubsectorRow(
+              id: subId,
+              name: sm['name'] as String? ?? '',
+              sectorId: sectorId,
+            ),
+          );
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _sectors = sectors;
+        _subsectors = subsectors;
+        _isLoadingSectors = false;
+        _normalizeLevelSelections();
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingSectors = false);
+      }
+    }
+  }
+
+  void _normalizeLevelSelections() {
+    bool hasSector(int? id) =>
+        id != null && _sectors.any((s) => s.id == id);
+    bool hasSub(int? id) =>
+        id != null && _subsectors.any((s) => s.id == id);
+    if (!hasSector(_sectorP)) {
+      _sectorP = null;
+    }
+    if (!hasSector(_sectorS)) {
+      _sectorS = null;
+    }
+    if (!hasSector(_sectorT)) {
+      _sectorT = null;
+    }
+    if (!hasSub(_subP)) {
+      _subP = null;
+    }
+    if (!hasSub(_subS)) {
+      _subS = null;
+    }
+    if (!hasSub(_subT)) {
+      _subT = null;
+    }
+  }
+
+  Map<String, String> _buildNameTranslationsPayload() {
+    final nt = <String, String>{};
+    for (final code in _translatableLangs) {
+      final lc = code.toLowerCase();
+      if (lc == 'en') {
+        nt['en'] = _nameController.text.trim();
+      } else {
+        final c = _nameI18nControllers[lc];
+        if (c != null) {
+          nt[lc] = c.text;
+        }
+      }
+    }
+    return nt;
+  }
+
+  Map<String, dynamic> _buildSavePayload() {
+    final sl = IndicatorLevelIds(
+      primary: _sectorP,
+      secondary: _sectorS,
+      tertiary: _sectorT,
+    );
+    final subL = IndicatorLevelIds(
+      primary: _subP,
+      secondary: _subS,
+      tertiary: _subT,
+    );
+
+    return {
+      'name': _nameController.text.trim(),
+      'type': _typeController.text.trim(),
+      'unit': _unitController.text.trim().isEmpty
+          ? null
+          : _unitController.text.trim(),
+      'fdrs_kpi_code': _fdrsController.text.trim().isEmpty
+          ? null
+          : _fdrsController.text.trim(),
+      'definition': _definitionController.text.trim().isEmpty
+          ? null
+          : _definitionController.text.trim(),
+      'emergency': _emergency,
+      'archived': _archived,
+      'comments': _commentsController.text.trim().isEmpty
+          ? null
+          : _commentsController.text.trim(),
+      'related_programs': _relatedProgramsController.text.trim().isEmpty
+          ? null
+          : _relatedProgramsController.text.trim(),
+      'name_translations': _buildNameTranslationsPayload(),
+      'sector': sl.isEmpty ? <String, dynamic>{} : sl.toJson(),
+      'sub_sector': subL.isEmpty ? <String, dynamic>{} : subL.toJson(),
+    };
   }
 
   Future<void> _saveIndicator() async {
@@ -116,48 +353,35 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
 
     final provider =
         Provider.of<IndicatorBankAdminProvider>(context, listen: false);
-
-    final data = <String, dynamic>{
-      'name': _nameController.text.trim(),
-      'type': _typeController.text.trim(),
-      if (_unitController.text.trim().isNotEmpty)
-        'unit': _unitController.text.trim(),
-      if (_definitionController.text.trim().isNotEmpty)
-        'definition': _definitionController.text.trim(),
-      'emergency': _emergency,
-      'archived': _archived,
-      if (_commentsController.text.trim().isNotEmpty)
-        'comments': _commentsController.text.trim(),
-      if (_relatedProgramsController.text.trim().isNotEmpty)
-        'related_programs': _relatedProgramsController.text.trim(),
-    };
-
+    final data = _buildSavePayload();
     final success = await provider.updateIndicator(widget.indicatorId, data);
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+    if (!mounted) {
+      return;
+    }
 
-      final localizations = AppLocalizations.of(context)!;
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(localizations.indicatorUpdatedSuccessfully),
-            backgroundColor: Color(AppConstants.ifrcRed),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        Navigator.of(context).pop(true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(provider.error ?? localizations.error),
-            backgroundColor: const Color(AppConstants.errorColor),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+    setState(() {
+      _isLoading = false;
+    });
+
+    final localizations = AppLocalizations.of(context)!;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localizations.indicatorUpdatedSuccessfully),
+          backgroundColor: Color(AppConstants.ifrcRed),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).pop(true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.error ?? localizations.error),
+          backgroundColor: const Color(AppConstants.errorColor),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -171,7 +395,7 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
       appBar: AppAppBar(
         title: localizations.editIndicator,
       ),
-      body: _isLoading && _indicator == null
+      body: _isLoading && !_detailReady
           ? const Center(
               child: CircularProgressIndicator(),
             )
@@ -207,7 +431,6 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                     child: ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        // Name Field
                         TextFormField(
                           controller: _nameController,
                           decoration: InputDecoration(
@@ -228,10 +451,9 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                           },
                         ),
                         const SizedBox(height: 16),
-
-                        // Type Field (Dropdown)
                         DropdownButtonFormField<String>(
-                          initialValue: _typeController.text.isEmpty
+                          // ignore: deprecated_member_use
+                          value: _typeController.text.isEmpty
                               ? null
                               : _typeController.text,
                           decoration: InputDecoration(
@@ -264,8 +486,6 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                           },
                         ),
                         const SizedBox(height: 16),
-
-                        // Unit Field
                         TextFormField(
                           controller: _unitController,
                           decoration: InputDecoration(
@@ -280,13 +500,29 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                           ),
                         ),
                         const SizedBox(height: 16),
-
-                        // Definition Field
+                        TextFormField(
+                          controller: _fdrsController,
+                          decoration: InputDecoration(
+                            labelText:
+                                localizations.indicatorEditFdrsKpiLabel,
+                            hintText:
+                                localizations.indicatorEditFdrsKpiHint,
+                            prefixIcon: const Icon(Icons.tag_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: context.lightSurfaceColor,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         TextFormField(
                           controller: _definitionController,
                           decoration: InputDecoration(
-                            labelText: localizations.indicatorDetailDefinition,
-                            hintText: localizations.indicatorEditDefinitionHint,
+                            labelText:
+                                localizations.indicatorDetailDefinition,
+                            hintText:
+                                localizations.indicatorEditDefinitionHint,
                             prefixIcon: const Icon(Icons.description_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -296,48 +532,60 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                           ),
                           maxLines: 4,
                         ),
-                        const SizedBox(height: 16),
-
-                        // Sector Field
-                        TextFormField(
-                          controller: _sectorController,
-                          decoration: InputDecoration(
-                            labelText: localizations.indicatorDetailSector,
-                            hintText: localizations.indicatorEditSectorHint,
-                            prefixIcon: const Icon(Icons.business_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        if (_translatableLangs.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              localizations.indicatorEditMultilingualSection,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                            filled: true,
-                            fillColor: context.lightSurfaceColor,
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Sub-Sector Field
-                        TextFormField(
-                          controller: _subSectorController,
-                          decoration: InputDecoration(
-                            labelText: localizations.indicatorDetailSubsector,
-                            hintText: localizations.indicatorEditSubsectorHint,
-                            prefixIcon:
-                                const Icon(Icons.business_center_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            filled: true,
-                            fillColor: context.lightSurfaceColor,
+                          const SizedBox(height: 12),
+                          for (final code in _translatableLangs) ...[
+                            if (code.toLowerCase() != 'en') ...[
+                              TextFormField(
+                                controller: _nameI18nControllers[code
+                                    .toLowerCase()],
+                                textDirection: _rtlLangs.contains(
+                                        code.toLowerCase())
+                                    ? TextDirection.rtl
+                                    : TextDirection.ltr,
+                                decoration: InputDecoration(
+                                  labelText: localizations
+                                      .indicatorEditNameForLanguage(
+                                    code.toUpperCase(),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  filled: true,
+                                  fillColor: context.lightSurfaceColor,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ],
+                        ],
+                        const SizedBox(height: 12),
+                        if (_isLoadingSectors)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: LinearProgressIndicator(),
                           ),
-                        ),
+                        _sectorDropdownGroup(localizations, theme),
+                        const SizedBox(height: 8),
+                        _subsectorDropdownGroup(localizations, theme),
                         const SizedBox(height: 16),
-
-                        // Related Programs Field
                         TextFormField(
                           controller: _relatedProgramsController,
                           decoration: InputDecoration(
-                            labelText: localizations.indicatorDetailRelatedPrograms,
-                            hintText:
-                                localizations.indicatorEditRelatedProgramsHint,
+                            labelText: localizations
+                                .indicatorDetailRelatedPrograms,
+                            hintText: localizations
+                                .indicatorEditRelatedProgramsHint,
                             prefixIcon: const Icon(Icons.list_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -347,12 +595,11 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                           ),
                         ),
                         const SizedBox(height: 16),
-
-                        // Comments Field
                         TextFormField(
                           controller: _commentsController,
                           decoration: InputDecoration(
-                            labelText: localizations.indicatorEditCommentsLabel,
+                            labelText:
+                                localizations.indicatorEditCommentsLabel,
                             hintText: localizations.indicatorEditCommentsHint,
                             prefixIcon: const Icon(Icons.comment_outlined),
                             border: OutlineInputBorder(
@@ -364,8 +611,6 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                           maxLines: 3,
                         ),
                         const SizedBox(height: 24),
-
-                        // Emergency Checkbox
                         AppCheckboxListTile(
                           title: localizations.indicatorEditEmergency,
                           value: _emergency,
@@ -375,21 +620,17 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                             });
                           },
                         ),
-
-                        // Archived Checkbox
                         AppCheckboxListTile(
                           title: localizations.indicatorDetailArchived,
                           value: _archived,
+                          enabled: _canArchive,
                           onChanged: (value) {
                             setState(() {
                               _archived = value ?? false;
                             });
                           },
                         ),
-
                         const SizedBox(height: 32),
-
-                        // Save Button
                         ElevatedButton(
                           onPressed: _isLoading ? null : _saveIndicator,
                           style: ElevatedButton.styleFrom(
@@ -421,8 +662,6 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                                 ),
                         ),
                         const SizedBox(height: 16),
-
-                        // Cancel Button
                         OutlinedButton(
                           onPressed: _isLoading
                               ? null
@@ -439,7 +678,7 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                             ),
                           ),
                           child: Text(
-                            'Cancel',
+                            localizations.cancel,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -451,6 +690,146 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
                     ),
                   ),
                 ),
+    );
+  }
+
+  Widget _sectorDropdownGroup(
+    AppLocalizations loc,
+    ThemeData theme,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          loc.indicatorEditSectorGroup,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _levelDropdown(
+          loc,
+          loc.indicatorEditSectorLevelPrimary,
+          _sectorP,
+          (v) => setState(() => _sectorP = v),
+          _sectors,
+        ),
+        const SizedBox(height: 8),
+        _levelDropdown(
+          loc,
+          loc.indicatorEditSectorLevelSecondary,
+          _sectorS,
+          (v) => setState(() => _sectorS = v),
+          _sectors,
+        ),
+        const SizedBox(height: 8),
+        _levelDropdown(
+          loc,
+          loc.indicatorEditSectorLevelTertiary,
+          _sectorT,
+          (v) => setState(() => _sectorT = v),
+          _sectors,
+        ),
+      ],
+    );
+  }
+
+  Widget _subsectorDropdownGroup(
+    AppLocalizations loc,
+    ThemeData theme,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          loc.indicatorEditSubsectorGroup,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _levelDropdown(
+          loc,
+          loc.indicatorEditSectorLevelPrimary,
+          _subP,
+          (v) => setState(() => _subP = v),
+          null,
+        ),
+        const SizedBox(height: 8),
+        _levelDropdown(
+          loc,
+          loc.indicatorEditSectorLevelSecondary,
+          _subS,
+          (v) => setState(() => _subS = v),
+          null,
+        ),
+        const SizedBox(height: 8),
+        _levelDropdown(
+          loc,
+          loc.indicatorEditSectorLevelTertiary,
+          _subT,
+          (v) => setState(() => _subT = v),
+          null,
+        ),
+      ],
+    );
+  }
+
+  Widget _levelDropdown(
+    AppLocalizations loc,
+    String levelLabel,
+    int? value,
+    void Function(int?) onChanged,
+    List<_SectorRow>? sectorOrNull,
+  ) {
+    final items = <DropdownMenuItem<int?>>[
+      DropdownMenuItem<int?>(
+        value: null,
+        child: Text(loc.indicatorEditSelectNone),
+      ),
+    ];
+    if (sectorOrNull != null) {
+      for (final s in sectorOrNull) {
+        items.add(
+          DropdownMenuItem<int?>(
+            value: s.id,
+            child: Text(
+              s.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      }
+    } else {
+      for (final s in _subsectors) {
+        items.add(
+          DropdownMenuItem<int?>(
+            value: s.id,
+            child: Text(
+              s.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      }
+    }
+
+    return DropdownButtonFormField<int?>(
+      // ignore: deprecated_member_use
+      value: value,
+      decoration: InputDecoration(
+        labelText: levelLabel,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        filled: true,
+        fillColor: context.lightSurfaceColor,
+      ),
+      isExpanded: true,
+      items: items,
+      onChanged: onChanged,
     );
   }
 }

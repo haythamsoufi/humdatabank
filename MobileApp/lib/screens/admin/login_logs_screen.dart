@@ -401,11 +401,18 @@ class _LogTile extends StatelessWidget {
       ts = DateTime.parse(log.timestampIso);
     } catch (_) {}
 
-    final userLine = log.userEmail != null
-        ? (log.userName?.trim().isNotEmpty == true
-            ? '${log.userName} · ${log.userEmail}'
-            : log.userEmail!)
-        : log.emailAttempted;
+    final hasName = log.userName != null && log.userName!.trim().isNotEmpty;
+    final titleText = hasName
+        ? log.userName!.trim()
+        : (log.userEmail != null && log.userEmail!.isNotEmpty
+            ? log.userEmail!
+            : (log.emailAttempted.isNotEmpty
+                ? log.emailAttempted
+                : '—'));
+    final dateText =
+        ts != null ? dateFmt.format(ts.toLocal()) : log.timestampIso;
+    final showEmailUnderDate =
+        hasName && log.userEmail != null && log.userEmail!.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -419,7 +426,7 @@ class _LogTile extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    ts != null ? dateFmt.format(ts.toLocal()) : log.timestampIso,
+                    titleText,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -445,9 +452,16 @@ class _LogTile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              userLine,
+              dateText,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            if (showEmailUnderDate) ...[
+              const SizedBox(height: 2),
+              Text(
+                log.userEmail!,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
             if (log.userEmail == null && log.emailAttempted.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 2),

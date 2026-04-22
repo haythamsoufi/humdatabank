@@ -47,6 +47,8 @@ class FormItem(db.Model):
     indicator_bank_id = Column(Integer, ForeignKey('indicator_bank.id'), nullable=True)
     type = Column(String(50), nullable=True)
     unit = Column(String(50), nullable=True)
+    indicator_type_id = Column(Integer, ForeignKey('indicator_bank_type.id'), nullable=True)
+    indicator_unit_id = Column(Integer, ForeignKey('indicator_bank_unit.id'), nullable=True)
     validation_condition = db.Column(db.Text, nullable=True)
     validation_message = db.Column(db.Text, nullable=True)
 
@@ -89,6 +91,8 @@ class FormItem(db.Model):
         lazy='select'
     )
     indicator_bank = relationship('IndicatorBank', backref='form_item_usages', lazy='select')
+    measurement_type = relationship('IndicatorBankType', foreign_keys=[indicator_type_id], lazy='select')
+    measurement_unit = relationship('IndicatorBankUnit', foreign_keys=[indicator_unit_id], lazy='select')
 
     __table_args__ = (
         db.Index('ix_form_item_version_order', 'version_id', 'order'),
@@ -97,6 +101,8 @@ class FormItem(db.Model):
         db.Index('ix_form_item_indicator_bank', 'indicator_bank_id'),
         db.Index('ix_form_item_lookup_list', 'lookup_list_id'),
         db.Index('ix_form_item_template', 'template_id'),
+        db.Index('ix_form_item_indicator_type', 'indicator_type_id'),
+        db.Index('ix_form_item_indicator_unit', 'indicator_unit_id'),
     )
     # Lookup list relationship - only works for database IDs, not special strings like 'emergency_operations'
     @property
@@ -357,9 +363,17 @@ class FormItem(db.Model):
         """Returns True if this indicator supports disaggregation based on type and unit."""
         if not self.is_indicator:
             return False
+        t_ok = self.type and str(self.type).lower() == 'number'
+        if not t_ok:
+            return False
+        if self.indicator_unit_id and self.measurement_unit is not None:
+            return bool(self.measurement_unit.allows_disaggregation)
         from config import Config
-        return (self.type and self.type.lower() == 'number' and
-                self.unit and self.unit in Config.DISAGGREGATION_ALLOWED_UNITS)
+        u = (self.unit or '').strip()
+        if not u:
+            return False
+        allowed = {x.lower() for x in (getattr(Config, "DISAGGREGATION_ALLOWED_UNITS", None) or [])}
+        return u.lower() in allowed
 
     @property
     def disaggregation_options_display(self):

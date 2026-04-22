@@ -54,24 +54,60 @@ String _summaryPlainText(html.Element? details) {
   return t.isEmpty ? 'Sources' : t;
 }
 
+/// [Backoffice] `app/services/ai_answer_verifier.py` appends a markdown blockquote
+/// with this meaning; it may appear in the same sources `<ul>` as a second `<li>`.
+/// It must not be counted as a document source for the collapsed "Sources (N)" label.
+bool _isAnswerVerificationCaveatPlain(String plain) {
+  final t = plain.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (t.isEmpty) return false;
+  if (t.contains('could not be verified against the available sources')) {
+    return true;
+  }
+  if (t.startsWith('note:') && t.contains('could not be verified')) {
+    return true;
+  }
+  if (t.startsWith('> note:') && t.contains('could not be verified')) {
+    return true;
+  }
+  return false;
+}
+
 /// Counts items inside `.chat-response-sources-body`: prefers `<li>`; otherwise
-/// non-empty segments split on `<br>`.
+/// non-empty segments split on `<br>`. Omits the answer-verification caveat (not a source).
 int _countSourcesInBody(html.Element? details) {
   if (details == null) return 0;
   final bodies = details.getElementsByClassName('chat-response-sources-body');
   if (bodies.isEmpty) return 0;
   final body = bodies.first;
   final lis = body.getElementsByTagName('li');
-  if (lis.isNotEmpty) return lis.length;
+  if (lis.isNotEmpty) {
+    var n = 0;
+    for (final li in lis) {
+      final plain = li.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (plain.isNotEmpty && !_isAnswerVerificationCaveatPlain(plain)) {
+        n++;
+      }
+    }
+    return n;
+  }
   final raw = body.innerHtml;
   if (raw.trim().isEmpty) return 0;
   final segments = raw.split(RegExp(r'<br\s*/?>', caseSensitive: false));
   var count = 0;
   for (final seg in segments) {
     final plain = seg.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-    if (plain.isNotEmpty) count++;
+    if (plain.isNotEmpty && !_isAnswerVerificationCaveatPlain(plain)) {
+      count++;
+    }
   }
-  return count > 0 ? count : 1;
+  if (count > 0) return count;
+  // Legacy fallback: one implicit block if there is visible HTML we did not count as segments.
+  final fallbackPlain =
+      body.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (fallbackPlain.isNotEmpty && !_isAnswerVerificationCaveatPlain(fallbackPlain)) {
+    return 1;
+  }
+  return 0;
 }
 
 bool _detailsInitiallyOpen(html.Element? details) {

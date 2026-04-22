@@ -18,10 +18,52 @@ import '../../config/routes.dart';
 import '../../theme/chat_immersive_palette.dart';
 import '../../utils/theme_extensions.dart';
 import '../../utils/accessibility_helper.dart';
+import '../../utils/ai_chat_message_html_split.dart';
 import '../../widgets/chat_response_sources_details_extension.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/ios_button.dart';
 import '../../l10n/app_localizations.dart';
+
+/// User-visible copy for AI chat [AiChatMessage] rows with [role] == `error`.
+/// Raw transport exceptions are replaced by localized text when [errorType] or heuristics match.
+String _userFacingChatErrorText(
+  AppLocalizations loc,
+  String raw,
+  String? errorType,
+) {
+  switch (errorType) {
+    case 'network_error':
+      return loc.aiChatErrorNetwork;
+    case 'timeout_error':
+      return loc.aiChatErrorTimeout;
+    case 'server_error':
+      return loc.aiChatErrorServer;
+    case 'quota_exceeded':
+      return raw;
+    default:
+      break;
+  }
+  final l = raw.toLowerCase();
+  if (l.contains('timeoutexception') ||
+      l.contains('read timed out') ||
+      l.contains('connection timed out') ||
+      l.contains('timed out')) {
+    return loc.aiChatErrorTimeout;
+  }
+  if (l.contains('socketexception') ||
+      l.contains('failed host lookup') ||
+      l.contains('nodename nor servname') ||
+      l.contains('network is unreachable') ||
+      l.contains('no address associated with hostname') ||
+      (l.contains('clientexception') && (l.contains('socket') || l.contains('lookup'))) ||
+      (l.contains('os error:') && l.contains('errno') && l.contains('uri=')) ) {
+    return loc.aiChatErrorNetwork;
+  }
+  if (l.contains('clientexception') && l.contains('uri=')) {
+    return loc.aiChatErrorServer;
+  }
+  return raw;
+}
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -30,7 +72,7 @@ class AiChatScreen extends StatefulWidget {
   State<AiChatScreen> createState() => _AiChatScreenState();
 }
 
-class _AiChatScreenState extends State<AiChatScreen> {
+class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClientMixin {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
@@ -202,7 +244,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final isAuthed = auth.isAuthenticated;
     // Don't block UI on token fetch (it can timeout/retry); conversations can still load via cookie auth / local DB.
     unawaited(context.read<AiChatProvider>().ensureTokenIfLoggedIn(isAuthenticated: isAuthed));
-    await context.read<AiChatProvider>().loadConversations(isAuthenticated: isAuthed);
+    await context.read<AiChatProvider>().loadConversations(
+      isAuthenticated: isAuthed,
+      sessionUserId: isAuthed ? auth.user?.id.toString() : null,
+    );
   }
 
   void _scrollToBottom() {
@@ -659,6 +704,119 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return processed;
   }
 
+  /// Shared HTML + styles for assistant narrative and for [trailing sources] after charts.
+  Widget _buildAssistantMessageHtml(BuildContext context, ThemeData theme, String processedData) {
+    return Html(
+      data: processedData,
+      extensions: const [
+        ChatResponseSourcesDetailsExtension(),
+      ],
+      style: {
+        'body': Style(
+          margin: Margins.zero,
+          padding: HtmlPaddings.zero,
+          color: _chatBody(theme),
+          fontSize: FontSize(16),
+          lineHeight: const LineHeight(1.45),
+        ),
+        'a': Style(
+          color: _chatLink(theme),
+          textDecoration: TextDecoration.underline,
+          fontWeight: FontWeight.w500,
+        ),
+        'div.chat-response-sources': Style(
+          display: Display.block,
+          margin: Margins.only(top: 12, bottom: 4),
+          padding: HtmlPaddings.all(12),
+          backgroundColor: _chatSourcesPanelBg(theme),
+          border: Border.all(color: _chatOutline(theme)),
+        ),
+        'details.chat-response-sources summary': Style(
+          display: Display.block,
+          fontSize: FontSize(13.5),
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+          color: _chatMuted(theme),
+        ),
+        '.chat-response-sources-body': Style(
+          display: Display.block,
+          color: _chatMuted(theme),
+          fontSize: FontSize(13.5),
+          lineHeight: const LineHeight(1.45),
+          fontWeight: FontWeight.w400,
+        ),
+        'details.chat-response-sources .chat-response-sources-body': Style(
+          margin: Margins.only(top: 4),
+          padding: HtmlPaddings.all(10),
+          backgroundColor: _chatSourcesPanelBg(theme),
+          border: Border(
+            top: BorderSide(color: _chatOutline(theme)),
+          ),
+        ),
+        '.chat-response-sources-body a': Style(
+          color: _chatLink(theme),
+          textDecoration: TextDecoration.underline,
+          fontWeight: FontWeight.w500,
+          fontSize: FontSize(13.5),
+        ),
+        '.chat-response-sources-body strong': Style(
+          fontWeight: FontWeight.w500,
+          color: _chatBody(theme),
+        ),
+        '.chat-response-sources-body b': Style(
+          fontWeight: FontWeight.w500,
+          color: _chatBody(theme),
+        ),
+        '.chat-response-sources-body ul': Style(
+          margin: Margins.only(top: 6, bottom: 0),
+          padding: HtmlPaddings.only(left: 18, top: 0, right: 0, bottom: 0),
+        ),
+        '.chat-response-sources-body ol': Style(
+          margin: Margins.only(top: 6, bottom: 0),
+          padding: HtmlPaddings.only(left: 20, top: 0, right: 0, bottom: 0),
+        ),
+        '.chat-response-sources-body li': Style(
+          margin: Margins.only(bottom: 6),
+          color: _chatMuted(theme),
+          fontSize: FontSize(13.5),
+          lineHeight: const LineHeight(1.45),
+        ),
+        '.chatbot-tour-trigger': Style(
+          display: Display.inlineBlock,
+          padding: HtmlPaddings.symmetric(horizontal: 12, vertical: 8),
+          margin: Margins.only(top: 8),
+          backgroundColor: _chatBubble(theme),
+          border: Border.all(
+            color: _chatOutline(theme),
+          ),
+        ),
+        '.source-doc-link': Style(
+          display: Display.inlineBlock,
+          padding: HtmlPaddings.symmetric(horizontal: 10, vertical: 6),
+          margin: Margins.only(top: 6, right: 6),
+          backgroundColor: _chatBubble(theme),
+          border: Border(
+            left: BorderSide(
+              color: _chatSourceDocAccent(theme),
+              width: 3,
+            ),
+            top: BorderSide(color: _chatOutline(theme)),
+            right: BorderSide(color: _chatOutline(theme)),
+            bottom: BorderSide(color: _chatOutline(theme)),
+          ),
+          color: _chatBody(theme),
+          textDecoration: TextDecoration.none,
+          fontSize: FontSize(12.5),
+          fontWeight: FontWeight.w500,
+          letterSpacing: -0.15,
+        ),
+      },
+      onLinkTap: (url, attributes, element) {
+        _handleLinkTap(context, url);
+      },
+    );
+  }
+
   /// True if [url] is a document download/source link from the AI (backend path).
   bool _isDocumentSourceUrl(String url) {
     final path = url.split('?').first.split('#').first.trim();
@@ -737,7 +895,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final auth = context.watch<AuthProvider>();
     final ai = context.watch<AiChatProvider>();
     final isAuthed = auth.isAuthenticated;
@@ -849,12 +1011,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
+            // Prefer inline progress (last row) over the top banner so the panel stays
+            // under the user message, same as while streaming.
+            final hasInlineProgressSlot = ai.messages.isNotEmpty &&
+                ai.messages.last.role == 'assistant' &&
+                ai.messages.last.content.isEmpty &&
+                (ai.isStreaming || ai.inflightRestoreActive);
             final showInflightBar = ai.inflightRestoreActive &&
                 ai.agentSteps.isNotEmpty &&
-                !(ai.isStreaming &&
-                    ai.messages.isNotEmpty &&
-                    ai.messages.last.role == 'assistant' &&
-                    ai.messages.last.content.isEmpty);
+                !hasInlineProgressSlot;
 
             return Column(
               children: [
@@ -1105,23 +1270,35 @@ class _AiChatScreenState extends State<AiChatScreen> {
                               final isUser = m.role == 'user';
                               final isLastAssistant = !isUser &&
                                   i == ai.messages.length - 1 &&
-                                  ai.isStreaming &&
-                                  m.content.isEmpty;
+                                  m.content.isEmpty &&
+                                  (ai.isStreaming || ai.inflightRestoreActive);
+
+                              // Defer only when structured cards render; otherwise keep Sources in the same bubble.
+                              final hasStructuredVisuals = m.structuredPayloads.isNotEmpty;
+                              final assistantBodySplit = (!isUser && !isLastAssistant && hasStructuredVisuals)
+                                  ? splitAssistantHtmlForVisualsAfterBody(m.content)
+                                  : null;
 
                               final isEditing = _editingMessageIndex == i;
                               final assistantMaxWidth =
                                   MediaQuery.of(context).size.width - (_chatPagePaddingH * 2);
                               final userMaxWidth = MediaQuery.of(context).size.width * 0.78;
 
+                              // Assistant rows use CrossAxisAlignment.start on the list item, so
+                              // the message Column would size to the Html intrinsic width and charts
+                              // could collapse to ~0 width (one character per line). Use a fixed
+                              // width for assistant so structured charts/maps get full line width.
                               return Align(
                                 alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                                 child: ConstrainedBox(
                                   constraints: BoxConstraints(
                                     maxWidth: isUser ? userMaxWidth : assistantMaxWidth,
                                   ),
-                                  child: Column(
+                                  child: SizedBox(
+                                    width: isUser ? null : assistantMaxWidth,
+                                    child: Column(
                                     mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.stretch,
                                     children: [
                                       // Message bubble (ChatGPT-style: soft pill for user, flat for assistant)
                                       Container(
@@ -1169,120 +1346,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                                         steps: ai.agentSteps,
                                                       )
                                                     : const _TypingIndicator())
-                                                : Html(
-                                                    data: _processHtmlForMobile(m.content),
-                                                    extensions: const [
-                                                      ChatResponseSourcesDetailsExtension(),
-                                                    ],
-                                                    style: {
-                                                      'body': Style(
-                                                        margin: Margins.zero,
-                                                        padding: HtmlPaddings.zero,
-                                                        color: _chatBody(theme),
-                                                        fontSize: FontSize(16),
-                                                        lineHeight: const LineHeight(1.45),
-                                                      ),
-                                                      'a': Style(
-                                                        color: _chatLink(theme),
-                                                        textDecoration: TextDecoration.underline,
-                                                        fontWeight: FontWeight.w500,
-                                                      ),
-                                                      // Web sends `<div class="chat-response-sources">` when Sources is normalized to a block.
-                                                      'div.chat-response-sources': Style(
-                                                        display: Display.block,
-                                                        margin: Margins.only(top: 12, bottom: 4),
-                                                        padding: HtmlPaddings.all(12),
-                                                        backgroundColor: _chatSourcesPanelBg(theme),
-                                                        border: Border.all(color: _chatOutline(theme)),
-                                                      ),
-                                                      // Collapsible Sources (`<details>`): typography on summary; body uses classes below.
-                                                      'details.chat-response-sources summary': Style(
-                                                        display: Display.block,
-                                                        fontSize: FontSize(13.5),
-                                                        fontWeight: FontWeight.w600,
-                                                        letterSpacing: 0.2,
-                                                        color: _chatMuted(theme),
-                                                      ),
-                                                      // Source list body: typography (panel chrome differs for `div` vs `details` wrappers).
-                                                      '.chat-response-sources-body': Style(
-                                                        display: Display.block,
-                                                        color: _chatMuted(theme),
-                                                        fontSize: FontSize(13.5),
-                                                        lineHeight: const LineHeight(1.45),
-                                                        fontWeight: FontWeight.w400,
-                                                      ),
-                                                      // `<details>`: body sits under the collapsible header — inset panel + top rule.
-                                                      'details.chat-response-sources .chat-response-sources-body': Style(
-                                                        margin: Margins.only(top: 4),
-                                                        padding: HtmlPaddings.all(10),
-                                                        backgroundColor: _chatSourcesPanelBg(theme),
-                                                        border: Border(
-                                                          top: BorderSide(color: _chatOutline(theme)),
-                                                        ),
-                                                      ),
-                                                      '.chat-response-sources-body a': Style(
-                                                        color: _chatLink(theme),
-                                                        textDecoration: TextDecoration.underline,
-                                                        fontWeight: FontWeight.w500,
-                                                        fontSize: FontSize(13.5),
-                                                      ),
-                                                      '.chat-response-sources-body strong': Style(
-                                                        fontWeight: FontWeight.w500,
-                                                        color: _chatBody(theme),
-                                                      ),
-                                                      '.chat-response-sources-body b': Style(
-                                                        fontWeight: FontWeight.w500,
-                                                        color: _chatBody(theme),
-                                                      ),
-                                                      '.chat-response-sources-body ul': Style(
-                                                        margin: Margins.only(top: 6, bottom: 0),
-                                                        padding: HtmlPaddings.only(left: 18, top: 0, right: 0, bottom: 0),
-                                                      ),
-                                                      '.chat-response-sources-body ol': Style(
-                                                        margin: Margins.only(top: 6, bottom: 0),
-                                                        padding: HtmlPaddings.only(left: 20, top: 0, right: 0, bottom: 0),
-                                                      ),
-                                                      '.chat-response-sources-body li': Style(
-                                                        margin: Margins.only(bottom: 6),
-                                                        color: _chatMuted(theme),
-                                                        fontSize: FontSize(13.5),
-                                                        lineHeight: const LineHeight(1.45),
-                                                      ),
-                                                      // Style tour trigger links with a soft pill (ChatGPT-like)
-                                                      '.chatbot-tour-trigger': Style(
-                                                        display: Display.inlineBlock,
-                                                        padding: HtmlPaddings.symmetric(horizontal: 12, vertical: 8),
-                                                        margin: Margins.only(top: 8),
-                                                        backgroundColor: _chatBubble(theme),
-                                                        border: Border.all(
-                                                          color: _chatOutline(theme),
-                                                        ),
-                                                      ),
-                                                      // In-body document citations: pill + teal accent (not plain bold underline).
-                                                      '.source-doc-link': Style(
-                                                        display: Display.inlineBlock,
-                                                        padding: HtmlPaddings.symmetric(horizontal: 10, vertical: 6),
-                                                        margin: Margins.only(top: 6, right: 6),
-                                                        backgroundColor: _chatBubble(theme),
-                                                        border: Border(
-                                                          left: BorderSide(
-                                                            color: _chatSourceDocAccent(theme),
-                                                            width: 3,
-                                                          ),
-                                                          top: BorderSide(color: _chatOutline(theme)),
-                                                          right: BorderSide(color: _chatOutline(theme)),
-                                                          bottom: BorderSide(color: _chatOutline(theme)),
-                                                        ),
-                                                        color: _chatBody(theme),
-                                                        textDecoration: TextDecoration.none,
-                                                        fontSize: FontSize(12.5),
-                                                        fontWeight: FontWeight.w500,
-                                                        letterSpacing: -0.15,
-                                                      ),
-                                                    },
-                                                    onLinkTap: (url, attributes, element) {
-                                                      _handleLinkTap(context, url);
-                                                    },
+                                                : _buildAssistantMessageHtml(
+                                                    context,
+                                                    theme,
+                                                    _processHtmlForMobile(assistantBodySplit?.mainHtml ?? m.content),
                                                   ),
                                       ),
                                       // Show structured payloads (maps/charts) even while the assistant row
@@ -1351,6 +1418,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                                 payloads: m.structuredPayloads,
                                               ),
                                             ],
+                                          ),
+                                        ),
+                                      if (!isUser &&
+                                          !isLastAssistant &&
+                                          assistantBodySplit != null &&
+                                          (assistantBodySplit.trailingSourcesHtml != null) &&
+                                          assistantBodySplit.trailingSourcesHtml!.trim().isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 8),
+                                          child: _buildAssistantMessageHtml(
+                                            context,
+                                            theme,
+                                            _processHtmlForMobile(assistantBodySplit.trailingSourcesHtml!),
                                           ),
                                         ),
                                       // Icons (below the bubble)
@@ -1436,6 +1516,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                         ),
                                     ],
                                   ),
+                                ),
                                 ),
                               );
                             },
@@ -2538,7 +2619,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      errorMessage,
+                      _userFacingChatErrorText(loc, errorMessage, errorType),
                       style: TextStyle(
                         color: gptDark ? const Color(0xFFF0D4D4) : cs.onErrorContainer,
                         fontSize: 14,

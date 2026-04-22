@@ -1085,6 +1085,16 @@ class AppLocalizations {
       'indicator_edit_comments_label': 'Comments',
       'indicator_edit_emergency': 'Emergency Indicator',
       'indicator_edit_save': 'Save Indicator',
+      'indicator_edit_fdrs_kpi_label': 'FDRS KPI Code',
+      'indicator_edit_fdrs_kpi_hint': 'e.g. FDRS KPI code (optional)',
+      'indicator_edit_multilingual_section': 'Multilingual names (optional)',
+      'indicator_edit_name_for_language': 'Name (%s)',
+      'indicator_edit_select_none': '— Select —',
+      'indicator_edit_sector_group': 'Sector',
+      'indicator_edit_subsector_group': 'Sub-sector',
+      'indicator_edit_sector_level_primary': 'Primary',
+      'indicator_edit_sector_level_secondary': 'Secondary',
+      'indicator_edit_sector_level_tertiary': 'Tertiary',
 
       // Generics / fallbacks
       'generic_untitled': 'Untitled',
@@ -1147,6 +1157,11 @@ class AppLocalizations {
       'ai_tooltip_not_helpful': 'Not helpful',
       'ai_footer_model_warning':
           'AI can make mistakes. Check important information.',
+      'ai_chat_error_network':
+          'Couldn\'t reach the AI service. Check your internet connection and try again.',
+      'ai_chat_error_timeout':
+          'The request timed out. Check your connection and try again.',
+      'ai_chat_error_server': 'Something went wrong. Please try again.',
       'ai_tooltip_configure_sources': 'Configure data sources',
       'ai_input_policy_required':
           'Acknowledge the AI policy above to send messages',
@@ -2114,6 +2129,11 @@ class AppLocalizations {
       'ai_tooltip_not_helpful': 'No útil',
       'ai_footer_model_warning':
           'La IA puede equivocarse. Compruebe la información importante.',
+      'ai_chat_error_network':
+          'No se pudo conectar con el servicio de IA. Compruebe su conexión a internet e inténtelo de nuevo.',
+      'ai_chat_error_timeout':
+          'La solicitud tardó demasiado. Compruebe su conexión e inténtelo de nuevo.',
+      'ai_chat_error_server': 'Algo salió mal. Inténtelo de nuevo.',
       'ai_tooltip_configure_sources': 'Configurar fuentes de datos',
       'ai_input_policy_required':
           'Reconozca la política de IA arriba para enviar mensajes',
@@ -3087,6 +3107,11 @@ class AppLocalizations {
       'ai_tooltip_not_helpful': 'Pas utile',
       'ai_footer_model_warning':
           'L\'IA peut se tromper. Vérifiez les informations importantes.',
+      'ai_chat_error_network':
+          'Impossible d\'accéder au service d\'IA. Vérifiez votre connexion internet et réessayez.',
+      'ai_chat_error_timeout':
+          'La requête a expiré. Vérifiez votre connexion et réessayez.',
+      'ai_chat_error_server': 'Un problème est survenu. Veuillez réessayer.',
       'ai_tooltip_configure_sources': 'Configurer les sources de données',
       'ai_input_policy_required':
           'Reconnaissez la politique IA ci-dessus pour envoyer des messages',
@@ -4021,6 +4046,10 @@ class AppLocalizations {
       'ai_tooltip_not_helpful': 'غير مفيد',
       'ai_footer_model_warning':
           'قد يخطئ الذكاء الاصطناعي. تحقق من المعلومات المهمة.',
+      'ai_chat_error_network':
+          'تعذر الوصول إلى خدمة الذكاء الاصطناعي. تحقق من اتصال الإنترنت وحاول مرة أخرى.',
+      'ai_chat_error_timeout': 'انتهت مهلة الطلب. تحقق من الاتصال وحاول مرة أخرى.',
+      'ai_chat_error_server': 'حدث خطأ. يرجى المحاولة مرة أخرى.',
       'ai_tooltip_configure_sources': 'تهيئة مصادر البيانات',
       'ai_input_policy_required':
           'أقر بسياسة الذكاء الاصطناعي أعلاه لإرسال الرسائل',
@@ -4982,6 +5011,11 @@ class AppLocalizations {
       'ai_tooltip_not_helpful': 'उपयोगी नहीं',
       'ai_footer_model_warning':
           'AI गलतियाँ कर सकता है। महत्वपूर्ण जानकारी जाँचें।',
+      'ai_chat_error_network':
+          'AI सेवा तक पहुंच नहीं हो सकी। अपना इंटरनेट कनेक्शन जांचें और फिर कोशिश करें।',
+      'ai_chat_error_timeout':
+          'अनुरोध का समय समाप्त हो गया। कनेक्शन जांचें और फिर कोशिश करें।',
+      'ai_chat_error_server': 'कुछ गलत हुआ। कृपया फिर कोशिश करें।',
       'ai_tooltip_configure_sources': 'डेटा स्रोत कॉन्फ़िगर करें',
       'ai_input_policy_required':
           'संदेश भेजने के लिए ऊपर AI नीति स्वीकार करें',
@@ -5948,6 +5982,11 @@ class AppLocalizations {
       'ai_tooltip_not_helpful': 'Не полезно',
       'ai_footer_model_warning':
           'ИИ может ошибаться. Проверяйте важную информацию.',
+      'ai_chat_error_network':
+          'Не удалось подключиться к сервису ИИ. Проверьте подключение к интернету и повторите попытку.',
+      'ai_chat_error_timeout':
+          'Время ожидания запроса истекло. Проверьте соединение и повторите попытку.',
+      'ai_chat_error_server': 'Что-то пошло не так. Повторите попытку.',
       'ai_tooltip_configure_sources': 'Настроить источники данных',
       'ai_input_policy_required':
           'Подтвердите политику ИИ выше, чтобы отправлять сообщения',
@@ -6863,6 +6902,9 @@ class AppLocalizations {
       'ai_tooltip_not_helpful': '没有帮助',
       'ai_footer_model_warning':
           'AI 可能出错。请核实重要信息。',
+      'ai_chat_error_network': '无法连接到 AI 服务。请检查网络连接后重试。',
+      'ai_chat_error_timeout': '请求超时。请检查连接后重试。',
+      'ai_chat_error_server': '出了点问题。请重试。',
       'ai_tooltip_configure_sources': '配置数据来源',
       'ai_input_policy_required':
           '请先确认上方的 AI 政策再发送消息',
@@ -8256,6 +8298,21 @@ class AppLocalizations {
   String get indicatorEditCommentsLabel => translate('indicator_edit_comments_label');
   String get indicatorEditEmergency => translate('indicator_edit_emergency');
   String get indicatorEditSave => translate('indicator_edit_save');
+  String get indicatorEditFdrsKpiLabel => translate('indicator_edit_fdrs_kpi_label');
+  String get indicatorEditFdrsKpiHint => translate('indicator_edit_fdrs_kpi_hint');
+  String get indicatorEditMultilingualSection =>
+      translate('indicator_edit_multilingual_section');
+  String indicatorEditNameForLanguage(String code) => translate('indicator_edit_name_for_language')
+      .replaceAll('%s', code);
+  String get indicatorEditSelectNone => translate('indicator_edit_select_none');
+  String get indicatorEditSectorGroup => translate('indicator_edit_sector_group');
+  String get indicatorEditSubsectorGroup => translate('indicator_edit_subsector_group');
+  String get indicatorEditSectorLevelPrimary =>
+      translate('indicator_edit_sector_level_primary');
+  String get indicatorEditSectorLevelSecondary =>
+      translate('indicator_edit_sector_level_secondary');
+  String get indicatorEditSectorLevelTertiary =>
+      translate('indicator_edit_sector_level_tertiary');
 
   String get genericUntitled => translate('generic_untitled');
   String get genericUntitledDocument => translate('generic_untitled_document');
@@ -8303,6 +8360,9 @@ class AppLocalizations {
   String get aiTooltipHelpful => translate('ai_tooltip_helpful');
   String get aiTooltipNotHelpful => translate('ai_tooltip_not_helpful');
   String get aiFooterModelWarning => translate('ai_footer_model_warning');
+  String get aiChatErrorNetwork => translate('ai_chat_error_network');
+  String get aiChatErrorTimeout => translate('ai_chat_error_timeout');
+  String get aiChatErrorServer => translate('ai_chat_error_server');
   String get aiTooltipConfigureSources => translate('ai_tooltip_configure_sources');
   String get aiInputPolicyRequired => translate('ai_input_policy_required');
   String get aiInputPlaceholderMessage => translate('ai_input_placeholder_message');

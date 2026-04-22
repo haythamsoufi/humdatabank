@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../providers/admin/user_analytics_provider.dart';
 import '../../providers/shared/auth_provider.dart';
-import '../../widgets/admin_filter_panel.dart';
-import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
+import '../../widgets/error_state.dart';
+import '../../widgets/loading_indicator.dart';
 import '../../config/routes.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../utils/constants.dart';
@@ -21,9 +22,6 @@ class UserAnalyticsScreen extends StatefulWidget {
 
 class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
     with AdminScreenViewLoggingMixin {
-  String _selectedTimeRange = '7d';
-  String? _selectedMetricFilter;
-
   @override
   String get adminScreenViewRoutePath => AppRoutes.userAnalytics;
 
@@ -31,169 +29,30 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _applyFilters();
+      _load();
     });
   }
 
-  void _applyFilters() {
-    final provider = Provider.of<UserAnalyticsProvider>(context, listen: false);
-    provider.loadAnalytics(
-      timeRange: _selectedTimeRange,
-      metricFilter: _selectedMetricFilter,
-    );
+  void _load() {
+    Provider.of<UserAnalyticsProvider>(context, listen: false).loadAnalytics();
   }
 
-  void _clearFilters() {
-    setState(() {
-      _selectedTimeRange = '7d';
-      _selectedMetricFilter = null;
-    });
-    Provider.of<UserAnalyticsProvider>(context, listen: false)
-        .loadAnalytics(timeRange: '7d');
+  int _intVal(Map<String, dynamic> data, String key) {
+    final v = data[key];
+    if (v is int) return v;
+    return int.tryParse(v?.toString() ?? '') ?? 0;
   }
 
-  Future<void> _openFiltersBottomSheet() async {
-    final loc = AppLocalizations.of(context)!;
-    await showAdminFiltersBottomSheet<void>(
-      context: context,
-      builder: (sheetContext, setModalState) {
-        return AdminFilterPanel(
-          title: loc.adminFilters,
-          surfaceCard: false,
-          actions: AdminFilterPanelActions(
-            applyLabel: loc.adminFiltersApply,
-            clearLabel: loc.adminFiltersClear,
-            onApply: () {
-              _applyFilters();
-              Navigator.of(sheetContext).pop();
-            },
-            onClear: () {
-              _clearFilters();
-              setModalState(() {});
-              Navigator.of(sheetContext).pop();
-            },
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: _selectedTimeRange,
-                decoration: InputDecoration(
-                  labelText: loc.timeRange,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                  isDense: true,
-                ),
-                items: [
-                  DropdownMenuItem<String>(
-                    value: '7d',
-                    child: Text(
-                      loc.last7Days,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: '30d',
-                    child: Text(
-                      loc.last30Days,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: '90d',
-                    child: Text(
-                      loc.last90Days,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: '1y',
-                    child: Text(
-                      loc.lastYear,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: 'all',
-                    child: Text(
-                      loc.allTime,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedTimeRange = value);
-                    setModalState(() {});
-                  }
-                },
-              ),
-              AdminFilterPanel.fieldGap,
-              DropdownButtonFormField<String?>(
-                initialValue: _selectedMetricFilter,
-                decoration: InputDecoration(
-                  labelText: loc.metric,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                  isDense: true,
-                ),
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(
-                      loc.allMetrics,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String?>(
-                    value: 'active_users',
-                    child: Text(
-                      loc.activeUsers,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String?>(
-                    value: 'logins',
-                    child: Text(
-                      loc.logins,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String?>(
-                    value: 'submissions',
-                    child: Text(
-                      loc.metricSubmissions,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DropdownMenuItem<String?>(
-                    value: 'page_views',
-                    child: Text(
-                      loc.pageViews,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() => _selectedMetricFilter = value);
-                  setModalState(() {});
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  String _formatTimestamp(BuildContext context, String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    final locale = Localizations.localeOf(context).toString();
+    try {
+      return DateFormat.yMMMd(locale).add_jm().format(dt.toLocal());
+    } catch (_) {
+      return DateFormat.yMMMd().add_jm().format(dt.toLocal());
+    }
   }
 
   @override
@@ -206,80 +65,27 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppAppBar(
         title: localizations.userAnalytics,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: localizations.adminFilters,
-            onPressed: _openFiltersBottomSheet,
-          ),
-        ],
       ),
       body: Consumer<UserAnalyticsProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading && provider.analyticsData == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(AppConstants.ifrcRed),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppLocalizations.of(context)!.loadingAnalytics,
-                    style: TextStyle(
-                      color: context.textSecondaryColor,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
+            return AppLoadingIndicator(
+              message: localizations.loadingAnalytics,
+              color: Color(AppConstants.ifrcRed),
+              useIOSStyle: false,
             );
           }
 
-          if (provider.error != null &&
-              provider.analyticsData == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      provider.error!,
-                      style: TextStyle(
-                        color: context.textSecondaryColor,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        provider.clearError();
-                        _applyFilters();
-                      },
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: Text(AppLocalizations.of(context)!.retry),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor:
-                            Color(AppConstants.ifrcRed),
-                        side: BorderSide(
-                          color: Color(AppConstants.ifrcRed),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          if (provider.error != null && provider.analyticsData == null) {
+            return AppErrorState(
+              message: provider.error!,
+              onRetry: () {
+                provider.clearError();
+                _load();
+              },
+              retryLabel: localizations.retry,
+              retryStyle: AppErrorRetryStyle.materialOutlined,
+              iconColor: Color(AppConstants.ifrcRed),
             );
           }
 
@@ -296,7 +102,7 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    AppLocalizations.of(context)!.noDataAvailable,
+                    localizations.noDataAvailable,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -308,38 +114,203 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
             );
           }
 
+          final pending = _intVal(data, 'pending_public_submissions_count');
+          final overdue = _intVal(data, 'overdue_assignments');
+          final failed = _intVal(data, 'failed_logins_24h');
+          final hasAttention = pending > 0 || overdue > 0 || failed > 0;
+
+          final activity = data['activity'];
+          final recentActivity = activity is Map
+              ? activity['recent_activity'] as List<dynamic>?
+              : null;
+
           return RefreshIndicator(
-            onRefresh: () async => _applyFilters(),
+            onRefresh: () async => _load(),
             color: Color(AppConstants.ifrcRed),
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (data['total_users'] != null)
-                    _buildStatCard(
-                      localizations.totalUsers,
-                      data['total_users'].toString(),
-                      Icons.people,
+                  _buildSectionLabel(context, localizations.keyMetrics),
+                  _buildStatCard(
+                    localizations.countries,
+                    _intVal(data, 'country_count').toString(),
+                    Icons.public,
+                  ),
+                  _buildStatCard(
+                    localizations.templates,
+                    _intVal(data, 'template_count').toString(),
+                    Icons.description_outlined,
+                  ),
+                  _buildStatCard(
+                    localizations.assignments,
+                    _intVal(data, 'assignment_count').toString(),
+                    Icons.assignment_outlined,
+                  ),
+                  _buildStatCard(
+                    localizations.indicators,
+                    _intVal(data, 'indicator_bank_count').toString(),
+                    Icons.analytics_outlined,
+                  ),
+                  const SizedBox(height: 8),
+                  if (hasAttention) ...[
+                    _buildSectionLabel(
+                        context, localizations.itemsRequiringAttention),
+                    if (pending > 0)
+                      _buildStatCard(
+                        localizations.pendingSubmissions,
+                        pending.toString(),
+                        Icons.pending_actions_outlined,
+                        accent: Colors.orange,
+                      ),
+                    if (overdue > 0)
+                      _buildStatCard(
+                        localizations.overdueAssignments,
+                        overdue.toString(),
+                        Icons.event_busy_outlined,
+                        accent: theme.colorScheme.error,
+                      ),
+                    if (failed > 0)
+                      _buildStatCard(
+                        '${localizations.loginLogsEventFailed} (24h)',
+                        failed.toString(),
+                        Icons.gpp_maybe_outlined,
+                        accent: theme.colorScheme.error,
+                      ),
+                    const SizedBox(height: 8),
+                  ],
+                  _buildSectionLabel(context, localizations.manageUsers),
+                  _buildStatCard(
+                    localizations.totalUsers,
+                    _intVal(data, 'user_count').toString(),
+                    Icons.people_outline,
+                  ),
+                  _buildStatCard(
+                    '${localizations.activeUsers} (${localizations.last30Days})',
+                    _intVal(data, 'active_users').toString(),
+                    Icons.person_search_outlined,
+                  ),
+                  _buildStatCard(
+                    localizations.systemAdministrators,
+                    _intVal(data, 'admin_count').toString(),
+                    Icons.admin_panel_settings_outlined,
+                  ),
+                  _buildStatCard(
+                    localizations.focalPoints,
+                    _intVal(data, 'focal_point_count').toString(),
+                    Icons.groups_outlined,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSectionLabel(context, localizations.recentActivity7Days),
+                  _buildStatCard(
+                    localizations.successfulLoginsToday,
+                    _intVal(data, 'today_logins').toString(),
+                    Icons.today_outlined,
+                  ),
+                  _buildStatCard(
+                    '${localizations.successfulLogins} (${localizations.last7Days})',
+                    _intVal(data, 'recent_logins').toString(),
+                    Icons.login,
+                  ),
+                  _buildStatCard(
+                    localizations.metricSubmissions,
+                    _intVal(data, 'public_submission_count').toString(),
+                    Icons.inbox_outlined,
+                  ),
+                  _buildStatCard(
+                    '${localizations.metricSubmissions} (${localizations.last7Days})',
+                    _intVal(data, 'recent_submissions').toString(),
+                    Icons.move_to_inbox,
+                  ),
+                  if (recentActivity != null && recentActivity.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _buildSectionLabel(context, localizations.recentActivity),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: context.borderColor,
+                          width: 1,
+                        ),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: recentActivity.length.clamp(0, 12),
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: context.borderColor,
+                        ),
+                        itemBuilder: (context, index) {
+                          final row = recentActivity[index];
+                          if (row is! Map) {
+                            return const SizedBox.shrink();
+                          }
+                          final name =
+                              row['user_name']?.toString() ?? '—';
+                          final action =
+                              row['action']?.toString() ?? '';
+                          final details = row['details']?.toString();
+                          final ts = _formatTimestamp(
+                            context,
+                            row['timestamp']?.toString(),
+                          );
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: context.textColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (action.isNotEmpty)
+                                  Text(
+                                    action,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: context.textSecondaryColor,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                if (details != null &&
+                                    details.isNotEmpty &&
+                                    details != action)
+                                  Text(
+                                    details,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: context.textSecondaryColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                if (ts.isNotEmpty)
+                                  Text(
+                                    ts,
+                                    style: TextStyle(
+                                      color: context.textSecondaryColor
+                                          .withValues(alpha: 0.85),
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  if (data['active_users'] != null)
-                    _buildStatCard(
-                      localizations.activeUsers,
-                      data['active_users'].toString(),
-                      Icons.person,
-                    ),
-                  if (data['recent_logins'] != null)
-                    _buildStatCard(
-                      localizations.logins,
-                      data['recent_logins'].toString(),
-                      Icons.login,
-                    ),
-                  if (data['total_submissions'] != null)
-                    _buildStatCard(
-                      localizations.metricSubmissions,
-                      data['total_submissions'].toString(),
-                      Icons.assignment,
-                    ),
+                  ],
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -360,7 +331,28 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon) {
+  Widget _buildSectionLabel(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.6,
+          color: context.textSecondaryColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon, {
+    Color? accent,
+  }) {
+    final c = accent ?? Color(AppConstants.ifrcRed);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
@@ -378,12 +370,12 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Color(AppConstants.ifrcRed).withValues(alpha: 0.1),
+                color: c.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
-                color: Color(AppConstants.ifrcRed),
+                color: c,
                 size: 24,
               ),
             ),

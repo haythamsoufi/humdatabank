@@ -5,6 +5,7 @@ Uses Flask-Babel for proper internationalization.
 """
 
 import logging
+from contextlib import suppress
 
 from flask import session
 
@@ -54,6 +55,22 @@ def get_localized_indicator_type(indicator_type: str) -> str:
     if not indicator_type:
         return ''
 
+    with suppress(Exception):
+        from flask import has_app_context
+
+        if has_app_context():
+            from app.extensions import db
+            from app.models import IndicatorBankType
+
+            row = IndicatorBankType.query.filter(
+                db.func.lower(IndicatorBankType.code) == str(indicator_type).strip().lower()
+            ).first()
+            if row and row.is_active:
+                loc = get_translation_key()
+                lab = row.get_name_translation(loc)
+                if lab:
+                    return lab
+
     # Map indicator types to translation keys
     type_translation_map = {
         'number': _('Number'),
@@ -91,6 +108,22 @@ def get_localized_indicator_unit(indicator_unit: str) -> str:
     """
     if not indicator_unit:
         return ''
+
+    with suppress(Exception):
+        from flask import has_app_context
+
+        if has_app_context():
+            from app.extensions import db
+            from app.models import IndicatorBankUnit
+
+            row = IndicatorBankUnit.query.filter(
+                db.func.lower(IndicatorBankUnit.code) == str(indicator_unit).strip().lower()
+            ).first()
+            if row and row.is_active:
+                loc = get_translation_key()
+                lab = row.get_name_translation(loc)
+                if lab:
+                    return lab
 
     # Map indicator units to translation keys
     unit_translation_map = {

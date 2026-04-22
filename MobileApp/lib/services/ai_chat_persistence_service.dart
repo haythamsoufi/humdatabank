@@ -220,6 +220,21 @@ class AiChatPersistenceService {
     }
   }
 
+  /// Deletes all locally stored messages for a conversation (all sync states).
+  Future<void> deleteAllMessagesForConversation(String conversationId) async {
+    try {
+      final db = await database;
+      await db.delete(
+        'ai_messages',
+        where: 'conversation_id = ?',
+        whereArgs: [conversationId],
+      );
+    } catch (e, stackTrace) {
+      DebugLogger.logError('Failed to delete messages for conversation: $e');
+      DebugLogger.logError('Stack trace: $stackTrace');
+    }
+  }
+
   /// Save a message to a conversation
   Future<void> saveMessage({
     required String conversationId,

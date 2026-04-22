@@ -3491,6 +3491,10 @@ async function processSelectedDocuments() {
             processBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Processing...") }}';
         }
 
+        if (typeof closeUploadModal === 'function') {
+            closeUploadModal();
+        }
+
         (async () => {
             let successCount = 0;
             let failCount = 0;
@@ -3624,9 +3628,6 @@ async function processSelectedDocuments() {
                     if (window.showAlert) window.showAlert(message, 'error');
                 else console.error(message);
                 }
-
-                // Close the modal before reloading
-                closeUploadModal();
 
                 // Delay reload to allow user to read error messages
                 // If there are errors, wait longer; if all succeeded, reload quickly

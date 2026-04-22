@@ -53,6 +53,7 @@ class AiChatService {
     String preferredLanguage = 'en',
     List<Map<String, dynamic>>? conversationHistory,
     List<String>? sources,
+    bool branchFromEdit = false,
   }) {
     return {
       'message': message,
@@ -63,6 +64,7 @@ class AiChatService {
       'client': 'mobile',
       if (conversationHistory != null && conversationHistory.isNotEmpty) 'conversationHistory': conversationHistory,
       if (sources != null && sources.isNotEmpty) 'sources': sources,
+      if (branchFromEdit) 'branch_from_edit': true,
     };
   }
 
@@ -77,6 +79,7 @@ class AiChatService {
     List<String>? sources,
     int maxRetries = 2,
     bool isAuthenticated = false,
+    bool branchFromEdit = false,
   }) async {
     Future<Map<String, dynamic>> doChatRequest({required String? token}) async {
       final headers = <String, String>{};
@@ -92,6 +95,7 @@ class AiChatService {
         preferredLanguage: preferredLanguage,
         conversationHistory: conversationHistory,
         sources: sources,
+        branchFromEdit: branchFromEdit,
       );
 
       final resp = await _api.post(

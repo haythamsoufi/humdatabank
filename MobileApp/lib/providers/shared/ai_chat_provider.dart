@@ -48,6 +48,10 @@ class AiChatProvider with ChangeNotifier {
   /// If it diverges from `_conversationId`, events are ignored (defense in depth).
   String? _wsStreamConversationId;
 
+  /// When the active WS send is an edit-branch, HTTP fallbacks must repeat `branch_from_edit` + history.
+  bool _wsBranchFromEdit = false;
+  List<Map<String, dynamic>>? _wsBranchConversationHistory;
+
   /// Incremented when switching chats / new chat / full reload so in-flight HTTP completions
   /// cannot apply to the wrong conversation.
   int _navigationEpoch = 0;
@@ -196,6 +200,24 @@ class AiChatProvider with ChangeNotifier {
   List<String> get selectedSources => List.unmodifiable(_sourcesSelected);
   String? get streamStatusHint => _streamStatusHint;
   bool get inflightRestoreActive => _inflightRestoreActive;
+
+  /// True when this chat is still generating: active stream on this device, detached while
+  /// viewing another tab, or server-side [inflight] from the conversation list.
+  bool isConversationOngoingInDrawer(String conversationId) {
+    if (conversationId.isEmpty) return false;
+    if (conversationId == _conversationId && (_isStreaming || _inflightRestoreActive)) {
+      return true;
+    }
+    if (_detachedAgentStepsByConversationId.containsKey(conversationId)) {
+      return true;
+    }
+    for (final c in _conversations) {
+      if (c.id == conversationId) {
+        return c.inflightInProgress;
+      }
+    }
+    return false;
+  }
 
   void clearStreamStatusHint() {
     _streamStatusHint = null;
@@ -368,7 +390,12 @@ class AiChatProvider with ChangeNotifier {
   Map<String, dynamic> _webSocketPayload({
     required String message,
     String? clientMessageId,
+    bool branchFromEdit = false,
+    List<Map<String, dynamic>>? branchConversationHistory,
   }) {
+    final hist = branchFromEdit && branchConversationHistory != null
+        ? branchConversationHistory
+        : _conversationHistoryPayload();
     return {
       'type': 'user_message',
       'message': message,
@@ -377,9 +404,10 @@ class AiChatProvider with ChangeNotifier {
       'preferred_language': _preferredLanguageCode,
       'page_context': _mobilePageContext(),
       'client': 'mobile',
-      'conversationHistory': _conversationHistoryPayload(),
+      'conversationHistory': hist,
       'sources': _sourcesForPayload(),
       'keep_running_on_disconnect': true,
+      if (branchFromEdit) 'branch_from_edit': true,
     };
   }
 
@@ -905,12 +933,21 @@ class AiChatProvider with ChangeNotifier {
     required String message,
     required bool isAuthenticated,
     String? clientMessageId,
+    bool branchFromEdit = false,
+    List<Map<String, dynamic>>? branchConversationHistory,
   }) async {
     await _disconnectWs();
+    _wsBranchFromEdit = branchFromEdit;
+    _wsBranchConversationHistory = branchConversationHistory;
     _wsStreamConversationId = _conversationId;
     final wsListenGeneration = _wsConnectionSession;
     _channel = await _service.connectWebSocket();
-    _channel!.sink.add(jsonEncode(_webSocketPayload(message: message, clientMessageId: clientMessageId)));
+    _channel!.sink.add(jsonEncode(_webSocketPayload(
+      message: message,
+      clientMessageId: clientMessageId,
+      branchFromEdit: branchFromEdit,
+      branchConversationHistory: branchConversationHistory,
+    )));
 
     _wsSub = _channel!.stream.listen(
       (event) async {
@@ -927,6 +964,8 @@ class AiChatProvider with ChangeNotifier {
           if (data['type'] == 'error' &&
               data['error_type'] == 'auth_required' &&
               isAuthenticated) {
+            final branchFromEdit = _wsBranchFromEdit;
+            final branchHistory = _wsBranchConversationHistory;
             _clearAgentProgress();
             _streamStatusHint = null;
             notifyListeners();
@@ -937,6 +976,8 @@ class AiChatProvider with ChangeNotifier {
               isAuthenticated: isAuthenticated,
               persistUserMessage: false,
               clientMessageId: clientMessageId,
+              branchFromEdit: branchFromEdit,
+              branchConversationHistory: branchHistory,
             );
             return;
           }
@@ -967,6 +1008,8 @@ class AiChatProvider with ChangeNotifier {
           isAuthenticated: isAuthenticated,
           persistUserMessage: false,
           clientMessageId: clientMessageId,
+          branchFromEdit: _wsBranchFromEdit,
+          branchConversationHistory: _wsBranchConversationHistory,
         );
       },
       onDone: () {
@@ -1305,14 +1348,16 @@ class AiChatProvider with ChangeNotifier {
     return message.content;
   }
 
-  /// Send a message after editing (replaces the message at editIndex and clears all after it)
+  /// Send a message after editing (replaces the message at editIndex and clears all after it).
+  ///
+  /// When authenticated with a [conversationId], uses the same contract as Backoffice
+  /// (`branch_from_edit` + full `conversationHistory` ending with the edited user turn) so
+  /// the server replaces rows in place. Logged-out users still fork into a new local chat.
   Future<void> sendEditedMessage({
     required String message,
     required int editIndex,
     required bool isAuthenticated,
   }) async {
-    // Editing cannot mutate server history; we fork a new conversation starting from the history before editIndex.
-    // This yields predictable behavior and keeps merge/sync consistent.
     _error = null;
     _errorType = null;
     _retryDelay = null;
@@ -1322,54 +1367,119 @@ class AiChatProvider with ChangeNotifier {
     for (int i = 0; i < _messages.length && i < editIndex; i++) {
       final m = _messages[i];
       if (m.role == 'error') continue;
-      // Skip empty assistant placeholders
       if (m.role == 'assistant' && m.content.isEmpty) continue;
       history.add(m);
     }
 
-    // Start a new forked conversation (new id), persist history offline-first
-    await startNewConversation();
-    final newCid = await _ensureLocalConversationId(
-      initialTitle: history.isNotEmpty ? history.first.content : message,
-    );
+    final branchPayload = <Map<String, dynamic>>[];
+    for (final m in history) {
+      branchPayload.add({'isUser': m.role == 'user', 'message': m.content});
+    }
+    branchPayload.add({'isUser': true, 'message': message});
 
-    _messages = List<AiChatMessage>.from(history);
-    notifyListeners();
+    if (!isAuthenticated || _conversationId == null || _conversationId!.isEmpty) {
+      await startNewConversation();
+      final newCid = await _ensureLocalConversationId(
+        initialTitle: history.isNotEmpty ? history.first.content : message,
+      );
+
+      _messages = List<AiChatMessage>.from(history);
+      notifyListeners();
+
+      for (final m in history) {
+        await _persistence.saveMessage(
+          conversationId: newCid,
+          role: m.role,
+          content: m.content,
+          localMessageId: _uuid.v4(),
+          syncState: isAuthenticated ? AiChatPersistenceService.syncStatePendingServer : AiChatPersistenceService.syncStateLocalOnly,
+          createdAt: m.createdAt,
+          meta: m.role == 'assistant' ? _assistantPersistMeta(m) : null,
+        );
+      }
+
+      if (isAuthenticated && history.isNotEmpty) {
+        try {
+          final importPayload = history.map((m) {
+            return {
+              'client_message_id': _uuid.v4(),
+              'role': m.role,
+              'content': m.content,
+              'created_at': m.createdAt.toIso8601String(),
+            };
+          }).toList();
+          await _service.importConversationMessages(conversationId: newCid, messages: importPayload);
+        } catch (e) {
+          DebugLogger.logWarn('AI', 'Failed to import fork history (continuing): $e');
+        }
+      }
+
+      await sendMessageStreaming(
+        message: message,
+        isAuthenticated: isAuthenticated,
+        preferredLanguageCode: _preferredLanguageCode,
+      );
+      return;
+    }
+
+    final cid = _conversationId!;
+    await _disconnectWs();
+    _clearAgentProgress();
+    _initAgentProgressIfNeeded();
+
+    await _persistence.deleteAllMessagesForConversation(cid);
 
     for (final m in history) {
       await _persistence.saveMessage(
-        conversationId: newCid,
+        conversationId: cid,
         role: m.role,
         content: m.content,
         localMessageId: _uuid.v4(),
-        syncState: isAuthenticated ? AiChatPersistenceService.syncStatePendingServer : AiChatPersistenceService.syncStateLocalOnly,
+        syncState: AiChatPersistenceService.syncStatePendingServer,
         createdAt: m.createdAt,
+        meta: m.role == 'assistant' ? _assistantPersistMeta(m) : null,
       );
     }
 
-    // If authenticated, import the fork history to the server so the conversation is consistent across devices.
-    if (isAuthenticated && history.isNotEmpty) {
-      try {
-        final importPayload = history.map((m) {
-          return {
-            'client_message_id': _uuid.v4(),
-            'role': m.role,
-            'content': m.content,
-            'created_at': m.createdAt.toIso8601String(),
-          };
-        }).toList();
-        await _service.importConversationMessages(conversationId: newCid, messages: importPayload);
-      } catch (e) {
-        DebugLogger.logWarn('AI', 'Failed to import fork history (continuing): $e');
-      }
-    }
-
-    // Now send the edited message normally (it will append user+assistant and stream the reply)
-    await sendMessageStreaming(
-      message: message,
-      isAuthenticated: isAuthenticated,
-      preferredLanguageCode: _preferredLanguageCode,
+    final userLocalId = _uuid.v4();
+    await _persistence.saveMessage(
+      conversationId: cid,
+      role: 'user',
+      content: message,
+      localMessageId: userLocalId,
+      syncState: AiChatPersistenceService.syncStatePendingServer,
     );
+
+    _messages = [
+      ...List<AiChatMessage>.from(history),
+      AiChatMessage(role: 'user', content: message),
+      AiChatMessage(role: 'assistant', content: ''),
+    ];
+    _isStreaming = true;
+    notifyListeners();
+
+    try {
+      await _runWebSocketStream(
+        message: message,
+        isAuthenticated: isAuthenticated,
+        clientMessageId: userLocalId,
+        branchFromEdit: true,
+        branchConversationHistory: branchPayload,
+      );
+    } catch (e) {
+      DebugLogger.logWarn('AI', 'WS connect failed, falling back to HTTP: $e');
+      _isStreaming = false;
+      _clearAgentProgress();
+      notifyListeners();
+      await _sendHttpIntoLastAssistant(
+        message,
+        isAuthenticated: isAuthenticated,
+        persistUserMessage: false,
+        clientMessageId: userLocalId,
+        branchFromEdit: true,
+        branchConversationHistory: branchPayload,
+      );
+    }
   }
 
   Future<void> sendMessageStreaming({
@@ -1433,6 +1543,8 @@ class AiChatProvider with ChangeNotifier {
     bool isAuthenticated = false,
     bool persistUserMessage = true,
     String? clientMessageId,
+    bool branchFromEdit = false,
+    List<Map<String, dynamic>>? branchConversationHistory,
   }) async {
     _clearAgentProgress();
     _isStreaming = true;
@@ -1441,6 +1553,11 @@ class AiChatProvider with ChangeNotifier {
     try {
       // For anonymous requests, do not send a conversation_id to the server (server ignores it anyway).
       final serverConversationId = isAuthenticated ? _conversationId : null;
+      final hist = isAuthenticated
+          ? (branchFromEdit && branchConversationHistory != null
+              ? branchConversationHistory
+              : _conversationHistoryPayload())
+          : null;
       final data = await _service.sendMessageHttp(
         message: message,
         conversationId: serverConversationId,
@@ -1448,8 +1565,9 @@ class AiChatProvider with ChangeNotifier {
         clientMessageId: isAuthenticated ? clientMessageId : null,
         pageContext: _mobilePageContext(),
         preferredLanguage: _preferredLanguageCode,
-        conversationHistory: isAuthenticated ? _conversationHistoryPayload() : null,
+        conversationHistory: hist,
         sources: isAuthenticated ? _sourcesForPayload() : null,
+        branchFromEdit: branchFromEdit,
       );
       if (navEpoch != _navigationEpoch) {
         _isStreaming = false;
@@ -1514,8 +1632,11 @@ class AiChatProvider with ChangeNotifier {
             syncState: isAuthenticated ? AiChatPersistenceService.syncStatePendingServer : AiChatPersistenceService.syncStateLocalOnly,
             meta: _assistantPersistMeta(asstMsg),
           );
-          // Update conversation summary
-          final title = message.length > 80 ? '${message.substring(0, 80)}...' : message;
+          // Update conversation summary (edits: keep title from first user turn when unchanged)
+          final titleSrc = branchFromEdit && _messages.isNotEmpty
+              ? _messages.first.content
+              : message;
+          final title = titleSrc.length > 80 ? '${titleSrc.substring(0, 80)}...' : titleSrc;
           final convo = AiConversationSummary(
             id: _conversationId!,
             title: title,

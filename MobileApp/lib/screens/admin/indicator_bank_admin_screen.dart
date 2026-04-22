@@ -447,18 +447,6 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'indicator_bank_add_button',
-        onPressed: () {
-          Navigator.of(context).pushNamed(
-            AppRoutes.webview,
-            arguments: '/admin/indicator_bank/new',
-          );
-        },
-        backgroundColor: Color(AppConstants.ifrcRed),
-        icon: const Icon(Icons.add),
-        label: Text(localizations.newIndicator),
-      ),
       bottomNavigationBar: AppBottomNavigationBar(
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,

@@ -82,21 +82,46 @@ class AiConversationSummary {
   final String? title;
   final DateTime? updatedAt;
   final DateTime? lastMessageAt;
+  /// From GET `/api/ai/v2/conversations` when [meta.inflight.status] is `in_progress` server-side.
+  final bool inflightInProgress;
 
   AiConversationSummary({
     required this.id,
     this.title,
     this.updatedAt,
     this.lastMessageAt,
+    this.inflightInProgress = false,
   });
+
+  AiConversationSummary copyWith({
+    String? id,
+    String? title,
+    DateTime? updatedAt,
+    DateTime? lastMessageAt,
+    bool? inflightInProgress,
+  }) {
+    return AiConversationSummary(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      inflightInProgress: inflightInProgress ?? this.inflightInProgress,
+    );
+  }
 
   factory AiConversationSummary.fromJson(Map<String, dynamic> json) {
     DateTime? dt(String? s) => s == null ? null : DateTime.tryParse(s);
+    final inflight = json['inflight'];
+    var running = false;
+    if (inflight is Map) {
+      running = (inflight['status']?.toString() ?? '') == 'in_progress';
+    }
     return AiConversationSummary(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString(),
       updatedAt: dt(json['updated_at']?.toString()),
       lastMessageAt: dt(json['last_message_at']?.toString()),
+      inflightInProgress: running,
     );
   }
 }

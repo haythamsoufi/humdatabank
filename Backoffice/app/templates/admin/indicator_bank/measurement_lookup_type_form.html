@@ -3,6 +3,27 @@
 
 {% block title %}{{ title }}{% endblock %}
 
+{% block head %}
+    {{ super() }}
+    <style nonce="{{ csp_style_nonce() }}">
+        .form-section {
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
 {{ page_header(
     title=title,
@@ -23,38 +44,45 @@
   </p>
   {% endif %}
 
-  <form method="post" class="space-y-6">
+  <form method="post">
     {{ form.hidden_tag() }}
-    <div>
-      <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.code.label.text }}</label>
-      {{ form.code(class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm") }}
-      {% for e in form.code.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
-    </div>
-    <div>
-      <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.name.label.text }}</label>
-      {{ form.name(class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm") }}
-      {% for e in form.name.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
-    </div>
-    <div>
-      <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.sort_order.label.text }}</label>
-      {{ form.sort_order(class="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm") }}
-    </div>
-    <div class="flex items-center gap-2">
-      {{ form.is_active() }}
-      <label for="{{ form.is_active.id }}" class="text-sm text-gray-700">{{ form.is_active.label.text }}</label>
+    <div class="form-section">
+      <h2 class="section-title"><i class="fas fa-cog mr-2"></i>{{ _('Type details') }}</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-700 text-sm font-semibold mb-2" for="{{ form.code.id }}">{{ form.code.label.text }}</label>
+          {{ form.code(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500") }}
+          {% for e in form.code.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="block text-gray-700 text-sm font-semibold mb-2" for="{{ form.name.id }}">{{ form.name.label.text }}</label>
+          {{ form.name(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500") }}
+          {% for e in form.name.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="block text-gray-700 text-sm font-semibold mb-2" for="{{ form.sort_order.id }}">{{ form.sort_order.label.text }}</label>
+          {{ form.sort_order(class="mt-1 w-32 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500") }}
+        </div>
+        <div class="flex items-center gap-2">
+          {{ form.is_active() }}
+          <label for="{{ form.is_active.id }}" class="text-sm text-gray-700">{{ form.is_active.label.text }}</label>
+        </div>
+      </div>
     </div>
 
     {% if TRANSLATABLE_LANGUAGES and TRANSLATABLE_LANGUAGES|length > 0 %}
-    <h3 class="text-sm font-semibold text-gray-800 border-b border-gray-200 pb-1">{{ _('Translated labels (optional)') }}</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {% for code in TRANSLATABLE_LANGUAGES %}
-      {% set f = form['name_' ~ code] %}
-      <div>
-        {{ f.label(class="block text-sm text-gray-700 mb-1") }}
-        {{ f(class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm", dir=("rtl" if code in ['ar','fa','he','ur'] else None)) }}
-        {% for e in f.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+    <div class="form-section">
+      <h2 class="section-title"><i class="fas fa-language mr-2"></i>{{ _('Translated labels (optional)') }}</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {% set f = form['name_' ~ code] %}
+        <div class="{% if code in ['ar','fa','he','ur'] %}md:col-span-2{% endif %}">
+          {{ f.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+          {{ f(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500", dir=("rtl" if code in ['ar','fa','he','ur'] else None)) }}
+          {% for e in f.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
     {% endif %}
 

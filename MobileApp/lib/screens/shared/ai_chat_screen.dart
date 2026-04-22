@@ -2048,6 +2048,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                       c,
                                       ai.conversationId == c.id,
                                       isAuthed,
+                                      ai.isConversationOngoingInDrawer(c.id),
                                     ),
                                   ),
                                 ],
@@ -2060,6 +2061,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                       c,
                                       ai.conversationId == c.id,
                                       isAuthed,
+                                      ai.isConversationOngoingInDrawer(c.id),
                                     ),
                                   ),
                                 ],
@@ -2353,11 +2355,13 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
     AiConversationSummary conversation,
     bool isSelected,
     bool isAuthed,
+    bool isOngoing,
   ) {
     final loc = AppLocalizations.of(context)!;
     final title = conversation.title ?? loc.aiNewChatTitleFallback;
     final truncatedTitle = title.length > 50 ? '${title.substring(0, 50)}...' : title;
     final theme = Theme.of(context);
+    final muted = _chatMuted(theme);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -2384,16 +2388,36 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                   color: isSelected ? _chatBubble(theme) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  truncatedTitle,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.25,
-                    color: _chatBody(theme),
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        truncatedTitle,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.25,
+                          color: _chatBody(theme),
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isOngoing) ...[
+                      const SizedBox(width: 8),
+                      Semantics(
+                        label: 'Generating',
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),

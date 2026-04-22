@@ -158,7 +158,8 @@ def get_localized_indicator_unit(indicator_unit: str) -> str:
         'survivors': _('Survivors'),
         'refugees': _('Refugees'),
         'migrants': _('Migrants'),
-        'displaced': _('Displaced')
+        'displaced': _('Displaced'),
+        'ns': _('National Society'),
     }
 
     unit_key = indicator_unit.lower()

@@ -611,65 +611,76 @@ def render_digest_email(user, notifications, frequency, locale: Optional[str] = 
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #dc2626; color: white; padding: 20px; text-align: center; }
-            .notification { border-left: 3px solid #2563eb; padding: 15px; margin: 15px 0; background-color: #f9fafb; }
-            .notification.unread { background-color: #eff6ff; }
-            .notification h3 { margin: 0 0 10px 0; color: #111827; }
-            .notification p { margin: 5px 0; color: #4b5563; }
-            .notification .meta { font-size: 12px; color: #6b7280; }
-            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-            .button { display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+            body { margin: 0; padding: 0; background: #eef2f7; color: #1f2937;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              line-height: 1.65; -webkit-font-smoothing: antialiased; }
+            .email-outer { max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }
+            .email-card { background: #ffffff; border: 1px solid #e2e8f0; }
+            .email-header { background: #0d9488; color: #ffffff; padding: 28px 36px; text-align: center; }
+            .email-header h1 { margin: 0 0 8px; font-size: 24px; font-weight: 600; }
+            .email-header p { margin: 0; font-size: 15px; opacity: 0.95; }
+            .email-body { padding: 32px 36px; background: #ffffff; }
+            .email-body > p { margin: 0 0 14px; }
+            .notification { border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; padding: 18px 20px; margin: 16px 0; background: #f8fafc; }
+            .notification.unread { background: #f0fdfa; border-left-color: #0d9488; }
+            .notification h3 { margin: 0 0 8px; color: #0f172a; font-size: 17px; font-weight: 600; }
+            .notification p { margin: 6px 0; color: #334155; }
+            .notification .meta { font-size: 12px; color: #64748b; margin-top: 8px; }
+            .action-button { display: inline-block; background: #0d9488; color: #ffffff !important; padding: 10px 20px;
+              text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 10px; border: 1px solid #0f766e; }
+            .email-footer { padding: 22px 36px; text-align: center; font-size: 12px; color: #64748b;
+              background: #f8fafc; border-top: 1px solid #e2e8f0; }
+            .email-footer a { color: #0d9488; }
+            .email-footer p { margin: 6px 0; }
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h1>{{ frequency }} Notification Digest</h1>
-                <p>{{ notifications|length }} new notification(s) for {{ user.name }}</p>
-            </div>
-
-            <div style="padding: 20px;">
-                <p>Hello {{ user.name }},</p>
-                <p>Here's your {{ frequency.lower() }} notification digest:</p>
-
-                {% for notification in notifications %}
-                <div class="notification {% if not notification.is_read %}unread{% endif %}">
-                    <h3>{{ notification.title }}</h3>
-                    <p>{{ notification.message }}</p>
-                    <div class="meta">
-                        <span>{{ notification.notification_type.value.replace('_', ' ').title() }}</span>
-                        <span> • </span>
-                        <span>{{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
-                        {% if notification.priority != 'normal' %}
-                        <span> • </span>
-                        <span style="color: #dc2626; font-weight: bold;">{{ notification.priority.upper() }}</span>
+        <div class="email-outer">
+            <div class="email-card">
+                <div class="email-header">
+                    <h1>{{ frequency }} notification digest</h1>
+                    <p>{{ notifications|length }} new notification(s) for {{ user.name }}</p>
+                </div>
+                <div class="email-body">
+                    <p>Hello {{ user.name }},</p>
+                    <p>Here's your {{ frequency.lower() }} notification digest:</p>
+                    {% for notification in notifications %}
+                    <div class="notification {% if not notification.is_read %}unread{% endif %}">
+                        <h3>{{ notification.title }}</h3>
+                        <p>{{ notification.message }}</p>
+                        <div class="meta">
+                            <span>{{ notification.notification_type.value.replace('_', ' ').title() }}</span>
+                            <span> • </span>
+                            <span>{{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            {% if notification.priority != 'normal' %}
+                            <span> • </span>
+                            <span style="color: #dc2626; font-weight: 600;">{{ notification.priority.upper() }}</span>
+                            {% endif %}
+                        </div>
+                        {% if notification.related_url %}
+                        <a href="{{ (base_url ~ notification.related_url) | e }}" class="action-button">View details</a>
                         {% endif %}
                     </div>
-                    {% if notification.related_url %}
-                    <a href="{{ base_url }}{{ notification.related_url }}" class="button">View Details</a>
-                    {% endif %}
+                    {% endfor %}
+                    <div style="text-align: center; margin-top: 28px;">
+                        <a href="{{ (base_url ~ '/notifications') | e }}" class="action-button">View all notifications</a>
+                    </div>
                 </div>
-                {% endfor %}
-
-                <div style="text-align: center; margin-top: 30px;">
-                    <a href="{{ base_url }}/notifications" class="button">View All Notifications</a>
+                <div class="email-footer">
+                    <p>You're receiving this email because you have email notifications enabled.</p>
+                    <p><a href="{{ (base_url ~ '/notifications') | e }}">Manage your notification preferences</a></p>
+                    <p>{{ org_name | e }}</p>
                 </div>
-            </div>
-
-            <div class="footer">
-                <p>You're receiving this email because you have email notifications enabled.</p>
-                <p><a href="{{ base_url }}/notifications">Manage your notification preferences</a></p>
-                <p>{{ org_name }}</p>
             </div>
         </div>
     </body>
     </html>
     """
 
-    base_url = current_app.config.get('BASE_URL', 'http://localhost:5000')
+    base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
 
     # Sanitize (and translate) notification content for safe rendering.
     # Translate at send time using the user's preferred locale so digest emails
@@ -711,57 +722,73 @@ def render_instant_email(user, notification):
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #dc2626; color: white; padding: 20px; text-align: center; }
-            .header.action-required { background-color: #b91c1c; }
-            .header .subtitle { font-size: 14px; opacity: 0.9; margin-top: 4px; }
-            .content { padding: 30px; background-color: #f9fafb; }
-            .notification { border-left: 4px solid #2563eb; padding: 20px; background-color: white; }
-            .notification.action-required { border-left-color: #dc2626; }
-            .notification h2 { margin: 0 0 15px 0; color: #111827; }
-            .notification p { margin: 10px 0; color: #4b5563; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; }
-            .button.action-required { background-color: #dc2626; }
-            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+            body { margin: 0; padding: 0; background: #eef2f7; color: #1f2937;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              line-height: 1.65; -webkit-font-smoothing: antialiased; }
+            .email-outer { max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }
+            .email-card { background: #ffffff; border: 1px solid #e2e8f0; }
+            .email-header { color: #ffffff; padding: 28px 36px; text-align: center; }
+            .email-header.informational { background: #0d9488; }
+            .email-header.action-required { background: #b91c1c; }
+            .email-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+            .email-header .subtitle { font-size: 15px; opacity: 0.95; margin: 8px 0 0; }
+            .email-body { padding: 32px 36px; background: #ffffff; }
+            .email-body > p { margin: 0 0 16px; }
+            .message-panel { border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; padding: 22px 24px; background: #f8fafc; }
+            .message-panel.action-required { border-left-color: #dc2626; background: #fffafa; }
+            .message-panel h2 { margin: 0 0 12px; color: #0f172a; font-size: 20px; font-weight: 600; }
+            .message-panel p { margin: 10px 0; color: #334155; }
+            .meta { font-size: 12px; color: #64748b; margin-top: 12px; }
+            .action-button { display: inline-block; padding: 12px 24px; text-decoration: none; font-weight: 600; font-size: 15px; margin: 12px 0 0; color: #ffffff !important; }
+            .action-button.informational { background: #0d9488; border: 1px solid #0f766e; }
+            .action-button.action-required { background: #dc2626; border: 1px solid #b91c1c; }
+            .email-footer { padding: 22px 36px; text-align: center; font-size: 12px; color: #64748b;
+              background: #f8fafc; border-top: 1px solid #e2e8f0; }
+            .email-footer a { color: #0d9488; }
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header {% if is_action_required %}action-required{% endif %}">
-                <h1>{{ header_label }}</h1>
-                {% if header_subtitle %}<p class="subtitle">{{ header_subtitle }}</p>{% endif %}
-            </div>
-
-            <div class="content">
-                <p>Hello {{ user.name }},</p>
-
-                <div class="notification {% if is_action_required %}action-required{% endif %}">
-                    <h2>{{ notification.title }}</h2>
-                    <p>{{ notification.message }}</p>
-                    <p style="font-size: 12px; color: #6b7280;">
-                        {{ notification.notification_type.value.replace('_', ' ').title() }}
-                        {% if notification.priority and notification.priority != 'normal' %}
-                        • <span style="color: #dc2626; font-weight: bold;">{{ notification.priority.upper() }}</span>
-                        {% endif %}
-                    </p>
-                    {% if notification.related_url %}
-                    <a href="{{ base_url }}{{ notification.related_url }}" class="button {% if is_action_required %}action-required{% endif %}">{{ button_label }}</a>
-                    {% endif %}
+        <div class="email-outer">
+            <div class="email-card">
+                <div class="email-header {% if is_action_required %}action-required{% else %}informational{% endif %}">
+                    <h1>{{ header_label }}</h1>
+                    {% if header_subtitle %}<p class="subtitle">{{ header_subtitle }}</p>{% endif %}
                 </div>
-            </div>
-
-            <div class="footer">
-                <p><a href="{{ base_url }}/notifications">View all notifications</a> | <a href="{{ base_url }}/notifications">Manage preferences</a></p>
-                <p>{{ org_name }}</p>
+                <div class="email-body">
+                    <p>Hello {{ user.name }},</p>
+                    <div class="message-panel {% if is_action_required %}action-required{% endif %}">
+                        <h2>{{ notification.title }}</h2>
+                        <p>{{ notification.message }}</p>
+                        <p class="meta">
+                            {{ notification.notification_type.value.replace('_', ' ').title() }}
+                            {% if notification.priority and notification.priority != 'normal' %}
+                            &nbsp;•&nbsp;<span style="color: #dc2626; font-weight: 600;">{{ notification.priority.upper() }}</span>
+                            {% endif %}
+                        </p>
+                        {% if notification.related_url %}
+                        <a href="{{ (base_url ~ notification.related_url) | e }}"
+                           class="action-button {% if is_action_required %}action-required{% else %}informational{% endif %}">{{ button_label }}</a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="email-footer">
+                    <p>
+                        <a href="{{ (base_url ~ '/notifications') | e }}">View all notifications</a>
+                        &nbsp;|&nbsp;
+                        <a href="{{ (base_url ~ '/notifications') | e }}">Manage preferences</a>
+                    </p>
+                    <p>{{ org_name | e }}</p>
+                </div>
             </div>
         </div>
     </body>
     </html>
     """
 
-    base_url = current_app.config.get('BASE_URL', 'http://localhost:5000')
+    base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
 
     # Get organization branding
     org_name = get_org_name()

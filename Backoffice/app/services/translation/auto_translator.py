@@ -76,6 +76,41 @@ def _normalize_language_code(lang: Optional[Union[str, object]], *, default: str
     return default
 
 
+def _iter_email_template_translatable_string_nodes(soup) -> list:
+    """
+    In-order NavigableString nodes that may contain user-visible (translatable) text.
+
+    Skips ``<style>`` / ``<script>`` (CSS/JS must not be sent to machine translation) and
+    comments / CDATA, which would otherwise be mangled or produce garbage translations.
+    """
+    if soup is None:
+        return []
+    try:
+        from bs4 import CData, Comment, NavigableString, Tag
+    except ImportError:  # pragma: no cover
+        return []
+
+    out: list = []
+    for node in soup.find_all(string=True, recursive=True):
+        if not isinstance(node, NavigableString) or not node.parent:
+            continue
+        if isinstance(node, (Comment, CData)):
+            continue
+        parent = node.parent
+        # Do not translate strings that hang directly off the document root (e.g. doctype
+        # fragments) — those are not user-visible and can mangle the serialized output.
+        if not isinstance(parent, Tag):
+            continue
+        pname = (getattr(parent, "name", None) or "").strip()
+        if pname in ("[document]",):
+            continue
+        plower = pname.lower()
+        if plower in ("style", "script"):
+            continue
+        out.append(node)
+    return out
+
+
 def _is_meaningful_after_protection(protected_text: str, token_map: Dict[str, str]) -> bool:
     """
     Return True if there's meaningful text left after placeholder protection.
@@ -588,6 +623,45 @@ class AutoTranslator:
                 self.default_service = 'libre'
             else:
                 self.default_service = None
+
+    @staticmethod
+    def _protect_jinja_expressions(text: str) -> Tuple[str, Dict[str, str]]:
+        """
+        Protect Jinja2 ``{{ ... }}`` and ``{% ... %}`` fragments before machine translation
+        of HTML email templates, so variable names and control tags are not translated.
+
+        Uses ``JINJAHOLDER*`` tokens (distinct from ``IFRCPLACEHOLDER*`` used in
+        :meth:`_protect_variables`) to reduce collision if both run on nested protection passes.
+        """
+        if not text:
+            return text, {}
+        token_map: Dict[str, str] = {}
+        token_counter = 0
+
+        def make_token() -> str:
+            nonlocal token_counter
+            n = token_counter
+            letters: list[str] = []
+            while True:
+                letters.append(chr(ord("A") + (n % 26)))
+                n = (n // 26) - 1
+                if n < 0:
+                    break
+            suffix = "".join(reversed(letters))
+            token = f"JINJAHOLDER{suffix}"
+            token_counter += 1
+            return token
+
+        out: list[str] = []
+        last = 0
+        for m in re.finditer(r"(\{\{[\s\S]*?\}\}|\{\%[\s\S]*?\%\})", text):
+            out.append(text[last:m.start()])
+            tok = make_token()
+            token_map[tok] = m.group(1)
+            out.append(tok)
+            last = m.end()
+        out.append(text[last:])
+        return "".join(out), token_map
 
     @staticmethod
     def _protect_variables(text: str) -> Tuple[str, Dict[str, str]]:
@@ -1139,6 +1213,158 @@ class AutoTranslator:
 
         return result
 
+    def _translate_email_template_html_by_text_nodes(
+        self,
+        html: str,
+        target_languages: List[str],
+        service_name: str = None,
+    ) -> Optional[Dict[str, str]]:
+        """
+        Parse HTML, translate only string nodes (not ``<style>`` / ``<script>``),
+        re-run Jinja protection per node, and replace text in a fresh tree per target language.
+
+        Returns:
+            - ``{}`` if parsing succeeded but there is no translatable text.
+            - ``None`` if BeautifulSoup is unavailable or the document could not be parsed
+              (caller may fall back to full-document translation).
+        """
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError as e:  # pragma: no cover
+            logger.warning("translate_email_template_html: beautifulsoup4 not available: %s", e)
+            return None
+
+        source = str(html)
+        result: Dict[str, str] = {}
+        try:
+            soup0 = BeautifulSoup(source, "html.parser")
+        except Exception as e:
+            logger.warning("translate_email_template_html: HTML parse failed: %s", e)
+            return None
+
+        work_template: list = []
+        for node in _iter_email_template_translatable_string_nodes(soup0):
+            raw = str(node)
+            jpro, jmap = self._protect_jinja_expressions(raw)
+            if not _is_meaningful_after_protection(jpro, jmap):
+                continue
+            work_template.append((jpro, jmap, raw))
+
+        if not work_template:
+            return {}
+
+        n_segments = len(work_template)
+        for lang in target_languages or []:
+            lang_code = self._get_language_code(lang)
+            if not lang_code:
+                continue
+            try:
+                soup2 = BeautifulSoup(source, "html.parser")
+            except Exception as e:
+                logger.warning("translate_email_template_html: re-parse for %r failed: %s", lang, e)
+                continue
+
+            work = []
+            for node in _iter_email_template_translatable_string_nodes(soup2):
+                raw = str(node)
+                jpro, jmap = self._protect_jinja_expressions(raw)
+                if not _is_meaningful_after_protection(jpro, jmap):
+                    continue
+                work.append((node, jpro, jmap, raw))
+
+            if len(work) != n_segments:
+                logger.warning(
+                    "translate_email_template_html: translatable node count changed (%s vs %s) for %r; skipping language",
+                    len(work),
+                    n_segments,
+                    lang,
+                )
+                continue
+
+            ok = True
+            for i in range(n_segments):
+                jpro_w, jmap_w, raw_w = work_template[i]
+                node, jpro, jmap, _raw = work[i]
+                if jpro != jpro_w or jmap != jmap_w:
+                    logger.warning("translate_email_template_html: node mismatch at index %s for %r; skipping", i, lang)
+                    ok = False
+                    break
+                tr = self.translate_text(jpro, lang, "en", service_name)
+                if not tr:
+                    tr = raw_w
+                else:
+                    tr = self._restore_variables(tr, jmap_w)
+                try:
+                    node.replace_with(tr)
+                except Exception as e:  # pragma: no cover
+                    logger.debug("translate_email_template_html: replace failed at %s: %s", i, e)
+                    ok = False
+                    break
+            if ok:
+                result[lang_code] = str(soup2)
+        return result
+
+    def _translate_email_template_html_as_full_blob(
+        self,
+        html: str,
+        target_languages: List[str],
+        service_name: str = None,
+    ) -> Dict[str, str]:
+        """
+        Legacy path: protect Jinja, send the entire HTML in one request.
+
+        Vulnerable to MT rewriting tags/CSS; used only on parse failure or as last resort.
+        """
+        if not target_languages:
+            return {}
+        if not html or not str(html).strip():
+            return {}
+
+        jinja_protected, jinja_map = self._protect_jinja_expressions(str(html))
+        if not _is_meaningful_after_protection(jinja_protected, jinja_map):
+            return {}
+
+        result: Dict[str, str] = {}
+        for lang in target_languages:
+            tr = self.translate_text(jinja_protected, lang, "en", service_name)
+            if tr:
+                restored = self._restore_variables(tr, jinja_map)
+                lang_code = self._get_language_code(lang)
+                if lang_code:
+                    result[lang_code] = restored
+        return result
+
+    def translate_email_template_html(
+        self,
+        html: str,
+        target_languages: List[str] = None,
+        service_name: str = None,
+    ) -> Dict[str, str]:
+        """
+        Translate email HTML (English source) to multiple languages.
+
+        The document is parsed as HTML: **only text nodes** outside ``<style>`` and ``<script>``
+        are sent to the translator, so **HTML tags, inline CSS, and full ``<style>`` blocks are
+        left unchanged** (as in the source). Jinja2 ``{{ }}`` / ``{% %}`` in those text nodes are
+        protected and restored the same as before.
+
+        Returns:
+            ``{'fr': '...', 'es': '...', ...}`` with ISO language keys.
+        """
+        if not target_languages:
+            return {}
+        if not html or not str(html).strip():
+            return {}
+
+        by_node = self._translate_email_template_html_by_text_nodes(
+            str(html), target_languages, service_name=service_name
+        )
+        if by_node is not None:
+            return by_node
+        return self._translate_email_template_html_as_full_blob(
+            str(html), target_languages, service_name=service_name
+        )
+
     def _get_service(self, service_name: str = None) -> Optional[TranslationService]:
         """Get translation service by name"""
         if service_name and service_name in self.services:
@@ -1223,3 +1449,12 @@ def translate_template_name_auto(name: str, target_languages: List[str] = None,
                                service_name: str = None) -> Dict[str, str]:
     """Convenience function to translate template name"""
     return auto_translator.translate_template_name(name, target_languages, service_name)
+
+
+def translate_email_template_html_auto(
+    html: str,
+    target_languages: List[str] = None,
+    service_name: str = None,
+) -> Dict[str, str]:
+    """Translate English email HTML to target languages; preserves Jinja2 syntax."""
+    return auto_translator.translate_email_template_html(html, target_languages, service_name)

@@ -373,36 +373,46 @@ def api_send_notifications():
             # Create HTML email content using DB template with fallback
             from app.services.email.rendering import render_admin_email_template
 
-            default_email_template = """<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #e31e24; color: white; padding: 20px; text-align: center; }
-        .content { background-color: #f9f9f9; padding: 20px; margin-top: 20px; }
-        .message { background-color: white; padding: 15px; border-left: 4px solid #e31e24; margin: 15px 0; white-space: pre-wrap; }
-        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>{{ title }}</h1>
-        </div>
-        <div class="content">
-            <div class="message">
-                {{ message }}
-            </div>
-        </div>
-        <div class="footer">
-            <p>This is an automated message from {{ org_name }}.</p>
-        </div>
-    </div>
-</body>
-</html>"""
-
+            default_email_template = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>{{ title }}</title>
+                <style>
+                    body { margin: 0; padding: 0; background: #eef2f7; color: #1f2937;
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                      line-height: 1.65; -webkit-font-smoothing: antialiased; }
+                    .email-outer { max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }
+                    .email-card { background: #ffffff; border: 1px solid #e2e8f0; }
+                    .email-header { background: #0d9488; color: #ffffff; padding: 28px 40px; text-align: center; }
+                    .email-header h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+                    .email-body { padding: 32px 40px; background: #ffffff; }
+                    .message { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0d9488;
+                      padding: 22px 24px; white-space: pre-wrap; font-size: 15px; color: #334155; }
+                    .email-footer { padding: 22px 40px; text-align: center; font-size: 12px; color: #64748b;
+                      background: #f8fafc; border-top: 1px solid #e2e8f0; }
+                    .email-footer p { margin: 0; }
+                </style>
+            </head>
+            <body>
+                <div class="email-outer">
+                    <div class="email-card">
+                        <div class="email-header">
+                            <h1>{{ title }}</h1>
+                        </div>
+                        <div class="email-body">
+                            <div class="message">{{ message }}</div>
+                        </div>
+                        <div class="email-footer">
+                            <p>This is an automated message from {{ org_name }}.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
             email_template = get_email_template(
                 'email_template_notification',
                 default=default_email_template,

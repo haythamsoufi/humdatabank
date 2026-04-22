@@ -61,6 +61,10 @@ def validate_notification_url(url: str) -> bool:
         # Reject protocol-relative URLs (//evil.com)
         if url.startswith('//'):
             return False
+        # Reject characters that break out of HTML attributes or enable injection if ever
+        # rendered without escaping (defence in depth alongside Jinja escaping).
+        if any(ch in url for ch in ('"', "'", '<', '>', '\n', '\r', '\0')):
+            return False
         # Allow relative paths by default (safest option)
         return True
 

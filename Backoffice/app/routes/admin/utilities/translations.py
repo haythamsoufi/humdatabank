@@ -1370,7 +1370,15 @@ def api_auto_translate():
 
 
     try:
-        from app.services.translation.auto_translator import get_auto_translator, translate_form_item_auto, translate_section_name_auto, translate_question_option_auto, translate_page_name_auto, translate_template_name_auto
+        from app.services.translation.auto_translator import (
+            get_auto_translator,
+            translate_form_item_auto,
+            translate_section_name_auto,
+            translate_question_option_auto,
+            translate_page_name_auto,
+            translate_template_name_auto,
+            translate_email_template_html_auto,
+        )
         from app.services.authorization_service import AuthorizationService
 
         data = get_json_safe()
@@ -1607,6 +1615,19 @@ def api_auto_translate():
                         message='No translation available; original text returned.',
                     )
                 return json_bad_request(f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.')
+
+        elif translation_type == 'email_template_html':
+            # English HTML email body; Jinja {{ }} / {% %} preserved in auto_translator
+            result = translate_email_template_html_auto(
+                html=text,
+                target_languages=target_languages,
+                service_name=service_name,
+            )
+            if result and len(result) > 0:
+                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+            return json_bad_request(
+                f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.'
+            )
 
         elif translation_type == 'translation':
             # Translate a translation file entry (msgid to other languages)

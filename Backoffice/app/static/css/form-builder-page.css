@@ -32,11 +32,66 @@
     user-select: none;
 }
 
-/* Toolbar: same border box as .btn-success / .btn-primary / .btn-purple so heights align */
-#form-builder-ui #add-section-btn.btn.btn-success,
-#form-builder-ui #template-variables-btn.btn {
+/* Toolbar row: Add Section + Template Variables (no .btn class — see form_builder.html) */
+#form-builder-ui .form-builder-toolbar-control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4375rem;
+    padding: 0.5rem 1rem;
+    font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25;
     border: 1px solid transparent;
     box-sizing: border-box;
+    border-radius: 0;
+    cursor: pointer;
+    user-select: none;
+    transition:
+        background-color 0.15s ease-in-out,
+        color 0.15s ease-in-out,
+        box-shadow 0.15s ease-in-out;
+}
+#form-builder-ui .form-builder-toolbar-control > i {
+    flex-shrink: 0;
+    line-height: 1;
+}
+#form-builder-ui #add-section-btn.form-builder-toolbar-control--add {
+    background-color: var(--btn-success);
+    color: #fff;
+    border: none;
+}
+#form-builder-ui #add-section-btn.form-builder-toolbar-control--add:hover {
+    background-color: var(--btn-success-hover);
+    box-shadow: 0 2px 6px var(--btn-success-focus);
+    color: #fff;
+}
+#form-builder-ui #add-section-btn.form-builder-toolbar-control--add:active {
+    background-color: var(--btn-success-active);
+}
+#form-builder-ui #add-section-btn.form-builder-toolbar-control--add:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--btn-success-focus);
+}
+
+#form-builder-ui #template-variables-btn.form-builder-toolbar-control.template-variables-btn--has-vars {
+    background-color: var(--btn-purple);
+    color: #fff;
+    border: none;
+    box-shadow: none;
+}
+#form-builder-ui #template-variables-btn.form-builder-toolbar-control.template-variables-btn--has-vars:hover {
+    background-color: var(--btn-purple-hover);
+    box-shadow: 0 2px 6px var(--btn-purple-focus);
+    color: #fff;
+}
+#form-builder-ui #template-variables-btn.form-builder-toolbar-control.template-variables-btn--has-vars:active {
+    background-color: var(--btn-purple-active);
+}
+#form-builder-ui #template-variables-btn.form-builder-toolbar-control.template-variables-btn--has-vars:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--btn-purple-focus);
 }
 
 /*

@@ -69,14 +69,14 @@ export class TemplateVariablesManager {
         countSpan.textContent = count > 0 ? `(${count})` : '(0)';
         countSpan.classList.remove('hidden');
 
-        // Grey when no variables; purple when any exist (semantic .btn only)
+        // Grey when no variables; purple when any exist (styles: form-builder-page.css)
         if (count === 0) {
-            btn.classList.remove('btn-purple');
+            btn.classList.remove('template-variables-btn--has-vars');
             btn.classList.add('template-variables-btn--empty');
             btn.disabled = false;
         } else {
             btn.classList.remove('template-variables-btn--empty');
-            btn.classList.add('btn-purple');
+            btn.classList.add('template-variables-btn--has-vars');
             btn.disabled = false;
         }
     }

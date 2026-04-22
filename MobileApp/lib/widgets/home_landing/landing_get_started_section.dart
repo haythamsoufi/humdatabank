@@ -699,6 +699,7 @@ class _OverviewBody extends StatelessWidget {
                     choroplethPolygons: polys,
                     initialFit: initialFit,
                     maxZoom: 22,
+                    polygonSimplification: 0,
                     notifyParentScrollWhilePointersDown: true,
                     onCountryIso2Tapped: (iso2) {
                       showFdrsCountryInsightSheet(

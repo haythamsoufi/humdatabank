@@ -380,7 +380,7 @@ class _UnifiedPlanningDocumentsScreenState
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int?>(
-                    key: ValueKey<int?>(tempType),
+                    key: ValueKey<String>('unified_filter_type_$tempType'),
                     initialValue: tempType,
                     isExpanded: true,
                     menuMaxHeight: menuMaxH,
@@ -409,7 +409,7 @@ class _UnifiedPlanningDocumentsScreenState
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int?>(
-                    key: ValueKey<int?>(tempYear),
+                    key: ValueKey<String>('unified_filter_year_$tempYear'),
                     initialValue: tempYear,
                     isExpanded: true,
                     menuMaxHeight: menuMaxH,
@@ -938,6 +938,8 @@ class _UnifiedPlanningDocCardState extends State<_UnifiedPlanningDocCard>
                   children: [
                     Row(
                       children: [
+                        // Use [Flexible] with loose fit so the chip hugs the label; [Expanded]
+                        // would stretch the badge across the full row minus the year.
                         Flexible(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -949,6 +951,7 @@ class _UnifiedPlanningDocCardState extends State<_UnifiedPlanningDocCard>
                             child: Text(
                               typeLabel,
                               maxLines: 1,
+                              softWrap: false,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
@@ -1148,24 +1151,36 @@ class _FreshCenterStripeState extends State<_FreshCenterStripe>
               child: ClipRect(
                 child: ColoredBox(
                   color: red,
+                  // Row is intentionally wider than the viewport (marquee). Give it
+                  // unbounded width so it does not trigger RenderFlex overflow; we clip
+                  // above. (copies * measured unit width can still exceed [w] when
+                  // text scale factor differs from TextPainter.)
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: AnimatedBuilder(
-                      animation: _marquee,
-                      builder: (context, child) {
-                        return Transform.translate(
-                          offset: Offset(-_unitW * _marquee.value, 0),
-                          child: child,
-                        );
-                      },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List<Widget>.generate(
-                          copies.clamp(3, 24),
-                          (_) => Text(
-                            _tickerCell(),
-                            maxLines: 1,
-                            style: style,
+                    child: UnconstrainedBox(
+                      constrainedAxis: Axis.vertical,
+                      clipBehavior: Clip.hardEdge,
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        height: _kStripeHeight,
+                        child: AnimatedBuilder(
+                          animation: _marquee,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(-_unitW * _marquee.value, 0),
+                              child: child,
+                            );
+                          },
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: List<Widget>.generate(
+                              copies.clamp(3, 24),
+                              (_) => Text(
+                                _tickerCell(),
+                                maxLines: 1,
+                                style: style,
+                              ),
+                            ),
                           ),
                         ),
                       ),

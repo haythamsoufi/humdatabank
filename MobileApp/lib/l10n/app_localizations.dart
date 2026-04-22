@@ -762,15 +762,15 @@ class AppLocalizations {
           'Select at least one year (or year not set) and one round, or choose All.',
       'unified_planning_analytics_map_tooltip': 'Participation world map',
       'unified_planning_participation_map_title': 'Participation by country',
-      'unified_planning_participation_map_hint':
-          'Use the filter control to choose years and rounds. “Full” participation means the country published at least one document for every year × document-type slot that appears in the filtered list.',
-      'unified_planning_participation_slots_label': '%s slots (year × round)',
-      'unified_planning_participation_no_slots': 'No slots match the current filters.',
+      'unified_planning_participation_slots_label':
+          '%s year & document type combinations',
+      'unified_planning_participation_no_slots':
+          'Nothing matches the current filters.',
       'unified_planning_participation_stats': '%s full · %s partial · %s off map',
-      'unified_planning_participation_sheet_slots': '%s of %s slots covered',
+      'unified_planning_participation_sheet_slots': '%s of %s combinations',
       'unified_planning_participation_sheet_full': 'Full participation',
       'unified_planning_participation_sheet_partial': 'Partial participation',
-      'unified_planning_participation_sheet_none': 'No coverage for these slots',
+      'unified_planning_participation_sheet_none': 'No coverage',
       'unified_planning_participation_legend_full': 'Full participation',
       'unified_planning_participation_legend_partial': 'Partial participation',
       'unified_planning_participation_legend_no_data': 'No coverage',
@@ -8291,8 +8291,6 @@ class AppLocalizations {
       translate('unified_planning_analytics_map_tooltip');
   String get unifiedPlanningParticipationMapTitle =>
       translate('unified_planning_participation_map_title');
-  String get unifiedPlanningParticipationMapHint =>
-      translate('unified_planning_participation_map_hint');
   String unifiedPlanningParticipationSlotsLabel(String n) =>
       translate('unified_planning_participation_slots_label')
           .replaceFirst('%s', n);

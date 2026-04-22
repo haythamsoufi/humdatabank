@@ -363,6 +363,12 @@ class AssignmentOfflineBundleService {
             'Saved CSS ${body.length}B -> $relPath <= $absolute',
           );
         }
+        if (pathLower.endsWith('.js') || pathLower.endsWith('.mjs')) {
+          DebugLogger.logInfo(
+            'OFFLINE_BUNDLE',
+            'Saved JS ${body.length}B -> $relPath <= $absolute',
+          );
+        }
       } catch (e) {
         final isCss = _pathLooksLikeCss(absolute.path);
         DebugLogger.logWarn(

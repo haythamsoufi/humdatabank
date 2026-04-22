@@ -1319,6 +1319,148 @@ def api_settings_email_templates():
     return json_ok(success=ok)
 
 
+@bp.route("/api/settings/email-template-preview", methods=["POST"])
+@admin_permission_required("admin.settings.manage")
+def api_settings_email_template_preview():
+    """
+    Render the current (unsaved) email template HTML with sample context.
+
+    JSON body: { "template_key": str, "html_b64": str (UTF-8 base64), "template_language": str? }
+    *template_language* (e.g. ar, fr) is used to resolve localized org branding in preview.
+    """
+    from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
+    from app.services.email.preview_context import get_email_template_preview_context
+    from app.services.email.rendering import render_admin_email_template_for_preview
+
+    data = get_json_safe()
+    template_key = (data.get("template_key") or "").strip()
+    html_b64 = data.get("html_b64")
+    template_language = data.get("template_language") or data.get("lang")
+    if template_key not in EMAIL_TEMPLATE_KEYS:
+        return json_bad_request("Invalid or missing template_key.")
+    if not isinstance(html_b64, str) or not html_b64.strip():
+        return json_bad_request("html_b64 is required.")
+    if template_language is not None and not isinstance(template_language, str):
+        return json_bad_request("template_language must be a string when provided.")
+
+    source = _b64decode_utf8(html_b64)
+    if not source.strip():
+        return json_bad_request("Template content is empty or could not be decoded.")
+
+    context = get_email_template_preview_context(
+        template_key, template_language=template_language
+    )
+    rendered, err = render_admin_email_template_for_preview(source, **context)
+    if err:
+        return json_bad_request(err)
+    return json_ok(html=rendered)
+
+
+# Short labels for test email subject line (match Emails settings UI).
+_EMAIL_TEMPLATE_TEST_LABELS = {
+    "email_template_suggestion_confirmation": "Indicator Suggestion Confirmation",
+    "email_template_admin_notification": "Admin Notification (New Suggestion)",
+    "email_template_security_alert": "Security Alert",
+    "email_template_welcome": "Welcome Email",
+    "email_template_notification": "Notification Email Wrapper",
+}
+
+
+@bp.route("/api/settings/email-template-test-send", methods=["POST"])
+@admin_permission_required("admin.settings.manage")
+def api_settings_email_template_test_send():
+    """
+    Send one test email to the current user's address using the same HTML and sample
+    context as the preview (unsaved editor content for the given language).
+    """
+    from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
+    from app.services.email.client import send_email
+    from app.services.email.preview_context import (
+        get_email_template_preview_context,
+        normalize_template_language,
+    )
+    from app.services.email.rendering import render_admin_email_template_for_preview
+
+    if not current_user.is_authenticated or not getattr(current_user, "email", None):
+        return json_bad_request("Your account has no email address; cannot send a test message.")
+
+    data = get_json_safe()
+    template_key = (data.get("template_key") or "").strip()
+    html_b64 = data.get("html_b64")
+    template_language = data.get("template_language") or data.get("lang")
+    if template_key not in EMAIL_TEMPLATE_KEYS:
+        return json_bad_request("Invalid or missing template_key.")
+    if not isinstance(html_b64, str) or not html_b64.strip():
+        return json_bad_request("html_b64 is required.")
+    if template_language is not None and not isinstance(template_language, str):
+        return json_bad_request("template_language must be a string when provided.")
+
+    source = _b64decode_utf8(html_b64)
+    if not source.strip():
+        return json_bad_request("Template content is empty or could not be decoded.")
+
+    tlang = normalize_template_language(template_language)
+    context = get_email_template_preview_context(
+        template_key, template_language=template_language
+    )
+    rendered, err = render_admin_email_template_for_preview(source, **context)
+    if err:
+        return json_bad_request(err)
+    if not (rendered or "").strip():
+        return json_bad_request("Rendered message is empty.")
+
+    label = _EMAIL_TEMPLATE_TEST_LABELS.get(template_key, template_key)
+    subject = f"[Test email] {label} ({tlang})"
+
+    try:
+        ok = send_email(
+            subject=subject,
+            recipients=[current_user.email],
+            html=rendered,
+            sender=current_app.config.get("MAIL_DEFAULT_SENDER"),
+        )
+    except Exception as e:  # pragma: no cover
+        current_app.logger.warning("email template test send failed: %s", e, exc_info=True)
+        return json_server_error("Failed to send email. Check mail configuration and logs.")
+
+    if not ok:
+        return json_server_error("Email was not sent (no recipients or mail API rejected the request).")
+
+    current_app.logger.info(
+        "Test email sent for template %s (%s) to user id %s",
+        template_key,
+        tlang,
+        getattr(current_user, "id", None),
+    )
+    return json_ok(sent_to=current_user.email, subject=subject)
+
+
+@bp.route("/api/settings/email-templates/seed", methods=["POST"])
+@admin_permission_required("admin.settings.manage")
+def api_settings_email_templates_seed():
+    """Load bundled default email/notification templates (same as ``flask seed-email-templates``)."""
+    from scripts.seed_email_templates import seed_templates
+
+    data = get_json_safe() or {}
+    force = bool(data.get("force"))
+    try:
+        stats = seed_templates(
+            force=force,
+            user_id=current_user.id if current_user.is_authenticated else None,
+        )
+    except Exception as e:
+        current_app.logger.warning("email template seed failed: %s", e, exc_info=True)
+        return json_server_error("Failed to seed email templates.")
+
+    current_app.logger.info(
+        "Email templates seeded via settings UI (force=%s) by user id %s: %s",
+        force,
+        getattr(current_user, "id", None),
+        stats,
+    )
+    return json_ok(stats=stats, force=force)
+
+
 @bp.route("/api/settings/languages", methods=["GET", "POST"])
 @admin_permission_required('admin.settings.manage')
 def api_languages_settings():

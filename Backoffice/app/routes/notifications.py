@@ -2644,17 +2644,30 @@ def api_send_campaign(campaign_id):
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        h2 {{ color: #2563eb; }}
-        .priority-high {{ color: #dc2626; font-weight: bold; }}
+        body {{ margin: 0; padding: 0; background: #eef2f7; color: #1f2937;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          line-height: 1.65; -webkit-font-smoothing: antialiased; }}
+        .email-outer {{ max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }}
+        .email-card {{ background: #ffffff; border: 1px solid #e2e8f0; }}
+        .email-header {{ background: #0d9488; color: #ffffff; padding: 28px 36px; text-align: center; }}
+        .email-header h1 {{ margin: 0; font-size: 22px; font-weight: 600; }}
+        .email-body {{ padding: 32px 36px; font-size: 15px; color: #334155; }}
+        .email-body a {{ color: #0d9488; font-weight: 600; }}
+        .priority-high {{ color: #dc2626; font-weight: 600; }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>{sanitize_for_email(campaign.title)}</h2>
-        <div>{sanitize_for_email(campaign.message).replace(chr(10), '<br>')}</div>
+    <div class="email-outer">
+        <div class="email-card">
+            <div class="email-header">
+                <h1>{sanitize_for_email(campaign.title)}</h1>
+            </div>
+            <div class="email-body">
+                {sanitize_for_email(campaign.message).replace(chr(10), '<br>')}
+            </div>
+        </div>
     </div>
 </body>
 </html>"""

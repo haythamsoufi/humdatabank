@@ -437,6 +437,90 @@
     {# NOTE: Email templates are saved via JSON (base64) to avoid WAF false positives. #}
     <input type="hidden" name="email_templates_present" value="0" />
 
+    <style nonce="{{ csp_nonce() }}">
+    /* Jinja / Mustache variable syntax (double braces) - highlight layer behind transparent textarea, edit tab only */
+    #panel-emails .email-template-edit-wrap {
+      position: relative;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.375rem;
+      border-top-left-radius: 0;
+      background: #fff;
+    }
+    #panel-emails .email-template-edit-wrap:focus-within {
+      box-shadow: 0 0 0 1px #fff, 0 0 0 3px #3b82f6;
+    }
+    #panel-emails .email-template-syntax-backdrop {
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      z-index: 0;
+      margin: 0;
+      padding: 0.5rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      word-break: break-word;
+      overflow: hidden;
+      pointer-events: none;
+      color: #1f2937;
+      tab-size: 2;
+      -moz-tab-size: 2;
+    }
+    #panel-emails .email-template-jinja-var {
+      color: #0d9488;
+      font-weight: 500;
+      text-decoration: underline;
+      text-decoration-color: rgba(13, 148, 136, 0.45);
+      text-underline-offset: 2px;
+    }
+    #panel-emails .email-template-body-textarea {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      min-height: 20rem;
+      max-height: 70vh;
+      box-sizing: border-box;
+      padding: 0.5rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      tab-size: 2;
+      -moz-tab-size: 2;
+      color: transparent;
+      caret-color: #111827;
+      background: transparent;
+      border: 0;
+      border-radius: inherit;
+      resize: vertical;
+      overflow-y: auto;
+    }
+    #panel-emails .email-template-body-textarea::placeholder { color: #9ca3af; }
+    #panel-emails .email-template-body-textarea:focus { outline: none; }
+    /* Preview: size iframe like the editor (textarea min 20rem, max 70vh) so mode switch does not collapse height */
+    #panel-emails .email-template-code-surface {
+      min-height: 20rem;
+    }
+    #panel-emails .email-template-preview-frame {
+      display: block;
+      width: 100%;
+      min-height: 32rem;
+      height: min(70vh, 52rem);
+      border: 0;
+      background: #fff;
+    }
+    /* RTL language tab: editor + syntax layer (mixed HTML + Arabic) */
+    #panel-emails .email-template-edit-wrap[dir="rtl"] .email-template-body-textarea,
+    #panel-emails .email-template-edit-wrap[dir="rtl"] .email-template-syntax-backdrop {
+      direction: rtl;
+      text-align: start;
+      unicode-bidi: plaintext;
+    }
+    </style>
+
     {# ── Group: Email Templates ────────────────────────── #}
     <div class="mb-6">
       <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Email & Notification Templates') }}</label>
@@ -445,6 +529,15 @@
         {{ _('Templates are used for both system emails and the Notifications Center. Each template has an HTML body (per language) and optional pre-fill fields (title, message, priority) used when composing a notification. Use Jinja2 syntax. Typical placeholder names include:') }}
         <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">org_name, org_short_name, copyright_year, user_name, submitter_name, etc.</span>
       </p>
+      <div class="flex flex-wrap items-center gap-2 mb-2" role="group" aria-label="{{ _('Default email templates') }}">
+        <button type="button" id="email-templates-seed-gaps-btn" class="btn btn-sm btn-success inline-flex items-center gap-1.5">
+          <i class="fas fa-download text-[10px]" aria-hidden="true"></i>{{ _('Load defaults (fill empty only)') }}
+        </button>
+        <button type="button" id="email-templates-seed-force-btn" class="btn btn-sm btn-warning inline-flex items-center gap-1.5">
+          <i class="fas fa-rotate text-[10px]" aria-hidden="true"></i>{{ _('Reset all to built-in defaults') }}
+        </button>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">{{ _('Fills or overwrites from the current release’s bundled HTML (same as the flask seed-email-templates command). The page reloads after a successful run.') }}</p>
 
       {% set email_templates = [
         {
@@ -474,7 +567,7 @@
         }
       ] %}
 
-      <div class="mb-4">
+      <div class="mb-4 max-w-3xl">
         <label for="email-template-selector" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Template to Edit') }}</label>
         <select
           id="email-template-selector"
@@ -506,33 +599,87 @@
           </div>
         </div>
 
-        {# ── Language sub-tabs ── #}
-        {% call scroll_tab_bar(border_bottom=False, lang_tabs_for=template.key, inner_class='items-center gap-0.5') %}
-          {% for lang in current_supported %}
-          <button type="button"
-                  class="email-lang-tab px-3 py-1.5 text-xs font-medium border border-b-0 rounded-t-md transition-colors
-                         {% if lang == 'en' %}bg-white text-blue-600 border-gray-200 relative z-10{% else %}bg-gray-50 text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-100{% endif %}"
-                  data-template-key="{{ template.key }}"
-                  data-lang="{{ lang }}">
-            {{ LANGUAGE_DISPLAY_NAMES.get(lang, lang|upper) }}
-            {% if lang == 'en' %}<span class="text-gray-400 font-normal ml-0.5">({{ _('default') }})</span>{% endif %}
-          </button>
-          {% endfor %}
-        {% endcall %}
+        {# ── Language sub-tabs + Edit/Preview (same row, matching tab style) ── #}
+        <div class="flex flex-wrap items-end gap-4 sm:gap-6 lg:gap-8">
+          <div class="min-w-0 flex-1">
+            {% call scroll_tab_bar(border_bottom=False, lang_tabs_for=template.key, inner_class='items-center gap-0.5', wrapper_class='mb-0') %}
+              {% for lang in current_supported %}
+              <button type="button"
+                      class="email-lang-tab px-3 py-1.5 text-xs font-medium border border-b-0 rounded-t-md transition-colors
+                             {% if lang == 'en' %}bg-white text-blue-600 border-gray-200 relative z-10{% else %}bg-gray-50 text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-100{% endif %}"
+                      data-template-key="{{ template.key }}"
+                      data-lang="{{ lang }}">
+                {{ LANGUAGE_DISPLAY_NAMES.get(lang, lang|upper) }}
+                {% if lang == 'en' %}<span class="text-gray-400 font-normal ml-0.5">({{ _('default') }})</span>{% endif %}
+              </button>
+              {% endfor %}
+            {% endcall %}
+          </div>
+          <div class="email-template-autotrans-wrap flex-shrink-0 hidden max-w-full"
+               data-template-key="{{ template.key }}"
+               title="{{ _('Uses the English template text for this form as the source. Jinja variables like org_name are preserved.') }}">
+            <button type="button"
+                    class="btn btn-sm btn-warning email-template-autotrans-btn inline-flex items-center gap-1.5 whitespace-nowrap"
+                    data-template-key="{{ template.key }}">
+              <i class="fas fa-language text-[10px]" aria-hidden="true"></i>{{ _('Auto-translate from English') }}
+            </button>
+          </div>
+          <div class="email-template-test-send-wrap flex-shrink-0 max-w-full">
+            <button type="button"
+                    class="btn btn-sm btn-primary email-template-test-send-btn inline-flex items-center gap-1.5 whitespace-nowrap{% if not current_user.email %} opacity-50 cursor-not-allowed{% endif %}"
+                    data-template-key="{{ template.key }}"
+                    {% if not current_user.email %}disabled title="{{ _('Add an email address to your user account to send a test message.') }}"
+                    {% else %}title="{{ _('Sends a sample email with the same test data as Preview to:') }} {{ current_user.email }}"{% endif %}>
+              <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send me test email') }}
+            </button>
+          </div>
+          <div class="flex-shrink-0" role="group" aria-label="{{ _('Switch between HTML editor and preview') }}">
+            <div class="email-template-view-toggle inline-flex border border-b-0 rounded-t-md border-gray-200 overflow-hidden shadow-sm divide-x divide-gray-200" id="email-template-view-toggle-{{ template.key }}">
+              <button type="button"
+                      class="email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-white text-blue-600 relative z-10"
+                      data-mode="edit" data-template-key="{{ template.key }}" aria-pressed="true">
+                <i class="fas fa-code text-[10px]" aria-hidden="true"></i>{{ _('Edit') }}
+              </button>
+              <button type="button"
+                      class="email-template-mode-btn email-template-mode-preview-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                      data-mode="preview" data-template-key="{{ template.key }}" aria-pressed="false">
+                <i class="fas fa-eye text-[10px]" aria-hidden="true"></i>{{ _('Preview') }}
+              </button>
+            </div>
+          </div>
+        </div>
 
-        {# ── Textarea ── #}
-        <textarea
-          id="{{ template.key }}"
-          data-current-lang="en"
-          rows="20"
-          class="w-full font-mono text-xs rounded-md rounded-tl-none border-gray-200 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_email_templates.get(template.key, {}).get('en', '') }}</textarea>
-
-        {# Hidden input carrying all per-language content as JSON #}
-        <input type="hidden"
-               id="{{ template.key }}-translations"
-               data-settings-email-template-hidden="1"
-               value="{{ current_email_templates.get(template.key, {}) | tojson | forceescape }}" />
+        {# ── HTML editor + live preview (same area) ── #}
+        <div class="email-template-code-surface" data-template-key="{{ template.key }}">
+          <div class="email-template-edit-pane">
+            <div class="email-template-edit-wrap overflow-hidden rounded-md rounded-tl-none">
+              <pre class="email-template-syntax-backdrop" aria-hidden="true"></pre>
+              <textarea
+                id="{{ template.key }}"
+                class="email-template-body-textarea"
+                data-current-lang="en"
+                rows="20"
+                spellcheck="false"
+                placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_email_templates.get(template.key, {}).get('en', '') }}</textarea>
+            </div>
+            {# Hidden input carrying all per-language content as JSON #}
+            <input type="hidden"
+                   id="{{ template.key }}-translations"
+                   data-settings-email-template-hidden="1"
+                   value="{{ current_email_templates.get(template.key, {}) | tojson | forceescape }}" />
+          </div>
+          <div class="email-template-preview-pane hidden flex flex-col rounded-md rounded-tl-none border border-gray-200 bg-white overflow-hidden" dir="ltr">
+            <p class="text-xs text-gray-500 border-b border-gray-100 px-2 py-1.5 bg-gray-50 flex-shrink-0" dir="ltr">
+              {{ _('Rendered with sample placeholder data for the active language above.') }}
+            </p>
+            <div class="email-template-preview-loading hidden flex items-center gap-2 text-sm text-gray-600 py-4 px-2" role="status" dir="ltr">
+              <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>{{ _('Rendering…') }}
+            </div>
+            <div class="email-template-preview-error hidden text-sm text-red-700 bg-red-50 border-b border-red-100 px-2 py-2 whitespace-pre-wrap" dir="ltr"></div>
+            <iframe class="email-template-preview-frame w-full border-0 bg-white"
+                    title="{{ _('Email preview') }}"></iframe>
+          </div>
+        </div>
 
         {# Notification Center pre-fill (same template, used when composing a notification) #}
         {% set meta = current_template_metadata.get(template.key, {}) %}
@@ -1827,6 +1974,62 @@
     return out;
   }
 
+  /* HTML escape, then mark Jinja mustache variable spans (syntax backdrop under transparent textarea) */
+  function escapeHtmlText(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function highlightJinjaMustacheToHtml(raw) {
+    if (!raw) return '';
+    var oB = String.fromCharCode(123);
+    var cB = String.fromCharCode(125);
+    var re = new RegExp(oB + oB + '[\\s\\S]*?' + cB + cB, 'g');
+    var out = [];
+    var last = 0;
+    var m;
+    while ((m = re.exec(raw)) !== null) {
+      out.push(escapeHtmlText(raw.slice(last, m.index)));
+      out.push('<span class="email-template-jinja-var">');
+      out.push(escapeHtmlText(m[0]));
+      out.push('</span>');
+      last = m.index + m[0].length;
+    }
+    out.push(escapeHtmlText(raw.slice(last)));
+    return out.join('');
+  }
+
+  function updateEmailTemplateSyntaxHighlight(ta) {
+    if (!ta) return;
+    var wrap = ta.closest('.email-template-edit-wrap');
+    var pre = wrap ? wrap.querySelector('.email-template-syntax-backdrop') : null;
+    if (!pre) return;
+    pre.innerHTML = highlightJinjaMustacheToHtml(ta.value);
+    pre.style.height = ta.scrollHeight + 'px';
+    pre.style.minHeight = ta.clientHeight + 'px';
+    pre.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
+  }
+
+  function bindEmailTemplateSyntaxToTextarea(ta) {
+    if (!ta) return;
+    function onInput() { updateEmailTemplateSyntaxHighlight(ta); }
+    function onScroll() {
+      var w = ta.closest('.email-template-edit-wrap');
+      var p = w ? w.querySelector('.email-template-syntax-backdrop') : null;
+      if (p) p.style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
+    }
+    ta.addEventListener('input', onInput);
+    ta.addEventListener('scroll', onScroll);
+    if (window.ResizeObserver) {
+      (new ResizeObserver(function () { updateEmailTemplateSyntaxHighlight(ta); })).observe(ta);
+    }
+  }
+
   /* Initialise in-memory data from hidden inputs */
   document.querySelectorAll('.email-template-editor').forEach(function (editor) {
     var hiddenInput = editor.querySelector('input[type="hidden"][id$="-translations"]');
@@ -1843,12 +2046,252 @@
     textarea.dataset.currentLang = 'en';
   });
 
+  document.querySelectorAll('.email-template-body-textarea').forEach(function (ta) {
+    bindEmailTemplateSyntaxToTextarea(ta);
+    updateEmailTemplateSyntaxHighlight(ta);
+    applyEmailTemplateTextDirection(ta);
+  });
+
   /* Template metadata initial snapshot (Notification Center pre-fill) */
   (function initMetadataSnapshot() {
     var metaInput = document.getElementById('template-metadata-json');
     if (!metaInput) { metadataInitial = '{}'; return; }
     metadataInitial = (decodeEntities(metaInput.value || '') || '').trim() || '{}';
   })();
+
+  /* ── Email template: edit / preview toggle (inline in code area) ── */
+  var EMAIL_PREVIEW_URL = {{ url_for('settings.api_settings_email_template_preview') | tojson }};
+  var EMAIL_TEST_SEND_URL = {{ url_for('settings.api_settings_email_template_test_send') | tojson }};
+  var EMAIL_SEED_URL = {{ url_for('settings.api_settings_email_templates_seed') | tojson }};
+  var MSG_SEED_CONFIRM_FORCE = {{ _('Replace every email and notification template with the built-in defaults from this version? Custom HTML and pre-fill text will be lost.') | tojson }};
+  var L_SEED_BODIES = {{ _('Template HTML') | tojson }};
+  var L_SEED_PREFILL = {{ _('Notification pre-fill') | tojson }};
+  var L_SEED_UPD = {{ _('updated from defaults') | tojson }};
+  var L_SEED_LEFT = {{ _('left unchanged') | tojson }};
+  var emailTemplateViewMode = 'edit';
+  var MSG_EMAIL_AUTOTRANS_EN_EMPTY = {{ _('The English version of this template is empty. Add or save English text first, then try again.') | tojson }};
+  var MSG_TEST_EMAIL_NO_ADDR = {{ _('Your user account has no email address. Add one in your profile, then try again.') | tojson }};
+  var MSG_TEST_EMAIL_SENT = {{ _('Test email sent to') | tojson }};
+  var MSG_TEST_EMAIL_FAIL = {{ _('Test email could not be sent. Check the message below or your mail settings.') | tojson }};
+
+  function base64EncodeUtf8Preview(str) {
+    try {
+      return btoa(unescape(encodeURIComponent(String(str || ''))));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getCsrfForEmailPreview() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    if (m && m.getAttribute('content')) return m.getAttribute('content');
+    var f = document.getElementById('manage-settings-form');
+    if (f) {
+      var inp = f.querySelector('input[name="csrf_token"]');
+      if (inp) return inp.value || '';
+    }
+    return '';
+  }
+
+  function syncActiveEmailTemplateToMap() {
+    document.querySelectorAll('.email-template-editor').forEach(function (editor) {
+      var textarea = editor.querySelector('textarea[id^="email_template_"]');
+      if (!textarea) return;
+      var key = textarea.id;
+      var currentLang = textarea.dataset.currentLang || 'en';
+      if (!templateLangData[key]) templateLangData[key] = {};
+      templateLangData[key][currentLang] = textarea.value;
+    });
+  }
+
+  function isEmailTemplateRtlLang(code) {
+    if (!code || typeof code !== 'string') return false;
+    var base = String(code).trim().toLowerCase().split('_')[0].split('-')[0];
+    return (
+      base === 'ar' || base === 'he' || base === 'iw' || base === 'fa' || base === 'ur' ||
+      base === 'ps' || base === 'dv' || base === 'ckb' || base === 'sd' || base === 'ug'
+    );
+  }
+
+  function applyEmailTemplateTextDirection(textarea) {
+    if (!textarea) return;
+    var lang = (textarea.dataset && textarea.dataset.currentLang) ? String(textarea.dataset.currentLang) : 'en';
+    var rtl = isEmailTemplateRtlLang(lang);
+    var dir = rtl ? 'rtl' : 'ltr';
+    var wrap = textarea.closest('.email-template-edit-wrap');
+    var surface = textarea.closest('.email-template-code-surface');
+    textarea.setAttribute('dir', dir);
+    textarea.setAttribute('lang', lang);
+    if (wrap) {
+      wrap.setAttribute('dir', dir);
+      wrap.setAttribute('lang', lang);
+    }
+    if (surface) {
+      surface.setAttribute('dir', dir);
+    }
+    var pre = wrap ? wrap.querySelector('.email-template-syntax-backdrop') : null;
+    if (pre) {
+      pre.setAttribute('dir', dir);
+    }
+  }
+
+  function applyRtlToEmailPreviewSrcdoc(html, langCode) {
+    if (!isEmailTemplateRtlLang(langCode)) return html;
+    if (!html || typeof html !== 'string') return html;
+    if (/<html[^>]*\bdir\s*=/i.test(html)) return html;
+    var trimmed = html.trim();
+    if (/^<!DOCTYPE/i.test(trimmed) || /^<html/i.test(trimmed)) {
+      return html.replace(/<html(\s[^>]*)?>/i, function (full, inner) {
+        if (inner && /\bdir\s*=/.test(inner)) return full;
+        return '<html' + (inner || '') + ' dir="rtl">';
+      });
+    }
+    return '<div dir="rtl" style="direction:rtl;text-align:start;">' + html + '</div>';
+  }
+
+  var ETM_CLASS_EDIT = 'email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors';
+  var ETM_CLASS_PREVIEW = 'email-template-mode-btn email-template-mode-preview-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors';
+
+  function updateEmailTemplateViewToggle() {
+    var isEdit = emailTemplateViewMode === 'edit';
+    document.querySelectorAll('.email-template-mode-edit-btn').forEach(function (btn) {
+      btn.className = ETM_CLASS_EDIT + (isEdit
+        ? ' bg-white text-blue-600 relative z-10'
+        : ' bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100');
+      btn.setAttribute('aria-pressed', isEdit ? 'true' : 'false');
+    });
+    document.querySelectorAll('.email-template-mode-preview-btn').forEach(function (btn) {
+      btn.className = ETM_CLASS_PREVIEW + (isEdit
+        ? ' bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+        : ' bg-white text-blue-600 relative z-10');
+      btn.setAttribute('aria-pressed', isEdit ? 'false' : 'true');
+    });
+  }
+
+  function setEmailTemplateViewMode(mode) {
+    if (mode !== 'edit' && mode !== 'preview') return;
+    emailTemplateViewMode = mode;
+    updateEmailTemplateViewToggle();
+    applyEmailTemplateViewMode();
+  }
+
+  function loadEmailTemplatePreviewInEditor(editorBlock) {
+    if (!editorBlock) return;
+    var loading = editorBlock.querySelector('.email-template-preview-loading');
+    var errEl = editorBlock.querySelector('.email-template-preview-error');
+    var frame = editorBlock.querySelector('.email-template-preview-frame');
+    if (!loading || !errEl || !frame) return;
+
+    if (editorBlock.id && editorBlock.id.indexOf('editor-') !== 0) return;
+    var templateKey = editorBlock.id.replace(/^editor-/, '');
+
+    syncActiveEmailTemplateToMap();
+    var textarea = document.getElementById(templateKey);
+    var lang = (textarea && textarea.dataset.currentLang) ? textarea.dataset.currentLang : 'en';
+    var html = '';
+    if (templateLangData[templateKey] && typeof templateLangData[templateKey][lang] === 'string') {
+      html = templateLangData[templateKey][lang];
+    } else if (textarea) {
+      html = textarea.value;
+    }
+
+    errEl.classList.add('hidden');
+    errEl.textContent = '';
+    try { frame.removeAttribute('srcdoc'); } catch (_) {}
+    loading.classList.remove('hidden');
+
+    var trimmed = (html || '').trim();
+    if (!trimmed) {
+      loading.classList.add('hidden');
+      errEl.textContent = {{ _('No template content for this language. Add HTML in the editor or switch language tab.') | tojson }};
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    var b64 = base64EncodeUtf8Preview(trimmed);
+    if (!b64) {
+      loading.classList.add('hidden');
+      errEl.textContent = {{ _('Could not encode template for preview.') | tojson }};
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    var csrf = getCsrfForEmailPreview();
+    var previewLang = (textarea && textarea.dataset && textarea.dataset.currentLang)
+      ? String(textarea.dataset.currentLang).trim()
+      : 'en';
+    /* CSRF-only fetch: 400 template errors return JSON without throwing (not apiFetch). */
+    ((window.getFetch && window.getFetch()) || fetch)(EMAIL_PREVIEW_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf
+      },
+      body: JSON.stringify({ template_key: templateKey, html_b64: b64, template_language: previewLang })
+    }).then(function (resp) {
+      return resp.json().then(function (payload) {
+        return { ok: resp.ok, status: resp.status, payload: payload };
+      });
+    }).then(function (result) {
+      loading.classList.add('hidden');
+      var payload = result.payload || {};
+      if (result.ok && payload.success && typeof payload.html === 'string' && payload.html.trim()) {
+        frame.srcdoc = applyRtlToEmailPreviewSrcdoc(payload.html, previewLang);
+        return;
+      }
+      var errMsg = (payload && (payload.error || payload.message)) ? (payload.error || payload.message) : null;
+      var msg = errMsg || ({{ _('Preview failed.') | tojson }} + ' (' + result.status + ')');
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }).catch(function () {
+      loading.classList.add('hidden');
+      errEl.textContent = {{ _('Network error while loading preview.') | tojson }};
+      errEl.classList.remove('hidden');
+    });
+  }
+
+  function applyEmailTemplateViewMode() {
+    var sel = document.getElementById('email-template-selector');
+    var activeKey = sel ? sel.value : '';
+    document.querySelectorAll('.email-template-editor').forEach(function (ed) {
+      var isActive = activeKey && ed.id === 'editor-' + activeKey;
+      var editPane = ed.querySelector('.email-template-edit-pane');
+      var prevPane = ed.querySelector('.email-template-preview-pane');
+      if (!editPane || !prevPane) return;
+      if (!isActive) {
+        editPane.classList.remove('hidden');
+        prevPane.classList.add('hidden');
+        return;
+      }
+      if (emailTemplateViewMode === 'edit') {
+        editPane.classList.remove('hidden');
+        prevPane.classList.add('hidden');
+        var taEdit = ed.querySelector('.email-template-body-textarea');
+        if (taEdit) {
+          setTimeout(function () { updateEmailTemplateSyntaxHighlight(taEdit); }, 0);
+        }
+      } else {
+        editPane.classList.add('hidden');
+        prevPane.classList.remove('hidden');
+        loadEmailTemplatePreviewInEditor(ed);
+      }
+    });
+  }
+
+  function setEmailAutotransVisibleForKey(templateKey) {
+    if (!templateKey) return;
+    document.querySelectorAll('.email-template-autotrans-wrap').forEach(function (w) {
+      var key = w.getAttribute('data-template-key') || '';
+      if (key !== templateKey) {
+        w.classList.add('hidden');
+        return;
+      }
+      var ta = document.getElementById(key);
+      var lang = (ta && ta.dataset && ta.dataset.currentLang) || 'en';
+      if (lang === 'en') w.classList.add('hidden');
+      else w.classList.remove('hidden');
+    });
+  }
 
   /* ── Template selector (dropdown) ── */
   function showEmailTemplate(templateKey) {
@@ -1859,16 +2302,22 @@
       var el = document.getElementById('editor-' + templateKey);
       if (el) el.style.display = 'block';
     }
+    applyEmailTemplateViewMode();
+    setEmailAutotransVisibleForKey(templateKey);
+    if (templateKey) {
+      var taActive = document.getElementById(templateKey);
+      if (taActive) applyEmailTemplateTextDirection(taActive);
+    }
   }
 
   var selector = document.getElementById('email-template-selector');
   if (selector) {
     selector.addEventListener('change', function () { showEmailTemplate(this.value); });
-    // Auto-show the first template on load
     if (selector.value) {
       showEmailTemplate(selector.value);
     }
   }
+  updateEmailTemplateViewToggle();
 
   /* ── Language tab switching ── */
   var LANG_ACTIVE   = 'bg-white text-blue-600 border-gray-200 relative z-10';
@@ -1886,25 +2335,291 @@
       var textarea    = document.getElementById(templateKey);
       if (!textarea || !templateKey) return;
 
-      // Save current content to in-memory map
       var currentLang = textarea.dataset.currentLang || 'en';
       if (!templateLangData[templateKey]) templateLangData[templateKey] = {};
       templateLangData[templateKey][currentLang] = textarea.value;
       emailTemplatesDirty = true;
 
-      // Load target language
       textarea.value = templateLangData[templateKey][lang] || '';
       textarea.dataset.currentLang = lang;
 
-      // Update tab visuals
       var tabRow = this.closest('[data-lang-tabs-for]');
       if (tabRow) {
         tabRow.querySelectorAll('.email-lang-tab').forEach(function (t) {
           switchLangClasses(t, t.dataset.lang === lang);
         });
       }
+
+      if (emailTemplateViewMode === 'preview') {
+        var edLang = document.getElementById('editor-' + templateKey);
+        if (edLang) loadEmailTemplatePreviewInEditor(edLang);
+      } else {
+        updateEmailTemplateSyntaxHighlight(textarea);
+      }
+      applyEmailTemplateTextDirection(textarea);
+      setEmailAutotransVisibleForKey(templateKey);
     });
   });
+
+  /* Edit / preview: one state; buttons duplicated per template — delegate from Emails panel */
+  (function initEmailViewToggle() {
+    var panel = document.getElementById('panel-emails');
+    if (!panel) return;
+    panel.addEventListener('click', function (e) {
+      var btn = e.target.closest('.email-template-mode-btn');
+      if (!btn || !panel.contains(btn)) return;
+      var mode = btn.getAttribute('data-mode');
+      if (mode === 'edit') setEmailTemplateViewMode('edit');
+      else if (mode === 'preview') setEmailTemplateViewMode('preview');
+    });
+  })();
+
+  (function initEmailTemplateAutotrans() {
+    var panel = document.getElementById('panel-emails');
+    if (!panel) return;
+
+    panel.addEventListener('click', function (e) {
+      var btn = e.target.closest('.email-template-autotrans-btn');
+      if (!btn || !panel.contains(btn)) return;
+      if (!window.AutoTranslateService || typeof window.AutoTranslateService.translate !== 'function') {
+        var msg = {{ _('Auto-translate is not available. Refresh the page and try again.') | tojson }};
+        if (window.showAlert) window.showAlert(msg, 'warning');
+        else if (window.__clientWarn) window.__clientWarn(msg);
+        return;
+      }
+      var templateKey = btn.getAttribute('data-template-key') || '';
+      if (!templateKey) return;
+      var textarea = document.getElementById(templateKey);
+      if (!textarea) return;
+
+      syncActiveEmailTemplateToMap();
+      var currentLang = textarea.dataset.currentLang || 'en';
+      if (currentLang === 'en') return;
+      if (!templateLangData[templateKey]) templateLangData[templateKey] = {};
+      var sourceEn = (templateLangData[templateKey]['en'] != null) ? String(templateLangData[templateKey]['en']) : '';
+      if (!sourceEn.trim()) {
+        if (window.showAlert) window.showAlert(MSG_EMAIL_AUTOTRANS_EN_EMPTY, 'warning');
+        else if (window.__clientWarn) window.__clientWarn(MSG_EMAIL_AUTOTRANS_EN_EMPTY);
+        return;
+      }
+
+      var origNodes = Array.from(btn.childNodes).map(function (n) { return n.cloneNode(true); });
+      function restoreBtn() {
+        btn.replaceChildren.apply(btn, origNodes.map(function (n) { return n.cloneNode(true); }));
+        btn.classList.remove('btn-loading');
+        btn.disabled = false;
+      }
+      btn.classList.add('btn-loading');
+      btn.disabled = true;
+
+      window.AutoTranslateService.translate({
+        type: 'email_template_html',
+        text: sourceEn,
+        target_languages: [currentLang],
+        permission_context: 'settings',
+        permission_code: 'admin.settings.manage'
+      }).then(function (res) {
+        if (!res || !res.translations) {
+          if (window.TranslationModalUtils) {
+            window.TranslationModalUtils.showAutoTranslateError(
+              btn,
+              '',
+              {{ _('Translation failed: invalid response from the server.') | tojson }},
+              { originalNodes: origNodes, restoreDelayMs: 2000 }
+            );
+          } else { restoreBtn(); }
+          return;
+        }
+        var translated = res.translations[currentLang];
+        if (typeof translated !== 'string' || !translated.trim()) {
+          if (window.TranslationModalUtils) {
+            window.TranslationModalUtils.showAutoTranslateError(
+              btn,
+              '',
+              (res && res.message) || {{ _('No translation was returned for this language.') | tojson }},
+              { originalNodes: origNodes, restoreDelayMs: 2500 }
+            );
+          } else { restoreBtn(); }
+          return;
+        }
+        textarea.value = translated;
+        if (!templateLangData[templateKey]) templateLangData[templateKey] = {};
+        templateLangData[templateKey][currentLang] = translated;
+        emailTemplatesDirty = true;
+        updateEmailTemplateSyntaxHighlight(textarea);
+        if (emailTemplateViewMode === 'preview') {
+          var ed = document.getElementById('editor-' + templateKey);
+          if (ed) loadEmailTemplatePreviewInEditor(ed);
+        }
+        restoreBtn();
+      }).catch(function (err) {
+        if (window.TranslationModalUtils) {
+          window.TranslationModalUtils.showAutoTranslateError(
+            btn,
+            '',
+            (err && err.message) || {{ _('Translation request failed.') | tojson }},
+            { originalNodes: origNodes, restoreDelayMs: 2500 }
+          );
+        } else {
+          restoreBtn();
+        }
+      });
+    });
+  })();
+
+  (function initEmailTemplateTestSend() {
+    var panel = document.getElementById('panel-emails');
+    if (!panel) return;
+    if (!EMAIL_TEST_SEND_URL) return;
+
+    panel.addEventListener('click', function (e) {
+      var btn = e.target.closest('.email-template-test-send-btn');
+      if (!btn || !panel.contains(btn)) return;
+      if (btn.disabled) {
+        if (window.showAlert) window.showAlert(MSG_TEST_EMAIL_NO_ADDR, 'warning');
+        return;
+      }
+      var templateKey = btn.getAttribute('data-template-key') || '';
+      if (!templateKey) return;
+      var textarea = document.getElementById(templateKey);
+      if (!textarea) return;
+
+      syncActiveEmailTemplateToMap();
+      var lang = (textarea.dataset && textarea.dataset.currentLang) ? String(textarea.dataset.currentLang).trim() : 'en';
+      var html = '';
+      if (templateLangData[templateKey] && typeof templateLangData[templateKey][lang] === 'string') {
+        html = templateLangData[templateKey][lang];
+      } else {
+        html = textarea.value;
+      }
+      var trimmed = (html || '').trim();
+      if (!trimmed) {
+        if (window.showAlert) {
+          window.showAlert({{ _('This language has no template content to send. Add HTML in the editor or pick another language tab.') | tojson }}, 'warning');
+        }
+        return;
+      }
+      var b64;
+      try {
+        b64 = base64EncodeUtf8Preview(trimmed);
+      } catch (err) {
+        if (window.showAlert) window.showAlert(String(err), 'error');
+        return;
+      }
+      if (!b64) {
+        if (window.showAlert) window.showAlert({{ _('Could not prepare the email body.') | tojson }}, 'error');
+        return;
+      }
+
+      var origNodes = Array.from(btn.childNodes).map(function (n) { return n.cloneNode(true); });
+      function restoreTestBtn() {
+        btn.replaceChildren.apply(btn, origNodes.map(function (n) { return n.cloneNode(true); }));
+        btn.classList.remove('btn-loading');
+        btn.disabled = false;
+      }
+      btn.classList.add('btn-loading');
+      btn.disabled = true;
+
+      var csrf = getCsrfForEmailPreview();
+      ((window.getFetch && window.getFetch()) || fetch)(EMAIL_TEST_SEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrf,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ template_key: templateKey, html_b64: b64, template_language: lang })
+      }).then(function (resp) {
+        return resp.json().then(function (payload) { return { ok: resp.ok, status: resp.status, payload: payload }; });
+      }).then(function (result) {
+        restoreTestBtn();
+        var p = result.payload || {};
+        if (result.ok && p.success) {
+          var to = p.sent_to || '';
+          if (window.showAlert) {
+            window.showAlert(MSG_TEST_EMAIL_SENT + (to ? ' ' + to : ''), 'success');
+          }
+          return;
+        }
+        var errMsg = (p && (p.error || p.message)) ? (p.error || p.message) : (MSG_TEST_EMAIL_FAIL + (result.status ? ' (' + result.status + ')' : ''));
+        if (window.showAlert) window.showAlert(errMsg, 'error');
+        else if (window.__clientWarn) window.__clientWarn(errMsg);
+      }).catch(function () {
+        restoreTestBtn();
+        if (window.showAlert) window.showAlert({{ _('Network error while sending test email.') | tojson }}, 'error');
+      });
+    });
+  })();
+
+  /* ── Seed default email templates (flask seed-email-templates) ── */
+  (function initEmailTemplateSeed() {
+    var gapsBtn = document.getElementById('email-templates-seed-gaps-btn');
+    var forceBtn = document.getElementById('email-templates-seed-force-btn');
+    if (!gapsBtn || !forceBtn) return;
+
+    function setBusy(yes, loadingBtn) {
+      [gapsBtn, forceBtn].forEach(function (b) {
+        b.disabled = !!yes;
+        if (yes) {
+          if (loadingBtn && b === loadingBtn) b.classList.add('btn-loading');
+          else b.classList.remove('btn-loading');
+        } else {
+          b.classList.remove('btn-loading');
+        }
+      });
+    }
+
+    function describeSeedStats(st) {
+      st = st || {};
+      var e = st.email || {};
+      var m = st.metadata || {};
+      var parts = [];
+      if (e.seeded != null || e.skipped != null) {
+        parts.push(L_SEED_BODIES + ': ' + (e.seeded != null ? e.seeded : '0') + ' ' + L_SEED_UPD + ', ' + (e.skipped != null ? e.skipped : '0') + ' ' + L_SEED_LEFT);
+      }
+      if (m.seeded != null || m.skipped != null) {
+        parts.push(L_SEED_PREFILL + ': ' + (m.seeded != null ? m.seeded : '0') + ' ' + L_SEED_UPD + ', ' + (m.skipped != null ? m.skipped : '0') + ' ' + L_SEED_LEFT);
+      }
+      return parts.join(' — ');
+    }
+
+    function doSeed(force, activeBtn) {
+      if (force && !window.confirm(MSG_SEED_CONFIRM_FORCE)) return;
+      setBusy(true, activeBtn);
+      var headers = {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfForEmailPreview()
+      };
+      ((window.getFetch && window.getFetch()) || fetch)(EMAIL_SEED_URL, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ force: !!force })
+      }).then(function (resp) {
+        return resp.json().then(function (payload) {
+          return { ok: resp.ok, status: resp.status, payload: payload || {} };
+        });
+      }).then(function (r) {
+        setBusy(false);
+        if (r.ok && r.payload && r.payload.success) {
+          var line = describeSeedStats(r.payload.stats) || {{ _('Seeding completed.') | tojson }};
+          if (window.showAlert) {
+            window.showAlert(line, 'success', null, function () { window.location.reload(); });
+          } else {
+            window.location.reload();
+          }
+          return;
+        }
+        var err = (r.payload && (r.payload.message || r.payload.error)) ? (r.payload.message || r.payload.error) : ({{ _('Seeding failed') | tojson }} + (r.status ? ' (' + r.status + ')' : ''));
+        if (window.showAlert) window.showAlert(String(err), 'error');
+        else if (window.__clientWarn) window.__clientWarn(String(err));
+      }).catch(function () {
+        setBusy(false);
+        if (window.showAlert) window.showAlert({{ _('Network error while seeding templates.') | tojson }}, 'error');
+      });
+    }
+    gapsBtn.addEventListener('click', function () { doSeed(false, gapsBtn); });
+    forceBtn.addEventListener('click', function () { doSeed(true, forceBtn); });
+  })();
 
   /* ── Sync in-memory data → hidden inputs on form submit ── */
   var form = document.getElementById('manage-settings-form');
@@ -1930,9 +2645,12 @@
     });
   }
 
-  /* ── Variable insertion ── */
+  /* ── Variable insertion (switch to edit if preview is showing) ── */
   document.querySelectorAll('.insert-variable-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
+      if (emailTemplateViewMode === 'preview') {
+        setEmailTemplateViewMode('edit');
+      }
       var variable = this.getAttribute('data-variable');
       var targetId = this.getAttribute('data-target');
       var textarea = document.getElementById(targetId);
@@ -1944,6 +2662,7 @@
       textarea.focus();
       textarea.setSelectionRange(start + variable.length, start + variable.length);
       emailTemplatesDirty = true;
+      updateEmailTemplateSyntaxHighlight(textarea);
     });
   });
 })();

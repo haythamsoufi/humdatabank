@@ -476,9 +476,10 @@ const ALERT_TITLES = { error: 'Error', warning: 'Warning', success: 'Success', i
  * Show a blocking alert dialog (replaces native alert)
  * @param {string} message - The message to display
  * @param {string} type - Type of alert: 'info', 'warning', 'error', 'success' (default: 'info')
- * @param {string} title - Optional title for the dialog
+ * @param {string|null} title - Optional title for the dialog
+ * @param {function|null} onClose - Optional callback when the user clicks OK (after the modal closes)
  */
-function showAlert(message, type = 'info', title = null) {
+function showAlert(message, type = 'info', title = null, onClose = null) {
     const iconType = ALERT_ICON_TYPES[type] || 'info';
     const alertTitle = title || ALERT_TITLES[type] || 'Information';
 
@@ -512,6 +513,13 @@ function showAlert(message, type = 'info', title = null) {
         e.preventDefault();
         e.stopPropagation();
         closeModal();
+        if (typeof onClose === 'function') {
+            try {
+                onClose();
+            } catch (err) {
+                console.error('showAlert onClose error:', err);
+            }
+        }
     });
 
     setTimeout(() => okBtn.focus(), 100);

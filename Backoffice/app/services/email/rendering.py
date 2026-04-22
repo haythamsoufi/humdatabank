@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional
 
 import bleach
 from jinja2.sandbox import SandboxedEnvironment
@@ -93,8 +93,8 @@ _ALLOWED_TAGS = list({
     'wbr',
 })
 
-# Protocols permitted in href / src attributes.
-_SAFE_PROTOCOLS = {'http', 'https', 'mailto', 'tel'}
+# Protocols permitted in href / src attributes (must match bleach.clean(protocols=...)).
+_SAFE_PROTOCOLS = ('http', 'https', 'mailto', 'tel')
 
 # Attribute names that carry URLs and must be protocol-checked.
 _URL_ATTRS = frozenset({'href', 'src', 'action', 'formaction', 'data'})
@@ -103,9 +103,14 @@ _URL_ATTRS = frozenset({'href', 'src', 'action', 'formaction', 'data'})
 def _allow_attr(tag: str, name: str, value: str) -> bool:
     """Bleach attribute callback – blocks event handlers and unsafe URLs."""
     name_lower = name.lower()
+    tag_lower = (tag or "").lower()
 
     # Block all event-handler attributes (onclick, onload, onmouseover …)
     if name_lower.startswith('on'):
+        return False
+
+    # Meta refresh / client redirect vectors in HTML email (webmail may interpret these).
+    if tag_lower == 'meta' and name_lower == 'http-equiv':
         return False
 
     # Block javascript: / vbscript: / data: URLs in link/resource attributes.
@@ -120,6 +125,47 @@ def _allow_attr(tag: str, name: str, value: str) -> bool:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+def render_admin_email_template_for_preview(
+    template_str: str, **context: Any
+) -> tuple[Optional[str], Optional[str]]:
+    """Render an admin email template and return (sanitised_html, error_message).
+
+    Unlike :func:`render_admin_email_template`, Jinja and sanitization failures
+    are returned to the caller for display in the settings UI instead of
+    logging only. Used by the email template preview endpoint.
+    """
+    if not template_str or not str(template_str).strip():
+        return None, "Template is empty for this language."
+
+    try:
+        tmpl = _sandbox.from_string(template_str)
+        rendered = tmpl.render(**context)
+    except Exception as e:
+        logger.info("Admin email template preview: render failed: %s", e)
+        return None, str(e) or "Template render failed"
+
+    if not (rendered or "").strip():
+        return None, "Template rendered to empty output."
+
+    try:
+        cleaned = bleach.clean(
+            rendered,
+            tags=_ALLOWED_TAGS,
+            attributes=_allow_attr,
+            protocols=_SAFE_PROTOCOLS,
+            strip=True,
+            strip_comments=False,
+        )
+    except Exception as e:
+        logger.info("Admin email template preview: sanitization failed: %s", e)
+        return None, f"HTML sanitization failed: {e}"
+
+    if not (cleaned or "").strip():
+        return None, "Output was empty after sanitization."
+
+    return cleaned, None
+
 
 def render_admin_email_template(template_str: str, **context: Any) -> str:
     """Render an admin-provided Jinja2 email template safely.
@@ -159,6 +205,7 @@ def render_admin_email_template(template_str: str, **context: Any) -> str:
             rendered,
             tags=_ALLOWED_TAGS,
             attributes=_allow_attr,
+            protocols=_SAFE_PROTOCOLS,
             strip=True,
             strip_comments=False,
         )

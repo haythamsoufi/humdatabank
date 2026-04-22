@@ -15,8 +15,8 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/home_landing/fdrs_world_map.dart';
 import '../../widgets/home_landing/world_geojson_cache.dart';
 
-/// Choropleth of country participation in unified planning documents across the
-/// year × document-type (round) slots implied by the current filters.
+/// Choropleth of how many filtered year + document-type combinations each
+/// country has published.
 class UnifiedPlanningParticipationMapScreen extends StatefulWidget {
   const UnifiedPlanningParticipationMapScreen({
     super.key,
@@ -355,21 +355,11 @@ class _UnifiedPlanningParticipationMapScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-            child: Text(
-              loc.unifiedPlanningParticipationMapHint,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: context.textSecondaryColor,
-                height: 1.35,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(
               children: [
                 Icon(
-                  Icons.grid_on_rounded,
+                  Icons.filter_alt_outlined,
                   size: 18,
                   color: theme.colorScheme.primary,
                 ),
@@ -415,7 +405,7 @@ class _UnifiedPlanningParticipationMapScreenState
                     choroplethPolygons: polys,
                     initialFit: initialFit,
                     maxZoom: 22,
-                    polygonSimplification: 0.35,
+                    polygonSimplification: 0,
                     onCountryIso2Tapped: (iso2) => _onCountryTap(
                       context,
                       loc: loc,

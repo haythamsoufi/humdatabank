@@ -614,7 +614,7 @@ class _FdrsOverviewMapState extends State<FdrsOverviewMap> {
               : PolygonLayer<String>(
                   hitNotifier: _hitNotifier,
                   simplificationTolerance: widget.polygonSimplification,
-                  drawInSingleWorld: true,
+                  drawInSingleWorld: false,
                   polygons: widget.choroplethPolygons,
                   drawLabelsLast: false,
                   polygonLabels: false,

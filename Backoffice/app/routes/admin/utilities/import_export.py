@@ -336,7 +336,6 @@ def _process_indicator_import(file_path):
                         is_active = _to_bool(r.get("is_active"))
                         icon_class = (r.get("icon_class") or None)
                         logo_filename = (r.get("logo_filename") or None)
-                        logo_path = (r.get("logo_path") or None)
                         name_translations = _to_json_dict(r.get("name_translations_json")) or {}
 
                         if record_type == "sector":
@@ -358,7 +357,6 @@ def _process_indicator_import(file_path):
                                 obj.is_active = is_active
                             obj.icon_class = icon_class
                             obj.logo_filename = logo_filename
-                            obj.logo_path = logo_path
                             obj.name_translations = name_translations or {}
                             if is_new:
                                 result["sectors_imported"] += 1
@@ -386,7 +384,6 @@ def _process_indicator_import(file_path):
                                 obj.is_active = is_active
                             obj.icon_class = icon_class
                             obj.logo_filename = logo_filename
-                            obj.logo_path = logo_path
                             obj.name_translations = name_translations or {}
                             if is_new:
                                 result["subsectors_imported"] += 1

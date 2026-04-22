@@ -936,7 +936,7 @@ def export_indicators():
         db_ss_headers = [
             "record_type", "id", "name", "description", "sector_id",
             "display_order", "is_active", "icon_class", "logo_filename",
-            "logo_path", "name_translations_json", "created_at", "updated_at",
+            "name_translations_json", "created_at", "updated_at",
         ]
         for col, header in enumerate(db_ss_headers, 1):
             cell = ws_db_ss.cell(row=1, column=col, value=header)
@@ -954,10 +954,9 @@ def export_indicators():
             ws_db_ss.cell(row=ss_row, column=7, value=s.is_active)
             ws_db_ss.cell(row=ss_row, column=8, value=s.icon_class)
             ws_db_ss.cell(row=ss_row, column=9, value=s.logo_filename)
-            ws_db_ss.cell(row=ss_row, column=10, value=s.logo_path)
-            ws_db_ss.cell(row=ss_row, column=11, value=_json_dump(s.name_translations or {}))
-            ws_db_ss.cell(row=ss_row, column=12, value=s.created_at.isoformat() if getattr(s, "created_at", None) else "")
-            ws_db_ss.cell(row=ss_row, column=13, value=s.updated_at.isoformat() if getattr(s, "updated_at", None) else "")
+            ws_db_ss.cell(row=ss_row, column=10, value=_json_dump(s.name_translations or {}))
+            ws_db_ss.cell(row=ss_row, column=11, value=s.created_at.isoformat() if getattr(s, "created_at", None) else "")
+            ws_db_ss.cell(row=ss_row, column=12, value=s.updated_at.isoformat() if getattr(s, "updated_at", None) else "")
             ss_row += 1
 
         all_subsectors = SubSector.query.order_by(SubSector.display_order, SubSector.name).all()
@@ -971,10 +970,9 @@ def export_indicators():
             ws_db_ss.cell(row=ss_row, column=7, value=ss.is_active)
             ws_db_ss.cell(row=ss_row, column=8, value=ss.icon_class)
             ws_db_ss.cell(row=ss_row, column=9, value=ss.logo_filename)
-            ws_db_ss.cell(row=ss_row, column=10, value=ss.logo_path)
-            ws_db_ss.cell(row=ss_row, column=11, value=_json_dump(ss.name_translations or {}))
-            ws_db_ss.cell(row=ss_row, column=12, value=ss.created_at.isoformat() if getattr(ss, "created_at", None) else "")
-            ws_db_ss.cell(row=ss_row, column=13, value=ss.updated_at.isoformat() if getattr(ss, "updated_at", None) else "")
+            ws_db_ss.cell(row=ss_row, column=10, value=_json_dump(ss.name_translations or {}))
+            ws_db_ss.cell(row=ss_row, column=11, value=ss.created_at.isoformat() if getattr(ss, "created_at", None) else "")
+            ws_db_ss.cell(row=ss_row, column=12, value=ss.updated_at.isoformat() if getattr(ss, "updated_at", None) else "")
             ss_row += 1
 
         ws_db_cw = wb.create_sheet(title="DB_CommonWords")

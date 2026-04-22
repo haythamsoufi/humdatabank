@@ -247,7 +247,6 @@ def save_system_logo(file_storage, item_name: str, item_type: str, is_sector: bo
     Raises:
         ValueError: If the file type is not allowed or file is too large.
     """
-    import uuid
     from werkzeug.utils import secure_filename
 
     if not file_storage or not file_storage.filename:
@@ -270,9 +269,11 @@ def save_system_logo(file_storage, item_name: str, item_type: str, is_sector: bo
             f"Logo file is too large ({file_size // 1024}KB). Maximum size is {_MAX_LOGO_SIZE_BYTES // (1024*1024)}MB."
         )
 
-    unique_filename = f"{secure_filename(item_name)}_{item_type}_{uuid.uuid4().hex[:8]}{ext}"
+    # Deterministic name: one file per item; sector/subsector names are unique in the DB.
+    # Edit flow deletes the previous file before saving a new upload.
+    stored_filename = f"{secure_filename(item_name)}_{item_type}{ext}"
 
     from app.services import storage_service as _ss
     sub = "sectors" if is_sector else "subsectors"
-    _ss.upload(_ss.SYSTEM, f"{sub}/{unique_filename}", file_storage)
-    return unique_filename
+    _ss.upload(_ss.SYSTEM, f"{sub}/{stored_filename}", file_storage)
+    return stored_filename

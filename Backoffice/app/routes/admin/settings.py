@@ -1397,8 +1397,8 @@ def _message_for_email_test_send_failure(failure: list) -> str:
         if not raw:
             return ""
         s = " ".join(str(raw).replace("\r", " ").split())
-        if len(s) > 500:
-            s = s[:500] + "…"
+        if len(s) > 900:
+            s = s[:900] + "…"
         return f" Mail service response: {s}"
 
     if not failure:
@@ -1431,6 +1431,24 @@ def _message_for_email_test_send_failure(failure: list) -> str:
         "The test email was not sent. See application logs for the mail service response, "
         "and verify EMAIL_API_KEY, EMAIL_API_URL, and MAIL_DEFAULT_SENDER."
     )
+
+
+def _response_for_email_test_send_failure(failure: list, msg: str):
+    """
+    Avoid returning HTTP 500 for upstream mail API errors: those are not application bugs.
+
+    - 502: mail provider reachable but rejected the request (e.g. HTTP 400 from IFRC API).
+    - 503: outbound email not configured in this environment.
+    - 400: client-side constraints (allowlist, empty body, no recipients).
+    """
+    code = (failure[0] or {}).get("code") if failure else None
+    if code in ("email_api_http_error", "email_api_request_error"):
+        return json_error(msg, 502)
+    if code in ("no_default_sender", "no_email_api_key", "no_email_api_url"):
+        return json_error(msg, 503)
+    if code in ("recipient_allowlist", "empty_email_body", "no_recipients"):
+        return json_bad_request(msg)
+    return json_server_error(msg)
 
 
 @bp.route("/api/settings/email-template-test-send", methods=["POST"])
@@ -1504,7 +1522,7 @@ def api_settings_email_template_test_send():
             failure,
             msg,
         )
-        return json_server_error(msg)
+        return _response_for_email_test_send_failure(failure, msg)
 
     current_app.logger.info(
         "Test email sent for template %s (%s) to user id %s",

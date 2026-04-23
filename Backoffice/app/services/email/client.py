@@ -67,6 +67,36 @@ def _ifrc_envelope_to_cc_bcc(
     return noreply, "", ""
 
 
+def _ifrc_http_error_diag(
+    resp: "requests.Response",
+    payload: dict,
+    body_b64: str,
+    raw_html: str,
+    is_single_in_to: bool,
+    recipients: List[str],
+    cc: List[str],
+    bcc: List[str],
+) -> str:
+    """Safe, no-secrets diagnostic line for IFRC Email API HTTP errors (logs + admin UI)."""
+    try:
+        approx_json = len(json.dumps(payload, ensure_ascii=False))
+    except Exception:
+        approx_json = -1
+    html_bytes = len(raw_html.encode("utf-8"))
+    hdr_id = ""
+    for hk in ("X-Request-Id", "X-Correlation-Id", "Request-Id"):
+        v = resp.headers.get(hk)
+        if v:
+            hdr_id = f" {hk}={str(v)[:64]}"
+            break
+    return (
+        f"diag: status={resp.status_code} body_b64_chars={len(body_b64)} "
+        f"html_utf8_bytes={html_bytes} json_post_approx={approx_json} "
+        f"single_to={is_single_in_to} to_n={len(recipients)} cc_n={len(cc)} bcc_n={len(bcc)}"
+        f"{hdr_id}"
+    )
+
+
 def send_email(
     subject: str,
     recipients: Iterable[str],
@@ -243,19 +273,21 @@ def _send_via_ifrc(
         return False
 
     body_b64 = _b64_utf8(raw_html)
+    # IFRC gateway examples (and scripts/test_email.py) always send Cc/Bcc keys; some
+    # environments reject payloads when these properties are omitted entirely.
+    cc_b64 = _b64_utf8(out_cc) if (out_cc and out_cc.strip()) else ""
+    bcc_b64 = _b64_utf8(out_bcc) if (out_bcc and out_bcc.strip()) else ""
     payload: dict = {
         "FromAsBase64": _b64_utf8(sender),
         "ToAsBase64": _b64_utf8(to_addr),
+        "CcAsBase64": cc_b64,
+        "BccAsBase64": bcc_b64,
         "SubjectAsBase64": _b64_utf8(subject),
         "BodyAsBase64": body_b64,
         "IsBodyHtml": True,
         "TemplateName": "",
         "TemplateLanguage": "",
     }
-    if out_cc and out_cc.strip():
-        payload["CcAsBase64"] = _b64_utf8(out_cc)
-    if out_bcc and out_bcc.strip():
-        payload["BccAsBase64"] = _b64_utf8(out_bcc)
 
     # Add attachments if supported by the API (optional; API may use AttachmentsAsBase64 or similar)
     if attachments:
@@ -347,33 +379,37 @@ def _send_via_ifrc(
                 f"Check API key permissions. Response: {error_message}"
             )
         elif resp.status_code == 400:
-            try:
-                approx_json = len(json.dumps(payload, ensure_ascii=False))
-            except Exception:
-                approx_json = -1
             current_app.logger.error(
-                "Email API bad request (400) for %s. Response: %s. "
-                "Diagnostic (no secrets): approx_json_len=%s body_b64_len=%s "
-                "envelope_single_to=%s recipients_n=%s cc_n=%s bcc_n=%s has_keys=%s",
+                "Email API bad request (400) for %s. Response: %s. %s. payload_keys=%s",
                 safe_url,
                 error_message,
-                approx_json,
-                len((payload.get("BodyAsBase64") or "")),
-                is_single_in_to,
-                len(recipients),
-                len(cc),
-                len(bcc),
+                _ifrc_http_error_diag(
+                    resp, payload, body_b64, raw_html, is_single_in_to, recipients, cc, bcc
+                ),
                 sorted(payload.keys()),
             )
         else:
             current_app.logger.error(
-                f"Email API error {resp.status_code} for {safe_url}. Response: {error_message}"
+                "Email API error %s for %s. Response: %s. %s",
+                resp.status_code,
+                safe_url,
+                error_message,
+                _ifrc_http_error_diag(
+                    resp, payload, body_b64, raw_html, is_single_in_to, recipients, cc, bcc
+                ),
             )
 
         if _failure_info is not None:
             fail: dict = {"code": "email_api_http_error", "http_status": resp.status_code}
-            if error_excerpt_full:
-                fail["response_excerpt"] = error_excerpt_full
+            diag = _ifrc_http_error_diag(
+                resp, payload, body_b64, raw_html, is_single_in_to, recipients, cc, bcc
+            )
+            excerpt = (error_excerpt_full or "").strip()
+            if not excerpt or excerpt == "No response body":
+                excerpt = f"No response body. {diag}"
+            else:
+                excerpt = f"{excerpt} | {diag}"
+            fail["response_excerpt"] = excerpt
             _failure_info.append(fail)
         return False
     except Exception as e:

@@ -101,7 +101,8 @@ def send_email(
         attachments: Optional list of (filename, content_bytes, content_type) to attach.
         _failure_info: If provided, a single failure dict is appended on False returns
         (``code`` one of: no_recipients, no_default_sender, recipient_allowlist, no_email_api_key,
-        no_email_api_url, email_api_http_error, email_api_request_error; ``http_status`` for HTTP cases).
+        no_email_api_url, email_api_http_error, email_api_request_error; ``http_status`` and optional
+        ``response_excerpt`` for HTTP error cases).
 
     Returns:
         True if email was sent successfully, False otherwise
@@ -318,18 +319,23 @@ def _send_via_ifrc(
         ))
 
         t = resp.text
+        error_excerpt_full = ""
         if t is not None and str(t).strip():
-            error_message = str(t)[:200]
+            error_excerpt_full = str(t)[:2000]
+            error_message = error_excerpt_full[:200]
         else:
             # Some gateways return 400 with empty text; try raw bytes for triage
             try:
                 raw = (resp.content or b"")[:500]
                 if raw:
-                    error_message = f"(body empty as text, raw len={len(raw)} repr={raw!r})"
+                    error_excerpt_full = f"(body empty as text, raw len={len(raw)} repr={raw!r})"[:2000]
+                    error_message = error_excerpt_full[:200]
                 else:
                     error_message = "No response body"
+                    error_excerpt_full = error_message
             except Exception:
                 error_message = "No response body"
+                error_excerpt_full = error_message
         if resp.status_code == 401:
             current_app.logger.error(
                 f"Email API authentication failed (401) for {safe_url}. "
@@ -365,7 +371,10 @@ def _send_via_ifrc(
             )
 
         if _failure_info is not None:
-            _failure_info.append({"code": "email_api_http_error", "http_status": resp.status_code})
+            fail: dict = {"code": "email_api_http_error", "http_status": resp.status_code}
+            if error_excerpt_full:
+                fail["response_excerpt"] = error_excerpt_full
+            _failure_info.append(fail)
         return False
     except Exception as e:
         current_app.logger.error(

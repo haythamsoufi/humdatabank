@@ -2069,6 +2069,20 @@
   var L_SEED_UPD = {{ _('updated from defaults') | tojson }};
   var L_SEED_LEFT = {{ _('left unchanged') | tojson }};
   var emailTemplateViewMode = 'edit';
+  /** Temporary: set false when finished — logs preview / test-send / seed API request + response in the browser console. */
+  var DEBUG_EMAIL_SETTINGS_API = true;
+  function _debugEmailSettingsApi(phase, info) {
+    if (!DEBUG_EMAIL_SETTINGS_API) return;
+    try {
+      console.log('[email-settings API]', phase, info);
+    } catch (_) {}
+  }
+  try {
+    window.setDebugEmailSettingsApi = function (v) {
+      DEBUG_EMAIL_SETTINGS_API = v !== false && v !== '0';
+      return DEBUG_EMAIL_SETTINGS_API;
+    };
+  } catch (_) {}
   var MSG_EMAIL_AUTOTRANS_EN_EMPTY = {{ _('The English version of this template is empty. Add or save English text first, then try again.') | tojson }};
   var MSG_TEST_EMAIL_NO_ADDR = {{ _('Your user account has no email address. Add one in your profile, then try again.') | tojson }};
   var MSG_TEST_EMAIL_SENT = {{ _('Test email sent to') | tojson }};
@@ -2220,6 +2234,13 @@
     var previewLang = (textarea && textarea.dataset && textarea.dataset.currentLang)
       ? String(textarea.dataset.currentLang).trim()
       : 'en';
+    _debugEmailSettingsApi('preview request', {
+      url: EMAIL_PREVIEW_URL,
+      template_key: templateKey,
+      template_language: previewLang,
+      html_len: trimmed.length,
+      html_b64_len: b64.length
+    });
     /* CSRF-only fetch: 400 template errors return JSON without throwing (not apiFetch). */
     ((window.getFetch && window.getFetch()) || fetch)(EMAIL_PREVIEW_URL, {
       method: 'POST',
@@ -2233,8 +2254,18 @@
         return { ok: resp.ok, status: resp.status, payload: payload };
       });
     }).then(function (result) {
-      loading.classList.add('hidden');
       var payload = result.payload || {};
+      _debugEmailSettingsApi('preview response', {
+        ok: result.ok,
+        status: result.status,
+        success: payload.success,
+        has_html: typeof payload.html === 'string' && payload.html.length > 0,
+        html_len: typeof payload.html === 'string' ? payload.html.length : 0,
+        error: payload.error,
+        message: payload.message,
+        payload: payload
+      });
+      loading.classList.add('hidden');
       if (result.ok && payload.success && typeof payload.html === 'string' && payload.html.trim()) {
         frame.srcdoc = applyRtlToEmailPreviewSrcdoc(payload.html, previewLang);
         return;
@@ -2243,7 +2274,8 @@
       var msg = errMsg || ({{ _('Preview failed.') | tojson }} + ' (' + result.status + ')');
       errEl.textContent = msg;
       errEl.classList.remove('hidden');
-    }).catch(function () {
+    }).catch(function (err) {
+      _debugEmailSettingsApi('preview error', { name: err && err.name, message: err && err.message });
       loading.classList.add('hidden');
       errEl.textContent = {{ _('Network error while loading preview.') | tojson }};
       errEl.classList.remove('hidden');
@@ -2521,6 +2553,15 @@
       btn.disabled = true;
 
       var csrf = getCsrfForEmailPreview();
+      var testBody = { template_key: templateKey, html_b64: b64, template_language: lang };
+      _debugEmailSettingsApi('test-send request', {
+        url: EMAIL_TEST_SEND_URL,
+        template_key: templateKey,
+        template_language: lang,
+        html_len: trimmed.length,
+        html_b64_len: b64.length,
+        body_json_len: (function () { try { return JSON.stringify(testBody).length; } catch (e) { return -1; } })()
+      });
       ((window.getFetch && window.getFetch()) || fetch)(EMAIL_TEST_SEND_URL, {
         method: 'POST',
         headers: {
@@ -2528,12 +2569,22 @@
           'X-CSRFToken': csrf,
           'X-Requested-With': 'XMLHttpRequest'
         },
-        body: JSON.stringify({ template_key: templateKey, html_b64: b64, template_language: lang })
+        body: JSON.stringify(testBody)
       }).then(function (resp) {
         return resp.json().then(function (payload) { return { ok: resp.ok, status: resp.status, payload: payload }; });
       }).then(function (result) {
-        restoreTestBtn();
         var p = result.payload || {};
+        _debugEmailSettingsApi('test-send response', {
+          ok: result.ok,
+          httpStatus: result.status,
+          success: p.success,
+          sent_to: p.sent_to,
+          subject: p.subject,
+          error: p.error,
+          message: p.message,
+          payload: p
+        });
+        restoreTestBtn();
         if (result.ok && p.success) {
           var to = p.sent_to || '';
           if (window.showAlert) {
@@ -2544,7 +2595,8 @@
         var errMsg = (p && (p.error || p.message)) ? (p.error || p.message) : (MSG_TEST_EMAIL_FAIL + (result.status ? ' (' + result.status + ')' : ''));
         if (window.showAlert) window.showAlert(errMsg, 'error');
         else if (window.__clientWarn) window.__clientWarn(errMsg);
-      }).catch(function () {
+      }).catch(function (err) {
+        _debugEmailSettingsApi('test-send error', { name: err && err.name, message: err && err.message });
         restoreTestBtn();
         if (window.showAlert) window.showAlert({{ _('Network error while sending test email.') | tojson }}, 'error');
       });
@@ -2590,6 +2642,7 @@
         'Content-Type': 'application/json',
         'X-CSRFToken': getCsrfForEmailPreview()
       };
+      _debugEmailSettingsApi('seed request', { url: EMAIL_SEED_URL, force: !!force });
       ((window.getFetch && window.getFetch()) || fetch)(EMAIL_SEED_URL, {
         method: 'POST',
         headers: headers,
@@ -2599,6 +2652,7 @@
           return { ok: resp.ok, status: resp.status, payload: payload || {} };
         });
       }).then(function (r) {
+        _debugEmailSettingsApi('seed response', { ok: r.ok, status: r.status, success: r.payload && r.payload.success, payload: r.payload || {} });
         setBusy(false);
         if (r.ok && r.payload && r.payload.success) {
           var line = describeSeedStats(r.payload.stats) || {{ _('Seeding completed.') | tojson }};
@@ -2612,7 +2666,8 @@
         var err = (r.payload && (r.payload.message || r.payload.error)) ? (r.payload.message || r.payload.error) : ({{ _('Seeding failed') | tojson }} + (r.status ? ' (' + r.status + ')' : ''));
         if (window.showAlert) window.showAlert(String(err), 'error');
         else if (window.__clientWarn) window.__clientWarn(String(err));
-      }).catch(function () {
+      }).catch(function (err) {
+        _debugEmailSettingsApi('seed error', { name: err && err.name, message: err && err.message });
         setBusy(false);
         if (window.showAlert) window.showAlert({{ _('Network error while seeding templates.') | tojson }}, 'error');
       });

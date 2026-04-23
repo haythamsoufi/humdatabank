@@ -1392,6 +1392,15 @@ _EMAIL_TEST_SEND_FAILURE_MESSAGES = {
 
 
 def _message_for_email_test_send_failure(failure: list) -> str:
+    def _api_detail_suffix() -> str:
+        raw = (failure[0] or {}).get("response_excerpt") if failure else None
+        if not raw:
+            return ""
+        s = " ".join(str(raw).replace("\r", " ").split())
+        if len(s) > 500:
+            s = s[:500] + "…"
+        return f" Mail service response: {s}"
+
     if not failure:
         return (
             "The test email was not sent. See application logs for the mail service response, "
@@ -1403,13 +1412,21 @@ def _message_for_email_test_send_failure(failure: list) -> str:
     if code == "email_api_http_error":
         status = (failure[0] or {}).get("http_status")
         if status == 401:
-            return "The email API returned HTTP 401. Verify that EMAIL_API_KEY is correct in this environment."
+            return (
+                "The email API returned HTTP 401. Verify that EMAIL_API_KEY is correct in this environment."
+            ) + _api_detail_suffix()
         if status == 403:
-            return "The email API returned HTTP 403. Check that the API key is allowed to send."
+            return (
+                "The email API returned HTTP 403. Check that the API key is allowed to send."
+            ) + _api_detail_suffix()
         if status == 400:
-            return "The email API returned HTTP 400 (rejected the payload). Check application logs for details."
+            return (
+                "The email API returned HTTP 400 (rejected the payload). Check application logs for details."
+            ) + _api_detail_suffix()
         if status is not None:
-            return f"The email API returned HTTP {status}. Check application logs for the response body."
+            return (
+                f"The email API returned HTTP {status}. Check application logs for the response body."
+            ) + _api_detail_suffix()
     return (
         "The test email was not sent. See application logs for the mail service response, "
         "and verify EMAIL_API_KEY, EMAIL_API_URL, and MAIL_DEFAULT_SENDER."

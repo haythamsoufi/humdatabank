@@ -1420,9 +1420,17 @@ def _message_for_email_test_send_failure(failure: list) -> str:
                 "The email API returned HTTP 403. Check that the API key is allowed to send."
             ) + _api_detail_suffix()
         if status == 400:
-            return (
+            msg = (
                 "The email API returned HTTP 400 (rejected the payload). Check application logs for details."
             ) + _api_detail_suffix()
+            nbytes = (failure[0] or {}).get("html_utf8_bytes")
+            if isinstance(nbytes, int) and nbytes > 4096:
+                msg += (
+                    f" Your HTML body is {nbytes} bytes (UTF-8). Some mail gateways return HTTP 400 with "
+                    "no response body when the message exceeds a 4KB limit—try shortening the template "
+                    "(especially CSS in <style>) or ask the mail API team to confirm the maximum body size."
+                )
+            return msg
         if status is not None:
             return (
                 f"The email API returned HTTP {status}. Check application logs for the response body."

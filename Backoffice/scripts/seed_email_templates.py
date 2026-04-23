@@ -51,36 +51,7 @@ DEFAULT_EMAIL_TEMPLATES = {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Indicator Suggestion Confirmation</title>
-    <style>
-        body { margin: 0; padding: 0; background: #eef2f7; color: #1f2937;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-          line-height: 1.65; -webkit-font-smoothing: antialiased; }
-        .email-outer { max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }
-        .email-card { background: #ffffff; border: 1px solid #e2e8f0; }
-        .email-header { background: #0d9488; color: #ffffff; padding: 32px 40px; text-align: center; }
-        .email-header h1 { margin: 0 0 8px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
-        .email-header h2 { margin: 0; font-size: 18px; font-weight: 500; opacity: 0.95; }
-        .email-body { padding: 36px 40px 32px; background: #ffffff; }
-        .email-body p { margin: 0 0 16px; }
-        .email-body ul { margin: 8px 0 0; padding-left: 22px; }
-        .email-body li { margin: 8px 0; }
-        .email-footer { padding: 22px 40px; text-align: center; font-size: 12px; color: #64748b;
-          background: #f8fafc; border-top: 1px solid #e2e8f0; }
-        .email-footer p { margin: 6px 0; }
-        .highlight { background: #f0fdfa; border: 1px solid #99f6e4; border-left: 4px solid #0d9488;
-          padding: 20px 22px; margin: 22px 0; font-size: 14px; }
-        .details { background: #f8fafc; border: 1px solid #e2e8f0; padding: 22px 24px; margin: 20px 0; }
-        .details h3 { margin: 0 0 14px; font-size: 17px; color: #0f172a; font-weight: 600; }
-        .comparison-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
-        .comparison-table th, .comparison-table td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; }
-        .comparison-table th { background: #f1f5f9; font-weight: 600; color: #334155; }
-        .unchanged { color: #64748b; }
-        .changed { background: #fffbeb; font-weight: 600; color: #92400e; }
-        .new-indicator-list { list-style: none; padding: 0; margin: 0; }
-        .new-indicator-list li { padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
-        .new-indicator-list li:last-child { border-bottom: none; }
-        .new-indicator-list strong { color: #0d9488; }
-    </style>
+    <style>body{margin:0;padding:0;background:#eef2f7;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.65;-webkit-font-smoothing:antialiased}.email-outer{max-width:960px;width:100%;margin:0 auto;padding:28px 20px;box-sizing:border-box}.email-card{background:#fff;border:1px solid #e2e8f0}.email-header{background:#0d9488;color:#fff;padding:32px 40px;text-align:center}.email-header h1{margin:0 0 8px;font-size:26px;font-weight:600;letter-spacing:-.02em}.email-header h2{margin:0;font-size:18px;font-weight:500;opacity:.95}.email-body{padding:36px 40px 32px;background:#fff}.email-body p{margin:0 0 16px}.email-body ul{margin:8px 0 0;padding-left:22px}.email-body li{margin:8px 0}.email-footer{padding:22px 40px;text-align:center;font-size:12px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0}.email-footer p{margin:6px 0}.highlight{background:#f0fdfa;border:1px solid #99f6e4;border-left:4px solid #0d9488;padding:20px 22px;margin:22px 0;font-size:14px}.details{background:#f8fafc;border:1px solid #e2e8f0;padding:22px 24px;margin:20px 0}.details h3{margin:0 0 14px;font-size:17px;color:#0f172a;font-weight:600}.comparison-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}.comparison-table th,.comparison-table td{border:1px solid #e2e8f0;padding:10px 12px;text-align:left}.comparison-table th{background:#f1f5f9;font-weight:600;color:#334155}.unchanged{color:#64748b}.changed{background:#fffbeb;font-weight:600;color:#92400e}.new-indicator-list{list-style:none;padding:0;margin:0}.new-indicator-list li{padding:10px 0;border-bottom:1px solid #e2e8f0}.new-indicator-list li:last-child{border-bottom:none}.new-indicator-list strong{color:#0d9488}</style>
 </head>
 <body>
     <div class="email-outer">

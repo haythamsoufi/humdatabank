@@ -253,7 +253,8 @@ def _send_via_ifrc(
     # Dummy / organizational "To" in the API envelope; real delivery in Cc/Bcc
     fixed_to_address = (current_app.config.get("MAIL_NOREPLY_SENDER") or sender or "").strip() or sender
 
-    raw_html = (html or "").strip()
+    # Drop NULs (some DB/editor paths inject them; gateways may reject the JSON or body).
+    raw_html = (html or "").strip().replace("\x00", "")
     if not raw_html:
         current_app.logger.warning("send via IFRC: empty HTML body after strip, aborting")
         if _failure_info is not None:
@@ -410,6 +411,7 @@ def _send_via_ifrc(
             else:
                 excerpt = f"{excerpt} | {diag}"
             fail["response_excerpt"] = excerpt
+            fail["html_utf8_bytes"] = len(raw_html.encode("utf-8"))
             _failure_info.append(fail)
         return False
     except Exception as e:

@@ -147,6 +147,8 @@ void main() async {
   // Wait for critical services to initialize
   await Future.wait(initFutures);
   await migrateLegacySharedPreferencesKeys(sl<StorageService>());
+  final initialThemeMode =
+      await ThemeProvider.loadInitialModeFromStorage(sl<StorageService>());
   performanceService.endInit('critical_services');
 
   await LauncherShortcutsService.install();
@@ -205,19 +207,19 @@ void main() async {
                   : (AppConfig.isProduction ? 'production' : 'development');
         },
         appRunner: () {
-          runApp(const MyApp());
+          runApp(MyApp(initialThemeMode: initialThemeMode));
         },
       );
     } catch (e) {
       // Sentry initialization failed - run app without it
       DebugLogger.logError('Failed to initialize Sentry: $e');
       DebugLogger.logInfo('INIT', 'Running app without Sentry');
-      runApp(const MyApp());
+      runApp(MyApp(initialThemeMode: initialThemeMode));
     }
   } else {
     // Run app without Sentry if DSN is not configured
     DebugLogger.logInfo('INIT', 'Sentry disabled (DSN not configured)');
-    runApp(const MyApp());
+    runApp(MyApp(initialThemeMode: initialThemeMode));
   }
 }
 
@@ -239,7 +241,11 @@ Future<Map<String, String>> _languageHeaderInterceptor(
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.initialThemeMode});
+
+  /// From [ThemeProvider.loadInitialModeFromStorage] before [runApp] so the
+  /// first [MaterialApp] frame matches the saved light/dark/system choice.
+  final String initialThemeMode;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -271,7 +277,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // Refresh session in background
       // Get auth provider from context if available, otherwise use service directly
       final authService = AuthService();
-      authService.refreshSession().then((success) {
+      // forceRefresh: bypass 5-minute rate limit so a cold return from
+      // background (especially on iOS) always attempts a token refresh before
+      // other work hits the API with an expired access token.
+      authService.refreshSession(forceRefresh: true).then((success) {
         if (success) {
           DebugLogger.logAuth('Session refreshed successfully on app resume');
         } else {
@@ -309,7 +318,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(
+            create: (_) => ThemeProvider(initialMode: widget.initialThemeMode)),
         ChangeNotifierProvider(create: (_) {
           final offlineProvider = OfflineProvider();
           // Initialize offline provider asynchronously (non-blocking)

@@ -849,9 +849,13 @@ class AuthService {
           _refreshAttempts.removeAt(0);
         }
         _logSessionMetrics('refresh_failure_error');
-        return false;
+        // Do not return false here: [ApiService] treats false as "refresh
+        // definitively failed" and clears JWT + session. HTTP 5xx / edge
+        // responses are often transient (especially on iOS right after resume).
+        throw Exception(
+            'JWT refresh failed with HTTP ${response.statusCode} after ${maxRetries + 1} attempts');
       }
-    } on TimeoutException {
+    } on TimeoutException catch (e, st) {
       if (retryCount < maxRetries) {
         DebugLogger.logWarn('AUTH', 'JWT refresh timeout, retrying...');
         await Future.delayed(Duration(seconds: 1 * (retryCount + 1)));
@@ -864,7 +868,9 @@ class AuthService {
         _refreshAttempts.removeAt(0);
       }
       _logSessionMetrics('refresh_failure_timeout');
-      return false;
+      // Rethrow so [ApiService] does not clear tokens (see 401 handler). User
+      // stays logged in; the next API call or resume can refresh again.
+      Error.throwWithStackTrace(e, st);
     } on AuthenticationException {
       DebugLogger.logWarn('AUTH', 'Authentication error during JWT refresh');
       await _jwtService.clearTokens();
@@ -884,7 +890,9 @@ class AuthService {
         _refreshAttempts.removeAt(0);
       }
       _logSessionMetrics('refresh_failure_exception');
-      return false;
+      // Rethrow transient errors — do not collapse to false or [ApiService]
+      // will wipe auth state (common on iOS when the network is not ready yet).
+      rethrow;
     }
   }
 

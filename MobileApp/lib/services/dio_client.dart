@@ -195,7 +195,16 @@ class _UnauthorizedInterceptor extends Interceptor {
       handler.next(err);
       return;
     }
-    final ok = await cb();
+    final bool ok;
+    try {
+      ok = await cb();
+    } catch (e) {
+      // Transient errors from [AuthService.refreshSession] rethrow instead of
+      // returning false so [ApiService] will not clear tokens. Propagate 401.
+      DebugLogger.logWarn('DIO_AUTH', 'JWT refresh threw, keeping session: $e');
+      handler.next(err);
+      return;
+    }
     if (!ok) {
       handler.next(err);
       return;

@@ -2096,6 +2096,16 @@
     }
   }
 
+  /** WAF-friendly POST body: { "payload": b64(JSON.stringify(inner)) } — same pattern as settings save. */
+  function wrapEmailTemplateApiJsonBody(innerObj) {
+    try {
+      var payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(innerObj))));
+      return JSON.stringify({ payload: payloadB64 });
+    } catch (_) {
+      return null;
+    }
+  }
+
   function getCsrfForEmailPreview() {
     var m = document.querySelector('meta[name="csrf-token"]');
     if (m && m.getAttribute('content')) return m.getAttribute('content');
@@ -2234,21 +2244,32 @@
     var previewLang = (textarea && textarea.dataset && textarea.dataset.currentLang)
       ? String(textarea.dataset.currentLang).trim()
       : 'en';
+    var previewBodyInner = { template_key: templateKey, html_b64: b64, template_language: previewLang };
+    var previewBodyStr = wrapEmailTemplateApiJsonBody(previewBodyInner);
+    if (!previewBodyStr) {
+      loading.classList.add('hidden');
+      errEl.textContent = {{ _('Could not encode template for preview.') | tojson }};
+      errEl.classList.remove('hidden');
+      return;
+    }
     _debugEmailSettingsApi('preview request', {
       url: EMAIL_PREVIEW_URL,
       template_key: templateKey,
       template_language: previewLang,
       html_len: trimmed.length,
-      html_b64_len: b64.length
+      html_b64_len: b64.length,
+      body_wrapped: true,
+      post_body_len: previewBodyStr.length
     });
     /* CSRF-only fetch: 400 template errors return JSON without throwing (not apiFetch). */
     ((window.getFetch && window.getFetch()) || fetch)(EMAIL_PREVIEW_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrf
+        'X-CSRFToken': csrf,
+        'X-Requested-With': 'XMLHttpRequest'
       },
-      body: JSON.stringify({ template_key: templateKey, html_b64: b64, template_language: previewLang })
+      body: previewBodyStr
     }).then(function (resp) {
       return resp.json().then(function (payload) {
         return { ok: resp.ok, status: resp.status, payload: payload };
@@ -2553,14 +2574,21 @@
       btn.disabled = true;
 
       var csrf = getCsrfForEmailPreview();
-      var testBody = { template_key: templateKey, html_b64: b64, template_language: lang };
+      var testBodyInner = { template_key: templateKey, html_b64: b64, template_language: lang };
+      var testBodyStr = wrapEmailTemplateApiJsonBody(testBodyInner);
+      if (!testBodyStr) {
+        restoreTestBtn();
+        if (window.showAlert) window.showAlert({{ _('Could not prepare the email body.') | tojson }}, 'error');
+        return;
+      }
       _debugEmailSettingsApi('test-send request', {
         url: EMAIL_TEST_SEND_URL,
         template_key: templateKey,
         template_language: lang,
         html_len: trimmed.length,
         html_b64_len: b64.length,
-        body_json_len: (function () { try { return JSON.stringify(testBody).length; } catch (e) { return -1; } })()
+        body_wrapped: true,
+        post_body_len: testBodyStr.length
       });
       ((window.getFetch && window.getFetch()) || fetch)(EMAIL_TEST_SEND_URL, {
         method: 'POST',
@@ -2569,7 +2597,7 @@
           'X-CSRFToken': csrf,
           'X-Requested-With': 'XMLHttpRequest'
         },
-        body: JSON.stringify(testBody)
+        body: testBodyStr
       }).then(function (resp) {
         return resp.json().then(function (payload) { return { ok: resp.ok, status: resp.status, payload: payload }; });
       }).then(function (result) {

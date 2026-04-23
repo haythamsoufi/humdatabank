@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 import requests
 from typing import Iterable, Optional, List, Tuple
 from flask import current_app
@@ -9,6 +10,34 @@ from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 def _b64_utf8(plain: str) -> str:
     return str(base64.b64encode(plain.encode("utf-8")), "utf-8")
+
+
+def _compact_ifrc_html_body(html: str) -> str:
+    """
+    Reduce UTF-8 size for IFRC Email API payloads. Some gateways return HTTP 400 with an
+    empty body when ``BodyAsBase64`` decodes to more than ~4KB of HTML.
+
+    Uses rendering-safe transforms only: strip HTML comments, collapse whitespace between
+    tags, and minify ``<style>`` blocks to a single line.
+    """
+    if not html:
+        return html
+    h = html
+    h = re.sub(r"<!--[\s\S]*?-->", "", h)
+    h = re.sub(r">\s+<", "><", h)
+
+    def _squish_style(m: re.Match) -> str:
+        open_tag, body, close_tag = m.group(1), m.group(2), m.group(3)
+        body = re.sub(r"\s+", " ", body.strip())
+        return f"{open_tag}{body}{close_tag}"
+
+    h = re.sub(
+        r"(<style[^>]*>)([\s\S]*?)(</style\s*>)",
+        _squish_style,
+        h,
+        flags=re.IGNORECASE,
+    )
+    return h.strip()
 
 
 def _to_list(values: Optional[Iterable[str]]) -> List[str]:
@@ -255,6 +284,15 @@ def _send_via_ifrc(
 
     # Drop NULs (some DB/editor paths inject them; gateways may reject the JSON or body).
     raw_html = (html or "").strip().replace("\x00", "")
+    _pre_compact = len(raw_html.encode("utf-8"))
+    raw_html = _compact_ifrc_html_body(raw_html)
+    _post_compact = len(raw_html.encode("utf-8"))
+    if _post_compact < _pre_compact:
+        current_app.logger.debug(
+            "IFRC email HTML compacted for size: %s -> %s bytes (UTF-8)",
+            _pre_compact,
+            _post_compact,
+        )
     if not raw_html:
         current_app.logger.warning("send via IFRC: empty HTML body after strip, aborting")
         if _failure_info is not None:

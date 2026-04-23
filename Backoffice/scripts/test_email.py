@@ -1,6 +1,14 @@
 """
 Test script for email sending functionality.
 Sends a test email to verify the email configuration is working correctly.
+
+Usage:
+  python scripts/test_email.py
+  python scripts/test_email.py path/to/body.html
+  TEST_EMAIL_HTML_FILE=path/to/body.html python scripts/test_email.py
+
+Optional env:
+  TEST_EMAIL_RECIPIENT, TEST_EMAIL_SUBJECT, FLASK_CONFIG
 """
 import logging
 import os
@@ -18,6 +26,23 @@ import json
 import base64
 
 
+def _load_html_content(argv):
+    """HTML body: CLI path, TEST_EMAIL_HTML_FILE, or built-in minimal default."""
+    path = None
+    if len(argv) > 1 and argv[1] and not argv[1].startswith("-"):
+        path = argv[1]
+    if not path:
+        path = os.environ.get("TEST_EMAIL_HTML_FILE", "").strip()
+    if path:
+        p = os.path.abspath(path)
+        if not os.path.isfile(p):
+            logger.error("HTML file not found: %s", p)
+            sys.exit(2)
+        with open(p, encoding="utf-8") as f:
+            return f.read()
+    return None
+
+
 def test_email_sending():
     """Test email sending to a configured recipient (set in script)."""
 
@@ -28,8 +53,13 @@ def test_email_sending():
     recipient = os.environ.get("TEST_EMAIL_RECIPIENT", "test@example.com")
 
     # Test email content
-    subject = "Test Email - Humanitarian Databank"
-    html_content = """<html>
+    subject = os.environ.get("TEST_EMAIL_SUBJECT", "Test Email - Humanitarian Databank")
+    from_file = _load_html_content(sys.argv)
+    if from_file is not None:
+        html_content = from_file
+        logger.info("Using HTML from file (%d chars)", len(html_content))
+    else:
+        html_content = """<html>
 <body>
 <h2>Email Test</h2>
 <p>This is a test email from the Humanitarian Databank backend system.</p>

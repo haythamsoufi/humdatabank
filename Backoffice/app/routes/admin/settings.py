@@ -1319,6 +1319,30 @@ def api_settings_email_templates():
     return json_ok(success=ok)
 
 
+def _parse_email_template_api_request_body():
+    """
+    Parse POST JSON for email template preview / test-send.
+
+    Supports:
+      - ``{ "template_key", "html_b64", "template_language"? }`` (legacy), or
+      - ``{ "payload" | "payload_b64": "<base64 UTF-8 JSON of those keys>" }`` to reduce WAF false positives.
+    Returns ``(inner_dict, None)`` or ``(None, error_response)``.
+    """
+    data = get_json_safe()
+    if not isinstance(data, dict):
+        return None, json_bad_request("Invalid JSON body.")
+    wrapped = data.get("payload") or data.get("payload_b64")
+    if wrapped:
+        try:
+            inner = json.loads(base64.b64decode(str(wrapped)).decode("utf-8"))
+        except Exception:
+            return None, json_bad_request("Invalid payload encoding.")
+        if not isinstance(inner, dict):
+            return None, json_bad_request("Invalid payload encoding.")
+        return inner, None
+    return data, None
+
+
 @bp.route("/api/settings/email-template-preview", methods=["POST"])
 @admin_permission_required("admin.settings.manage")
 def api_settings_email_template_preview():
@@ -1326,13 +1350,17 @@ def api_settings_email_template_preview():
     Render the current (unsaved) email template HTML with sample context.
 
     JSON body: { "template_key": str, "html_b64": str (UTF-8 base64), "template_language": str? }
+    or { "payload": "<base64 of UTF-8 JSON of the same fields>" }.
+
     *template_language* (e.g. ar, fr) is used to resolve localized org branding in preview.
     """
     from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
     from app.services.email.preview_context import get_email_template_preview_context
     from app.services.email.rendering import render_admin_email_template_for_preview
 
-    data = get_json_safe()
+    data, parse_err = _parse_email_template_api_request_body()
+    if parse_err:
+        return parse_err
     template_key = (data.get("template_key") or "").strip()
     html_b64 = data.get("html_b64")
     template_language = data.get("template_language") or data.get("lang")
@@ -1463,8 +1491,11 @@ def _response_for_email_test_send_failure(failure: list, msg: str):
 @admin_permission_required("admin.settings.manage")
 def api_settings_email_template_test_send():
     """
-    Send one test email to the current user's address using the same HTML and sample
+    Send one test email to the signed-in user's address using the same HTML and sample
     context as the preview (unsaved editor content for the given language).
+
+    Accepts the same JSON shape as :func:`api_settings_email_template_preview` (flat or
+    ``payload`` / ``payload_b64`` wrapper).
     """
     from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
     from app.services.email.client import send_email
@@ -1474,10 +1505,14 @@ def api_settings_email_template_test_send():
     )
     from app.services.email.rendering import render_admin_email_template_for_preview
 
-    if not current_user.is_authenticated or not getattr(current_user, "email", None):
+    if not current_user.is_authenticated:
+        return json_bad_request("You must be signed in to send a test message.")
+    if not getattr(current_user, "email", None):
         return json_bad_request("Your account has no email address; cannot send a test message.")
 
-    data = get_json_safe()
+    data, parse_err = _parse_email_template_api_request_body()
+    if parse_err:
+        return parse_err
     template_key = (data.get("template_key") or "").strip()
     html_b64 = data.get("html_b64")
     template_language = data.get("template_language") or data.get("lang")
@@ -1533,10 +1568,11 @@ def api_settings_email_template_test_send():
         return _response_for_email_test_send_failure(failure, msg)
 
     current_app.logger.info(
-        "Test email sent for template %s (%s) to user id %s",
+        "Test email sent for template %s (%s) to user id %s (%s)",
         template_key,
         tlang,
         getattr(current_user, "id", None),
+        current_user.email,
     )
     return json_ok(sent_to=current_user.email, subject=subject)
 

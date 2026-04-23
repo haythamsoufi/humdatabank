@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
-from flask import request, current_app, g
+from flask import request, current_app, g, has_request_context
 from flask_login import current_user
 from app.models import SecurityEvent, AdminActionLog
 from app import db
@@ -30,7 +30,8 @@ class SecurityMonitor:
 
     @staticmethod
     def log_security_event(event_type: str, severity: str, description: str,
-                          context_data: Optional[Dict] = None, user_id: Optional[int] = None):
+                          context_data: Optional[Dict] = None, user_id: Optional[int] = None,
+                          notify_admins: bool = True):
         """
         Log a security event.
 
@@ -40,12 +41,23 @@ class SecurityMonitor:
             description: Event description
             context_data: Additional context data
             user_id: Associated user ID
+            notify_admins: If True, send email for high/critical (set False to avoid loops when email itself fails)
         """
         try:
             client_info = SecurityMonitor._get_client_info()
 
+            if user_id is not None:
+                resolved_user_id = user_id
+            elif has_request_context():
+                try:
+                    resolved_user_id = current_user.id if current_user.is_authenticated else None
+                except Exception:
+                    resolved_user_id = None
+            else:
+                resolved_user_id = None
+
             security_event = SecurityEvent(
-                user_id=user_id or (current_user.id if current_user.is_authenticated else None),
+                user_id=resolved_user_id,
                 event_type=event_type,
                 severity=severity,
                 description=description,
@@ -58,7 +70,7 @@ class SecurityMonitor:
             db.session.commit()
 
             # Send alert if severity is high or critical
-            if severity in ['high', 'critical']:
+            if notify_admins and severity in ['high', 'critical']:
                 SecurityMonitor._send_security_alert(security_event)
 
         except Exception as e:
@@ -68,13 +80,22 @@ class SecurityMonitor:
     @staticmethod
     def _get_client_info() -> Dict[str, Any]:
         """Get client information for logging."""
+        if has_request_context():
+            return {
+                'ip_address': request.remote_addr or 'unknown',
+                'user_agent': request.user_agent.string if request.user_agent else 'unknown',
+                'referrer': request.referrer or 'unknown',
+                'method': request.method,
+                'endpoint': request.endpoint or 'unknown',
+                'url': request.url or 'unknown'
+            }
         return {
-            'ip_address': request.remote_addr or 'unknown',
-            'user_agent': request.user_agent.string if request.user_agent else 'unknown',
-            'referrer': request.referrer or 'unknown',
-            'method': request.method,
-            'endpoint': request.endpoint or 'unknown',
-            'url': request.url or 'unknown'
+            'ip_address': 'system',
+            'user_agent': 'unknown',
+            'referrer': 'unknown',
+            'method': 'N/A',
+            'endpoint': 'N/A',
+            'url': 'N/A',
         }
 
     @staticmethod
@@ -280,9 +301,12 @@ security_monitor = SecurityMonitor()
 
 # Convenience functions
 def log_security_event(event_type: str, severity: str, description: str,
-                      context_data: Optional[Dict] = None):
+                      context_data: Optional[Dict] = None, user_id: Optional[int] = None,
+                      notify_admins: bool = True):
     """Log a security event."""
-    security_monitor.log_security_event(event_type, severity, description, context_data)
+    security_monitor.log_security_event(
+        event_type, severity, description, context_data, user_id=user_id, notify_admins=notify_admins
+    )
 
 def check_security_thresholds():
     """Check security thresholds and create alerts."""

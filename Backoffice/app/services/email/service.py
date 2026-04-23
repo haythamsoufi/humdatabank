@@ -798,6 +798,7 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
             html=html_content,
             sender=current_app.config.get('MAIL_DEFAULT_SENDER'),
             bcc=[team_email] if team_email else None,
+            _suppress_email_failure_security_event=True,
         )
 
         if success:

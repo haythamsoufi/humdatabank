@@ -1448,24 +1448,15 @@ def _message_for_email_test_send_failure(failure: list) -> str:
                 "The email API returned HTTP 403. Check that the API key is allowed to send."
             ) + _api_detail_suffix()
         if status == 400:
-            msg = (
-                "The email API returned HTTP 400 (rejected the payload). Check application logs for details."
+            # IFRC often returns 400 with an empty body—there is no official reason string to show.
+            # Sizes in the appended excerpt are from our email client, not from the mail API.
+            return (
+                "The email API returned HTTP 400 without a response body explaining why. "
+                "Logs include technical details measured by this app (not an error message from the mail service). "
+                "The cause may be validation, networking, or environment-specific—not necessarily template size. "
+                "If another deployment works with the same URL and API key, compare outbound networking and egress IP, "
+                "and contact the mail API operator with the time of the failure."
             ) + _api_detail_suffix()
-            nbytes = (failure[0] or {}).get("html_utf8_bytes")
-            nb64 = (failure[0] or {}).get("body_b64_chars")
-            if isinstance(nb64, int) and nb64 > 4090:
-                msg += (
-                    f" The encoded body is {nb64} Base64 characters; some gateways cap ~4096 on that field "
-                    f"(raw HTML may be smaller, e.g. {nbytes} UTF-8 bytes). Shorten CSS in <style> or contact "
-                    "the mail API team for the exact limit."
-                )
-            elif isinstance(nbytes, int) and nbytes > 4096:
-                msg += (
-                    f" Your HTML body is {nbytes} bytes (UTF-8). Some mail gateways return HTTP 400 with "
-                    "no response body when the message exceeds a 4KB limit—try shortening the template "
-                    "(especially CSS in <style>) or ask the mail API team to confirm the maximum body size."
-                )
-            return msg
         if status is not None:
             return (
                 f"The email API returned HTTP {status}. Check application logs for the response body."

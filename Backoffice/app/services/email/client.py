@@ -92,6 +92,57 @@ def _to_list(values: Optional[Iterable[str]]) -> List[str]:
     return [str(v).strip() for v in values if str(v).strip()]
 
 
+def _is_production_flask_config() -> bool:
+    return (os.environ.get("FLASK_CONFIG", "") or "").lower() == "production"
+
+
+def _failure_warrants_security_event(fail: dict) -> bool:
+    code = (fail or {}).get("code") or ""
+    if code in ("email_api_http_error", "email_api_request_error"):
+        return True
+    if code in ("no_email_api_key", "no_email_api_url", "no_default_sender"):
+        return _is_production_flask_config()
+    return False
+
+
+def _maybe_record_email_delivery_failure(
+    subject: str,
+    recipients: List[str],
+    failure: dict,
+    *,
+    suppress_security_hook: bool,
+) -> None:
+    if suppress_security_hook or not _failure_warrants_security_event(failure):
+        return
+    try:
+        from app.services.security.monitoring import SecurityMonitor
+
+        code = failure.get("code", "unknown")
+        subj = (subject or "")[:180]
+        desc = f"Email delivery failed ({code}). Subject: {subj}"
+        ctx = {
+            "failure_code": code,
+            "recipient_count": len(recipients or []),
+        }
+        if failure.get("http_status") is not None:
+            ctx["http_status"] = failure.get("http_status")
+        ex = failure.get("response_excerpt")
+        if ex:
+            ctx["response_excerpt"] = str(ex)[:500]
+
+        SecurityMonitor.log_security_event(
+            event_type="email_delivery_failure",
+            severity="high",
+            description=desc,
+            context_data=ctx,
+            notify_admins=True,
+        )
+    except Exception as e:
+        current_app.logger.error(
+            "Failed to record email delivery security event: %s", e, exc_info=True
+        )
+
+
 def _filter_recipients_for_environment(recipients: List[str], cc: List[str], bcc: List[str]) -> Tuple[List[str], List[str], List[str]]:
     """
     Filter email recipients based on ALLOWED_EMAIL_RECIPIENTS_DEV.
@@ -185,6 +236,7 @@ def send_email(
     attachments: Optional[List[Tuple[str, bytes, str]]] = None,
     _filtered_out: Optional[list] = None,
     _failure_info: Optional[List[dict]] = None,
+    _suppress_email_failure_security_event: bool = False,
 ) -> bool:
     """
     Send an email using the IFRC Email API (HTML body, base64 fields).
@@ -208,6 +260,8 @@ def send_email(
         (``code`` one of: no_recipients, no_default_sender, recipient_allowlist, no_email_api_key,
         no_email_api_url, email_api_http_error, email_api_request_error; ``http_status`` and optional
         ``response_excerpt`` for HTTP error cases).
+        _suppress_email_failure_security_event: When True, do not create security events / admin alerts
+        for this send (used when sending those alerts to avoid recursion).
 
     Returns:
         True if email was sent successfully, False otherwise
@@ -229,8 +283,15 @@ def send_email(
             "MAIL_DEFAULT_SENDER is not configured. "
             "Please set MAIL_DEFAULT_SENDER in your environment variables."
         )
+        fail = {"code": "no_default_sender"}
         if _failure_info is not None:
-            _failure_info.append({"code": "no_default_sender"})
+            _failure_info.append(fail)
+        _maybe_record_email_delivery_failure(
+            subject,
+            recipients_list,
+            fail,
+            suppress_security_hook=_suppress_email_failure_security_event,
+        )
         return False
 
     # Apply recipient filtering (ALLOWED_EMAIL_RECIPIENTS_DEV, disabled in production)
@@ -253,7 +314,7 @@ def send_email(
         if not subject.startswith('[HIGH PRIORITY]'):
             final_subject = f"[HIGH PRIORITY] {subject}"
 
-    return _send_via_ifrc(
+    ok = _send_via_ifrc(
         subject=final_subject,
         sender=sender_email,
         recipients=recipients_list,
@@ -265,6 +326,14 @@ def send_email(
         attachments=attachments,
         _failure_info=_failure_info,
     )
+    if not ok and _failure_info and _failure_info[-1]:
+        _maybe_record_email_delivery_failure(
+            final_subject,
+            recipients_list,
+            _failure_info[-1],
+            suppress_security_hook=_suppress_email_failure_security_event,
+        )
+    return ok
 
 
 def _send_via_ifrc(

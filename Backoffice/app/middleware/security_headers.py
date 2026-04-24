@@ -94,7 +94,7 @@ def add_security_headers(response):
         f"style-src {style_src}; "
         "img-src 'self' data: blob: https:; "
         "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
-        "connect-src 'self' https://unpkg.com https://www.gstatic.com https://cdn.jsdelivr.net https://nominatim.openstreetmap.org https://ipapi.co; "
+        "connect-src 'self' https://unpkg.com https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://nominatim.openstreetmap.org https://ipapi.co; "
         f"frame-src {frame_src}; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "

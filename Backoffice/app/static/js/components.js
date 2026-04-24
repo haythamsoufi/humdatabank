@@ -561,7 +561,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const titleH4 = document.createElement('h4');
             titleH4.className = `text-sm font-medium ${titleColor} ${!notification.is_read ? 'font-semibold' : ''}`;
             titleH4.style.color = notification.is_read ? '#4b5563' : (isUrgent ? '#b91c1c' : (isHighPriority ? '#c2410c' : '#111827'));
-            titleH4.textContent = primaryText;
+            titleH4.appendChild(document.createTextNode(primaryText));
+            if (!notification.is_read) {
+                const dot = document.createElement('span');
+                dot.className = `notification-dropdown-unread-dot ml-1.5 w-2 h-2 ${dotColor} rounded-full inline-block align-middle flex-shrink-0`;
+                dot.setAttribute('aria-hidden', 'true');
+                titleH4.appendChild(dot);
+            }
             headerDiv.appendChild(titleH4);
 
             if (isHighPriority) {
@@ -581,12 +587,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 priorityBadge.textContent = (priority || '').toUpperCase();
                 headerDiv.appendChild(priorityBadge);
-            }
-
-            if (!notification.is_read) {
-                const dot = document.createElement('span');
-                dot.className = `ml-2 w-2 h-2 ${dotColor} rounded-full`;
-                headerDiv.appendChild(dot);
             }
 
             const messageP = document.createElement('p');
@@ -768,7 +768,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (notificationElement) {
                     notificationElement.classList.remove('bg-blue-50', 'bg-red-50', 'bg-orange-50');
                     notificationElement.style.borderLeft = '';
-                    const unreadDot = notificationElement.querySelector('.bg-blue-500.rounded-full, .bg-orange-500.rounded-full, .bg-red-500.rounded-full');
+                    const unreadDot = notificationElement.querySelector('.notification-dropdown-unread-dot');
                     if (unreadDot) unreadDot.remove();
                     const markReadBtn = notificationElement.querySelector('.mark-notification-read-btn');
                     if (markReadBtn) {
@@ -869,11 +869,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     notificationElement.classList.add(bgClass);
                     notificationElement.style.borderLeft = `4px solid ${stripeColor}`;
                     const titleH4 = notificationElement.querySelector('h4');
-                    const headerDiv = titleH4 ? titleH4.closest('.flex') : notificationElement.querySelector('.flex');
-                    if (headerDiv) {
+                    if (titleH4 && !titleH4.querySelector('.notification-dropdown-unread-dot')) {
                         const dot = document.createElement('span');
-                        dot.className = `ml-2 w-2 h-2 ${dotClass} rounded-full`;
-                        headerDiv.appendChild(dot);
+                        dot.className = `notification-dropdown-unread-dot ml-1.5 w-2 h-2 ${dotClass} rounded-full inline-block align-middle flex-shrink-0`;
+                        dot.setAttribute('aria-hidden', 'true');
+                        titleH4.appendChild(dot);
                     }
                     if (titleH4) {
                         titleH4.classList.add('font-semibold');
@@ -968,7 +968,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 unreadElements.forEach(notificationElement => {
                     notificationElement.classList.remove('bg-blue-50', 'bg-red-50', 'bg-orange-50');
                     notificationElement.style.borderLeft = '';
-                    const unreadDot = notificationElement.querySelector('.bg-blue-500.rounded-full, .bg-orange-500.rounded-full, .bg-red-500.rounded-full');
+                    const unreadDot = notificationElement.querySelector('.notification-dropdown-unread-dot');
                     if (unreadDot) unreadDot.remove();
                     const markReadBtn = notificationElement.querySelector('.mark-notification-read-btn');
                     if (markReadBtn) {

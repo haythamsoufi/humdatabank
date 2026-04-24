@@ -1212,10 +1212,15 @@ def manage_settings():
             flash("An error occurred. Please try again.", "danger")
         return redirect(url_for("settings.manage_settings"))
 
+    _all_lang_disp = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", None) or {}
+    _primary_lang_disp = getattr(Config, "LANGUAGE_DISPLAY_NAMES", None) or {}
+    merged_language_display_names = {**_all_lang_disp, **_primary_lang_disp}
+
     return render_template(
         "admin/settings/manage_settings.html",
         all_known_languages=all_known_languages,
         language_names=Config.LANGUAGE_DISPLAY_NAMES,
+        merged_language_display_names=merged_language_display_names,
         current_supported=current_supported,
         current_show_language_flags=current_show_language_flags,
         current_doc_types=current_doc_types,

@@ -1084,6 +1084,10 @@ def edit_template(template_id):
         .count()
     )
 
+    _all_lang_disp = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", None) or {}
+    _primary_lang_disp = getattr(Config, "LANGUAGE_DISPLAY_NAMES", None) or {}
+    merged_language_display_names = {**_all_lang_disp, **_primary_lang_disp}
+
     return render_template("forms/form_builder/form_builder.html",
                            **template_data,
                            title=f"Edit Form Template: {template.name}",
@@ -1115,7 +1119,8 @@ def edit_template(template_id):
                            item_data_counts=item_data_counts,
                            section_data_counts=section_data_counts,
                            has_archived_items=has_archived_items,
-                           invalid_indicator_items_count=invalid_indicator_items_count)
+                           invalid_indicator_items_count=invalid_indicator_items_count,
+                           merged_language_display_names=merged_language_display_names)
 
 @bp.route("/templates/<int:template_id>/delete-info", methods=["GET"])
 @admin_permission_required('admin.templates.delete')

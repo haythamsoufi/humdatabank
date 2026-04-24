@@ -4,7 +4,8 @@
   "description": "Humanitarian Databank Backoffice",
   "scripts": {
     "build:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --minify -c ./assets/tailwind.config.js",
-    "watch:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch -c ./assets/tailwind.config.js"
+    "watch:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch -c ./assets/tailwind.config.js",
+    "vendor:tinymce": "node ./scripts/vendor-tinymce.cjs"
   },
   "dependencies": {
     "ag-grid-community": "^34.3.1",
@@ -17,6 +18,7 @@
     "@tailwindcss/forms": "^0.5.10",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.18"
+    "tailwindcss": "^3.4.18",
+    "tinymce": "^6.8.3"
   }
 }

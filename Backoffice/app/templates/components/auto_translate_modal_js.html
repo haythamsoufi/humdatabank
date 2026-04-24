@@ -74,11 +74,7 @@ Requires auto_translate_config to be set with endpoint URL
     // Dynamic language display names from system configuration (ISO codes only)
     const languageDisplayNames = {};
     {% for lang_code in TRANSLATABLE_LANGUAGES %}
-        {% if LANGUAGE_DISPLAY_NAMES and lang_code in LANGUAGE_DISPLAY_NAMES %}
-            {% set lang_display = LANGUAGE_DISPLAY_NAMES[lang_code] %}
-        {% else %}
-            {% set lang_display = lang_code.upper() %}
-        {% endif %}
+        {% set lang_display = LANGUAGE_DISPLAY_NAMES.get(lang_code) or ALL_LANGUAGES_DISPLAY_NAMES.get(lang_code) or lang_code.upper() %}
     languageDisplayNames[{{ lang_code | tojson }}] = {{ _(lang_display) | tojson }};
     {% endfor %}
 

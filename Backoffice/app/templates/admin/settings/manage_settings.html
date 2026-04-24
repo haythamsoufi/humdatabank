@@ -500,17 +500,153 @@
     }
     #panel-emails .email-template-body-textarea::placeholder { color: #9ca3af; }
     #panel-emails .email-template-body-textarea:focus { outline: none; }
-    /* Preview: size iframe like the editor (textarea min 20rem, max 70vh) so mode switch does not collapse height */
+    /* Code + visual: keep surface height consistent when switching */
     #panel-emails .email-template-code-surface {
       min-height: 20rem;
     }
-    #panel-emails .email-template-preview-frame {
-      display: block;
-      width: 100%;
-      min-height: 32rem;
-      height: min(70vh, 52rem);
+    #panel-emails .email-template-workspace .email-template-edit-wrap {
       border: 0;
+      border-radius: 0;
       background: #fff;
+    }
+    #panel-emails .email-template-workspace .email-template-edit-wrap:focus-within {
+      box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.25);
+    }
+    #panel-emails .email-template-workspace .email-template-edit-wrap .email-template-body-textarea,
+    #panel-emails .email-template-workspace .email-template-edit-wrap .email-template-syntax-backdrop {
+      min-height: 20rem;
+    }
+    /* Visual: flex children need min-height:0 so the frame does not stretch with content. Scrolling is inside the iframe (TinyMCE height fixed; do not use autoresize). */
+    #panel-emails .email-template-workspace .email-template-visual-tinymce-wrap {
+      min-height: 0;
+    }
+    #panel-emails .email-template-workspace .tox .tox-edit-container,
+    #panel-emails .email-template-workspace .tox .tox-edit-area,
+    #panel-emails .email-template-workspace .tox .tox-edit-area__iframe {
+      min-height: 0;
+    }
+    #panel-emails .email-template-visual-ta {
+      min-height: 0;
+      width: 100%;
+    }
+    /* TinyMCE chrome: match workspace (slate strip, gray borders, no heavy shadow) */
+    #panel-emails .email-template-workspace .tox-tinymce {
+      border: 1px solid #e5e7eb;
+      border-radius: 0.375rem;
+      box-shadow: none;
+      background: #fff;
+    }
+    #panel-emails .email-template-workspace .tox .tox-editor-header {
+      border: 0;
+      box-shadow: none;
+      padding: 0;
+      background: #f8fafc;
+    }
+    #panel-emails .email-template-workspace .tox .tox-menubar,
+    #panel-emails .email-template-workspace .tox .tox-menubar + * {
+      border: 0;
+    }
+    #panel-emails .email-template-workspace .tox .tox-toolbar,
+    #panel-emails .email-template-workspace .tox .tox-toolbar__overflow,
+    #panel-emails .email-template-workspace .tox .tox-toolbar__primary {
+      background: #f8fafc;
+      background-image: none;
+      border: 0;
+      border-bottom: 1px solid #e5e7eb;
+      min-height: 0;
+    }
+    #panel-emails .email-template-workspace .tox .tox-toolbar-overlord,
+    #panel-emails .email-template-workspace .tox .tox-editor-header,
+    #panel-emails .email-template-workspace .tox .tox-toolbar__primary {
+      padding: 0.25rem 0.5rem 0.375rem;
+    }
+    #panel-emails .email-template-workspace .tox .tox-toolbar__group {
+      margin: 0 0.1rem 0.15rem 0;
+    }
+    #panel-emails .email-template-workspace .tox .tox-toolbar__group:not(:last-of-type) {
+      border-right: 0;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn--select {
+      min-width: 4.5rem;
+      max-width: 7.5rem;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn {
+      border-radius: 0.25rem;
+      color: #4b5563;
+      min-height: 1.75rem;
+      min-width: 1.6rem;
+      width: auto;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn--bespoke,
+    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-label] {
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn--select .tox-tbtn__select-chevron,
+    #panel-emails .email-template-workspace .tox .tox-tbtn--select {
+      line-height: 1.2;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn--enabled,
+    #panel-emails .email-template-workspace .tox .tox-tbtn:hover {
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-pressed="true"] {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn:disabled,
+    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-disabled="true"] {
+      color: #9ca3af;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn .tox-icon {
+      fill: currentColor;
+    }
+    #panel-emails .email-template-workspace .tox .tox-toolbar__group .tox-toolbar__group {
+      border-left: 0;
+    }
+    #panel-emails .email-template-workspace .tox .tox-tbtn--select .tox-tbtn__select-label,
+    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-label] {
+      text-transform: none;
+    }
+    #panel-emails .email-template-workspace .tox .tox-edit-area,
+    #panel-emails .email-template-workspace .tox .tox-edit-area::before {
+      border: 0;
+    }
+    #panel-emails .email-template-workspace .tox .tox-edit-area__iframe {
+      background: #fff;
+    }
+    #panel-emails .email-template-workspace .tox-tinymce:focus-within {
+      border-color: #c7d2fe;
+      box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+    }
+    #panel-emails .email-template-workspace .tox .tox-sidebar-wrap {
+      border: 0;
+    }
+    /* Context table toolbar + floating (same page has only this editor) */
+    .tox.tox-silver-sink .tox-toolbar--overflow,
+    .tox .tox-pop .tox-toolbar--overflow,
+    .tox .tox-pop .tox-toolbar--primary,
+    .tox .tox-tinymce-aux .tox-pop .tox-toolbar--overflow {
+      background: #f8fafc !important;
+      background-image: none;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.375rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+    .tox.tox-silver-sink .tox-menu,
+    .tox .tox-tinymce-aux .tox-menu {
+      border: 1px solid #e5e7eb;
+      border-radius: 0.375rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+    }
+    .tox .tox-dialog,
+    .tox .tox-dialog__header {
+      border-color: #e5e7eb;
+      border-radius: 0.375rem;
+    }
+    .tox .tox-dialog {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
     /* RTL language tab: editor + syntax layer (mixed HTML + Arabic) */
     #panel-emails .email-template-edit-wrap[dir="rtl"] .email-template-body-textarea,
@@ -529,13 +665,40 @@
         {{ _('Templates are used for both system emails and the Notifications Center. Each template has an HTML body (per language) and optional pre-fill fields (title, message, priority) used when composing a notification. Use Jinja2 syntax. Typical placeholder names include:') }}
         <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">org_name, org_short_name, copyright_year, user_name, submitter_name, etc.</span>
       </p>
-      <div class="flex flex-wrap items-center gap-2 mb-2" role="group" aria-label="{{ _('Default email templates') }}">
-        <button type="button" id="email-templates-seed-gaps-btn" class="btn btn-sm btn-success inline-flex items-center gap-1.5">
-          <i class="fas fa-download text-[10px]" aria-hidden="true"></i>{{ _('Load defaults (fill empty only)') }}
+      <div class="relative inline-block text-left mb-2"
+           id="email-templates-seed-dropdown"
+           role="group"
+           aria-label="{{ _('Default email templates') }}">
+        <button type="button"
+                id="email-templates-seed-toggle"
+                class="btn btn-sm btn-secondary inline-flex items-center gap-1.5"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="email-templates-seed-menu"
+                title="{{ _('Fills empty template fields from this release, or replaces all with built-in defaults') }}">
+          <i class="fas fa-layer-group text-[10px]" aria-hidden="true"></i>
+          <span>{{ _('Default templates') }}</span>
+          <i class="fas fa-chevron-down text-[9px] opacity-80" aria-hidden="true"></i>
         </button>
-        <button type="button" id="email-templates-seed-force-btn" class="btn btn-sm btn-warning inline-flex items-center gap-1.5">
-          <i class="fas fa-rotate text-[10px]" aria-hidden="true"></i>{{ _('Reset all to built-in defaults') }}
-        </button>
+        <div id="email-templates-seed-menu"
+             class="hidden absolute left-0 z-30 mt-1 min-w-[16rem] max-w-[calc(100vw-2rem)] rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+             role="menu"
+             aria-labelledby="email-templates-seed-toggle">
+          <button type="button"
+                  id="email-templates-seed-gaps-btn"
+                  class="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-gray-50 inline-flex items-center gap-2"
+                  role="menuitem">
+            <i class="fas fa-download text-[10px] text-green-600 w-3.5 flex-shrink-0" aria-hidden="true"></i>
+            <span>{{ _('Load defaults (fill empty only)') }}</span>
+          </button>
+          <button type="button"
+                  id="email-templates-seed-force-btn"
+                  class="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-gray-50 inline-flex items-center gap-2 border-t border-gray-100"
+                  role="menuitem">
+            <i class="fas fa-rotate text-[10px] text-amber-600 w-3.5 flex-shrink-0" aria-hidden="true"></i>
+            <span>{{ _('Reset all to built-in defaults') }}</span>
+          </button>
+        </div>
       </div>
       <p class="text-xs text-gray-500 mb-3">{{ _('Fills or overwrites from the current release’s bundled HTML (same as the flask seed-email-templates command). The page reloads after a successful run.') }}</p>
 
@@ -579,105 +742,106 @@
       </div>
 
       {% for template in email_templates %}
-      <div class="email-template-editor mb-6 border border-gray-200 rounded-lg p-4"
+      <div class="email-template-editor mb-8"
            id="editor-{{ template.key }}"
            {% if not loop.first %}style="display: none;"{% endif %}>
 
-        {# ── Header: label, description, variable insertion ── #}
-        <div class="flex items-start justify-between mb-3">
-          <div class="flex-1">
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ template.label }}</label>
-            <p class="text-xs text-gray-500 mb-1">{{ template.description }}</p>
-          </div>
-          <div class="ml-4 flex-shrink-0">
-            <div class="flex flex-wrap gap-1">
-              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ org_name }}' }}" data-target="{{ template.key }}">{{ _('Org Name') }}</button>
-              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ copyright_year }}' }}" data-target="{{ template.key }}">{{ _('Year') }}</button>
-              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ user_name }}' }}" data-target="{{ template.key }}">{{ _('User Name') }}</button>
-              <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ submitter_name }}' }}" data-target="{{ template.key }}">{{ _('Submitter') }}</button>
-            </div>
-          </div>
-        </div>
-
-        {# ── Language sub-tabs + Edit/Preview (same row, matching tab style) ── #}
-        <div class="flex flex-wrap items-end gap-4 sm:gap-6 lg:gap-8">
+        {# ── Title + description + variable chips (outside the framed editor) ── #}
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-3">
           <div class="min-w-0 flex-1">
-            {% call scroll_tab_bar(border_bottom=False, lang_tabs_for=template.key, inner_class='items-center gap-0.5', wrapper_class='mb-0') %}
-              {% for lang in current_supported %}
-              <button type="button"
-                      class="email-lang-tab px-3 py-1.5 text-xs font-medium border border-b-0 rounded-t-md transition-colors
-                             {% if lang == 'en' %}bg-white text-blue-600 border-gray-200 relative z-10{% else %}bg-gray-50 text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-100{% endif %}"
-                      data-template-key="{{ template.key }}"
-                      data-lang="{{ lang }}">
-                {{ LANGUAGE_DISPLAY_NAMES.get(lang, lang|upper) }}
-                {% if lang == 'en' %}<span class="text-gray-400 font-normal ml-0.5">({{ _('default') }})</span>{% endif %}
-              </button>
-              {% endfor %}
-            {% endcall %}
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ template.label }}</label>
+            <p class="text-xs text-gray-500 mb-0">{{ template.description }}</p>
           </div>
-          <div class="email-template-autotrans-wrap flex-shrink-0 hidden max-w-full"
-               data-template-key="{{ template.key }}"
-               title="{{ _('Uses the English template text for this form as the source. Jinja variables like org_name are preserved.') }}">
-            <button type="button"
-                    class="btn btn-sm btn-warning email-template-autotrans-btn inline-flex items-center gap-1.5 whitespace-nowrap"
-                    data-template-key="{{ template.key }}">
-              <i class="fas fa-language text-[10px]" aria-hidden="true"></i>{{ _('Auto-translate from English') }}
-            </button>
-          </div>
-          <div class="email-template-test-send-wrap flex-shrink-0 max-w-full">
-            <button type="button"
-                    class="btn btn-sm btn-primary email-template-test-send-btn inline-flex items-center gap-1.5 whitespace-nowrap{% if not current_user.email %} opacity-50 cursor-not-allowed{% endif %}"
-                    data-template-key="{{ template.key }}"
-                    {% if not current_user.email %}disabled title="{{ _('Add an email address to your user account to send a test message.') }}"
-                    {% else %}title="{{ _('Sends a sample email with the same test data as Preview to:') }} {{ current_user.email }}"{% endif %}>
-              <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send me test email') }}
-            </button>
-          </div>
-          <div class="flex-shrink-0" role="group" aria-label="{{ _('Switch between HTML editor and preview') }}">
-            <div class="email-template-view-toggle inline-flex border border-b-0 rounded-t-md border-gray-200 overflow-hidden shadow-sm divide-x divide-gray-200" id="email-template-view-toggle-{{ template.key }}">
-              <button type="button"
-                      class="email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-white text-blue-600 relative z-10"
-                      data-mode="edit" data-template-key="{{ template.key }}" aria-pressed="true">
-                <i class="fas fa-code text-[10px]" aria-hidden="true"></i>{{ _('Edit') }}
-              </button>
-              <button type="button"
-                      class="email-template-mode-btn email-template-mode-preview-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                      data-mode="preview" data-template-key="{{ template.key }}" aria-pressed="false">
-                <i class="fas fa-eye text-[10px]" aria-hidden="true"></i>{{ _('Preview') }}
-              </button>
-            </div>
+          <div class="flex flex-wrap gap-1.5 sm:justify-end sm:flex-shrink-0">
+            <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ org_name }}' }}" data-target="{{ template.key }}">{{ _('Org Name') }}</button>
+            <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ copyright_year }}' }}" data-target="{{ template.key }}">{{ _('Year') }}</button>
+            <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ user_name }}' }}" data-target="{{ template.key }}">{{ _('User Name') }}</button>
+            <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ submitter_name }}' }}" data-target="{{ template.key }}">{{ _('Submitter') }}</button>
           </div>
         </div>
 
-        {# ── HTML editor + live preview (same area) ── #}
-        <div class="email-template-code-surface" data-template-key="{{ template.key }}">
-          <div class="email-template-edit-pane">
-            <div class="email-template-edit-wrap overflow-hidden rounded-md rounded-tl-none">
-              <pre class="email-template-syntax-backdrop" aria-hidden="true"></pre>
-              <textarea
-                id="{{ template.key }}"
-                class="email-template-body-textarea"
-                data-current-lang="en"
-                rows="20"
-                spellcheck="false"
-                placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_email_templates.get(template.key, {}).get('en', '') }}</textarea>
+        {# ── One frame: controls strip + editor (avoids double borders / misaligned “tabs”) ── #}
+        <div class="email-template-workspace rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="email-template-workspace-top flex flex-col gap-2.5 sm:flex-row-reverse sm:items-end sm:justify-between sm:gap-3 px-3 py-2.5 border-b border-gray-200 bg-slate-50/90">
+            <div class="flex flex-wrap items-center gap-2 sm:justify-end sm:flex-shrink-0">
+              <div class="email-template-autotrans-wrap hidden max-w-full"
+                   data-template-key="{{ template.key }}"
+                   title="{{ _('Uses the English template text for this form as the source. Jinja variables like org_name are preserved.') }}">
+                <button type="button"
+                        class="btn btn-sm btn-warning email-template-autotrans-btn inline-flex items-center gap-1.5 whitespace-nowrap"
+                        data-template-key="{{ template.key }}">
+                  <i class="fas fa-language text-[10px]" aria-hidden="true"></i>{{ _('Auto-translate from English') }}
+                </button>
+              </div>
+              <div class="email-template-test-send-wrap max-w-full">
+                <button type="button"
+                        class="btn btn-sm btn-primary email-template-test-send-btn inline-flex items-center gap-1.5 whitespace-nowrap{% if not current_user.email %} opacity-50 cursor-not-allowed{% endif %}"
+                        data-template-key="{{ template.key }}"
+                        {% if not current_user.email %}disabled title="{{ _('Add an email address to your user account to send a test message.') }}"
+                        {% else %}title="{{ _('Sends a test email with sample placeholder data (same as server rendering) to:') }} {{ current_user.email }}"{% endif %}>
+                  <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send me test email') }}
+                </button>
+              </div>
+              <div class="inline-flex" role="group" aria-label="{{ _('Switch between HTML and visual editor') }}">
+                <div class="email-template-view-toggle inline-flex rounded-md border border-gray-200 overflow-hidden shadow-sm divide-x divide-gray-200" id="email-template-view-toggle-{{ template.key }}">
+                  <button type="button"
+                          class="email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-white text-blue-600 relative z-10"
+                          data-mode="edit" data-template-key="{{ template.key }}" aria-pressed="true">
+                    <i class="fas fa-code text-[10px]" aria-hidden="true"></i>{{ _('HTML') }}
+                  </button>
+                  <button type="button"
+                          class="email-template-mode-btn email-template-mode-visual-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                          data-mode="visual" data-template-key="{{ template.key }}" aria-pressed="false">
+                    <i class="fas fa-magic text-[10px]" aria-hidden="true"></i>{{ _('Visual') }}
+                  </button>
+                </div>
+              </div>
             </div>
-            {# Hidden input carrying all per-language content as JSON #}
-            <input type="hidden"
-                   id="{{ template.key }}-translations"
-                   data-settings-email-template-hidden="1"
-                   value="{{ current_email_templates.get(template.key, {}) | tojson | forceescape }}" />
+            <div class="min-w-0 w-full sm:flex-1 sm:max-w-[min(100%,42rem)]">
+              {% call scroll_tab_bar(border_bottom=False, lang_tabs_for=template.key, inner_class='items-center gap-0.5', wrapper_class='mb-0') %}
+                {% for lang in current_supported %}
+                <button type="button"
+                        class="email-lang-tab px-3 py-1.5 text-xs font-medium border border-b-0 rounded-t-md transition-colors
+                               {% if lang == 'en' %}bg-white text-blue-600 border-gray-200 relative z-10 shadow-sm{% else %}bg-slate-100/80 text-gray-500 border-transparent hover:text-gray-800 hover:bg-white/90{% endif %}"
+                        data-template-key="{{ template.key }}"
+                        data-lang="{{ lang }}">
+                  {{ language_endonym(lang) or LANGUAGE_DISPLAY_NAMES.get(lang) or ALL_LANGUAGES_DISPLAY_NAMES.get(lang) or lang|upper }}
+                  {% if lang == 'en' %}<span class="text-gray-400 font-normal ml-0.5">({{ _('default') }})</span>{% endif %}
+                </button>
+                {% endfor %}
+              {% endcall %}
+            </div>
           </div>
-          <div class="email-template-preview-pane hidden flex flex-col rounded-md rounded-tl-none border border-gray-200 bg-white overflow-hidden" dir="ltr">
-            <p class="text-xs text-gray-500 border-b border-gray-100 px-2 py-1.5 bg-gray-50 flex-shrink-0" dir="ltr">
-              {{ _('Rendered with sample placeholder data for the active language above.') }}
-            </p>
-            <div class="email-template-preview-loading hidden flex items-center gap-2 text-sm text-gray-600 py-4 px-2" role="status" dir="ltr">
-              <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>{{ _('Rendering…') }}
+
+          <div class="email-template-code-surface min-w-0" data-template-key="{{ template.key }}">
+            <div class="email-template-edit-pane">
+              <div class="email-template-edit-wrap overflow-hidden">
+                <pre class="email-template-syntax-backdrop" aria-hidden="true"></pre>
+                <textarea
+                  id="{{ template.key }}"
+                  class="email-template-body-textarea"
+                  data-current-lang="en"
+                  rows="20"
+                  spellcheck="false"
+                  placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_email_templates.get(template.key, {}).get('en', '') }}</textarea>
+              </div>
+              <input type="hidden"
+                     id="{{ template.key }}-translations"
+                     data-settings-email-template-hidden="1"
+                     value="{{ current_email_templates.get(template.key, {}) | tojson | forceescape }}" />
             </div>
-            <div class="email-template-preview-error hidden text-sm text-red-700 bg-red-50 border-b border-red-100 px-2 py-2 whitespace-pre-wrap" dir="ltr"></div>
-            <iframe class="email-template-preview-frame w-full border-0 bg-white"
-                    title="{{ _('Email preview') }}"></iframe>
+            <div class="email-template-visual-pane hidden flex flex-col bg-white min-h-0"
+                 data-template-key="{{ template.key }}">
+              <div class="email-template-visual-tinymce-wrap flex-1 min-h-0 px-3 py-2">
+                <textarea
+                  id="{{ template.key }}-visual"
+                  class="email-template-visual-ta w-full text-sm"
+                  data-email-visual-for="{{ template.key }}"
+                  rows="1"
+                  spellcheck="true"
+                  aria-label="{{ _('Visual email editor') }}"></textarea>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -708,7 +872,7 @@
           </div>
         </div>
 
-        <p class="text-xs text-gray-400 mt-1">
+        <p class="text-xs text-gray-400 mt-2">
           {{ _('Leave empty to use system default template. Non-English versions fall back to English when empty.') }}
         </p>
       </div>
@@ -967,12 +1131,12 @@
     </div>{# /panel-ai #}
 
     {# ── Save bar (always visible) ───────────────── #}
-    <div class="flex items-center justify-end border-t border-gray-200 pt-4">
-      <label class="flex items-center mr-4 text-sm text-gray-600">
-        <input type="checkbox" name="restart" value="1" class="mr-2">
+    <div class="flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-end">
+      <label class="flex items-center text-sm text-gray-600 sm:mr-4">
+        <input type="checkbox" name="restart" value="1" class="mr-2 shrink-0">
         {{ _('Restart app after saving (recommended to apply across all processes)') }}
       </label>
-      <button type="submit" id="settings-save-btn" class="btn btn-success min-w-44">{{ _('Save Settings') }}</button>
+      <button type="submit" id="settings-save-btn" class="btn btn-success min-w-44 self-end sm:self-auto">{{ _('Save Settings') }}</button>
     </div>
 
     </div>{# /p-6 content wrapper #}
@@ -2059,9 +2223,13 @@
     metadataInitial = (decodeEntities(metaInput.value || '') || '').trim() || '{}';
   })();
 
-  /* ── Email template: edit / preview toggle (inline in code area) ── */
+  /* ── Email template: HTML / visual (TinyMCE) toggle (inline in code area) ── */
   var EMAIL_PREVIEW_URL = {{ url_for('settings.api_settings_email_template_preview') | tojson }};
   var EMAIL_TEST_SEND_URL = {{ url_for('settings.api_settings_email_template_test_send') | tojson }};
+  var L_TINYMCE_VAR_TIP = {{ _('Click to switch: edit the template with Jinja placeholders, or see sample values (server-rendered preview, not saved).') | tojson }};
+  var L_TINYMCE_VAR_BTN = {{ _('Variables') | tojson }};
+  var MSG_TINYMCE_VAR_PREVIEW_FAIL = {{ _('Could not load sample values for this template.') | tojson }};
+  var MSG_TINYMCE_VAR_PREVIEW_EMPTY = {{ _('Add some template content first, then show sample values.') | tojson }};
   var EMAIL_SEED_URL = {{ url_for('settings.api_settings_email_templates_seed') | tojson }};
   var MSG_SEED_CONFIRM_FORCE = {{ _('Replace every email and notification template with the built-in defaults from this version? Custom HTML and pre-fill text will be lost.') | tojson }};
   var L_SEED_BODIES = {{ _('Template HTML') | tojson }};
@@ -2069,8 +2237,8 @@
   var L_SEED_UPD = {{ _('updated from defaults') | tojson }};
   var L_SEED_LEFT = {{ _('left unchanged') | tojson }};
   var emailTemplateViewMode = 'edit';
-  /** Temporary: set false when finished — logs preview / test-send / seed API request + response in the browser console. */
-  var DEBUG_EMAIL_SETTINGS_API = true;
+  /** Set false to silence console logs for test-send / seed API. */
+  var DEBUG_EMAIL_SETTINGS_API = false;
   function _debugEmailSettingsApi(phase, info) {
     if (!DEBUG_EMAIL_SETTINGS_API) return;
     try {
@@ -2117,7 +2285,604 @@
     return '';
   }
 
+  function getEmailTinymceForKey(templateKey) {
+    if (!templateKey || !window.tinymce) return null;
+    return tinymce.get(String(templateKey) + '-visual') || null;
+  }
+
+  /* Visual mode: 'placeholders' = Jinja source, 'values' = server-rendered sample (read-only for save) */
+  var emailTinymceVarMode = {};
+  var emailTinymceVarToggleApi = {};
+  /** Last <head> innerHTML for a template (TinyMCE 6 has no fullpage; body in editor, head re-applied to iframe). */
+  var emailTinymceHeadByKey = {};
+  function getEmailTinymceVarMode(tk) {
+    return (emailTinymceVarMode[tk] || 'placeholders') === 'values' ? 'values' : 'placeholders';
+  }
+  function setEmailTinymceVarMode(tk, m) {
+    if (!tk) return;
+    emailTinymceVarMode[tk] = m === 'values' ? 'values' : 'placeholders';
+  }
+  function setEmailTinymceVarToggleVisual(tk, isValues) {
+    var a = emailTinymceVarToggleApi[tk];
+    if (a && typeof a.setActive === 'function') {
+      try { a.setActive(!!isValues); } catch (e) {}
+    }
+  }
+
+  function applyRtlToEmailPreviewHtml(html, langCode) {
+    if (!isEmailTemplateRtlLang(langCode)) return html;
+    if (!html || typeof html !== 'string') return html;
+    if (/<html[^>]*\bdir\s*=/i.test(html)) return html;
+    var trimmed = html.trim();
+    if (/^<!DOCTYPE/i.test(trimmed) || /^<html/i.test(trimmed)) {
+      return html.replace(/<html(\s[^>]*)?>/i, function (full, inner) {
+        if (inner && /\bdir\s*=/.test(inner)) return full;
+        return '<html' + (inner || '') + ' dir="rtl">';
+      });
+    }
+    return '<div dir="rtl" style="direction:rtl;text-align:start;">' + html + '</div>';
+  }
+
+  function isFullHtmlDocumentFragment(s) {
+    if (!s || typeof s !== 'string') return false;
+    var t = s.trim();
+    return t.indexOf('<!DOCTYPE') === 0 || /^<html[\s>]/i.test(t);
+  }
+
+  function injectEmailTemplateHeadIntoTinymceEd(ed, headInner) {
+    if (!ed) return;
+    if (!ed.getDoc || !ed.getDoc()) return;
+    var doc = ed.getDoc();
+    if (!doc.head) return;
+    [].forEach.call(doc.head.querySelectorAll('[data-email-template-head="1"]'), function (n) {
+      try { n.remove(); } catch (e) {}
+    });
+    if (!headInner || !String(headInner).trim()) return;
+    var container;
+    try {
+      container = new window.DOMParser().parseFromString(
+        '<!DOCTYPE html><html><head>' + String(headInner) + '</head><body></body></html>',
+        'text/html'
+      );
+    } catch (e) {
+      return;
+    }
+    if (!container || !container.head) return;
+    [].forEach.call(container.head.children, function (el) {
+      if (!el || el.nodeName === '#text') return;
+      var tag = (el.nodeName || '').toUpperCase();
+      if (tag !== 'TITLE' && tag !== 'STYLE' && tag !== 'LINK' && tag !== 'META') return;
+      try {
+        var imp = doc.importNode(el, true);
+        imp.setAttribute('data-email-template-head', '1');
+        doc.head.appendChild(imp);
+      } catch (e) {}
+    });
+  }
+
+  /* Visual: wrap Jinja2 double-brace placeholders in body text; strip on save. Matches HTML-tab .email-template-jinja-var. */
+  var HTE_JINJA_CLS = 'htd-email-jinja';
+  /* No literal double-open-brace in this Jinja2 file; that would start a Jinja print. */
+  var HTE_JINJA_OPEN = '{' + '{';
+  var HTE_JINJA_RE = new RegExp('\\{\\{[\\s\\S]*?\\}\\}', 'g');
+  function shouldSkipJinjaWalkEl(el) {
+    if (!el || el.nodeType !== 1) return false;
+    var tag = (el.nodeName || '').toLowerCase();
+    if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea') return true;
+    if (el.classList && el.classList.contains(HTE_JINJA_CLS)) return true;
+    return false;
+  }
+  function jinjaTextNodeHasPlaceholder(t) {
+    if (!t || t.indexOf(HTE_JINJA_OPEN) < 0) return false;
+    HTE_JINJA_RE.lastIndex = 0;
+    return HTE_JINJA_RE.test(t);
+  }
+  function processJinjaInTextNode(textNode, doc) {
+    if (!textNode || textNode.nodeType !== 3) return;
+    var t = textNode.nodeValue;
+    if (!jinjaTextNodeHasPlaceholder(t)) return;
+    HTE_JINJA_RE.lastIndex = 0;
+    var parent = textNode.parentNode;
+    if (!parent) return;
+    var m;
+    var last = 0;
+    var fr = doc.createDocumentFragment();
+    HTE_JINJA_RE.lastIndex = 0;
+    while ((m = HTE_JINJA_RE.exec(t)) !== null) {
+      if (m.index > last) {
+        fr.appendChild(doc.createTextNode(t.slice(last, m.index)));
+      }
+      var sp = doc.createElement('span');
+      sp.setAttribute('class', HTE_JINJA_CLS);
+      sp.setAttribute('data-htd-jinja', '1');
+      sp.appendChild(doc.createTextNode(m[0]));
+      fr.appendChild(sp);
+      last = m.index + m[0].length;
+    }
+    if (last < t.length) {
+      fr.appendChild(doc.createTextNode(t.slice(last)));
+    }
+    if (fr.childNodes.length) {
+      try {
+        parent.replaceChild(fr, textNode);
+      } catch (e) {}
+    }
+  }
+  function walkJinjaInNode(root, doc) {
+    if (!root) return;
+    var n = root.firstChild;
+    while (n) {
+      var next = n.nextSibling;
+      if (n.nodeType === 1) {
+        if (!shouldSkipJinjaWalkEl(n)) walkJinjaInNode(n, doc);
+      } else if (n.nodeType === 3) {
+        processJinjaInTextNode(n, doc);
+      }
+      n = next;
+    }
+  }
+  function applyJinjaHighlightToBodyHtmlString(bodyHtml) {
+    if (bodyHtml == null || !String(bodyHtml) || String(bodyHtml).indexOf(HTE_JINJA_OPEN) < 0) return String(bodyHtml || '');
+    var d, wrap, doc;
+    try {
+      d = new window.DOMParser().parseFromString(
+        '<!DOCTYPE html><html><body id="__htd_ja"><div id="__htd_jw">' + String(bodyHtml) + '</div></body></html>',
+        'text/html'
+      );
+      doc = d;
+      wrap = d.getElementById('__htd_jw');
+    } catch (e) {
+      return String(bodyHtml);
+    }
+    if (!wrap || !doc) return String(bodyHtml);
+    walkJinjaInNode(wrap, doc);
+    return wrap.innerHTML;
+  }
+  function stripJinjaHighlightFromBodyHtmlString(bodyHtml) {
+    var s = String(bodyHtml || '');
+    if ((s.indexOf(HTE_JINJA_CLS) < 0) && (s.indexOf('data-htd-jinja') < 0)) return s;
+    var d, wrap;
+    try {
+      d = new window.DOMParser().parseFromString(
+        '<!DOCTYPE html><html><body id="__htd_ja2"><div id="__htd_jw2">' + String(bodyHtml) + '</div></body></html>',
+        'text/html'
+      );
+      wrap = d.getElementById('__htd_jw2');
+    } catch (e) {
+      return s;
+    }
+    if (!wrap) return s;
+    [].forEach.call(wrap.querySelectorAll('span.' + HTE_JINJA_CLS + ',span[data-htd-jinja]'), function (sp) {
+      var p = sp.parentNode;
+      if (!p) return;
+      while (sp.firstChild) p.insertBefore(sp.firstChild, sp);
+      p.removeChild(sp);
+    });
+    return wrap.innerHTML;
+  }
+  function normalizeBodyForTinymceDisplay(bodyStr, templateKey) {
+    var s0 = String(bodyStr || '');
+    s0 = stripJinjaHighlightFromBodyHtmlString(s0);
+    if (getEmailTinymceVarMode(templateKey) === 'values') return s0;
+    return applyJinjaHighlightToBodyHtmlString(s0);
+  }
+  function injectJinjaVarHighlightStyleInTinymceEd(ed) {
+    if (!ed || !ed.getDoc) return;
+    var doc = ed.getDoc();
+    if (!doc || !doc.head) return;
+    /* Drop previous build so we can update highlight rules; version bump when styles change. */
+    [].forEach.call(doc.querySelectorAll('style[data-email-jinja-hl]'), function (n) {
+      try {
+        n.remove();
+      } catch (e) {}
+    });
+    var st = doc.createElement('style');
+    st.setAttribute('data-email-jinja-hl', '2');
+    st.textContent =
+      '.' + HTE_JINJA_CLS + '{' +
+      'box-sizing:border-box;' +
+      'color:#0f3d3a;' +
+      'background:#fff;' +
+      'border:1.5px solid #115e59;' +
+      'box-shadow:0 0 0 1px rgba(255,255,255,0.9),0 1px 3px rgba(0,0,0,0.2);' +
+      'border-radius:4px;padding:0.08em 0.24em;font-weight:600;' +
+      'font-family:ui-monospace,Consolas,Monaco,Menlo,monospace;font-size:0.9em;' +
+      'letter-spacing:0.02em' +
+      '}';
+    try {
+      doc.head.appendChild(st);
+    } catch (e) {}
+  }
+  function afterTinymceEmailBodySet(ed, templateKey) {
+    if (!ed) return;
+    window.setTimeout(function () {
+      injectEmailTemplateHeadIntoTinymceEd(ed, (templateKey && emailTinymceHeadByKey[templateKey] != null) ? String(emailTinymceHeadByKey[templateKey]) : '');
+      injectJinjaVarHighlightStyleInTinymceEd(ed);
+    }, 0);
+  }
+
+  /**
+   * TinyMCE 6 removed the fullpage plugin. Store <head> separately and edit <body> only, then
+   * inject <style> / <link> into the editor iframe and rebuild full documents on save.
+   */
+  function setEmailTinymceContentPreservingDocument(ed, html, templateKey) {
+    if (!ed || !templateKey) return;
+    if (html == null) {
+      emailTinymceHeadByKey[templateKey] = '';
+      ed.setContent('');
+      return;
+    }
+    var h = String(html);
+    if (!h.trim()) {
+      emailTinymceHeadByKey[templateKey] = '';
+      ed.setContent('');
+      return;
+    }
+    var done = function (bodyInner) {
+      var inner = normalizeBodyForTinymceDisplay(bodyInner, templateKey);
+      ed.setContent(inner, { format: 'html' });
+      afterTinymceEmailBodySet(ed, templateKey);
+    };
+    try {
+      var d = new window.DOMParser().parseFromString(h, 'text/html');
+      var headInner = (d.head && d.head.innerHTML) ? d.head.innerHTML.trim() : '';
+      var bodyEl = d.body;
+      if (!bodyEl) {
+        emailTinymceHeadByKey[templateKey] = '';
+        ed.setContent(normalizeBodyForTinymceDisplay(h, templateKey), { format: 'html' });
+        afterTinymceEmailBodySet(ed, templateKey);
+        return;
+      }
+      if (!headInner && !isFullHtmlDocumentFragment(h) && h.indexOf('<head') < 0) {
+        emailTinymceHeadByKey[templateKey] = '';
+        ed.setContent(normalizeBodyForTinymceDisplay(h, templateKey), { format: 'html' });
+        afterTinymceEmailBodySet(ed, templateKey);
+        return;
+      }
+      emailTinymceHeadByKey[templateKey] = headInner;
+      done(bodyEl.innerHTML);
+    } catch (e) {
+      if (window.console && console.debug) window.console.debug('setEmailTinymceContent', e);
+      try {
+        ed.setContent(normalizeBodyForTinymceDisplay(h, templateKey), { format: 'html' });
+        afterTinymceEmailBodySet(ed, templateKey);
+      } catch (e2) {}
+      emailTinymceHeadByKey[templateKey] = '';
+    }
+  }
+
+  function rebuildCurrentEmailFromTinymce(templateKey) {
+    var m = getEmailTinymceForKey(templateKey);
+    if (!m) {
+      var ta0 = document.getElementById(templateKey);
+      return ta0 ? ta0.value : '';
+    }
+    var headInner = (emailTinymceHeadByKey[templateKey] != null) ? String(emailTinymceHeadByKey[templateKey]) : '';
+    var bodyInner = stripJinjaHighlightFromBodyHtmlString(m.getContent() || '');
+    if (!headInner.trim()) return bodyInner;
+    return '<!DOCTYPE html>\n<html><head>' + headInner + '</head><body>' + bodyInner + '</body></html>';
+  }
+
+  function copyEmailTinymceToTextareaByKey(templateKey) {
+    if (getEmailTinymceVarMode(templateKey) === 'values') return;
+    var m = getEmailTinymceForKey(templateKey);
+    if (!m) return;
+    var ta = document.getElementById(templateKey);
+    if (ta) ta.value = rebuildCurrentEmailFromTinymce(templateKey);
+  }
+
+  function copyEmailTinymceToTextareaForAll() {
+    document.querySelectorAll('.email-template-editor').forEach(function (ed) {
+      if (!ed.id || ed.id.indexOf('editor-') !== 0) return;
+      var key = ed.id.replace(/^editor-/, '');
+      copyEmailTinymceToTextareaByKey(key);
+    });
+  }
+
+  function destroyEmailTinymceByKey(templateKey) {
+    if (!templateKey || !window.tinymce) return;
+    var m = getEmailTinymceForKey(templateKey);
+    if (m) m.remove();
+    setEmailTinymceVarMode(templateKey, 'placeholders');
+    try { delete emailTinymceVarToggleApi[templateKey]; } catch (e) {}
+    try { delete emailTinymceHeadByKey[templateKey]; } catch (e) {}
+  }
+
+  function getPlaceholderHtmlForTemplateKey(templateKey) {
+    var mainTa = document.getElementById(templateKey);
+    if (!mainTa) return '';
+    var l = mainTa.dataset.currentLang || 'en';
+    if (templateLangData[templateKey] && templateLangData[templateKey][l] != null) {
+      return String(templateLangData[templateKey][l]);
+    }
+    return mainTa.value;
+  }
+
+  function syncTinymcePlaceholderToMapForPreview(templateKey) {
+    if (getEmailTinymceVarMode(templateKey) === 'values') return;
+    copyEmailTinymceToTextareaByKey(templateKey);
+    var mainTa = document.getElementById(templateKey);
+    if (!mainTa) return;
+    if (!templateLangData[templateKey]) templateLangData[templateKey] = {};
+    templateLangData[templateKey][mainTa.dataset.currentLang || 'en'] = mainTa.value;
+  }
+
+  /**
+   * Server preview runs bleach, which strips or empties <style> in <head> for admin safety.
+   * Reuse the <head> from the unsent placeholder source (same template) and the rendered <body> from the API
+   * so the Visual "sample values" view keeps the same CSS as the Placeholders view.
+   */
+  function mergeEmailPreviewWithSourceHead(placeholderSource, serverHtml) {
+    if (!serverHtml || typeof serverHtml !== 'string') return serverHtml || '';
+    var ph = (placeholderSource || '').trim();
+    if (!ph) return serverHtml;
+    if (!/<style[\s>]/i.test(ph) && !/<link[^>]+rel\s*=\s*["']?stylesheet/i.test(ph)) {
+      return serverHtml;
+    }
+    try {
+      var parser = new window.DOMParser();
+      var dPh = parser.parseFromString(ph, 'text/html');
+      var dSv = parser.parseFromString(serverHtml, 'text/html');
+      var headInner = (dPh.head && dPh.head.innerHTML) ? dPh.head.innerHTML.trim() : '';
+      if (!headInner) return serverHtml;
+      var bodyInner = (dSv.body && dSv.body.innerHTML) ? dSv.body.innerHTML : serverHtml;
+      return '<!DOCTYPE html>\n<html><head>' + headInner + '</head><body>' + bodyInner + '</body></html>';
+    } catch (e) {
+      return serverHtml;
+    }
+  }
+
+  function runEmailTinymceSampleValuesRequest(templateKey, onDone) {
+    if (!EMAIL_PREVIEW_URL) {
+      onDone(new Error('url'));
+      return;
+    }
+    var mainTa = document.getElementById(templateKey);
+    if (!mainTa) { onDone(new Error('no ta')); return; }
+    var plang = (mainTa.dataset && mainTa.dataset.currentLang) ? String(mainTa.dataset.currentLang).trim() : 'en';
+    var src = getPlaceholderHtmlForTemplateKey(templateKey);
+    var trimmed = (src || '').trim();
+    if (!trimmed) { onDone(new Error('empty')); return; }
+    var b64 = base64EncodeUtf8Preview(trimmed);
+    if (!b64) { onDone(new Error('b64')); return; }
+    var bodyStr = wrapEmailTemplateApiJsonBody({ template_key: templateKey, html_b64: b64, template_language: plang });
+    if (!bodyStr) { onDone(new Error('wrap')); return; }
+    var csrf = getCsrfForEmailPreview();
+    _debugEmailSettingsApi('template-var-preview request', { url: EMAIL_PREVIEW_URL, template_key: templateKey, template_language: plang });
+    ((window.getFetch && window.getFetch()) || fetch)(EMAIL_PREVIEW_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: bodyStr
+    }).then(function (resp) {
+      return resp.json().then(function (payload) {
+        return { ok: resp.ok, status: resp.status, payload: payload };
+      });
+    }).then(function (result) {
+      _debugEmailSettingsApi('template-var-preview response', { ok: result.ok, status: result.status, payload: result.payload });
+      var p = result.payload || {};
+      if (result.ok && p.success && typeof p.html === 'string' && p.html.trim()) {
+        var merged = mergeEmailPreviewWithSourceHead(src, p.html);
+        onDone(null, applyRtlToEmailPreviewHtml(merged, plang));
+        return;
+      }
+      onDone(new Error(p.error || p.message || (MSG_TINYMCE_VAR_PREVIEW_FAIL + (result.status ? ' (' + result.status + ')' : ''))));
+    }).catch(function (err) {
+      onDone(err, null);
+    });
+  }
+
+  function getTemplateKeyFromEditorBlock(el) {
+    if (!el || !el.id || el.id.indexOf('editor-') !== 0) return '';
+    return el.id.replace(/^editor-/, '');
+  }
+
+  /* Self-hosted (same origin) to avoid third-party “Tracking Prevention” storage noise from cdnjs. */
+  var TINYMCE_BASE_URL = {{ url_for('static', filename='libs/tinymce')|tojson }};
+
+  var tinymceLoadPromise = null;
+  function loadTinymceIfNeeded(done) {
+    if (window.tinymce) {
+      setTimeout(done, 0);
+      return;
+    }
+    if (tinymceLoadPromise) {
+      tinymceLoadPromise.then(function () { done(); });
+      return;
+    }
+    tinymceLoadPromise = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = TINYMCE_BASE_URL + '/tinymce.min.js';
+      s.onload = function () { resolve(1); };
+      s.onerror = function () { resolve(0); };
+      document.head.appendChild(s);
+    });
+    tinymceLoadPromise.then(function () { done(); });
+  }
+
+  function buildTinymceEmailOptions(templateKey) {
+    var ta = document.getElementById(templateKey);
+    var lang = (ta && ta.dataset && ta.dataset.currentLang) ? String(ta.dataset.currentLang) : 'en';
+    var rtl = isEmailTemplateRtlLang(lang);
+    return {
+      selector: '#' + templateKey.replace(/"/g, '\\"') + '-visual',
+      /* Fixed viewport; do not use autoresize (it grows the frame to full document height). */
+      height: 480,
+      resize: false,
+      statusbar: false,
+      /* Wrap toolbar to match narrow card; no DOM path bar. */
+      toolbar_mode: 'wrap',
+      menubar: false,
+      branding: false,
+      promotion: false,
+      /* fullpage was removed in TinyMCE 6; we split head/body in JS. */
+      plugins: 'image link lists table visualblocks',
+      /* forecolor / backcolor: free core toolbar; image: URL/alt in dialog (upload needs a custom images_upload_url handler). */
+      toolbar: 'undo redo | blocks | bold italic underline | forecolor backcolor | alignleft aligncenter alignright | bullist numlist outdent indent | link image table | emailvarmode | removeformat',
+      /* When the caret is in a table, show row/column + cell formatting (contextual bar). */
+      table_toolbar: 'tableprops tabledelete | tablecellprops tablerowprops | tablemergecells tablesplitcells | tablecellvalign | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablecellbackgroundcolor | tablecellborderwidth tablecellborderstyle',
+      valid_elements: '*[*]',
+      invalid_elements: '',
+      verify_html: false,
+      entity_encoding: 'raw',
+      apply_source_formatting: false,
+      remove_trailing_brs: false,
+      convert_urls: false,
+      relative_urls: false,
+      remove_script_host: false,
+      base_url: TINYMCE_BASE_URL,
+      suffix: '.min',
+      skin: 'oxide',
+      /* Do not load TinyMCE 'default' content.css — it overrides body/typography and makes emails look unstyled. */
+      content_css: false,
+      directionality: rtl ? 'rtl' : 'ltr',
+      setup: function (ed) {
+        ed.on('input change keyup', function () { emailTemplatesDirty = true; });
+        if (ed.ui && ed.ui.registry) {
+          var tk = templateKey;
+          ed.ui.registry.addToggleButton('emailvarmode', {
+            text: L_TINYMCE_VAR_BTN || 'Var',
+            icon: 'preview',
+            tooltip: L_TINYMCE_VAR_TIP,
+            onAction: function (api) {
+              if (getEmailTinymceVarMode(tk) === 'values') {
+                var ph = getPlaceholderHtmlForTemplateKey(tk);
+                setEmailTinymceVarMode(tk, 'placeholders');
+                setEmailTinymceContentPreservingDocument(ed, ph, tk);
+                var b0 = ed.getBody();
+                if (b0) {
+                  var main0 = document.getElementById(tk);
+                  if (main0) {
+                    var cl0 = main0.dataset.currentLang || 'en';
+                    b0.setAttribute('dir', isEmailTemplateRtlLang(cl0) ? 'rtl' : 'ltr');
+                    b0.style.direction = isEmailTemplateRtlLang(cl0) ? 'rtl' : 'ltr';
+                    b0.setAttribute('lang', cl0);
+                  }
+                }
+                api.setActive(false);
+                return;
+              }
+              if (api) { api.setActive(false); }
+              syncTinymcePlaceholderToMapForPreview(tk);
+              if (api) api.setEnabled(false);
+              runEmailTinymceSampleValuesRequest(tk, function (err, outHtml) {
+                if (api) api.setEnabled(true);
+                if (err) {
+                  var m = (err && err.message === 'empty') ? MSG_TINYMCE_VAR_PREVIEW_EMPTY
+                    : (err && err.message) ? String(err.message) : MSG_TINYMCE_VAR_PREVIEW_FAIL;
+                  if (api) api.setActive(false);
+                  if (window.showAlert) window.showAlert(m, 'warning');
+                  return;
+                }
+                setEmailTinymceVarMode(tk, 'values');
+                setEmailTinymceContentPreservingDocument(ed, outHtml, tk);
+                var b2 = ed.getBody();
+                if (b2) {
+                  var main2 = document.getElementById(tk);
+                  if (main2) {
+                    var cl2 = main2.dataset.currentLang || 'en';
+                    b2.setAttribute('dir', isEmailTemplateRtlLang(cl2) ? 'rtl' : 'ltr');
+                    b2.style.direction = isEmailTemplateRtlLang(cl2) ? 'rtl' : 'ltr';
+                    b2.setAttribute('lang', cl2);
+                  }
+                }
+                if (api) api.setActive(true);
+              });
+            },
+            onSetup: function (api) {
+              emailTinymceVarToggleApi[tk] = api;
+              try { api.setActive(false); } catch (e) {}
+              return function () {
+                if (emailTinymceVarToggleApi[tk] === api) emailTinymceVarToggleApi[tk] = null;
+              };
+            }
+          });
+        }
+      }
+    };
+  }
+
+  function startEmailTinymceForKey(templateKey) {
+    if (!templateKey || !window.tinymce) return;
+    var vId = templateKey + '-visual';
+    if (getEmailTinymceForKey(templateKey)) return;
+    var visTa = document.getElementById(vId);
+    if (!visTa) return;
+    if (!visTa.parentNode || (visTa.closest('.email-template-editor') && visTa.closest('.email-template-editor').style.display === 'none')) return;
+    try {
+      tinymce.init(Object.assign({
+        init_instance_callback: function (ed) {
+          var b = ed.getBody();
+          if (b) b.setAttribute('spellcheck', 'true');
+          /* Re-apply the full source so <head><style>…</head> is kept (html format can drop it). */
+          if (visTa && visTa.value) {
+            setEmailTinymceContentPreservingDocument(ed, visTa.value, templateKey);
+          }
+          b = ed.getBody();
+          if (b) {
+            var mainT = document.getElementById(templateKey);
+            if (mainT) {
+              var clang = mainT.dataset.currentLang || 'en';
+              var dr = isEmailTemplateRtlLang(clang) ? 'rtl' : 'ltr';
+              b.setAttribute('dir', dr);
+              b.style.direction = dr;
+              b.setAttribute('lang', clang);
+            }
+          }
+        }
+      }, buildTinymceEmailOptions(templateKey)));
+    } catch (e) {
+      if (window.console && console.warn) console.warn('TinyMCE init', e);
+    }
+  }
+
+  function loadEmailTemplateVisualInEditor(editorBlock) {
+    if (!editorBlock) return;
+    var templateKey = getTemplateKeyFromEditorBlock(editorBlock);
+    if (!templateKey) return;
+    var mainTa = document.getElementById(templateKey);
+    var visTa = document.getElementById(templateKey + '-visual');
+    if (!visTa) return;
+    setEmailTinymceVarMode(templateKey, 'placeholders');
+    setEmailTinymceVarToggleVisual(templateKey, false);
+    var html = '';
+    if (mainTa) html = mainTa.value;
+    if (!html.trim() && templateLangData[templateKey] && mainTa) {
+      var l = mainTa.dataset.currentLang || 'en';
+      if (templateLangData[templateKey][l] != null) {
+        html = String(templateLangData[templateKey][l]);
+      }
+    }
+    visTa.value = html;
+    var existing = getEmailTinymceForKey(templateKey);
+    if (existing) {
+      setEmailTinymceContentPreservingDocument(existing, html, templateKey);
+      var b = existing.getBody();
+      if (b && mainTa) {
+        var clang = mainTa.dataset.currentLang || 'en';
+        var dr = isEmailTemplateRtlLang(clang) ? 'rtl' : 'ltr';
+        b.setAttribute('dir', dr);
+        b.style.direction = dr;
+        b.setAttribute('lang', clang);
+      }
+      return;
+    }
+    loadTinymceIfNeeded(function () {
+      if (typeof window.tinymce === 'undefined') {
+        if (window.showAlert) {
+          window.showAlert({{ _('The visual editor could not be loaded. Check your network, then refresh the page.') | tojson }}, 'error');
+        }
+        return;
+      }
+      startEmailTinymceForKey(templateKey);
+    });
+  }
+
   function syncActiveEmailTemplateToMap() {
+    copyEmailTinymceToTextareaForAll();
     document.querySelectorAll('.email-template-editor').forEach(function (editor) {
       var textarea = editor.querySelector('textarea[id^="email_template_"]');
       if (!textarea) return;
@@ -2159,22 +2924,8 @@
     }
   }
 
-  function applyRtlToEmailPreviewSrcdoc(html, langCode) {
-    if (!isEmailTemplateRtlLang(langCode)) return html;
-    if (!html || typeof html !== 'string') return html;
-    if (/<html[^>]*\bdir\s*=/i.test(html)) return html;
-    var trimmed = html.trim();
-    if (/^<!DOCTYPE/i.test(trimmed) || /^<html/i.test(trimmed)) {
-      return html.replace(/<html(\s[^>]*)?>/i, function (full, inner) {
-        if (inner && /\bdir\s*=/.test(inner)) return full;
-        return '<html' + (inner || '') + ' dir="rtl">';
-      });
-    }
-    return '<div dir="rtl" style="direction:rtl;text-align:start;">' + html + '</div>';
-  }
-
   var ETM_CLASS_EDIT = 'email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors';
-  var ETM_CLASS_PREVIEW = 'email-template-mode-btn email-template-mode-preview-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors';
+  var ETM_CLASS_VISUAL = 'email-template-mode-btn email-template-mode-visual-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors';
 
   function updateEmailTemplateViewToggle() {
     var isEdit = emailTemplateViewMode === 'edit';
@@ -2184,8 +2935,8 @@
         : ' bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100');
       btn.setAttribute('aria-pressed', isEdit ? 'true' : 'false');
     });
-    document.querySelectorAll('.email-template-mode-preview-btn').forEach(function (btn) {
-      btn.className = ETM_CLASS_PREVIEW + (isEdit
+    document.querySelectorAll('.email-template-mode-visual-btn').forEach(function (btn) {
+      btn.className = ETM_CLASS_VISUAL + (isEdit
         ? ' bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100'
         : ' bg-white text-blue-600 relative z-10');
       btn.setAttribute('aria-pressed', isEdit ? 'false' : 'true');
@@ -2193,140 +2944,41 @@
   }
 
   function setEmailTemplateViewMode(mode) {
-    if (mode !== 'edit' && mode !== 'preview') return;
+    if (mode !== 'edit' && mode !== 'visual') return;
     emailTemplateViewMode = mode;
     updateEmailTemplateViewToggle();
     applyEmailTemplateViewMode();
-  }
-
-  function loadEmailTemplatePreviewInEditor(editorBlock) {
-    if (!editorBlock) return;
-    var loading = editorBlock.querySelector('.email-template-preview-loading');
-    var errEl = editorBlock.querySelector('.email-template-preview-error');
-    var frame = editorBlock.querySelector('.email-template-preview-frame');
-    if (!loading || !errEl || !frame) return;
-
-    if (editorBlock.id && editorBlock.id.indexOf('editor-') !== 0) return;
-    var templateKey = editorBlock.id.replace(/^editor-/, '');
-
-    syncActiveEmailTemplateToMap();
-    var textarea = document.getElementById(templateKey);
-    var lang = (textarea && textarea.dataset.currentLang) ? textarea.dataset.currentLang : 'en';
-    var html = '';
-    if (templateLangData[templateKey] && typeof templateLangData[templateKey][lang] === 'string') {
-      html = templateLangData[templateKey][lang];
-    } else if (textarea) {
-      html = textarea.value;
-    }
-
-    errEl.classList.add('hidden');
-    errEl.textContent = '';
-    try { frame.removeAttribute('srcdoc'); } catch (_) {}
-    loading.classList.remove('hidden');
-
-    var trimmed = (html || '').trim();
-    if (!trimmed) {
-      loading.classList.add('hidden');
-      errEl.textContent = {{ _('No template content for this language. Add HTML in the editor or switch language tab.') | tojson }};
-      errEl.classList.remove('hidden');
-      return;
-    }
-
-    var b64 = base64EncodeUtf8Preview(trimmed);
-    if (!b64) {
-      loading.classList.add('hidden');
-      errEl.textContent = {{ _('Could not encode template for preview.') | tojson }};
-      errEl.classList.remove('hidden');
-      return;
-    }
-
-    var csrf = getCsrfForEmailPreview();
-    var previewLang = (textarea && textarea.dataset && textarea.dataset.currentLang)
-      ? String(textarea.dataset.currentLang).trim()
-      : 'en';
-    var previewBodyInner = { template_key: templateKey, html_b64: b64, template_language: previewLang };
-    var previewBodyStr = wrapEmailTemplateApiJsonBody(previewBodyInner);
-    if (!previewBodyStr) {
-      loading.classList.add('hidden');
-      errEl.textContent = {{ _('Could not encode template for preview.') | tojson }};
-      errEl.classList.remove('hidden');
-      return;
-    }
-    _debugEmailSettingsApi('preview request', {
-      url: EMAIL_PREVIEW_URL,
-      template_key: templateKey,
-      template_language: previewLang,
-      html_len: trimmed.length,
-      html_b64_len: b64.length,
-      body_wrapped: true,
-      post_body_len: previewBodyStr.length
-    });
-    /* CSRF-only fetch: 400 template errors return JSON without throwing (not apiFetch). */
-    ((window.getFetch && window.getFetch()) || fetch)(EMAIL_PREVIEW_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrf,
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: previewBodyStr
-    }).then(function (resp) {
-      return resp.json().then(function (payload) {
-        return { ok: resp.ok, status: resp.status, payload: payload };
-      });
-    }).then(function (result) {
-      var payload = result.payload || {};
-      _debugEmailSettingsApi('preview response', {
-        ok: result.ok,
-        status: result.status,
-        success: payload.success,
-        has_html: typeof payload.html === 'string' && payload.html.length > 0,
-        html_len: typeof payload.html === 'string' ? payload.html.length : 0,
-        error: payload.error,
-        message: payload.message,
-        payload: payload
-      });
-      loading.classList.add('hidden');
-      if (result.ok && payload.success && typeof payload.html === 'string' && payload.html.trim()) {
-        frame.srcdoc = applyRtlToEmailPreviewSrcdoc(payload.html, previewLang);
-        return;
-      }
-      var errMsg = (payload && (payload.error || payload.message)) ? (payload.error || payload.message) : null;
-      var msg = errMsg || ({{ _('Preview failed.') | tojson }} + ' (' + result.status + ')');
-      errEl.textContent = msg;
-      errEl.classList.remove('hidden');
-    }).catch(function (err) {
-      _debugEmailSettingsApi('preview error', { name: err && err.name, message: err && err.message });
-      loading.classList.add('hidden');
-      errEl.textContent = {{ _('Network error while loading preview.') | tojson }};
-      errEl.classList.remove('hidden');
-    });
   }
 
   function applyEmailTemplateViewMode() {
     var sel = document.getElementById('email-template-selector');
     var activeKey = sel ? sel.value : '';
     document.querySelectorAll('.email-template-editor').forEach(function (ed) {
+      var key = getTemplateKeyFromEditorBlock(ed);
       var isActive = activeKey && ed.id === 'editor-' + activeKey;
       var editPane = ed.querySelector('.email-template-edit-pane');
-      var prevPane = ed.querySelector('.email-template-preview-pane');
-      if (!editPane || !prevPane) return;
+      var visPane = ed.querySelector('.email-template-visual-pane');
+      if (!editPane || !visPane) return;
       if (!isActive) {
+        copyEmailTinymceToTextareaByKey(key);
+        destroyEmailTinymceByKey(key);
         editPane.classList.remove('hidden');
-        prevPane.classList.add('hidden');
+        visPane.classList.add('hidden');
         return;
       }
       if (emailTemplateViewMode === 'edit') {
+        copyEmailTinymceToTextareaByKey(key);
+        destroyEmailTinymceByKey(key);
         editPane.classList.remove('hidden');
-        prevPane.classList.add('hidden');
+        visPane.classList.add('hidden');
         var taEdit = ed.querySelector('.email-template-body-textarea');
         if (taEdit) {
           setTimeout(function () { updateEmailTemplateSyntaxHighlight(taEdit); }, 0);
         }
       } else {
         editPane.classList.add('hidden');
-        prevPane.classList.remove('hidden');
-        loadEmailTemplatePreviewInEditor(ed);
+        visPane.classList.remove('hidden');
+        loadEmailTemplateVisualInEditor(ed);
       }
     });
   }
@@ -2390,7 +3042,20 @@
 
       var currentLang = textarea.dataset.currentLang || 'en';
       if (!templateLangData[templateKey]) templateLangData[templateKey] = {};
-      templateLangData[templateKey][currentLang] = textarea.value;
+      if (emailTemplateViewMode === 'visual' && getEmailTinymceForKey(templateKey)) {
+        if (getEmailTinymceVarMode(templateKey) === 'values') {
+          templateLangData[templateKey][currentLang] = textarea.value;
+        } else {
+          var m0 = getEmailTinymceForKey(templateKey);
+          if (m0) {
+            templateLangData[templateKey][currentLang] = rebuildCurrentEmailFromTinymce(templateKey);
+          } else {
+            templateLangData[templateKey][currentLang] = textarea.value;
+          }
+        }
+      } else {
+        templateLangData[templateKey][currentLang] = textarea.value;
+      }
       emailTemplatesDirty = true;
 
       textarea.value = templateLangData[templateKey][lang] || '';
@@ -2403,9 +3068,9 @@
         });
       }
 
-      if (emailTemplateViewMode === 'preview') {
+      if (emailTemplateViewMode === 'visual') {
         var edLang = document.getElementById('editor-' + templateKey);
-        if (edLang) loadEmailTemplatePreviewInEditor(edLang);
+        if (edLang) loadEmailTemplateVisualInEditor(edLang);
       } else {
         updateEmailTemplateSyntaxHighlight(textarea);
       }
@@ -2414,7 +3079,7 @@
     });
   });
 
-  /* Edit / preview: one state; buttons duplicated per template — delegate from Emails panel */
+  /* Edit / visual: one state; buttons duplicated per template — delegate from Emails panel */
   (function initEmailViewToggle() {
     var panel = document.getElementById('panel-emails');
     if (!panel) return;
@@ -2423,7 +3088,7 @@
       if (!btn || !panel.contains(btn)) return;
       var mode = btn.getAttribute('data-mode');
       if (mode === 'edit') setEmailTemplateViewMode('edit');
-      else if (mode === 'preview') setEmailTemplateViewMode('preview');
+      else if (mode === 'visual') setEmailTemplateViewMode('visual');
     });
   })();
 
@@ -2500,9 +3165,9 @@
         templateLangData[templateKey][currentLang] = translated;
         emailTemplatesDirty = true;
         updateEmailTemplateSyntaxHighlight(textarea);
-        if (emailTemplateViewMode === 'preview') {
+        if (emailTemplateViewMode === 'visual') {
           var ed = document.getElementById('editor-' + templateKey);
-          if (ed) loadEmailTemplatePreviewInEditor(ed);
+          if (ed) loadEmailTemplateVisualInEditor(ed);
         }
         restoreBtn();
       }).catch(function (err) {
@@ -2635,10 +3300,26 @@
   (function initEmailTemplateSeed() {
     var gapsBtn = document.getElementById('email-templates-seed-gaps-btn');
     var forceBtn = document.getElementById('email-templates-seed-force-btn');
-    if (!gapsBtn || !forceBtn) return;
+    var toggleBtn = document.getElementById('email-templates-seed-toggle');
+    var seedMenu = document.getElementById('email-templates-seed-menu');
+    if (!gapsBtn || !forceBtn || !toggleBtn || !seedMenu) return;
+
+    function closeSeedMenu() {
+      seedMenu.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var isOpen = !seedMenu.classList.contains('hidden');
+      seedMenu.classList.toggle('hidden', isOpen);
+      toggleBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+    document.addEventListener('click', closeSeedMenu);
+    seedMenu.addEventListener('click', function (e) { e.stopPropagation(); });
 
     function setBusy(yes, loadingBtn) {
-      [gapsBtn, forceBtn].forEach(function (b) {
+      [toggleBtn, gapsBtn, forceBtn].forEach(function (b) {
         b.disabled = !!yes;
         if (yes) {
           if (loadingBtn && b === loadingBtn) b.classList.add('btn-loading');
@@ -2700,14 +3381,21 @@
         if (window.showAlert) window.showAlert({{ _('Network error while seeding templates.') | tojson }}, 'error');
       });
     }
-    gapsBtn.addEventListener('click', function () { doSeed(false, gapsBtn); });
-    forceBtn.addEventListener('click', function () { doSeed(true, forceBtn); });
+    gapsBtn.addEventListener('click', function () {
+      closeSeedMenu();
+      doSeed(false, toggleBtn);
+    });
+    forceBtn.addEventListener('click', function () {
+      closeSeedMenu();
+      doSeed(true, toggleBtn);
+    });
   })();
 
   /* ── Sync in-memory data → hidden inputs on form submit ── */
   var form = document.getElementById('manage-settings-form');
   if (form) {
     form.addEventListener('submit', function () {
+      copyEmailTinymceToTextareaForAll();
       document.querySelectorAll('.email-template-editor').forEach(function (editor) {
         var textarea    = editor.querySelector('textarea[id^="email_template_"]');
         var hiddenInput = editor.querySelector('input[type="hidden"][id$="-translations"]');
@@ -2728,14 +3416,37 @@
     });
   }
 
-  /* ── Variable insertion (switch to edit if preview is showing) ── */
+  /* ── Variable insertion (HTML textarea or TinyMCE when Visual is active) ── */
   document.querySelectorAll('.insert-variable-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      if (emailTemplateViewMode === 'preview') {
-        setEmailTemplateViewMode('edit');
-      }
       var variable = this.getAttribute('data-variable');
       var targetId = this.getAttribute('data-target');
+      if (emailTemplateViewMode === 'visual' && getEmailTinymceForKey(targetId)) {
+        if (getEmailTinymceVarMode(targetId) === 'values') {
+          var tEd0 = getEmailTinymceForKey(targetId);
+          var phIns = getPlaceholderHtmlForTemplateKey(targetId);
+          setEmailTinymceVarMode(targetId, 'placeholders');
+          setEmailTinymceContentPreservingDocument(tEd0, phIns, targetId);
+          setEmailTinymceVarToggleVisual(targetId, false);
+          if (tEd0 && tEd0.getBody()) {
+            var bIns = tEd0.getBody();
+            var mIns = document.getElementById(targetId);
+            if (mIns) {
+              var cIns = mIns.dataset.currentLang || 'en';
+              bIns.setAttribute('dir', isEmailTemplateRtlLang(cIns) ? 'rtl' : 'ltr');
+              bIns.style.direction = isEmailTemplateRtlLang(cIns) ? 'rtl' : 'ltr';
+            }
+          }
+        }
+        var tEd = getEmailTinymceForKey(targetId);
+        if (tEd) {
+          tEd.insertContent(String(variable || ''), { format: 'raw' });
+          tEd.focus();
+          emailTemplatesDirty = true;
+          return;
+        }
+        setEmailTemplateViewMode('edit');
+      }
       var textarea = document.getElementById(targetId);
       if (!textarea) return;
       var start  = textarea.selectionStart;
@@ -3131,7 +3842,7 @@
 <script type="application/json" id="translation-data">
 {
     "supportedLanguages": {{ current_supported | tojson }},
-    "languageDisplayNames": {{ LANGUAGE_DISPLAY_NAMES | tojson }}
+    "languageDisplayNames": {{ merged_language_display_names | tojson }}
 }
 </script>
 

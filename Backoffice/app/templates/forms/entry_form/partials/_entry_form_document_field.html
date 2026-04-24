@@ -114,7 +114,8 @@
                             </div>
                         </div>
                         <div class="mt-2 space-y-1 w-full">
-                            <span class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">{{ LANGUAGE_DISPLAY_NAMES.get(doc.language, doc.language or _('N/A')) }}</span>
+                            {% set doc_lang_base = (doc.language or '').split('_')[0].split('-')[0] %}
+                            <span class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">{{ language_endonym(doc_lang_base) or LANGUAGE_DISPLAY_NAMES.get(doc_lang_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(doc_lang_base) or (doc.language or _('N/A')) }}</span>
                             <p class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">({{ _('Uploaded by %(user)s on %(date)s', user=doc.uploaded_by_user.name if doc.uploaded_by_user else _('Unknown'), date=doc.uploaded_at|format_date_localized('medium')) }})</p>
                             {% if doc.id in entity_repo_document_ids %}
                             <span class="text-xs font-medium text-blue-800 block">{{ _("From this entity's document repository") }}</span>
@@ -164,7 +165,8 @@
                     </div>
                 </div>
                 <div class="mt-2 space-y-1 w-full">
-                    <span class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">{{ LANGUAGE_DISPLAY_NAMES.get(doc.language, doc.language or _('N/A')) }}</span>
+                    {% set doc_lang_base = (doc.language or '').split('_')[0].split('-')[0] %}
+                    <span class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">{{ language_endonym(doc_lang_base) or LANGUAGE_DISPLAY_NAMES.get(doc_lang_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(doc_lang_base) or (doc.language or _('N/A')) }}</span>
                     <p class="text-xs block {% if doc.id in entity_repo_document_ids %}text-blue-700{% else %}text-green-600{% endif %}">({{ _('Uploaded by %(user)s on %(date)s', user=doc.uploaded_by_user.name if doc.uploaded_by_user else _('Unknown'), date=doc.uploaded_at|format_date_localized('medium')) }})</p>
                     {% if doc.id in entity_repo_document_ids %}
                     <span class="text-xs font-medium text-blue-800 block">{{ _("From this entity's document repository") }}</span>

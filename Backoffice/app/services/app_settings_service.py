@@ -1144,6 +1144,112 @@ def get_notification_priority(notification_type: str, default: str = "normal") -
 
 
 # ---------------------------------------------------------------------------
+# Notification audience rules (focal vs org admins vs system managers per type)
+# ---------------------------------------------------------------------------
+
+NOTIFICATION_AUDIENCE_RULES_KEY = "notification_audience_rules"
+NOTIFICATION_AUDIENCE_BUCKETS = frozenset(("focal_points", "admin_users", "system_managers"))
+
+# ``admin_users``: entity-scoped org admins (admin_core / admin_*), not system_manager.
+# ``system_managers``: deployment-wide system_manager role.
+DEFAULT_NOTIFICATION_AUDIENCE_RULES: Dict[str, Dict[str, bool]] = {
+    "assignment_created": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "assignment_submitted": {"focal_points": True, "admin_users": True, "system_managers": True},
+    "assignment_approved": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "assignment_reopened": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "public_submission_received": {"focal_points": False, "admin_users": True, "system_managers": True},
+    "form_updated": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "document_uploaded": {"focal_points": True, "admin_users": True, "system_managers": True},
+    "user_added_to_country": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "template_updated": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "self_report_created": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "deadline_reminder": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "admin_message": {"focal_points": True, "admin_users": True, "system_managers": True},
+    "access_request_received": {"focal_points": False, "admin_users": True, "system_managers": True},
+}
+
+
+def _deep_copy_default_audience_rules() -> Dict[str, Dict[str, bool]]:
+    return {k: dict(v) for k, v in DEFAULT_NOTIFICATION_AUDIENCE_RULES.items()}
+
+
+def get_notification_audience_rules() -> Dict[str, Dict[str, bool]]:
+    """Return stored audience overrides only (may be partial). Values are bool per bucket."""
+    data = read_settings()
+    raw = data.get(NOTIFICATION_AUDIENCE_RULES_KEY)
+    if not isinstance(raw, dict):
+        return {}
+    result: Dict[str, Dict[str, bool]] = {}
+    for k, v in raw.items():
+        if not isinstance(k, str) or not k.strip():
+            continue
+        if not isinstance(v, dict):
+            continue
+        inner: Dict[str, bool] = {}
+        for b in NOTIFICATION_AUDIENCE_BUCKETS:
+            if b in v and isinstance(v[b], bool):
+                inner[b] = v[b]
+        if inner:
+            result[k.strip()] = inner
+    return result
+
+
+def get_merged_notification_audience_rules() -> Dict[str, Dict[str, bool]]:
+    """Full notification type -> audience buckets merged with defaults."""
+    merged = _deep_copy_default_audience_rules()
+    overrides = get_notification_audience_rules()
+    for nt_key, inner in overrides.items():
+        if nt_key not in merged:
+            continue
+        for b in NOTIFICATION_AUDIENCE_BUCKETS:
+            if b in inner:
+                merged[nt_key][b] = inner[b]
+    return merged
+
+
+def audience_bucket_enabled(notification_type, bucket: str) -> bool:
+    """Whether emissions using this audience bucket are allowed for this notification type."""
+    if bucket not in NOTIFICATION_AUDIENCE_BUCKETS:
+        return False
+    nt_val = getattr(notification_type, "value", None)
+    if nt_val is None:
+        nt_val = str(notification_type)
+    nt_val = str(nt_val).strip()
+    merged = get_merged_notification_audience_rules()
+    row = merged.get(nt_val)
+    if not row:
+        return False
+    return bool(row.get(bucket))
+
+
+def set_notification_audience_rules(
+    rules: Dict[str, Dict[str, bool]], user_id: Optional[int] = None
+) -> bool:
+    """Persist notification audience rules. Keys are NotificationType.value strings."""
+    from app.models.enums import NotificationType
+
+    allowed_nt = {nt.value for nt in NotificationType}
+    cleaned: Dict[str, Dict[str, bool]] = {}
+    for k, inner in (rules or {}).items():
+        if not isinstance(k, str) or not k.strip():
+            continue
+        ks = k.strip()
+        if ks not in allowed_nt:
+            continue
+        if not isinstance(inner, dict):
+            continue
+        inner_clean: Dict[str, bool] = {}
+        for b in NOTIFICATION_AUDIENCE_BUCKETS:
+            if b in inner and isinstance(inner[b], bool):
+                inner_clean[b] = inner[b]
+        if inner_clean:
+            cleaned[ks] = inner_clean
+    data = read_settings()
+    data[NOTIFICATION_AUDIENCE_RULES_KEY] = cleaned
+    return write_settings(data, user_id=user_id)
+
+
+# ---------------------------------------------------------------------------
 # Auto-approve access requests  (env-var driven, not a DB setting)
 # ---------------------------------------------------------------------------
 

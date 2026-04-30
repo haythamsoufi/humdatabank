@@ -158,6 +158,7 @@ def create_test_admin(db_session, **kwargs):
     if kwargs.get("can_manage_users", True):
         _grant(role_id, "admin.users.view")
         _grant(role_id, "admin.users.edit")
+        _grant(role_id, "admin.users.create")
     if kwargs.get("can_manage_templates", True):
         _grant(role_id, "admin.templates.view")
         _grant(role_id, "admin.templates.edit")

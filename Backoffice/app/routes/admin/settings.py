@@ -479,6 +479,7 @@ def _manage_settings_form_baseline(
     current_branding: dict,
     current_chatbot_name: str,
     notification_priorities: dict,
+    merged_notification_audience_rules: dict,
     ai_groups: list,
     ai_beta_enabled: bool,
     ai_beta_allowed_user_ids: list,
@@ -517,6 +518,23 @@ def _manage_settings_form_baseline(
     for nt in NotificationType:
         key = nt.value
         base[f"notification_priority_{key}"] = (notification_priorities or {}).get(key) or "normal"
+
+    from app.utils.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
+
+    merged_aud = merged_notification_audience_rules or {}
+    for spec in NOTIFICATION_TYPE_REGISTRY_SPECS:
+        tk = spec["type_key"]
+        aud = spec.get("audiences") or []
+        row = merged_aud.get(tk) or {}
+        if "focal_points" in aud:
+            if row.get("focal_points"):
+                base[f"na_fp_{tk}"] = "1"
+        if "admin_users" in aud:
+            if row.get("admin_users"):
+                base[f"na_au_{tk}"] = "1"
+        if "system_managers" in aud:
+            if row.get("system_managers"):
+                base[f"na_sm_{tk}"] = "1"
 
     base.update(_collect_ai_form_baseline_from_groups(ai_groups))
 
@@ -567,6 +585,12 @@ def _manage_settings_audit_label(key: str) -> str:
     if key.startswith("notification_priority_"):
         slug = key.replace("notification_priority_", "").replace("_", " ")
         return f"Notification priority ({slug})"
+    if key.startswith("na_fp_"):
+        return f"Notification audience focal ({key.replace('na_fp_', '').replace('_', ' ')})"
+    if key.startswith("na_au_"):
+        return f"Notification audience admin ({key.replace('na_au_', '').replace('_', ' ')})"
+    if key.startswith("na_sm_"):
+        return f"Notification audience system managers ({key.replace('na_sm_', '').replace('_', ' ')})"
     if key.startswith("ai_") and not key.endswith("_clear"):
         sub = key[3:]
         return f"AI: {sub.replace('_', ' ')}"
@@ -595,6 +619,34 @@ def _format_manage_settings_audit_description(detail):
         return "Updated system settings: " + ", ".join(labels)
     head = ", ".join(labels[:10])
     return f"Updated system settings ({len(labels)} areas), including: {head}, …"
+
+
+def _notification_audience_rules_from_post(data) -> dict:
+    """Build notification_audience_rules from POST keys ``na_fp_<type>``, ``na_au_<type>``, ``na_sm_<type>``."""
+    from app.utils.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
+
+    def _truthy(val):
+        if val is None:
+            return False
+        if isinstance(val, bool):
+            return val
+        return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+    rules = {}
+    for spec in NOTIFICATION_TYPE_REGISTRY_SPECS:
+        tk = spec["type_key"]
+        aud = spec.get("audiences") or []
+        if not aud:
+            continue
+        inner = {}
+        if "focal_points" in aud:
+            inner["focal_points"] = _truthy(data.get(f"na_fp_{tk}"))
+        if "admin_users" in aud:
+            inner["admin_users"] = _truthy(data.get(f"na_au_{tk}"))
+        if "system_managers" in aud:
+            inner["system_managers"] = _truthy(data.get(f"na_sm_{tk}"))
+        rules[tk] = inner
+    return rules
 
 
 @bp.route("/settings", methods=["GET", "POST"])
@@ -627,6 +679,8 @@ def manage_settings():
         get_template_metadata,
         get_notification_priorities,
         set_notification_priorities,
+        get_merged_notification_audience_rules,
+        set_notification_audience_rules,
         get_mobile_min_app_version,
         set_mobile_min_app_version,
     )
@@ -689,12 +743,35 @@ def manage_settings():
 
     # Notification priorities (per notification type)
     from app.models.enums import NotificationType
-    notification_type_labels = [
-        (nt.value, nt.value.replace("_", " ").title())
-        for nt in NotificationType
-    ]
+    from flask_babel import gettext as _
+
     notification_priorities = get_notification_priorities()
+    merged_notification_audience_rules = get_merged_notification_audience_rules()
     current_mobile_min_app_version = get_mobile_min_app_version() or ""
+
+    ttl_map_ns = current_app.config.get("NOTIFICATION_TTL_DAYS", {}) or {}
+
+    def _manage_settings_ttl_resolve(type_key: str) -> int:
+        try:
+            return int(ttl_map_ns.get(type_key, 90))
+        except (TypeError, ValueError):
+            return 90
+
+    from app.utils.notification_registry import build_notification_settings_delivery_rows
+
+    notification_delivery_catalog = build_notification_settings_delivery_rows(
+        _manage_settings_ttl_resolve,
+        lambda tk: (notification_priorities or {}).get(tk) or "normal",
+        gettext_fn=_,
+        merged_audience_rules=merged_notification_audience_rules,
+    )
+
+    _feat = current_app.config.get("FEATURES") or {}
+    notification_feature_flags = {
+        str(k): bool(v)
+        for k, v in _feat.items()
+        if str(k).startswith("notifications_")
+    }
 
     if request.method == "POST":
         settings_audit_detail = None
@@ -744,6 +821,7 @@ def manage_settings():
                         current_branding=current_branding,
                         current_chatbot_name=current_chatbot_name,
                         notification_priorities=notification_priorities,
+                        merged_notification_audience_rules=merged_notification_audience_rules,
                         ai_groups=ai_groups,
                         ai_beta_enabled=ai_beta_enabled,
                         ai_beta_allowed_user_ids=ai_beta_allowed_user_ids,
@@ -1008,6 +1086,15 @@ def manage_settings():
                 current_app.logger.debug("set_notification_priorities failed: %s", e)
                 notif_priorities_ok = False
 
+            # Notification audience rules (focal points vs admin-capable emitters)
+            notif_audience_ok = True
+            try:
+                aud_rules = _notification_audience_rules_from_post(data)
+                notif_audience_ok = set_notification_audience_rules(aud_rules, user_id=user_id)
+            except Exception as e:
+                current_app.logger.debug("set_notification_audience_rules failed: %s", e)
+                notif_audience_ok = False
+
             # AI Settings
             ai_ok = True
             if data.get("ai_settings_present") == "1":
@@ -1248,8 +1335,9 @@ def manage_settings():
         ai_beta_enabled=ai_beta_enabled,
         ai_beta_allowed_user_ids=ai_beta_allowed_user_ids,
         ai_beta_user_options=ai_beta_user_options,
-        notification_type_labels=notification_type_labels,
         notification_priorities=notification_priorities,
+        notification_delivery_catalog=notification_delivery_catalog,
+        notification_feature_flags=notification_feature_flags,
         current_mobile_min_app_version=current_mobile_min_app_version,
         title="System Configuration",
         visual_branding_upload_available=branding_visual_upload_available(),

@@ -13,6 +13,13 @@ from app.services.user_analytics_service import log_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
 from app.utils.error_handling import handle_json_view_exception
+from app.utils.profile_summary_payload import (
+    role_badge_key_from_rbac_codes,
+    collect_arg_strings,
+    parse_uuid_list,
+    parse_int_user_ids,
+    profile_summary_scope_fields,
+)
 from app.utils.transactions import request_transaction_rollback
 
 from . import bp
@@ -321,32 +328,23 @@ def api_user_update(user_id):
 def api_users_profile_summary():
     """Return lightweight user profile summaries for AG Grid hover popups."""
     try:
-        user_ids_raw = request.args.getlist('user_ids')
-        if not user_ids_raw:
-            user_ids_csv = (request.args.get('user_ids') or '').strip()
-            if user_ids_csv:
-                user_ids_raw = [part.strip() for part in user_ids_csv.split(',') if part.strip()]
+        user_ids_raw = collect_arg_strings(request.args, "user_ids")
+        external_raw = collect_arg_strings(request.args, "external_ids")
+        emails_raw = collect_arg_strings(request.args, "emails")
 
-        emails_raw = request.args.getlist('emails')
-        if not emails_raw:
-            emails_csv = (request.args.get('emails') or '').strip()
-            if emails_csv:
-                emails_raw = [part.strip() for part in emails_csv.split(',') if part.strip()]
+        user_ids = parse_int_user_ids(user_ids_raw)
+        external_uuids = parse_uuid_list(external_raw)
+        emails = [str(email).strip().lower() for email in emails_raw if str(email).strip()]
 
-        user_ids = []
-        for value in user_ids_raw:
-            with suppress(Exception):
-                user_ids.append(int(value))
-
-        emails = [str(email).strip().lower() for email in (emails_raw or []) if str(email).strip()]
-
-        if not user_ids and not emails:
+        if not user_ids and not external_uuids and not emails:
             return json_ok(status='success', profiles=[])
 
         query = User.query
         filters = []
         if user_ids:
             filters.append(User.id.in_(list(set(user_ids))))
+        if external_uuids:
+            filters.append(User.external_id.in_(list(set(external_uuids))))
         if emails:
             filters.append(db.func.lower(User.email).in_(list(set(emails))))
         if filters:
@@ -375,7 +373,7 @@ def api_users_profile_summary():
             for row in last_presence_rows:
                 last_presence_by_user_id[row.user_id] = row.last_presence
 
-        roles_by_user_id = {}
+        role_codes_by_user_id = {}
         with suppress(Exception):
             from app.models.rbac import RbacRole, RbacUserRole
 
@@ -387,22 +385,33 @@ def api_users_profile_summary():
                 role = roles_by_id.get(ur.role_id)
                 if not role:
                     continue
-                roles_by_user_id.setdefault(ur.user_id, []).append(role.name or role.code)
+                role_code = (role.code or "").strip()
+                if role_code:
+                    role_codes_by_user_id.setdefault(ur.user_id, []).append(role_code)
 
         all_permissions = UserEntityPermission.query.filter(
             UserEntityPermission.user_id.in_(found_user_ids)
         ).all()
 
-        country_count_by_user_id = {}
-        entity_counts_by_user_id = {}
+        country_ids_by_user_id: dict[int, set[int]] = {}
+        entity_counts_by_user_id: dict[int, dict[str, int]] = {}
         for perm in all_permissions:
             uid = int(perm.user_id)
             etype = str(perm.entity_type or '')
             if etype == 'country':
-                country_count_by_user_id[uid] = country_count_by_user_id.get(uid, 0) + 1
+                country_ids_by_user_id.setdefault(uid, set()).add(int(perm.entity_id))
             elif etype:
                 bucket = entity_counts_by_user_id.setdefault(uid, {})
                 bucket[etype] = int(bucket.get(etype, 0)) + 1
+
+        all_countries = Country.query.all()
+        country_id_to_name_region = {
+            int(c.id): (str(c.name or ''), str(c.region or '')) for c in all_countries
+        }
+        region_to_all_country_ids: dict[str, set[int]] = {}
+        for c in all_countries:
+            r = str(c.region or '')
+            region_to_all_country_ids.setdefault(r, set()).add(int(c.id))
 
         profiles = []
         for user in users:
@@ -411,28 +420,33 @@ def api_users_profile_summary():
                 with suppress(Exception):
                     profile_color = user.generate_profile_color()
 
-            entity_counts = entity_counts_by_user_id.get(user.id, {})
-            entity_summary_parts = []
-            for key, value in sorted(entity_counts.items()):
-                if int(value) > 0:
-                    entity_summary_parts.append(f"{key.replace('_', ' ')}: {value}")
-
             last_presence_dt = last_presence_by_user_id.get(user.id)
             last_presence_iso = last_presence_dt.isoformat() + 'Z' if last_presence_dt else None
 
-            profiles.append({
+            rb_key = role_badge_key_from_rbac_codes(
+                role_codes_by_user_id.get(user.id, [])
+            )
+            row = {
                 'id': user.id,
+                'external_id': str(user.external_id) if user.external_id else None,
                 'name': user.name or '',
                 'email': user.email or '',
                 'title': user.title or '',
                 'profile_color': profile_color or '#3B82F6',
                 'active': bool(user.active),
                 'last_presence': last_presence_iso,
-                'rbac_roles': roles_by_user_id.get(user.id, []),
-                'countries_count': int(country_count_by_user_id.get(user.id, 0)),
-                'entity_counts': entity_counts,
-                'entity_summary': ', '.join(entity_summary_parts),
-            })
+                'role_badge_key': rb_key,
+            }
+            row.update(
+                profile_summary_scope_fields(
+                    rb_key,
+                    country_ids_by_user_id.get(user.id, set()),
+                    dict(entity_counts_by_user_id.get(user.id, {})),
+                    country_id_to_name_region=country_id_to_name_region,
+                    region_to_all_country_ids=region_to_all_country_ids,
+                )
+            )
+            profiles.append(row)
 
         return json_ok(status='success', profiles=profiles)
     except Exception as e:

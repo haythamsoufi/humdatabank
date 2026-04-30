@@ -3,10 +3,8 @@ from flask_login import login_required, current_user
 from app.models import db, User, Country, CountryAccessRequest
 from app.models.assignments import AssignmentEntityStatus
 from app.models.core import UserEntityPermission
-from app.models.rbac import RbacUserRole, RbacRole
 from app.models.enums import EntityType
 from app.models.system import CountryAccessRequestStatus
-from sqlalchemy import or_
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.forms.assignments import ReopenAssignmentForm, ApproveAssignmentForm
 from app.forms.auth_forms import RequestCountryAccessForm
@@ -189,27 +187,9 @@ def request_country_access():
                 skipped_already_has_access = []
                 skipped_invalid = []
 
-                # Get all admins and system managers (excluding the requester) for notifications
-                from app.services.notification.core import create_notification
+                from app.services.notification.audience import collect_entity_admin_audience_recipient_ids
                 from app.models.enums import NotificationType
-                admin_role_ids = (
-                    db.session.query(RbacRole.id)
-                    .filter(
-                        or_(
-                            RbacRole.code == "system_manager",
-                            RbacRole.code == "admin_core",
-                            RbacRole.code.like("admin\\_%", escape="\\"),
-                        )
-                    )
-                    .subquery()
-                )
-                admin_users = (
-                    User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
-                    .filter(RbacUserRole.role_id.in_(admin_role_ids), User.id != current_user.id)
-                    .distinct()
-                    .all()
-                )
-                admin_user_ids = [admin.id for admin in admin_users] if admin_users else []
+
                 user_name = current_user.name or current_user.email
 
                 # Process each country
@@ -273,8 +253,17 @@ def request_country_access():
 
                         created_requests.append(access_request)
 
-                        # Notify admins and system managers about the access request
+                        admin_user_ids = collect_entity_admin_audience_recipient_ids(
+                            NotificationType.access_request_received,
+                            'country',
+                            country_id_int,
+                            exclude_user_ids=[current_user.id],
+                        )
+
+                        # Notify org admins / system managers covering this country (per notification audience settings)
                         if admin_user_ids and not auto_approve:
+                            from app.services.notification.core import create_notification
+
                             try:
                                 country_name = country.name if country else 'Unknown Country'
 

@@ -11,7 +11,7 @@ import hashlib
 import hmac
 from flask_login import UserMixin
 from sqlalchemy import Table, Column, Integer, ForeignKey, String, Text, DateTime, Boolean, JSON, Enum, LargeBinary, Date, Float, event, and_
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import relationship, backref, foreign
 from config import Config
 import enum
@@ -92,6 +92,9 @@ class User(UserMixin, db.Model):
     )
 
     api_key = db.Column(db.String(64), unique=True, nullable=True)
+
+    # Opaque identifier for browser/API references (avoids exposing sequential integer ids).
+    external_id = db.Column(PGUUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4)
 
     @property
     def is_active(self):

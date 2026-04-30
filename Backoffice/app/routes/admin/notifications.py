@@ -266,6 +266,7 @@ def notifications_registry():
             str(r["ttl_days"]),
             r["default_priority"],
             icon_cls,
+            "active" if r.get("emitter_active") else "hypothetical",
         ]
         hay = " ".join(hay_parts).lower()
         if q and q not in hay:
@@ -277,6 +278,7 @@ def notifications_registry():
                 "group_display": _(r["group"]),
                 "description_display": _(r["description"]),
                 "icon_class": icon_cls,
+                "emitter_status_display": _("Active") if r.get("emitter_active") else _("Hypothetical"),
             }
         )
 
@@ -290,6 +292,7 @@ def notifications_registry():
                 _("Group"),
                 _("Type key"),
                 _("Label"),
+                _("Emitter active"),
                 _("Default priority"),
                 _("TTL (days)"),
                 _("Description"),
@@ -302,6 +305,7 @@ def notifications_registry():
                     rw["group_display"],
                     rw["type_key"],
                     rw["label"],
+                    _("Yes") if rw.get("emitter_active") else _("No"),
                     rw["default_priority"],
                     rw["ttl_days"],
                     rw["description_display"],

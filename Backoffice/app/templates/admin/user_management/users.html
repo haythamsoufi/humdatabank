@@ -9,7 +9,8 @@
 {% set can_manage_roles_permissions = current_is_system_manager or has_permission('admin.users.roles.assign') %}
 {# Roles & Permissions (RBAC management) is System Manager only (also enforced server-side). #}
 {% set can_manage_rbac = current_is_system_manager %}
-{% set can_create_user = current_is_system_manager or has_permission('admin.users.create') %}
+{% set azure_b2c_configured = azure_b2c_configured | default(false) %}
+{% set can_create_user = (current_is_system_manager or has_permission('admin.users.create')) and (not azure_b2c_configured) %}
 {% set can_edit_user = current_is_system_manager or has_permission('admin.users.edit') %}
 
 {% block title %}{{ _('Manage Users') }}{% endblock %}
@@ -226,12 +227,22 @@
                 {% set role_display_text = _('No roles') %}
             {% endif %}
         {% endif %}
+        {% if is_system_manager %}
+            {% set role_badge_key = 'system_manager' %}
+        {% elif is_admin_user %}
+            {% set role_badge_key = 'admin' %}
+        {% elif is_focal_point %}
+            {% set role_badge_key = 'focal_point' %}
+        {% else %}
+            {% set role_badge_key = 'user' %}
+        {% endif %}
         {
             id: {{ user.id }},
+            external_id: {{ (user.external_id|string if user.external_id else '')|tojson|safe }},
             name: {{ (user.name or '')|tojson|safe }},
             email: {{ (user.email or '')|tojson|safe }},
             title: {{ (user.title or '')|tojson|safe }},
-            rbac_roles: {{ (user_roles|map(attribute='name')|list)|tojson|safe }},
+            role_badge_key: {{ role_badge_key|tojson|safe }},
             role_codes: {{ user_role_codes|tojson|safe }},
             role_display: {{ role_display_text|tojson|safe }},
             role_tooltip: {{ role_tooltip_text|tojson|safe }},

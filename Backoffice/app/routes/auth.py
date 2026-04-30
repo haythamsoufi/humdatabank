@@ -25,7 +25,7 @@ from app.services.user_analytics_service import (
 )
 from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
 from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.api_responses import json_bad_request, json_ok, json_server_error, json_forbidden
 from app.utils.password_validator import validate_password_strength
 from app.models import PasswordResetToken
 import uuid
@@ -37,6 +37,7 @@ from app.services.email.client import send_email
 from app.services.app_settings_service import get_organization_name, is_organization_email, user_has_ai_beta_access
 from app.utils.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
 from app.utils.request_utils import clear_mobile_app_embed_cookie
+from app.utils.azure_b2c_config import is_azure_b2c_configured
 
 bp = Blueprint("auth", __name__)
 
@@ -972,6 +973,12 @@ def register():
     if request.method == 'GET':
         # Prefer modal usage
         return redirect(url_for('auth.login'))
+    if is_azure_b2c_configured():
+        flash(
+            _('Self-service registration is not available. Please sign in with your organization account.'),
+            'warning',
+        )
+        return redirect(url_for('auth.login'))
     # POST
     if form.validate_on_submit():
         from app.services import UserService
@@ -1057,6 +1064,8 @@ def check_register_email():
     address is already registered. Returns JSON:
       { "ok": true, "exists": true|false }
     """
+    if is_azure_b2c_configured():
+        return json_forbidden('registration_disabled', success=False, ok=False)
     email = (request.args.get('email') or '').strip().lower()
     if not email:
         return json_bad_request('missing_email', ok=False)
@@ -1080,13 +1089,15 @@ def forgot_password():
         user = UserService.get_by_email(email)
         # Always show success to avoid revealing account existence
         if user:
-            token = _generate_reset_token(email)
-            if token is None:
-                flash(_('We could not process the reset request at this time. Please try again later.'), 'danger')
-                return redirect(url_for('auth.login'))
-            sent = _send_password_reset_email(email, token)
-            if not sent:
-                flash(_('We could not send the reset email at this time. Please contact support.'), 'danger')
+            skip_reset = is_azure_b2c_configured() and not user.password_hash
+            if not skip_reset:
+                token = _generate_reset_token(email)
+                if token is None:
+                    flash(_('We could not process the reset request at this time. Please try again later.'), 'danger')
+                    return redirect(url_for('auth.login'))
+                sent = _send_password_reset_email(email, token)
+                if not sent:
+                    flash(_('We could not send the reset email at this time. Please contact support.'), 'danger')
         flash(_('If an account exists for that email, a reset link has been sent.'), 'info')
         return redirect(url_for('auth.login'))
     # Validation errors
@@ -1107,6 +1118,9 @@ def reset_password(token):
     if not user:
         flash(_('Invalid reset link.'), 'warning')
         return redirect(url_for('auth.forgot_password'))
+    if is_azure_b2c_configured() and not user.password_hash:
+        flash(_('This reset link is invalid or has expired.'), 'warning')
+        return redirect(url_for('auth.login'))
     form = ResetPasswordForm()
     if form.validate_on_submit():
         # Server-side password strength validation

@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "macros/translation_modal.html" import translation_modal, translation_matrix_modal %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_loading %}
 
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
@@ -1107,36 +1108,60 @@
 
     {# ═══════════════ TAB: Notifications ═══════════════ #}
     <div class="settings-panel hidden" id="panel-notifications">
-    <div class="mb-6">
-      <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Notification Priorities') }}</label>
-      <p class="text-xs text-gray-500 mb-3">
-        {{ _('Set the priority level for each notification type. High/urgent priorities trigger immediate emails and action-required styling.') }}
-      </p>
-      <div class="overflow-x-auto border border-gray-200 rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Notification Type') }}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Priority') }}</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            {% for nt_key, nt_label in notification_type_labels %}
-            <tr>
-              <td class="px-4 py-2 text-sm text-gray-700">{{ nt_label }}</td>
-              <td class="px-4 py-2">
-                <select name="notification_priority_{{ nt_key }}"
-                        class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                  <option value="normal" {% if (notification_priorities.get(nt_key) or 'normal') == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
-                  <option value="high" {% if notification_priorities.get(nt_key) == 'high' %}selected{% endif %}>{{ _('High') }}</option>
-                  <option value="urgent" {% if notification_priorities.get(nt_key) == 'urgent' %}selected{% endif %}>{{ _('Urgent') }}</option>
-                  <option value="low" {% if notification_priorities.get(nt_key) == 'low' %}selected{% endif %}>{{ _('Low') }}</option>
-                </select>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+
+    <div class="mb-6 border border-gray-200 rounded-lg overflow-hidden">
+      <div class="bg-gray-50/90 border-b border-gray-200 px-4 py-3">
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900">{{ _('Notifications') }}</h3>
+          <p class="text-xs text-gray-600 mt-1.5 max-w-3xl">
+            {{ _('Each row describes who receives the in-app notification when it is created, how long it is kept (TTL), and the default priority for new notifications of that type. Where applicable, enable or disable delivery to focal points (assignment editor/submitter on the entity) and to admin-capable users (system_manager, admin_core, admin_*). Stored items appear in the Notifications Center; WebSockets, push, and email depend on feature flags and each user’s own preferences. High and urgent priorities can trigger immediate email and stronger styling even when the user prefers digests.') }}
+          </p>
+          <p class="text-xs text-gray-600 mt-2 max-w-3xl">
+            {{ _('Hypothetical types are listed at the bottom; the word Hypothetical appears in the Type column when no in-app notification is emitted for that row yet.') }}
+          </p>
+        </div>
+        {# Feature flags (read-only): show effective On/Off from Config.FEATURES — not editable here #}
+        {% set notification_ff_rows = [
+          ('notifications_websocket_enabled', _('WebSockets')),
+          ('notifications_push_enabled', _('Push notifications')),
+          ('notifications_email_digests_enabled', _('Email digests')),
+          ('notifications_analytics_enabled', _('Analytics')),
+          ('notifications_webhooks_enabled', _('Webhooks')),
+        ] %}
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-y-5 gap-x-6 p-4 border border-gray-100 rounded-lg bg-white/80 xl:gap-x-0 xl:divide-x xl:divide-gray-300">
+          {% for fk, flabel in notification_ff_rows %}
+          {% set fv = (notification_feature_flags or {}).get(fk, false) %}
+          <div class="flex items-start justify-between gap-3 min-w-0 xl:px-5 xl:first:ps-0 xl:last:pe-0">
+            <div class="min-w-0 flex-1 flex flex-col gap-1 font-sans antialiased">
+              <span class="text-sm font-semibold text-gray-900 leading-snug">{{ flabel }}</span>
+              <code class="notification-feature-flag-key block w-full max-w-full overflow-x-auto whitespace-nowrap rounded px-0 py-0 text-[10px] sm:text-[11px] font-normal leading-snug text-gray-600 bg-transparent [font-variant-numeric:tabular-nums]"
+                    title="{{ fk }}">{{ fk }}</code>
+            </div>
+            <span class="mt-0.5 inline-flex min-w-[3rem] shrink-0 items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums shadow-sm
+                  {% if fv %}border-teal-600 bg-teal-600 text-white ring-1 ring-inset ring-white/25{% else %}border-amber-400 bg-amber-100 text-amber-950 ring-1 ring-inset ring-amber-500/15{% endif %}"
+                  role="status"
+                  title="{{ _('Configured via deployment / Config.FEATURES') }}"
+                  aria-label="{{ flabel }}: {% if fv %}{{ _('On') }}{% else %}{{ _('Off') }}{% endif %}">
+              {% if fv %}{{ _('On') }}{% else %}{{ _('Off') }}{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="text-[11px] text-gray-500 mt-3 mb-0">{{ _('Feature flags come from environment variables (see Config.FEATURES).') }}</p>
+      </div>
+      <style nonce="{{ csp_nonce() }}">
+        /* Hypothetical notification types — muted rows at bottom of grid */
+        #notificationSettingsGrid .ag-row.notification-settings-grid-row-hypothetical {
+          background-color: rgb(248 250 252);
+        }
+      </style>
+      <script type="application/json" id="notification-settings-grid-rows">{{ notification_delivery_catalog | tojson }}</script>
+      <div id="notificationSettingsGridWrap" class="relative w-full min-w-0 bg-white border-t border-gray-100" style="min-height: 14rem;">
+        {{ ag_grid_loading('notificationSettingsGrid', loading_text=_('Loading notification settings…')) }}
+        <div id="notificationSettingsGrid-container" class="w-full min-w-0" style="display: none;">
+          <div id="notificationSettingsGrid" class="ag-theme-alpine ag-grid-container"
+               style="width: 100%; height: min(70vh, 36rem);"></div>
+        </div>
       </div>
     </div>
     </div>{# /panel-notifications #}
@@ -1364,6 +1389,314 @@
     </div>{# /p-6 content wrapper #}
   </form>
 </div>
+
+{{ ag_grid_js() }}
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  'use strict';
+  var PL = {
+    normal: {{ _('Normal')|tojson }},
+    high: {{ _('High')|tojson }},
+    urgent: {{ _('Urgent')|tojson }},
+    low: {{ _('Low')|tojson }}
+  };
+  var AUDIENCE_NA_TITLE = {{ _('Not applicable for this notification type (no delivery on this channel).')|tojson }};
+
+  function escHtml(s) {
+    if (window.AgGridRenderers && typeof AgGridRenderers.escapeHtml === 'function') {
+      return AgGridRenderers.escapeHtml(s == null ? '' : String(s));
+    }
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+
+  function waitForAg(cb, tries) {
+    tries = tries || 0;
+    if (typeof AgGridHelper !== 'undefined') {
+      cb();
+      return;
+    }
+    if (tries > 80) return;
+    setTimeout(function () { waitForAg(cb, tries + 1); }, 50);
+  }
+
+    function setupNotificationSettingsGrid() {
+    var jsonEl = document.getElementById('notification-settings-grid-rows');
+    var gridEl = document.getElementById('notificationSettingsGrid');
+    if (!jsonEl || !gridEl || typeof AgGridHelper === 'undefined' || !AgGridHelper.create) return;
+
+    var rows = [];
+    try {
+      rows = JSON.parse(jsonEl.textContent || '[]');
+    } catch (e) {
+      return;
+    }
+
+    function fitNotificationColumnsIfVisible(api) {
+      if (!api || typeof api.sizeColumnsToFit !== 'function' || !gridEl) return;
+      var w = gridEl.clientWidth || gridEl.getBoundingClientRect().width;
+      /* Panel uses Tailwind .hidden until the Notifications tab is active; avoid fitting at ~0px. */
+      if (w < 200) return;
+      try {
+        api.sizeColumnsToFit();
+      } catch (e) {}
+    }
+
+    function audienceCheckbox(prefix, audienceKey, propKey, titleStr) {
+      return function (params) {
+        var aud = params.data.audiences || [];
+        if (aud.indexOf(audienceKey) === -1) {
+          /* Registry omits this bucket (e.g. public_submission_received is admin-only → focal N/A). */
+          return '<label class="inline-flex items-center justify-center cursor-default pointer-events-none opacity-70" title="' +
+            escAttr(AUDIENCE_NA_TITLE) + '">' +
+            '<input type="checkbox" disabled tabindex="-1" ' +
+            'class="rounded border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed opacity-80" ' +
+            'aria-label="' + escAttr(AUDIENCE_NA_TITLE) + '" /></label>';
+        }
+        var tk = params.data.type_key;
+        var checked = params.data[propKey] ? ' checked' : '';
+        return '<label class="inline-flex items-center justify-center cursor-pointer" title="' + escAttr(titleStr) + '">' +
+          '<input type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" name="' +
+          prefix + tk + '" value="1"' + checked + ' /></label>';
+      };
+    }
+
+    function prioritySelect(params) {
+      var tk = params.data.type_key;
+      var cur = (params.data.current_priority || 'normal').toLowerCase();
+      function opt(val, label) {
+        var sel = cur === val ? ' selected' : '';
+        return '<option value="' + escAttr(val) + '"' + sel + '>' + escHtml(label) + '</option>';
+      }
+      return '<select name="notification_priority_' + tk + '" class="w-full min-w-[7.5rem] rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm capitalize">' +
+        opt('normal', PL.normal) + opt('high', PL.high) + opt('urgent', PL.urgent) + opt('low', PL.low) +
+        '</select>';
+    }
+
+    function typeCell(params) {
+      var d = params.data || {};
+      var ic = escAttr(d.icon_class || '');
+      var hypo = (d.emitter_active === false || d.emitter_active === 0);
+      var hypoHtml = '';
+      if (hypo) {
+        var hlab = escHtml(d.emitter_status_display || '');
+        var htit = escAttr(d.emitter_status_hint || '');
+        hypoHtml =
+          '<span class="mt-1 inline-flex w-fit rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700" title="' +
+          htit +
+          '">' +
+          hlab +
+          '</span>';
+      }
+      return '<div class="flex items-start gap-2">' +
+        '<span class="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600" aria-hidden="true">' +
+        '<i class="' + ic + ' text-xs"></i></span>' +
+        '<div class="min-w-0">' +
+        '<div class="font-medium text-gray-900">' + escHtml(d.label) + '</div>' +
+        '<div class="font-mono text-[11px] text-gray-500 break-all">' + escHtml(d.type_key) + '</div>' +
+        hypoHtml +
+        '</div></div>';
+    }
+
+    var columnDefs = [
+      {
+        field: 'group_display',
+        headerName: {{ _('Group')|tojson }},
+        flex: 0.55,
+        minWidth: 96,
+        maxWidth: 200,
+        filter: 'agTextColumnFilter',
+        sortable: true,
+        wrapHeaderText: true,
+        autoHeaderHeight: true
+      },
+      {
+        field: 'label',
+        headerName: {{ _('Type')|tojson }},
+        flex: 0.85,
+        minWidth: 168,
+        maxWidth: 340,
+        filter: 'agTextColumnFilter',
+        sortable: true,
+        cellRenderer: typeCell,
+        autoHeight: true,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        cellStyle: { 'white-space': 'normal', 'line-height': '1.35', 'align-items': 'flex-start' }
+      },
+      {
+        field: 'recipients_display',
+        headerName: {{ _('Recipients')|tojson }},
+        flex: 3.5,
+        minWidth: 280,
+        filter: 'agTextColumnFilter',
+        sortable: true,
+        wrapText: true,
+        autoHeight: true,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        cellStyle: { 'white-space': 'normal', 'line-height': '1.45', 'font-size': '12px', color: '#374151' }
+      },
+      {
+        field: 'audience_focal_points',
+        headerName: {{ _('Focal points')|tojson }},
+        width: 128,
+        minWidth: 118,
+        maxWidth: 152,
+        sortable: false,
+        filter: false,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        cellRenderer: audienceCheckbox('na_fp_', 'focal_points', 'audience_focal_points', {{ _('Notify focal points (assignment editor/submitter)')|tojson }}),
+        cellStyle: { display: 'flex', 'align-items': 'center', 'justify-content': 'center' }
+      },
+      {
+        field: 'audience_admin_users',
+        headerName: {{ _('Org admins')|tojson }},
+        width: 108,
+        minWidth: 96,
+        maxWidth: 132,
+        sortable: false,
+        filter: false,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        cellRenderer: audienceCheckbox('na_au_', 'admin_users', 'audience_admin_users', {{ _('Notify entity-assigned admins (admin_core / admin_*, not system managers)')|tojson }}),
+        cellStyle: { display: 'flex', 'align-items': 'center', 'justify-content': 'center' }
+      },
+      {
+        field: 'audience_system_managers',
+        headerName: {{ _('System managers')|tojson }},
+        width: 116,
+        minWidth: 100,
+        maxWidth: 140,
+        sortable: false,
+        filter: false,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        cellRenderer: audienceCheckbox('na_sm_', 'system_managers', 'audience_system_managers', {{ _('Notify deployment-wide system managers')|tojson }}),
+        cellStyle: { display: 'flex', 'align-items': 'center', 'justify-content': 'center' }
+      },
+      {
+        field: 'ttl_days',
+        headerName: {{ _('TTL')|tojson }},
+        width: 84,
+        minWidth: 72,
+        maxWidth: 104,
+        filter: 'agNumberColumnFilter',
+        sortable: true,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        cellStyle: { 'text-align': 'center', fontFamily: 'ui-monospace, monospace', fontSize: '12px' }
+      },
+      {
+        field: 'current_priority',
+        headerName: {{ _('Priority')|tojson }},
+        width: 136,
+        minWidth: 124,
+        maxWidth: 168,
+        sortable: false,
+        filter: false,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        cellRenderer: prioritySelect
+      }
+    ];
+
+    var result = AgGridHelper.create(
+      'notificationSettingsGrid',
+      'system-notification-settings',
+      columnDefs,
+      rows,
+      {
+        columnVisibility: { enableExport: false, showPanelButton: false, persistOnChange: false },
+        autoDetectFilters: false,
+        gridOptions: {
+          suppressRowVirtualisation: true,
+          suppressColumnVirtualisation: true,
+          animateRows: false,
+          domLayout: 'normal',
+          /* Default helper runs sizeColumnsToFit while this tab can still be display:none — skip that pass. */
+          sizeColumnsToFitOnInit: false,
+          getRowClass: function (params) {
+            var d = params.data;
+            if (!d || d.emitter_active !== false) return '';
+            return 'notification-settings-grid-row-hypothetical';
+          }
+        },
+        onReady: function (api) {
+          window.__notificationSettingsGridApi = api;
+          /* ColumnVisibilityManager restores visibility/order from localStorage; older saves lacked
+             audience_system_managers so AG Grid left it at the far right. Force canonical order. */
+          try {
+            if (api && typeof api.applyColumnState === 'function') {
+              var notificationSettingsColumnOrder = [
+                'group_display',
+                'label',
+                'recipients_display',
+                'audience_focal_points',
+                'audience_admin_users',
+                'audience_system_managers',
+                'ttl_days',
+                'current_priority'
+              ];
+              api.applyColumnState({
+                state: notificationSettingsColumnOrder.map(function (colId) {
+                  return { colId: colId };
+                }),
+                applyOrder: true
+              });
+            }
+          } catch (e) {}
+          setTimeout(function () {
+            fitNotificationColumnsIfVisible(api);
+          }, 50);
+        }
+      }
+    );
+
+    if (result && result.api) {
+      window.__notificationSettingsGridApi = result.api;
+    }
+  }
+
+  function onTabActivated(ev) {
+    if (!ev || !ev.detail || ev.detail.tab !== 'notifications') return;
+    var api = window.__notificationSettingsGridApi;
+    var gel = document.getElementById('notificationSettingsGrid');
+    if (!api || !gel) return;
+    setTimeout(function () {
+      var w = gel.clientWidth || gel.getBoundingClientRect().width;
+      if (w < 200) return;
+      try {
+        if (typeof api.doLayout === 'function') api.doLayout();
+        if (typeof api.sizeColumnsToFit === 'function') api.sizeColumnsToFit();
+      } catch (e) {}
+    }, 80);
+  }
+
+  document.addEventListener('settings-tab-activated', onTabActivated);
+
+  waitForAg(function () {
+    setupNotificationSettingsGrid();
+    var hash = (location.hash || '').replace('#', '');
+    if (hash === 'notifications' && window.__notificationSettingsGridApi) {
+      var api0 = window.__notificationSettingsGridApi;
+      var g0 = document.getElementById('notificationSettingsGrid');
+      setTimeout(function () {
+        if (!g0 || (g0.clientWidth || g0.getBoundingClientRect().width) < 200) return;
+        try {
+          if (typeof api0.doLayout === 'function') api0.doLayout();
+          if (typeof api0.sizeColumnsToFit === 'function') api0.sizeColumnsToFit();
+        } catch (e) {}
+      }, 100);
+    }
+  });
+})();
+</script>
 
 {# ── Tab switching logic ─────────────────────────── #}
 <script nonce="{{ csp_nonce() }}">
@@ -3838,7 +4171,18 @@
     Object.keys(current || {}).forEach(function (k) { keys[k] = true; });
     Object.keys(keys).forEach(function (k) {
       if (settingsFieldEqual(k, initial[k], current[k])) return;
-      out[k] = current[k];
+      var val = current[k];
+      /* Notification audience cells use native checkboxes; unchecked ones are absent from FormData.
+         Partial save merges over a baseline where checked boxes are "1", so undefined would be
+         dropped by JSON.stringify and the server would keep the old true — see na_fp_/na_au_. */
+      if (
+        val === undefined || val === null || val === ''
+      ) {
+        if (k.indexOf('na_fp_') === 0 || k.indexOf('na_au_') === 0 || k.indexOf('na_sm_') === 0) {
+          val = '0';
+        }
+      }
+      out[k] = val;
     });
     return out;
   }

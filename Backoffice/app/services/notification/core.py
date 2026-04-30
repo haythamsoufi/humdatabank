@@ -26,6 +26,12 @@ import hashlib
 from typing import Optional, Dict, Any, Tuple, List, Union
 from urllib.parse import urlparse
 
+from app.services.app_settings_service import audience_bucket_enabled
+from app.services.notification.audience import (
+    collect_entity_admin_audience_recipient_ids,
+    get_assignment_editor_submitter_user_ids_for_entity,
+)
+
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -2231,8 +2237,8 @@ def notify_entity_focal_points(
         list: Created notification objects
     """
     try:
-        from app.models.core import UserEntityPermission
-        from app.services.entity_service import EntityService
+        if not audience_bucket_enabled(notification_type, "focal_points"):
+            return []
 
         exclude_set = set()
         if exclude_user_id is not None:
@@ -2240,24 +2246,11 @@ def notify_entity_focal_points(
         if exclude_user_ids:
             exclude_set.update(exclude_user_ids)
 
-        # Get all focal points for this entity via UserEntityPermission (RBAC-only)
-        from app.models.rbac import RbacUserRole, RbacRole
-        permissions = UserEntityPermission.query.filter_by(
-            entity_type=entity_type,
-            entity_id=entity_id
-        ).join(User, UserEntityPermission.user_id == User.id).join(
-            RbacUserRole, RbacUserRole.user_id == User.id
-        ).join(
-            RbacRole, RbacUserRole.role_id == RbacRole.id
-        ).filter(
-            RbacRole.code == "assignment_editor_submitter"
-        ).all()
-
-        # Get user IDs, excluding the specified users if provided
-        focal_point_ids = [
-            perm.user_id for perm in permissions
-            if perm.user_id not in exclude_set
-        ]
+        focal_point_ids = get_assignment_editor_submitter_user_ids_for_entity(
+            entity_type,
+            entity_id,
+            exclude_user_ids=list(exclude_set) if exclude_set else None,
+        )
 
         if not focal_point_ids:
             return []
@@ -2316,7 +2309,7 @@ def get_default_icon_for_activity_category(activity_category):
 # Convenience functions for common notification scenarios
 
 def notify_assignment_created(assignment_entity_status):
-    """Notify focal points when a new assignment is created for any entity type."""
+    """Notify focal points (and optionally entity-scoped admins) when a new assignment is created."""
     aes = assignment_entity_status
     entity_type = aes.entity_type
     entity_id = aes.entity_id
@@ -2377,9 +2370,43 @@ def notify_assignment_created(assignment_entity_status):
         related_object_id=aes.assigned_form_id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
         priority='normal'
-    )
+    ) or []
 
-    return notifications
+    # Optional admin channels (org admins vs system managers are separate settings buckets).
+    admin_notifications = []
+    secondary_recipients = collect_entity_admin_audience_recipient_ids(
+        NotificationType.assignment_created,
+        entity_type,
+        entity_id,
+    )
+    if secondary_recipients:
+        focal_cover = set(
+            get_assignment_editor_submitter_user_ids_for_entity(entity_type, entity_id)
+        )
+        admin_only = [uid for uid in secondary_recipients if uid not in focal_cover]
+        if admin_only:
+            admin_notifications = create_notification(
+                user_ids=admin_only,
+                notification_type=NotificationType.assignment_created,
+                title_key='notification.assignment_created.title',
+                title_params=None,
+                message_key='notification.assignment_created.message',
+                message_params={
+                    'template': template_name,
+                    'period': assigned_form.period_name,
+                    'due_date': due_date_str,
+                    '_entity_type': entity_type,
+                    '_entity_id': entity_id,
+                },
+                related_object_type='assignment',
+                related_object_id=aes.assigned_form_id,
+                related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+                entity_type=entity_type,
+                entity_id=entity_id,
+                priority='normal',
+            ) or []
+
+    return list(notifications) + list(admin_notifications)
 
 
 def notify_assignment_submitted(assignment_entity_status):
@@ -2413,27 +2440,17 @@ def notify_assignment_submitted(assignment_entity_status):
         user_id=None
     )
 
-    # Identify admin users first so we can exclude them from focal-point notifications.
-    # Users who are both admin and focal point get only the admin notification (avoids duplicate emails).
-    from app.models.rbac import RbacUserRole, RbacRole
-
-    admin_role_ids = select(RbacRole.id).where(
-        or_(
-            RbacRole.code == "system_manager",
-            RbacRole.code == "admin_core",
-            RbacRole.code.like("admin\\_%", escape="\\"),
-        )
+    # Identify entity-scoped admins for dedupe + optional admin broadcast (never global admin blast).
+    secondary_recipients = collect_entity_admin_audience_recipient_ids(
+        NotificationType.assignment_submitted,
+        entity_type,
+        entity_id,
     )
 
-    admin_users = (
-        User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
-        .filter(RbacUserRole.role_id.in_(admin_role_ids))
-        .distinct()
-        .all()
-    )
-    admin_user_ids = [u.id for u in admin_users]
+    # Exclude users who already receive the admin/SM copy below (avoid duplicate in-app notifications).
+    exclude_from_focal = set(secondary_recipients)
 
-    # Notify other focal points in the same entity (exclude submitter and admins)
+    # Notify focal points (assignment_editor/submitter), including the submitter when they hold that role.
     notifications = notify_entity_focal_points(
         entity_type=entity_type,
         entity_id=entity_id,
@@ -2451,8 +2468,7 @@ def notify_assignment_submitted(assignment_entity_status):
         related_object_id=aes.id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
         priority='normal',
-        exclude_user_id=current_user.id if current_user.is_authenticated else None,
-        exclude_user_ids=admin_user_ids
+        exclude_user_ids=list(exclude_from_focal) if exclude_from_focal else None,
     )
 
     # Get entity name for the notification message
@@ -2464,31 +2480,34 @@ def notify_assignment_submitted(assignment_entity_status):
 
     submitter_name = current_user.name if (current_user and current_user.is_authenticated) else "A focal point"
 
-    admin_notifications = create_notification(
-        user_ids=admin_user_ids,
-        notification_type=NotificationType.assignment_submitted,
-        title_key='notification.assignment_submitted.admin.title',
-        title_params={
-            'submitter_name': submitter_name,
-            'period': assigned_form.period_name,
-        },
-        message_key='notification.assignment_submitted.admin.message',
-        message_params={
-            'template': template_name,
-            'country': entity_name,
-            'period': assigned_form.period_name,
-            'submitter_name': submitter_name,
-            '_entity_type': entity_type,
-            '_entity_id': entity_id
-        },
-        entity_type=entity_type,
-        entity_id=entity_id,
-        related_object_type='assignment',
-        related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
-        priority='high',
-        override_email_preferences=True  # Always email admins for action-required review
-    )
+    if secondary_recipients:
+        admin_notifications = create_notification(
+            user_ids=secondary_recipients,
+            notification_type=NotificationType.assignment_submitted,
+            title_key='notification.assignment_submitted.admin.title',
+            title_params={
+                'submitter_name': submitter_name,
+                'period': assigned_form.period_name,
+            },
+            message_key='notification.assignment_submitted.admin.message',
+            message_params={
+                'template': template_name,
+                'country': entity_name,
+                'period': assigned_form.period_name,
+                'submitter_name': submitter_name,
+                '_entity_type': entity_type,
+                '_entity_id': entity_id
+            },
+            entity_type=entity_type,
+            entity_id=entity_id,
+            related_object_type='assignment',
+            related_object_id=aes.id,
+            related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+            priority='high',
+            override_email_preferences=True  # Always email admins for action-required review
+        )
+    else:
+        admin_notifications = []
 
     return notifications + (admin_notifications or [])
 
@@ -2779,36 +2798,22 @@ def notify_self_report_created(assignment_entity_status):
 
 
 def notify_public_submission_received(public_submission):
-    """Notify admins when a public submission is received."""
+    """Notify org admins and/or system managers when a public submission is received."""
     try:
-        from app.models import User
-        from app.models.rbac import RbacUserRole, RbacRole
-        from sqlalchemy import or_
-
-        # Get all admin-capable users (RBAC-only): system managers + any admin_* role + admin_core
-        admin_role_ids = (
-            select(RbacRole.id)
-            .where(
-                or_(
-                    RbacRole.code == "system_manager",
-                    RbacRole.code == "admin_core",
-                    RbacRole.code.like("admin\\_%", escape="\\"),
-                )
-            )
-        )
-
-        admin_users = (
-            User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
-            .filter(RbacUserRole.role_id.in_(admin_role_ids))
-            .distinct()
-            .all()
-        )
-
-        if not admin_users:
-            current_app.logger.debug("No admins to notify about public submission")
+        country_eid = public_submission.country_id
+        if not country_eid:
+            current_app.logger.debug("Public submission has no country — skipping admin notifications")
             return []
 
-        # Get template and country information
+        admin_user_ids = collect_entity_admin_audience_recipient_ids(
+            NotificationType.public_submission_received,
+            "country",
+            int(country_eid),
+        )
+        if not admin_user_ids:
+            current_app.logger.debug("No recipients for public submission admin notification")
+            return []
+
         from app.models.forms import FormTemplate
 
         template_name = 'Unknown Template'
@@ -2822,7 +2827,7 @@ def notify_public_submission_received(public_submission):
 
         # Create notifications for all admins
         return create_notification(
-            user_ids=[admin.id for admin in admin_users],
+            user_ids=admin_user_ids,
             notification_type=NotificationType.public_submission_received,
             title_key='notification.public_submission_received.title',
             title_params=None,
@@ -2921,52 +2926,35 @@ def notify_standalone_document_uploaded(document, country_id):
                 f"[DOCUMENT_NOTIFICATION] Document status is 'Pending' - will notify admins/system managers only"
             )
 
-            # Pending documents: Only notify admin-capable users (RBAC-only)
-            from app.models.rbac import RbacUserRole, RbacRole
-
-            admin_role_ids = (
-                select(RbacRole.id)
-                .where(
-                    or_(
-                        RbacRole.code == "system_manager",
-                        RbacRole.code == "admin_core",
-                        RbacRole.code.like("admin\\_%", escape="\\"),
-                    )
-                )
+            xs_uploader = [uploader_id] if uploader_id else []
+            admin_user_ids = collect_entity_admin_audience_recipient_ids(
+                NotificationType.document_uploaded,
+                "country",
+                int(country_id),
+                exclude_user_ids=xs_uploader,
             )
 
-            admin_users = (
-                User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
-                .filter(RbacUserRole.role_id.in_(admin_role_ids))
-                .distinct()
-                .all()
-            )
-
-            current_app.logger.info(
-                f"[DOCUMENT_NOTIFICATION] Found {len(admin_users)} total admins/system managers"
-            )
-
-            # Exclude the uploader
-            admin_user_ids = [
-                admin.id for admin in admin_users
-                if not uploader_id or admin.id != uploader_id
-            ]
-
-            excluded_admin_ids = [
-                admin.id for admin in admin_users
-                if uploader_id and admin.id == uploader_id
-            ]
-
-            if excluded_admin_ids:
+            if not admin_user_ids:
                 current_app.logger.info(
-                    f"[DOCUMENT_NOTIFICATION] Excluding uploader (admin/system manager) from notifications: {excluded_admin_ids}"
+                    "[DOCUMENT_NOTIFICATION] Pending document: no org-admin/system-manager recipients (settings or empty)"
+                )
+            else:
+
+                current_app.logger.info(
+                    f"[DOCUMENT_NOTIFICATION] Found admin-capable users to notify: {len(admin_user_ids)}"
                 )
 
-            current_app.logger.info(
-                f"[DOCUMENT_NOTIFICATION] Will notify {len(admin_user_ids)} admins/system managers: {admin_user_ids}"
-            )
+                excluded_admin_ids = xs_uploader if xs_uploader else []
 
-            if admin_user_ids:
+                if excluded_admin_ids:
+                    current_app.logger.info(
+                        f"[DOCUMENT_NOTIFICATION] Excluding uploader (admin/system manager) from notifications: {excluded_admin_ids}"
+                    )
+
+                current_app.logger.info(
+                    f"[DOCUMENT_NOTIFICATION] Will notify {len(admin_user_ids)} admins/system managers: {admin_user_ids}"
+                )
+
                 # Get user emails for logging
                 admin_emails = [
                     User.query.get(uid).email for uid in admin_user_ids
@@ -3009,10 +2997,6 @@ def notify_standalone_document_uploaded(document, country_id):
                     current_app.logger.warning(
                         f"[DOCUMENT_NOTIFICATION] No admin notifications were created (may have been filtered by preferences)"
                     )
-            else:
-                current_app.logger.info(
-                    f"[DOCUMENT_NOTIFICATION] No admins/system managers to notify (all excluded or none exist)"
-                )
         else:
             current_app.logger.info(
                 f"[DOCUMENT_NOTIFICATION] Document status is '{document.status}' - will notify focal points only"
@@ -3110,7 +3094,9 @@ def notify_standalone_document_uploaded(document, country_id):
                     f"[DOCUMENT_NOTIFICATION] Will notify {len(focal_point_ids)} focal points: {focal_point_ids}"
                 )
 
-                if focal_point_ids:
+                if focal_point_ids and audience_bucket_enabled(
+                    NotificationType.document_uploaded, "focal_points"
+                ):
                     focal_point_emails = [
                         User.query.get(uid).email for uid in focal_point_ids
                     ]
@@ -3147,6 +3133,10 @@ def notify_standalone_document_uploaded(document, country_id):
                         current_app.logger.warning(
                             f"[DOCUMENT_NOTIFICATION] No focal point notifications were created (may have been filtered by preferences)"
                         )
+                elif focal_point_ids:
+                    current_app.logger.info(
+                        "[DOCUMENT_NOTIFICATION] Audience rule: focal_points disabled for document_uploaded — skipping focal notifications"
+                    )
                 else:
                     current_app.logger.info(
                         f"[DOCUMENT_NOTIFICATION] No focal points to notify (all excluded or none exist)"

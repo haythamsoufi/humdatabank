@@ -1144,6 +1144,66 @@ msgstr ""
 msgid "Admins"
 msgstr "Admins"
 
+#: app/templates/admin/settings/manage_settings.html
+msgid "Org admins"
+msgstr "Org admins"
+
+#: app/templates/admin/settings/manage_settings.html
+msgid "System managers"
+msgstr "System managers"
+
+#: app/templates/admin/settings/manage_settings.html
+msgid ""
+"Notify entity-assigned admins (admin_core / admin_*, not system managers)"
+msgstr ""
+"Notify entity-assigned admins (admin_core / admin_*, not system managers)"
+
+#: app/templates/admin/settings/manage_settings.html
+msgid "Notify deployment-wide system managers"
+msgstr "Notify deployment-wide system managers"
+
+#: app/utils/notification_registry.py app/templates/admin/settings/manage_settings.html
+msgid "Hypothetical"
+msgstr "Hypothetical"
+
+#: app/utils/notification_registry.py
+msgid "An in-app notification is created when this event occurs."
+msgstr "An in-app notification is created when this event occurs."
+
+#: app/utils/notification_registry.py app/templates/admin/notifications/registry.html
+msgid ""
+"Reserved for preferences or future use — the application does not emit "
+"this notification type yet."
+msgstr ""
+"Reserved for preferences or future use — the application does not emit "
+"this notification type yet."
+
+#: app/templates/admin/settings/manage_settings.html
+msgid ""
+"Hypothetical types are listed at the bottom; the word Hypothetical appears "
+"in the Type column when no in-app notification is emitted for that row yet."
+msgstr ""
+"Hypothetical types are listed at the bottom; the word Hypothetical appears "
+"in the Type column when no in-app notification is emitted for that row yet."
+
+#: app/templates/admin/notifications/registry.html
+msgid "Emitter status"
+msgstr "Emitter status"
+
+#: app/routes/admin/notifications.py
+msgid "Emitter active"
+msgstr "Emitter active"
+
+#: app/templates/admin/notifications/registry.html
+msgid ""
+"Emitter status Active means this notification type is emitted today; "
+"Hypothetical means it is reserved for preferences or future use only. "
+"Active rows appear first."
+msgstr ""
+"Emitter status Active means this notification type is emitted today; "
+"Hypothetical means it is reserved for preferences or future use only. "
+"Active rows appear first."
+
 #: app/templates/admin/indicator_bank/indicator_bank.html:371
 msgid "Adult Literacy"
 msgstr "Adult Literacy"

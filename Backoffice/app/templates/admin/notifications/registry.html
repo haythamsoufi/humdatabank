@@ -50,6 +50,7 @@
             {{ _('total registry size') }} <span class="font-semibold text-gray-800">{{ total_catalog }}</span>
             {% endif %}
         </p>
+        <p class="text-xs text-gray-600 mb-4 max-w-3xl">{{ _('Emitter status Active means this notification type is emitted today; Hypothetical means it is reserved for preferences or future use only. Active rows appear first.') }}</p>
 
         <div class="overflow-x-auto border border-gray-200 rounded-md">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -58,6 +59,7 @@
                         <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap w-44">{{ _('Group') }}</th>
                         <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 w-40">{{ _('Type key') }}</th>
                         <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700">{{ _('Label') }}</th>
+                        <th scope="col" class="px-3 py-2 text-center font-semibold text-gray-700 w-28">{{ _('Emitter status') }}</th>
                         <th scope="col" class="px-3 py-2 text-center font-semibold text-gray-700 w-28">{{ _('Icon') }}</th>
                         <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 w-32">{{ _('Default priority') }}</th>
                         <th scope="col" class="px-3 py-2 text-right font-semibold text-gray-700 w-28">{{ _('TTL (days)') }}</th>
@@ -66,10 +68,17 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
                     {% for row in rows %}
-                    <tr class="hover:bg-gray-50 align-top">
+                    <tr class="hover:bg-gray-50 align-top {% if not row.emitter_active %}bg-slate-50/90{% endif %}">
                         <td class="px-3 py-2 text-gray-900">{{ row.group_display }}</td>
                         <td class="px-3 py-2 font-mono text-xs text-gray-900 break-all">{{ row.type_key }}</td>
                         <td class="px-3 py-2 text-gray-800">{{ row.label }}</td>
+                        <td class="px-3 py-2 text-center whitespace-nowrap">
+                            {% if row.emitter_active %}
+                            <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">{{ row.emitter_status_display }}</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700" title="{{ _('Reserved for preferences or future use — the application does not emit this notification type yet.') }}">{{ row.emitter_status_display }}</span>
+                            {% endif %}
+                        </td>
                         <td class="px-3 py-2 text-center text-gray-700">
                             <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100" title="{{ row.icon_class }}" aria-hidden="true">
                                 <i class="{{ row.icon_class }} text-sm"></i>
@@ -81,7 +90,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="px-4 py-8 text-center text-gray-500">{{ _('No rows match this search.') }}</td>
+                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">{{ _('No rows match this search.') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -1,7 +1,7 @@
 from flask import request, current_app
 from flask_login import login_required, current_user
 from app.models import db, User, UserSessionLog
-from app.models.core import UserEntityPermission
+from app.models.core import Country, UserEntityPermission
 from app.models.rbac import RbacUserRole, RbacRole
 from sqlalchemy import or_, func
 from contextlib import suppress
@@ -9,6 +9,13 @@ from contextlib import suppress
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
+from app.utils.profile_summary_payload import (
+    role_badge_key_from_rbac_codes,
+    collect_arg_strings,
+    parse_uuid_list,
+    parse_int_user_ids,
+    profile_summary_scope_fields,
+)
 
 from app.routes.main import bp
 
@@ -18,36 +25,39 @@ from app.routes.main import bp
 def api_users_profile_summary():
     """Return lightweight user profile summaries for hover tooltips (dashboard/non-admin pages)."""
     try:
-        user_ids_raw = request.args.getlist('user_ids')
-        if not user_ids_raw:
-            user_ids_csv = (request.args.get('user_ids') or '').strip()
-            if user_ids_csv:
-                user_ids_raw = [part.strip() for part in user_ids_csv.split(',') if part.strip()]
+        user_ids_raw = collect_arg_strings(request.args, "user_ids")
+        external_raw = collect_arg_strings(request.args, "external_ids")
+        emails_raw = collect_arg_strings(request.args, "emails")
 
-        emails_raw = request.args.getlist('emails')
-        if not emails_raw:
-            emails_csv = (request.args.get('emails') or '').strip()
-            if emails_csv:
-                emails_raw = [part.strip() for part in emails_csv.split(',') if part.strip()]
+        external_uuids = parse_uuid_list(external_raw)
+        emails = [str(e).strip().lower() for e in emails_raw if str(e).strip()]
+        parsed_user_ids = parse_int_user_ids(user_ids_raw)
 
-        user_ids = []
-        for value in user_ids_raw:
-            with suppress(Exception):
-                user_ids.append(int(value))
+        from app.services.authorization_service import AuthorizationService
+        is_privileged = bool(
+            AuthorizationService.is_system_manager(current_user) or
+            AuthorizationService.has_rbac_permission(current_user, "admin.users.view")
+        )
 
-        emails = [str(email).strip().lower() for email in (emails_raw or []) if str(email).strip()]
+        # Non-privileged callers must not use arbitrary sequential ids (enumeration).
+        # Allow integer id only for the current user (self).
+        if is_privileged:
+            effective_user_ids = parsed_user_ids
+        else:
+            effective_user_ids = [i for i in parsed_user_ids if i == int(current_user.id)]
 
-        if not user_ids and not emails:
+        if not effective_user_ids and not external_uuids and not emails:
             return json_ok(status='success', profiles=[])
 
         query = User.query
         filters = []
-        if user_ids:
-            filters.append(User.id.in_(list(set(user_ids))))
+        if effective_user_ids:
+            filters.append(User.id.in_(list(set(effective_user_ids))))
+        if external_uuids:
+            filters.append(User.external_id.in_(list(set(external_uuids))))
         if emails:
             filters.append(func.lower(User.email).in_(list(set(emails))))
-        if filters:
-            query = query.filter(or_(*filters))
+        query = query.filter(or_(*filters))
 
         users = query.all()
         if not users:
@@ -55,12 +65,6 @@ def api_users_profile_summary():
 
         # Non-admin users can only fetch profile summaries for users sharing at least one entity scope,
         # plus themselves. Admin/system-manager users are unrestricted.
-        from app.services.authorization_service import AuthorizationService
-        is_privileged = bool(
-            AuthorizationService.is_system_manager(current_user) or
-            AuthorizationService.has_rbac_permission(current_user, "admin.users.view")
-        )
-
         if not is_privileged:
             visible_user_ids = {int(current_user.id)}
             requester_scopes = {
@@ -97,7 +101,7 @@ def api_users_profile_summary():
             for row in last_presence_rows:
                 last_presence_by_user_id[row.user_id] = row.last_presence
 
-        roles_by_user_id = {}
+        role_codes_by_user_id = {}
         with suppress(Exception):
             user_roles = RbacUserRole.query.filter(RbacUserRole.user_id.in_(found_user_ids)).all()
             role_ids = list({ur.role_id for ur in user_roles})
@@ -108,23 +112,32 @@ def api_users_profile_summary():
                 if not role:
                     continue
                 role_code = (role.code or '').strip()
-                role_label = (role.name or '').strip()
-                roles_by_user_id.setdefault(ur.user_id, []).append(role_code or role_label)
+                if role_code:
+                    role_codes_by_user_id.setdefault(ur.user_id, []).append(role_code)
 
         all_permissions = UserEntityPermission.query.filter(
             UserEntityPermission.user_id.in_(found_user_ids)
         ).all()
 
-        country_count_by_user_id = {}
-        entity_counts_by_user_id = {}
+        country_ids_by_user_id: dict[int, set[int]] = {}
+        entity_counts_by_user_id: dict[int, dict[str, int]] = {}
         for perm in all_permissions:
             uid = int(perm.user_id)
             etype = str(perm.entity_type or '')
             if etype == 'country':
-                country_count_by_user_id[uid] = country_count_by_user_id.get(uid, 0) + 1
+                country_ids_by_user_id.setdefault(uid, set()).add(int(perm.entity_id))
             elif etype:
                 bucket = entity_counts_by_user_id.setdefault(uid, {})
                 bucket[etype] = int(bucket.get(etype, 0)) + 1
+
+        all_countries = Country.query.all()
+        country_id_to_name_region = {
+            int(c.id): (str(c.name or ''), str(c.region or '')) for c in all_countries
+        }
+        region_to_all_country_ids: dict[str, set[int]] = {}
+        for c in all_countries:
+            r = str(c.region or '')
+            region_to_all_country_ids.setdefault(r, set()).add(int(c.id))
 
         profiles = []
         for user in users:
@@ -133,28 +146,34 @@ def api_users_profile_summary():
                 with suppress(Exception):
                     profile_color = user.generate_profile_color()
 
-            entity_counts = entity_counts_by_user_id.get(user.id, {})
-            entity_summary_parts = []
-            for key, value in sorted(entity_counts.items()):
-                if int(value) > 0:
-                    entity_summary_parts.append(f"{key.replace('_', ' ')}: {value}")
-
             last_presence_dt = last_presence_by_user_id.get(user.id)
             last_presence_iso = last_presence_dt.isoformat() + 'Z' if last_presence_dt else None
 
-            profiles.append({
-                'id': user.id,
+            rb_key = role_badge_key_from_rbac_codes(
+                role_codes_by_user_id.get(user.id, [])
+            )
+            row = {
+                'external_id': str(user.external_id) if user.external_id else None,
                 'name': user.name or '',
                 'email': user.email or '',
                 'title': user.title or '',
                 'profile_color': profile_color or '#3B82F6',
                 'active': bool(user.active),
                 'last_presence': last_presence_iso,
-                'rbac_roles': roles_by_user_id.get(user.id, []),
-                'countries_count': int(country_count_by_user_id.get(user.id, 0)),
-                'entity_counts': entity_counts,
-                'entity_summary': ', '.join(entity_summary_parts),
-            })
+                'role_badge_key': rb_key,
+            }
+            row.update(
+                profile_summary_scope_fields(
+                    rb_key,
+                    country_ids_by_user_id.get(user.id, set()),
+                    dict(entity_counts_by_user_id.get(user.id, {})),
+                    country_id_to_name_region=country_id_to_name_region,
+                    region_to_all_country_ids=region_to_all_country_ids,
+                )
+            )
+            if is_privileged:
+                row['id'] = user.id
+            profiles.append(row)
 
         return json_ok(status='success', profiles=profiles)
     except Exception as e:

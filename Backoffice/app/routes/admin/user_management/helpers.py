@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.models.system import UserDevice
 from app.utils.entity_groups import get_enabled_entity_groups, get_allowed_entity_type_codes
+from app.utils.azure_b2c_config import is_azure_b2c_configured
 
 
 def _apply_role_type_and_implications(
@@ -144,12 +145,14 @@ def _is_azure_sso_enabled() -> bool:
 
     When enabled, users may not have a local password (passwords are managed externally).
     """
-    return bool(
-        current_app.config.get("AZURE_B2C_TENANT")
-        and current_app.config.get("AZURE_B2C_POLICY")
-        and current_app.config.get("AZURE_B2C_CLIENT_ID")
-        and current_app.config.get("AZURE_B2C_CLIENT_SECRET")
-    )
+    return is_azure_b2c_configured(current_app)
+
+
+def _normalize_user_email_for_comparison(value) -> str:
+    """Lowercase/strip for comparing submitted vs stored login emails."""
+    if value is None:
+        return ""
+    return str(value).strip().lower()
 
 
 def _compute_role_type_for_user_id(user_id: int) -> str:

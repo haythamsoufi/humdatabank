@@ -76,6 +76,17 @@ def register_template_context(app, config_class):
             return {"mobile_app_embedded": False}
 
     @app.context_processor
+    def inject_azure_b2c_configured():
+        """True when Azure AD B2C OIDC is fully configured (identity owned by IdP)."""
+        try:
+            from app.utils.azure_b2c_config import is_azure_b2c_configured
+
+            return {"azure_b2c_configured": bool(is_azure_b2c_configured())}
+        except Exception as e:
+            current_app.logger.debug("inject_azure_b2c_configured failed: %s", e)
+            return {"azure_b2c_configured": False}
+
+    @app.context_processor
     def inject_dynamic_locale_settings():
         """Override stale Jinja globals with DB-backed language UI settings every request.
 

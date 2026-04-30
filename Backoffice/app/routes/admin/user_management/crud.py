@@ -21,12 +21,14 @@ from app.utils.error_handling import handle_json_view_exception
 from app.utils.entity_groups import get_enabled_entity_groups
 from app.utils.profile_utils import PROFILE_COLORS
 from app.models.system import UserDevice
+from app.utils.azure_b2c_config import is_azure_b2c_configured
 
 from . import bp
 from .helpers import (
     _apply_role_type_and_implications,
     _get_allowed_non_country_entity_types,
     _is_azure_sso_enabled,
+    _normalize_user_email_for_comparison,
     _compute_role_type_for_user_id,
     _filter_requested_admin_roles_for_actor,
     _filter_role_choices_for_actor,
@@ -293,6 +295,23 @@ def approve_all_access_requests():
 @permission_required('admin.users.create')
 def new_user():
     """Admin route to add a new user."""
+    if is_azure_b2c_configured():
+        actor_id = None
+        try:
+            if getattr(current_user, "is_authenticated", False):
+                actor_id = current_user.id
+        except Exception:
+            pass
+        current_app.logger.info(
+            "Admin user create blocked: Azure AD B2C is configured (actor_id=%s).",
+            actor_id,
+        )
+        flash(
+            "New accounts are created through Azure AD B2C sign-in. Manual user creation is not available.",
+            "warning",
+        )
+        return redirect(url_for("user_management.manage_users"))
+
     form = UserForm()
     enabled_entity_groups = get_enabled_entity_groups()
     allowed_non_country_entity_types = _get_allowed_non_country_entity_types()
@@ -609,220 +628,242 @@ def edit_user(user_id):
                                    azure_sso_enabled=azure_sso_enabled,
                                    profile_palette_hexes=PROFILE_COLORS)
 
-        # Store old values for audit logging
-        try:
-            from app.models.rbac import RbacUserRole
-            old_rbac_role_ids = [ur.role_id for ur in RbacUserRole.query.filter_by(user_id=user.id).all()]
-        except Exception as e:
-            current_app.logger.debug("old_rbac_role_ids query failed: %s", e)
-            old_rbac_role_ids = []
+        skip_save = False
+        if azure_sso_enabled:
+            submitted = _normalize_user_email_for_comparison(form.email.data)
+            stored = _normalize_user_email_for_comparison(user.email)
+            if submitted != stored:
+                current_app.logger.warning(
+                    "SECURITY: rejected admin user email change while Azure B2C is enabled "
+                    "(actor_id=%s target_user_id=%s submitted=%r stored=%r)",
+                    getattr(current_user, "id", None),
+                    user.id,
+                    form.email.data,
+                    user.email,
+                )
+                flash(
+                    "Email addresses are managed in Azure AD B2C and cannot be changed in this application.",
+                    "danger",
+                )
+                skip_save = True
+                form.email.data = user.email
 
-        old_values = {
-            'email': user.email,
-            'name': user.name,
-            'title': user.title,
-            'profile_color': user.profile_color,
-            'rbac_role_ids': old_rbac_role_ids,
-            'country_ids': [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
-        }
+        if not skip_save:
+            # Store old values for audit logging
+            try:
+                from app.models.rbac import RbacUserRole
+                old_rbac_role_ids = [ur.role_id for ur in RbacUserRole.query.filter_by(user_id=user.id).all()]
+            except Exception as e:
+                current_app.logger.debug("old_rbac_role_ids query failed: %s", e)
+                old_rbac_role_ids = []
 
-        # Update user details
-        user.email = form.email.data
-        user.name = form.name.data
-        user.title = form.title.data
-        _pc_raw = getattr(form, "profile_color", None) and form.profile_color.data
-        user.profile_color = _pc_raw.strip() if _pc_raw else "#3B82F6"
+            old_values = {
+                'email': user.email,
+                'name': user.name,
+                'title': user.title,
+                'profile_color': user.profile_color,
+                'rbac_role_ids': old_rbac_role_ids,
+                'country_ids': [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
+            }
 
-        # Update RBAC roles (best-effort; no-op if RBAC not migrated)
-        import logging as _logging
-        _log = _logging.getLogger(__name__)
-        _log.warning("[role-downgrade-backend] can_assign_rbac_roles=%s, form.rbac_roles=%s, choices=%s",
-                     can_assign_rbac_roles,
-                     getattr(form, "rbac_roles", "MISSING"),
-                     bool(getattr(getattr(form, "rbac_roles", None), "choices", None)))
-        if can_assign_rbac_roles and getattr(form, "rbac_roles", None) is not None and getattr(form.rbac_roles, "choices", None):
-            requested_role_ids = list(form.rbac_roles.data or [])
-            _log.warning("[role-downgrade-backend] requested_role_ids from form: %s", requested_role_ids)
-            if (not current_is_sys_mgr) and restricted_role_ids:
-                requested_role_ids = [rid for rid in requested_role_ids if int(rid) not in restricted_role_ids]
-            # Backend enforcement: role_type defaults + drop deprecated upload-only role.
-            role_type = request.form.get("role_type")
-            _log.warning("[role-downgrade-backend] role_type from form: %s", role_type)
-            requested_role_ids = _apply_role_type_and_implications(
-                requested_role_ids,
-                role_type=role_type,
-                drop_role_codes={"assignment_documents_uploader"},
-            )
-            if not current_is_sys_mgr:
-                requested_role_ids, dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)
-                if dropped:
-                    flash("Some admin roles were not applied because you can only assign admin roles you already have.", "warning")
-            _log.warning("[role-downgrade-backend] FINAL requested_role_ids to save: %s", requested_role_ids)
-            _set_user_rbac_roles(user, requested_role_ids)
-        else:
-            _log.warning("[role-downgrade-backend] SKIPPED role update (condition failed)")
+            # Update user details (email is identity in B2C mode — never apply form email)
+            if not azure_sso_enabled:
+                user.email = form.email.data
+            user.name = form.name.data
+            user.title = form.title.data
+            _pc_raw = getattr(form, "profile_color", None) and form.profile_color.data
+            user.profile_color = _pc_raw.strip() if _pc_raw else "#3B82F6"
 
-        # Update password if provided (local auth only)
-        if (not azure_sso_enabled) and form.password.data:
-            user.set_password(form.password.data)
+            # Update RBAC roles (best-effort; no-op if RBAC not migrated)
+            import logging as _logging
+            _log = _logging.getLogger(__name__)
+            _log.warning("[role-downgrade-backend] can_assign_rbac_roles=%s, form.rbac_roles=%s, choices=%s",
+                         can_assign_rbac_roles,
+                         getattr(form, "rbac_roles", "MISSING"),
+                         bool(getattr(getattr(form, "rbac_roles", None), "choices", None)))
+            if can_assign_rbac_roles and getattr(form, "rbac_roles", None) is not None and getattr(form.rbac_roles, "choices", None):
+                requested_role_ids = list(form.rbac_roles.data or [])
+                _log.warning("[role-downgrade-backend] requested_role_ids from form: %s", requested_role_ids)
+                if (not current_is_sys_mgr) and restricted_role_ids:
+                    requested_role_ids = [rid for rid in requested_role_ids if int(rid) not in restricted_role_ids]
+                # Backend enforcement: role_type defaults + drop deprecated upload-only role.
+                role_type = request.form.get("role_type")
+                _log.warning("[role-downgrade-backend] role_type from form: %s", role_type)
+                requested_role_ids = _apply_role_type_and_implications(
+                    requested_role_ids,
+                    role_type=role_type,
+                    drop_role_codes={"assignment_documents_uploader"},
+                )
+                if not current_is_sys_mgr:
+                    requested_role_ids, dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)
+                    if dropped:
+                        flash("Some admin roles were not applied because you can only assign admin roles you already have.", "warning")
+                _log.warning("[role-downgrade-backend] FINAL requested_role_ids to save: %s", requested_role_ids)
+                _set_user_rbac_roles(user, requested_role_ids)
+            else:
+                _log.warning("[role-downgrade-backend] SKIPPED role update (condition failed)")
 
-        # Update country assignments (legacy)
-        if 'countries' in enabled_entity_groups:
-            selected_country_ids = form.countries.data
-            if selected_country_ids:
-                selected_countries = Country.query.filter(Country.id.in_(selected_country_ids)).all()
+            # Update password if provided (local auth only)
+            if (not azure_sso_enabled) and form.password.data:
+                user.set_password(form.password.data)
 
-                # Sync entity permissions for countries
-                # Remove old country permissions
+            # Update country assignments (legacy)
+            if 'countries' in enabled_entity_groups:
+                selected_country_ids = form.countries.data
+                if selected_country_ids:
+                    selected_countries = Country.query.filter(Country.id.in_(selected_country_ids)).all()
+
+                    # Sync entity permissions for countries
+                    # Remove old country permissions
+                    UserEntityPermission.query.filter_by(
+                        user_id=user.id,
+                        entity_type=EntityType.country.value
+                    ).delete()
+
+                    # Add new country permissions
+                    for country in selected_countries:
+                        perm = UserEntityPermission(
+                            user_id=user.id,
+                            entity_type=EntityType.country.value,
+                            entity_id=country.id
+                        )
+                        db.session.add(perm)
+                else:
+                    selected_country_ids = []
+                    # Remove all country permissions
+                    UserEntityPermission.query.filter_by(
+                        user_id=user.id,
+                        entity_type=EntityType.country.value
+                    ).delete()
+            else:
+                # Preserve existing assignments when countries are disabled
+                selected_country_ids = [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
+
+            # Handle notification preferences
+            from app.services.notification.service import NotificationService
+            from app.models import NotificationType
+
+            # Get or create notification preferences for the user
+            preferences = NotificationService.get_notification_preferences(user.id)
+
+            # Get enabled notification types from form
+            email_types = request.form.getlist('notification_type_email')
+            push_types = request.form.getlist('notification_type_push')
+
+            # Get all notification types to determine if all are selected
+            all_types = [nt.value for nt in NotificationType]
+
+            # Determine if all types are selected
+            all_email_selected = len(email_types) == len(all_types)
+            all_push_selected = len(push_types) == len(all_types)
+
+            # Update notification preferences from form data
+            # email_notifications and push_notifications are determined by whether any types are selected
+            frequency = request.form.get('notification_frequency', 'instant')
+            preferences.email_notifications = all_email_selected or len(email_types) > 0
+            preferences.sound_enabled = request.form.get('sound_enabled') == 'on'
+            preferences.notification_frequency = frequency
+            preferences.push_notifications = all_push_selected or len(push_types) > 0
+
+            # Handle digest day and time
+            if frequency == 'daily' or frequency == 'weekly':
+                preferences.digest_time = request.form.get('digest_time') or None
+                if frequency == 'weekly':
+                    preferences.digest_day = request.form.get('digest_day') or None
+                else:
+                    preferences.digest_day = None  # Clear day for daily
+            else:
+                preferences.digest_day = None
+                preferences.digest_time = None
+
+            # If all types are selected, send empty list (backend interprets as all enabled)
+            preferences.notification_types_enabled = [] if all_email_selected else email_types
+            preferences.push_notification_types_enabled = [] if all_push_selected else push_types
+
+            # Handle entity permissions from form (NS Structure and Secretariat)
+            # Always remove all non-country entity permissions first, then add back what's in the form
+            entity_permissions = request.form.getlist('entity_permissions')
+
+            # Define all possible entity types (excluding countries which are handled separately)
+            all_entity_types = allowed_non_country_entity_types
+
+            # Remove all old entity permissions (excluding countries)
+            for entity_type in all_entity_types:
                 UserEntityPermission.query.filter_by(
                     user_id=user.id,
-                    entity_type=EntityType.country.value
+                    entity_type=entity_type
                 ).delete()
 
-                # Add new country permissions
-                for country in selected_countries:
+            # Parse and add new entity permissions from form
+            permissions_by_type = {}
+            for perm_str in entity_permissions:
+                if ':' in perm_str:
+                    entity_type, entity_id = perm_str.split(':', 1)
+                    try:
+                        entity_id = int(entity_id)
+                        # Skip countries - they're handled separately above
+                        if entity_type != EntityType.country.value and entity_type in all_entity_types:
+                            if entity_type not in permissions_by_type:
+                                permissions_by_type[entity_type] = []
+                            permissions_by_type[entity_type].append(entity_id)
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid entity IDs
+
+            # Add new entity permissions
+            for entity_type, entity_ids in permissions_by_type.items():
+                for entity_id in entity_ids:
                     perm = UserEntityPermission(
                         user_id=user.id,
-                        entity_type=EntityType.country.value,
-                        entity_id=country.id
+                        entity_type=entity_type,
+                        entity_id=entity_id
                     )
                     db.session.add(perm)
-            else:
-                selected_country_ids = []
-                # Remove all country permissions
-                UserEntityPermission.query.filter_by(
-                    user_id=user.id,
-                    entity_type=EntityType.country.value
-                ).delete()
-        else:
-            # Preserve existing assignments when countries are disabled
-            selected_country_ids = [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
 
-        # Handle notification preferences
-        from app.services.notification.service import NotificationService
-        from app.models import NotificationType
+            # Prepare new values for audit logging
+            try:
+                from app.models.rbac import RbacUserRole
+                new_rbac_role_ids = [ur.role_id for ur in RbacUserRole.query.filter_by(user_id=user.id).all()]
+            except Exception as e:
+                current_app.logger.debug("new_rbac_role_ids query failed: %s", e)
+                new_rbac_role_ids = []
 
-        # Get or create notification preferences for the user
-        preferences = NotificationService.get_notification_preferences(user.id)
+            new_values = {
+                'email': user.email,
+                'name': user.name,
+                'title': user.title,
+                'profile_color': user.profile_color,
+                'rbac_role_ids': new_rbac_role_ids,
+                'country_ids': selected_country_ids or [],
+                'entity_permissions': entity_permissions,
+                'password_changed': bool(form.password.data)
+            }
 
-        # Get enabled notification types from form
-        email_types = request.form.getlist('notification_type_email')
-        push_types = request.form.getlist('notification_type_push')
+            # Determine risk level based on changes
+            risk_level = 'low'
+            if set(old_values.get('rbac_role_ids') or []) != set(new_values.get('rbac_role_ids') or []) or form.password.data:
+                risk_level = 'medium'
+            old_sys = bool(sys_role and sys_role.id in (old_values.get("rbac_role_ids") or []))
+            new_sys = bool(sys_role and sys_role.id in (new_values.get("rbac_role_ids") or []))
+            if old_sys != new_sys:
+                risk_level = 'high'
 
-        # Get all notification types to determine if all are selected
-        all_types = [nt.value for nt in NotificationType]
+            db.session.flush()  # Flush before logging
 
-        # Determine if all types are selected
-        all_email_selected = len(email_types) == len(all_types)
-        all_push_selected = len(push_types) == len(all_types)
+            # Log admin action for user update
+            log_admin_action(
+                action_type='user_update',
+                description=f'Updated user: {user.email}',
+                target_type='user',
+                target_id=user.id,
+                target_description=f'{user.name or user.email}',
+                old_values=old_values,
+                new_values=new_values,
+                risk_level=risk_level
+            )
 
-        # Update notification preferences from form data
-        # email_notifications and push_notifications are determined by whether any types are selected
-        frequency = request.form.get('notification_frequency', 'instant')
-        preferences.email_notifications = all_email_selected or len(email_types) > 0
-        preferences.sound_enabled = request.form.get('sound_enabled') == 'on'
-        preferences.notification_frequency = frequency
-        preferences.push_notifications = all_push_selected or len(push_types) > 0
-
-        # Handle digest day and time
-        if frequency == 'daily' or frequency == 'weekly':
-            preferences.digest_time = request.form.get('digest_time') or None
-            if frequency == 'weekly':
-                preferences.digest_day = request.form.get('digest_day') or None
-            else:
-                preferences.digest_day = None  # Clear day for daily
-        else:
-            preferences.digest_day = None
-            preferences.digest_time = None
-
-        # If all types are selected, send empty list (backend interprets as all enabled)
-        preferences.notification_types_enabled = [] if all_email_selected else email_types
-        preferences.push_notification_types_enabled = [] if all_push_selected else push_types
-
-        # Handle entity permissions from form (NS Structure and Secretariat)
-        # Always remove all non-country entity permissions first, then add back what's in the form
-        entity_permissions = request.form.getlist('entity_permissions')
-
-        # Define all possible entity types (excluding countries which are handled separately)
-        all_entity_types = allowed_non_country_entity_types
-
-        # Remove all old entity permissions (excluding countries)
-        for entity_type in all_entity_types:
-            UserEntityPermission.query.filter_by(
-                user_id=user.id,
-                entity_type=entity_type
-            ).delete()
-
-        # Parse and add new entity permissions from form
-        permissions_by_type = {}
-        for perm_str in entity_permissions:
-            if ':' in perm_str:
-                entity_type, entity_id = perm_str.split(':', 1)
-                try:
-                    entity_id = int(entity_id)
-                    # Skip countries - they're handled separately above
-                    if entity_type != EntityType.country.value and entity_type in all_entity_types:
-                        if entity_type not in permissions_by_type:
-                            permissions_by_type[entity_type] = []
-                        permissions_by_type[entity_type].append(entity_id)
-                except (ValueError, TypeError):
-                    continue  # Skip invalid entity IDs
-
-        # Add new entity permissions
-        for entity_type, entity_ids in permissions_by_type.items():
-            for entity_id in entity_ids:
-                perm = UserEntityPermission(
-                    user_id=user.id,
-                    entity_type=entity_type,
-                    entity_id=entity_id
-                )
-                db.session.add(perm)
-
-        # Prepare new values for audit logging
-        try:
-            from app.models.rbac import RbacUserRole
-            new_rbac_role_ids = [ur.role_id for ur in RbacUserRole.query.filter_by(user_id=user.id).all()]
-        except Exception as e:
-            current_app.logger.debug("new_rbac_role_ids query failed: %s", e)
-            new_rbac_role_ids = []
-
-        new_values = {
-            'email': user.email,
-            'name': user.name,
-            'title': user.title,
-            'profile_color': user.profile_color,
-            'rbac_role_ids': new_rbac_role_ids,
-            'country_ids': selected_country_ids or [],
-            'entity_permissions': entity_permissions,
-            'password_changed': bool(form.password.data)
-        }
-
-        # Determine risk level based on changes
-        risk_level = 'low'
-        if set(old_values.get('rbac_role_ids') or []) != set(new_values.get('rbac_role_ids') or []) or form.password.data:
-            risk_level = 'medium'
-        old_sys = bool(sys_role and sys_role.id in (old_values.get("rbac_role_ids") or []))
-        new_sys = bool(sys_role and sys_role.id in (new_values.get("rbac_role_ids") or []))
-        if old_sys != new_sys:
-            risk_level = 'high'
-
-        db.session.flush()  # Flush before logging
-
-        # Log admin action for user update
-        log_admin_action(
-            action_type='user_update',
-            description=f'Updated user: {user.email}',
-            target_type='user',
-            target_id=user.id,
-            target_description=f'{user.name or user.email}',
-            old_values=old_values,
-            new_values=new_values,
-            risk_level=risk_level
-        )
-
-        db.session.flush()
-        flash(f"User '{user.name}' has been updated successfully.", "success")
-        return redirect(url_for('user_management.manage_users'))
+            db.session.flush()
+            flash(f"User '{user.name}' has been updated successfully.", "success")
+            return redirect(url_for('user_management.manage_users'))
 
     # Pre-populate form with user data for GET request
     if request.method == 'GET':

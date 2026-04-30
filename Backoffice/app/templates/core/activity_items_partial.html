@@ -18,6 +18,7 @@
 
     {# Wrap the clickable card in an anchor when we have a target URL (CSP-safe, no inline JS) #}
     {% set activity_user_id = activity.user.id if activity.user else '' %}
+    {% set activity_user_external_id = (activity.user.external_id|string if activity.user and activity.user.external_id else '') %}
     {% set activity_template_period = activity.summary_params.get('template_period') if activity.summary_params else '' %}
     {% if not activity_template_period %}
         {# Fallback: construct from template and period if template_period not available #}
@@ -30,10 +31,10 @@
         {% endif %}
     {% endif %}
     {% if activity_href %}
-    <a href="{{ activity_href }}" class="block activity-item-wrapper" data-user-id="{{ activity_user_id }}" data-template-period="{{ activity_template_period }}">
+    <a href="{{ activity_href }}" class="block activity-item-wrapper" data-user-id="{{ activity_user_id }}" data-user-external-id="{{ activity_user_external_id }}" data-template-period="{{ activity_template_period }}">
         <div class="activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
     {% else %}
-    <div class="activity-item-wrapper activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" data-user-id="{{ activity_user_id }}" data-template-period="{{ activity_template_period }}">
+    <div class="activity-item-wrapper activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" data-user-id="{{ activity_user_id }}" data-user-external-id="{{ activity_user_external_id }}" data-template-period="{{ activity_template_period }}">
     {% endif %}
         <div class="flex items-start justify-between mb-3">
             <div class="flex items-center">

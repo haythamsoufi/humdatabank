@@ -4,9 +4,10 @@
 
 {# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set azure_b2c_configured = azure_b2c_configured | default(false) %}
 {% set can_view_analytics = current_is_system_manager or has_permission('admin.analytics.view') %}
 {% set can_view_users = current_is_system_manager or has_permission('admin.users.view') %}
-{% set can_create_user = current_is_system_manager or has_permission('admin.users.create') %}
+{% set can_create_user = (current_is_system_manager or has_permission('admin.users.create')) and (not azure_b2c_configured) %}
 {% set can_view_templates = current_is_system_manager or has_permission('admin.templates.view') %}
 {% set can_create_templates = current_is_system_manager or has_permission('admin.templates.create') %}
 {% set can_view_assignments = current_is_system_manager or has_permission('admin.assignments.view') %}

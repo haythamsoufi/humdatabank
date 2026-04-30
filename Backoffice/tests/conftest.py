@@ -181,6 +181,10 @@ END $$;
                 except Exception:
                     pass  # Ignore if doesn't exist
 
+            if db.engine.dialect.name == "postgresql":
+                with db.engine.begin() as conn:
+                    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+
             # Create all tables - handle duplicate index errors gracefully
             # Use a custom approach that continues even if index creation fails
             try:

@@ -358,8 +358,11 @@
             var userActive = options.activeField ? data[options.activeField] : user.active;
             var profileColor = options.profileColorField ? data[options.profileColorField] : user.profile_color;
             var roleList = options.rolesField ? data[options.rolesField] : user.rbac_roles;
+            var roleBadgeKey = options.roleBadgeKeyField ? data[options.roleBadgeKeyField] : user.role_badge_key;
+            var externalId = options.externalIdField ? data[options.externalIdField] : user.external_id;
             var countriesCount = options.countriesCountField ? data[options.countriesCountField] : user.countries_count;
             var entitySummary = options.entitySummaryField ? data[options.entitySummaryField] : user.entity_summary;
+            var scopeDisplayLines = user.scope_display_lines;
             var lastPresence = options.lastPresenceField ? data[options.lastPresenceField] : user.last_presence;
             var fallbackLabel = options.fallbackLabel || getTranslation('unknownUser', 'Unknown User');
             var showEmail = options.showEmail !== false;
@@ -376,11 +379,16 @@
                 title: userTitle || '',
                 active: userActive,
                 profile_color: profileColor || '#3B82F6',
+                role_badge_key: roleBadgeKey || '',
+                external_id: externalId ? String(externalId) : '',
                 rbac_roles: Array.isArray(roleList) ? roleList : [],
                 countries_count: countriesCount,
                 entity_summary: entitySummary || '',
                 last_presence: lastPresence || null
             };
+            if (Array.isArray(scopeDisplayLines) && scopeDisplayLines.length) {
+                inlineProfile.scope_display_lines = scopeDisplayLines;
+            }
 
             var encodedProfile = '';
             try {
@@ -393,6 +401,9 @@
             html += '<span class="ag-user-hover-trigger" style="display:flex;flex:1 1 0%;flex-direction:column;min-width:0;max-width:100%;overflow:hidden;cursor:pointer;"';
             if (userId !== null && userId !== undefined && userId !== '') {
                 html += ' data-user-id="' + escapeHtmlAttr(userId) + '"';
+            }
+            if (externalId) {
+                html += ' data-user-external-id="' + escapeHtmlAttr(String(externalId)) + '"';
             }
             if (userEmail) {
                 html += ' data-user-email="' + escapeHtmlAttr(userEmail) + '"';
@@ -440,8 +451,11 @@
             var userActive = options.activeField ? data[options.activeField] : user.active;
             var profileColor = options.profileColorField ? data[options.profileColorField] : user.profile_color;
             var roleList = options.rolesField ? data[options.rolesField] : user.rbac_roles;
+            var roleBadgeKey = options.roleBadgeKeyField ? data[options.roleBadgeKeyField] : user.role_badge_key;
+            var externalId = options.externalIdField ? data[options.externalIdField] : user.external_id;
             var countriesCount = options.countriesCountField ? data[options.countriesCountField] : user.countries_count;
             var entitySummary = options.entitySummaryField ? data[options.entitySummaryField] : user.entity_summary;
+            var scopeDisplayLines = user.scope_display_lines;
             var lastPresence = options.lastPresenceField ? data[options.lastPresenceField] : user.last_presence;
             var fallbackLabel = options.fallbackLabel || getTranslation('unknownUser', 'Unknown User');
             var showEmail = options.showEmail !== false;
@@ -460,11 +474,16 @@
                 title: userTitle || '',
                 active: userActive,
                 profile_color: profileColor || '#3B82F6',
+                role_badge_key: roleBadgeKey || '',
+                external_id: externalId ? String(externalId) : '',
                 rbac_roles: Array.isArray(roleList) ? roleList : [],
                 countries_count: countriesCount,
                 entity_summary: entitySummary || '',
                 last_presence: lastPresence || null
             };
+            if (Array.isArray(scopeDisplayLines) && scopeDisplayLines.length) {
+                inlineProfile.scope_display_lines = scopeDisplayLines;
+            }
 
             var encodedProfile = '';
             try {
@@ -479,6 +498,9 @@
             html += '<span class="ag-user-hover-trigger" style="display:flex;flex:1 1 0%;flex-direction:column;gap:4px;min-width:0;max-width:100%;overflow:hidden;cursor:pointer;"';
             if (userId !== null && userId !== undefined && userId !== '') {
                 html += ' data-user-id="' + escapeHtmlAttr(userId) + '"';
+            }
+            if (externalId) {
+                html += ' data-user-external-id="' + escapeHtmlAttr(String(externalId)) + '"';
             }
             if (userEmail) {
                 html += ' data-user-email="' + escapeHtmlAttr(userEmail) + '"';

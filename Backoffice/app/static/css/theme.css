@@ -226,3 +226,11 @@ a.modal-action-btn {
   font-size: 0.875rem;
   line-height: 1.25rem;
 }
+
+/*
+ * Feature-flag / config identifiers (System Settings → Notifications, etc.).
+ * Prefer system UI monospace before legacy Courier-style generic monospace.
+ */
+.notification-feature-flag-key {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", Menlo, Monaco, Consolas, monospace;
+}

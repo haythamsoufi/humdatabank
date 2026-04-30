@@ -10,6 +10,7 @@
     var HIDE_DELAY_MS = 160;
     var profileCacheById = {};
     var profileCacheByEmail = {};
+    var profileCacheByExternalId = {};
     var activeTrigger = null;
     var popupEl = null;
     var showTimer = null;
@@ -122,6 +123,9 @@
             });
             result.entity_summary = pieces.join(', ');
         }
+        if (result.external_id === undefined && result.user_external_id) {
+            result.external_id = result.user_external_id;
+        }
         return result;
     }
 
@@ -133,9 +137,16 @@
         if (profile.email) {
             profileCacheByEmail[String(profile.email).toLowerCase()] = profile;
         }
+        if (profile.external_id) {
+            profileCacheByExternalId[String(profile.external_id).toLowerCase()] = profile;
+        }
     }
 
-    function readCachedProfile(userId, email) {
+    function readCachedProfile(userId, email, externalId) {
+        if (externalId) {
+            var byExt = profileCacheByExternalId[String(externalId).toLowerCase()];
+            if (byExt) return byExt;
+        }
         if (userId !== null && userId !== undefined && userId !== '') {
             var byId = profileCacheById[String(userId)];
             if (byId) return byId;
@@ -147,9 +158,13 @@
         return null;
     }
 
-    function fetchProfileSummary(userId, email) {
+    function fetchProfileSummary(userId, email, externalId) {
         var queryParts = [];
-        if (userId !== null && userId !== undefined && userId !== '') {
+        externalId = (externalId || '').trim();
+        if (externalId) {
+            queryParts.push('external_ids=' + encodeURIComponent(externalId));
+        }
+        if (userId !== null && userId !== undefined && userId !== '' && !externalId) {
             queryParts.push('user_ids=' + encodeURIComponent(String(userId)));
         }
         if (email) {
@@ -222,8 +237,59 @@
             .trim();
     }
 
-    function resolveRoleTheme(roles) {
-        var roleList = Array.isArray(roles) ? roles : [];
+    function resolveRoleTheme(profile) {
+        profile = profile || {};
+        var key = String(profile.role_badge_key || '').toLowerCase();
+        if (key === 'system_manager') {
+            return {
+                key: 'system_manager',
+                label: 'System Manager',
+                labelColor: '#4c1d95',
+                badgeBackground: '#ede9fe',
+                badgeColor: '#5b21b6',
+                popupBackground: 'linear-gradient(180deg, #faf5ff 0%, #ffffff 55%)',
+                popupBorder: '#7c3aed',
+                popupShadow: '0 14px 34px rgba(76,29,149,0.35)'
+            };
+        }
+        if (key === 'admin') {
+            return {
+                key: 'admin',
+                label: 'Administrator',
+                labelColor: '#92400e',
+                badgeBackground: '#fef3c7',
+                badgeColor: '#b45309',
+                popupBackground: '#fffaf0',
+                popupBorder: '#f59e0b',
+                popupShadow: '0 12px 28px rgba(180,83,9,0.24)'
+            };
+        }
+        if (key === 'focal_point') {
+            return {
+                key: 'focal_point',
+                label: 'Focal Point',
+                labelColor: '#1e3a8a',
+                badgeBackground: '#dbeafe',
+                badgeColor: '#1d4ed8',
+                popupBackground: '#ffffff',
+                popupBorder: '#3B82F6',
+                popupShadow: '0 10px 30px rgba(0,0,0,0.25)'
+            };
+        }
+        if (key === 'user') {
+            return {
+                key: 'default',
+                label: 'User',
+                labelColor: '#374151',
+                badgeBackground: '#f3f4f6',
+                badgeColor: '#4b5563',
+                popupBackground: '#ffffff',
+                popupBorder: '#9ca3af',
+                popupShadow: '0 10px 30px rgba(0,0,0,0.22)'
+            };
+        }
+
+        var roleList = Array.isArray(profile.rbac_roles) ? profile.rbac_roles : [];
         var normalized = roleList.map(normalizeRoleToken);
         var hasSystemManager = normalized.some(function(role) {
             return role.indexOf('system_manager') !== -1;
@@ -310,11 +376,11 @@
         var initials = displayName.split(' ').map(function(part) {
             return part ? part.charAt(0) : '';
         }).join('').toUpperCase().slice(0, 2) || 'U';
-        var roles = Array.isArray(profile.rbac_roles) ? profile.rbac_roles : [];
         var countriesCount = toNumber(profile.countries_count, 0);
         var entitySummary = profile.entity_summary || '';
+        var scopeDisplayLines = Array.isArray(profile.scope_display_lines) ? profile.scope_display_lines : [];
         var presence = formatPresenceDate(profile.last_presence);
-        var roleTheme = resolveRoleTheme(roles);
+        var roleTheme = resolveRoleTheme(profile);
 
         /* Row 1: avatar + (name/email col) + (date/status col). Row 2: role badge full width */
         var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
@@ -355,17 +421,24 @@
         html += '</div>';
         html += '</div>';
 
-        var showAssignmentMeta = roleTheme.key !== 'system_manager';
-        if (showAssignmentMeta && (roles.length || countriesCount > 0 || entitySummary)) {
+        var showScopeMeta = roleTheme.key === 'focal_point' && (
+            scopeDisplayLines.length > 0 || countriesCount > 0 || entitySummary
+        );
+        if (showScopeMeta) {
             html += '<div style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:8px;font-size:12px;color:#374151;display:grid;gap:4px;">';
-            if (roles.length) {
-                html += '<div><span style="font-weight:600;color:#6b7280;">Roles:</span> ' + escapeHtml(roles.slice(0, 3).join(', ')) + '</div>';
-            }
-            if (countriesCount > 0) {
-                html += '<div><span style="font-weight:600;color:#6b7280;">Countries:</span> ' + escapeHtml(countriesCount) + '</div>';
-            }
-            if (entitySummary) {
-                html += '<div><span style="font-weight:600;color:#6b7280;">Entities:</span> ' + escapeHtml(entitySummary) + '</div>';
+            if (scopeDisplayLines.length) {
+                scopeDisplayLines.forEach(function(line) {
+                    if (line) {
+                        html += '<div>' + escapeHtml(String(line)) + '</div>';
+                    }
+                });
+            } else {
+                if (countriesCount > 0) {
+                    html += '<div><span style="font-weight:600;color:#6b7280;">Countries:</span> ' + escapeHtml(String(countriesCount)) + '</div>';
+                }
+                if (entitySummary) {
+                    html += '<div><span style="font-weight:600;color:#6b7280;">Entities:</span> ' + escapeHtml(entitySummary) + '</div>';
+                }
             }
             html += '</div>';
         }
@@ -429,7 +502,8 @@
         var inlineProfile = normalizeProfile(parseInlineProfile(trigger), trigger.getAttribute('data-user-email') || '');
         var userId = inlineProfile.id !== undefined ? inlineProfile.id : trigger.getAttribute('data-user-id');
         var email = inlineProfile.email || trigger.getAttribute('data-user-email') || '';
-        var cached = readCachedProfile(userId, email);
+        var externalId = (inlineProfile.external_id || trigger.getAttribute('data-user-external-id') || '').trim();
+        var cached = readCachedProfile(userId, email, externalId);
         var effectiveProfile = cached || inlineProfile;
 
         if (!effectiveProfile || (!effectiveProfile.name && !effectiveProfile.email)) {
@@ -440,14 +514,15 @@
 
         function renderProfile(profileToRender) {
             var popup = getPopupElement();
-            applyPopupTheme(resolveRoleTheme(profileToRender.rbac_roles));
+            applyPopupTheme(resolveRoleTheme(profileToRender));
             popup.innerHTML = buildPopupHtml(profileToRender);
             positionPopup(trigger);
             popup.style.display = 'block';
         }
 
-        if (!cached && userId !== null && userId !== undefined && userId !== '') {
-            fetchProfileSummary(userId, email).then(function(fetched) {
+        var needsFetch = !cached && (externalId || (userId !== null && userId !== undefined && userId !== '') || email);
+        if (needsFetch) {
+            fetchProfileSummary(userId, email, externalId).then(function(fetched) {
                 if (activeTrigger !== trigger) return;
                 var profileToRender = fetched ? normalizeProfile(fetched, email) : effectiveProfile;
                 renderProfile(profileToRender);

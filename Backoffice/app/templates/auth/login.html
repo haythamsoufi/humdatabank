@@ -626,6 +626,7 @@ body.modal-open {
 
 </div>
 
+{% if not (azure_b2c_configured | default(false)) %}
 <!-- Register Modal -->
 <div id="registerModal" class="fixed inset-0 hidden items-center justify-center bg-black/50">
   <div id="registerModalCard" class="bg-white w-full max-w-md rounded-md shadow-lg p-6 relative">
@@ -671,6 +672,7 @@ body.modal-open {
     </form>
   </div>
   </div>
+{% endif %}
 
 <!-- Forgot Password Modal -->
 <div id="forgotModal" class="fixed inset-0 hidden items-center justify-center bg-black/50">
@@ -1340,18 +1342,25 @@ function setupModal(openBtnId, modalId, closeBtnId) {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
 }
 
-setupModal('openRegisterModal', 'registerModal', 'closeRegisterModal');
 setupModal('openForgotModal', 'forgotModal', 'closeForgotModal');
+{% if not (azure_b2c_configured | default(false)) %}
+setupModal('openRegisterModal', 'registerModal', 'closeRegisterModal');
+{% endif %}
 
 // Auto-open modal when server indicates validation errors
 var openModalType = '{{ open_modal }}';
 document.addEventListener('DOMContentLoaded', function() {
     if (openModalType === 'register') {
-        document.getElementById('registerModal').classList.remove('hidden');
-        document.getElementById('registerModal').classList.add('flex');
-        document.body.classList.add('modal-open');
-        setTimeout(initRegisterCountrySelect, 0);
-        setTimeout(setupRegisterEmailCheck, 0);
+{% if not (azure_b2c_configured | default(false)) %}
+        const registerModalEl = document.getElementById('registerModal');
+        if (registerModalEl) {
+            registerModalEl.classList.remove('hidden');
+            registerModalEl.classList.add('flex');
+            document.body.classList.add('modal-open');
+            setTimeout(initRegisterCountrySelect, 0);
+            setTimeout(setupRegisterEmailCheck, 0);
+        }
+{% endif %}
     } else if (openModalType === 'forgot') {
         document.getElementById('forgotModal').classList.remove('hidden');
         document.getElementById('forgotModal').classList.add('flex');

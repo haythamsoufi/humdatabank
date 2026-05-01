@@ -179,19 +179,19 @@
                     </div>
 
                     <div class="mb-4">
-                        {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
                         {% if form.profile_color is defined %}
                         {% set _pc_init = (form.profile_color.data or '#3B82F6') %}
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-start gap-2">
+                            <div class="flex-shrink-0 w-10 flex justify-center pt-7">
                             {% if read_only %}
-                            <div class="flex-shrink-0 w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center text-white text-xs font-semibold overflow-hidden" id="user-profile-color-preview" style="background-color: {{ _pc_init }};" aria-hidden="true">
+                            <div class="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center text-white text-xs font-semibold overflow-hidden" id="user-profile-color-preview" style="background-color: {{ _pc_init }};" aria-hidden="true">
                                 {% if user %}{{ user | profile_initials }}{% else %}?{% endif %}
                             </div>
                             {{ form.profile_color(type="hidden") }}
                             {% else %}
                             <button type="button"
                                     id="user-profile-color-open"
-                                    class="flex-shrink-0 p-0 border-0 bg-transparent rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                    class="p-0 border-0 bg-transparent rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                                     title="{{ _('Choose profile colour') }}"
                                     aria-haspopup="dialog"
                                     aria-expanded="false"
@@ -202,7 +202,9 @@
                             </button>
                             {{ form.profile_color(type="hidden", id="user_profile_color_input") }}
                             {% endif %}
+                            </div>
                             <div class="flex-1 min-w-0">
+                                {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
                                 {% if read_only %}
                                     {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", id="user_form_name", placeholder="Full Name", readonly=True, disabled=True) }}
                                 {% else %}
@@ -214,6 +216,7 @@
                             <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                         {% endfor %}
                         {% else %}
+                        {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
                         {% if read_only %}
                             {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", id="user_form_name", placeholder="Full Name", readonly=True, disabled=True) }}
                         {% else %}

@@ -462,6 +462,24 @@ body.chat-immersive #aiChatWidget .chat-sidebar-toggle {
     gap: 10px;
 }
 
+/* Draggable floating window */
+#aiChatWidget.chat-dragged {
+    bottom: auto !important;
+    right: auto !important;
+}
+body:not(.chat-immersive) #aiChatWidget .chat-header {
+    cursor: grab;
+}
+body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
+    cursor: grabbing;
+    user-select: none;
+}
+@media (max-width: 768px) {
+    body:not(.chat-immersive) #aiChatWidget .chat-header {
+        cursor: default;
+    }
+}
+
 
 .chat-sidebar-toggle--left {
     flex-shrink: 0;

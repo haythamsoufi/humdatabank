@@ -1532,9 +1532,17 @@ class HumDatabankChatbot {
                 const href = showMeLink.getAttribute('href') || '';
                 if (!href) return;
                 e.preventDefault();
-                // Close chatbot before navigating
-                this.toggleChat(false);
-                window.location.href = href;
+                const tourMatch = href.match(/chatbot-tour=([a-zA-Z0-9-]+)/);
+                if (tourMatch && window.WorkflowTourParser && typeof window.WorkflowTourParser.handleTourTrigger === 'function') {
+                    // handleTourTrigger closes the chat, fetches/registers the tour, then either
+                    // starts it in-place (same page) or navigates with the hash (different page).
+                    const workflowId = tourMatch[1];
+                    const targetPage = href.split('#')[0] || window.location.pathname;
+                    window.WorkflowTourParser.handleTourTrigger(workflowId, targetPage);
+                } else {
+                    this.toggleChat(false);
+                    window.location.href = href;
+                }
             }
         });
 
@@ -2467,19 +2475,20 @@ class HumDatabankChatbot {
                     ctx.contentElement.innerHTML = sanitizedHtml;
                     ctx.contentElement.classList.remove('streaming-cursor');
 
-                    if (window.WorkflowTourParser && typeof window.WorkflowTourParser.processMessage === 'function') {
-                        try {
-                            window.WorkflowTourParser.processMessage(ctx.contentElement);
-                        } catch (e) {
-                            console.debug('WorkflowTourParser error:', e);
-                        }
-                    }
                     const showMeLink = this._augmentOnboardingActions(ctx.contentElement);
                     if (showMeLink) {
                         const btnWrapper = document.createElement('div');
                         btnWrapper.className = 'chatbot-show-me-wrapper';
                         btnWrapper.appendChild(showMeLink);
                         ctx.contentElement.appendChild(btnWrapper);
+                    }
+                    // processMessage after showMeLink is in the DOM so it binds tour triggers on it too
+                    if (window.WorkflowTourParser && typeof window.WorkflowTourParser.processMessage === 'function') {
+                        try {
+                            window.WorkflowTourParser.processMessage(ctx.contentElement);
+                        } catch (e) {
+                            console.debug('WorkflowTourParser error:', e);
+                        }
                     }
                     this._formatChatResponseSources(ctx.contentElement);
                     this._addTableCopyButtons(ctx.contentElement);

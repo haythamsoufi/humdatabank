@@ -1102,6 +1102,7 @@ class HumDatabankChatbot {
 
         const canInit = this.elements.widget && (this.elements.fab || this._isImmersive());
         if (canInit) {
+            this._initFloatingDrag();
             this.setupEventListeners();
             this.loadConversationHistory();
             this.loadExpandedState();
@@ -1539,6 +1540,84 @@ class HumDatabankChatbot {
 
     }
 
+    _initFloatingDrag() {
+        const widget = this.elements && this.elements.widget;
+        if (!widget || this._isImmersive()) return;
+        const header = widget.querySelector('.chat-header');
+        if (!header) return;
+
+        const STORAGE_KEY = 'chatbot_float_pos';
+        let dragging = false;
+        let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+        const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
+        const applyPos = (left, top) => {
+            const maxLeft = window.innerWidth - widget.offsetWidth;
+            const maxTop = window.innerHeight - widget.offsetHeight;
+            widget.style.left = clamp(left, 0, Math.max(0, maxLeft)) + 'px';
+            widget.style.top  = clamp(top,  0, Math.max(0, maxTop))  + 'px';
+        };
+
+        const onMouseMove = (e) => {
+            if (!dragging) return;
+            applyPos(startLeft + e.clientX - startX, startTop + e.clientY - startY);
+        };
+
+        const onMouseUp = () => {
+            if (!dragging) return;
+            dragging = false;
+            widget.classList.remove('chat-dragging');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    left: parseInt(widget.style.left, 10),
+                    top:  parseInt(widget.style.top,  10),
+                }));
+            } catch (_) {}
+        };
+
+        header.addEventListener('mousedown', (e) => {
+            if (this._isImmersive() || this._isMobileFloatingLayout()) return;
+            if (e.button !== 0) return;
+            if (e.target.closest('button, a, input, textarea, select, [role="button"]')) return;
+
+            const rect = widget.getBoundingClientRect();
+            widget.classList.add('chat-dragged');
+            applyPos(rect.left, rect.top);
+
+            dragging = true;
+            startX    = e.clientX;
+            startY    = e.clientY;
+            startLeft = parseInt(widget.style.left, 10);
+            startTop  = parseInt(widget.style.top,  10);
+
+            widget.classList.add('chat-dragging');
+            e.preventDefault();
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        // Clamp back inside viewport on window resize
+        window.addEventListener('resize', () => {
+            if (!widget.classList.contains('chat-dragged')) return;
+            applyPos(parseInt(widget.style.left, 10), parseInt(widget.style.top, 10));
+        });
+
+        this._restoreFloatPos = () => {
+            if (this._isImmersive() || this._isMobileFloatingLayout()) return;
+            try {
+                const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+                if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+                    widget.classList.add('chat-dragged');
+                    applyPos(saved.left, saved.top);
+                }
+            } catch (_) {}
+        };
+    }
+
     toggleChat(forceOpen) {
         const isOpen = typeof forceOpen === 'boolean' ? forceOpen : !this.isOpen();
 
@@ -1549,6 +1628,7 @@ class HumDatabankChatbot {
         }
 
         if (isOpen) {
+            if (typeof this._restoreFloatPos === 'function') this._restoreFloatPos();
             // Only show greeting if chat is opened AND there's no conversation history
             if (this.conversationHistory.length === 0) {
                 this.showWelcomeMessage();
@@ -1775,10 +1855,16 @@ class HumDatabankChatbot {
         this.scrollToBottom();
     }
 
+    _isSuppressedStepDetail(text) {
+        // Filter internal planner diagnostics that have no value for end users.
+        return /^No single-tool shortcut for this request/i.test(String(text || '').trim());
+    }
+
     appendStepDetail(detailLine) {
         if (!detailLine || typeof detailLine !== 'string') return;
         const trimmed = String(detailLine).trim();
         if (!trimmed) return;
+        if (this._isSuppressedStepDetail(trimmed)) return;
         const typingIndicator = document.getElementById('typingIndicator');
         if (!typingIndicator) return;
         const stepsList = typingIndicator.querySelector('.chat-progress-steps');
@@ -2042,6 +2128,7 @@ class HumDatabankChatbot {
                     }
                     console.warn('[Chatbot] Transport: WebSocket failed, falling back to SSE:', wsError);
                     this.isTyping = true;
+                    this.hideTypingIndicator(); // clear any partial WS steps before SSE retries from scratch
                     this.showTypingIndicator();
                     this._setSendButtonStop(true);
                 }
@@ -2060,6 +2147,7 @@ class HumDatabankChatbot {
                     }
                     console.warn('[Chatbot] Transport: SSE failed, falling back to HTTP JSON:', sseError);
                     this.isTyping = true;
+                    this.hideTypingIndicator(); // clear any partial SSE steps before HTTP fallback
                     this.showTypingIndicator();
                     this._setSendButtonStop(true);
                 }
@@ -2302,20 +2390,21 @@ class HumDatabankChatbot {
             case 'step':
                 if (msg.message) {
                     this._log('STEP payload:', { message: msg.message, detail: msg.detail });
-                    this.updateTypingIndicator(msg.message, msg.detail);
+                    const stepDetail = msg.detail != null ? String(msg.detail).trim() : '';
+                    const visibleDetail = this._isSuppressedStepDetail(stepDetail) ? '' : stepDetail;
+                    this.updateTypingIndicator(msg.message, visibleDetail || undefined);
                     if (!ctx.steps) ctx.steps = [];
                     const stepMsg = String(msg.message || '').trim();
-                    const stepDetail = msg.detail != null ? String(msg.detail).trim() : '';
                     const last = ctx.steps[ctx.steps.length - 1];
                     if (last && (last.message || '').trim() === stepMsg) {
-                        if (stepDetail) (last.detail_lines = last.detail_lines || []).push(stepDetail);
+                        if (visibleDetail) (last.detail_lines = last.detail_lines || []).push(visibleDetail);
                     } else {
-                        ctx.steps.push({ message: stepMsg, detail_lines: stepDetail ? [stepDetail] : [] });
+                        ctx.steps.push({ message: stepMsg, detail_lines: visibleDetail ? [visibleDetail] : [] });
                     }
                 } else if (msg.detail) {
                     this._log('STEP (detail-only) payload:', { detail: msg.detail });
                     this.appendStepDetail(msg.detail);
-                    if (ctx.steps && ctx.steps.length) {
+                    if (!this._isSuppressedStepDetail(msg.detail) && ctx.steps && ctx.steps.length) {
                         const last = ctx.steps[ctx.steps.length - 1];
                         if (!last.detail_lines) last.detail_lines = [];
                         last.detail_lines.push(String(msg.detail || '').trim());
@@ -2328,13 +2417,15 @@ class HumDatabankChatbot {
                 if (msg.detail) {
                     this._log('STEP_DETAIL payload:', { detail: msg.detail });
                     this.appendStepDetail(msg.detail);
-                    if (!ctx.steps) ctx.steps = [];
-                    if (!ctx.steps.length) {
-                        ctx.steps.push({ message: (this._uiString && this._uiString('preparingQuery')) || 'Preparing query…', detail_lines: [] });
+                    if (!this._isSuppressedStepDetail(msg.detail)) {
+                        if (!ctx.steps) ctx.steps = [];
+                        if (!ctx.steps.length) {
+                            ctx.steps.push({ message: (this._uiString && this._uiString('preparingQuery')) || 'Preparing query…', detail_lines: [] });
+                        }
+                        const lastStep = ctx.steps[ctx.steps.length - 1];
+                        if (!lastStep.detail_lines) lastStep.detail_lines = [];
+                        lastStep.detail_lines.push(String(msg.detail || '').trim());
                     }
-                    const lastStep = ctx.steps[ctx.steps.length - 1];
-                    if (!lastStep.detail_lines) lastStep.detail_lines = [];
-                    lastStep.detail_lines.push(String(msg.detail || '').trim());
                 }
                 break;
 
@@ -2382,6 +2473,13 @@ class HumDatabankChatbot {
                         } catch (e) {
                             console.debug('WorkflowTourParser error:', e);
                         }
+                    }
+                    const showMeLink = this._augmentOnboardingActions(ctx.contentElement);
+                    if (showMeLink) {
+                        const btnWrapper = document.createElement('div');
+                        btnWrapper.className = 'chatbot-show-me-wrapper';
+                        btnWrapper.appendChild(showMeLink);
+                        ctx.contentElement.appendChild(btnWrapper);
                     }
                     this._formatChatResponseSources(ctx.contentElement);
                     this._addTableCopyButtons(ctx.contentElement);
@@ -6032,6 +6130,13 @@ class HumDatabankChatbot {
                 const workflowId = fallbackByPath[path];
                 if (!workflowId) continue;
                 return `${path}${parsed.search || ''}#chatbot-tour=${encodeURIComponent(workflowId)}`;
+            }
+            // 4) Plain-text fallback: AI may mention a path as text rather than a hyperlink.
+            const bodyText = (root.textContent || root.innerText || '');
+            for (const [path, workflowId] of Object.entries(fallbackByPath)) {
+                if (bodyText.includes(path)) {
+                    return `${path}#chatbot-tour=${encodeURIComponent(workflowId)}`;
+                }
             }
         } catch (error) {
             console.debug('Failed to infer workflow tour href:', error);

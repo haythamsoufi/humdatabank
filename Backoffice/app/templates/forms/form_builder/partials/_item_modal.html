@@ -701,11 +701,12 @@
                             {# Column Headers #}
                             <div class="mb-4">
                                 <div class="flex items-center gap-2 flex-wrap mb-2">
-                                    <label class="text-gray-700 text-sm font-semibold">Column Headers</label>
+                                    <label class="text-gray-700 text-sm font-semibold">Column Codes</label>
                                     <button type="button" id="matrix-column-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage column header translations') }}" aria-label="{{ _('Translations') }}">
                                         <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                     </button>
                                 </div>
+                                <p class="text-xs text-gray-500 mb-2">Enter a stable code for each column (e.g. <code class="bg-gray-100 px-1 rounded">total_beneficiaries</code>). Use the translations button to set display labels in English and other languages.</p>
                                 <div id="matrix-columns-container" class="space-y-2">
                                     <!-- Column headers will be added here dynamically -->
                                 </div>
@@ -784,7 +785,7 @@
                         <template id="matrix-column-template">
                             <div class="matrix-column">
                                 <div class="flex items-center space-x-2">
-                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="Enter column header">
+                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="e.g. total_beneficiaries">
                                     <input type="hidden" class="column-name-translations" value="{}">
                                     <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-32 sm:text-sm border-gray-300 rounded-md">
                                         <option value="number">Number</option>

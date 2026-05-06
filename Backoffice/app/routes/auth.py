@@ -38,6 +38,7 @@ from app.services.app_settings_service import get_organization_name, is_organiza
 from app.utils.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
 from app.utils.request_utils import clear_mobile_app_embed_cookie
 from app.utils.azure_b2c_config import is_azure_b2c_configured
+from app.utils.csp_nonce import get_style_nonce
 
 bp = Blueprint("auth", __name__)
 
@@ -454,7 +455,7 @@ def azure_login():
         "client_id": cfg["client_id"],
         "response_type": "code",
         "redirect_uri": cfg["redirect_uri"],
-        "response_mode": "query",
+        "response_mode": "form_post",
         "scope": cfg["scope"],
         "state": signed_state,  # signed JWT carries verifier/nonce/next
         "nonce": nonce,
@@ -504,11 +505,24 @@ def azure_callback():
     error = request.values.get("error")
     error_description = request.values.get("error_description")
     if error:
-        # User canceled from B2C UI
+        # User canceled from B2C UI — silently return them to login
         if error_description and "AADB2C90091" in error_description:
             return redirect(url_for("auth.login"))
-        flash(_("Azure sign-in failed."), "warning")
-        return redirect(url_for("auth.login"))
+        current_app.logger.warning(
+            "Azure B2C auth error: %s — %s", error, error_description or "(no description)"
+        )
+        return render_template(
+            "errors/error.html",
+            error_code=None,
+            error_title=_("Sign-In Failed"),
+            error_message=_(
+                "Oops, something went wrong! We weren't able to complete your sign-in. "
+                "Please try again or contact support if the problem continues."
+            ),
+            error_details=None,
+            current_user=current_user,
+            style_nonce=get_style_nonce(),
+        ), 200
 
     code = request.values.get("code")
     state = request.values.get("state")

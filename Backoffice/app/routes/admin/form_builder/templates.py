@@ -14,9 +14,10 @@ from app.models import (FormTemplate, FormSection, FormItem, FormPage, Indicator
     QuestionType, TemplateShare, User, FormTemplateVersion, AssignedForm)
 from app.models.core import Country
 from app.forms.form_builder import (FormTemplateForm, FormSectionForm, IndicatorForm, QuestionForm, DocumentFieldForm)
+from app.forms.base import int_or_none
 from app.routes.admin.shared import (admin_required, admin_permission_required, permission_required,
     system_manager_required, check_template_access)
-from app.utils.request_utils import is_json_request, get_request_data
+from app.utils.request_utils import is_json_request, get_request_data, _is_json_body
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.services.user_analytics_service import log_admin_action
 from app.services.template_excel_service import TemplateExcelService
@@ -780,6 +781,14 @@ def edit_template(template_id):
                 "TEMPLATE_UPDATE: form submission template_id=%s version_id=%s method=%s keys=%s",
                 template.id, selected_version.id, request.method, list(data.keys())
             )
+
+        # For JSON/AJAX submissions, request.form is empty so WTForms binds no data.
+        # Pre-populate the three fields that are either validated or read via form.field.data.
+        if _is_json_body():
+            form.name.data = (data.get('name') or '').strip()
+            form.description.data = data.get('description') or ''
+            raw_owner = data.get('owned_by')
+            form.owned_by.data = int_or_none(raw_owner) if raw_owner is not None else None
 
         # Validate form
         if not form.validate():

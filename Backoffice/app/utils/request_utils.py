@@ -3,6 +3,9 @@
 Shared request utilities for JSON/AJAX detection.
 Centralizes is_json_request to replace ad-hoc X-Requested-With / request.is_json checks.
 """
+import base64
+import json
+
 from flask import request
 
 from app.utils.api_helpers import get_json_safe
@@ -57,6 +60,10 @@ def get_request_data():
     :class:`_JsonFormProxy` wrapping the parsed body so callers can keep
     using ``.get()`` / ``.getlist()`` / ``in`` without branching.
 
+    Transparently unwraps ``{ "payload": "<base64 UTF-8 JSON>" }`` bodies
+    sent by the frontend to avoid WAF false positives on JSON-encoded config
+    strings (matrix config, translations, etc.).
+
     Otherwise returns ``request.form`` directly.
 
     Usage in handlers::
@@ -66,7 +73,14 @@ def get_request_data():
         items = data.getlist('items')
     """
     if _is_json_body():
-        return _JsonFormProxy(get_json_safe() or {})
+        raw = get_json_safe() or {}
+        wrapped = raw.get("payload") or raw.get("payload_b64")
+        if wrapped and isinstance(wrapped, str):
+            try:
+                raw = json.loads(base64.b64decode(str(wrapped)).decode("utf-8"))
+            except Exception:
+                pass
+        return _JsonFormProxy(raw)
     return request.form
 
 

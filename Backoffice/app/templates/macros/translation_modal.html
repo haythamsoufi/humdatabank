@@ -167,9 +167,12 @@
                             <th class="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-300">
                                 {% if context == 'pages' %}Page Name (English)
                                 {% elif context == 'options' %}Option Text (English)
-                                {% elif context == 'column_headers' %}Column Header (English)
+                                {% elif context == 'column_headers' %}Column Code
                                 {% else %}Text (English){% endif %}
                             </th>
+                            {% if context == 'column_headers' %}
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-300">English</th>
+                            {% endif %}
                             {% for code in SUPPORTED_LANGUAGES %}
                                 {% if code != 'en' %}
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-300">{{ (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}</th>

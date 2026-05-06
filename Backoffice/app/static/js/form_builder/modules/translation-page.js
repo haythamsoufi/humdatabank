@@ -333,6 +333,19 @@ function attachMatrixColumnHeadersModal() {
       const supportedLanguages = window.TranslationModalUtils.supportedLanguages || [];
       const languageDisplayNames = window.TranslationModalUtils.languageDisplayNames || {};
       const cells = [];
+
+      // English label cell — always first, editable
+      const enCell = document.createElement('td');
+      enCell.className = 'px-4 py-2 border-r border-gray-300';
+      const enTextarea = document.createElement('textarea');
+      enTextarea.className = 'w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500';
+      enTextarea.rows = 2;
+      enTextarea.setAttribute('data-language', 'en');
+      enTextarea.placeholder = 'English label';
+      enTextarea.value = translations['en'] || '';
+      enCell.appendChild(enTextarea);
+      cells.push(enCell);
+
       supportedLanguages.filter(code => code !== 'en').forEach(code => {
         const cell = document.createElement('td');
         cell.className = 'px-4 py-2 border-r border-gray-300';
@@ -493,9 +506,14 @@ function attachMatrixColumnHeadersModal() {
         }
         autoBtn.disabled = true;
 
-        const columnTexts = Array.from(columnDivs).map(div => {
-          const input = div.querySelector('.column-text');
-          return input ? (input.value || '').trim() : '';
+        // Build source texts from the modal's current English textarea values, falling back to the code
+        const tbody = document.getElementById(tbodyId);
+        const currentRows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+        const columnTexts = currentRows.map(row => {
+          const enTextarea = row.querySelector('textarea[data-language="en"]');
+          if (enTextarea && enTextarea.value.trim()) return enTextarea.value.trim();
+          const codeTd = row.querySelector('td');
+          return codeTd ? codeTd.textContent.trim() : '';
         }).filter(text => text.trim());
 
         if (columnTexts.length === 0) {

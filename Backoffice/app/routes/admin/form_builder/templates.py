@@ -1232,19 +1232,9 @@ def delete_template(template_id):
         # ``FormTemplate.name`` is derived from the published (or first) version; capture it
         # before unpublishing and bulk-deleting versions below.
         template_name = template.name
-        # Delete template sharing records first
-        TemplateShare.query.filter_by(template_id=template.id).delete(synchronize_session=False)
 
-        # Delete assignments (which will cascade to public submissions and entity statuses)
-        from app.models.assignments import AssignedForm
-        assignments_deleted = AssignedForm.query.filter_by(template_id=template.id).delete(synchronize_session=False)
-        current_app.logger.debug(f"VERSIONING_DEBUG: delete_template - deleted {assignments_deleted} assignments")
-
-        # Unpublish to avoid FK constraints
-        template.published_version_id = None
-        db.session.flush()
-
-        # Manually delete children and dependent data in safe order (works even without DB ON DELETE)
+        from app.models.assignments import AssignedForm, AssignmentEntityStatus, PublicSubmission
+        from app.models.documents import SubmittedDocument
         from app.models.form_items import FormItem
         from app.models.forms import (
             FormPage,
@@ -1256,17 +1246,54 @@ def delete_template(template_id):
             DynamicIndicatorData,
         )
 
-        # Subqueries for dependent deletes
+        # Delete template sharing records first
+        TemplateShare.query.filter_by(template_id=template.id).delete(synchronize_session=False)
+
+        # Subqueries used throughout
         item_ids_subq = select(FormItem.id).filter_by(template_id=template.id).scalar_subquery()
         section_ids_subq = select(FormSection.id).filter_by(template_id=template.id).scalar_subquery()
+        assignment_ids_subq = select(AssignedForm.id).filter(
+            AssignedForm.template_id == template.id
+        ).scalar_subquery()
+        entity_status_ids_subq = select(AssignmentEntityStatus.id).filter(
+            AssignmentEntityStatus.assigned_form_id.in_(assignment_ids_subq)
+        ).scalar_subquery()
+        public_sub_ids_subq = select(PublicSubmission.id).filter(
+            PublicSubmission.assigned_form_id.in_(assignment_ids_subq)
+        ).scalar_subquery()
 
-        # Delete data rows that reference this template's items/sections first to avoid FK violations
+        # Delete data rows that reference this template's items/sections first
         formdata_deleted = FormData.query.filter(FormData.form_item_id.in_(item_ids_subq)).delete(synchronize_session=False)
         repeat_data_deleted = RepeatGroupData.query.filter(RepeatGroupData.form_item_id.in_(item_ids_subq)).delete(synchronize_session=False)
         repeat_instances_deleted = RepeatGroupInstance.query.filter(RepeatGroupInstance.section_id.in_(section_ids_subq)).delete(synchronize_session=False)
         dynamic_data_deleted = DynamicIndicatorData.query.filter(DynamicIndicatorData.section_id.in_(section_ids_subq)).delete(synchronize_session=False)
 
-        # Now remove the structural records
+        # Delete submitted documents (children of entity statuses and public submissions)
+        # Must happen before AssignmentEntityStatus deletion — bulk delete bypasses ORM cascade
+        SubmittedDocument.query.filter(
+            db.or_(
+                SubmittedDocument.assignment_entity_status_id.in_(entity_status_ids_subq),
+                SubmittedDocument.public_submission_id.in_(public_sub_ids_subq),
+            )
+        ).delete(synchronize_session=False)
+
+        # Delete entity statuses before assignments — DB FK has no ON DELETE CASCADE
+        AssignmentEntityStatus.query.filter(
+            AssignmentEntityStatus.assigned_form_id.in_(assignment_ids_subq)
+        ).delete(synchronize_session=False)
+
+        # Delete public submissions, then the assignment records themselves
+        PublicSubmission.query.filter(
+            PublicSubmission.assigned_form_id.in_(assignment_ids_subq)
+        ).delete(synchronize_session=False)
+        assignments_deleted = AssignedForm.query.filter_by(template_id=template.id).delete(synchronize_session=False)
+        current_app.logger.debug(f"VERSIONING_DEBUG: delete_template - deleted {assignments_deleted} assignments")
+
+        # Unpublish to avoid FK constraints on published_version_id
+        template.published_version_id = None
+        db.session.flush()
+
+        # Remove the structural records
         items_deleted = FormItem.query.filter_by(template_id=template.id).delete(synchronize_session=False)
         sections_deleted = FormSection.query.filter_by(template_id=template.id).delete(synchronize_session=False)
         pages_deleted = FormPage.query.filter_by(template_id=template.id).delete(synchronize_session=False)

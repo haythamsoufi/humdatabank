@@ -441,27 +441,25 @@ class AuthService {
       await AiChatService().clearToken();
       await _session.clearSession();
 
-      // Preserve the device install ID so the same physical device reuses the
-      // same token on next login (prevents duplicate device rows).
-      // Wrapped in try-catch so a Keychain/platform error doesn't abort the
-      // rest of the logout cleanup (setting _currentUser = null, stopping
-      // timers, etc.).
-      String? deviceInstallId;
-      try {
-        deviceInstallId =
-            await _storage.getSecure(AppConfig.persistentDeviceInstallIdKey);
-      } catch (_) {}
+      // Wipe auth-scoped state from secure storage and SharedPreferences,
+      // but preserve user UI/UX preferences (theme, language, Arabic font,
+      // chatbot AI policy acknowledgement) and the persistent device-install
+      // ID.  Previously this called `_storage.clearSecure()` + `_storage.clear()`
+      // which nuked **every** SharedPreferences entry — including the user's
+      // selected theme and language — every time we logged out, even when the
+      // logout was triggered automatically by a transient 401.  The "lost
+      // theme after a day" symptom was caused by that broad wipe combined
+      // with the over-eager auth-error path; both are fixed here.
+      await _storage.clearSecureExcept(<String>[
+        AppConfig.persistentDeviceInstallIdKey,
+      ]);
+      await _storage.clearPrefsExcept(<String>[
+        AppConfig.themeModeKey,
+        AppConfig.selectedLanguageKey,
+        AppConfig.arabicTextFontKey,
+        AppConfig.chatbotAiPolicyAcknowledgedKey,
+      ]);
 
-      await _storage.clearSecure();
-      await _storage.clear();
-
-      // Restore the device install ID after wiping secure storage.
-      try {
-        if (deviceInstallId != null && deviceInstallId.isNotEmpty) {
-          await _storage.setSecure(
-              AppConfig.persistentDeviceInstallIdKey, deviceInstallId);
-        }
-      } catch (_) {}
       await OfflineCacheService().clearAll();
       await OfflineQueueService().clearAll();
       await AiChatPersistenceService().clearAllConversations();
@@ -516,32 +514,40 @@ class AuthService {
     DebugLogger.logAuth('Starting periodic session refresh timer (every ${_periodicRefreshInterval.inMinutes} minutes)');
 
     _periodicRefreshTimer = Timer.periodic(_periodicRefreshInterval, (_) async {
-      // Only refresh if we have a valid session
+      // Stop if we no longer have any auth credentials at all.  Previously
+      // this gated solely on `_session.hasSession()` (the Flask cookie),
+      // which meant JWT-only logins (the typical mobile path when the
+      // server doesn't set a session cookie alongside the token response)
+      // killed the periodic refresh on the very first tick — leaving the
+      // app to discover token expiry only when the user next interacted.
+      final hasJwt = await _jwtService.hasTokens();
       final hasSession = await _session.hasSession();
-      if (!hasSession) {
-        DebugLogger.logAuth('No session found - stopping periodic refresh');
+      if (!hasJwt && !hasSession) {
+        DebugLogger.logAuth('No JWT or session cookie — stopping periodic refresh');
         _stopPeriodicRefresh();
         return;
       }
 
-      // Check if session is expired
-      final isExpired = await _session.isSessionExpired();
-      if (isExpired) {
-        DebugLogger.logAuth('Session expired - stopping periodic refresh');
-        _stopPeriodicRefresh();
+      // Skip if access token is still comfortably valid: refreshing while
+      // the token is fresh just consumes a refresh-rotation slot for no gain.
+      // The 60 s expiry buffer in JwtTokenService still applies, so the
+      // first periodic tick after the token enters the buffer will refresh.
+      final accessExpired = await _jwtService.isAccessTokenExpired();
+      if (!accessExpired) {
+        DebugLogger.logAuth('Periodic refresh tick — JWT still fresh, skipping');
         return;
       }
 
-      // Refresh session in background (non-blocking)
-      DebugLogger.logAuth('Periodic session refresh triggered');
+      DebugLogger.logAuth('Periodic JWT refresh triggered (access token aging out)');
       refreshSession().then((success) {
         if (success) {
-          DebugLogger.logAuth('Periodic session refresh completed successfully');
+          DebugLogger.logAuth('Periodic JWT refresh completed successfully');
         } else {
-          DebugLogger.logWarn('AUTH', 'Periodic session refresh failed');
+          DebugLogger.logWarn('AUTH', 'Periodic JWT refresh definitively rejected');
         }
       }).catchError((e) {
-        DebugLogger.logWarn('AUTH', 'Periodic session refresh error: $e');
+        // Transient failure — keep tokens, will retry next tick.
+        DebugLogger.logWarn('AUTH', 'Periodic JWT refresh transient error (ignored): $e');
       });
     });
   }
@@ -687,10 +693,17 @@ class AuthService {
     };
   }
 
-  // Refresh session by making a lightweight API call
-  // This extends the session lifetime on the backend
-  // IMPROVED: Added retry logic, enhanced queue system, and rate limiting
-  Future<bool> refreshSession({int retryCount = 0, bool forceRefresh = false}) async {
+  /// Refresh JWT tokens via the mobile refresh endpoint.
+  ///
+  /// Concurrent calls are coalesced (in-process single-flight): the first
+  /// call performs the network round-trip; subsequent callers wait for the
+  /// same result and avoid a token-rotation reuse storm.
+  ///
+  /// Rate limiting: when not [forceRefresh], a recently-attempted refresh
+  /// short-circuits and returns the *current* JWT validity rather than
+  /// blindly returning `true` (which previously masked an expired token
+  /// and caused the next API call to 401).
+  Future<bool> refreshSession({bool forceRefresh = false}) async {
     // If already refreshing, queue this request
     if (_isRefreshing && _refreshCompleter != null) {
       DebugLogger.logAuth('Session refresh already in progress, queuing request...');
@@ -724,8 +737,16 @@ class AuthService {
           : _minRefreshInterval;
 
       if (now.difference(_lastRefreshAttempt!) < minInterval) {
-        DebugLogger.logAuth('Refresh rate limited - too soon since last refresh (${now.difference(_lastRefreshAttempt!).inMinutes} minutes ago, min interval: ${minInterval.inMinutes} min)');
-        return true; // Assume still valid
+        // Don't blindly return `true` — that previously caused the next API
+        // call to 401 (and trigger another refresh) when the access token
+        // had aged out *during* the rate-limit window.  Report the actual
+        // JWT validity instead so the caller can plan accordingly.
+        final accessExpired = await _jwtService.isAccessTokenExpired();
+        DebugLogger.logAuth(
+            'Refresh rate limited (last attempt ${now.difference(_lastRefreshAttempt!).inMinutes}m ago, '
+            'min interval ${minInterval.inMinutes}m) — '
+            'reporting current JWT validity: accessExpired=$accessExpired');
+        return !accessExpired;
       }
     }
 
@@ -738,7 +759,7 @@ class AuthService {
     _emitSessionState(SessionState.refreshing);
 
     try {
-      final result = await _doRefreshSession(retryCount: retryCount);
+      final result = await _doRefreshSession();
       _refreshCompleter!.complete(result);
 
       // Process any queued refresh requests
@@ -778,122 +799,139 @@ class AuthService {
   }
 
   // Internal method that performs the actual token refresh via JWT refresh token.
-  Future<bool> _doRefreshSession({int retryCount = 0}) async {
-    const maxRetries = 2;
-    try {
-      DebugLogger.logAuth('Refreshing JWT tokens... (attempt ${retryCount + 1}/${maxRetries + 1})');
+  //
+  // Contract:
+  //   - Returns `true` on success (new tokens saved).
+  //   - Returns `false` only when the server *definitively* rejected the
+  //     refresh token (HTTP 401/403): the refresh token is no longer
+  //     usable, so JWT + session state is cleared and the user must
+  //     re-authenticate.
+  //   - Throws on every other failure (timeout, network, 5xx, parse error).
+  //     Tokens are **not** cleared on a throw; the caller must treat it as
+  //     a transient failure and try again later.  Callers downstream of
+  //     [ApiService] then surface a NetworkError instead of an AuthError,
+  //     so [AuthErrorHandler] does not trigger a destructive logout.
+  //
+  // The request is sent exactly once.  Refresh tokens are one-time-use on
+  // the server (see Backoffice/app/utils/mobile_jwt.py + auth.py "Refresh
+  // token reuse detected"): the first time the server processes our request
+  // it consumes the JTI and blacklists the JWT session.  If we then re-send
+  // the same refresh token (e.g. after a TLS reset on the response, a 504
+  // from a flaky proxy, or a TimeoutException), the second attempt will
+  // come back as 401 *and* the server-side session blacklist will have
+  // killed any future refresh — forcing the user to log in again with a
+  // perfectly valid refresh token still in their pocket.  This was the
+  // primary cause of the "I left the app for a day and now I have to log
+  // in again" symptom.
+  Future<bool> _doRefreshSession() async {
+    DebugLogger.logAuth('Refreshing JWT tokens (single-shot, non-retryable)...');
 
-      final refreshToken = await _jwtService.getRefreshToken();
-      if (refreshToken == null) {
-        if (_oauthFlowPending) {
-          // The Chrome Custom Tab OAuth flow is still in progress. The deep-link
-          // tokens have not been saved yet — do NOT wipe auth state here, because
-          // AzureLoginScreen is about to save fresh tokens and load the user.
-          DebugLogger.logWarn('AUTH',
-              'No refresh token — OAuth flow pending, skipping auth-state clear');
-          return false;
-        }
-        DebugLogger.logWarn('AUTH', 'No refresh token available — clearing auth state');
-        await _jwtService.clearTokens();
-        await _session.clearSession();
-        _currentUser = null;
-        return false;
-      }
-
-      final response = await _api.post(
-        AppConfig.mobileRefreshEndpoint,
-        body: {'refresh_token': refreshToken},
-        includeAuth: false,
-        contentType: ApiService.contentTypeJson,
-      );
-
-      if (response.statusCode == 200) {
-        DebugLogger.logAuth('JWT tokens refreshed successfully');
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        await _saveJwtTokensFromResponse(data);
-
-        _refreshSuccessCount++;
-        _lastRefreshTime = DateTime.now();
-        _refreshAttempts.add(DateTime.now());
-        if (_refreshAttempts.length > _maxRefreshAttemptsHistory) {
-          _refreshAttempts.removeAt(0);
-        }
-        _logSessionMetrics('refresh_success');
-        return true;
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
+    final refreshToken = await _jwtService.getRefreshToken();
+    if (refreshToken == null) {
+      if (_oauthFlowPending) {
+        // The Chrome Custom Tab OAuth flow is still in progress. The deep-link
+        // tokens have not been saved yet — do NOT wipe auth state here, because
+        // AzureLoginScreen is about to save fresh tokens and load the user.
         DebugLogger.logWarn('AUTH',
-            'Refresh token rejected (status: ${response.statusCode}) — clearing auth state');
-        _refreshFailureCount++;
-        _refreshAttempts.add(DateTime.now());
-        if (_refreshAttempts.length > _maxRefreshAttemptsHistory) {
-          _refreshAttempts.removeAt(0);
-        }
-        _logSessionMetrics('refresh_failure_expired');
-
-        await _jwtService.clearTokens();
-        await _session.clearSession();
-        _currentUser = null;
+            'No refresh token — OAuth flow pending, skipping auth-state clear');
         return false;
-      } else {
-        if (retryCount < maxRetries) {
-          DebugLogger.logWarn('AUTH',
-              'JWT refresh failed with status ${response.statusCode}, retrying...');
-          await Future.delayed(Duration(seconds: 1 * (retryCount + 1)));
-          return await _doRefreshSession(retryCount: retryCount + 1);
-        }
-        DebugLogger.logError(
-            'JWT refresh failed with status ${response.statusCode} after ${maxRetries + 1} attempts');
-        _refreshFailureCount++;
-        _refreshAttempts.add(DateTime.now());
-        if (_refreshAttempts.length > _maxRefreshAttemptsHistory) {
-          _refreshAttempts.removeAt(0);
-        }
-        _logSessionMetrics('refresh_failure_error');
-        // Do not return false here: [ApiService] treats false as "refresh
-        // definitively failed" and clears JWT + session. HTTP 5xx / edge
-        // responses are often transient (especially on iOS right after resume).
-        throw Exception(
-            'JWT refresh failed with HTTP ${response.statusCode} after ${maxRetries + 1} attempts');
       }
-    } on TimeoutException catch (e, st) {
-      if (retryCount < maxRetries) {
-        DebugLogger.logWarn('AUTH', 'JWT refresh timeout, retrying...');
-        await Future.delayed(Duration(seconds: 1 * (retryCount + 1)));
-        return await _doRefreshSession(retryCount: retryCount + 1);
-      }
-      DebugLogger.logError('JWT refresh timeout after ${maxRetries + 1} attempts');
-      _refreshFailureCount++;
-      _refreshAttempts.add(DateTime.now());
-      if (_refreshAttempts.length > _maxRefreshAttemptsHistory) {
-        _refreshAttempts.removeAt(0);
-      }
-      _logSessionMetrics('refresh_failure_timeout');
-      // Rethrow so [ApiService] does not clear tokens (see 401 handler). User
-      // stays logged in; the next API call or resume can refresh again.
-      Error.throwWithStackTrace(e, st);
-    } on AuthenticationException {
-      DebugLogger.logWarn('AUTH', 'Authentication error during JWT refresh');
+      DebugLogger.logWarn('AUTH', 'No refresh token available — clearing auth state');
       await _jwtService.clearTokens();
       await _session.clearSession();
       _currentUser = null;
       return false;
+    }
+
+    http.Response response;
+    try {
+      response = await _api.post(
+        AppConfig.mobileRefreshEndpoint,
+        body: {'refresh_token': refreshToken},
+        includeAuth: false,
+        contentType: ApiService.contentTypeJson,
+        // Critical: refresh tokens rotate one-time-use server-side.  Re-sending
+        // the same token after a transient failure causes a "reuse detected"
+        // 401 and a server-side session blacklist.
+        retryable: false,
+      );
+    } on AuthenticationException {
+      // Refresh endpoint is unauthenticated, so this should never come from
+      // the refresh response itself.  If it does (e.g. an interceptor
+      // surfaces an auth error), treat it as transient — do NOT clear
+      // tokens here.  The next refresh attempt may succeed.
+      DebugLogger.logWarn(
+          'AUTH', 'Unexpected AuthenticationException from refresh transport — treating as transient');
+      _recordRefreshFailure('refresh_failure_unexpected_auth_exception');
+      rethrow;
     } catch (e) {
-      if (retryCount < maxRetries) {
-        DebugLogger.logWarn('AUTH', 'Error during JWT refresh: $e, retrying...');
-        await Future.delayed(Duration(seconds: 1 * (retryCount + 1)));
-        return await _doRefreshSession(retryCount: retryCount + 1);
-      }
-      DebugLogger.logError('JWT refresh error after ${maxRetries + 1} attempts: $e');
-      _refreshFailureCount++;
-      _refreshAttempts.add(DateTime.now());
-      if (_refreshAttempts.length > _maxRefreshAttemptsHistory) {
-        _refreshAttempts.removeAt(0);
-      }
-      _logSessionMetrics('refresh_failure_exception');
-      // Rethrow transient errors — do not collapse to false or [ApiService]
-      // will wipe auth state (common on iOS when the network is not ready yet).
+      // TimeoutException, http.ClientException, SocketException, etc. — any
+      // transport-level failure.  The server may or may not have processed
+      // our request: from our point of view it could go either way, so we
+      // must not assume the refresh token has been consumed and we must not
+      // clear tokens.  The user stays logged in; the next foreground or
+      // API call can attempt another refresh.
+      DebugLogger.logWarn('AUTH', 'Transient JWT refresh failure: $e — keeping tokens');
+      _recordRefreshFailure('refresh_failure_transient');
       rethrow;
     }
+
+    if (response.statusCode == 200) {
+      try {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        await _saveJwtTokensFromResponse(data);
+      } catch (e) {
+        // 200 with an unparseable body is a server bug; treat as transient
+        // (don't clear tokens). The current refresh token is technically now
+        // consumed server-side, so a follow-up refresh will fail — but at
+        // worst we lose this one session, not the user's UI prefs.
+        DebugLogger.logError('Failed to parse refresh response body: $e');
+        _recordRefreshFailure('refresh_failure_parse_error');
+        rethrow;
+      }
+      DebugLogger.logAuth('JWT tokens refreshed successfully');
+      _refreshSuccessCount++;
+      _lastRefreshTime = DateTime.now();
+      _recordRefreshAttempt();
+      _logSessionMetrics('refresh_success');
+      return true;
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      // Server explicitly rejected the refresh token (expired, revoked,
+      // already consumed, or session blacklisted).  This is the only case
+      // where we KNOW the refresh token is unusable — clear and force
+      // re-authentication.
+      DebugLogger.logWarn('AUTH',
+          'Refresh token definitively rejected (status: ${response.statusCode}) — clearing auth state');
+      _recordRefreshFailure('refresh_failure_rejected');
+      await _jwtService.clearTokens();
+      await _session.clearSession();
+      _currentUser = null;
+      return false;
+    }
+
+    // Anything else (5xx, redirect, etc.) is treated as transient: do not
+    // clear tokens, do not collapse to `false` (which callers interpret as
+    // "definitive failure, force logout").  Throw and let upstream layers
+    // deal with it as a network error.
+    DebugLogger.logError(
+        'JWT refresh failed with HTTP ${response.statusCode} (treated as transient — tokens preserved)');
+    _recordRefreshFailure('refresh_failure_http_${response.statusCode}');
+    throw Exception('JWT refresh failed with HTTP ${response.statusCode}');
+  }
+
+  void _recordRefreshAttempt() {
+    _refreshAttempts.add(DateTime.now());
+    if (_refreshAttempts.length > _maxRefreshAttemptsHistory) {
+      _refreshAttempts.removeAt(0);
+    }
+  }
+
+  void _recordRefreshFailure(String label) {
+    _refreshFailureCount++;
+    _recordRefreshAttempt();
+    _logSessionMetrics(label);
   }
 
   /// Restore [currentUser] from [AppConfig.cachedUserProfileKey] after process
@@ -949,9 +987,24 @@ class AuthService {
               'offline use; will refresh when online');
         } else {
           DebugLogger.logAuth('Access token expired — attempting silent JWT refresh');
-          final refreshed = await refreshSession(forceRefresh: true);
+          bool refreshed;
+          try {
+            refreshed = await refreshSession(forceRefresh: true);
+          } catch (e) {
+            // Transient failure (timeout, network drop, 5xx).  We do NOT
+            // know if the user is still authenticated, so do not log them
+            // out.  Treat as offline — let the cached user stay logged in,
+            // and allow the next foreground / API call to retry the refresh.
+            DebugLogger.logWarn('AUTH',
+                'Silent JWT refresh threw transient error ($e) — preserving cached auth; '
+                'will retry on next API call or app resume');
+            return _currentUser != null;
+          }
           if (!refreshed) {
-            DebugLogger.logWarn('AUTH', 'Silent JWT refresh failed — user must re-login');
+            // Definitive rejection (server returned 401/403 on the refresh
+            // token itself, or no refresh token was available).
+            DebugLogger.logWarn('AUTH',
+                'Silent JWT refresh definitively rejected — user must re-login');
             _currentUser = null;
             return false;
           }
@@ -1197,8 +1250,19 @@ class AuthService {
   }
 
   // Validate session in background without blocking.
+  //
   // Uses the JWT-aware mobile session endpoint so that admin force-logouts
   // (which blacklist the JWT session_id) are detected immediately.
+  //
+  // Auth state is cleared here only when the server **explicitly** told us
+  // the session is invalid:
+  //   - HTTP 401/403 directly on the session check, or
+  //   - AuthenticationException bubbling up from ApiService (which only
+  //     throws after a refresh attempt was definitively rejected by the
+  //     server, not on transport errors).
+  // Any other failure (timeout, 5xx, socket reset, refresh request
+  // throwing transiently) is treated as a network blip — we keep the
+  // cached user logged in and let the next foreground / API call retry.
   void _validateSessionInBackground() {
     _api
         .get(
@@ -1211,24 +1275,28 @@ class AuthService {
         // Session is still valid; refresh user profile to pick up role changes.
         _loadUserProfile();
       } else if (response.statusCode == 401 || response.statusCode == 403) {
-        DebugLogger.logWarn('AUTH', 'Background validation: Session revoked or expired');
+        DebugLogger.logWarn('AUTH',
+            'Background validation: server returned ${response.statusCode} — clearing auth state');
         _jwtService.clearTokens();
         _session.clearSession();
         _currentUser = null;
+        _emitSessionState(SessionState.expired);
       }
+      // 5xx / other non-401 responses: do nothing.  The server probably
+      // hiccupped; we'll re-check on the next periodic tick or interaction.
     }).catchError((e) {
-      // ApiService throws AuthenticationException when a 401 triggers a failed
-      // token refresh (e.g. refresh token is also blacklisted).  Treat this
-      // the same as an explicit 401 — clear auth state so the next isLoggedIn()
-      // call returns false and the UI redirects to the login screen.
       if (e is AuthenticationException) {
-        DebugLogger.logWarn('AUTH', 'Background validation: AuthenticationException — clearing auth state');
-        _jwtService.clearTokens();
-        _session.clearSession();
+        // ApiService already cleared tokens in its own 401 handler before
+        // throwing this; we just sync our in-memory state.
+        DebugLogger.logWarn('AUTH',
+            'Background validation: AuthenticationException — auth state already cleared by ApiService');
         _currentUser = null;
+        _emitSessionState(SessionState.expired);
       } else {
-        // Network errors, timeouts, etc. — log but keep the cached user.
-        DebugLogger.logWarn('AUTH', 'Background validation error (network/transient, ignored): $e');
+        // TimeoutException, http.ClientException, SocketException,
+        // refresh-threw, etc. — keep the cached user logged in.
+        DebugLogger.logWarn('AUTH',
+            'Background validation transient error (preserving cached auth): $e');
       }
     });
   }

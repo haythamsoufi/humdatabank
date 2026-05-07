@@ -9,6 +9,7 @@ import 'utils/debug_logger.dart';
 // Shared providers
 import 'providers/shared/auth_provider.dart';
 import 'services/auth_service.dart';
+import 'services/jwt_token_service.dart';
 import 'providers/shared/dashboard_provider.dart';
 import 'providers/shared/notification_provider.dart';
 import 'providers/shared/language_provider.dart';
@@ -270,25 +271,49 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
-    // IMPROVED: Refresh session when app resumes from background
-    // This ensures users don't return to expired sessions
     if (state == AppLifecycleState.resumed) {
-      DebugLogger.logAuth('App resumed - refreshing session...');
-      // Refresh session in background
-      // Get auth provider from context if available, otherwise use service directly
-      final authService = AuthService();
-      // forceRefresh: bypass 5-minute rate limit so a cold return from
-      // background (especially on iOS) always attempts a token refresh before
-      // other work hits the API with an expired access token.
-      authService.refreshSession(forceRefresh: true).then((success) {
-        if (success) {
-          DebugLogger.logAuth('Session refreshed successfully on app resume');
-        } else {
-          DebugLogger.logWarn('AUTH', 'Session refresh failed on app resume');
-        }
-      }).catchError((e) {
-        DebugLogger.logWarn('AUTH', 'Error refreshing session on app resume: $e');
-      });
+      _refreshSessionOnResume();
+    }
+  }
+
+  /// Refresh JWTs after the app comes back to the foreground, but **only**
+  /// when the access token is actually expired (or close to it).  Refreshing
+  /// on every resume — even when the token is fresh — burns a refresh-token
+  /// rotation slot for no benefit and previously interacted badly with the
+  /// retry storm on flaky cellular connections, occasionally causing the
+  /// server to mark the user's session as a token-reuse attempt and force
+  /// re-authentication.
+  Future<void> _refreshSessionOnResume() async {
+    final authService = AuthService();
+    try {
+      final jwtService = JwtTokenService();
+      final hasTokens = await jwtService.hasTokens();
+      if (!hasTokens) {
+        // Not logged in (or already cleared elsewhere).  Nothing to refresh.
+        return;
+      }
+      final accessExpired = await jwtService.isAccessTokenExpired();
+      if (!accessExpired) {
+        DebugLogger.logAuth('App resumed — JWT still fresh, no refresh needed');
+        return;
+      }
+      DebugLogger.logAuth('App resumed — JWT expired, attempting silent refresh');
+      // forceRefresh bypasses the 5-minute rate limiter.  refreshSession is
+      // single-flight and the underlying refresh request is non-retryable,
+      // so even if the splash screen also kicks one off there is at most
+      // one refresh-token rotation in flight.
+      final success = await authService.refreshSession(forceRefresh: true);
+      if (success) {
+        DebugLogger.logAuth('Session refreshed successfully on app resume');
+      } else {
+        DebugLogger.logWarn(
+            'AUTH', 'Session refresh definitively rejected on app resume');
+      }
+    } catch (e) {
+      // Transient failure — leave tokens in place; the next API call will
+      // retry the refresh.  Crucially, do NOT clear auth state here.
+      DebugLogger.logWarn(
+          'AUTH', 'Transient error refreshing session on app resume: $e');
     }
   }
 

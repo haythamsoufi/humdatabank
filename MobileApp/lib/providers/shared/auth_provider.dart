@@ -80,21 +80,35 @@ class AuthProvider with ChangeNotifier {
       }
       if (isLoggedIn) _authCheckedThisSession = true;
       return isLoggedIn;
-    } catch (e) {
+    } on AuthenticationException catch (e) {
+      // Definitive auth failure — server explicitly told us we're no longer
+      // authenticated (refresh token rejected, session blacklisted, account
+      // deactivated, etc.).  This is the only case where it's correct to
+      // clear the cached user from disk.
       _error = e.toString();
-      DebugLogger.logError('Error checking auth status: $e');
-      // On error, only keep cached user if we're not forcing revalidation
-      if (forceRevalidate) {
-        // Force revalidation failed - clear user
-        _user = null;
-        await _storage.remove(AppConfig.cachedUserProfileKey);
-        return false;
-      }
-      // If we have cached user and not forcing revalidation, assume still logged in
-      if (_user == null) {
-        return false;
-      }
-      return true;
+      DebugLogger.logWarn(
+          'AUTH', 'checkAuthStatus: definitive AuthenticationException — clearing cached user');
+      _user = null;
+      await _storage.remove(AppConfig.cachedUserProfileKey);
+      return false;
+    } catch (e) {
+      // Transient failure (timeout, socket error, 5xx, refresh threw).
+      // Previously, any thrown exception while `forceRevalidate` was true
+      // would clear the cached user and bounce the user to the login screen
+      // — even when their JWTs in secure storage were still perfectly valid
+      // and only the cold-start network probe had failed.  That was the
+      // primary cause of the "I have to log in again after a day of
+      // inactivity" symptom: a single flaky `mobileSessionCheckEndpoint`
+      // call wiped the cached profile and looked exactly like a logout.
+      //
+      // New policy: keep the cached user across transient failures
+      // regardless of `forceRevalidate`.  The next foreground / API call
+      // will re-validate; only an explicit AuthenticationException above
+      // (server-confirmed) clears local auth state.
+      _error = e.toString();
+      DebugLogger.logWarn('AUTH',
+          'checkAuthStatus: transient error ($e) — keeping cached user; will revalidate later');
+      return _user != null;
     } finally {
       _isLoading = false;
       notifyListeners();

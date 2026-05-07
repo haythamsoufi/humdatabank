@@ -455,10 +455,7 @@ def azure_login():
         "client_id": cfg["client_id"],
         "response_type": "code",
         "redirect_uri": cfg["redirect_uri"],
-        # form_post avoids WAF false positives on the JWT state in the query string.
-        # Mobile (Chrome Custom Tabs) must use query so the OS can intercept the GET
-        # redirect — form_post emits a JS-submitted POST which Custom Tabs can't catch.
-        "response_mode": "query" if is_mobile_oauth else "form_post",
+        "response_mode": "query",
         "scope": cfg["scope"],
         "state": signed_state,  # signed JWT carries verifier/nonce/next
         "nonce": nonce,

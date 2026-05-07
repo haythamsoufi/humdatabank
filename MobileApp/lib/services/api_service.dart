@@ -670,6 +670,16 @@ class ApiService {
     }
   }
 
+  /// Send a POST request.
+  ///
+  /// [retryable] (default `true`): allow the built-in retry loop to re-send
+  /// the request on transient failures (502/503/504, timeouts).  Set to
+  /// `false` for any operation whose server-side processing must run **at
+  /// most once** — most importantly the JWT refresh endpoint, which uses
+  /// one-time-use refresh-token rotation.  Re-sending the same refresh
+  /// token after the server already consumed it triggers a "reuse detected"
+  /// 401 *and* causes the server to blacklist the JWT session, forcing the
+  /// user to log in again.
   Future<http.Response> post(
     String endpoint, {
     Map<String, dynamic>? body,
@@ -678,6 +688,7 @@ class ApiService {
     String contentType = contentTypeJson,
     Map<String, String>? additionalHeaders,
     bool queueOnOffline = true,
+    bool retryable = true,
   }) async {
     if (includeAuth && !skipExpiredGuard) await _guardSessionExpiry();
 
@@ -724,11 +735,20 @@ class ApiService {
     }
 
     // Retry configuration
-    const retryConfig = RetryConfig(
-      maxRetries: 2, // Fewer retries for POST (modify operations)
-      initialDelay: Duration(seconds: 1),
-      backoffMultiplier: 2.0,
-    );
+    // [retryable] = false collapses the loop to a single attempt: any retry
+    // semantics are the caller's responsibility (e.g. AuthService refresh,
+    // which must never re-send a one-time-use refresh token).
+    final retryConfig = retryable
+        ? const RetryConfig(
+            maxRetries: 2, // Fewer retries for POST (modify operations)
+            initialDelay: Duration(seconds: 1),
+            backoffMultiplier: 2.0,
+          )
+        : const RetryConfig(
+            maxRetries: 0,
+            initialDelay: Duration.zero,
+            backoffMultiplier: 1.0,
+          );
 
     final requestTimeout = ApiTimeouts.receive;
     var usedLiveNetwork = false;

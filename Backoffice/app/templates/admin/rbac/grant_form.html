@@ -1,0 +1,131 @@
+{% extends "core/layout.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <a href="{{ url_for('rbac_management.manage_grants') }}" class="text-blue-600 hover:underline">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Grants
+        </a>
+    </div>
+
+    <h2 class="text-2xl font-bold mb-4">{{ title }}</h2>
+
+    <form method="POST" class="bg-white shadow rounded-lg p-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Grant To</label>
+            <select name="principal_type" id="principal-type" class="form-control mb-2" required>
+                <option value="">-- Select Type --</option>
+                <option value="user">User</option>
+                <option value="role">Role</option>
+            </select>
+
+            <select name="principal_id" id="principal-id" class="form-control" required>
+                <option value="">-- Select User or Role --</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Permission</label>
+            <select name="permission_id" class="form-control" required>
+                <option value="">-- Select Permission --</option>
+                {% for perm in permissions %}
+                <option value="{{ perm.id }}">{{ perm.code }} - {{ perm.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Effect</label>
+            <select name="effect" class="form-control" required>
+                <option value="allow">Allow</option>
+                <option value="deny">Deny</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Deny takes precedence over allow when multiple grants match.</p>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Scope</label>
+            <select name="scope_kind" id="scope-kind" class="form-control" required>
+                <option value="global">Global (no restrictions)</option>
+                <option value="entity">Specific Entity</option>
+                <option value="template">Specific Template</option>
+                <option value="assignment">Specific Assignment</option>
+            </select>
+        </div>
+
+        <div id="scope-entity" class="mb-4 hidden">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Entity</label>
+            <input type="text" name="entity_type" placeholder="Entity Type (e.g., country)" class="form-control mb-2">
+            <input type="number" name="entity_id" placeholder="Entity ID" class="form-control">
+        </div>
+
+        <div id="scope-template" class="mb-4 hidden">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Template ID</label>
+            <input type="number" name="template_id" placeholder="Template ID" class="form-control">
+        </div>
+
+        <div id="scope-assignment" class="mb-4 hidden">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Assignment ID</label>
+            <input type="number" name="assigned_form_id" placeholder="Assignment ID" class="form-control">
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save mr-2"></i>Create Grant
+            </button>
+            <a href="{{ url_for('rbac_management.manage_grants') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+// Pre-escaped user and role data (JSON-encoded for safety)
+var usersData = {{ users | map(attribute='id') | list | tojson }};
+var usersEmail = {{ users | map(attribute='email') | list | tojson }};
+var usersName = {{ users | map(attribute='name') | list | tojson }};
+var rolesData = {{ roles | map(attribute='id') | list | tojson }};
+var rolesName = {{ roles | map(attribute='name') | list | tojson }};
+var rolesCode = {{ roles | map(attribute='code') | list | tojson }};
+
+// Handle principal type dropdown
+document.getElementById('principal-type').addEventListener('change', function() {
+    const principalType = this.value;
+    const principalSelect = document.getElementById('principal-id');
+    principalSelect.innerHTML = '<option value="">-- Select --</option>';
+
+    if (principalType === 'user') {
+        for (var i = 0; i < usersData.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = usersData[i];
+            opt.textContent = usersEmail[i] + ' (' + (usersName[i] || 'No name') + ')';
+            principalSelect.appendChild(opt);
+        }
+    } else if (principalType === 'role') {
+        for (var i = 0; i < rolesData.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = rolesData[i];
+            opt.textContent = rolesName[i] + ' (' + rolesCode[i] + ')';
+            principalSelect.appendChild(opt);
+        }
+    }
+});
+
+// Handle scope kind dropdown
+document.getElementById('scope-kind').addEventListener('change', function() {
+    const scopeKind = this.value;
+    document.getElementById('scope-entity').classList.add('hidden');
+    document.getElementById('scope-template').classList.add('hidden');
+    document.getElementById('scope-assignment').classList.add('hidden');
+
+    if (scopeKind === 'entity') {
+        document.getElementById('scope-entity').classList.remove('hidden');
+    } else if (scopeKind === 'template') {
+        document.getElementById('scope-template').classList.remove('hidden');
+    } else if (scopeKind === 'assignment') {
+        document.getElementById('scope-assignment').classList.remove('hidden');
+    }
+});
+</script>
+{% endblock %}

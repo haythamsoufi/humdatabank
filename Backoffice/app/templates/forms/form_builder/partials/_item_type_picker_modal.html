@@ -1,0 +1,95 @@
+{# Item Type Picker Modal - Grid of tiles; one shared tooltip (always on top, no stacking issues) #}
+{% set tile_base = "item-type-tile flex flex-col items-center justify-center p-5 min-h-[7rem] rounded-xl border-2 border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 hover:shadow-lg group" %}
+<style nonce="{{ csp_nonce() }}">
+    /* Above item modal (z-50) when opened from "Change item type" */
+    #item-type-picker-modal { z-index: 9999; }
+    #item-type-picker-tooltip {
+        position: fixed;
+        z-index: 100;
+        width: max-content;
+        max-width: min(90vw, 340px);
+        min-width: 120px;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #fff;
+        background: #111827;
+        border-radius: 0.5rem;
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2);
+        pointer-events: none;
+        box-sizing: border-box;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.15s ease, visibility 0.15s ease;
+        transform: translateX(-50%);
+    }
+    #item-type-picker-tooltip.is-visible { opacity: 1; visibility: visible; }
+    #item-type-picker-tooltip .tooltip-arrow {
+        position: absolute;
+        left: 50%;
+        margin-left: -8px;
+        width: 0;
+        height: 0;
+        border: 8px solid transparent;
+    }
+    #item-type-picker-tooltip.is-below .tooltip-arrow { top: -16px; border-bottom-color: #111827; }
+    #item-type-picker-tooltip.is-above .tooltip-arrow { bottom: -16px; border-top-color: #111827; }
+    #item-type-picker-tooltip .item-type-picker-tooltip__body { display: block; line-height: 1.4; color: #fff; }
+    .item-type-tile .item-type-tooltip-copy { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+</style>
+
+<div id="item-type-picker-modal" class="fixed inset-0 bg-gray-900/70 backdrop-blur-sm overflow-y-auto h-full w-full hidden flex items-center justify-center p-4" aria-modal="true" aria-labelledby="item-type-picker-title">
+    <div class="relative w-full max-w-4xl rounded-2xl shadow-2xl bg-white border border-gray-200 overflow-visible" role="dialog">
+        <div class="absolute top-4 right-4 z-10">
+            <button type="button" class="item-type-picker-close p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="{{ _('Close') }}">
+                <i class="fas fa-times w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="p-8 pb-6">
+            <h2 id="item-type-picker-title" class="text-xl font-bold text-gray-900 mb-1 pr-10">
+                {{ _('Add item to') }} <span id="item-type-picker-section-name" class="text-blue-600">Section</span>
+            </h2>
+            <p class="text-sm text-gray-500 mb-6">{{ _('Choose the type of item you want to add') }}</p>
+            <input type="hidden" id="item-type-picker-section-id" value="">
+            <input type="hidden" id="item-type-picker-section-name-input" value="">
+
+            <div id="item-type-picker-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <button type="button" class="{{ tile_base }} bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-purple-100 focus:ring-purple-500" data-item-type="indicator">
+                    <span class="item-type-tooltip-copy" aria-hidden="true">{{ _('Link an indicator from the indicator bank. Uses standard definitions and units.') }}</span>
+                    <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-purple-100 text-purple-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-chart-line text-xl"></i></span>
+                    <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ _('Indicator from Bank') }}</span>
+                </button>
+                {% for qvalue, qlabel in question_type_choices_for_js %}
+                {% set qicon = 'fa-font' if qvalue == 'text' else 'fa-align-left' if qvalue == 'textarea' else 'fa-hashtag' if qvalue == 'number' else 'fa-percent' if qvalue == 'percentage' else 'fa-check-square' if qvalue == 'yesno' else 'fa-dot-circle' if qvalue == 'single_choice' else 'fa-list-check' if qvalue == 'multiple_choice' else 'fa-calendar' if qvalue == 'date' else 'fa-calendar-alt' if qvalue == 'datetime' else 'fa-sticky-note' if qvalue == 'blank' else 'fa-question-circle' %}
+                {% set qdesc = _('Short text answer (one line).') if qvalue == 'text' else _('Long text answer (multiple lines).') if qvalue == 'textarea' else _('Numeric value. Can set unit (e.g. People, %).') if qvalue == 'number' else _('Percentage value (0–100).') if qvalue == 'percentage' else _('Yes or No answer.') if qvalue == 'yesno' else _('Pick one option from a list.') if qvalue == 'single_choice' else _('Pick one or more options from a list.') if qvalue == 'multiple_choice' else _('Date only.') if qvalue == 'date' else _('Date and time.') if qvalue == 'datetime' else _('Informational text or note (no answer).') if qvalue == 'blank' else _('Custom question.') %}
+                <button type="button" class="{{ tile_base }} bg-gradient-to-br from-green-50 to-white hover:border-green-400 hover:shadow-green-100 focus:ring-green-500" data-item-type="question" data-question-type="{{ qvalue }}">
+                    <span class="item-type-tooltip-copy" aria-hidden="true">{{ qdesc }}</span>
+                    <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-green-100 text-green-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas {{ qicon }} text-xl"></i></span>
+                    <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ qlabel }}</span>
+                </button>
+                {% endfor %}
+                <button type="button" class="{{ tile_base }} bg-gradient-to-br from-blue-50 to-white hover:border-blue-400 hover:shadow-blue-100 focus:ring-blue-500" data-item-type="document_field">
+                    <span class="item-type-tooltip-copy" aria-hidden="true">{{ _('Allow users to upload documents (e.g. PDFs). Optional type and period.') }}</span>
+                    <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-blue-100 text-blue-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-file-upload text-xl"></i></span>
+                    <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ _('Document Field') }}</span>
+                </button>
+                <button type="button" class="{{ tile_base }} bg-gradient-to-br from-amber-50 to-white hover:border-amber-400 hover:shadow-amber-100 focus:ring-amber-500" data-item-type="matrix">
+                    <span class="item-type-tooltip-copy" aria-hidden="true">{{ _('Table with rows and columns. Enter values per cell. Supports totals.') }}</span>
+                    <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-amber-100 text-amber-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-table text-xl"></i></span>
+                    <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ _('Matrix Table') }}</span>
+                </button>
+                {% for field_type in custom_field_types %}
+                <button type="button" class="{{ tile_base }} bg-gradient-to-br from-orange-50 to-white hover:border-orange-400 hover:shadow-orange-100 focus:ring-orange-500" data-item-type="plugin_{{ field_type.type_id }}">
+                    <span class="item-type-tooltip-copy" aria-hidden="true">{{ field_type.description or _('Custom field type from a plugin.') }}</span>
+                    <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-orange-100 text-orange-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-puzzle-piece text-xl"></i></span>
+                    <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ field_type.display_name }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div id="item-type-picker-tooltip" role="tooltip" aria-hidden="true">
+        <span class="tooltip-arrow"></span>
+        <span class="item-type-picker-tooltip__body"></span>
+    </div>
+</div>

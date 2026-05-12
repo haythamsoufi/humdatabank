@@ -1,0 +1,319 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ (is_edit and (_('Edit') + ' ' + entity_label)) or (_('New') + ' ' + entity_label) }}{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{% set actions = [] %}
+
+{{ page_header(
+    title=(is_edit and (_('Edit') + ' ' + entity_label)) or (_('New') + ' ' + entity_label),
+    icon=icon or 'fas fa-pen',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Organization'), 'url': url_for('organization.index')},
+        {'name': (is_edit and (_('Edit') + ' ' + entity_label)) or (_('New') + ' ' + entity_label)}
+    ],
+    actions=actions
+) }}
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <form method="POST" class="p-4 sm:p-5">
+        {{ form.hidden_tag() }}
+
+        {# Auto Translate Button #}
+        <div class="mb-4 flex justify-end">
+            <button type="button" id="auto-translate-btn" class="btn btn-success" title="Auto-translate all blank translation fields to all languages">
+                <i class="fas fa-magic w-4 h-4 mr-1"></i>
+                Auto Translate
+            </button>
+        </div>
+
+        {# Use grid layout for better field arrangement #}
+        {% set rendered = namespace(names=[]) %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {# Iterate through form fields excluding CSRF and submit-like fields #}
+            {% for field in form %}
+                {% if field.type == 'CSRFTokenField' or field.name in ['csrf_token'] or field.type == 'SubmitField' %}
+                    {# hidden/handled elsewhere #}
+                {% elif field.name in rendered.names %}
+                    {# already rendered as part of a group #}
+                    {% else %}
+                    {# Detect if this field has language-specific translation siblings by scanning all form fields #}
+                    {% set group = namespace(fields=[]) %}
+                    {% for inner in form %}
+                        {% if inner.name != field.name and inner.name.startswith(field.name ~ '_') %}
+                            {% if inner.name not in rendered.names %}
+                                {% set __ = group.fields.append(inner) %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {% set has_translations = group.fields|length > 0 %}
+
+                    {% if has_translations %}
+                        <div class="md:col-span-2">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide" for="{{ field.id }}">
+                                        {{ field.label.text }}
+                                    </label>
+                                    {{ field(class_='block w-full px-3 py-2 text-sm rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow') }}
+                                    {% if field.errors %}
+                                        <p class="mt-1 text-xs text-red-600">{{ field.errors[0] }}</p>
+                                    {% endif %}
+                                </div>
+                                {% for tf in group.fields %}
+                                    {% set code = tf.name.split('_')[-1] %}
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide" for="{{ tf.id }}">
+                                            {{ tf.label.text }}
+                                        </label>
+                                        {% set input_classes = 'block w-full px-3 py-2 text-sm rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow' %}
+                                        {% if code == 'ar' %}
+                                            {{ tf(class_=input_classes, dir='rtl', style="font-family: 'Tajawal', sans-serif;") }}
+                                        {% else %}
+                                            {{ tf(class_=input_classes) }}
+                                        {% endif %}
+                                        {% if tf.errors %}
+                                            <p class="mt-1 text-xs text-red-600">{{ tf.errors[0] }}</p>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% set __ = rendered.names.append(field.name) %}
+                        {% for tf in group.fields %}
+                            {% set __ = rendered.names.append(tf.name) %}
+                        {% endfor %}
+                    {% elif field.type == 'TextAreaField' %}
+                    {# TextArea fields span full width #}
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide" for="{{ field.id }}">
+                            {{ field.label.text }}
+                        </label>
+                        {{ field(class_='block w-full px-3 py-2 text-sm rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow', rows='3') }}
+                        {% if field.errors %}
+                            <p class="mt-1 text-xs text-red-600">{{ field.errors[0] }}</p>
+                        {% endif %}
+                    </div>
+                {% elif field.type == 'BooleanField' %}
+                    {# Boolean fields in a compact inline layout #}
+                    <div class="md:col-span-2">
+                        <label class="inline-flex items-center cursor-pointer group">
+                            {{ field(class_='w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0 transition-colors') }}
+                            <span class="ml-2 text-sm font-medium text-gray-700 group-hover:text-gray-900">{{ field.label.text }}</span>
+                        </label>
+                        {% if field.errors %}
+                            <p class="mt-1 text-xs text-red-600">{{ field.errors[0] }}</p>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    {# Regular input fields #}
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide" for="{{ field.id }}">
+                            {{ field.label.text }}
+                        </label>
+                        {% if field.type == 'SelectField' %}
+                            {{ field(class_='block w-full px-3 py-2 text-sm rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow bg-white') }}
+                        {% else %}
+                            {{ field(class_='block w-full px-3 py-2 text-sm rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow') }}
+                        {% endif %}
+                        {% if field.errors %}
+                            <p class="mt-1 text-xs text-red-600">{{ field.errors[0] }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        </div>
+
+
+        {# Compact action buttons #}
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+            <a href="{{ cancel_url or url_for('organization.index') }}" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-gray-500 transition-colors">
+                {{ _('Cancel') }}
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-save mr-1.5 text-xs"></i>
+                {{ _('Save') }}
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+    <script nonce="{{ csp_nonce() }}">
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-translate functionality for entity fields
+            const autoTranslateBtn = document.getElementById('auto-translate-btn');
+
+            if (autoTranslateBtn) {
+                autoTranslateBtn.addEventListener('click', function() {
+                    const translatableLanguages = {{ TRANSLATABLE_LANGUAGES | tojson | safe }};
+
+                    // Collect all fields that need translation
+                    const fieldsToTranslate = [];
+                    const baseFields = document.querySelectorAll('input[type="text"], textarea');
+
+                    baseFields.forEach(field => {
+                        const fieldName = field.name;
+                        if (!fieldName) return;
+
+                        const baseValue = field.value || '';
+                        if (!baseValue.trim()) return; // Skip if base field is empty
+
+                        // Check each language for translation fields
+                        translatableLanguages.forEach(langCode => {
+                            const translationFieldName = fieldName + '_' + langCode;
+                            const translationField = document.querySelector(`[name="${translationFieldName}"]`);
+
+                            if (translationField) {
+                                const translationValue = translationField.value || '';
+                                if (!translationValue.trim()) {
+                                    // This field needs translation
+                                    fieldsToTranslate.push({
+                                        field_name: fieldName,
+                                        base_value: baseValue,
+                                        language_code: langCode,
+                                        translation_field: translationField
+                                    });
+                                }
+                            }
+                        });
+                    });
+
+                    if (fieldsToTranslate.length === 0) {
+                        if (window.showAlert) window.showAlert('No blank translation fields found to translate', 'info');
+                        else window.__clientLog && window.__clientLog('No blank translation fields');
+                        return;
+                    }
+
+                    // Show loading state
+                    const originalText = autoTranslateBtn.innerHTML;
+                    autoTranslateBtn.innerHTML = '<i class="fas fa-spinner fa-spin w-4 h-4 mr-2"></i>Translating...';
+                    autoTranslateBtn.disabled = true;
+
+                    // Group fields by base field name to translate all languages at once
+                    const fieldsByBaseName = {};
+                    fieldsToTranslate.forEach(field => {
+                        if (!fieldsByBaseName[field.field_name]) {
+                            fieldsByBaseName[field.field_name] = {
+                                base_value: field.base_value,
+                                translations: []
+                            };
+                        }
+                        fieldsByBaseName[field.field_name].translations.push({
+                            language_code: field.language_code,
+                            translation_field: field.translation_field
+                        });
+                    });
+
+                    // Translate each base field with all its target languages
+                    const baseFieldNames = Object.keys(fieldsByBaseName);
+                    let currentIndex = 0;
+                    let successCount = 0;
+                    let errorCount = 0;
+
+                    function translateNext() {
+                        if (currentIndex >= baseFieldNames.length) {
+                            // All translations complete
+                            if (successCount > 0) {
+                                autoTranslateBtn.innerHTML = '<i class="fas fa-check w-4 h-4 mr-2"></i>Translated!';
+                                setTimeout(() => {
+                                    autoTranslateBtn.innerHTML = originalText;
+                                    autoTranslateBtn.disabled = false;
+                                }, 2000);
+                            } else {
+                                if (window.showAlert) window.showAlert('Translation failed for all fields', 'error');
+                                else console.error('Translation failed');
+                                autoTranslateBtn.innerHTML = originalText;
+                                autoTranslateBtn.disabled = false;
+                            }
+                            return;
+                        }
+
+                        const baseFieldName = baseFieldNames[currentIndex];
+                        const fieldGroup = fieldsByBaseName[baseFieldName];
+                        currentIndex++;
+
+                        // Get all target language codes for this field
+                        const targetLanguages = fieldGroup.translations.map(t => t.language_code);
+
+                        // Call auto-translate API
+                        fetch('{{ url_for("utilities.api_auto_translate") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                            },
+                            body: JSON.stringify({
+                                type: 'form_item',
+                                permission_context: 'organization',
+                                permission_code: 'admin.organization.manage',
+                                text: fieldGroup.base_value,
+                                target_languages: targetLanguages,
+                                translation_service: 'ifrc'
+                            })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => {
+                                    throw new Error(err.message || `HTTP ${response.status}`);
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            window.__clientLog && window.__clientLog('Auto-translate response:', data);
+
+                            if (data.success && data.translations && data.translations.label_translations) {
+                                // The API returns label_translations with language codes as keys (e.g., 'fr', 'es')
+                                const labelTranslations = data.translations.label_translations;
+
+                                fieldGroup.translations.forEach(translationItem => {
+                                    // Use language code directly (API returns codes, not names)
+                                    const translation = labelTranslations[translationItem.language_code];
+
+                                    if (translation) {
+                                        translationItem.translation_field.value = translation;
+                                        successCount++;
+                                        window.__clientLog && window.__clientLog(`Translated ${baseFieldName} to ${translationItem.language_code}:`, translation);
+                                    } else {
+                                        window.__clientWarn && window.__clientWarn(`No translation found for ${baseFieldName} in language ${translationItem.language_code}`);
+                                        errorCount++;
+                                    }
+                                });
+                            } else {
+                                console.error('Translation failed:', data);
+                                const errorMsg = data.message || 'Unknown error';
+                                console.error('Error message:', errorMsg);
+                                errorCount += fieldGroup.translations.length;
+                            }
+
+                            // Continue with next field
+                            setTimeout(translateNext, 100);
+                        })
+                        .catch(error => {
+                            console.error('Auto-translate error:', error);
+                            console.error('Error details:', {
+                                baseFieldName: baseFieldName,
+                                baseValue: fieldGroup.base_value,
+                                targetLanguages: targetLanguages,
+                                error: error.message
+                            });
+                            errorCount += fieldGroup.translations.length;
+                            // Continue with next field
+                            setTimeout(translateNext, 100);
+                        });
+                    }
+
+                    // Start translating
+                    translateNext();
+                });
+            }
+        });
+    </script>
+{% endblock %}

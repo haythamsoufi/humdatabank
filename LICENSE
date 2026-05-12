@@ -1,0 +1,72 @@
+Humanitarian Databank - Proprietary License
+
+Copyright (c) 2024 Haytham ALSOUFI
+All rights reserved.
+
+NOTICE: The Humanitarian Databank software (backoffice, website, mobile app, and related
+documentation) is proprietary to Haytham ALSOUFI (the "Developer"). It was built
+with collaboration and testing support from IFRC colleagues; IFRC funded certain
+third-party AI service licenses used in the work. Licensed for use by the
+International Federation of Red Cross and Red Crescent Societies (IFRC) Secretariat
+and its network of National Societies.
+
+LICENSE TERMS:
+
+1. AUTHORIZED USE
+   This Software is licensed for use by:
+   - IFRC Secretariat and its offices
+   - National Red Cross and Red Crescent Societies within the IFRC network
+
+2. PROHIBITED ACTIVITIES
+   You may NOT:
+   - Use this Software outside the IFRC network without explicit written permission
+   - Copy, modify, or create derivative works without explicit written permission from the Developer
+   - Distribute, sublicense, or transfer this Software to any third party outside the IFRC network
+   - Use this Software for commercial purposes outside IFRC activities
+   - Reverse engineer, decompile, or disassemble this Software
+   - Remove or alter any copyright, trademark, or proprietary notices
+
+3. PERMITTED USE WITHIN IFRC NETWORK
+   Authorized users within the IFRC network may:
+   - Use the Software for IFRC humanitarian data management purposes
+   - Deploy the Software on IFRC-authorized infrastructure
+   - Modify the Software for internal IFRC use (subject to maintaining copyright notices)
+   - Share modifications with other authorized IFRC network users
+
+4. INTELLECTUAL PROPERTY
+   All rights, title, and interest in and to the Software remain with the Developer
+   (Haytham ALSOUFI). This license does not grant any ownership rights. The Software
+   is developed by the Developer as an individual, not as an employee or agent of IFRC.
+
+5. CONFIDENTIALITY
+   The Software contains confidential and proprietary information. You agree to
+   maintain the confidentiality of the Software and not disclose it to unauthorized
+   parties outside the IFRC network.
+
+6. TERMINATION
+   This license is effective until terminated. The Developer may terminate this
+   license immediately if you breach any of its terms. Upon termination, you must
+   immediately cease all use of the Software and destroy all copies.
+
+7. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+8. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE DEVELOPER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+9. GOVERNING LAW
+   This license shall be governed by and construed in accordance with applicable laws.
+
+10. CONTACT
+    For licensing inquiries, permissions, or questions about authorized use,
+    please contact:
+    Haytham ALSOUFI: haythamsoufi@outlook.com
+
+By accessing, using, or copying this Software, you acknowledge that you have
+read, understood, and agree to be bound by the terms of this license. If you
+do not agree to these terms, you may not use this Software.

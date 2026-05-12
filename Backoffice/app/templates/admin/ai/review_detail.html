@@ -1,0 +1,247 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Review Trace') }} #{{ review.id }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Review Trace') + ' #' + review.id|string,
+    icon='fas fa-clipboard-check',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'AI System', 'url': url_for('ai_management.ai_dashboard')},
+        {'name': 'Review Queue', 'url': url_for('ai_management.ai_review_queue')},
+        {'name': 'Review #' + review.id|string}
+    ]
+) }}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Trace details (2/3 width) -->
+    <div class="lg:col-span-2 space-y-4">
+
+        <!-- Query -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ _('User Query') }}</h3>
+            <p class="text-gray-900">{{ trace.query if trace else '—' }}</p>
+        </div>
+
+        <!-- Answer -->
+        {% if trace and trace.final_answer %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ _('AI Answer') }}</h3>
+            <div class="prose prose-sm max-w-none text-gray-800">{{ trace.final_answer }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Steps -->
+        {% if trace and trace.steps %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{{ _('Reasoning Steps') }} ({{ trace.steps|length }})</h3>
+            <div class="space-y-3">
+            {% for step in trace.steps %}
+            <div class="border-l-2 border-blue-200 pl-3 text-sm">
+                {% if step.get('thought') %}
+                <p class="text-gray-500 italic mb-1">{{ step.thought[:300] }}{% if step.thought|length > 300 %}…{% endif %}</p>
+                {% endif %}
+                {% if step.get('action') and step.action != 'finish' %}
+                <p class="font-medium text-blue-700"><i class="fas fa-wrench mr-1 text-xs"></i>{{ step.action }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Review panel (1/3 width) -->
+    <div class="space-y-4">
+
+        <!-- Metrics card -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{{ _('Quality Metrics') }}</h3>
+            <dl class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Grounding Score') }}</dt>
+                    <dd class="font-semibold">
+                        {% if trace and trace.grounding_score is not none %}
+                        {{ (trace.grounding_score * 100)|int }}%
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Confidence') }}</dt>
+                    <dd class="font-semibold">{{ (trace.confidence_level or '—')|title if trace else '—' }}</dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('User Rating') }}</dt>
+                    <dd>
+                        {% if trace and trace.user_rating == 'like' %}
+                        <span class="text-green-600"><i class="fas fa-thumbs-up"></i> Like</span>
+                        {% elif trace and trace.user_rating == 'dislike' %}
+                        <span class="text-red-500"><i class="fas fa-thumbs-down"></i> Dislike</span>
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Execution Path') }}</dt>
+                    <dd class="text-xs font-mono">{{ (trace.execution_path or '—') if trace else '—' }}</dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Cost') }}</dt>
+                    <dd>${{ '%.4f' % (trace.total_cost_usd or 0) if trace else '0.0000' }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        {% if trace and (
+            trace.llm_quality_score is not none or
+            trace.llm_quality_verdict or
+            trace.llm_needs_review is not none or
+            trace.llm_quality_reasoning or
+            trace.llm_provider or
+            trace.llm_model
+        ) %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{{ _('LLM Judge') }}</h3>
+            <dl class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Score') }}</dt>
+                    <dd class="font-semibold">
+                        {% if trace.llm_quality_score is not none %}
+                        {{ (trace.llm_quality_score * 100)|int }}%
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Verdict') }}</dt>
+                    <dd class="font-semibold">{{ (trace.llm_quality_verdict or '—')|replace('_', ' ')|title }}</dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Needs Review') }}</dt>
+                    <dd class="font-semibold">
+                        {% if trace.llm_needs_review is sameas true %}
+                        <span class="text-red-600">{{ _('Yes') }}</span>
+                        {% elif trace.llm_needs_review is sameas false %}
+                        <span class="text-green-600">{{ _('No') }}</span>
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-600">{{ _('Judge Model') }}</dt>
+                    <dd class="text-xs font-mono">
+                        {% if trace.llm_provider or trace.llm_model %}
+                        {{ (trace.llm_provider or '—') ~ ' / ' ~ (trace.llm_model or '—') }}
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+            </dl>
+            {% if trace.llm_quality_reasoning %}
+            <div class="mt-3 pt-3 border-t border-gray-100">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{{ _('Judge Reasoning') }}</p>
+                <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ trace.llm_quality_reasoning }}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Annotation form -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{{ _('Annotation') }}</h3>
+            <form id="reviewForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Verdict') }}</label>
+                    <select id="verdictSelect" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">— {{ _('Select verdict') }} —</option>
+                        <option value="correct" {{ 'selected' if review.verdict == 'correct' }}>{{ _('Correct') }}</option>
+                        <option value="partially_correct" {{ 'selected' if review.verdict == 'partially_correct' }}>{{ _('Partially Correct') }}</option>
+                        <option value="incorrect" {{ 'selected' if review.verdict == 'incorrect' }}>{{ _('Incorrect') }}</option>
+                        <option value="needs_improvement" {{ 'selected' if review.verdict == 'needs_improvement' }}>{{ _('Needs Improvement') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Notes') }}</label>
+                    <textarea id="notesInput" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="{{ _('Reviewer notes...') }}">{{ review.reviewer_notes or '' }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Ground Truth Answer') }}</label>
+                    <textarea id="groundTruthInput" rows="4" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="{{ _('Correct answer for regression testing...') }}">{{ review.ground_truth_answer or '' }}</textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" id="saveReviewBtn"
+                            class="btn btn-primary flex-1">
+                        {{ _('Save') }}
+                    </button>
+                    <button type="button" id="dismissBtn"
+                            class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition">
+                        {{ _('Dismiss') }}
+                    </button>
+                </div>
+            </form>
+            {% if review.verdict %}
+            <p class="mt-3 text-xs text-gray-500">
+                {{ _('Last updated:') }} {{ review.completed_at.strftime('%Y-%m-%d %H:%M') if review.completed_at else '—' }}
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- Trace link -->
+        {% if trace %}
+        <a href="{{ url_for('ai_management.trace_detail', trace_id=trace.id) }}"
+           class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800">
+            <i class="fas fa-chart-line"></i> {{ _('View Full Trace') }}
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+const SAVE_URL = {{ url_for('ai_management.ai_review_detail', review_id=review.id)|tojson|safe }};
+const QUEUE_URL = {{ url_for('ai_management.ai_review_queue')|tojson|safe }};
+
+function getFetchClient() {
+    return (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
+}
+
+async function submitReview(status, includeAnnotationFields = true) {
+    const payload = { status: status };
+    if (includeAnnotationFields) {
+        payload.verdict = document.getElementById('verdictSelect').value;
+        payload.reviewer_notes = document.getElementById('notesInput').value;
+        payload.ground_truth_answer = document.getElementById('groundTruthInput').value;
+    }
+
+    const btn = status === 'dismissed'
+        ? document.getElementById('dismissBtn')
+        : document.getElementById('saveReviewBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = status === 'dismissed' ? '{{ _("Dismissing...") }}' : '{{ _("Saving...") }}';
+    try {
+        const resp = await getFetchClient()(SAVE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (data.success) {
+            window.location.href = QUEUE_URL;
+        } else {
+            alert('{{ _("Save failed.") }}');
+        }
+    } catch(e) {
+        alert('{{ _("Error: ") }}' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+document.getElementById('saveReviewBtn').addEventListener('click', () => submitReview('completed'));
+document.getElementById('dismissBtn').addEventListener('click', () => {
+    submitReview('dismissed', false);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,203 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "macros/filter_card.html" import filter_card %}
+{% from "macros/empty_state.html" import empty_state %}
+{% from "components/pagination.html" import render_pagination %}
+
+{% block title %}Activity Logs - Admin Panel{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    /* Custom styles specific to this page, if any, can go here.
+       Aim to use Tailwind utilities primarily. */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+
+    {% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title='Activity Logs',
+        icon='fas fa-clipboard-list',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Analytics', 'url': url_for('analytics.analytics_dashboard')},
+            {'name': 'Activity Logs'}
+        ]
+    ) }}
+
+    {% call filter_card() %}
+            <div>
+                <label for="user" class="block text-sm font-medium text-gray-700 mb-1">User Email</label>
+                <input type="text" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="user" name="user"
+                       value="{{ filters.user or '' }}" placeholder="Search by email">
+            </div>
+            <div>
+                <label for="activity_type" class="block text-sm font-medium text-gray-700 mb-1">Activity Type</label>
+                <select class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="activity_type" name="activity_type">
+                    <option value="">All Types</option>
+                    {% for activity_type in activity_types %}
+                    <option value="{{ activity_type }}" {% if filters.activity_type == activity_type %}selected{% endif %}>{{ activity_type|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="endpoint" class="block text-sm font-medium text-gray-700 mb-1">Endpoint</label>
+                <input type="text" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="endpoint" name="endpoint"
+                       value="{{ filters.endpoint or '' }}" placeholder="Search endpoint">
+            </div>
+            <div>
+                <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <input type="date" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="date_from" name="date_from"
+                       value="{{ filters.date_from or '' }}">
+            </div>
+            <div>
+                <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <input type="date" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="date_to" name="date_to"
+                       value="{{ filters.date_to or '' }}">
+            </div>
+            <div class="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-5 flex flex-col sm:flex-row gap-3 sm:items-end justify-start xl:justify-end pt-2">
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                    <i class="fas fa-filter mr-2"></i> Filter
+                </button>
+                <a href="{{ url_for('analytics.activity_logs') }}" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Clear Filters
+                </a>
+            </div>
+    {% endcall %}
+
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <h5 class="text-xl font-semibold text-gray-800 mb-2 sm:mb-0">
+                <i class="fas fa-list-alt mr-2"></i> Activity Events <span class="text-sm text-gray-500 font-normal">({{ logs.total }} total)</span>
+            </h5>
+            {% if logs.pages > 0 %}
+            <div class="text-sm text-gray-600">
+                Page {{ logs.page }} of {{ logs.pages }}
+            </div>
+            {% endif %}
+        </div>
+        <div class="p-0">
+            {% if logs.items %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Endpoint</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for log in logs.items %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {{ log.timestamp|datetime_local('datetime', 'text-sm text-gray-900') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if log.user %}
+                                <div class="text-sm font-medium text-gray-900">{{ log.user.name or log.user.email }}</div>
+                                <div class="text-xs text-gray-500">{{ log.user.email }}</div>
+                                {% else %}
+                                <span class="text-sm text-gray-500">Unknown User</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if log.activity_type == 'page_view' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    <i class="fas fa-eye mr-1"></i> Page View
+                                </span>
+                                {% elif log.activity_type == 'form_submit' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    <i class="fas fa-paper-plane mr-1"></i> Form Submit
+                                </span>
+                                {% elif log.activity_type == 'file_upload' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                    <i class="fas fa-upload mr-1"></i> File Upload
+                                </span>
+                                {% elif log.activity_type == 'data_export' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                    <i class="fas fa-download mr-1"></i> Data Export
+                                </span>
+                                {% elif log.activity_type == 'admin_action' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    <i class="fas fa-shield-alt mr-1"></i> Admin Action
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    <i class="fas fa-cog mr-1"></i> {{ log.activity_type|title }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if log.activity_description %}
+                                <div class="text-sm text-gray-900 max-w-xs truncate" title="{{ log.activity_description }}">
+                                    {{ log.activity_description }}
+                                </div>
+                                {% else %}
+                                <span class="text-sm text-gray-500">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if log.endpoint %}
+                                <div class="text-sm text-gray-900 font-mono">{{ log.endpoint }}</div>
+                                {% if log.http_method %}
+                                <div class="text-xs text-gray-500">{{ log.http_method }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-sm text-gray-500">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900 font-mono">{{ log.ip_address }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if log.response_status_code %}
+                                    {% if log.response_status_code < 300 %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        {{ log.response_status_code }}
+                                    </span>
+                                    {% elif log.response_status_code < 400 %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        {{ log.response_status_code }}
+                                    </span>
+                                    {% elif log.response_status_code < 500 %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        {{ log.response_status_code }}
+                                    </span>
+                                    {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                        {{ log.response_status_code }}
+                                    </span>
+                                    {% endif %}
+                                    {% if log.response_time_ms %}
+                                    <div class="text-xs text-gray-500 mt-1">{{ log.response_time_ms }}ms</div>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-sm text-gray-500">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            {{ empty_state(icon="fas fa-chart-line", title="No activity logs found matching your criteria.") }}
+            {% endif %}
+        </div>
+
+        {{ render_pagination(logs) }}
+    </div>
+</div>
+{% endblock %}
+
+
+

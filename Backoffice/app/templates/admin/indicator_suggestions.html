@@ -1,0 +1,162 @@
+{% extends "core/layout.html" %}
+{% from "components/pagination.html" import render_pagination %}
+
+{% block title %}Indicator Suggestions - Admin{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=_('Indicator Suggestions'),
+    icon='fas fa-lightbulb',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+        {'name': _('Suggestions')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Back to Indicator Bank'),
+            'url': url_for('system_admin.manage_indicator_bank'),
+            'classes': 'professional-action-btn'
+        }
+    ]
+) }}
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-ifrc-navy mb-4">Filters</h2>
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label for="status" class="block text-sm font-medium text-ifrc-gray-700 mb-1">Status</label>
+                <select name="status" id="status" class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md focus:ring-2 focus:ring-ifrc-red focus:border-ifrc-red">
+                    <option value="">All Statuses</option>
+                    <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>Pending Review</option>
+                    <option value="reviewed" {% if status_filter == 'reviewed' %}selected{% endif %}>Under Review</option>
+                    <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                    <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+            <div>
+                <label for="suggestion_type" class="block text-sm font-medium text-ifrc-gray-700 mb-1">Suggestion Type</label>
+                <select name="suggestion_type" id="suggestion_type" class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md focus:ring-2 focus:ring-ifrc-red focus:border-ifrc-red">
+                    <option value="">All Types</option>
+                    <option value="correction" {% if suggestion_type_filter == 'correction' %}selected{% endif %}>Correction to existing indicator</option>
+                    <option value="improvement" {% if suggestion_type_filter == 'improvement' %}selected{% endif %}>Improvement to existing indicator</option>
+                    <option value="new_indicator" {% if suggestion_type_filter == 'new_indicator' %}selected{% endif %}>Propose new indicator</option>
+                    <option value="other" {% if suggestion_type_filter == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="btn btn-primary">
+                    Apply Filters
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Suggestions List -->
+    <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-ifrc-gray-200">
+            <h2 class="text-lg font-semibold text-ifrc-navy">
+                Suggestions ({{ pagination.total }} total)
+            </h2>
+        </div>
+
+        {% if suggestions %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-ifrc-gray-200">
+                <thead class="bg-ifrc-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-ifrc-gray-500 uppercase tracking-wider">
+                            Submitted
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-ifrc-gray-500 uppercase tracking-wider">
+                            Submitter
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-ifrc-gray-500 uppercase tracking-wider">
+                            Type
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-ifrc-gray-500 uppercase tracking-wider">
+                            Indicator Name
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-ifrc-gray-500 uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-ifrc-gray-500 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-ifrc-gray-200">
+                    {% for suggestion in suggestions %}
+                    <tr class="hover:bg-ifrc-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-ifrc-gray-900">
+                            {{ suggestion.submitted_at|datetime_local('datetime') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-ifrc-gray-900">{{ suggestion.submitter_name }}</div>
+                            <div class="text-sm text-ifrc-gray-500">{{ suggestion.submitter_email }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if suggestion.suggestion_type == 'new_indicator' %}bg-blue-100 text-blue-800
+                                {% elif suggestion.suggestion_type == 'correction' %}bg-yellow-100 text-yellow-800
+                                {% elif suggestion.suggestion_type == 'improvement' %}bg-green-100 text-green-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ suggestion.suggestion_type_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-ifrc-gray-900">{{ suggestion.indicator_name }}</div>
+                            {% if suggestion.indicator_id %}
+                            <div class="text-sm text-ifrc-gray-500">Existing indicator</div>
+                            {% else %}
+                            <div class="text-sm text-ifrc-gray-500">New indicator</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if suggestion.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% elif suggestion.status == 'reviewed' %}bg-blue-100 text-blue-800
+                                {% elif suggestion.status == 'approved' %}bg-green-100 text-green-800
+                                {% elif suggestion.status == 'rejected' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ suggestion.status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="{{ url_for('utilities.view_indicator_suggestion', suggestion_id=suggestion.id) }}"
+                               class="text-ifrc-red hover:text-ifrc-red-dark transition-colors duration-150">
+                                View Details
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {{ render_pagination(pagination) }}
+
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <div class="text-ifrc-gray-500">
+                <svg class="mx-auto h-12 w-12 text-ifrc-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-ifrc-gray-900">No suggestions found</h3>
+                <p class="mt-1 text-sm text-ifrc-gray-500">
+                    {% if status_filter or suggestion_type_filter %}
+                    Try adjusting your filters to see more results.
+                    {% else %}
+                    No indicator suggestions have been submitted yet.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

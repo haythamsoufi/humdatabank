@@ -1,0 +1,23 @@
+[
+  {
+    "id": 2,
+    "resource_type": "resource",
+    "publication_date": null,
+    "created_at": "2026-04-12T20:23:47.841817",
+    "updated_at": "2026-04-12T21:28:05.028568",
+    "default_title": "FDRS User Guide 2024",
+    "default_description": "",
+    "title": "FDRS User Guide 2024",
+    "description": "",
+    "language": "en",
+    "filename": "FDRS User Guide 2024_EN.pdf",
+    "has_file": true,
+    "has_thumbnail": true,
+    "file_available": true,
+    "download_url": "http://localhost:5000/resources/download/2/en",
+    "thumbnail_url": "http://localhost:5000/resources/thumbnail/2/en",
+    "available_languages": [
+      "en"
+    ]
+  }
+]

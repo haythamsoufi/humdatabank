@@ -1,0 +1,9 @@
+/* Admin dashboard - sharp UI corners (moved from inline template styles) */
+
+.sharp-ui * {
+    border-radius: 0 !important;
+}
+.sharp-ui .avatar-circle,
+.sharp-ui .avatar-circle * {
+    border-radius: 9999px !important;
+}

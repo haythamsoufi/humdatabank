@@ -1,0 +1,159 @@
+<!-- Backoffice/plugins/interactive_map/templates/field.html -->
+
+{#
+  NOTE: This is a pure template (markup only).
+  The host (generic PluginFieldLoader) will:
+  - fetch and inject this template (if needed),
+  - load `es_module_path` and `css_files` from get_entry_form_config(),
+  - call the exported class to initialize.
+
+  This keeps the host plugin-agnostic and the plugin self-contained.
+#}
+
+{# Provide config JSON for map_field.js to read (uses id="map-config-<fieldId>") #}
+<script type="application/json" id="map-config-{{ field_name }}">{{ config_json | safe }}</script>
+
+<div
+    class="interactive-map-field"
+    data-field-id="{{ field_name }}"
+    data-can-edit="{{ 'true' if can_edit else 'false' }}"
+    data-existing-data="{{ existing_data_json | e }}">
+
+    <div class="map-controls">
+        <div class="map-controls-row">
+            <div class="map-controls-search">
+                <div class="search-input-wrapper">
+                    <input type="text"
+                           class="form-control search-input-with-icons"
+                           id="address-search-{{ field_name }}"
+                           placeholder="Search for a location...">
+                    <button class="btn btn-link search-icon-btn"
+                            type="button"
+                            data-action="map:search-location"
+                            data-field-id="{{ field_name }}"
+                            data-input-id="address-search-{{ field_name }}"
+                            title="Search location"
+                            aria-label="Search location">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <button class="btn btn-link locate-icon-btn"
+                            type="button"
+                            data-action="map:go-to-current-location"
+                            data-field-id="{{ field_name }}"
+                            title="Locate me"
+                            aria-label="Locate me">
+                        <i class="fas fa-crosshairs"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="map-controls-actions">
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        data-action="map:toggle-marker-mode"
+                        data-field-id="{{ field_name }}"
+                        id="add-marker-btn-{{ field_name }}">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span class="add-marker-text">Add Marker</span>
+                </button>
+            </div>
+        </div>
+        <!-- Manual coordinate input (shown when marker mode is active) -->
+        <div class="manual-coordinates-input" id="manual-coordinates-{{ field_name }}" style="display: none;">
+            <div class="manual-coords-row">
+                <div class="manual-coords-input-group">
+                    <label for="manual-lat-{{ field_name }}" class="manual-coords-label">Latitude:</label>
+                    <input type="number"
+                           step="any"
+                           class="form-control manual-coords-input"
+                           id="manual-lat-{{ field_name }}"
+                           placeholder="e.g. 40.7128"
+                           min="-90"
+                           max="90">
+                </div>
+                <div class="manual-coords-input-group">
+                    <label for="manual-lng-{{ field_name }}" class="manual-coords-label">Longitude:</label>
+                    <input type="number"
+                           step="any"
+                           class="form-control manual-coords-input"
+                           id="manual-lng-{{ field_name }}"
+                           placeholder="e.g. -74.0060"
+                           min="-180"
+                           max="180">
+                </div>
+                <button type="button"
+                        class="btn btn-primary btn-sm manual-coords-add-btn"
+                        data-action="map:add-manual-marker"
+                        data-field-id="{{ field_name }}">
+                    <i class="fas fa-plus"></i> Add at Coordinates
+                </button>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <div class="map-container">
+        <div id="map-{{ field_name }}"
+             class="map-field"
+             style="height: {{ config.get('map_height', 400) }}px; width: 100%; border-radius: 8px; overflow: hidden;">
+            <!-- Map will be rendered here by JavaScript -->
+        </div>
+    </div>
+
+    <div class="map-info mt-3">
+        <!-- Minimal map information bar (hidden for now) -->
+        <div class="map-info-bar" style="display: none;">
+            <div class="map-info-item">
+                <small class="text-muted">Center Latitude:</small>
+                <div class="font-monospace" id="center-lat-{{ field_name }}">--</div>
+            </div>
+            <div class="map-info-item">
+                <small class="text-muted">Center Longitude:</small>
+                <div class="font-monospace" id="center-lng-{{ field_name }}">--</div>
+            </div>
+            <div class="map-info-item">
+                <small class="text-muted">Zoom Level:</small>
+                <div class="font-monospace" id="zoom-level-{{ field_name }}">--</div>
+            </div>
+            <div class="map-info-item">
+                <small class="text-muted">Markers:</small>
+                <div class="font-monospace" id="marker-count-{{ field_name }}">0</div>
+            </div>
+        </div>
+
+        <!-- Marker list below map info -->
+        <div class="marker-list-container mt-3">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center w-100">
+                        <h6 class="mb-0">
+                            <i class="fas fa-list text-success"></i>
+                            Marker List
+                        </h6>
+                        <button type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                data-action="map:clear-markers"
+                                data-field-id="{{ field_name }}"
+                                title="Clear all markers">
+                            <i class="fas fa-trash"></i>
+                            <span class="btn-text">Clear All</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="marker-list-{{ field_name }}" class="marker-list">
+                        <p class="text-muted text-center mb-0">No markers added yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden input for form submission -->
+    <input type="hidden"
+           name="field_value[{{ field_id }}]"
+           id="map-data-{{ field_name }}"
+           value="{{ field_value or '{}' }}">
+
+    <!-- Field validation feedback -->
+    <div class="invalid-feedback" id="map-validation-{{ field_name }}"></div>
+</div>

@@ -1,0 +1,282 @@
+<!-- Backoffice/plugins/interactive_map/builder.html -->
+<!-- This template contains only the plugin-specific configuration -->
+<!-- Common fields (label, description) are provided by the base plugin template -->
+<!-- IMPORTANT: The label field must have name="label" to be captured during form submission -->
+
+<div class="plugin-field-builder interactive-map-builder">
+    <div class="mb-4">
+        <h4 class="text-lg font-semibold text-gray-700 mb-3">
+            <i class="fas fa-map-marked-alt text-blue-600 mr-2"></i>
+            Interactive Map Configuration
+        </h4>
+        <p class="text-sm text-gray-600 mb-4">
+            Configure how this interactive map field will behave in your form.
+        </p>
+    </div>
+
+    <!-- Section selector proxy (populated/synced by item-modal.js) -->
+    <!-- NOTE: No "name" attribute to avoid duplicating section_id submissions. -->
+    <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            Section <span class="text-red-500">*</span>
+        </label>
+        <select
+            id="interactive-map-section-proxy-{{ field_id }}"
+            data-section-proxy="true"
+            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            required>
+            <option value="">Select a section...</option>
+        </select>
+        <p class="mt-1 text-sm text-gray-500">
+            Choose which section this plugin field belongs to.
+        </p>
+    </div>
+
+    <!-- Map Provider Configuration -->
+    <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            Map Provider <span class="text-red-500">*</span>
+        </label>
+        <select name="map_type" id="map-type-{{ field_id }}"
+                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                required>
+            <option value="">Select a map provider</option>
+            <option value="openstreetmap" {{ 'selected' if config.get('map_type') == 'openstreetmap' else '' }}>
+                OpenStreetMap (Free)
+            </option>
+            <option value="google_maps" {{ 'selected' if config.get('map_type') == 'google_maps' else '' }}>
+                Google Maps (Requires API Key)
+            </option>
+            <option value="mapbox" {{ 'selected' if config.get('map_type') == 'mapbox' else '' }}>
+                Mapbox
+            </option>
+            <option value="leaflet" {{ 'selected' if config.get('map_type') == 'leaflet' else '' }}>
+                Leaflet (Free)
+            </option>
+        </select>
+        <p class="mt-1 text-sm text-gray-500">
+            Choose the map service provider for this field.
+        </p>
+    </div>
+
+    <!-- Map Display Configuration -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Default Zoom Level
+            </label>
+            <input type="number"
+                   name="default_zoom"
+                   id="default-zoom-{{ field_id }}"
+                   value="{{ config.get('default_zoom', 10) }}"
+                   min="1" max="18"
+                   class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            <p class="mt-1 text-sm text-gray-500">
+                Zoom level from 1 (world) to 18 (street level)
+            </p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Map Height (px)
+            </label>
+            <input type="number"
+                   name="map_height"
+                   id="map-height-{{ field_id }}"
+                   value="{{ config.get('map_height', 400) }}"
+                   min="200" max="800"
+                   class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            <p class="mt-1 text-sm text-gray-500">
+                Height of the map in pixels
+            </p>
+        </div>
+    </div>
+
+    <!-- Default Location Configuration -->
+    <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            Default Center Location
+        </label>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
+                <input type="number"
+                       name="map_center_lat"
+                       id="map-center-lat-{{ field_id }}"
+                       value="{{ config.get('map_center_lat', 0) }}"
+                       step="0.000001"
+                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                       placeholder="0.000000">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
+                <input type="number"
+                       name="map_center_lng"
+                       id="map-center-lng-{{ field_id }}"
+                       value="{{ config.get('map_center_lng', 0) }}"
+                       step="0.000001"
+                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                       placeholder="0.000000">
+            </div>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">
+            Set the default center point for the map. Use 0,0 for world center.
+        </p>
+    </div>
+
+    <!-- Drawing Options -->
+    <div class="mb-6">
+        <h5 class="text-md font-medium text-gray-700 mb-3">Drawing Options</h5>
+
+        <div class="plugin-option-to-properties mb-4">
+            <label class="flex items-center text-gray-700 text-sm">
+                <input type="checkbox"
+                       name="allow_drawing"
+                       id="allow-drawing-{{ field_id }}"
+                       value="true"
+                       {{ 'checked' if config.get('allow_drawing', False) else '' }}
+                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <span class="ml-2">Allow drawing shapes on the map</span>
+            </label>
+        </div>
+
+        <div class="plugin-option-to-properties">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Allowed Geometry Types</label>
+            <div class="space-y-2">
+                <label class="flex items-center text-gray-700 text-sm">
+                    <input type="checkbox"
+                           name="allowed_geometry_types_Point"
+                           value="Point"
+                           {{ 'checked' if 'Point' in config.get('allowed_geometry_types', ['Point']) else '' }}
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <span class="ml-2">Point</span>
+                </label>
+                <label class="flex items-center text-gray-700 text-sm">
+                    <input type="checkbox"
+                           name="allowed_geometry_types_LineString"
+                           value="LineString"
+                           {{ 'checked' if 'LineString' in config.get('allowed_geometry_types', ['Point']) else '' }}
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <span class="ml-2">Line</span>
+                </label>
+                <label class="flex items-center text-gray-700 text-sm">
+                    <input type="checkbox"
+                           name="allowed_geometry_types_Polygon"
+                           value="Polygon"
+                           {{ 'checked' if 'Polygon' in config.get('allowed_geometry_types', ['Point']) else '' }}
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <span class="ml-2">Polygon</span>
+                </label>
+                <label class="flex items-center text-gray-700 text-sm">
+                    <input type="checkbox"
+                           name="allowed_geometry_types_MultiPolygon"
+                           value="MultiPolygon"
+                           {{ 'checked' if 'MultiPolygon' in config.get('allowed_geometry_types', ['Point']) else '' }}
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <span class="ml-2">Multi-Polygon</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plugin Options (will be integrated into Properties section) -->
+    <div class="plugin-option-to-properties">
+        <label class="flex items-center text-gray-700 text-sm">
+            <input type="checkbox"
+                   name="allow_markers"
+                   id="allow-markers-{{ field_id }}"
+                   value="true"
+                   {{ 'checked' if config.get('allow_markers', True) else '' }}
+                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="ml-2">Allow users to add markers</span>
+        </label>
+    </div>
+
+    <div class="plugin-option-to-properties">
+        <label class="flex items-center text-gray-700 text-sm">
+            <input type="checkbox"
+                   name="allow_multiple_markers"
+                   id="allow-multiple-{{ field_id }}"
+                   value="true"
+                   {{ 'checked' if config.get('allow_multiple_markers', True) else '' }}
+                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="ml-2">Allow multiple markers</span>
+        </label>
+    </div>
+
+    <div class="plugin-option-to-properties">
+        <label class="flex items-center text-gray-700 text-sm">
+            <input type="checkbox"
+                   name="show_search_box"
+                   id="show-search-{{ field_id }}"
+                   value="true"
+                   {{ 'checked' if config.get('show_search_box', True) else '' }}
+                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="ml-2">Show location search box</span>
+        </label>
+    </div>
+
+    <div class="plugin-option-to-properties">
+        <label class="flex items-center text-gray-700 text-sm">
+            <input type="checkbox"
+                   name="show_coordinates"
+                   id="show-coordinates-{{ field_id }}"
+                   value="true"
+                   {{ 'checked' if config.get('show_coordinates', True) else '' }}
+                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="ml-2">Display coordinate information</span>
+        </label>
+    </div>
+
+    <!-- Validation Rules -->
+    <div class="mb-6">
+        <h5 class="text-md font-medium text-gray-700 mb-3">Validation Rules</h5>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Minimum Markers</label>
+                <input type="number"
+                       name="min_markers"
+                       id="min-markers-{{ field_id }}"
+                       value="{{ config.get('min_markers', 0) }}"
+                       min="0" max="100"
+                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Maximum Markers</label>
+                <input type="number"
+                       name="max_markers"
+                       id="max-markers-{{ field_id }}"
+                       value="{{ config.get('max_markers', 10) }}"
+                       min="1" max="100"
+                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">
+            Set limits for the number of markers users can add.
+        </p>
+    </div>
+
+    <!-- Coordinate Precision -->
+    <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            Coordinate Precision (decimal places)
+        </label>
+        <input type="number"
+               name="coordinate_precision"
+               id="coordinate-precision-{{ field_id }}"
+               value="{{ config.get('coordinate_precision', 6) }}"
+               min="4" max="8"
+               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+        <p class="mt-1 text-sm text-gray-500">
+            Number of decimal places for coordinate precision (4-8)
+        </p>
+    </div>
+
+
+
+    <!-- Hidden Configuration Storage -->
+    <input type="hidden" name="field_type" value="interactive_map">
+    <input type="hidden" name="plugin_name" value="interactive_map">
+</div>

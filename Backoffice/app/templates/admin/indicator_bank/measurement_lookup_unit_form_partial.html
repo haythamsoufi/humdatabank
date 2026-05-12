@@ -1,0 +1,136 @@
+{# Form body for unit create/edit. Used in modal (modal=true) and full page (modal=false). #}
+<div class="ml-form-wrap">
+  <style nonce="{{ csp_style_nonce() }}">
+    .ml-form-wrap .form-section {
+      background-color: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .ml-form-wrap .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    /* Row layout: do not rely on Tailwind flex here (avoids missing utilities / form-plugin clashes in modals) */
+    .ml-form-wrap .ml-measurement-meta {
+      display: grid;
+      width: 100%;
+      box-sizing: border-box;
+      grid-template-columns: minmax(0, 1fr) 8rem min-content;
+      gap: 0.75rem 1rem;
+      align-items: end;
+    }
+    .ml-form-wrap .ml-measurement-meta__code {
+      min-width: 0;
+    }
+    .ml-form-wrap .ml-measurement-meta__order {
+      min-width: 0;
+    }
+    .ml-form-wrap .ml-measurement-meta__active {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 0.5rem;
+      padding-bottom: 0.35rem;
+    }
+    @media (max-width: 36rem) {
+      .ml-form-wrap .ml-measurement-meta {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+      .ml-form-wrap .ml-measurement-meta__active {
+        padding-bottom: 0;
+      }
+    }
+    .ml-form-wrap .ml-measurement-meta input[type="text"],
+    .ml-form-wrap .ml-measurement-meta input[type="number"] {
+      max-width: 100%;
+      box-sizing: border-box;
+      width: 100%;
+    }
+  </style>
+  {% if is_edit and row and usage_count is defined and usage_count > 0 %}
+  <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 mb-3">
+    {{ _('Reference count:') }} <strong>{{ usage_count }}</strong>.
+    {{ _('The code field is locked while this entry is still in use.') }}
+  </p>
+  {% endif %}
+
+  <form method="post" action="{{ form_action_url }}" class="ml-unit-form" data-ml-form="unit">
+    {{ form.hidden_tag() }}
+    <div class="form-section">
+      <h2 class="section-title"><i class="fas fa-balance-scale mr-2"></i>{{ _('Unit details') }}</h2>
+      <div class="ml-measurement-meta">
+        <div class="ml-measurement-meta__code">
+          <label class="block text-gray-700 text-sm font-semibold mb-2" for="{{ form.code.id }}">{{ form.code.label.text }}</label>
+          {{ form.code(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500") }}
+          {% for e in form.code.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+        </div>
+        <div class="ml-measurement-meta__order">
+          <label class="block text-gray-700 text-sm font-semibold mb-2" for="{{ form.sort_order.id }}">{{ form.sort_order.label.text }}</label>
+          {{ form.sort_order(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500") }}
+        </div>
+        <div class="ml-measurement-meta__active">
+          {{ form.is_active() }}
+          <label for="{{ form.is_active.id }}" class="text-sm text-gray-700 m-0">{{ form.is_active.label.text }}</label>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center gap-2">
+        {{ form.allows_disaggregation() }}
+        <label for="{{ form.allows_disaggregation.id }}" class="text-sm text-gray-700">{{ form.allows_disaggregation.label.text }}</label>
+      </div>
+    </div>
+
+    <div class="form-section max-h-64 overflow-y-auto pr-1">
+      <h2 class="section-title"><i class="fas fa-language mr-2"></i>{{ _('Translated labels (optional)') }}</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-gray-700 text-sm font-semibold mb-2" for="{{ form.name.id }}">{{ form.name.label.text }}</label>
+          {{ form.name(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500") }}
+          {% for e in form.name.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+        </div>
+        {% if TRANSLATABLE_LANGUAGES and TRANSLATABLE_LANGUAGES|length > 0 %}
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {% set f = form['name_' ~ code] %}
+        <div>
+          {{ f.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+          {{ f(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:ring-teal-500 focus:border-teal-500", dir=("rtl" if code in ['ar','fa','he','ur'] else None)) }}
+          {% for e in f.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-2">
+      <div>
+        {% if modal|default(true) and is_edit and row and delete_url is defined and delete_url and usage_count is defined and usage_count == 0 %}
+        <button type="button" class="btn btn-danger" id="mlUnitDeleteOpen" data-ml-url="{{ delete_url|e }}">
+          <i class="fas fa-trash mr-1"></i>{{ _('Delete unit') }}
+        </button>
+        {% elif modal|default(true) and is_edit and usage_count is defined and usage_count > 0 %}
+        <p class="text-sm text-gray-500 m-0 text-left">{{ _('Delete is only available when no indicators reference this unit (usage: %(n)s).', n=usage_count) }}</p>
+        {% elif (not (modal|default(true))) and is_edit and row and usage_count is defined and usage_count == 0 %}
+        <button type="button" class="btn btn-danger" id="deleteMeasurementUnitOpen" aria-controls="deleteMeasurementUnitModal">
+          <i class="fas fa-trash mr-1"></i>{{ _('Delete unit') }}
+        </button>
+        {% elif (not (modal|default(true))) and is_edit and usage_count is defined and usage_count > 0 %}
+        <p class="text-sm text-gray-500 m-0">{{ _('Delete is only available when no indicators reference this unit (usage: %(n)s).', n=usage_count) }}</p>
+        {% endif %}
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {{ form.submit(class="btn btn-success") }}
+        {% if modal|default(true) %}
+        <button type="button" class="btn btn-secondary ml-unit-cancel" data-ml-modal-dismiss>{{ _('Cancel') }}</button>
+        {% else %}
+        <a class="btn btn-secondary" href="{{ url_for('system_admin.manage_measurement_lookups') }}">{{ _('Cancel') }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+</div>

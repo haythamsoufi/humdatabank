@@ -1,0 +1,101 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ _('Notification type registry') }} - {{ _('Admin Panel') }}{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+    {{ page_header(
+        title=_('Notification type registry'),
+        icon='fas fa-book',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Notifications Center'), 'url': url_for('admin_notifications.notifications_center')},
+            {'name': _('Notification type registry')}
+        ],
+        info_tooltip=_('Maps each canonical notification type key to descriptions, configured default priority, TTL (from System Configuration overrides), and the icon shown in grids. Matches the NotificationType enum used for stored rows.')
+    ) }}
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
+        <form method="get" action="{{ url_for('admin_notifications.notifications_registry') }}" class="flex flex-col sm:flex-row flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[12rem]">
+                <label for="ntr_q" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Search') }}</label>
+                <input type="search" name="q" id="ntr_q" value="{{ q }}"
+                       class="form-input w-full border-gray-300 rounded-md text-sm font-mono"
+                       placeholder="{{ _('group, type key, label, description, priority…') }}"
+                       autocomplete="off">
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search mr-2"></i>{{ _('Apply') }}
+                </button>
+                <a href="{{ url_for('admin_notifications.notifications_registry') }}" class="btn btn-secondary">{{ _('Clear') }}</a>
+                <a href="{{ url_for('admin_notifications.notifications_registry', q=q, export='csv') }}" class="btn btn-success">
+                    <i class="fas fa-file-csv mr-2"></i>{{ _('Export CSV') }}
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
+        <p class="text-sm text-gray-600 mb-4">
+            <span class="font-semibold text-gray-800">{{ filtered_count }}</span>
+            {{ _('rows') }}
+            {% if q %}
+            <span class="text-gray-400">·</span>
+            {{ _('filtered from') }} <span class="font-semibold text-gray-800">{{ total_catalog }}</span> {{ _('total') }}
+            {% else %}
+            <span class="text-gray-400">·</span>
+            {{ _('total registry size') }} <span class="font-semibold text-gray-800">{{ total_catalog }}</span>
+            {% endif %}
+        </p>
+        <p class="text-xs text-gray-600 mb-4 max-w-3xl">{{ _('Emitter status Active means this notification type is emitted today; Hypothetical means it is reserved for preferences or future use only. Active rows appear first.') }}</p>
+
+        <div class="overflow-x-auto border border-gray-200 rounded-md">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap w-44">{{ _('Group') }}</th>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 w-40">{{ _('Type key') }}</th>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700">{{ _('Label') }}</th>
+                        <th scope="col" class="px-3 py-2 text-center font-semibold text-gray-700 w-28">{{ _('Emitter status') }}</th>
+                        <th scope="col" class="px-3 py-2 text-center font-semibold text-gray-700 w-28">{{ _('Icon') }}</th>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 w-32">{{ _('Default priority') }}</th>
+                        <th scope="col" class="px-3 py-2 text-right font-semibold text-gray-700 w-28">{{ _('TTL (days)') }}</th>
+                        <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 min-w-[14rem]">{{ _('Description') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for row in rows %}
+                    <tr class="hover:bg-gray-50 align-top {% if not row.emitter_active %}bg-slate-50/90{% endif %}">
+                        <td class="px-3 py-2 text-gray-900">{{ row.group_display }}</td>
+                        <td class="px-3 py-2 font-mono text-xs text-gray-900 break-all">{{ row.type_key }}</td>
+                        <td class="px-3 py-2 text-gray-800">{{ row.label }}</td>
+                        <td class="px-3 py-2 text-center whitespace-nowrap">
+                            {% if row.emitter_active %}
+                            <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">{{ row.emitter_status_display }}</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700" title="{{ _('Reserved for preferences or future use — the application does not emit this notification type yet.') }}">{{ row.emitter_status_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-center text-gray-700">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100" title="{{ row.icon_class }}" aria-hidden="true">
+                                <i class="{{ row.icon_class }} text-sm"></i>
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 font-mono text-xs text-gray-800">{{ row.default_priority }}</td>
+                        <td class="px-3 py-2 text-right font-mono text-xs text-gray-800">{{ row.ttl_days }}</td>
+                        <td class="px-3 py-2 text-gray-800">{{ row.description_display }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">{{ _('No rows match this search.') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1163 @@
+{
+  "navigation": {
+    "home": "Vista General Global",
+    "indicatorBank": "Banco de Indicadores",
+    "publications": "Recursos",
+    "analysis": "Análisis",
+    "dataVisualization": "Explorar Datos",
+    "disaggregationAnalysis": "Análisis de Desagregación",
+    "globalInitiative": "Iniciativas Globales",
+    "unifiedPlanningReporting": "Planificación e Informes Unificados",
+    "chat": "Chat",
+    "countries": "Países",
+    "organizationalStructure": "Estructura Organizacional",
+    "apiBuilder": "Constructor de API",
+    "language": "Idioma",
+    "siteTitle": "Banco de datos Humanitarian Databank",
+    "databank": "Banco de Datos",
+    "login": "Iniciar Sesión",
+    "openMainMenu": "Abrir menú principal"
+  },
+  "demoBanner": {
+    "badge": "DEMO",
+    "description": "Este es un entorno de demostración.",
+    "scope": "Alcance"
+  },
+  "homepage": {
+    "hero": {
+      "title": "El Banco de datos Humanitarian Databank",
+      "subtitle": "Acceso a datos, visualizaciones e información",
+      "description": "Explora datos humanitarios integrales, indicadores y publicaciones de la Federación Internacional de Sociedades de la Cruz Roja y de la Media Luna Roja.",
+      "exploreButton": "Explorar Datos",
+      "learnMoreButton": "Saber Más"
+    },
+    "features": {
+      "title": "Lo Que Ofrecemos",
+      "dataAccess": {
+        "title": "Acceso a Datos",
+        "description": "Acceso integral a datos humanitarios e indicadores"
+      },
+      "visualizations": {
+        "title": "Visualizaciones",
+        "description": "Gráficos interactivos para análisis de datos"
+      },
+      "publications": {
+        "title": "Publicaciones",
+        "description": "Informes de investigación y publicaciones"
+      },
+      "insights": {
+        "title": "Información",
+        "description": "Análisis e información basada en datos"
+      }
+    },
+    "featureCards": {
+      "visualizations": {
+        "title": "Visualizaciones Interactivas",
+        "description": "Analiza tendencias y patrones con gráficos y mapas sofisticados.",
+        "button": "Ir a Visualización de Datos →"
+      },
+      "chat": {
+        "title": "Chat con Nuestros Datos",
+        "description": "Haz preguntas sobre los datos de la plataforma en lenguaje natural.",
+        "button": "Chat con Datos →"
+      },
+      "countries": {
+        "title": "Perfiles de Países",
+        "description": "Explora información detallada y estadísticas para países individuales.",
+        "button": "Explorar Países →"
+      }
+    },
+    "latestFromField": {
+      "title": "Últimas Noticias del Campo",
+      "story1": {
+        "title": "Respuesta de Emergencia en la Región X",
+        "description": "Proporcionando ayuda vital a comunidades afectadas por inundaciones recientes...",
+        "link": "Leer Más →"
+      },
+      "story2": {
+        "title": "Impacto de la Iniciativa de Salud",
+        "description": "Nuevas clínicas móviles expanden el acceso a la salud para aldeas remotas...",
+        "link": "Leer Más →"
+      },
+      "story3": {
+        "title": "Descubre Más Historias",
+        "description": "Explora el impacto del trabajo de la plataforma alrededor del mundo.",
+        "link": "Ver Todas las Actualizaciones →"
+      }
+    },
+    "stats": {
+      "title": "Nuestro Impacto",
+      "countries": "Países",
+      "indicators": "Indicadores",
+      "publications": "Publicaciones",
+      "dataPoints": "Puntos de Datos"
+    }
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "notFound": "Página no encontrada",
+    "backToHome": "Volver al Inicio",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "view": "Ver",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "submit": "Enviar",
+    "close": "Cerrar",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "download": "Descargar",
+    "share": "Compartir",
+    "more": "Más",
+    "less": "Menos",
+    "tryAgain": "Intentar de nuevo",
+    "home": "Inicio",
+    "yes": "Sí",
+    "no": "No",
+    "select": "Seleccionar"
+  },
+  "indicatorBank": {
+    "title": "Banco de Indicadores",
+    "meta": {
+      "description": "Explora indicadores del banco de indicadores de la Humanitarian Databank."
+    },
+    "hero": {
+      "title": "Banco de indicadores Humanitarian Databank",
+      "description": "Explora nuestra colección integral de indicadores utilizados en las operaciones de la Humanitarian Databank."
+    },
+    "loading": {
+      "title": "Cargando Banco de Indicadores",
+      "description": "Por favor espera mientras obtenemos los indicadores..."
+    },
+    "error": {
+      "title": "Error del Banco de Indicadores"
+    },
+    "search": {
+      "placeholder": "Buscar indicadores..."
+    },
+    "filter": {
+      "placeholder": "Filtrar indicadores..."
+    },
+    "viewMode": {
+      "grid": "Vista de Cuadrícula",
+      "table": "Vista de Tabla"
+    },
+    "indicator": "indicador",
+    "indicators": "indicadores",
+    "filters": {
+      "title": "Filtros",
+      "active": "Activo",
+      "apply": "Aplicar Filtros",
+      "clearAll": "Limpiar Todo",
+      "search": {
+        "title": "Buscar Indicadores",
+        "placeholder": "Buscar por nombre o definición del indicador..."
+      },
+      "type": {
+        "label": "Tipo",
+        "all": "Todos los Tipos"
+      },
+      "sector": {
+        "label": "Sector",
+        "all": "Todos los Sectores"
+      },
+      "subsector": {
+        "label": "Subsector",
+        "all": "Todos los Subsectores"
+      },
+      "status": {
+        "label": "Estado",
+        "activeOnly": "Solo Activos",
+        "all": "Todos los Indicadores",
+        "archivedOnly": "Solo Archivados"
+      }
+    },
+    "results": {
+      "showing": "Mostrando",
+      "matching": " que coinciden con \"{{term}}\"",
+      "noResults": "No se encontraron indicadores que coincidan con tus criterios.",
+      "noIndicators": "No hay indicadores disponibles en este momento."
+    },
+    "table": {
+      "name": "Nombre",
+      "type": "Tipo",
+      "sector": "Sector",
+      "subsector": "Subsector",
+      "unit": "Unidad"
+    },
+    "guide": {
+      "title": "Guía para la Selección de Indicadores",
+      "step1": {
+        "title": "Definir el Propósito",
+        "description": "El primer paso para seleccionar un indicador debe ser definir claramente y entender el propósito de su uso: ¿dónde, en qué contexto y hacia qué objetivo se utilizará el indicador?"
+      },
+      "step2": {
+        "title": "Identificar Sectores/Subsectores",
+        "description": "Define qué área de enfoque debe estar presente en tu solución. Los indicadores en este banco están organizados por los sectores anteriores. Cada sector se divide en subsectores, por los cuales se agrupan los indicadores."
+      },
+      "step3": {
+        "title": "Seleccionar Indicadores Específicos",
+        "description": "Cada subsector se divide consecuentemente en indicadores específicos para medir y recopilar datos. Puedes obtener más información sobre cada indicador haciendo clic en él."
+      }
+    },
+    "proposeNewIndicator": "¿No encuentras un indicador? Propón uno nuevo aquí.",
+    "proposeModal": {
+      "thankYou": "¡Gracias!",
+      "successMessage": "Tu propuesta de indicador se ha enviado correctamente. La revisaremos y nos pondremos en contacto contigo si es necesario.",
+      "confirmationEmailSent": "Correo de Confirmación Enviado",
+      "confirmationEmailMessage": "Se ha enviado un correo de confirmación a {{email}}. Por favor revisa tu bandeja de entrada (y la carpeta de spam) para obtener detalles sobre tu envío.",
+      "close": "Cerrar",
+      "clearAll": "Limpiar Todo",
+      "cancel": "Cancelar",
+      "submitting": "Enviando...",
+      "submitProposal": "Enviar Propuesta",
+      "failedToSubmit": "Error al enviar la propuesta: {{message}}"
+    }
+  },
+  "resources": {
+    "title": "Recursos",
+    "meta": {
+      "description": "Explora informes de investigación, publicaciones y recursos de la Humanitarian Databank."
+    },
+    "hero": {
+      "title": "Recursos",
+      "description": "Informes de investigación, publicaciones y recursos de la Humanitarian Databank"
+    },
+    "loading": {
+      "title": "Cargando Recursos",
+      "description": "Por favor espera mientras obtenemos los recursos..."
+    },
+    "error": {
+      "title": "Error de Recursos",
+      "loadFailed": "No se pudieron cargar los recursos. Por favor inténtalo de nuevo más tarde."
+    },
+    "search": {
+      "placeholder": "Buscar recursos...",
+      "button": "Buscar"
+    },
+    "pagination": {
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "page": "Página",
+      "of": "de"
+    },
+    "noResults": "No se encontraron recursos que coincidan con tus criterios de búsqueda.",
+    "noResources": "No hay recursos disponibles en este momento.",
+    "sections": {
+      "publications": {
+        "title": "Publicaciones",
+        "expand": "Expandir Publicaciones",
+        "collapse": "Contraer Publicaciones",
+        "pagination": "Paginación de Publicaciones",
+        "none": "No hay publicaciones disponibles.",
+        "noResults": "No se encontraron publicaciones que coincidan con tu búsqueda."
+      },
+      "otherResources": {
+        "title": "Otros Recursos",
+        "expand": "Expandir Otros Recursos",
+        "collapse": "Contraer Otros Recursos",
+        "pagination": "Paginación de Otros Recursos",
+        "loading": "Cargando otros recursos...",
+        "none": "No hay otros recursos disponibles",
+        "noResults": "No se encontraron otros recursos",
+        "tryAdjusting": "Intenta ajustar tus términos de búsqueda.",
+        "comingSoon": "Se agregarán tipos de recursos adicionales aquí cuando estén disponibles."
+      }
+    },
+    "pdfViewer": {
+      "loading": "Cargando PDF...",
+      "error": "No se pudo cargar el PDF. Por favor intenta descargar el archivo en su lugar.",
+      "download": "Descargar PDF",
+      "close": "Cerrar",
+      "previousPage": "Página Anterior",
+      "nextPage": "Página Siguiente",
+      "pageOf": "Página {{current}} de {{total}}",
+      "pageError": "No se pudo cargar la página del PDF. Por favor intenta descargar el archivo en su lugar."
+    }
+  },
+  "dataVisualization": {
+    "title": "Visualización de Datos",
+    "meta": {
+      "description": "Explora visualizaciones de datos interactivas de la Humanitarian Databank."
+    },
+    "hero": {
+      "title": "Visualización de Datos",
+      "description": "Interactúa con datos humanitarios clave a través de gráficos, mapas y paneles."
+    },
+    "sections": {
+      "fundingOverview": {
+        "title": "Resumen de Financiamiento",
+        "placeholder": "Componente de Gráfico (ej., Recharts BarChart) irá aquí."
+      },
+      "globalReach": {
+        "title": "Mapa de Alcance Global",
+        "placeholder": "Componente de Mapa Interactivo (ej., Leaflet, Mapbox) irá aquí."
+      },
+      "sectoralImpact": {
+        "title": "Impacto Sectorial",
+        "healthImpact": "Gráfico para Impacto en Salud",
+        "washActivities": "Gráfico para Actividades WASH"
+      }
+    }
+  },
+  "exploreData": {
+    "title": "Explorar Datos",
+    "meta": {
+      "description": "Crea visualizaciones de datos personalizadas y explora datos de la Humanitarian Databank seleccionando indicadores, países y tipos de gráficos."
+    },
+    "hero": {
+      "title": "Explorar Datos",
+      "description": "Crea visualizaciones de datos personalizadas seleccionando indicadores, países y tipos de gráficos. Descarga tus gráficos para informes y presentaciones."
+    },
+    "configure": {
+      "title": "Configurar Tu Visualización",
+      "step1": "Seleccionar Indicador",
+      "step2": "Seleccionar Países",
+      "step3": "Seleccionar Período y Tipo de Gráfico",
+      "filterBySector": "Filtrar por Sector (Opcional)",
+      "allSectors": "Todos los Sectores",
+      "selectIndicator": "Seleccionar Indicador *",
+      "chooseIndicator": "Elegir un indicador...",
+      "noIndicatorsAvailable": "No hay indicadores disponibles",
+      "loading": "Cargando...",
+      "selectCountries": "Seleccionar Países *",
+      "chooseCountries": "Elegir países...",
+      "allCountriesSelected": "Todos los países seleccionados",
+      "regionsSelected": "{{count}} región(es) seleccionada(s)",
+      "selected": "Seleccionado:",
+      "countriesSelected": "{{count}} países seleccionados",
+      "chartType": "Tipo de Gráfico",
+      "timePeriod": "Período *",
+      "singleYear": "Año Único",
+      "range": "Rango",
+      "selectYear": "Seleccionar un año...",
+      "loadingPeriods": "Cargando períodos...",
+      "fromYear": "Año Desde",
+      "toYear": "Año Hasta",
+      "from": "Desde...",
+      "to": "Hasta...",
+      "selectedRange": "Rango seleccionado: {{from}} - {{to}}",
+      "years": "{{count}} años",
+      "generateChart": "Generar Gráfico",
+      "generating": "Generando...",
+      "clearSavedConfiguration": "Limpiar Configuración Guardada",
+      "summary": "Resumen",
+      "indicator": "Indicador:",
+      "countries": "Países:",
+      "period": "Período:",
+      "notSelected": "No seleccionado"
+    },
+    "chart": {
+      "title": "Visualización de Datos",
+      "chart": "Gráfico",
+      "table": "Tabla",
+      "generatedOn": "Generado el",
+      "downloadData": "Descargar datos como CSV",
+      "data": "Datos",
+      "downloadChart": "Descargar gráfico como PNG",
+      "noChartData": "No hay datos de gráfico disponibles",
+      "checkConsole": "Por favor revise la consola para información de depuración",
+      "configuration": "Configuración",
+      "sector": "Sector:",
+      "chartType": "Tipo de Gráfico:",
+      "years": "Años:",
+      "dataSummary": "Resumen de Datos",
+      "totalDataPoints": "Total de Puntos de Datos:",
+      "maxValue": "Valor Máximo:",
+      "minValue": "Valor Mínimo:",
+      "average": "Promedio:",
+      "allCountries": "Todos los Países",
+      "regions": "Regiones ({{count}})",
+      "countries": "Países ({{count}})",
+      "allCountriesSelected": "Todos los países seleccionados",
+      "entireRegion": "(región completa)",
+      "moreCountries": "+{{count}} países más",
+      "keyStatistics": "Estadísticas Clave",
+      "totalGrowth": "Crecimiento Total",
+      "currentTotal": "Total Actual",
+      "averageAnnualGrowth": "Crecimiento Anual Promedio",
+      "tableHeaders": {
+        "value": "Valor",
+        "year": "Año",
+        "country": "País"
+      }
+    },
+    "placeholder": {
+      "title": "Visualización de Datos",
+      "subtitle": "Listo para explorar tus datos",
+      "noChartGenerated": "Aún No se Ha Generado un Gráfico",
+      "description": "Selecciona tu sector, indicador, países y tipo de gráfico preferidos, luego haz clic en \"Generar Visualización\" para crear tu vista de datos personalizada.",
+      "feature1": "Elige entre múltiples tipos de gráficos (Línea, Barra, Circular)",
+      "feature2": "Compara datos entre diferentes países",
+      "feature3": "Analiza tendencias a lo largo del tiempo"
+    },
+    "loading": {
+      "generating": "Generando tu visualización...",
+      "loadingData": "Cargando sectores e indicadores..."
+    },
+    "chartTypes": {
+      "line": {
+        "name": "Gráfico de Líneas",
+        "description": "Muestra tendencias a lo largo del tiempo"
+      },
+      "bar": {
+        "name": "Gráfico de Barras",
+        "description": "Compara valores entre categorías"
+      },
+      "pie": {
+        "name": "Gráfico Circular",
+        "description": "Muestra proporciones de un todo"
+      }
+    },
+    "confirmClearCache": "¿Estás seguro de que quieres limpiar toda la configuración guardada? Esto restablecerá tus selecciones y los datos del gráfico."
+  },
+  "chat": {
+    "title": "Chat con nuestros datos",
+    "meta": {
+      "description": "Haz preguntas sobre los datos de la plataforma usando el asistente de IA."
+    },
+    "hero": {
+      "title": "Chat con nuestros datos",
+      "description": "Escribe tus preguntas sobre los datos de la plataforma a continuación."
+    },
+    "messages": {
+      "welcome": "¡Hola! ¿Cómo puedo ayudarte a explorar los datos de la plataforma hoy?",
+      "thinking": "Pensando...",
+      "placeholder": "Pregunta sobre financiamiento, programas, países..."
+    },
+    "actions": {
+      "send": "Enviar"
+    },
+    "placeholder": {
+      "response": "Recibí tu mensaje: \"{{message}}\". Como marcador de posición, no puedo acceder a datos en tiempo real aún, pero estoy diseñado para responder preguntas sobre actividades de Humanitarian Databank, financiamiento e impacto basado en el banco de datos disponible."
+    }
+  },
+  "globalOverview": {
+    "title": "Vista General Global",
+    "meta": {
+      "description": "Explora datos humanitarios globales e indicadores de la Humanitarian Databank."
+    },
+    "hero": {
+      "title": "Vista General Global",
+      "description": "Explora datos humanitarios integrales, indicadores e insights de la Federación Internacional de Sociedades de la Cruz Roja y de la Media Luna Roja."
+    },
+    "indicators": {
+      "volunteers": "Voluntarios",
+      "staff": "Personal",
+      "branches": "Sucursales",
+      "localUnits": "Unidades Locales",
+      "bloodDonors": "Donantes de Sangre",
+      "firstAid": "Primeros Auxilios",
+      "peopleReached": "Personas Alcanzadas",
+      "income": "Ingresos",
+      "expenditure": "Gastos"
+    },
+    "peopleReached": {
+      "crossCutting": "Transversal",
+      "crossCuttingDesc": "Actividades e intervenciones humanitarias transversales",
+      "climateEnvironmental": "Crisis climáticas y ambientales",
+      "climateEnvironmentalDesc": "Personas alcanzadas a través de la respuesta a crisis climáticas y ambientales",
+      "evolvingCrises": "Crisis y desastres en evolución",
+      "evolvingCrisesDesc": "Personas alcanzadas a través de la respuesta a crisis y desastres en evolución",
+      "healthWellbeing": "Brechas crecientes en salud y bienestar",
+      "healthWellbeingDesc": "Personas alcanzadas a través de programas de salud y bienestar",
+      "migrationIdentity": "Migración e identidad",
+      "migrationIdentityDesc": "Personas alcanzadas a través de programas de apoyo a la migración e identidad",
+      "valuesPowerInclusion": "Valores, Poder e Inclusión",
+      "valuesPowerInclusionDesc": "Personas alcanzadas a través de iniciativas de valores, poder e inclusión",
+      "subIndicators": {
+        "longTermServices": "Número de personas alcanzadas con servicios y programas a largo plazo",
+        "emergencyResponse": "Número de personas alcanzadas con programas de respuesta de emergencia y recuperación temprana",
+        "climateAdaptation": "Adaptación Climática",
+        "environmentalProtection": "Protección Ambiental",
+        "disasterRiskReduction": "Reducción del Riesgo de Desastres",
+        "sustainableDevelopment": "Desarrollo Sostenible",
+        "emergencyResponseRecovery": "Respuesta de Emergencia",
+        "recoveryRehabilitation": "Recuperación y Rehabilitación",
+        "earlyWarningSystems": "Sistemas de Alerta Temprana",
+        "crisisPreparedness": "Preparación para Crisis",
+        "primaryHealthcare": "Atención Primaria de Salud",
+        "mentalHealthSupport": "Apoyo en Salud Mental",
+        "nutritionPrograms": "Programas de Nutrición",
+        "healthEducation": "Educación en Salud",
+        "migrantAssistance": "Asistencia a Migrantes",
+        "refugeeSupport": "Apoyo a Refugiados",
+        "communityIntegration": "Integración Comunitaria",
+        "identityProtection": "Protección de Identidad",
+        "genderEquality": "Igualdad de Género",
+        "youthEmpowerment": "Empoderamiento Juvenil",
+        "socialInclusion": "Inclusión Social",
+        "humanitarianValues": "Valores Humanitarios"
+      }
+    },
+    "regions": {
+      "global": "Vista General Global",
+      "globalDesc": "Ver datos de todas las regiones",
+      "africa": "África",
+      "africaDesc": "Países africanos",
+      "americas": "Américas",
+      "americasDesc": "América del Norte y del Sur",
+      "asiaPacific": "Asia Pacífico",
+      "asiaPacificDesc": "Países de Asia Pacífico",
+      "europeCentralAsia": "Europa y Asia Central",
+      "europeCentralAsiaDesc": "Países europeos y de Asia Central",
+      "mena": "Medio Oriente y Norte de África",
+      "menaDesc": "Países del Medio Oriente y Norte de África"
+    },
+    "map": {
+      "title": "Vista General Humanitaria {{region}}",
+      "description": "Mapa interactivo que muestra las actividades de {{organization}}, indicadores e impacto {{location}} {{year}}. {{indicatorInstruction}}",
+      "globalLocation": "en todo el mundo",
+      "regionalLocation": "en {{region}}",
+      "nationalLocation": "en {{country}}",
+      "yearFilter": "para {{year}}",
+      "peopleReachedInstruction": "Selecciona una subcategoría arriba para ver datos específicos.",
+      "indicatorInstruction": "Selecciona un indicador arriba para filtrar los datos.",
+      "regionSelector": "Región:",
+      "countriesInRegion": "{{count}} países en {{region}}",
+      "allRegions": "Todas las regiones",
+      "total": "Total: {{value}}",
+      "globalTotal": "Total global",
+      "selectedCountry": "País seleccionado",
+      "downloadCSV": "Descargar datos como archivo CSV",
+      "downloadPNG": "Descargar mapa como imagen PNG",
+      "cacheStatus": {
+        "cached": "📦 En caché",
+        "live": "🔄 En vivo",
+        "clearCache": "🗑️ Limpiar",
+        "clearCacheTitle": "Limpiar caché"
+      },
+      "dataRange": "Rango de Datos",
+      "bubbleSize": "Tamaño de Burbuja",
+      "choroplethMap": "Mapa Coroplético",
+      "bubbleMap": "Mapa de Burbujas",
+      "barChart": "Gráfico de Barras",
+      "showAbbreviated": "Mostrar valores abreviados (K, M, B)",
+      "showFull": "Mostrar valores completos (1,234,567)",
+      "stopAnimation": "Detener Animación",
+      "startBarChartRace": "Iniciar Carrera de Gráfico de Barras",
+      "startTimeAnimation": "Iniciar Animación de Tiempo",
+      "scrollToTop": "Desplazar hacia arriba",
+      "admin": "Admin",
+      "showAdmin": "Mostrar {{level}}",
+      "countries": "países",
+      "areas": "áreas",
+      "areasEstimated": "áreas (estimadas)"
+    },
+    "quickPrompts": {
+      "afghanVolunteers": "Cuéntame sobre los voluntarios del Creciente Rojo Afgano",
+      "disasterResponse": "Muéstrame datos globales de respuesta a desastres",
+      "humanitarianIndicators": "¿Cuáles son los indicadores humanitarios clave?"
+    },
+    "aiResponses": {
+      "afghanRedCrescent": "En los últimos años, la Sociedad del Creciente Rojo Afgano (ARCS) se ha basado en gran medida en su red de voluntarios para responder a desastres naturales, crisis de salud y emergencias relacionadas con conflictos en todo Afganistán. En 2013, la ARCS reportó tener alrededor de 23,440 voluntarios activos (<a href=\"https://arcs.af/sites/default/files/2021-05/English%20Booklet%20size%209%20x%2014%20cm.pdf\" target=\"_blank\" class=\"text-humdb-red hover:text-humdb-red-dark underline\">fuente</a>), contribuyendo a actividades en casi todas las provincias. Una revisión longitudinal de los esfuerzos de participación de voluntarios de la ARCS, apoyada por la Cruz Roja Sueca y el CICR, se detalla en un estudio de caso (<a href=\"https://ifrc.org/sites/default/files/2024-10/Longitudunal%20Review%20Case%20study_Afghan%20Red%20Crescent.pdf\" target=\"_blank\" class=\"text-humdb-red hover:text-humdb-red-dark underline\">fuente</a>). Los voluntarios jugaron roles cruciales en emergencias importantes como las avalanchas de 2015, el terremoto de Paktika en 2022 y los terremotos de Herat en 2023. Según el <a href=\"/resources\" class=\"text-humdb-red hover:text-humdb-red-dark underline inline-flex items-center\"><svg class=\"w-4 h-4 mr-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" strokeWidth={2} d=\"M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1\" /></svg>Informe Everyone Counts 2022</a> de la Humanitarian Databank, la ARCS reportó 393,077 voluntarios contribuyendo más de 2.1 millones de horas de servicio, incluyendo 257,437 horas en actividades relacionadas con la salud, con 56,456 personas capacitadas y 31,600 recibiendo primeros auxilios. Estas cifras destacan la escala e impacto del voluntariado en las operaciones de la ARCS, aunque otras fuentes sugieren fluctuaciones en el número de voluntarios a lo largo del tiempo.",
+      "disasterResponse": "La Humanitarian Databank responde a cientos de desastres y emergencias anualmente, proporcionando asistencia humanitaria crítica en todo el mundo. En 2023, la plataforma apoyó más de 1,000 operaciones de respuesta a desastres, alcanzando a más de 160 millones de personas afectadas por desastres relacionados con el clima, conflictos y emergencias de salud. Las áreas de respuesta clave incluyen refugio de emergencia, seguridad alimentaria, agua y saneamiento, servicios de salud y apoyo psicosocial. La respuesta a desastres de la red está coordinada a través del Fondo de Emergencia para Respuesta a Desastres (DREF) de la plataforma y Llamamientos de Emergencia, asegurando asistencia rápida y efectiva a las comunidades afectadas.",
+      "humanitarianIndicators": "La Base de Datos de la Red Humanitarian Databank rastrea varios indicadores humanitarios clave incluyendo voluntarios, personal, unidades locales, donantes de sangre, beneficiarios de primeros auxilios, personas alcanzadas, ingresos y gastos. Estos indicadores proporcionan insights integrales sobre la capacidad, alcance e impacto de la red en diferentes regiones y contextos. Los datos ayudan a medir el progreso hacia los objetivos humanitarios e informan la toma de decisiones estratégicas para operaciones futuras.",
+      "regionalComparison": "La comparación regional del número de voluntarios muestra niveles variables de participación en diferentes partes del mundo. África y Asia típicamente tienen el mayor número de voluntarios, reflejando los extensos programas basados en la comunidad en estas regiones. Europa y las Américas muestran fuerte participación de voluntarios en áreas específicas como respuesta a desastres y servicios de salud. El Medio Oriente demuestra participación creciente de voluntarios, particularmente en respuesta de emergencia e iniciativas de salud comunitaria."
+    },
+    "chartTitles": {
+      "arcsVolunteers": "Voluntarios ARCS (2019-2023)",
+      "disasterResponse": "Operaciones de Respuesta a Desastres Humanitarian Databank (2019-2023)",
+      "humanitarianIndicators": "Indicadores Humanitarios Clave (2023)",
+      "regionalComparison": "Voluntarios por Región (2023)",
+      "afghanistanVolunteers": "Voluntarios en Afganistán ({{year}})"
+    },
+    "copyButton": {
+      "copy": "Copiar texto al portapapeles",
+      "copied": "✓ ¡Copiado!"
+    }
+  },
+  "countries": {
+    "title": "Perfiles de Países",
+    "meta": {
+      "description": "Explora actividades y datos de la plataforma por país."
+    },
+    "hero": {
+      "title": "Perfiles de Países",
+      "description": "Selecciona un país para ver información detallada, datos e historias de impacto."
+    },
+    "loading": {
+      "title": "Cargando Países",
+      "description": "Por favor espera mientras obtenemos los perfiles de países..."
+    },
+    "error": {
+      "title": "Error de Países",
+      "loadFailed": "No se pudo cargar la lista de países."
+    },
+    "search": {
+      "label": "Buscar países",
+      "placeholder": "Buscar por país, Sociedad Nacional o código ISO...",
+      "noResults": "No se encontraron países que coincidan con tu búsqueda."
+    },
+    "noCountries": "No hay países para mostrar en este momento.",
+    "regions": "Regiones",
+    "countries": "países",
+    "selectRegion": "Selecciona una región",
+    "card": {
+      "viewProfile": "Ver Perfil",
+      "comingSoon": "Próximamente",
+      "profileDataComingSoon": "{{name}} - Datos del perfil próximamente",
+      "viewProfileFor": "Ver perfil para {{name}}"
+    },
+    "detail": {
+      "title": "Perfil de País",
+      "notFound": "Perfil de País No Encontrado",
+      "error": "El perfil de país solicitado no se pudo encontrar o aún no está disponible.",
+      "backToList": "Volver a la Lista de Países",
+      "atAGlance": "A Simple Vista",
+      "nationalSociety": "Sociedad Nacional"
+    }
+  },
+  "regions": {
+    "overview": "Resumen de {{count}} países en {{region}}",
+    "totalCountries": "Total de Países",
+    "nationalSocieties": "Sociedades Nacionales",
+    "region": "Región",
+    "countriesInRegion": "Países en {{region}}",
+    "clickToViewOverview": "Haz clic para ver el resumen de {{region}}",
+    "seeRegionOverview": "Ver Resumen de la Región {{region}}",
+    "notFound": "Región No Encontrada",
+    "regionNotFound": "La región solicitada no se pudo encontrar o aún no está disponible."
+  },
+  "sectorIndicators": {
+    "title": "Indicadores por Sector",
+    "loading": {
+      "title": "Cargando Indicadores",
+      "description": "Por favor espera mientras obtenemos los indicadores..."
+    },
+    "error": {
+      "title": "Error",
+      "loadFailed": "No se pudieron cargar los indicadores. Por favor inténtalo de nuevo más tarde.",
+      "invalidFilter": "Tipo de filtro inválido"
+    },
+    "search": {
+      "placeholder": "Buscar indicadores en esta categoría...",
+      "button": "Buscar",
+      "clear": "Limpiar"
+    },
+    "breadcrumb": {
+      "indicatorBank": "Banco de Indicadores",
+      "sector": "sector",
+      "subsector": "subsector"
+    },
+    "hero": {
+      "title": "Indicadores {{displayValue}}",
+      "description": "Explora indicadores en el {{displayValue}} {{filterType}}."
+    },
+    "results": {
+      "showing": "Mostrando {{count}} indicador",
+      "showingPlural": "Mostrando {{count}} indicadores",
+      "matching": " que coinciden con \"{{searchTerm}}\"",
+      "noResults": "No se encontraron indicadores que coincidan con tus criterios de búsqueda.",
+      "noIndicators": "No hay indicadores disponibles en el {{displayValue}} {{filterType}}."
+    },
+    "indicator": {
+      "archived": "Archivado",
+      "type": "Tipo",
+      "unit": "Unidad",
+      "sector": "Sector",
+      "emergency": "Emergencia",
+      "relatedPrograms": "Programas Relacionados"
+    },
+    "backToBank": "Volver al Banco de Indicadores"
+  },
+  "footer": {
+    "copyright": "© 2024 {orgName}. Todos los derechos reservados.",
+    "privacy": "Política de Privacidad",
+    "terms": "Términos de Servicio",
+    "contact": "Contáctenos",
+    "mobileApps": {
+      "title": "Aplicaciones Móviles",
+      "description": "Descarga nuestra aplicación móvil para dispositivos Android e iOS",
+      "downloadAndroid": "Descargar aplicación Android",
+      "downloadIOS": "Descargar aplicación iOS"
+    },
+    "api": {
+      "readDocs": "Leer la documentación de la API"
+    },
+    "orgLogoAlt": "Logotipo de Humanitarian Databank",
+    "organizationName": "Federación Internacional de Sociedades de la Cruz Roja y de la Media Luna Roja",
+    "developerTools": {
+      "title": "Herramientas de Desarrollo",
+      "description": "Construye y prueba endpoints de API para acceder a datos de la plataforma programáticamente",
+      "moreInfo": "Para más detalles, consulta la documentación de la API que cubre endpoints, parámetros, paginación y la opción de desagregación.",
+      "readDocs": "Leer la documentación de la API"
+    },
+    "developedBy": "Desarrollado por Haytham Alsoufi, voluntario de la Media Luna Roja Árabe Siria"
+  },
+  "downloadApps": {
+    "title": "Descargar Aplicaciones Móviles",
+    "meta": {
+      "description": "Descarga la aplicación móvil del Banco de datos Humanitarian Databank para dispositivos Android e iOS."
+    },
+    "hero": {
+      "title": "Descargar Aplicaciones Móviles",
+      "description": "Obtén la aplicación móvil del Banco de datos Humanitarian Databank para dispositivos Android e iOS."
+    },
+    "android": {
+      "title": "Aplicación Android",
+      "description": "Descarga el archivo APK para dispositivos Android",
+      "downloadButton": "Descargar APK",
+      "version": "Versión 1.0.0"
+    },
+    "ios": {
+      "title": "Aplicación iOS",
+      "description": "Descarga el archivo IPA para dispositivos iOS",
+      "downloadButton": "Descargar IPA",
+      "version": "Versión 1.0.0"
+    },
+    "instructions": {
+      "title": "Instrucciones de Instalación",
+      "android": {
+        "title": "Android",
+        "step1": "Descarga el archivo APK usando el botón de arriba",
+        "step2": "Habilita 'Instalar desde fuentes desconocidas' en la configuración de tu dispositivo",
+        "step3": "Abre el archivo APK descargado y sigue las indicaciones de instalación"
+      },
+      "ios": {
+        "title": "iOS",
+        "step1": "Descarga el archivo IPA usando el botón de arriba",
+        "step2": "Conecta tu dispositivo iOS a tu computadora",
+        "step3": "Usa iTunes o Finder para instalar el archivo IPA en tu dispositivo",
+        "step4": "Confía en el certificado del desarrollador en Configuración > General > Gestión de Dispositivos"
+      }
+    }
+  },
+  "apiBuilder": {
+    "title": "Constructor de Puntos de Entrada API",
+    "meta": {
+      "description": "Construir y probar puntos de entrada API para acceder a datos de la plataforma."
+    },
+    "hero": {
+      "title": "Constructor de Puntos de Entrada API",
+      "description": "Construir y probar puntos de entrada API para acceder a datos de la plataforma programáticamente."
+    },
+    "navigation": {
+      "overview": "Resumen",
+      "documentation": "Documentación",
+      "builder": "Constructor"
+    },
+    "description": {
+      "title": "API de Acceso a Datos",
+      "text": "Usa esta herramienta para construir puntos de entrada API para acceder a datos de la plataforma. El punto de entrada de datos te permite recuperar envíos de formularios, indicadores y otros datos con varios filtros y parámetros.",
+      "note": "Nota: Esta herramienta es solo para el punto de entrada público de datos. Para acceso completo a la API, contacta al administrador."
+    },
+    "endpoint": {
+      "title": "Punto de Entrada",
+      "method": "GET",
+      "path": "http://localhost:5000/api/v1/data",
+      "description": "Recuperar datos de formularios y envíos de la plataforma (clave API incluida automáticamente)"
+    },
+    "parameters": {
+      "title": "Parámetros de Consulta",
+      "description": "Selecciona y configura los parámetros que quieres incluir en tu solicitud de API:",
+      "clearAll": "Limpiar Todo",
+      "loadingOptions": "Cargando opciones de parámetros...",
+      "template_id": {
+        "label": "Plantilla",
+        "description": "Filtrar por plantilla de formulario específica",
+        "placeholder": "Seleccionar plantilla"
+      },
+      "submission_id": {
+        "label": "ID de Envío",
+        "description": "Filtrar por ID de envío específico",
+        "placeholder": "Ingresar ID de envío (número)"
+      },
+      "item_type": {
+        "label": "Tipo de Elemento",
+        "description": "Filtrar por tipo de elemento",
+        "placeholder": "Seleccionar tipo de elemento",
+        "options": {
+          "indicator": "Indicador",
+          "question": "Pregunta",
+          "document_field": "Campo de Documento"
+        }
+      },
+      "item_id": {
+        "label": "ID de Elemento",
+        "description": "Filtrar por ID de elemento de formulario",
+        "placeholder": "Ingresar ID de elemento (número)"
+      },
+      "period_name": {
+        "label": "Nombre del Período",
+        "description": "Filtrar por nombre del período",
+        "placeholder": "Ingresar nombre del período"
+      },
+      "country_id": {
+        "label": "País",
+        "description": "Filtrar por país específico",
+        "placeholder": "Seleccionar país"
+      },
+      "submission_type": {
+        "label": "Tipo de Envío",
+        "description": "Filtrar por tipo de envío",
+        "placeholder": "Seleccionar tipo de envío",
+        "options": {
+          "assigned": "Asignado",
+          "public": "Público"
+        }
+      },
+      "disagg": {
+        "label": "Incluir Desagregación",
+        "description": "Incluir datos de desagregación en los resultados cuando estén disponibles",
+        "placeholder": "Seleccionar sí o no"
+      },
+      "page": {
+        "label": "Página",
+        "description": "Número de página para paginación (predeterminado: 1)",
+        "placeholder": "Ingresa número de página"
+      },
+      "per_page": {
+        "label": "Elementos por Página",
+        "description": "Número de elementos por página (predeterminado: 20)",
+        "placeholder": "Ingresa elementos por página"
+      }
+    },
+    "generatedUrl": {
+      "title": "URL Generada",
+      "description": "Tu URL de punto de entrada API con los parámetros seleccionados:",
+      "copy": "Copiar URL",
+      "copied": "¡Copiado!",
+      "test": "Probar Punto de Entrada",
+      "testing": "Probando...",
+      "error": "Error al probar punto de entrada"
+    },
+    "response": {
+      "title": "Vista Previa de Respuesta",
+      "loading": "Cargando respuesta...",
+      "error": "Error al cargar respuesta",
+      "noData": "No hay datos devueltos",
+      "status": "Estado: {{code}}",
+      "showRaw": "Mostrar respuesta cruda"
+    },
+    "examples": {
+      "title": "Consultas de Ejemplo",
+      "description": "Prueba estas consultas de ejemplo para comenzar:",
+      "allData": "Todos los datos",
+      "assignedSubmissions": "Solo envíos asignados",
+      "publicSubmissions": "Solo envíos públicos",
+      "indicatorsOnly": "Solo indicadores",
+      "first10Results": "Primeros 10 resultados",
+      "dataFromTemplate": "Datos de {{templateName}}",
+      "dataFromCountry": "Datos de {{countryName}}"
+    },
+    "docs": {
+      "title": "Documentación de la API",
+      "intro": "Construye solicitudes y aprende a usar efectivamente la API de la Base de Datos. A continuación se encuentran los elementos esenciales para autenticación, filtrado, paginación y desagregación.",
+      "authentication": "Autenticación",
+      "authInstruction": "Pasa tu clave API a través del parámetro de consulta {{param}}.",
+      "queryParameters": "Parámetros de Consulta",
+      "examplesTitle": "Ejemplos",
+      "exampleBasic": "Solicitud básica (sin desagregación)",
+      "exampleDisagg": "Incluir datos de desagregación",
+      "exampleFilterPaginate": "Filtrar por plantilla, período y paginar",
+      "exampleCurlTitle": "Ejemplo cURL",
+      "errorsTitle": "Errores",
+      "errors": {
+        "400": "400: Parámetro o valor inválido",
+        "401": "401: Clave API faltante o inválida",
+        "404": "404: Recurso no encontrado",
+        "500": "500: Error del servidor"
+      }
+    },
+    "labels": {
+      "baseUrl": "URL Base",
+      "endpoint": "Punto de Entrada"
+    },
+    "builder": {
+      "title": "Construir Punto de Entrada"
+    },
+    "fieldType": {
+      "select": "Selección",
+      "number": "Número",
+      "text": "Texto"
+    },
+    "quickStart": {
+      "title": "Guía de Inicio Rápido",
+      "step1": "Selecciona los parámetros que quieres filtrar usando las casillas de verificación",
+      "step2": "Ingresa valores para los parámetros seleccionados",
+      "step3": "Copia la URL generada o pruébala directamente",
+      "step4": "Usa la URL en tus aplicaciones o scripts"
+    },
+    "activeParams": {
+      "title": "Parámetros Activos",
+      "none": "No hay parámetros seleccionados"
+    },
+    "download": {
+      "excel": "Descargar como Excel",
+      "preparingExcel": "Preparando Excel…"
+    }
+  },
+  "countryProfile": {
+    "title": "Perfil de País",
+    "loading": {
+      "title": "Cargando Perfil de País",
+      "description": "Por favor espera mientras obtenemos el perfil del país..."
+    },
+    "error": {
+      "title": "Error de Perfil de País",
+      "notFound": "Perfil de País No Encontrado",
+      "loadFailed": "No se pudo cargar los datos del perfil. Puede que no esté disponible aún."
+    },
+    "hero": {
+      "nationalSociety": "Sociedad Nacional"
+    },
+    "sections": {
+      "atAGlance": "A Simple Vista",
+      "ourWork": "Nuestro Trabajo en {{country}}",
+      "keyIndicators": "Indicadores Clave",
+      "operationalAreas": "Áreas Operacionales",
+      "relatedPublications": "Publicaciones Relacionadas"
+    },
+    "stats": {
+      "peopleAssisted": "Personas Asistidas (Último Año)",
+      "activePrograms": "Programas Activos",
+      "keyFocusAreas": "Áreas de Enfoque Clave"
+    },
+    "indicators": {
+      "period": "Período",
+      "moreCharts": "¡Gráficos más detallados próximamente!"
+    },
+    "map": {
+      "placeholder": "Marcador de Posición del Mapa Interactivo del País",
+      "adminLevels": {
+        "ADM0": "País",
+        "ADM1": "Provincia",
+        "ADM2": "Distrito",
+        "ADM3": "Subdistrito",
+        "label": "Nivel"
+      }
+    },
+    "publications": {
+      "comingSoon": "Las publicaciones específicas de {{country}} se listarán aquí una vez que se implemente el filtrado del backend.",
+      "viewAll": "Ver todas las publicaciones"
+    },
+    "actions": {
+      "backToList": "Volver a la Lista de Países"
+    }
+  },
+  "indicatorDetail": {
+    "title": "Detalles del Indicador",
+    "error": {
+      "title": "Error del Indicador",
+      "notFound": "Indicador no encontrado.",
+      "loadFailed": "No se pudieron cargar los detalles del indicador. Por favor inténtalo de nuevo más tarde."
+    },
+    "loading": {
+      "title": "Cargando Indicador",
+      "message": "Por favor espera mientras obtenemos los detalles del indicador..."
+    },
+    "sidebar": {
+      "title": "Todos los Indicadores",
+      "of": "de",
+      "searchPlaceholder": "Buscar indicadores...",
+      "noResults": "No se encontraron indicadores que coincidan con \"{{searchTerm}}\""
+    },
+    "header": {
+      "id": "ID del Indicador",
+      "suggestUpdates": "Sugerir Actualizaciones",
+      "archived": "Archivado"
+    },
+    "content": {
+      "definition": "Definición",
+      "keyProperties": "Propiedades Clave",
+      "type": "Tipo",
+      "unit": "Unidad de Medida",
+      "sector": "Sector",
+      "subSector": "Sub-Sector",
+      "emergencyContext": "Contexto de Emergencia",
+      "status": "Estado",
+      "active": "Activo",
+      "archived": "Archivado",
+      "relatedPrograms": "Programas Relacionados",
+      "unknownProgram": "Programa Desconocido",
+      "metadata": "Metadatos",
+      "created": "Creado",
+      "lastUpdated": "Última Actualización"
+    },
+    "footer": {
+      "backToBank": "Volver al Banco de Indicadores",
+      "goBack": "Volver"
+    },
+    "suggestModal": {
+      "suggestionTypes": {
+        "correction": "Corrección al indicador existente",
+        "improvement": "Mejora al indicador existente",
+        "newIndicator": "Proponer nuevo indicador",
+        "other": "Otro"
+      }
+    }
+  },
+  "disaggregationAnalysis": {
+    "title": "Análisis de Desagregación",
+    "meta": {
+      "description": "Análisis completo de datos desagregados en todos los indicadores de la plataforma, incluidos voluntarios, personal, liderazgo y personas alcanzadas por sexo y grupos de edad"
+    },
+    "hero": {
+      "title": "Análisis de Desagregación",
+      "description": "Análisis completo de datos desagregados en todos los indicadores de la plataforma, incluidos voluntarios, personal, miembros de la junta directiva y personas alcanzadas, con especial atención a la representación de género en el liderazgo y el voluntariado"
+    },
+    "stats": {
+      "avgDisaggregation": "Desagregación Promedio",
+      "ageDisaggregation": "Desagregación por Edad",
+      "womenLeadership": "Liderazgo Femenino",
+      "womenVolunteering": "Voluntariado Femenino",
+      "womenStaff": "Personal Femenino"
+    },
+    "tooltip": {
+      "trendData": "Datos de Tendencia",
+      "fiveYearTrends": "Tendencias de 5 Años",
+      "historicalTrendNotAvailable": "Datos de tendencia histórica no disponibles para esta métrica",
+      "historicalTrendsDescription": "Tendencias históricas para esta métrica a lo largo del tiempo",
+      "noHistoricalData": "No hay datos históricos disponibles",
+      "onlyCurrentPeriod": "Solo se muestran los datos del período actual",
+      "average": "Promedio:"
+    },
+    "error": {
+      "title": "Error al Cargar Datos",
+      "retry": "Reintentar"
+    },
+    "filters": {
+      "title": "Filtros y Opciones de Análisis",
+      "countries": "Países",
+      "period": "Período",
+      "indicator": "Indicador",
+      "chartType": "Tipo de Gráfico",
+      "allPeriods": "Todos los Períodos",
+      "allIndicators": "Todos los Indicadores",
+      "barChart": "Gráfico de Barras",
+      "pieChart": "Gráfico Circular",
+      "lineChart": "Gráfico de Líneas",
+      "clearFilters": "Limpiar Filtros",
+      "refreshData": "Actualizar Datos",
+      "loading": "Cargando...",
+      "selectMultiple": "Mantenga Ctrl/Cmd para seleccionar múltiples",
+      "disaggregatedRecords": "{{count}} desagregado / {{total}} registros en total"
+    },
+    "tabs": {
+      "overview": "Resumen",
+      "byIndicator": "Por Indicador",
+      "womenLeadership": "Mujeres en el Liderazgo",
+      "bySex": "Por Sexo",
+      "byAge": "Por Edad",
+      "bySexAge": "Sexo y Edad",
+      "byCountry": "Países",
+      "countryDisaggregation": "Cobertura",
+      "trends": "Tendencias"
+    },
+    "overview": {
+      "topCountries": "Principales Países por Personas Atendidas (Promedio)",
+      "overallDistribution": "Distribución General por Sexo",
+      "noData": "No hay datos disponibles"
+    },
+    "byIndicator": {
+      "title": "Análisis por Tipo de Indicador (con Desagregación Edad/Sexo)",
+      "description": "Distribución por Indicador con Desagregación Edad/Sexo",
+      "noData": "No hay indicadores con datos de desagregación edad/sexo disponibles",
+      "noDataDescription": "Solo se muestran los indicadores con desgloses demográficos en esta vista"
+    },
+    "womenLeadership": {
+      "comparison": "Mujeres en el Liderazgo vs Personal vs Voluntariado",
+      "representationPercentage": "Porcentaje de Representación de Mujeres",
+      "leadershipRoles": "Roles de Liderazgo",
+      "volunteering": "Voluntariado",
+      "staff": "Personal",
+      "womenOutOf": "{{value}} mujeres de {{total}} en total",
+      "byCountry": "Mujeres en el Liderazgo por País",
+      "percentageTitle": "Porcentaje de Mujeres en Posiciones de Liderazgo",
+      "trends": "Tendencias de Participación de Mujeres",
+      "leadershipOverTime": "Mujeres en el Liderazgo a lo Largo del Tiempo",
+      "volunteeringOverTime": "Mujeres en el Voluntariado a lo Largo del Tiempo",
+      "noData": "No hay datos de liderazgo desagregados por género disponibles"
+    },
+    "bySex": {
+      "title": "Análisis por Sexo",
+      "description": "Distribución por Sexo (Todos los Indicadores)",
+      "noData": "No hay datos desagregados por sexo disponibles"
+    },
+    "byAge": {
+      "title": "Análisis por Grupo de Edad",
+      "description": "Distribución por Grupo de Edad (Todos los Indicadores)",
+      "noData": "No hay datos desagregados por edad disponibles"
+    },
+    "bySexAge": {
+      "title": "Análisis por Sexo y Edad",
+      "description": "Distribución por Sexo y Grupos de Edad (Todos los Indicadores)",
+      "noData": "No hay datos desagregados por sexo-edad disponibles"
+    },
+    "byCountry": {
+      "title": "Análisis por País (Promedio)",
+      "description": "Distribución por País (Todos los Indicadores)",
+      "noData": "No hay datos de país disponibles"
+    },
+    "coverage": {
+      "title": "Cobertura de Desagregación por País (Agrupados por Región)",
+      "regionalSummary": "Resumen Regional",
+      "detailedBreakdown": "Desglose Detallado por Región",
+      "country": "País",
+      "totalRecords": "Registros Totales",
+      "sexPercentage": "Sexo %",
+      "agePercentage": "Edad %",
+      "sexAgePercentage": "Sexo+Edad %",
+      "overallPercentage": "General %",
+      "barChart": "Gráfico de Barras",
+      "countries": "países",
+      "average": "Promedio",
+      "noData": "No hay datos de desagregación disponibles",
+      "downloadCSV": "Descargar CSV",
+      "downloadPNG": "Descargar PNG",
+      "downloadRegionalSummary": "Descargar Resumen Regional como PNG",
+      "downloadRegion": "Descargar {{region}} como PNG"
+    },
+    "trends": {
+      "governingBoard": "Mujeres en la Junta Directiva - Tendencias a lo Largo del Tiempo",
+      "governingBoardTitle": "Porcentaje de Mujeres en la Junta Directiva a lo Largo del Tiempo",
+      "staff": "Mujeres en el Personal - Tendencias a lo Largo del Tiempo",
+      "staffTitle": "Porcentaje de Mujeres en Posiciones de Personal a lo Largo del Tiempo",
+      "volunteers": "Mujeres en los Voluntarios - Tendencias a lo Largo del Tiempo",
+      "volunteersTitle": "Porcentaje de Mujeres en el Voluntariado a lo Largo del Tiempo",
+      "comparison": "Comparación de Participación de Mujeres - Todas las Categorías",
+      "comparisonTitle": "Junta Directiva vs Personal vs Voluntarios",
+      "comparisonDescription": "Participación de Mujeres en Todas las Categorías",
+      "latestPeriodSummary": "Resumen del Período Más Reciente",
+      "noGoverningBoardData": "No hay datos de tendencia de la junta directiva disponibles",
+      "noStaffData": "No hay datos de tendencia del personal disponibles",
+      "noVolunteersData": "No hay datos de tendencia del voluntariado disponibles",
+      "noComparisonData": "No hay datos de comparación disponibles",
+      "noDisaggregationData": "No hay datos de desagregación disponibles",
+      "governingBoardChartTitle": "Porcentaje de Mujeres en la Junta Directiva a lo Largo del Tiempo",
+      "staffChartTitle": "Porcentaje de Mujeres en Posiciones de Personal a lo Largo del Tiempo",
+      "volunteeringChartTitle": "Porcentaje de Mujeres en el Voluntariado a lo Largo del Tiempo",
+      "leadershipOverTime": "Mujeres en el Liderazgo a lo Largo del Tiempo",
+      "volunteeringOverTime": "Mujeres en el Voluntariado a lo Largo del Tiempo",
+      "participationAllCategories": "Participación de Mujeres en Todas las Categorías",
+      "noTrendData": "No hay datos de tendencia disponibles"
+    },
+    "loading": {
+      "message": "Cargando datos desagregados..."
+    }
+  },
+  "nsStructure": {
+    "loading": {
+      "title": "Cargando estructura organizacional..."
+    },
+    "branches": "Ramas",
+    "subbranches": "Sub-ramas",
+    "selectBranch": "Seleccionar una rama",
+    "selectBranchToView": "Seleccione una rama para ver las sub-ramas",
+    "noBranches": "No se encontraron ramas",
+    "noSubbranches": "No se encontraron sub-ramas"
+  },
+  "data": {
+    "noData": "Sin datos",
+    "noTrendData": "Sin datos de tendencia",
+    "allPeriods": "Todos los Períodos",
+    "allRegions": "Todas las Regiones",
+    "regionalSummary": "Resumen Regional",
+    "noDataAvailable": "No hay datos disponibles"
+  }
+}

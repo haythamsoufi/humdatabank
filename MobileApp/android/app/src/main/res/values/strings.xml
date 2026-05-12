@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_trail_widget_title">Audit trail</string>
+    <string name="audit_trail_widget_empty">Open the app and visit Audit Trail to load recent entries.</string>
+</resources>

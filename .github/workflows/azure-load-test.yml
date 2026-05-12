@@ -1,0 +1,291 @@
+name: Azure Load Test (Locust)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub Environment (secrets; host is fixed per choice below)"
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+          - production
+      profile:
+        description: "Load profile"
+        required: true
+        type: choice
+        default: smoke
+        options:
+          - smoke
+          - default
+          - heavy
+          - custom
+      custom_users:
+        description: "For profile=custom only (virtual users)"
+        required: false
+        type: string
+        default: ""
+      custom_run_time_seconds:
+        description: "For profile=custom only (duration in seconds)"
+        required: false
+        type: string
+        default: ""
+      assignment_aes_ids:
+        description: "Optional focal-point assignments CSV (e.g. 123,456)"
+        required: false
+        type: string
+        default: ""
+      session_cookie:
+        description: "Optional session cookie for authenticated tasks (session=<value>). Falls back to LOADTEST_SESSION_COOKIE secret if blank."
+        required: false
+        type: string
+        default: ""
+      tail_status:
+        description: "Wait for run completion in workflow logs"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  AZ_SUBSCRIPTION_ID: f585c1c3-801b-4641-8d7f-145aa50ffb04
+  AZ_RESOURCE_GROUP: ifrctgo001rg
+  AZ_LOAD_TEST_RESOURCE: DatabankTest1
+  AZ_TEST_ID: 47c51031-8a61-41ec-b48d-2018263200f1
+  AZ_LOADTEST_CONFIG_FILE: Backoffice/azure/loadtest/loadtest.config.yaml
+
+jobs:
+  azure-load-test:
+    name: Azure load test (${{ inputs.profile }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure Load Testing CLI extension
+        run: |
+          set -euo pipefail
+          az extension add --name load --yes --only-show-errors
+
+      - name: Resolve run parameters
+        id: params
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          PROFILE: ${{ inputs.profile }}
+          CUSTOM_USERS: ${{ inputs.custom_users }}
+          CUSTOM_RUN_TIME: ${{ inputs.custom_run_time_seconds }}
+          INPUT_ASSIGNMENT_AES_IDS: ${{ inputs.assignment_aes_ids }}
+          ENV_ASSIGNMENT_AES_IDS: ${{ vars.LOADTEST_ASSIGNMENT_AES_IDS }}
+          LOADTEST_API_KEY: ${{ secrets.LOADTEST_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          case "${ENVIRONMENT_NAME}" in
+            staging)
+              BASE_URL="https://databank-stage.ifrc.org"
+              ;;
+            production)
+              BASE_URL="https://databank.ifrc.org"
+              ;;
+            *)
+              echo "::error::Unsupported environment '${ENVIRONMENT_NAME}'. Use staging or production."
+              exit 1
+              ;;
+          esac
+
+          if [[ -z "${LOADTEST_API_KEY}" ]]; then
+            echo "::error::Missing required environment secret LOADTEST_API_KEY."
+            exit 1
+          fi
+
+          case "${PROFILE}" in
+            smoke)
+              USERS=5
+              RUN_TIME=60
+              DISPLAY_NAME="Smoke"
+              ;;
+            default)
+              USERS=20
+              RUN_TIME=120
+              DISPLAY_NAME="Default"
+              ;;
+            heavy)
+              USERS=50
+              RUN_TIME=300
+              DISPLAY_NAME="Heavy"
+              ;;
+            custom)
+              if [[ -z "${CUSTOM_USERS}" || -z "${CUSTOM_RUN_TIME}" ]]; then
+                echo "::error::profile=custom requires both custom_users and custom_run_time_seconds."
+                exit 1
+              fi
+              USERS="${CUSTOM_USERS}"
+              RUN_TIME="${CUSTOM_RUN_TIME}"
+              DISPLAY_NAME="Custom (${USERS} VUs / ${RUN_TIME}s)"
+              ;;
+            *)
+              echo "::error::Unknown profile '${PROFILE}'."
+              exit 1
+              ;;
+          esac
+
+          if [[ -n "${INPUT_ASSIGNMENT_AES_IDS}" ]]; then
+            ASSIGNMENT_AES_IDS="${INPUT_ASSIGNMENT_AES_IDS}"
+          else
+            ASSIGNMENT_AES_IDS="${ENV_ASSIGNMENT_AES_IDS}"
+          fi
+
+          echo "base_url=${BASE_URL}" >> "${GITHUB_OUTPUT}"
+          echo "users=${USERS}" >> "${GITHUB_OUTPUT}"
+          echo "run_time=${RUN_TIME}" >> "${GITHUB_OUTPUT}"
+          echo "display_name=${DISPLAY_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "assignment_aes_ids=${ASSIGNMENT_AES_IDS}" >> "${GITHUB_OUTPUT}"
+
+      - name: Sync test definition to Azure Load Testing
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          BASE_URL: ${{ steps.params.outputs.base_url }}
+          USERS: ${{ steps.params.outputs.users }}
+          RUN_TIME: ${{ steps.params.outputs.run_time }}
+          ASSIGNMENT_AES_IDS: ${{ steps.params.outputs.assignment_aes_ids }}
+          LOADTEST_API_KEY: ${{ secrets.LOADTEST_API_KEY }}
+          LOADTEST_SESSION_COOKIE_INPUT: ${{ inputs.session_cookie }}
+          LOADTEST_SESSION_COOKIE_SECRET: ${{ secrets.LOADTEST_SESSION_COOKIE }}
+        run: |
+          set -euo pipefail
+
+          az account set --subscription "${AZ_SUBSCRIPTION_ID}" --only-show-errors
+
+          env_args=(
+            "LOADTEST_HOST=${BASE_URL}"
+            "LOCUST_USERS=${USERS}"
+            "LOCUST_RUN_TIME=${RUN_TIME}"
+            "LOADTEST_API_KEY=${LOADTEST_API_KEY}"
+          )
+
+          if [[ "${ENVIRONMENT_NAME}" == "production" ]]; then
+            env_args+=("LOADTEST_ALLOW_PROD=true")
+          else
+            env_args+=("LOADTEST_ALLOW_PROD=false")
+          fi
+
+          if [[ -n "${ASSIGNMENT_AES_IDS}" ]]; then
+            env_args+=("LOADTEST_ASSIGNMENT_AES_IDS=${ASSIGNMENT_AES_IDS}")
+          fi
+          LOADTEST_SESSION_COOKIE="${LOADTEST_SESSION_COOKIE_INPUT:-${LOADTEST_SESSION_COOKIE_SECRET:-}}"
+          if [[ -n "${LOADTEST_SESSION_COOKIE}" ]]; then
+            env_args+=("LOADTEST_SESSION_COOKIE=${LOADTEST_SESSION_COOKIE}")
+          fi
+
+          az load test update \
+            --load-test-resource "${AZ_LOAD_TEST_RESOURCE}" \
+            --resource-group "${AZ_RESOURCE_GROUP}" \
+            --test-id "${AZ_TEST_ID}" \
+            --load-test-config-file "${AZ_LOADTEST_CONFIG_FILE}" \
+            --env "${env_args[@]}" \
+            --only-show-errors
+
+      - name: Trigger test run
+        id: run
+        env:
+          DISPLAY_NAME: ${{ steps.params.outputs.display_name }}
+        run: |
+          set -euo pipefail
+
+          RUN_ID="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$(date +%H%M%S)"
+          RUN_JSON="$(az load test-run create \
+            --load-test-resource "${AZ_LOAD_TEST_RESOURCE}" \
+            --resource-group "${AZ_RESOURCE_GROUP}" \
+            --test-id "${AZ_TEST_ID}" \
+            --test-run-id "${RUN_ID}" \
+            --display-name "${DISPLAY_NAME}" \
+            --description "Triggered via GitHub Actions (${GITHUB_WORKFLOW})" \
+            --query "{runId:testRunId,status:status,portalUrl:portalUrl}" \
+            -o json \
+            --only-show-errors)"
+
+          echo "${RUN_JSON}"
+
+          RESOLVED_RUN_ID="$(echo "${RUN_JSON}" | jq -r '.runId')"
+          PORTAL_URL="$(echo "${RUN_JSON}" | jq -r '.portalUrl')"
+
+          echo "run_id=${RESOLVED_RUN_ID}" >> "${GITHUB_OUTPUT}"
+          echo "portal_url=${PORTAL_URL}" >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "### Azure Load Test Started"
+            echo "- Run ID: \`${RESOLVED_RUN_ID}\`"
+            echo "- Profile: \`${{ inputs.profile }}\`"
+            echo "- Environment: \`${{ inputs.environment }}\`"
+            echo "- Host: \`${{ steps.params.outputs.base_url }}\`"
+            echo "- Users: \`${{ steps.params.outputs.users }}\`"
+            echo "- Duration: \`${{ steps.params.outputs.run_time }}s\`"
+            echo "- Portal: ${PORTAL_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Tail run status
+        if: ${{ inputs.tail_status }}
+        env:
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+
+          FINAL_STATUS=""
+          for _ in $(seq 1 120); do
+            STATUS="$(az load test-run show \
+              --load-test-resource "${AZ_LOAD_TEST_RESOURCE}" \
+              --resource-group "${AZ_RESOURCE_GROUP}" \
+              --test-run-id "${RUN_ID}" \
+              --query status \
+              -o tsv \
+              --only-show-errors || true)"
+
+            echo "status=${STATUS}"
+
+            if [[ "${STATUS}" == "DONE" || "${STATUS}" == "FAILED" || "${STATUS}" == "CANCELLED" ]]; then
+              FINAL_STATUS="${STATUS}"
+              break
+            fi
+            sleep 15
+          done
+
+          if [[ -z "${FINAL_STATUS}" ]]; then
+            echo "::error::Timed out waiting for run completion."
+            exit 1
+          fi
+
+          FINAL_JSON="$(az load test-run show \
+            --load-test-resource "${AZ_LOAD_TEST_RESOURCE}" \
+            --resource-group "${AZ_RESOURCE_GROUP}" \
+            --test-run-id "${RUN_ID}" \
+            --query "{status:status,testResult:testResult,errorDetails:errorDetails,portalUrl:portalUrl}" \
+            -o json \
+            --only-show-errors)"
+          echo "${FINAL_JSON}"
+
+          TEST_RESULT="$(echo "${FINAL_JSON}" | jq -r '.testResult')"
+          PORTAL_URL="$(echo "${FINAL_JSON}" | jq -r '.portalUrl')"
+
+          {
+            echo "### Azure Load Test Completed"
+            echo "- Run ID: \`${RUN_ID}\`"
+            echo "- Status: \`${FINAL_STATUS}\`"
+            echo "- Test Result: \`${TEST_RESULT}\`"
+            echo "- Portal: ${PORTAL_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${FINAL_STATUS}" != "DONE" ]]; then
+            echo "::error::Load test run finished with status ${FINAL_STATUS}."
+            exit 1
+          fi

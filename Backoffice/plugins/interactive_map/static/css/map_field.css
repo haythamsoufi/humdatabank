@@ -1,0 +1,1216 @@
+/* Backoffice/plugins/interactive_map/static/css/map_field.css */
+
+.interactive-map-field {
+    position: relative;
+    margin-bottom: 1rem;
+    overflow: visible !important; /* Allow tooltips to extend beyond field container */
+}
+
+.map-container {
+    position: relative;
+    border-radius: 0.5rem;
+    overflow: visible; /* Allow tooltips to extend beyond map boundaries */
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Ensure Leaflet container itself clips properly but tooltips can escape */
+.map-container .leaflet-container {
+    overflow: hidden; /* Leaflet map tiles should still be clipped */
+    height: 24rem; /* 384px */
+    border-radius: 0.5rem;
+}
+
+/* Allow Leaflet panes to extend beyond container */
+.map-container .leaflet-pane {
+    overflow: visible !important;
+}
+
+.map-container .leaflet-tooltip-pane {
+    overflow: visible !important;
+    z-index: 10000 !important;
+    pointer-events: none !important;
+}
+
+.map-container .leaflet-tooltip {
+    pointer-events: auto !important;
+}
+
+/* Loading and error overlays */
+.map-loading-overlay,
+.map-error-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: 0.5rem;
+}
+
+.map-loading-overlay {
+    background-color: rgba(255, 255, 255, 0.9);
+}
+
+.map-error-overlay {
+    background-color: rgba(254, 242, 242, 0.95);
+}
+
+/* Map search bar styling */
+.map-search-bar {
+    width: 100%;
+}
+
+.map-search-bar .input-group {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+}
+
+.map-search-bar .form-control {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1%;
+    min-width: 0;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #495057;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.map-search-bar .form-control:focus {
+    color: #495057;
+    background-color: #fff;
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.map-search-bar .form-control {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: 0;
+}
+
+.map-search-bar .input-group-append {
+    display: flex;
+    margin-left: -1px;
+}
+
+.map-search-bar .input-group-append .btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 0;
+    padding: 0.375rem 0.75rem;
+    position: relative;
+    z-index: 2;
+}
+
+/* Search input with icons inside */
+.search-input-wrapper {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: visible;
+    z-index: 10;
+}
+
+/* Ensure buttons are always visible */
+.search-input-wrapper button {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.search-input-wrapper .form-control.search-input-with-icons {
+    padding-left: 2.5rem !important;
+    padding-right: 2.5rem !important;
+    width: 100%;
+    position: relative;
+    display: block;
+    overflow: visible;
+    height: 38px; /* Match button height */
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.search-input-wrapper .form-control.search-input-with-icons:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.search-input-wrapper .search-icon-btn {
+    position: absolute;
+    left: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 15;
+    background: transparent !important;
+    border: none !important;
+    color: #6c757d !important;
+    padding: 0.375rem 0.5rem !important;
+    pointer-events: all;
+    cursor: pointer;
+    transition: color 0.15s ease-in-out;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 2rem;
+    height: auto;
+    min-height: 2rem;
+    box-shadow: none !important;
+    margin: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.search-input-wrapper .locate-icon-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 15;
+    background: transparent !important;
+    border: none !important;
+    color: #6c757d !important;
+    padding: 0.375rem 0.5rem !important;
+    pointer-events: all;
+    cursor: pointer;
+    transition: color 0.15s ease-in-out;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 2rem;
+    height: auto;
+    min-height: 2rem;
+    box-shadow: none !important;
+    margin: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.search-input-wrapper .search-icon-btn:hover,
+.search-input-wrapper .locate-icon-btn:hover {
+    color: #007bff !important;
+    background: transparent !important;
+    transform: translateY(-50%) !important; /* Preserve positioning, prevent movement */
+}
+
+.search-input-wrapper .search-icon-btn:focus,
+.search-input-wrapper .locate-icon-btn:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.search-input-wrapper .search-icon-btn i,
+.search-input-wrapper .locate-icon-btn i {
+    font-size: 0.875rem;
+    line-height: 1;
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Ensure buttons override Bootstrap btn-link styles */
+.search-input-wrapper .btn-link {
+    text-decoration: none !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+.search-input-wrapper .btn-link:hover {
+    text-decoration: none !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+.search-input-wrapper .btn-link:focus {
+    text-decoration: none !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Map controls styling */
+.map-controls {
+    margin-bottom: 1rem;
+}
+
+.map-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: stretch;
+    width: 100%;
+}
+
+.map-controls-search {
+    flex: 1 1 auto;
+    min-width: 250px;
+}
+
+.map-controls-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .map-controls-row {
+        flex-direction: column;
+    }
+
+    .map-controls-search {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .map-controls-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .map-controls-actions .btn {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+/* Button styling - Bootstrap-like styles since Bootstrap CSS may not be loaded */
+.map-controls .btn,
+.map-controls button.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.375rem;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    cursor: pointer;
+    text-decoration: none;
+    height: 38px; /* Consistent height with search input */
+}
+
+.map-controls .btn-sm,
+.map-controls button.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.2rem;
+}
+
+/* Outline primary button */
+.map-controls .btn-outline-primary,
+.map-controls button.btn-outline-primary {
+    color: #007bff;
+    background-color: transparent;
+    background-image: none;
+    border-color: #007bff;
+}
+
+.map-controls .btn-outline-primary:hover:not(:disabled),
+.map-controls button.btn-outline-primary:hover:not(:disabled) {
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.map-controls .btn-outline-primary:focus,
+.map-controls button.btn-outline-primary:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.5);
+    outline: 0;
+}
+
+/* Filled primary button (active state) */
+.map-controls .btn-primary,
+.map-controls button.btn-primary {
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.map-controls .btn-primary:hover:not(:disabled),
+.map-controls button.btn-primary:hover:not(:disabled) {
+    color: #fff;
+    background-color: #0056b3;
+    border-color: #004085;
+}
+
+.map-controls .btn-primary:focus,
+.map-controls button.btn-primary:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.5);
+    outline: 0;
+}
+
+/* Outline secondary button */
+.map-controls .btn-outline-secondary,
+.map-controls button.btn-outline-secondary {
+    color: #6c757d;
+    background-color: transparent;
+    background-image: none;
+    border-color: #6c757d;
+}
+
+.map-controls .btn-outline-secondary:hover:not(:disabled),
+.map-controls button.btn-outline-secondary:hover:not(:disabled) {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.map-controls .btn-outline-secondary:focus,
+.map-controls button.btn-outline-secondary:focus {
+    box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.5);
+    outline: 0;
+}
+
+/* Button icons spacing */
+.map-controls .btn i {
+    font-size: 0.875rem;
+    line-height: 1;
+}
+
+.map-controls button {
+    transition: all 0.15s ease-in-out;
+}
+
+.map-controls-actions button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Note: Icon buttons inside search-input-wrapper have their own hover rule above that preserves positioning */
+
+.map-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Coordinate display */
+.coordinate-display {
+    background-color: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.coordinate-display .coordinates-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-weight: 600;
+    color: #374151;
+}
+
+.coordinates-display {
+    margin-left: auto;
+}
+
+.coordinates-display input {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.75rem;
+}
+
+/* Manual coordinates section */
+.manual-coordinates {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.manual-coordinates h4 {
+    color: #374151;
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.manual-coordinates input[type="number"] {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+/* Manual coordinate input row (shown when marker mode is active) */
+.manual-coordinates-input {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+}
+
+.manual-coords-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.manual-coords-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1 1 auto;
+    min-width: 150px;
+}
+
+.manual-coords-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.manual-coords-input {
+    height: 38px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.manual-coords-input:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.manual-coords-add-btn {
+    height: 38px;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .manual-coords-row {
+        flex-direction: column;
+    }
+
+    .manual-coords-input-group {
+        width: 100%;
+    }
+
+    .manual-coords-add-btn {
+        width: 100%;
+    }
+}
+
+/* Markers list styling */
+.markers-list {
+    margin-top: 1rem;
+}
+
+.markers-list h4 {
+    color: #374151;
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.markers-list h4 span {
+    background-color: #3b82f6;
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 9999px;
+    font-weight: 600;
+}
+
+.markers-container {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background-color: #f9fafb;
+    max-height: 12rem;
+    overflow-y: auto;
+}
+
+.markers-container > div {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.markers-container > div:last-child {
+    border-bottom: none;
+}
+
+.marker-item {
+    padding: 0.5rem;
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.875rem;
+}
+
+.marker-item .marker-info {
+    flex: 1;
+}
+
+.marker-item .marker-title {
+    font-weight: 500;
+    color: #111827;
+}
+
+.marker-item .marker-coordinates {
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.marker-item .marker-description {
+    color: #9ca3af;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.marker-item .marker-actions {
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+}
+
+.marker-item .marker-actions button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
+    transition: all 0.15s ease-in-out;
+}
+
+.marker-item .marker-actions button:hover {
+    background-color: #fef2f2;
+}
+
+/* Leaflet custom styles */
+.leaflet-container {
+    font-family: inherit;
+}
+
+/* ------------------------------------------------------------------
+   Leaflet marker icons (self-contained, no external PNG requests)
+   ------------------------------------------------------------------ */
+.ifrc-leaflet-marker-icon,
+.ifrc-leaflet-user-location-icon {
+    background: transparent !important;
+    border: none !important;
+}
+
+.ifrc-leaflet-marker-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #ef4444; /* red-500 */
+    border: 2px solid #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.ifrc-leaflet-user-location-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: #3b82f6; /* blue-500 */
+    border: 2px solid #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.leaflet-popup-content-wrapper {
+    border-radius: 0.375rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.leaflet-popup-content {
+    margin: 0.75rem;
+    line-height: 1.5;
+}
+
+.leaflet-popup-content h4 {
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+    color: #111827;
+}
+
+.leaflet-popup-content p {
+    margin: 0.25rem 0;
+}
+
+/* Custom marker mode cursor */
+.leaflet-container.marker-mode {
+    cursor: crosshair !important;
+}
+
+/* Button states */
+.btn-marker-mode {
+    background-color: #fbbf24 !important;
+}
+
+.btn-marker-mode:hover {
+    background-color: #f59e0b !important;
+}
+
+.btn-drawing-mode {
+    background-color: #fbbf24 !important;
+}
+
+.btn-drawing-mode:hover {
+    background-color: #f59e0b !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .map-container .leaflet-container {
+        height: 20rem; /* Smaller on mobile */
+    }
+
+    .map-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .coordinates-display {
+        margin-left: 0;
+        margin-top: 0.5rem;
+    }
+
+    .manual-coordinates .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Arabic text support */
+.interactive-map-field[dir="rtl"] {
+    direction: rtl;
+}
+
+.interactive-map-field[dir="rtl"] .map-controls {
+    direction: rtl;
+}
+
+.interactive-map-field[dir="rtl"] .coordinates-display {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .map-container {
+        border: 2px solid #000;
+    }
+
+    .marker-item {
+        border: 1px solid #000;
+    }
+
+    .manual-coordinates {
+        border: 1px solid #000;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .map-controls button {
+        transition: none;
+    }
+
+    .map-controls button:hover:not(:disabled) {
+        transform: none;
+    }
+
+    .marker-item .marker-actions button {
+        transition: none;
+    }
+}
+
+/* Focus styles for accessibility */
+.map-controls button:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.manual-coordinates input:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-color: #3b82f6;
+}
+
+/* Loading animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Custom scrollbar for markers list */
+.markers-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.markers-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.markers-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.markers-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Badge styles for marker list */
+.badge-sm {
+    font-size: 0.65rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.badge-outline-secondary {
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+    background-color: transparent;
+}
+
+/* Marker list improvements */
+.marker-list .marker-item {
+    margin-bottom: 0.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.marker-list .marker-item:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.marker-list .marker-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Modal improvements - Now using Tailwind CSS classes */
+/* Ensure modal appears above all map elements */
+#marker-edit-modal-* {
+    z-index: 9999 !important;
+}
+
+/* Override any Leaflet z-index that might interfere */
+.leaflet-container {
+    z-index: 1;
+}
+
+.leaflet-control-container {
+    z-index: 2;
+}
+
+/* Marker tooltip styling - custom tooltip rendered outside map container */
+.custom-marker-tooltip,
+.marker-tooltip {
+    position: fixed !important; /* Fixed positioning so it can escape containers */
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    max-width: 250px !important;
+    white-space: normal !important;
+    z-index: 10000 !important; /* High z-index to appear above everything */
+    pointer-events: auto !important; /* Allow interaction */
+    display: none; /* Hidden by default, shown on hover */
+}
+
+/* Tooltip button styling */
+.custom-marker-tooltip .tooltip-edit-btn,
+.custom-marker-tooltip .tooltip-delete-btn {
+    cursor: pointer;
+    border: none;
+    outline: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 500;
+}
+
+.custom-marker-tooltip .tooltip-edit-btn:hover,
+.custom-marker-tooltip .tooltip-delete-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.custom-marker-tooltip .flex {
+    display: flex;
+}
+
+.custom-marker-tooltip .gap-2 {
+    gap: 0.5rem;
+}
+
+.custom-marker-tooltip .mt-2 {
+    margin-top: 0.5rem;
+}
+
+.custom-marker-tooltip .pt-2 {
+    padding-top: 0.5rem;
+}
+
+.custom-marker-tooltip .border-t {
+    border-top: 1px solid #e5e7eb;
+}
+
+.custom-marker-tooltip .border-gray-200 {
+    border-color: #e5e7eb;
+}
+
+.marker-tooltip .leaflet-tooltip-top:before,
+.marker-tooltip .leaflet-tooltip-bottom:before,
+.marker-tooltip .leaflet-tooltip-left:before,
+.marker-tooltip .leaflet-tooltip-right:before {
+    border-color: #e5e7eb transparent !important;
+}
+
+.marker-tooltip .font-medium {
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.25rem;
+}
+
+.marker-tooltip .text-gray-600 {
+    color: #4b5563;
+}
+
+.marker-tooltip .text-xs {
+    font-size: 0.75rem;
+}
+
+/* Ensure Leaflet tooltip panes can extend beyond map container */
+.leaflet-tooltip-pane {
+    overflow: visible !important;
+    pointer-events: none !important; /* Don't block map interactions, but allow tooltip content */
+    position: absolute !important;
+}
+
+.leaflet-tooltip {
+    pointer-events: auto !important; /* But allow interaction with tooltip itself */
+    position: absolute !important;
+}
+
+/* Ensure parent containers don't clip tooltips */
+.plugin-field-container {
+    overflow: visible !important;
+}
+
+.interactive-map-field,
+.interactive-map-field * {
+    /* Allow tooltips to escape - but be careful not to break layout */
+}
+
+.interactive-map-field .map-container {
+    overflow: visible !important;
+}
+
+/* Map info bar styling (metadata display) - self-contained, no Bootstrap dependency */
+.map-info {
+    margin-top: 1rem;
+}
+
+/* Minimal map information bar - no card, no header, just a clean bar */
+.map-info-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.5rem;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0;
+}
+
+.map-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.map-info-item .text-muted {
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    line-height: 1.2;
+}
+
+.map-info-item .font-monospace {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
+    line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+    .map-info-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .map-info-item {
+        width: 100%;
+    }
+}
+
+.map-info .card {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.map-info .card-header {
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #374151;
+}
+
+.map-info .card-header .d-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.map-info .card-header h6 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.map-info .card-header .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    height: auto;
+    min-height: auto;
+}
+
+.map-info .card-header .btn-outline-danger {
+    color: #dc2626;
+    background-color: transparent;
+    border-color: #dc2626;
+}
+
+.map-info .card-header .btn-outline-danger:hover {
+    color: #fff;
+    background-color: #dc2626;
+    border-color: #dc2626;
+}
+
+.map-info .card-header i {
+    font-size: 1rem;
+}
+
+.map-info .card-body {
+    padding: 1rem;
+}
+
+.map-info .row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+}
+
+.map-info .row > [class*="col-"] {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+.map-info .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+}
+
+@media (max-width: 768px) {
+    .map-info .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+.map-info .col-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+}
+
+.map-info .mt-2 {
+    margin-top: 0.5rem;
+}
+
+.map-info .text-muted {
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.map-info .font-monospace {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
+    line-height: 1.5;
+}
+
+.map-info .marker-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.map-info .marker-list p {
+    margin: 0;
+    padding: 0.5rem 0;
+}
+
+/* Marker list container - full width below map info */
+.marker-list-container {
+    width: 100%;
+}
+
+/* Autocomplete dropdown styling */
+.map-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #ffffff;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1001;
+    margin-top: -1px;
+}
+
+/* Adjust input border when dropdown is visible */
+.search-input-wrapper.has-autocomplete .form-control.search-input-with-icons {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-color: transparent;
+}
+
+.map-autocomplete-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.map-autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.map-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.map-autocomplete-item:hover,
+.map-autocomplete-item.selected {
+    background-color: #f8f9fa;
+}
+
+.map-autocomplete-item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 0.25rem;
+    line-height: 1.4;
+}
+
+.map-autocomplete-item-name strong {
+    font-weight: 600;
+    color: #007bff;
+}
+
+.map-autocomplete-item-details {
+    font-size: 0.75rem;
+    color: #6b7280;
+    line-height: 1.3;
+}
+
+/* Ensure autocomplete appears above other elements */
+.search-input-wrapper {
+    z-index: 10;
+}
+
+.map-autocomplete-dropdown {
+    z-index: 1001;
+}
+
+/* Scrollbar styling for autocomplete */
+.map-autocomplete-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.map-autocomplete-dropdown::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.map-autocomplete-dropdown::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.map-autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

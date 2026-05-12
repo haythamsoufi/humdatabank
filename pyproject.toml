@@ -1,0 +1,9 @@
+[tool.bandit]
+# Scanned from repo root via `.github/workflows/security-scan.yml`
+exclude_dirs = [
+    "tests",
+    "migrations",
+    "node_modules",
+    ".venv",
+    "venv",
+]

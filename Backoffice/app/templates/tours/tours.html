@@ -1,0 +1,403 @@
+{# Tour Component Template #}
+{# This template contains all tour-related functionality separated from the main layout #}
+
+{% if current_user.is_authenticated %}
+    <!-- Tour Assets -->
+    <link rel="stylesheet" href="{{ static_url('libs/introjs.min.css') }}">
+    <script src="{{ static_url('libs/intro.min.js') }}"></script>
+
+    <!-- Tour Configuration Script -->
+    <script nonce="{{ csp_nonce() }}">
+        window.TOUR_I18N = {
+            next: "{{ _('Next') }}",
+            back: "{{ _('Back') }}",
+            skip: "{{ _('Skip') }}",
+            done: "{{ _('Done') }}",
+            cancel: "{{ _('Cancel') }}",
+            gotIt: "{{ _('Got it!') }}",
+            showMe: "{{ _('Show me') }}",
+
+            // Admin Tour Steps
+            admin_steps: {
+                brand: "{{ _('Welcome to the') }} {{ ORG_NAME }}. {{ _('This is the main navigation area.') }}",
+                sidebarToggle: "{{ _('Click here to expand or collapse the admin sidebar. The sidebar contains all admin tools and sections.') }}",
+                sidebar: "{{ _('Admin sidebar groups can be expanded or collapsed, and the state persists across visits. You have access to user management, form templates, assignments, and more.') }}",
+                language: "{{ _('Change the interface language here. Arabic uses RTL and the Tajawal font.') }}",
+                notifications: "{{ _('New alerts and system updates will appear here. You can mark them as read.') }}",
+                profile: "{{ _('Open your profile for account settings and logout. You can restart this tour from here.') }}",
+                chatbot: "{{ _('Chat with the AI assistant for help about the platform and admin functions.') }}",
+            },
+
+            // Focal Point Tour Steps
+            focal_steps: {
+                brand: "{{ _('Welcome to the') }} {{ ORG_NAME }}. {{ _('This is where you can access your country data and submit reports.') }}",
+                dashboardButton: "{{ _('Access your main dashboard to view assignments, metrics, and recent activities for your country.') }}",
+                documentManagement: "{{ _('Manage and access documents, publications, and other resources for your country.') }}",
+                sidebarToggle: "{{ _('Click here to expand or collapse the sidebar. The sidebar contains your dashboard and reporting tools.') }}",
+                sidebar: "{{ _('The sidebar shows your dashboard and available reporting forms. You can expand or collapse sections, and the state persists across visits.') }}",
+                countrySelect: "{{ _('Select your country to view your assignments and country-specific data.') }}",
+                createReport: "{{ _('Click here to create a new report using available templates for your country.') }}",
+                assignments: "{{ _('This section shows your current assignments. Click on any assignment to enter or view data.') }}",
+                pastSubmissions: "{{ _('View your past submissions and approved forms here. You can filter by year and template.') }}",
+                metrics: "{{ _('Monitor your data quality and submission performance with charts and statistics.') }}",
+                recentActivities: "{{ _('Stay updated with recent activities and changes made by other focal points in your country.') }}",
+                language: "{{ _('Change the interface language here. Arabic uses RTL and the Tajawal font.') }}",
+                notifications: "{{ _('New alerts, form assignments, and updates will appear here. You can mark them as read.') }}",
+                profile: "{{ _('Open your profile for account settings and logout. You can restart this tour from here.') }}",
+                chatbot: "{{ _('Chat with the AI assistant for help with reporting and using the platform.') }}",
+            },
+
+            // Entry Form Tour Steps
+            entry_form_steps: {
+                welcome: "{{ _('Welcome to the data entry form! This tour will guide you through the key features.') }}",
+                assignmentHeader: "{{ _('This section shows your assignment details including the template name, period, country, due date, and submission status.') }}",
+                excelButton: "{{ _('Use this button to import data from Excel or export a template. This is useful for bulk data entry or working offline.') }}",
+                pdfButton: "{{ _('Export the completed form as a PDF document for record-keeping or sharing.') }}",
+                sectionNav: "{{ _('Navigate between form sections here. The icons show section completion status: ✓ (completed), ✎ (in progress), ○ (not started). On mobile, use the floating menu button to access this sidebar.') }}",
+                formSection: "{{ _('Each section groups related fields together. Click the collapse button (△) to hide/show section content. Fill in all required fields marked with a red asterisk (*).') }}",
+                formField: "{{ _('Form fields may include text inputs, numbers, dates, dropdowns, or file uploads. Some fields show tooltips (ℹ) with additional information. Yellow-highlighted fields contain prefilled values you can review and modify.') }}",
+                saveButton: "{{ _('Save your progress at any time. Your data is preserved and you can return to continue editing later.') }}",
+                submitButton: "{{ _('When you are finished, click Submit to finalize your form. Warning: After submission, you cannot edit the form unless an admin reopens it.') }}",
+                prefilledNotice: "{{ _('This notice indicates that some fields have prefilled values (shown in yellow). These are suggested values that you can review and change as needed.') }}",
+                presenceBar: "{{ _('See who else is currently working on this form. This helps avoid conflicts when multiple people are editing.') }}",
+                mobileNav: "{{ _('On mobile, use this button to open the sections menu and access save/submit buttons.') }}",
+                dynamicIndicators: "{{ _('This is a dynamic section where you can add custom indicators from the indicator bank. Use this to report on additional metrics relevant to your country.') }}"
+            }
+        };
+    </script>
+
+    <!-- Tour Script - Load appropriate script based on access level -->
+    {% if user_access_level(current_user) in ['admin', 'system_manager'] %}
+        <script src="{{ static_url('js/admin/tour.js') }}"></script>
+    {% else %}
+        <script src="{{ static_url('js/focal-tour.js') }}"></script>
+    {% endif %}
+
+    <!-- Tour Styles -->
+    <style nonce="{{ csp_nonce() }}">
+        /* Intro.js customizations */
+        .introjs-overlay {
+            background: rgba(0, 0, 0, 0.4) !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+
+        /* Dynamic positioning for sidebar tour */
+        .humdb-intro.tour-adjusting {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        .humdb-intro {
+            border-radius: 12px !important;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            max-width: 350px !important;
+        }
+
+        /* Hide tour modal in mobile app */
+        html[data-mobile-app="true"] #tourPreModal,
+        html.mobile-app #tourPreModal {
+            display: none !important;
+            visibility: hidden !important;
+        }
+
+        .humdb-intro .introjs-tooltiptext {
+            font-size: 14px !important;
+            line-height: 1.5 !important;
+            color: #374151 !important;
+        }
+
+        .humdb-intro .introjs-button {
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            padding: 8px 16px !important;
+            font-size: 13px !important;
+            text-transform: none !important;
+            background: #c53030 !important;
+            color: white !important;
+            border: none !important;
+            z-index: 2147483647 !important;
+        }
+
+        /* Cancel button styling - make it look like a secondary action */
+        .humdb-intro .introjs-prevbutton[data-action="cancel"] {
+            background: transparent !important;
+            color: #c53030 !important;
+            border: 2px solid #c53030 !important;
+        }
+
+        .humdb-intro .introjs-prevbutton[data-action="cancel"]:hover {
+            background: #fef2f2 !important;
+            color: #991b1b !important;
+            border-color: #991b1b !important;
+        }
+
+        /* Single-step mode styling (when chatbot shows one specific step) */
+        .humdb-intro.single-step-mode {
+            max-width: 450px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+            border: none !important;
+            animation: tooltipFadeIn 0.3s ease-out !important;
+        }
+
+        @keyframes tooltipFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .humdb-intro.single-step-mode .introjs-tooltiptext {
+            padding: 20px !important;
+            font-size: 14px !important;
+            line-height: 1.6 !important;
+            color: #374151 !important;
+        }
+
+        .humdb-intro.single-step-mode .introjs-tooltipbuttons {
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 0 20px 20px 20px !important;
+            border-top: none !important;
+        }
+
+        .humdb-intro.single-step-mode .introjs-donebutton {
+            background: #c53030 !important;
+            color: white !important;
+            padding: 10px 28px !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            border-radius: 6px !important;
+            border: none !important;
+            box-shadow: 0 2px 8px rgba(197, 48, 48, 0.2) !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
+        }
+
+        .humdb-intro.single-step-mode .introjs-donebutton:hover {
+            background: #991b1b !important;
+            box-shadow: 0 4px 12px rgba(197, 48, 48, 0.3) !important;
+        }
+
+        .humdb-intro.single-step-mode .introjs-donebutton:active {
+            background: #7f1d1d !important;
+            box-shadow: 0 1px 4px rgba(197, 48, 48, 0.2) !important;
+        }
+
+        .humdb-intro.single-step-mode .introjs-arrow {
+            border-color: transparent !important;
+        }
+
+        /* Hide entire tooltip header (contains empty title and hidden skip button) */
+        .humdb-intro .introjs-tooltip-header {
+            display: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 0 !important;
+        }
+
+        /* Chatbot tour badge styling */
+        .humdb-intro .chatbot-tour-badge {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
+            padding: 8px 14px !important;
+            border-radius: 6px !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            margin-top: 0 !important;
+            margin-bottom: 16px !important;
+            display: inline-block !important;
+            width: fit-content !important;
+            line-height: 1.4 !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25) !important;
+            letter-spacing: 0.3px !important;
+        }
+
+        .humdb-intro .chatbot-tour-badge::before {
+            content: "🤖 " !important;
+            font-style: normal !important;
+            font-size: 14px !important;
+        }
+
+        /* Hide skip button completely */
+        .humdb-intro .introjs-skipbutton {
+            display: none !important;
+        }
+
+        /* Force chatbot button to stay in correct position during tour */
+        .introjs-showElement#aiChatbotFAB,
+        #aiChatbotFAB.introjs-showElement,
+        #aiChatbotFAB {
+            position: fixed !important;
+            bottom: 2rem !important;
+            z-index: 9999999 !important;
+            transform: none !important;
+            top: auto !important;
+        }
+
+        /* LTR positioning */
+        html[dir="ltr"] .introjs-showElement#aiChatbotFAB,
+        html[dir="ltr"] #aiChatbotFAB.introjs-showElement,
+        html[dir="ltr"] #aiChatbotFAB {
+            right: 2rem !important;
+            left: auto !important;
+        }
+
+        /* RTL positioning */
+        html[dir="rtl"] .introjs-showElement#aiChatbotFAB,
+        html[dir="rtl"] #aiChatbotFAB.introjs-showElement,
+        html[dir="rtl"] #aiChatbotFAB {
+            left: 2rem !important;
+            right: auto !important;
+        }
+
+        /* Ensure language dropdown appears above overlay during tour */
+        #language-dropdown {
+            z-index: 2147483647 !important;
+        }
+
+        .introjs-showElement .language-dropdown {
+            overflow: hidden !important;
+        }
+
+        /* Pre-tour modal with background image */
+        #tourPreModal .modal-content {
+            background-image: url('{{ static_url('tour-bg.png') }}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+        }
+
+        /* Overlay for better text readability */
+        #tourPreModal .modal-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 0;
+        }
+
+        /* Ensure content is above overlay */
+        #tourPreModal .modal-content > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Left-align header content */
+        #tourPreModal .header-content {
+            text-align: left;
+        }
+
+        /* Left-align main content */
+        #tourPreModal .main-content {
+            text-align: left;
+        }
+
+        #tourPreModal .shadow-2xl { box-shadow: 0 25px 50px rgba(0,0,0,0.25), 0 10px 20px rgba(0,0,0,0.15); }
+
+        /* Tour tooltip for profile menu */
+        .tour-tooltip {
+            position: absolute;
+            background: #1f2937;
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+            max-width: 250px;
+        }
+
+        .tour-tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .tour-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1f2937;
+        }
+
+        /* Pulse animation for the tour link */
+        .tour-link-pulse {
+            animation: pulse-highlight 2s infinite;
+        }
+
+        @keyframes pulse-highlight {
+            0%, 100% {
+                background-color: transparent;
+                color: #2563eb;
+            }
+            50% {
+                background-color: rgba(37, 99, 235, 0.1);
+                color: #1d4ed8;
+            }
+        }
+    </style>
+
+    <!-- Pre-Tour Modal -->
+    <div id="tourPreModal" class="fixed inset-0 hidden" style="z-index: 1200;">
+        <div id="tourPreModalScrim" class="absolute inset-0 bg-black bg-opacity-50"></div>
+        <div class="absolute inset-0 flex items-center justify-center px-4">
+            <div class="modal-content w-full max-w-4xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+                <div class="header-content text-white px-6 py-4">
+                    <h3 class="text-xl font-semibold">{{ _('Welcome to the') }} {{ ORG_NAME }}</h3>
+                    {% if user_access_level(current_user) in ['admin', 'system_manager'] %}
+                        <p class="text-white/90 text-sm mt-1">{{ _('A quick tour will help you get the most out of the admin tools.') }}</p>
+                    {% else %}
+                        <p class="text-white/90 text-sm mt-1">{{ _('A quick tour will help you navigate the platform and submit reports effectively.') }}</p>
+                    {% endif %}
+                </div>
+                <div class="main-content p-6 space-y-4">
+                    <p class="text-white">{{ _('In a minute, you can learn how to:') }}</p>
+                    {% if user_access_level(current_user) in ['admin', 'system_manager'] %}
+                        <ul class="list-disc list-inside space-y-1 text-white">
+                            <li>{{ _('Navigate the admin sidebar and learn about the different management sections') }}</li>
+                            <li>{{ _('Access user management, form templates, and assignment tools') }}</li>
+                            <li>{{ _('Switch languages, including the 6 UN languages') }}</li>
+                            <li>{{ _('Check notifications and manage your admin profile') }}</li>
+                            <li>{{ _('Use the AI assistant for help with admin functions') }}</li>
+                        </ul>
+                    {% else %}
+                        <ul class="list-disc list-inside space-y-1 text-white">
+                            <li>{{ _('Navigate your dashboard and access reporting tools') }}</li>
+                            <li>{{ _('Find and complete assigned forms for your country') }}</li>
+                            <li>{{ _('Switch languages, including the 6 UN languages') }}</li>
+                            <li>{{ _('Check notifications for new assignments and updates') }}</li>
+                            <li>{{ _('Use the AI assistant for help with reporting') }}</li>
+                        </ul>
+                    {% endif %}
+                </div>
+                <div class="px-6 pb-6 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-start">
+                    <button id="tourModalSkipBtn" class="w-full sm:w-auto px-6 py-2.5 bg-transparent border-2 border-white text-white hover:border-opacity-80 transition-all duration-200 font-medium">{{ _('Skip for now') }}</button>
+                    <button id="tourModalStartBtn" class="btn btn-danger w-full sm:w-auto transform">{{ _('Take the tour') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entry Form Tour Pre-Modal (Removed - tour is only triggered manually from profile menu) -->
+{% endif %}

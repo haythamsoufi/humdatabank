@@ -1,0 +1,42 @@
+{# templates/public_form_unavailable.html #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - {{ ORG_NAME }}</title>
+    <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
+    <style>
+        /* Basic styling to ensure the content is centered and takes up the viewport height */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+            font-family: sans-serif; /* Ensure a default font */
+        }
+        .container {
+            width: 100%;
+            max-width: 500px; /* Limit the width of the message container */
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 text-center">
+            <div class="text-red-500 mb-4">
+                <i class="fas fa-exclamation-circle fa-5x"></i> {# Large warning icon #}
+            </div>
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">Form Expired</h2>
+            <p class="text-gray-700">
+                This form is no longer available.
+            </p>
+            <p class="text-gray-700 mt-2">
+                {{ _('Please contact your') }} {{ ORG_NAME }} {{ _('focal point for assistance.') }}
+            </p>
+        </div>
+    </div>
+</body>
+</html>

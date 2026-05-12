@@ -1,0 +1,1098 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "components/ag_grid_includes.html" import ag_grid_container %}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% set can_edit_ml = has_permission('admin.indicator_bank.edit') %}
+{% set ml_header_actions = [
+  {
+    'type': 'link',
+    'text': _('Indicator bank'),
+    'url': url_for('system_admin.manage_indicator_bank'),
+    'icon': 'fas fa-list',
+    'classes': 'professional-action-btn',
+  }
+] + ([
+  {
+    'type': 'button',
+    'text': _('Auto translate all'),
+    'icon': 'fas fa-magic',
+    'classes': 'professional-action-btn professional-action-btn-orange',
+    'attributes': {
+      'id': 'auto-translate-all-btn',
+      'title': _('Auto-translate blank labels to all languages for types and units'),
+    },
+  }
+] if can_edit_ml else []) %}
+
+{% block title %}{{ _('Indicator types & units') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Indicator types & units'),
+    icon='fas fa-ruler-combined',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+        {'name': _('Types & units')}
+    ],
+    info_tooltip=_('Define measurement data types and units once. Indicators in the bank link to these rows; the stored type/unit codes stay aligned for APIs and forms.'),
+    actions=ml_header_actions
+) }}
+
+<div class="max-w-6xl mx-auto px-4 py-6">
+  <div class="bg-white shadow-md border border-gray-200">
+    {% call scroll_tab_bar(inner_id='measurement-lookups-tabs', aria_label=_('Measurement types and units')) %}
+        <button type="button" role="tab" data-tab="types" id="tab-btn-types" aria-controls="panel-types"
+                class="{{ admin_underline_tab_btn_classes(true) }}">
+          <i class="fas fa-shapes mr-1.5"></i>{{ _('Measurement types') }}
+        </button>
+        <button type="button" role="tab" data-tab="units" id="tab-btn-units" aria-controls="panel-units"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-balance-scale mr-1.5"></i>{{ _('Units') }}
+        </button>
+    {% endcall %}
+
+    <div class="p-6">
+      {# TAB: Types #}
+      <div class="settings-panel" id="panel-types" role="tabpanel" aria-labelledby="tab-btn-types">
+        <div class="relative">
+          <div class="flex flex-wrap items-center justify-end gap-3 mb-3">
+            <button type="button" class="btn btn-sm btn-success" id="mlAddTypeBtn">
+              <i class="fas fa-plus mr-1"></i>{{ _('Add type') }}
+            </button>
+            <div id="measurementTypesGrid-colvis" class="flex-shrink-0"></div>
+          </div>
+          {{ ag_grid_container('measurementTypesGrid', loading_text=_('Loading...'), placeholder_id='measurementTypesGrid-colvis', include_card=false, show_placeholder=False, empty_message=_('No types found. Run database migrations, then refresh.')) }}
+        </div>
+      </div>
+
+      {# TAB: Units #}
+      <div class="settings-panel hidden" id="panel-units" role="tabpanel" aria-labelledby="tab-btn-units">
+        <div class="relative">
+          <div class="flex flex-wrap items-center justify-end gap-3 mb-3">
+            <button type="button" class="btn btn-sm btn-success" id="mlAddUnitBtn">
+              <i class="fas fa-plus mr-1"></i>{{ _('Add unit') }}
+            </button>
+            <div id="measurementUnitsGrid-colvis" class="flex-shrink-0"></div>
+          </div>
+          {{ ag_grid_container('measurementUnitsGrid', loading_text=_('Loading...'), placeholder_id='measurementUnitsGrid-colvis', include_card=false, show_placeholder=False, empty_message=_('No units found. Run database migrations, then refresh.')) }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if can_edit_ml %}
+    {% set auto_translate_config = {
+        'title': _('Auto-translate types & units'),
+        'description': _('Translate English labels to all selected languages. Applies to both measurement types and units.'),
+        'endpoint': url_for('utilities.api_auto_translate'),
+        'item_type': 'measurement_lookups',
+        'permission_context': 'indicator_bank',
+        'permission_code': 'admin.indicator_bank.edit',
+    } %}
+    <script nonce="{{ csp_nonce() }}">
+    window.autoTranslateConfigFromTemplate = {{ auto_translate_config | tojson }};
+    </script>
+    {% include "components/auto_translate_modal.html" with context %}
+{% endif %}
+
+{% call modal_shell('measurementTypeModal', _('Measurement type'), max_width='max-w-2xl', z_index=60) %}
+<div id="measurementTypeModalBody" class="max-h-[min(80vh,720px)] overflow-y-auto"></div>
+{% endcall %}
+{% call modal_shell('measurementUnitModal', _('Unit'), max_width='max-w-2xl', z_index=60) %}
+<div id="measurementUnitModalBody" class="max-h-[min(80vh,720px)] overflow-y-auto"></div>
+{% endcall %}
+{% endblock %}
+
+{% block extra_js %}
+    {% if can_edit_ml %}
+        {% include "components/auto_translate_modal_js.html" with context %}
+    {% endif %}
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    (function () {
+        'use strict';
+        if (typeof AgGridHelper === 'undefined') return;
+
+        var ML_AUTO = {{ can_edit_ml|tojson|safe }};
+        var PATCH_TYPE_TMPL = {{ url_for('system_admin.api_patch_measurement_type_translations', tid=999001)|tojson|safe }}.replace('999001', '__ID__');
+        var PATCH_UNIT_TMPL = {{ url_for('system_admin.api_patch_measurement_unit_translations', uid=999002)|tojson|safe }}.replace('999002', '__ID__');
+
+        var I18N = {
+            yes: {{ _("Yes")|js }},
+            no: {{ _("No")|js }},
+            edit: {{ _("Edit")|js }}
+        };
+        var ML_URLS = {
+            newType: {{ url_for("system_admin.new_measurement_type")|tojson|safe }},
+            newUnit: {{ url_for("system_admin.new_measurement_unit")|tojson|safe }}
+        };
+        var ML_I18N = {
+            loadError: {{ _("Could not load the form. Try again or refresh the page.")|js }},
+            saveError: {{ _("Request failed. Check your data and try again.")|js }},
+            unitDeleteConfirm: {{ _("Delete this unit? This cannot be undone.")|js }},
+            loading: {{ _("Loading…")|js }}
+        };
+
+        var measurementTypesData = [
+            {% for t in types %}
+            {
+                _kind: 'type',
+                id: {{ t.id }},
+                code: {{ (t.code or "")|tojson|safe }},
+                name: {{ (t.name or "")|tojson|safe }},
+                {% set _nt = t.name_translations or {} %}
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                name_{{ code }}: {{ ((_nt.get(code) if _nt and _nt.get(code) else "") or "")|tojson|safe }},
+                {% endfor %}
+                sort_order: {{ t.sort_order|default(0)|tojson|safe }},
+                is_active: {{ t.is_active|tojson|safe }},
+                usage: {{ type_usage.get(t.id, 0)|tojson|safe }},
+                edit_url: {{ url_for("system_admin.edit_measurement_type", tid=t.id)|tojson|safe }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        var measurementUnitsData = [
+            {% for u in units %}
+            {
+                _kind: 'unit',
+                id: {{ u.id }},
+                code: {{ (u.code or "")|tojson|safe }},
+                name: {{ (u.name or "")|tojson|safe }},
+                {% set _nu = u.name_translations or {} %}
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                name_{{ code }}: {{ ((_nu.get(code) if _nu and _nu.get(code) else "") or "")|tojson|safe }},
+                {% endfor %}
+                sort_order: {{ u.sort_order|default(0)|tojson|safe }},
+                allows_disaggregation: {{ u.allows_disaggregation|tojson|safe }},
+                is_active: {{ u.is_active|tojson|safe }},
+                usage: {{ unit_usage.get(u.id, 0)|tojson|safe }},
+                edit_url: {{ url_for("system_admin.edit_measurement_unit", uid=u.id)|tojson|safe }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        function boolCellHtml(val, yesClass, noClass) {
+            if (val === true || val === 1) {
+                return '<span class="' + (yesClass || 'text-green-700') + '">' + I18N.yes + '</span>';
+            }
+            if (val === false || val === 0) {
+                return '<span class="' + (noClass || 'text-gray-500') + '">' + I18N.no + '</span>';
+            }
+            return '—';
+        }
+
+        function nameLangCellRenderer(params) {
+            var v = params.value;
+            if (v == null || v === '') return '<span class="text-gray-400">—</span>';
+            return '<span>' + AgGridRenderers.escapeHtml(String(v)) + '</span>';
+        }
+
+        var typeColumnDefs = [
+            {
+                field: 'code',
+                headerName: {{ _("Code")|js }},
+                minWidth: 100,
+                flex: 1,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellClass: 'font-mono text-xs',
+                cellRenderer: function (p) {
+                    var t = p.value;
+                    if (t == null || t === '') return '—';
+                    return '<span class="font-mono text-xs">' + AgGridRenderers.escapeHtml(String(t)) + '</span>';
+                }
+            },
+            {
+                field: 'name',
+                headerName: {{ _("Label (English)")|js }},
+                minWidth: 140,
+                flex: 2,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellRenderer: function (p) {
+                    if (p.value == null || p.value === '') return '—';
+                    return AgGridRenderers.escapeHtml(String(p.value));
+                }
+            },
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            {
+                field: 'name_{{ code }}',
+                headerName: {{ (_('Label') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+                minWidth: 160,
+                flex: 1,
+                hide: true,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellRenderer: nameLangCellRenderer,
+                cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+            },
+            {% endfor %}
+            {
+                field: 'sort_order',
+                headerName: {{ _("Order")|js }},
+                width: 100,
+                minWidth: 80,
+                maxWidth: 120,
+                filter: 'agNumberColumnFilter',
+                sortable: true
+            },
+            {
+                field: 'is_active',
+                headerName: {{ _("Active")|js }},
+                width: 100,
+                minWidth: 90,
+                maxWidth: 120,
+                filter: 'customSetFilter',
+                sortable: true,
+                cellRenderer: function (p) {
+                    return boolCellHtml(!!(p.data && p.data.is_active), 'text-green-700', 'text-red-700');
+                }
+            },
+            {
+                field: 'usage',
+                headerName: {{ _("Usage")|js }},
+                width: 100,
+                minWidth: 90,
+                maxWidth: 120,
+                filter: 'agNumberColumnFilter',
+                sortable: true
+            },
+            {
+                field: 'actions',
+                headerName: {{ _("Actions")|js }},
+                width: 100,
+                minWidth: 90,
+                maxWidth: 120,
+                lockVisible: true,
+                pinned: 'right',
+                lockPinned: true,
+                suppressMovable: true,
+                sortable: false,
+                filter: false,
+                cellRenderer: function (p) {
+                    var href = p.data && p.data.edit_url;
+                    if (!href) return '';
+                    var ph = href + (href.indexOf('?') >= 0 ? '&' : '?') + 'partial=1';
+                    return (
+                        '<button type="button" class="btn btn-sm btn-primary ml-type-edit" data-ml-partial-href="' +
+                        AgGridRenderers.escapeHtmlAttr(ph) +
+                        '">' +
+                        AgGridRenderers.escapeHtml(I18N.edit) +
+                        '</button>'
+                    );
+                }
+            }
+        ];
+
+        var unitColumnDefs = [
+            {
+                field: 'code',
+                headerName: {{ _("Code")|js }},
+                minWidth: 100,
+                flex: 1,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellRenderer: function (p) {
+                    var t = p.value;
+                    if (t == null || t === '') return '—';
+                    return '<span class="font-mono text-xs">' + AgGridRenderers.escapeHtml(String(t)) + '</span>';
+                }
+            },
+            {
+                field: 'name',
+                headerName: {{ _("Label (English)")|js }},
+                minWidth: 140,
+                flex: 2,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellRenderer: function (p) {
+                    if (p.value == null || p.value === '') return '—';
+                    return AgGridRenderers.escapeHtml(String(p.value));
+                }
+            },
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            {
+                field: 'name_{{ code }}',
+                headerName: {{ (_('Label') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+                minWidth: 160,
+                flex: 1,
+                hide: true,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellRenderer: nameLangCellRenderer,
+                cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+            },
+            {% endfor %}
+            {
+                field: 'sort_order',
+                headerName: {{ _("Order")|js }},
+                width: 100,
+                minWidth: 80,
+                maxWidth: 120,
+                filter: 'agNumberColumnFilter',
+                sortable: true
+            },
+            {
+                field: 'allows_disaggregation',
+                headerName: {{ _("Disagg")|js }},
+                width: 100,
+                minWidth: 90,
+                maxWidth: 120,
+                filter: 'customSetFilter',
+                sortable: true,
+                cellRenderer: function (p) {
+                    return boolCellHtml(!!(p.data && p.data.allows_disaggregation), 'text-green-700', 'text-gray-500');
+                }
+            },
+            {
+                field: 'is_active',
+                headerName: {{ _("Active")|js }},
+                width: 100,
+                minWidth: 90,
+                maxWidth: 120,
+                filter: 'customSetFilter',
+                sortable: true,
+                cellRenderer: function (p) {
+                    return boolCellHtml(!!(p.data && p.data.is_active), 'text-green-700', 'text-red-700');
+                }
+            },
+            {
+                field: 'usage',
+                headerName: {{ _("Usage")|js }},
+                width: 100,
+                minWidth: 90,
+                maxWidth: 120,
+                filter: 'agNumberColumnFilter',
+                sortable: true
+            },
+            {
+                field: 'actions',
+                headerName: {{ _("Actions")|js }},
+                width: 100,
+                minWidth: 90,
+                maxWidth: 120,
+                lockVisible: true,
+                pinned: 'right',
+                lockPinned: true,
+                suppressMovable: true,
+                sortable: false,
+                filter: false,
+                cellRenderer: function (p) {
+                    var href = p.data && p.data.edit_url;
+                    if (!href) return '';
+                    var ph = href + (href.indexOf('?') >= 0 ? '&' : '?') + 'partial=1';
+                    return (
+                        '<button type="button" class="btn btn-sm btn-primary ml-unit-edit" data-ml-partial-href="' +
+                        AgGridRenderers.escapeHtmlAttr(ph) +
+                        '">' +
+                        AgGridRenderers.escapeHtml(I18N.edit) +
+                        '</button>'
+                    );
+                }
+            }
+        ];
+
+        var typesResult = null;
+        var unitsResult = null;
+
+        var typeColOrder = ['code', 'name'{% for code in TRANSLATABLE_LANGUAGES %}, 'name_{{ code }}'{% endfor %}, 'sort_order', 'is_active', 'usage', 'actions'];
+        var unitColOrder = ['code', 'name'{% for code in TRANSLATABLE_LANGUAGES %}, 'name_{{ code }}'{% endfor %}, 'sort_order', 'allows_disaggregation', 'is_active', 'usage', 'actions'];
+
+        var mlTypeModalCtrl = null;
+        var mlUnitModalCtrl = null;
+        function mlGetCsrf() {
+            var m = document.querySelector('meta[name=csrf-token]');
+            return m ? m.getAttribute('content') : '';
+        }
+        function mlFetchPartial(url) {
+            return ((window.getFetch && window.getFetch()) || fetch)(url, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
+                credentials: 'same-origin',
+            }).then(function (r) {
+                if (!r.ok) throw new Error('load');
+                return r.text();
+            });
+        }
+        function mlShowTypeModalLoading() {
+            var body = document.getElementById('measurementTypeModalBody');
+            var shell = document.getElementById('measurementTypeModal');
+            if (!body || !shell) {
+                return;
+            }
+            body.innerHTML =
+                '<div class="py-16 flex flex-col items-center justify-center text-gray-600" role="status" aria-live="polite">' +
+                '<i class="fas fa-circle-notch fa-spin text-3xl text-teal-600 mb-3" aria-hidden="true"></i>' +
+                '<span class="text-sm font-medium">' +
+                (AgGridRenderers && AgGridRenderers.escapeHtml
+                    ? AgGridRenderers.escapeHtml(ML_I18N.loading)
+                    : String(ML_I18N.loading)) +
+                '</span></div>';
+            if (!mlTypeModalCtrl && window.ModalUtils) {
+                mlTypeModalCtrl = window.ModalUtils.makeModal(shell, {
+                    closeSelector: '.close-modal, .close-modal-btn, [data-ml-modal-dismiss]',
+                });
+            }
+            if (mlTypeModalCtrl && mlTypeModalCtrl.openModal) {
+                mlTypeModalCtrl.openModal();
+            } else {
+                shell.classList.remove('hidden');
+            }
+        }
+        function mlShowUnitModalLoading() {
+            var body = document.getElementById('measurementUnitModalBody');
+            var shell = document.getElementById('measurementUnitModal');
+            if (!body || !shell) {
+                return;
+            }
+            body.innerHTML =
+                '<div class="py-16 flex flex-col items-center justify-center text-gray-600" role="status" aria-live="polite">' +
+                '<i class="fas fa-circle-notch fa-spin text-3xl text-teal-600 mb-3" aria-hidden="true"></i>' +
+                '<span class="text-sm font-medium">' +
+                (AgGridRenderers && AgGridRenderers.escapeHtml
+                    ? AgGridRenderers.escapeHtml(ML_I18N.loading)
+                    : String(ML_I18N.loading)) +
+                '</span></div>';
+            if (!mlUnitModalCtrl && window.ModalUtils) {
+                mlUnitModalCtrl = window.ModalUtils.makeModal(shell, {
+                    closeSelector: '.close-modal, .close-modal-btn, [data-ml-modal-dismiss]',
+                });
+            }
+            if (mlUnitModalCtrl && mlUnitModalCtrl.openModal) {
+                mlUnitModalCtrl.openModal();
+            } else {
+                shell.classList.remove('hidden');
+            }
+        }
+        function mlCloseTypeModalIfOpen() {
+            if (mlTypeModalCtrl && mlTypeModalCtrl.closeModal) {
+                mlTypeModalCtrl.closeModal();
+            } else {
+                var sh = document.getElementById('measurementTypeModal');
+                if (sh) {
+                    sh.classList.add('hidden');
+                }
+            }
+        }
+        function mlCloseUnitModalIfOpen() {
+            if (mlUnitModalCtrl && mlUnitModalCtrl.closeModal) {
+                mlUnitModalCtrl.closeModal();
+            } else {
+                var sh = document.getElementById('measurementUnitModal');
+                if (sh) {
+                    sh.classList.add('hidden');
+                }
+            }
+        }
+        function mlOpenTypeWithFetch(url) {
+            mlShowTypeModalLoading();
+            return mlFetchPartial(url)
+                .then(function (html) {
+                    mlOpenTypeModalFromHtml(html);
+                })
+                .catch(function () {
+                    mlCloseTypeModalIfOpen();
+                    if (window.__clientWarn) {
+                        window.__clientWarn(ML_I18N.loadError);
+                    }
+                });
+        }
+        function mlOpenUnitWithFetch(url) {
+            mlShowUnitModalLoading();
+            return mlFetchPartial(url)
+                .then(function (html) {
+                    mlOpenUnitModalFromHtml(html);
+                })
+                .catch(function () {
+                    mlCloseUnitModalIfOpen();
+                    if (window.__clientWarn) {
+                        window.__clientWarn(ML_I18N.loadError);
+                    }
+                });
+        }
+        function mlWireTypeForm(bodyEl) {
+            var form = bodyEl.querySelector('form.ml-type-form');
+            if (form) {
+                form.addEventListener('submit', function mlSubmit(ev) {
+                    ev.preventDefault();
+                    var f = ev.currentTarget;
+                    if (!f || f.getAttribute('data-ml-form') !== 'type') return;
+                    var fd = new FormData(f);
+                    ((window.getFetch && window.getFetch()) || fetch)(f.action, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    })
+                        .then(function (r) {
+                            return r.json().then(function (j) {
+                                return { ok: r.ok, body: j };
+                            });
+                        })
+                        .then(function (out) {
+                            if (out.ok && out.body && (out.body.success === true)) {
+                                if (mlTypeModalCtrl && mlTypeModalCtrl.closeModal) {
+                                    mlTypeModalCtrl.closeModal();
+                                } else {
+                                    var sh = document.getElementById('measurementTypeModal');
+                                    if (sh) sh.classList.add('hidden');
+                                }
+                                window.location.reload();
+                            } else if (out.body && out.body.form_html) {
+                                mlOpenTypeModalFromHtml(out.body.form_html);
+                            } else {
+                                var emsg = (out.body && (out.body.error || out.body.message)) || ML_I18N.saveError;
+                                if (window.__clientWarn) {
+                                    window.__clientWarn(String(emsg));
+                                }
+                            }
+                        })
+                        .catch(function () {
+                            if (window.__clientWarn) {
+                                window.__clientWarn(ML_I18N.saveError);
+                            }
+                        });
+                });
+            }
+        }
+        function mlOpenTypeModalFromHtml(html) {
+            var body = document.getElementById('measurementTypeModalBody');
+            var shell = document.getElementById('measurementTypeModal');
+            if (!body || !shell) return;
+            body.innerHTML = html;
+            mlWireTypeForm(body);
+            if (!mlTypeModalCtrl && window.ModalUtils) {
+                mlTypeModalCtrl = window.ModalUtils.makeModal(shell, {
+                    closeSelector: '.close-modal, .close-modal-btn, [data-ml-modal-dismiss]',
+                });
+            }
+            if (mlTypeModalCtrl && mlTypeModalCtrl.openModal) {
+                mlTypeModalCtrl.openModal();
+            } else {
+                shell.classList.remove('hidden');
+            }
+        }
+        function mlWireUnitForm(bodyEl) {
+            var form = bodyEl.querySelector('form.ml-unit-form');
+            if (form) {
+                form.addEventListener('submit', function mlUSubmit(ev) {
+                    ev.preventDefault();
+                    var f = ev.currentTarget;
+                    if (!f || f.getAttribute('data-ml-form') !== 'unit') return;
+                    var fd = new FormData(f);
+                    ((window.getFetch && window.getFetch()) || fetch)(f.action, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    })
+                        .then(function (r) {
+                            return r.json().then(function (j) {
+                                return { ok: r.ok, body: j };
+                            });
+                        })
+                        .then(function (out) {
+                            if (out.ok && out.body && (out.body.success === true)) {
+                                if (mlUnitModalCtrl && mlUnitModalCtrl.closeModal) {
+                                    mlUnitModalCtrl.closeModal();
+                                } else {
+                                    var shu = document.getElementById('measurementUnitModal');
+                                    if (shu) shu.classList.add('hidden');
+                                }
+                                window.location.reload();
+                            } else if (out.body && out.body.form_html) {
+                                mlOpenUnitModalFromHtml(out.body.form_html);
+                            } else {
+                                var emsg = (out.body && (out.body.error || out.body.message)) || ML_I18N.saveError;
+                                if (window.__clientWarn) {
+                                    window.__clientWarn(String(emsg));
+                                }
+                            }
+                        })
+                        .catch(function () {
+                            if (window.__clientWarn) {
+                                window.__clientWarn(ML_I18N.saveError);
+                            }
+                        });
+                });
+            }
+            var del = bodyEl.querySelector('#mlUnitDeleteOpen');
+            if (del) {
+                del.addEventListener('click', function () {
+                    var u = del.getAttribute('data-ml-url');
+                    if (!u) return;
+                    if (!window.confirm(ML_I18N.unitDeleteConfirm)) return;
+                    ((window.getFetch && window.getFetch()) || fetch)(u, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': mlGetCsrf(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                            Accept: 'application/json',
+                        },
+                        credentials: 'same-origin',
+                    })
+                        .then(function (r) {
+                            return r.json().catch(function () {
+                                return {};
+                            });
+                        })
+                        .then(function (data) {
+                            if (data && (data.success === true)) {
+                                if (mlUnitModalCtrl && mlUnitModalCtrl.closeModal) {
+                                    mlUnitModalCtrl.closeModal();
+                                } else {
+                                    var shu2 = document.getElementById('measurementUnitModal');
+                                    if (shu2) shu2.classList.add('hidden');
+                                }
+                                window.location.reload();
+                            } else {
+                                var msg = (data && (data.error || data.message)) || ML_I18N.saveError;
+                                if (window.__clientWarn) {
+                                    window.__clientWarn(String(msg));
+                                }
+                            }
+                        });
+                });
+            }
+        }
+        function mlOpenUnitModalFromHtml(html) {
+            var ubody = document.getElementById('measurementUnitModalBody');
+            var ushell = document.getElementById('measurementUnitModal');
+            if (!ubody || !ushell) return;
+            ubody.innerHTML = html;
+            mlWireUnitForm(ubody);
+            if (!mlUnitModalCtrl && window.ModalUtils) {
+                mlUnitModalCtrl = window.ModalUtils.makeModal(ushell, {
+                    closeSelector: '.close-modal, .close-modal-btn, [data-ml-modal-dismiss]',
+                });
+            }
+            if (mlUnitModalCtrl && mlUnitModalCtrl.openModal) {
+                mlUnitModalCtrl.openModal();
+            } else {
+                ushell.classList.remove('hidden');
+            }
+        }
+        function mlGridTypeCellClick(e) {
+            if (!e || !e.colDef || e.colDef.field !== 'actions' || !e.event || !e.event.target) return;
+            var btn = e.event.target.closest('.ml-type-edit');
+            if (!btn) return;
+            e.event.preventDefault();
+            e.event.stopPropagation();
+            var u = btn.getAttribute('data-ml-partial-href');
+            if (!u) return;
+            mlOpenTypeWithFetch(u);
+        }
+        function mlGridUnitCellClick(e) {
+            if (!e || !e.colDef || e.colDef.field !== 'actions' || !e.event || !e.event.target) return;
+            var btn = e.event.target.closest('.ml-unit-edit');
+            if (!btn) return;
+            e.event.preventDefault();
+            e.event.stopPropagation();
+            var u = btn.getAttribute('data-ml-partial-href');
+            if (!u) return;
+            mlOpenUnitWithFetch(u);
+        }
+
+        function initTypesGrid() {
+            if (typesResult) return;
+            try {
+                typesResult = AgGridHelper.create('measurementTypesGrid', 'measurement-lookups-types', typeColumnDefs, measurementTypesData, {
+                    onReady: function (api) {
+                        AgGridHelper.pinActionsColumn(api, typeColOrder);
+                        window.measurementTypesGridApi = api;
+                    },
+                    gridOptions: {
+                        onCellClicked: mlGridTypeCellClick,
+                    },
+                });
+            } catch (e) {
+                console.warn('measurementTypesGrid init failed', e);
+            }
+        }
+
+        function initUnitsGrid() {
+            if (unitsResult) {
+                if (unitsResult.api && unitsResult.api.sizeColumnsToFit) {
+                    setTimeout(function () {
+                        try {
+                            unitsResult.api.sizeColumnsToFit();
+                        } catch (e2) { /* ignore */ }
+                    }, 120);
+                }
+                return;
+            }
+            try {
+                unitsResult = AgGridHelper.create('measurementUnitsGrid', 'measurement-lookups-units', unitColumnDefs, measurementUnitsData, {
+                    onReady: function (api) {
+                        AgGridHelper.pinActionsColumn(api, unitColOrder);
+                        window.measurementUnitsGridApi = api;
+                    },
+                    gridOptions: {
+                        onCellClicked: mlGridUnitCellClick,
+                    },
+                });
+            } catch (e) {
+                console.warn('measurementUnitsGrid init failed', e);
+            }
+        }
+
+        var A = window.AdminUnderlineTabs;
+        var tabs = document.querySelectorAll('#measurement-lookups-tabs .settings-tab');
+        var panelEls = document.querySelectorAll('#panel-types, #panel-units');
+        if (tabs.length && panelEls.length && A) {
+            function activate(tabId) {
+                A.activateStripTab('#measurement-lookups-tabs', tabId, { panelSelector: '.settings-panel' });
+            }
+
+            tabs.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var id = this.getAttribute('data-tab');
+                    if (!id) return;
+                    activate(id);
+                    try {
+                        history.replaceState(null, '', '#' + id);
+                    } catch (e) { /* ignore */ }
+                    if (id === 'units') {
+                        setTimeout(function () { initUnitsGrid(); }, 50);
+                    } else if (id === 'types' && typesResult && typesResult.api && typesResult.api.sizeColumnsToFit) {
+                        setTimeout(function () {
+                            try {
+                                typesResult.api.sizeColumnsToFit();
+                            } catch (e2) { /* ignore */ }
+                        }, 100);
+                    }
+                });
+            });
+
+            var hash = (location.hash || '').replace('#', '');
+
+            initTypesGrid();
+            if (hash === 'units') {
+                activate('units');
+                setTimeout(function () { initUnitsGrid(); }, 50);
+            }
+        } else {
+            initTypesGrid();
+        }
+
+        (function mlInitOpenersAndQuery() {
+            var addT = document.getElementById('mlAddTypeBtn');
+            if (addT) {
+                addT.addEventListener('click', function () {
+                    var u = ML_URLS.newType + (ML_URLS.newType.indexOf('?') >= 0 ? '&' : '?') + 'partial=1';
+                    mlOpenTypeWithFetch(u);
+                });
+            }
+            var addU = document.getElementById('mlAddUnitBtn');
+            if (addU) {
+                addU.addEventListener('click', function () {
+                    var u = ML_URLS.newUnit + (ML_URLS.newUnit.indexOf('?') >= 0 ? '&' : '?') + 'partial=1';
+                    mlOpenUnitWithFetch(u);
+                });
+            }
+            var sp = new URLSearchParams(location.search);
+            var nt = sp.get('new_type');
+            var nu = sp.get('new_unit');
+            var et = sp.get('edit_type');
+            var eu = sp.get('edit_unit');
+            if (!nt && !nu && !et && !eu) {
+                return;
+            }
+            var clean = new URL(location.href);
+            clean.searchParams.delete('new_type');
+            clean.searchParams.delete('new_unit');
+            clean.searchParams.delete('edit_type');
+            clean.searchParams.delete('edit_unit');
+            try {
+                history.replaceState(null, '', clean.pathname + clean.search + clean.hash);
+            } catch (eCl) { /* ignore */ }
+            if (nt === '1' || et) {
+                if (A && typeof A.activateStripTab === 'function') {
+                    A.activateStripTab('#measurement-lookups-tabs', 'types', { panelSelector: '.settings-panel' });
+                }
+            }
+            if (nu === '1' || eu) {
+                if (A && typeof A.activateStripTab === 'function') {
+                    A.activateStripTab('#measurement-lookups-tabs', 'units', { panelSelector: '.settings-panel' });
+                }
+                setTimeout(function () {
+                    initUnitsGrid();
+                }, 80);
+            }
+            if (nt === '1') {
+                mlOpenTypeWithFetch(ML_URLS.newType + (ML_URLS.newType.indexOf('?') >= 0 ? '&' : '?') + 'partial=1');
+            } else if (nu === '1') {
+                mlOpenUnitWithFetch(ML_URLS.newUnit + (ML_URLS.newUnit.indexOf('?') >= 0 ? '&' : '?') + 'partial=1');
+            } else if (et) {
+                var hrefET = {{ url_for('system_admin.edit_measurement_type', tid=999001)|tojson|safe }}.replace('999001', String(et)) + '?partial=1';
+                mlOpenTypeWithFetch(hrefET);
+            } else if (eu) {
+                var hrefEU = {{ url_for('system_admin.edit_measurement_unit', uid=999002)|tojson|safe }}.replace('999002', String(eu)) + '?partial=1';
+                mlOpenUnitWithFetch(hrefEU);
+            }
+        })();
+
+        if (ML_AUTO && typeof jQuery !== 'undefined') {
+            function mlLangField(lang) {
+                return 'name_' + lang;
+            }
+
+            function getAllMeasurementRows() {
+                var out = [];
+                if (typesResult && typesResult.api) {
+                    typesResult.api.forEachNode(function (n) {
+                        if (n.data) {
+                            out.push(n.data);
+                        }
+                    });
+                } else {
+                    measurementTypesData.forEach(function (r) {
+                        out.push(r);
+                    });
+                }
+                if (unitsResult && unitsResult.api) {
+                    unitsResult.api.forEachNode(function (n) {
+                        if (n.data) {
+                            out.push(n.data);
+                        }
+                    });
+                } else {
+                    measurementUnitsData.forEach(function (r) {
+                        out.push(r);
+                    });
+                }
+                return out;
+            }
+
+            function mlUpdateNodeTranslation(kind, id, lang, text) {
+                var field = mlLangField(lang);
+                if (kind === 'type' && typesResult && typesResult.api) {
+                    typesResult.api.forEachNode(function (n) {
+                        if (n.data && String(n.data.id) === String(id) && n.data._kind === 'type') {
+                            n.setDataValue(field, text);
+                        }
+                    });
+                }
+                if (kind === 'unit' && unitsResult && unitsResult.api) {
+                    unitsResult.api.forEachNode(function (n) {
+                        if (n.data && String(n.data.id) === String(id) && n.data._kind === 'unit') {
+                            n.setDataValue(field, text);
+                        }
+                    });
+                }
+            }
+
+            window.getPageSpecificTranslationCounts = function (overwriteExisting, selectedMsgids) {
+                overwriteExisting = !!overwriteExisting;
+                var counts = {};
+                {% for lang_code in TRANSLATABLE_LANGUAGES %}
+                counts['{{ lang_code }}'] = 0;
+                {% endfor %}
+                try {
+                    var rows = getAllMeasurementRows();
+                    var langs = Object.keys(counts);
+                    rows.forEach(function (row) {
+                        if (!row || !row.id) {
+                            return;
+                        }
+                        var base = (row.name || '').trim();
+                        if (!base || base === '-') {
+                            return;
+                        }
+                        langs.forEach(function (lang) {
+                            var f = mlLangField(lang);
+                            var cur = (row[f] || '').trim();
+                            var has = cur && cur !== '-';
+                            if (overwriteExisting) {
+                                counts[lang] += 1;
+                            } else if (!has) {
+                                counts[lang] += 1;
+                            }
+                        });
+                    });
+                } catch (err) {
+                    console.error('getPageSpecificTranslationCounts', err);
+                }
+                return counts;
+            };
+
+            window.performPageSpecificTranslation = function (selectedLanguages, selectedService) {
+                var overwriteExisting = jQuery('#overwrite-existing-translations').is(':checked');
+                var counts = window.getPageSpecificTranslationCounts(overwriteExisting);
+                var languagesNeedingTranslation = overwriteExisting
+                    ? selectedLanguages
+                    : selectedLanguages.filter(function (lang) {
+                          return counts[lang] > 0;
+                      });
+
+                var jobs = [];
+                getAllMeasurementRows().forEach(function (row) {
+                    if (!row || row.id == null) {
+                        return;
+                    }
+                    var base = (row.name || '').trim();
+                    if (!base) {
+                        return;
+                    }
+                    var kind = row._kind;
+                    if (kind !== 'type' && kind !== 'unit') {
+                        return;
+                    }
+                    languagesNeedingTranslation.forEach(function (lang) {
+                        var f = mlLangField(lang);
+                        var cur = (row[f] || '').trim();
+                        var has = cur && cur !== '-';
+                        var need = overwriteExisting ? true : !has;
+                        if (need) {
+                            jobs.push({ kind: kind, id: row.id, name: base, language: lang });
+                        }
+                    });
+                });
+
+                if (jobs.length === 0) {
+                    if (window.autoTranslateModal) {
+                        window.autoTranslateModal.logProgress({{ _("No rows need translation")|js }}, 'info');
+                        window.autoTranslateModal.translationState.isRunning = false;
+                        jQuery('#auto-translate-pause-btn').addClass('hidden');
+                        jQuery('#auto-translate-resume-btn').addClass('hidden');
+                        jQuery('#auto-translate-stop-btn').addClass('hidden');
+                        jQuery('#auto-translate-close-btn').removeClass('hidden');
+                    }
+                    return;
+                }
+
+                if (!window.autoTranslateModal) {
+                    return;
+                }
+
+                window.autoTranslateModal.translationState.totalItems = jobs.length;
+                window.autoTranslateModal.updateProgress();
+                window.autoTranslateModal.logProgress(
+                    {{ _("Starting")|js }} + ' ' + jobs.length + ' ' + {{ _("translations...")|js }},
+                    'info'
+                );
+
+                function finishOk() {
+                    window.autoTranslateModal.translationState.isRunning = false;
+                    window.autoTranslateModal.logProgress({{ _("Translation completed!")|js }}, 'success');
+                    jQuery('#auto-translate-pause-btn').addClass('hidden');
+                    jQuery('#auto-translate-resume-btn').addClass('hidden');
+                    jQuery('#auto-translate-stop-btn').addClass('hidden');
+                    jQuery('#auto-translate-close-btn').removeClass('hidden');
+                    if (window.autoTranslateModal.notifyCompletion) {
+                        window.autoTranslateModal.notifyCompletion();
+                    }
+                }
+
+                function processJobList(jobs, index, svc) {
+                    if (index >= jobs.length || window.autoTranslateModal.translationState.shouldStop) {
+                        finishOk();
+                        return;
+                    }
+                    if (window.autoTranslateModal.translationState.isPaused) {
+                        setTimeout(function () {
+                            processJobList(jobs, index, svc);
+                        }, 500);
+                        return;
+                    }
+
+                    var job = jobs[index];
+                    var pl = {
+                        type: 'document_field',
+                        permission_context: 'indicator_bank',
+                        permission_code: 'admin.indicator_bank.edit',
+                        text: job.name,
+                        target_languages: [job.language],
+                        translation_service: svc || 'ifrc',
+                    };
+                    var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(pl))));
+                    ((window.getFetch && window.getFetch()) || fetch)(window.autoTranslateModal.config.endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': jQuery('meta[name=csrf-token]').attr('content'),
+                        },
+                        body: JSON.stringify({ payload: b64 }),
+                    })
+                        .then(function (r) {
+                            return r.json();
+                        })
+                        .then(function (data) {
+                            window.autoTranslateModal.translationState.processedItems++;
+                            window.autoTranslateModal.updateProgress();
+                            if (
+                                data.success &&
+                                data.translations &&
+                                data.translations.label_translations &&
+                                data.translations.label_translations[job.language]
+                            ) {
+                                var translated = data.translations.label_translations[job.language];
+                                var url =
+                                    (job.kind === 'type' ? PATCH_TYPE_TMPL : PATCH_UNIT_TMPL).replace('__ID__', String(job.id));
+                                return ((window.getFetch && window.getFetch()) || fetch)(url, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': jQuery('meta[name=csrf-token]').attr('content'),
+                                    },
+                                    body: JSON.stringify({ translations: (function () {
+                                        var o = {};
+                                        o[job.language] = translated;
+                                        return o;
+                                    })() }),
+                                })
+                                    .then(function (r) {
+                                        return r.json();
+                                    })
+                                    .then(function (sd) {
+                                        if (sd && sd.success !== false) {
+                                            window.autoTranslateModal.translationState.successCount++;
+                                            mlUpdateNodeTranslation(job.kind, job.id, job.language, translated);
+                                            window.autoTranslateModal.logProgress(
+                                                '✓ ' + job.kind + ' ' + job.id + ' → ' + job.language,
+                                                'success'
+                                            );
+                                        } else {
+                                            window.autoTranslateModal.translationState.errorCount++;
+                                        }
+                                        window.autoTranslateModal.updateProgress();
+                                        setTimeout(function () {
+                                            processJobList(jobs, index + 1, svc);
+                                        }, 200);
+                                    })
+                                    .catch(function () {
+                                        window.autoTranslateModal.translationState.errorCount++;
+                                        setTimeout(function () {
+                                            processJobList(jobs, index + 1, svc);
+                                        }, 200);
+                                    });
+                            } else {
+                                window.autoTranslateModal.translationState.errorCount++;
+                                window.autoTranslateModal.updateProgress();
+                                setTimeout(function () {
+                                    processJobList(jobs, index + 1, svc);
+                                }, 200);
+                            }
+                        })
+                        .catch(function () {
+                            window.autoTranslateModal.translationState.errorCount++;
+                            window.autoTranslateModal.updateProgress();
+                            setTimeout(function () {
+                                processJobList(jobs, index + 1, svc);
+                            }, 200);
+                        });
+                }
+
+                processJobList(jobs, 0, selectedService);
+            };
+        }
+    })();
+    </script>
+{% endblock %}

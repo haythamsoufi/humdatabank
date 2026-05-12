@@ -1,0 +1,669 @@
+/* Component Styles */
+
+/* ==========================================================================
+   UNIFIED BUTTON SYSTEM
+   Design semantics (colours defined via CSS variables in theme.css):
+     .btn-primary   → teal  – Preview, Edit, Save draft, open/navigate actions
+     .btn-success   → green – Submit, Confirm, Add, Approve, Export, Import
+     .btn-danger    → red   – Delete, Remove, Reject
+     .btn-secondary → gray  – Cancel, Close, Back (no destructive intent)
+     .btn-warning   → orange– Auto-translate, automation, cautionary triggers
+     .btn-purple    → purple– Audit Trail, analytics, special views
+     .btn-ghost     → outline teal – lightweight secondary; for less prominent CTAs
+     .btn-dark      → slate – matches professional-action-btn default (page headers)
+
+   Size modifiers:  .btn-xs  .btn-sm  [default]  .btn-lg
+   Layout helpers:  .btn-block (full width)  .btn-icon (square, icon-only)
+   Dismiss:         .btn-close-icon — corner X on modals/panels (no border; do not use .btn-ghost here)
+   States:          [disabled] / .btn-disabled   .btn-loading
+
+   All .btn* variants share:
+     • Sharp corners  (border-radius: 0) — consistent with design language
+     • Font: Montserrat → Inter → system-ui fallback
+     • inline-flex with centered content and icon gap
+     • Subtle box-shadow focus ring from the matching colour variable
+     • Smooth transition on bg/shadow/opacity
+   ========================================================================== */
+
+/* ---------- Base ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4375rem;          /* 7px — slightly tighter than text gap */
+  padding: 0.5rem 1rem;
+  font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.8125rem;    /* 13px */
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  border-radius: 0;        /* Sharp corners — system-wide design language */
+  outline: none;
+  background-color: transparent;
+  color: inherit;
+  transition:
+    background-color 0.15s ease-in-out,
+    color            0.15s ease-in-out,
+    box-shadow       0.15s ease-in-out,
+    opacity          0.15s ease-in-out,
+    transform        0.15s ease-in-out;
+  user-select: none;
+  vertical-align: middle;
+}
+
+/* Ensure Tailwind's `.hidden` reliably hides `.btn` elements regardless of stylesheet order. */
+.btn.hidden {
+  display: none !important;
+}
+
+/* Prevent icon flex-shrink inside buttons */
+.btn > i,
+.btn > svg {
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* ---------- Disabled (native attribute + utility class) ---------- */
+.btn:disabled,
+.btn[disabled],
+.btn.btn-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ---------- Sizes ---------- */
+.btn-xs {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;    /* 11px */
+  gap: 0.3125rem;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;      /* 12px */
+  gap: 0.375rem;
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9375rem;    /* 15px */
+  gap: 0.5rem;
+}
+
+/* ---------- Layout ---------- */
+.btn-block {
+  width: 100%;
+}
+
+/* Square icon-only button (no text label) */
+.btn-icon {
+  padding: 0.5rem;
+  gap: 0;
+}
+.btn-icon.btn-xs { padding: 0.3125rem; }
+.btn-icon.btn-sm { padding: 0.4375rem; }
+.btn-icon.btn-lg { padding: 0.75rem;   }
+
+/*
+ * Icon-only dismiss (modal corner X, etc.) — no .btn-ghost outline box.
+ * Use instead of .btn + .btn-ghost for top-right close controls.
+ */
+.btn-close-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  margin: 0;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  cursor: pointer;
+  line-height: 1;
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  color: #6b7280;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+.btn-close-icon:hover {
+  color: #111827;
+  background-color: rgba(17, 24, 39, 0.06) !important;
+}
+.btn-close-icon:focus {
+  outline: none;
+}
+.btn-close-icon:focus-visible {
+  outline: 2px solid var(--btn-primary);
+  outline-offset: 2px;
+}
+
+/* Fallback: .close-modal without .btn — strip UA / stray borders */
+button.close-modal:not(.btn),
+a.close-modal:not(.btn) {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* ---------- Loading state ---------- */
+.btn-loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.btn-loading::before {
+  content: '';
+  display: inline-block;
+  width: 0.8125rem;        /* 13px */
+  height: 0.8125rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Colour Variants ---------- */
+
+/* Primary – teal (save draft, edit, navigate, view) */
+.btn-primary {
+  background-color: var(--btn-primary);
+  color: #ffffff;
+  border: none;
+}
+.btn-primary:hover         { background-color: var(--btn-primary-hover);  box-shadow: 0 2px 6px var(--btn-primary-focus); color: #fff; }
+.btn-primary:active        { background-color: var(--btn-primary-active); }
+.btn-primary:focus-visible { box-shadow: 0 0 0 3px var(--btn-primary-focus); }
+
+/* Success – green (submit, confirm, approve, export) */
+.btn-success {
+  background-color: var(--btn-success);
+  color: #ffffff;
+  border: none;
+}
+.btn-success:hover         { background-color: var(--btn-success-hover);  box-shadow: 0 2px 6px var(--btn-success-focus); color: #fff; }
+.btn-success:active        { background-color: var(--btn-success-active); }
+.btn-success:focus-visible { box-shadow: 0 0 0 3px var(--btn-success-focus); }
+
+/* Danger – red (delete, remove, reject) */
+.btn-danger {
+  background-color: var(--btn-danger);
+  color: #ffffff;
+  border: none;
+}
+.btn-danger:hover         { background-color: var(--btn-danger-hover);  box-shadow: 0 2px 6px var(--btn-danger-focus); color: #fff; }
+.btn-danger:active        { background-color: var(--btn-danger-active); }
+.btn-danger:focus-visible { box-shadow: 0 0 0 3px var(--btn-danger-focus); }
+
+/* Secondary – white/gray bordered (cancel, close, back) */
+.btn-secondary {
+  background-color: var(--btn-secondary-bg, #ffffff);
+  color: var(--btn-secondary-color, #374151);
+  border: 1px solid var(--btn-secondary-border, #d1d5db);
+}
+.btn-secondary:hover         { background-color: var(--btn-secondary-bg-hover, #f9fafb); box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+.btn-secondary:active        { background-color: #f3f4f6; }
+.btn-secondary:focus-visible { box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.2); }
+
+/* Warning – orange (auto-translate, automation, caution) */
+.btn-warning {
+  background-color: var(--btn-warning);
+  color: #ffffff;
+  border: none;
+}
+.btn-warning:hover         { background-color: var(--btn-warning-hover);  box-shadow: 0 2px 6px var(--btn-warning-focus); color: #fff; }
+.btn-warning:active        { background-color: var(--btn-warning-active); }
+.btn-warning:focus-visible { box-shadow: 0 0 0 3px var(--btn-warning-focus); }
+
+/* Purple – analytics, audit, special views */
+.btn-purple {
+  background-color: var(--btn-purple);
+  color: #ffffff;
+  border: none;
+}
+.btn-purple:hover         { background-color: var(--btn-purple-hover);  box-shadow: 0 2px 6px var(--btn-purple-focus); color: #fff; }
+.btn-purple:active        { background-color: var(--btn-purple-active); }
+.btn-purple:focus-visible { box-shadow: 0 0 0 3px var(--btn-purple-focus); }
+
+/* Dark / slate – matches professional-action-btn default (for page header parity) */
+.btn-dark {
+  background-color: #0f172a;
+  color: #ffffff;
+  border: none;
+}
+.btn-dark:hover         { background-color: #1e293b; box-shadow: 0 2px 4px rgba(15, 23, 42, 0.18); color: #fff; }
+.btn-dark:active        { background-color: #0f172a; }
+.btn-dark:focus-visible { box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.2); }
+
+/* Ghost – teal outline, transparent fill (lightweight secondary) */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--btn-primary);
+  border: 1px solid var(--btn-primary);
+}
+.btn-ghost:hover         { background-color: rgba(13, 148, 136, 0.07); color: var(--btn-primary-hover); border-color: var(--btn-primary-hover); }
+.btn-ghost:active        { background-color: rgba(13, 148, 136, 0.14); }
+.btn-ghost:focus-visible { box-shadow: 0 0 0 3px var(--btn-primary-focus); }
+
+/* Ghost danger – red outline variant (for soft destructive actions) */
+.btn-ghost-danger {
+  background-color: transparent;
+  color: var(--btn-danger);
+  border: 1px solid var(--btn-danger);
+}
+.btn-ghost-danger:hover         { background-color: rgba(220, 38, 38, 0.07); color: var(--btn-danger-hover); border-color: var(--btn-danger-hover); }
+.btn-ghost-danger:active        { background-color: rgba(220, 38, 38, 0.14); }
+.btn-ghost-danger:focus-visible { box-shadow: 0 0 0 3px var(--btn-danger-focus); }
+
+/* ==========================================================================
+   BUTTON GROUP
+   Horizontal row of .btn elements that share borders without double-lines.
+   Usage: <div class="btn-group"> <button class="btn btn-secondary">…</button> … </div>
+   ========================================================================== */
+.btn-group {
+  display: inline-flex;
+  gap: 0;
+}
+.btn-group > .btn + .btn {
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+.btn-group > .btn-secondary + .btn-secondary {
+  border-left-color: var(--btn-secondary-border, #d1d5db);
+}
+
+/* End unified button system */
+
+/* Flash Message Styles */
+.flash-messages {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 24rem;
+    width: 90%;
+    pointer-events: none;
+    transition: bottom 0.3s ease-out;
+}
+
+/* Adjust flash messages when offline banner is active */
+.flash-messages.offline-banner-active {
+    bottom: 4.5rem; /* 1.5rem base + ~3rem for offline banner height */
+}
+
+.alert {
+    position: relative;
+    padding: 1rem 3rem 1rem 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+    animation: slideInUp 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    pointer-events: auto;
+    width: 100%;
+    backdrop-filter: blur(8px);
+    background-color: rgba(17, 24, 39, 0.95); /* Dark gray base */
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    color: #e5e7eb;
+}
+
+.alert-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.alert-message {
+    flex-grow: 1;
+    font-weight: 500;
+    color: #e5e7eb;
+}
+
+.alert-close {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.25rem;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    border: none;
+    background: none;
+    color: #e5e7eb;
+}
+
+.alert-close:hover {
+    opacity: 1;
+    color: #ffffff;
+}
+
+.alert-success {
+    border-left: 4px solid #10b981;
+    background-color: rgba(17, 24, 39, 0.95);
+}
+
+.alert-danger {
+    border-left: 4px solid #ef4444;
+    background-color: rgba(17, 24, 39, 0.95);
+}
+
+.alert-warning {
+    border-left: 4px solid #f59e0b;
+    background-color: rgba(17, 24, 39, 0.95);
+}
+
+.alert-info {
+    border-left: 4px solid #3b82f6;
+    background-color: rgba(17, 24, 39, 0.95);
+}
+
+.alert.fade-out {
+    animation: slideOutDown 0.3s ease-out forwards;
+}
+
+/* Alert Animations */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutDown {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+/* Profile Popup Styling */
+.profile-popup {
+    position: absolute;
+    top: calc(100% - 4px);
+    right: 0;
+    z-index: 1100 !important; /* Higher z-index to ensure it's above everything */
+    min-width: 200px;
+}
+
+.profile-popup p {
+    word-wrap: break-word;
+}
+
+/* Enhanced Language Selector Styles */
+.language-selector-container {
+    position: relative;
+    overflow: visible; /* Allow dropdown to overflow */
+    z-index: 1100; /* Ensure it's above other elements */
+}
+
+.language-selector-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    backdrop-filter: blur(8px);
+    min-width: 120px;
+    justify-content: space-between;
+}
+
+.language-selector-button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.language-selector-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.2);
+}
+
+.language-selector-button .current-language {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.language-selector-button .dropdown-arrow {
+    transition: transform 0.2s ease-in-out;
+    opacity: 0.8;
+}
+
+.language-selector-button:hover .dropdown-arrow {
+    opacity: 1;
+}
+
+.language-dropdown {
+    min-width: 160px;
+    transform-origin: top right;
+    animation: dropdownSlideIn 0.2s ease-out;
+    z-index: 1100 !important; /* Higher z-index to ensure it's above everything */
+    position: absolute; /* Ensure it's positioned absolutely */
+}
+
+.language-dropdown.hidden {
+    display: none;
+}
+
+@keyframes dropdownSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.language-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    transition: all 0.15s ease-in-out;
+    border-radius: 0.375rem;
+    margin: 0.125rem;
+}
+
+.language-option:hover {
+    background-color: #f8fafc;
+    transform: translateX(2px);
+}
+
+.language-option.active {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    color: #1d4ed8;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+
+.language-option.active::before {
+    content: '✓';
+    position: absolute;
+    right: 1rem;
+    color: #1d4ed8;
+    font-weight: bold;
+}
+
+/* Enhanced Flag Icons */
+.flag-icon {
+    display: inline-block;
+    width: 20px;
+    height: 15px;
+    background-color: white;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.flag-icon-gb {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30"><rect width="60" height="30" fill="%23012169"/><path d="M0 0l60 30m0-30L0 30" stroke="%23fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="%23C8102E" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="%23fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="%23C8102E" stroke-width="6"/></svg>');
+}
+
+.flag-icon-fr {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2"><rect width="3" height="2" fill="white"/><rect width="1" height="2" fill="%23002395"/><rect width="1" height="2" x="1" fill="%23fff"/><rect width="1" height="2" x="2" fill="%23ED2939"/></svg>');
+}
+
+.flag-icon-es {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500"><rect width="750" height="500" fill="white"/><rect width="750" height="500" fill="%23c60b1e"/><rect width="750" height="250" y="125" fill="%23ffc400"/></svg>');
+}
+
+.flag-icon-sa {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="%23006c35"/><path d="M200 250l300 50l-300 50" stroke="%23fff" stroke-width="25" fill="none" stroke-linecap="round"/><circle cx="450" cy="300" r="60" fill="%23fff"/></svg>');
+}
+
+.flag-icon-ru {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 6"><rect width="9" height="6" fill="%23fff"/><rect width="9" height="4" y="2" fill="%23005aa6"/><rect width="9" height="2" y="4" fill="%23d52b1e"/></svg>');
+}
+
+.flag-icon-cn {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="%23de2910"/><path d="M0 0l180 120L0 240z" fill="%23ffde00"/><path d="M60 60l15 45h45l-37.5 27.5L90 150l-37.5-27.5L15 105h45z" fill="%23ffde00"/><path d="M0 0l60 40L0 80z" fill="%23ffde00"/><path d="M0 0l30 20L0 40z" fill="%23ffde00"/><path d="M0 0l15 10L0 20z" fill="%23ffde00"/></svg>');
+}
+
+.flag-icon-in {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="%23ff9933"/><rect width="900" height="300" y="150" fill="%23ffffff"/><rect width="900" height="300" y="450" fill="%23008800"/><circle cx="450" cy="300" r="60" fill="%23000088"/><circle cx="450" cy="300" r="48" fill="%23ffffff"/><circle cx="450" cy="300" r="36" fill="%23000088"/><circle cx="450" cy="300" r="24" fill="%23ffffff"/><circle cx="450" cy="300" r="12" fill="%23000088"/></svg>');
+}
+
+/* Custom Tooltip for Collapsed Sidebar */
+#sidebar-tooltip {
+    position: fixed;
+    left: 85px; /* Collapsed sidebar width (80px) + 5px gap */
+    background-color: #1a202c;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    z-index: 1050;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 1px solid #4a5568;
+    transform: translateY(-50%) translateX(-5px);
+}
+
+#sidebar-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* Language selector adjustments
+   - When using flags, hide the text and use a compact button.
+   - When flags are disabled, show the language name (default button styles apply). */
+.language-selector-button.flags-only .current-language-text {
+    display: none;
+}
+
+.language-selector-button.flags-only {
+    min-width: auto;
+    padding: 0.5rem;
+    justify-content: center;
+}
+
+.language-selector-button.flags-only .current-language {
+    justify-content: center;
+}
+
+/* Compact dropdown when flags are disabled (no flag images to accommodate) */
+.language-selector-button:not(.flags-only) ~ .language-dropdown {
+    min-width: auto;
+}
+
+.language-selector-button:not(.flags-only) ~ .language-dropdown .language-option {
+    gap: 0.25rem;
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+}
+
+.language-selector-button:not(.flags-only) {
+    min-width: auto;
+}
+
+/* Mobile optimization for notifications dropdown */
+@media (max-width: 768px) {
+    #notifications-dropdown {
+        position: fixed !important;
+        top: 4rem !important;
+        right: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        max-height: calc(100vh - 5rem) !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+    }
+
+    .notification-item {
+        padding: 1rem !important;
+    }
+
+    .notification-item h4 {
+        font-size: 0.875rem !important;
+    }
+
+    .notification-item p {
+        font-size: 0.8125rem !important;
+    }
+
+    .notifications-dropdown {
+        min-width: 100vw;
+    }
+}

@@ -1,0 +1,406 @@
+name: iOS Build
+
+# Avoid parallel iOS builds racing on the same Actions cache keys (Flutter SDK save often fails with
+# "Unable to reserve cache ... another job may be creating this cache", so the next run re-downloads ~2GB).
+concurrency:
+  group: ios-build-${{ github.repository }}
+  cancel-in-progress: false
+
+run-name: >-
+  ${{ format('iOS Build — {0} | {1} ({2})', inputs.build_target || 'device', inputs.organization_config || 'ifrc', inputs.backend_url) }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: 'Backend URL (profile: databank.ifrc.org → production; *.fly.dev → Humanitarian Databank demo; IFRC *-stage.ifrc.org → staging; localhost → development). Demo uses MOBILE_APP_API_KEY_LOCAL_DEV and bundle Humanitarian Databank (Demo).'
+        required: true
+        type: choice
+        options:
+          - http://localhost:5000
+          - http://10.0.2.2:5000
+          - https://backoffice-databank.fly.dev
+          - https://databank-stage.ifrc.org
+          - https://databank.ifrc.org
+        default: 'https://databank.ifrc.org'
+      organization_config:
+        description: 'Organization configuration (determines branding and app name)'
+        required: true
+        type: choice
+        options:
+          - ifrc
+          - ''
+        default: 'ifrc'
+      build_target:
+        description: 'device = iphoneos .app + unsigned IPA (install via AltStore/Sideloadly); simulator = debug ARM sim .app zipped as Runner.zip for Appetize.io (upload the inner Runner.zip, not device .ipa)'
+        required: true
+        type: choice
+        options:
+          - device
+          - simulator
+        default: 'device'
+      build_mode:
+        description: 'Build mode for device target: release (smaller, no debug banner) or debug (debug banner, verbose stack traces, asserts enabled — useful for on-device session/auth debugging)'
+        required: false
+        type: choice
+        options:
+          - release
+          - debug
+        default: 'release'
+      run_flutter_analyze:
+        description: 'Run flutter analyze before CocoaPods / Xcode (saves ~30–40s when disabled)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    # Public Next.js site for WebViews (Disaggregation, etc.) — same as AppConfig.productionFrontendUrl
+    env:
+      MOBILE_FRONTEND_URL: https://website-databank.fly.dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Determine Flutter project path
+        id: flutter_path
+        run: |
+          if [ -f "MobileApp/pubspec.yaml" ]; then
+            echo "path=MobileApp" >> $GITHUB_OUTPUT
+          elif [ -f "pubspec.yaml" ]; then
+            echo "path=." >> $GITHUB_OUTPUT
+          else
+            echo "Error: Could not find Flutter project"
+            exit 1
+          fi
+
+      # subosito/flutter-action's built-in cache uses a key that includes the engine revision and races when
+      # multiple jobs run (save fails → every run misses). We restore this path BEFORE the action and set
+      # cache: false on the action so only this step reads/writes the ~2GB SDK artifact.
+      # Bump ...-v2 if you change flutter-version above.
+      - name: Cache Flutter SDK (hostedtoolcache)
+        uses: actions/cache@v5
+        with:
+          path: /Users/runner/hostedtoolcache/flutter/stable-3.41.6-arm64
+          key: flutter-sdk-3.41.6-stable-${{ runner.os }}-${{ runner.arch }}-v2
+          restore-keys: |
+            flutter-sdk-3.41.6-stable-${{ runner.os }}-${{ runner.arch }}-
+
+      # Speed: avoid re-downloading Dart packages when lockfiles are unchanged (~10–20s per step).
+      # hashFiles() only accepts workspace-relative literals; this repo uses MobileApp/ (see Determine path step).
+      - name: Cache Pub (Dart packages)
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('MobileApp/pubspec.lock', 'MobileApp/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-pub-
+
+      # Cache workspace Pods AND CocoaPods download cache — Firebase binaries often land under
+      # ~/Library/Caches/CocoaPods, so caching only ios/Pods stays tiny (~15MB) and pod install re-downloads.
+      - name: Cache CocoaPods (Pods + CocoaPods cache)
+        uses: actions/cache@v5
+        with:
+          path: |
+            MobileApp/ios/Pods
+            /Users/runner/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-${{ runner.arch }}-ios-pods-${{ hashFiles('MobileApp/ios/Podfile.lock', 'MobileApp/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ios-pods-
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # Default image Xcode can lag; plugins may reference newer SDK APIs (e.g. device_info_plus 12+).
+          xcode-version: latest-stable
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.6 stable ships Dart 3.11.4.
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          # Disabled: we cache hostedtoolcache ourselves (see Cache Flutter SDK) to avoid cache key churn
+          # and "Unable to reserve cache" when multiple workflows use flutter-action concurrently.
+          cache: false
+
+      - name: Resolve iOS build target (device vs simulator)
+        id: ios_target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="${{ inputs.build_target }}"
+          else
+            TARGET="device"
+          fi
+          if [ "$TARGET" != "simulator" ]; then
+            TARGET="device"
+          fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "Resolved iOS build target: $TARGET"
+
+      - name: Resolve build profile from backend URL
+        id: resolve_env
+        run: |
+          BACKEND="${{ inputs.backend_url }}"
+          # Local / emulator → development (quick login, WebView localhost rules)
+          if [[ "$BACKEND" == *"localhost"* ]] || [[ "$BACKEND" == *"127.0.0.1"* ]] || [[ "$BACKEND" == *"10.0.2.2"* ]]; then
+            PROFILE=development
+          # Fly.io Humanitarian Databank preview (not IFRC staging)
+          elif [[ "$BACKEND" == *"fly.dev"* ]]; then
+            PROFILE=demo
+          # IFRC staging backoffice
+          elif [[ "$BACKEND" == *"-stage.ifrc.org"* ]]; then
+            PROFILE=staging
+          # Production IFRC backoffice
+          elif [[ "$BACKEND" == *"databank.ifrc.org"* ]]; then
+            PROFILE=production
+          else
+            echo "Unknown BACKEND_URL, defaulting profile to production: $BACKEND" >&2
+            PROFILE=production
+          fi
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          echo "Resolved build profile: $PROFILE"
+
+      - name: Resolve environment-specific API key
+        id: env_secrets
+        run: |
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) API_KEY="${{ secrets.MOBILE_APP_API_KEY_PRODUCTION }}" ;;
+            staging)    API_KEY="${{ secrets.MOBILE_APP_API_KEY_STAGING }}" ;;
+            demo)       API_KEY="${{ secrets.MOBILE_APP_API_KEY_LOCAL_DEV }}" ;;
+            *)          API_KEY="${{ secrets.MOBILE_APP_API_KEY_DEVELOPMENT }}" ;;
+          esac
+          echo "api_key=${API_KEY:-${{ secrets.MOBILE_APP_API_KEY }}}" >> "$GITHUB_OUTPUT"
+
+      - name: Create .env file with configuration
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          echo "BACKEND_URL=${{ inputs.backend_url }}" > .env
+          echo "FRONTEND_URL=$MOBILE_FRONTEND_URL" >> .env
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) echo "PRODUCTION=true" >> .env ;;
+            staging)    echo "STAGING=true" >> .env ;;
+            demo)       echo "DEMO=true" >> .env ;;
+            *)          echo "DEVELOPMENT=true" >> .env ;;
+          esac
+          echo "Created .env (profile=${{ steps.resolve_env.outputs.profile }}):"
+          echo "  BACKEND_URL=${{ inputs.backend_url }}"
+          echo "  FRONTEND_URL=$MOBILE_FRONTEND_URL"
+          cat .env
+
+      - name: Prepare Firebase iOS config (CI placeholder)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          cp ios/Runner/GoogleService-Info.plist.example ios/Runner/GoogleService-Info.plist
+
+      - name: Get Flutter dependencies
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: flutter pub get
+
+      - name: Analyze Dart (catch dependency/API issues before CocoaPods)
+        if: github.event_name != 'workflow_dispatch' || inputs.run_flutter_analyze
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        # --no-pub: pub get already ran; avoids a second full resolve (~10–20s in logs).
+        run: flutter analyze --no-fatal-infos --no-pub
+
+      - name: Install CocoaPods dependencies
+        working-directory: ${{ steps.flutter_path.outputs.path }}/ios
+        env:
+          COCOAPODS_DISABLE_STATS: 'true'
+        run: |
+          if ! command -v pod >/dev/null 2>&1; then
+            sudo gem install --no-document cocoapods
+          fi
+          # Plain install: Podfile.lock is authoritative. After Firebase bumps, refresh the lock via
+          # `.github/workflows/ios-regenerate-podfile-lock.yml` (repo-update every CI run costs ~30s+).
+          pod install
+
+      - name: Configure alternate bundle identifier and app name
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          PROFILE="${{ steps.resolve_env.outputs.profile }}"
+
+          # Derive a suffix for non-production builds so prod + demo/staging/dev can coexist on the same device.
+          if [ "$PROFILE" = "staging" ]; then
+            SUFFIX=".staging"
+          elif [ "$PROFILE" = "demo" ]; then
+            SUFFIX=".demo"
+          elif [ "$PROFILE" = "development" ]; then
+            SUFFIX=".dev"
+          else
+            SUFFIX=""
+          fi
+
+          if [ -n "$SUFFIX" ]; then
+            # iOS bundle ID — RunnerTests / AuditTrailWidget pick up the same prefix via the glob pattern.
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" ios/Runner.xcodeproj/project.pbxproj
+
+            # iOS App Group in entitlements — must be updated alongside the bundle ID so that prod and
+            # non-prod builds use SEPARATE Keychain partitions and shared-container NSUserDefaults.
+            # Without this patch both apps share group.com.hum.databank, which causes cross-app token
+            # overwrite (login on one app logs out the other).
+            sed -i '' "s/group\.com\.hum\.databank/group.com.hum.databank${SUFFIX}/g" ios/Runner/Runner.entitlements
+
+            # Android application ID + namespace — without this Android prevents dual-install because
+            # two apps with the same package name cannot coexist on the same device.
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" android/app/build.gradle
+          fi
+
+          # Resolve display name: IFRC staging / demo get explicit labels; prod/dev use org branding
+          if [ "$PROFILE" = "staging" ]; then
+            ENV_DISPLAY_NAME="IFRC Databank (Staging)"
+          elif [ "$PROFILE" = "demo" ]; then
+            ENV_DISPLAY_NAME="Humanitarian Databank (Demo)"
+          else
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              ORG="${{ inputs.organization_config }}"
+            else
+              ORG=ifrc
+            fi
+            if [ "$ORG" = "ifrc" ]; then
+              ENV_DISPLAY_NAME="IFRC Databank"
+            else
+              ENV_DISPLAY_NAME="Humanitarian Databank (CI - $PROFILE)"
+            fi
+          fi
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" ios/Runner/Info.plist > /dev/null 2>&1 && \
+            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName '$ENV_DISPLAY_NAME'" ios/Runner/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string '$ENV_DISPLAY_NAME'" ios/Runner/Info.plist
+
+          # Update URL scheme to avoid conflicts (optional - comment out if you want same scheme)
+          # /usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 'ifrcdatabankci'" ios/Runner/Info.plist
+
+      - name: Build iOS (no codesign)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        env:
+          IFRC_API_USER: ${{ secrets.IFRC_API_USER }}
+          IFRC_API_PASSWORD: ${{ secrets.IFRC_API_PASSWORD }}
+        run: |
+          # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step)
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) ENV_FLAG="PRODUCTION=true" ;;
+            staging)    ENV_FLAG="STAGING=true" ;;
+            demo)       ENV_FLAG="DEMO=true" ;;
+            *)          ENV_FLAG="DEVELOPMENT=true" ;;
+          esac
+
+          # Build with organization config if specified
+          ORG_CONFIG=""
+          if [ -n "${{ inputs.organization_config }}" ]; then
+            ORG_CONFIG="--dart-define=ORGANIZATION_CONFIG=${{ inputs.organization_config }}"
+          fi
+
+          # Simulator: Flutter does not support release or profile for iphonesimulator (JIT debug only).
+          if [ "${{ steps.ios_target.outputs.target }}" = "simulator" ]; then
+            # --no-pub: dependencies already resolved (pub get + pod install).
+            flutter build ios --simulator --debug --no-codesign --no-pub \
+              --dart-define=$ENV_FLAG \
+              --dart-define=BACKEND_URL="${{ inputs.backend_url }}" \
+              --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \
+              $ORG_CONFIG \
+              --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
+              --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}" \
+              --dart-define=IFRC_API_USER="$IFRC_API_USER" \
+              --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
+              --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+          else
+            # Device builds: release by default; debug mode shows the debug banner,
+            # enables asserts, and gives full stack traces — useful for on-device debugging
+            # (e.g. session invalidation root-cause). Install the unsigned IPA via
+            # AltStore or Sideloadly (free Apple ID, 7-day cert).
+            BUILD_MODE="${{ inputs.build_mode }}"
+            if [ "$BUILD_MODE" = "debug" ]; then
+              MODE_FLAG="--debug"
+            else
+              MODE_FLAG="--release"
+            fi
+            flutter build ios $MODE_FLAG --no-codesign --no-pub \
+              --dart-define=$ENV_FLAG \
+              --dart-define=BACKEND_URL="${{ inputs.backend_url }}" \
+              --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \
+              $ORG_CONFIG \
+              --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
+              --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}" \
+              --dart-define=IFRC_API_USER="$IFRC_API_USER" \
+              --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
+              --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+          fi
+
+      - name: Create unsigned IPA
+        if: steps.ios_target.outputs.target == 'device'
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          # Create a temporary directory for the IPA
+          mkdir -p build/ios/ipa/Payload
+          # Copy the app bundle
+          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          # Create the IPA archive with alternate bundle identifier name
+          cd build/ios/ipa
+          zip -r app-unsigned-ci.ipa Payload
+          cd ../../..
+
+      - name: Archive iOS build artifacts (device)
+        if: steps.ios_target.outputs.target == 'device'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-build-ci-${{ inputs.build_mode || 'release' }}
+          path: |
+            ${{ steps.flutter_path.outputs.path }}/build/ios/iphoneos/Runner.app
+            ${{ steps.flutter_path.outputs.path }}/build/ios/ipa/*.ipa
+          retention-days: 30
+
+      # Appetize.io requires a .zip (or .tar.gz) of the .app — not a raw folder upload.
+      # https://appetize.io/docs#section-ios — ARM simulator build (macos-latest) is recommended.
+      - name: Zip iOS Simulator bundle (Appetize)
+        if: steps.ios_target.outputs.target == 'simulator'
+        working-directory: ${{ steps.flutter_path.outputs.path }}/build/ios/iphonesimulator
+        run: |
+          if [ ! -d Runner.app ]; then
+            echo "Runner.app not found under iphonesimulator; listing build/ios:" >&2
+            find "${{ github.workspace }}/${{ steps.flutter_path.outputs.path }}/build/ios" -maxdepth 3 -type d 2>/dev/null || true
+            exit 1
+          fi
+          rm -f Runner.zip
+          # -y: store symlinks (avoids duplicated Flutter.framework copies in some toolchains)
+          zip -r -y Runner.zip Runner.app
+          ls -la Runner.zip
+
+      - name: Archive iOS Simulator build (Appetize .zip)
+        if: steps.ios_target.outputs.target == 'simulator'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-simulator-ci
+          path: ${{ steps.flutter_path.outputs.path }}/build/ios/iphonesimulator/Runner.zip
+          retention-days: 30
+
+      # Optional: Build IPA with code signing (requires Apple Developer account)
+      # Uncomment and configure the following steps if you have signing certificates
+      # - name: Setup Xcode
+      #   uses: maxim-lobanov/setup-xcode@v1
+      #   with:
+      #     xcode-version: latest-stable
+      #
+      # - name: Import Code Signing Certificate
+      #   uses: apple-actions/import-codesign-certs@v2
+      #   with:
+      #     p12-file-base64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+      #     p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      #
+      # - name: Build IPA
+      #   working-directory: MobileApp
+      #   run: |
+      #     # Use same profile as BACKEND_URL (see Resolve build profile from backend URL step)
+      #     flutter build ipa --release --dart-define=PRODUCTION=true
+      #     # or STAGING=true / DEVELOPMENT=true
+      #
+      # - name: Upload IPA
+      #   uses: actions/upload-artifact@v6
+      #   with:
+      #     name: ios-ipa
+      #     path: MobileApp/build/ios/ipa/*.ipa
+      #     retention-days: 30

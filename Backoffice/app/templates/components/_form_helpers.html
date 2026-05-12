@@ -1,0 +1,195 @@
+{# templates/_form_helpers.html #}
+{% macro render_field(field, label_visible=True, class="") %}
+  {#
+    Renders a WTForms field with a label, input, errors, and description.
+    - field: The WTForm field object.
+    - label_visible: Boolean, whether to display the label. Default is True.
+    - class: Optional string of CSS classes to add to the field's input element.
+    - Any other keyword arguments passed to this macro (e.g., placeholder, rows)
+      will be available in the implicit 'kwargs' dictionary and passed to the field widget.
+  #}
+  <div class="mb-4">
+    {% if label_visible and field.label %}
+      {{ field.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+    {% endif %}
+
+    {# Default classes for the field input, can be extended by the 'class' parameter #}
+    {% set base_input_classes = "shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %}
+    {% set final_input_classes = base_input_classes + " " + class if class else base_input_classes %}
+
+    {# Pass along any extra keyword arguments from the macro call to the field widget #}
+    {{ field(class=final_input_classes, **kwargs) }}
+
+    {% if field.errors %}
+      {% for error in field.errors %}
+        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+      {% endfor %}
+    {% endif %}
+
+    {# Display description if provided as a kwarg to the macro or on the field object itself #}
+    {% if kwargs.get('description') or field.description %}
+        <p class="mt-1 text-xs text-gray-500">{{ kwargs.get('description') or field.description }}</p>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro render_checkbox_group(field, legend_text="") %}
+  <div class="mb-4">
+    {% if legend_text or field.label %}
+      <legend class="block text-gray-700 text-sm font-semibold mb-2">{{ legend_text or field.label.text }}</legend>
+    {% endif %}
+    <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
+      {% for subfield in field %}
+        <label class="flex items-center text-sm text-gray-700">
+          {{ subfield(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+          <span class="ml-2">{{ subfield.label.text }}</span>
+        </label>
+      {% endfor %}
+    </div>
+    {% if field.errors %}
+      {% for error in field.errors %}
+        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+      {% endfor %}
+    {% endif %}
+    {% if field.description %}
+        <p class="mt-1 text-xs text-gray-500">{{ field.description }}</p>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro render_submit_button(field, class="btn btn-success") %}
+    {{ field(class=class) }}
+{% endmacro %}
+
+{% macro render_countries_by_region(field, countries_by_region, legend_text="") %}
+  <div class="mb-4">
+    {% if legend_text or field.label %}
+      <legend class="block text-gray-700 text-sm font-semibold mb-2">{{ legend_text or field.label.text }}</legend>
+    {% endif %}
+    <div class="p-4 border border-gray-200 rounded-md">
+      {# Global Select All Checkbox #}
+      <div class="flex items-center mb-4 pb-4 border-b border-gray-200">
+        <input type="checkbox" id="select-all-countries" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <label for="select-all-countries" class="ml-2 block text-sm font-bold text-gray-800">Select All Countries</label>
+      </div>
+
+      <div class="mt-1 space-y-4">
+        {% for region, countries in countries_by_region.items() %}
+          <div class="mb-4 last:mb-0">
+            <div class="flex items-center mb-2">
+              {# Region Checkbox (Select/Deselect All in Region) #}
+              <input type="checkbox"
+                     id="select-all-{{ region | replace(' ', '-') }}"
+                     class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 region-select-all"
+                     data-region="{{ region | replace(' ', '-') }}">
+              <label for="select-all-{{ region | replace(' ', '-') }}" class="ml-2 block text-sm font-bold text-gray-800">{{ region }}</label>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pl-6 region-countries" data-region="{{ region | replace(' ', '-') }}">
+              {% for country in countries %}
+                <div class="flex items-center">
+                  <input type="checkbox"
+                         name="{{ field.name }}"
+                         id="country-{{ country.id }}"
+                         value="{{ country.id }}"
+                         class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 country-checkbox"
+                         {% if field.object_data and country in field.object_data %}checked{% endif %}>
+                  <label for="country-{{ country.id }}" class="ml-2 block text-sm text-gray-900">{{ country.name }}</label>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% if field.errors %}
+      {% for error in field.errors %}
+        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get all "Select All" checkboxes for regions
+        const regionSelectAllCheckboxes = document.querySelectorAll('.region-select-all');
+        // Get all individual country checkboxes
+        const countryCheckboxes = document.querySelectorAll('.country-checkbox');
+        // Get the global "Select All" checkbox
+        const globalSelectAllCheckbox = document.getElementById('select-all-countries');
+
+        // Function to update the state of a region "Select All" checkbox
+        function updateRegionSelectAll(region) {
+            const regionSelectAllCheckbox = document.querySelector(`.region-select-all[data-region="${region}"]`);
+            const countriesInRegion = document.querySelectorAll(`.region-countries[data-region="${region}"] .country-checkbox`);
+            // Check if all countries in the region are checked, but only if there are countries in the region
+            const allChecked = countriesInRegion.length > 0 && Array.from(countriesInRegion).every(cb => cb.checked);
+            if (regionSelectAllCheckbox) {
+                regionSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+        // Function to update the state of the global "Select All" checkbox
+        function updateGlobalSelectAll() {
+            const allCountryCheckboxes = document.querySelectorAll('.country-checkbox');
+            // Check if all countries are checked, but only if there are countries
+            const allChecked = allCountryCheckboxes.length > 0 && Array.from(allCountryCheckboxes).every(cb => cb.checked);
+            if (globalSelectAllCheckbox) {
+                globalSelectAllCheckbox.checked = allChecked;
+            }
+        }
+
+        // Add event listener to the global "Select All" checkbox
+        if (globalSelectAllCheckbox) {
+            globalSelectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                // Set the checked state of all country checkboxes
+                countryCheckboxes.forEach(countryCheckbox => {
+                    countryCheckbox.checked = isChecked;
+                });
+                // Update the state of all region "Select All" checkboxes
+                regionSelectAllCheckboxes.forEach(regionCheckbox => {
+                    regionCheckbox.checked = isChecked;
+                });
+            });
+        }
+
+        // Add event listener to each region "Select All" checkbox
+        regionSelectAllCheckboxes.forEach(regionCheckbox => {
+            regionCheckbox.addEventListener('change', function() {
+                const region = this.dataset.region;
+                const isChecked = this.checked;
+                // Get all country checkboxes within this region
+                const countriesInRegion = document.querySelectorAll(`.region-countries[data-region="${region}"] .country-checkbox`);
+                // Set the checked state of country checkboxes based on the region checkbox
+                countriesInRegion.forEach(countryCheckbox => {
+                    countryCheckbox.checked = isChecked;
+                });
+                // After updating countries in the region, update the global select all checkbox
+                updateGlobalSelectAll();
+            });
+        });
+
+        // Add event listener to individual country checkboxes
+        countryCheckboxes.forEach(countryCheckbox => {
+            countryCheckbox.addEventListener('change', function() {
+                // Find the parent region container
+                const regionContainer = this.closest('.region-countries');
+                if (regionContainer) {
+                    const region = regionContainer.dataset.region;
+                    // Update the state of the region "Select All" checkbox
+                    updateRegionSelectAll(region);
+                }
+                // Update the state of the global "Select All" checkbox
+                updateGlobalSelectAll();
+            });
+        });
+
+        // Initial state on page load
+        updateGlobalSelectAll();
+        regionSelectAllCheckboxes.forEach(regionCheckbox => {
+            const region = regionCheckbox.dataset.region;
+            updateRegionSelectAll(region);
+        });
+    });
+  </script>
+{% endmacro %}

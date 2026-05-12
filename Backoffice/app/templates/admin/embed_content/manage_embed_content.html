@@ -1,0 +1,504 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_svg_icons.html" import svg_icon %}
+
+{% block title %}{{ _('Manage Embed Content') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Manage Embed Content'),
+    subtitle=_('Manage Power BI, Tableau Public, and other allowlisted embeds for the public website'),
+    icon='fas fa-code',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Website Management')},
+        {'name': _('Embed Content')}
+    ],
+    actions=[
+        {
+            'type': 'button',
+            'text': _('Add Embed'),
+            'icon': 'fas fa-plus',
+            'classes': 'professional-action-btn professional-action-btn-green',
+            'attributes': {'id': 'btn-add-embed'}
+        }
+    ]
+) }}
+
+{% if error %}
+<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 mb-6">
+    <i class="fas fa-exclamation-triangle mr-2"></i>{{ error }}
+</div>
+{% endif %}
+
+<div class="bg-white shadow border border-gray-200 overflow-hidden">
+    {% if items %}
+    <table class="min-w-full divide-y divide-gray-200" id="embed-table">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">#</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Title') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Category') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Type') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Updated') }}</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Actions') }}</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200" id="embed-tbody">
+            {% for item in items %}
+            <tr data-id="{{ item.id }}" class="hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-3 text-sm text-gray-500">{{ item.sort_order }}</td>
+                <td class="px-4 py-3">
+                    <div class="text-sm font-medium text-gray-900">{{ item.title }}</div>
+                    {% if item.description %}
+                    <div class="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{{ item.description }}</div>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                        {{ item.category | replace('_', ' ') | title }}
+                    </span>
+                    {% if item.page_slot %}
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 ml-1" title="{{ _('Page Slot') }}">
+                        <i class="fas fa-map-pin mr-1"></i>{{ item.page_slot | replace('_', ' ') | title }}
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">{{ item.embed_type }}</td>
+                <td class="px-4 py-3">
+                    {% if item.is_active %}
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                        <i class="fas fa-check-circle mr-1"></i>{{ _('Active') }}
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                        <i class="fas fa-minus-circle mr-1"></i>{{ _('Inactive') }}
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500">
+                    {{ item.updated_at.strftime('%Y-%m-%d %H:%M') if item.updated_at else '-' }}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <button type="button" class="btn btn-primary btn-sm js-embed-edit" data-item-id="{{ item.id }}"
+                                title="{{ _('Edit') }}">
+                            <i class="fas fa-edit"></i> {{ _('Edit') }}
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm js-embed-preview" data-item-id="{{ item.id }}"
+                                title="{{ _('Preview') }}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm js-embed-delete" data-item-id="{{ item.id }}"
+                                title="{{ _('Delete') }}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="text-center py-16">
+        <i class="fas fa-code text-4xl text-gray-300 mb-4"></i>
+        <p class="text-gray-500 mb-4">{{ _('No embed content items yet.') }}</p>
+        <button type="button" class="btn btn-success js-embed-open-create" id="btn-add-first-embed">
+            <i class="fas fa-plus mr-2"></i>{{ _('Add Your First Embed') }}
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<script type="application/json" id="embed-items-payload" nonce="{{ csp_nonce() }}">[{% for item in items %}{{- {'id': item.id, 'title': item.title, 'description': item.description or '', 'category': item.category, 'embed_url': item.embed_url, 'embed_type': item.embed_type, 'aspect_ratio': item.aspect_ratio or '', 'page_slot': item.page_slot or '', 'is_active': item.is_active}|tojson -}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+
+{# Create / Edit Modal #}
+<div id="embed-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none;">
+    <div class="bg-white w-full max-w-2xl mx-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+            <h3 id="modal-title" class="text-lg font-semibold text-gray-900">{{ _('Add Embed Content') }}</h3>
+            <button type="button" id="embed-modal-close" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+            <input type="hidden" id="embed-id" value="">
+
+            <div>
+                <label for="embed-title" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Title') }} <span class="text-red-500">*</span></label>
+                <input type="text" id="embed-title" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('e.g. ECHO Programmatic Partnership') }}">
+            </div>
+
+            <div>
+                <label for="embed-description" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                <textarea id="embed-description" rows="2" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Optional description...') }}"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="embed-category" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Category') }}</label>
+                    <select id="embed-category" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="global_initiative">{{ _('Global initiatives') }}</option>
+                        <option value="analysis">{{ _('Analysis') }}</option>
+                        <option value="tableau_program">{{ _('Tableau / dashboards') }}</option>
+                        <option value="partnerships">{{ _('Partnerships') }}</option>
+                        <option value="other">{{ _('Other') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="embed-type" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Embed type') }}</label>
+                    <select id="embed-type" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="powerbi">{{ _('Power BI') }}</option>
+                        <option value="tableau">{{ _('Tableau Public') }}</option>
+                        <option value="iframe">{{ _('Generic iframe (allowed hosts only)') }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label for="embed-page-slot" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Page Slot') }}</label>
+                <select id="embed-page-slot" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">{{ _('(None — unassigned)') }}</option>
+                    <option value="echo_partnership">{{ _('ECHO Programmatic Partnership') }}</option>
+                    <option value="grbm">{{ _('Global Route-based Migration') }}</option>
+                    <option value="phsm">{{ _('Professional Health Services Mapping') }}</option>
+                </select>
+                <p class="text-xs text-gray-400 mt-1">{{ _('Assigns this embed to a specific section on the Global Initiatives page.') }}</p>
+            </div>
+
+            <div>
+                <label for="embed-url" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Embed URL') }} <span class="text-red-500">*</span></label>
+                <textarea id="embed-url" rows="3" class="w-full border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Paste the view or embed URL (HTTPS only)') }}"></textarea>
+                <p id="embed-url-hint" class="text-xs text-gray-400 mt-1"></p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Aspect Ratio') }}</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="embed-aspect-ratio" class="w-24 border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="16:9">
+                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="16:9">16:9</button>
+                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="16:10">16:10</button>
+                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="4:3">4:3</button>
+                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="">{{ _('Auto') }}</button>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">{{ _('Auto-detected from pasted snippet, or pick a preset. Leave empty for default (75vh).') }}</p>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="embed-active" checked class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                <label for="embed-active" class="text-sm text-gray-700">{{ _('Active (visible on website)') }}</label>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+            <button type="button" class="btn btn-secondary" id="embed-modal-cancel">{{ _('Cancel') }}</button>
+            <button type="button" class="btn btn-success" id="btn-save-embed">
+                <i class="fas fa-save mr-1"></i>{{ _('Save') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+{# Preview Modal #}
+<div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none;">
+    <div class="bg-white w-full max-w-5xl mx-4 shadow-xl border border-gray-200" style="height:85vh;">
+        <div class="px-6 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+            <h3 id="preview-title" class="text-lg font-semibold text-gray-900">{{ _('Preview') }}</h3>
+            <button type="button" id="preview-modal-close" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="w-full" style="height:calc(85vh - 52px);">
+            <iframe id="preview-iframe" src="about:blank" class="w-full h-full border-0" referrerpolicy="no-referrer" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+
+{# Delete Confirmation Modal #}
+<div id="delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none;">
+    <div class="bg-white w-full max-w-md mx-4 shadow-xl border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-900">{{ _('Confirm Delete') }}</h3>
+        </div>
+        <div class="px-6 py-5">
+            <p class="text-sm text-gray-600">{{ _('Are you sure you want to delete') }} <strong id="delete-item-name"></strong>?</p>
+            <input type="hidden" id="delete-item-id" value="">
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+            <button type="button" class="btn btn-secondary" id="delete-modal-cancel">{{ _('Cancel') }}</button>
+            <button type="button" class="btn btn-danger" id="delete-modal-confirm">
+                <i class="fas fa-trash mr-1"></i>{{ _('Delete') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ super() }}
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    function csrfHeaders(extra) {
+        var token = document.querySelector('meta[name="csrf-token"]');
+        var h = { 'X-CSRFToken': token ? token.getAttribute('content') : '', 'X-Requested-With': 'XMLHttpRequest' };
+        if (extra) { for (var k in extra) { h[k] = extra[k]; } }
+        return h;
+    }
+    let embedItems = [];
+    try {
+        const el = document.getElementById('embed-items-payload');
+        if (el && el.textContent) {
+            embedItems = JSON.parse(el.textContent);
+        }
+    } catch (e) {
+        embedItems = [];
+    }
+
+    function findItem(itemId) {
+        const id = parseInt(itemId, 10);
+        return embedItems.find(function(x) { return x.id === id; });
+    }
+
+    function showModal(id) {
+        const m = document.getElementById(id);
+        if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+    }
+    function hideModal(id) {
+        const m = document.getElementById(id);
+        if (m) { m.style.display = 'none'; m.classList.add('hidden'); }
+    }
+
+    function updateEmbedUrlHint() {
+        var t = document.getElementById('embed-type');
+        var hint = document.getElementById('embed-url-hint');
+        if (!t || !hint) return;
+        var v = t.value;
+        if (v === 'tableau') {
+            hint.textContent = {{ _('HTTPS Tableau Public view URL, e.g. https://public.tableau.com/views/WorkbookName/SheetName. Embed parameters are added on the website.')|tojson }};
+        } else if (v === 'powerbi') {
+            hint.textContent = {{ _('HTTPS only. Hosts: app.powerbi.com, app.powerbigov.us, msit.powerbi.com')|tojson }};
+        } else {
+            hint.textContent = {{ _('HTTPS only. Allowed hosts: Power BI or Tableau Public domains above.')|tojson }};
+        }
+    }
+
+    function buildTableauEmbedSrc(viewUrl) {
+        var s = (viewUrl || '').trim();
+        if (!s) return s;
+        if (/[?&:]embed\s*=\s*y/i.test(s) || /:embed=y/.test(s)) return s;
+        return s + (s.indexOf('?') >= 0 ? '&' : '?') + ':embed=y&:showVizHome=no';
+    }
+
+    function embedPreviewSrc(url, embedType) {
+        var et = (embedType || 'powerbi').toLowerCase();
+        if (et === 'tableau') return buildTableauEmbedSrc(url);
+        return url;
+    }
+
+    var KNOWN_RATIOS = [[16,9],[16,10],[4,3],[3,2],[21,9],[1,1]];
+    function findDimension(text, dim) {
+        var cssPat = new RegExp("\\.css\\(\\s*['\"]" + dim + "['\"]\\s*,\\s*['\"]([\\d.]+)px['\"]", "i");
+        var m = text.match(cssPat);
+        if (m) return parseFloat(m[1]);
+        var attrPat = new RegExp(dim + "\\s*[:=]\\s*[\"']?([\\d.]+)", "i");
+        m = text.match(attrPat);
+        if (m) return parseFloat(m[1]);
+        return null;
+    }
+    function detectRatioFromSnippet(text) {
+        if (!text) return null;
+        var w = findDimension(text, 'width');
+        var h = findDimension(text, 'height');
+        if (!w || !h || w <= 0 || h <= 0) return null;
+        var actual = w / h;
+        for (var i = 0; i < KNOWN_RATIOS.length; i++) {
+            if (Math.abs(actual - KNOWN_RATIOS[i][0] / KNOWN_RATIOS[i][1]) < 0.04) {
+                return KNOWN_RATIOS[i][0] + ':' + KNOWN_RATIOS[i][1];
+            }
+        }
+        return Math.round(w) + ':' + Math.round(h);
+    }
+
+    function openCreateModal() {
+        document.getElementById('modal-title').textContent = '{{ _("Add Embed Content") }}';
+        document.getElementById('embed-id').value = '';
+        document.getElementById('embed-title').value = '';
+        document.getElementById('embed-description').value = '';
+        document.getElementById('embed-category').value = 'global_initiative';
+        document.getElementById('embed-page-slot').value = '';
+        document.getElementById('embed-url').value = '';
+        document.getElementById('embed-type').value = 'powerbi';
+        document.getElementById('embed-aspect-ratio').value = '';
+        document.getElementById('embed-active').checked = true;
+        updateEmbedUrlHint();
+        showModal('embed-modal');
+    }
+
+    function openEditModal(id, title, description, category, pageSlot, embedUrl, embedType, aspectRatio, isActive) {
+        document.getElementById('modal-title').textContent = '{{ _("Edit Embed Content") }}';
+        document.getElementById('embed-id').value = id;
+        document.getElementById('embed-title').value = title || '';
+        document.getElementById('embed-description').value = description || '';
+        document.getElementById('embed-category').value = category || 'global_initiative';
+        document.getElementById('embed-page-slot').value = pageSlot || '';
+        document.getElementById('embed-url').value = embedUrl || '';
+        document.getElementById('embed-type').value = embedType || 'powerbi';
+        document.getElementById('embed-aspect-ratio').value = aspectRatio || '';
+        document.getElementById('embed-active').checked = !!isActive;
+        updateEmbedUrlHint();
+        showModal('embed-modal');
+    }
+
+    function closeModal() { hideModal('embed-modal'); }
+
+    function saveEmbed() {
+        const id = document.getElementById('embed-id').value;
+        const payload = {
+            title: document.getElementById('embed-title').value.trim(),
+            description: document.getElementById('embed-description').value.trim(),
+            category: document.getElementById('embed-category').value.trim(),
+            page_slot: document.getElementById('embed-page-slot').value.trim() || null,
+            embed_url: document.getElementById('embed-url').value.trim(),
+            embed_type: document.getElementById('embed-type').value,
+            aspect_ratio: document.getElementById('embed-aspect-ratio').value.trim() || null,
+            is_active: document.getElementById('embed-active').checked
+        };
+
+        if (!payload.title || !payload.embed_url) {
+            alert('{{ _("Title and Embed URL are required.") }}');
+            return;
+        }
+
+        const url = id
+            ? '/admin/embed-content/' + id
+            : '/admin/embed-content/create';
+        const method = id ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: csrfHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json().then(function(d) { d._status = r.status; return d; }); })
+        .then(function(data) {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error || data.message || '{{ _("An error occurred.") }}');
+            }
+        })
+        .catch(function(err) {
+            console.error(err);
+            alert('{{ _("An error occurred.") }}');
+        });
+    }
+
+    function previewEmbed(url, title, embedType) {
+        document.getElementById('preview-title').textContent = title || '{{ _("Preview") }}';
+        document.getElementById('preview-iframe').src = embedPreviewSrc(url, embedType);
+        showModal('preview-modal');
+    }
+
+    function closePreview() {
+        document.getElementById('preview-iframe').src = 'about:blank';
+        hideModal('preview-modal');
+    }
+
+    function confirmDelete(id, name) {
+        document.getElementById('delete-item-id').value = id;
+        document.getElementById('delete-item-name').textContent = name;
+        showModal('delete-modal');
+    }
+
+    function closeDeleteModal() { hideModal('delete-modal'); }
+
+    function executeDelete() {
+        const id = document.getElementById('delete-item-id').value;
+        fetch('/admin/embed-content/' + id, {
+            method: 'DELETE',
+            headers: csrfHeaders({ 'Accept': 'application/json' }),
+            credentials: 'same-origin'
+        })
+        .then(function(r) { return r.json().then(function(d) { d._status = r.status; return d; }); })
+        .then(function(data) {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error || data.message || '{{ _("An error occurred.") }}');
+            }
+        })
+        .catch(function(err) {
+            console.error(err);
+            alert('{{ _("An error occurred.") }}');
+        });
+    }
+
+    var addBtn = document.getElementById('btn-add-embed');
+    if (addBtn) addBtn.addEventListener('click', openCreateModal);
+    var addFirst = document.getElementById('btn-add-first-embed');
+    if (addFirst) addFirst.addEventListener('click', openCreateModal);
+
+    var tbody = document.getElementById('embed-tbody');
+    if (tbody) {
+        tbody.addEventListener('click', function(e) {
+            var btn = e.target.closest('button');
+            if (!btn) return;
+            var itemId = btn.getAttribute('data-item-id');
+            var item = findItem(itemId);
+            if (!item) return;
+            if (btn.classList.contains('js-embed-edit')) {
+                openEditModal(item.id, item.title, item.description, item.category, item.page_slot, item.embed_url, item.embed_type, item.aspect_ratio, item.is_active);
+            } else if (btn.classList.contains('js-embed-preview')) {
+                previewEmbed(item.embed_url, item.title, item.embed_type);
+            } else if (btn.classList.contains('js-embed-delete')) {
+                confirmDelete(String(item.id), item.title);
+            }
+        });
+    }
+
+    var elClose = document.getElementById('embed-modal-close');
+    if (elClose) elClose.addEventListener('click', closeModal);
+    var elCancel = document.getElementById('embed-modal-cancel');
+    if (elCancel) elCancel.addEventListener('click', closeModal);
+    var elSave = document.getElementById('btn-save-embed');
+    if (elSave) elSave.addEventListener('click', saveEmbed);
+
+    var embedTypeSel = document.getElementById('embed-type');
+    if (embedTypeSel) embedTypeSel.addEventListener('change', updateEmbedUrlHint);
+
+    var prevClose = document.getElementById('preview-modal-close');
+    if (prevClose) prevClose.addEventListener('click', closePreview);
+
+    var delCancel = document.getElementById('delete-modal-cancel');
+    if (delCancel) delCancel.addEventListener('click', closeDeleteModal);
+    var delConfirm = document.getElementById('delete-modal-confirm');
+    if (delConfirm) delConfirm.addEventListener('click', executeDelete);
+
+    document.querySelectorAll('.js-ratio-preset').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.getElementById('embed-aspect-ratio').value = btn.getAttribute('data-ratio') || '';
+        });
+    });
+
+    var urlField = document.getElementById('embed-url');
+    if (urlField) {
+        urlField.addEventListener('input', function() {
+            var v = urlField.value;
+            if (v && v.length > 20) {
+                var detected = detectRatioFromSnippet(v);
+                if (detected) {
+                    document.getElementById('embed-aspect-ratio').value = detected;
+                }
+            }
+        });
+    }
+})();
+</script>
+{% endblock extra_js %}

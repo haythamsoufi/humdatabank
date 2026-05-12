@@ -1,0 +1,209 @@
+{
+  "supportMap": {
+    "QA": ["SY", "LB", "SD"]
+  },
+  "flows": {
+    "2023": [
+      { "from": "QA", "to": "SY", "value": 3 },
+      { "from": "QA", "to": "LB", "value": 2 },
+      { "from": "QA", "to": "SD", "value": 1 },
+      { "from": "DE", "to": "UA", "value": 2 },
+      { "from": "US", "to": "HT", "value": 1 }
+    ],
+    "2022": [
+      { "from": "QA", "to": "SY", "value": 2.5 },
+      { "from": "QA", "to": "LB", "value": 1.8 },
+      { "from": "QA", "to": "SD", "value": 0.9 },
+      { "from": "DE", "to": "UA", "value": 1.8 },
+      { "from": "US", "to": "HT", "value": 0.8 }
+    ],
+    "2021": [
+      { "from": "QA", "to": "SY", "value": 2.2 },
+      { "from": "QA", "to": "LB", "value": 1.5 },
+      { "from": "QA", "to": "SD", "value": 0.7 },
+      { "from": "DE", "to": "UA", "value": 1.5 },
+      { "from": "US", "to": "HT", "value": 0.6 }
+    ],
+    "2020": [
+      { "from": "QA", "to": "SY", "value": 1.8 },
+      { "from": "QA", "to": "LB", "value": 1.2 },
+      { "from": "QA", "to": "SD", "value": 0.5 },
+      { "from": "DE", "to": "UA", "value": 1.2 },
+      { "from": "US", "to": "HT", "value": 0.5 }
+    ],
+    "2019": [
+      { "from": "QA", "to": "SY", "value": 1.5 },
+      { "from": "QA", "to": "LB", "value": 1.0 },
+      { "from": "QA", "to": "SD", "value": 0.4 },
+      { "from": "DE", "to": "UA", "value": 1.0 },
+      { "from": "US", "to": "HT", "value": 0.4 }
+    ]
+  },
+  "indicators": {
+    "total-funding": {
+      "unit": "USD",
+      "data": {
+        "2023": {
+          "QA": { "value": 45000000, "name": "Qatar" },
+          "SY": { "value": 32000000, "name": "Syria" },
+          "LB": { "value": 18000000, "name": "Lebanon" },
+          "SD": { "value": 12000000, "name": "Sudan" },
+          "DE": { "value": 28000000, "name": "Germany" },
+          "UA": { "value": 15000000, "name": "Ukraine" },
+          "US": { "value": 55000000, "name": "United States" },
+          "HT": { "value": 8000000, "name": "Haiti" }
+        },
+        "2022": {
+          "QA": { "value": 42000000, "name": "Qatar" },
+          "SY": { "value": 30000000, "name": "Syria" },
+          "LB": { "value": 16500000, "name": "Lebanon" },
+          "SD": { "value": 11000000, "name": "Sudan" },
+          "DE": { "value": 26000000, "name": "Germany" },
+          "UA": { "value": 14000000, "name": "Ukraine" },
+          "US": { "value": 52000000, "name": "United States" },
+          "HT": { "value": 7500000, "name": "Haiti" }
+        },
+        "2021": {
+          "QA": { "value": 39000000, "name": "Qatar" },
+          "SY": { "value": 28000000, "name": "Syria" },
+          "LB": { "value": 15000000, "name": "Lebanon" },
+          "SD": { "value": 10000000, "name": "Sudan" },
+          "DE": { "value": 24000000, "name": "Germany" },
+          "UA": { "value": 13000000, "name": "Ukraine" },
+          "US": { "value": 49000000, "name": "United States" },
+          "HT": { "value": 7000000, "name": "Haiti" }
+        },
+        "2020": {
+          "QA": { "value": 36000000, "name": "Qatar" },
+          "SY": { "value": 26000000, "name": "Syria" },
+          "LB": { "value": 13500000, "name": "Lebanon" },
+          "SD": { "value": 9000000, "name": "Sudan" },
+          "DE": { "value": 22000000, "name": "Germany" },
+          "UA": { "value": 12000000, "name": "Ukraine" },
+          "US": { "value": 46000000, "name": "United States" },
+          "HT": { "value": 6500000, "name": "Haiti" }
+        },
+        "2019": {
+          "QA": { "value": 33000000, "name": "Qatar" },
+          "SY": { "value": 24000000, "name": "Syria" },
+          "LB": { "value": 12000000, "name": "Lebanon" },
+          "SD": { "value": 8000000, "name": "Sudan" },
+          "DE": { "value": 20000000, "name": "Germany" },
+          "UA": { "value": 11000000, "name": "Ukraine" },
+          "US": { "value": 43000000, "name": "United States" },
+          "HT": { "value": 6000000, "name": "Haiti" }
+        }
+      }
+    },
+    "people-reached": {
+      "unit": "People",
+      "data": {
+        "2023": {
+          "QA": { "value": 125000, "name": "Qatar" },
+          "SY": { "value": 2800000, "name": "Syria" },
+          "LB": { "value": 950000, "name": "Lebanon" },
+          "SD": { "value": 420000, "name": "Sudan" },
+          "DE": { "value": 180000, "name": "Germany" },
+          "UA": { "value": 3200000, "name": "Ukraine" },
+          "US": { "value": 210000, "name": "United States" },
+          "HT": { "value": 150000, "name": "Haiti" }
+        },
+        "2022": {
+          "QA": { "value": 118000, "name": "Qatar" },
+          "SY": { "value": 2650000, "name": "Syria" },
+          "LB": { "value": 900000, "name": "Lebanon" },
+          "SD": { "value": 400000, "name": "Sudan" },
+          "DE": { "value": 170000, "name": "Germany" },
+          "UA": { "value": 3000000, "name": "Ukraine" },
+          "US": { "value": 200000, "name": "United States" },
+          "HT": { "value": 142000, "name": "Haiti" }
+        },
+        "2021": {
+          "QA": { "value": 110000, "name": "Qatar" },
+          "SY": { "value": 2500000, "name": "Syria" },
+          "LB": { "value": 850000, "name": "Lebanon" },
+          "SD": { "value": 380000, "name": "Sudan" },
+          "DE": { "value": 160000, "name": "Germany" },
+          "UA": { "value": 2800000, "name": "Ukraine" },
+          "US": { "value": 190000, "name": "United States" },
+          "HT": { "value": 135000, "name": "Haiti" }
+        },
+        "2020": {
+          "QA": { "value": 102000, "name": "Qatar" },
+          "SY": { "value": 2350000, "name": "Syria" },
+          "LB": { "value": 800000, "name": "Lebanon" },
+          "SD": { "value": 360000, "name": "Sudan" },
+          "DE": { "value": 150000, "name": "Germany" },
+          "UA": { "value": 2600000, "name": "Ukraine" },
+          "US": { "value": 180000, "name": "United States" },
+          "HT": { "value": 128000, "name": "Haiti" }
+        },
+        "2019": {
+          "QA": { "value": 95000, "name": "Qatar" },
+          "SY": { "value": 2200000, "name": "Syria" },
+          "LB": { "value": 750000, "name": "Lebanon" },
+          "SD": { "value": 340000, "name": "Sudan" },
+          "DE": { "value": 140000, "name": "Germany" },
+          "UA": { "value": 2400000, "name": "Ukraine" },
+          "US": { "value": 170000, "name": "United States" },
+          "HT": { "value": 120000, "name": "Haiti" }
+        }
+      }
+    },
+    "services": {
+      "unit": "Services",
+      "data": {
+        "2023": {
+          "QA": { "value": 45, "name": "Qatar" },
+          "SY": { "value": 128, "name": "Syria" },
+          "LB": { "value": 67, "name": "Lebanon" },
+          "SD": { "value": 52, "name": "Sudan" },
+          "DE": { "value": 38, "name": "Germany" },
+          "UA": { "value": 142, "name": "Ukraine" },
+          "US": { "value": 58, "name": "United States" },
+          "HT": { "value": 34, "name": "Haiti" }
+        },
+        "2022": {
+          "QA": { "value": 42, "name": "Qatar" },
+          "SY": { "value": 120, "name": "Syria" },
+          "LB": { "value": 63, "name": "Lebanon" },
+          "SD": { "value": 49, "name": "Sudan" },
+          "DE": { "value": 36, "name": "Germany" },
+          "UA": { "value": 135, "name": "Ukraine" },
+          "US": { "value": 55, "name": "United States" },
+          "HT": { "value": 32, "name": "Haiti" }
+        },
+        "2021": {
+          "QA": { "value": 39, "name": "Qatar" },
+          "SY": { "value": 112, "name": "Syria" },
+          "LB": { "value": 59, "name": "Lebanon" },
+          "SD": { "value": 46, "name": "Sudan" },
+          "DE": { "value": 34, "name": "Germany" },
+          "UA": { "value": 128, "name": "Ukraine" },
+          "US": { "value": 52, "name": "United States" },
+          "HT": { "value": 30, "name": "Haiti" }
+        },
+        "2020": {
+          "QA": { "value": 36, "name": "Qatar" },
+          "SY": { "value": 104, "name": "Syria" },
+          "LB": { "value": 55, "name": "Lebanon" },
+          "SD": { "value": 43, "name": "Sudan" },
+          "DE": { "value": 32, "name": "Germany" },
+          "UA": { "value": 121, "name": "Ukraine" },
+          "US": { "value": 49, "name": "United States" },
+          "HT": { "value": 28, "name": "Haiti" }
+        },
+        "2019": {
+          "QA": { "value": 33, "name": "Qatar" },
+          "SY": { "value": 96, "name": "Syria" },
+          "LB": { "value": 51, "name": "Lebanon" },
+          "SD": { "value": 40, "name": "Sudan" },
+          "DE": { "value": 30, "name": "Germany" },
+          "UA": { "value": 114, "name": "Ukraine" },
+          "US": { "value": 46, "name": "United States" },
+          "HT": { "value": 26, "name": "Haiti" }
+        }
+      }
+    }
+  }
+}

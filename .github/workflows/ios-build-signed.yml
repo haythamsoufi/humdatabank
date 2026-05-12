@@ -1,0 +1,204 @@
+name: iOS Build (Signed IPA)
+
+on:
+  workflow_dispatch:  # Manual trigger only for security
+    inputs:
+      backend_url:
+        description: 'Backoffice URL (databank.ifrc.org → production; *.fly.dev → Humanitarian Databank demo; IFRC *-stage.ifrc.org → staging)'
+        required: true
+        type: choice
+        options:
+          - https://databank.ifrc.org
+          - https://backoffice-databank.fly.dev
+          - https://databank-stage.ifrc.org
+        default: 'https://databank.ifrc.org'
+      organization_config:
+        description: 'Organization configuration (determines branding and app name)'
+        required: true
+        type: choice
+        options:
+          - ifrc
+          - ''
+        default: 'ifrc'
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-signed:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.6 stable ships Dart 3.11.4.
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Determine Flutter project path
+        id: flutter_path
+        run: |
+          if [ -f "MobileApp/pubspec.yaml" ]; then
+            echo "path=MobileApp" >> $GITHUB_OUTPUT
+          elif [ -f "pubspec.yaml" ]; then
+            echo "path=." >> $GITHUB_OUTPUT
+          else
+            echo "Error: Could not find Flutter project"
+            exit 1
+          fi
+
+      - name: Resolve build profile from backend URL
+        id: resolve_env
+        run: |
+          BACKEND="${{ inputs.backend_url }}"
+          if [[ "$BACKEND" == *"localhost"* ]] || [[ "$BACKEND" == *"127.0.0.1"* ]] || [[ "$BACKEND" == *"10.0.2.2"* ]]; then
+            PROFILE=development
+          elif [[ "$BACKEND" == *"fly.dev"* ]]; then
+            PROFILE=demo
+          elif [[ "$BACKEND" == *"-stage.ifrc.org"* ]]; then
+            PROFILE=staging
+          elif [[ "$BACKEND" == *"databank.ifrc.org"* ]]; then
+            PROFILE=production
+          else
+            echo "Unknown BACKEND_URL, defaulting profile to production: $BACKEND" >&2
+            PROFILE=production
+          fi
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          echo "Resolved build profile: $PROFILE"
+
+      - name: Resolve environment-specific API key
+        id: env_secrets
+        run: |
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) API_KEY="${{ secrets.MOBILE_APP_API_KEY_PRODUCTION }}" ;;
+            staging)    API_KEY="${{ secrets.MOBILE_APP_API_KEY_STAGING }}" ;;
+            demo)       API_KEY="${{ secrets.MOBILE_APP_API_KEY_LOCAL_DEV }}" ;;
+            *)          API_KEY="${{ secrets.MOBILE_APP_API_KEY_DEVELOPMENT }}" ;;
+          esac
+          echo "api_key=${API_KEY:-${{ secrets.MOBILE_APP_API_KEY }}}" >> "$GITHUB_OUTPUT"
+
+      - name: Create .env file with configuration
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          echo "BACKEND_URL=${{ inputs.backend_url }}" > .env
+          echo "FRONTEND_URL=https://website-databank.fly.dev" >> .env
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) echo "PRODUCTION=true" >> .env ;;
+            staging)    echo "STAGING=true" >> .env ;;
+            demo)       echo "DEMO=true" >> .env ;;
+            *)          echo "DEVELOPMENT=true" >> .env ;;
+          esac
+          echo "Created .env (profile=${{ steps.resolve_env.outputs.profile }}):"
+          cat .env
+
+      - name: Prepare Firebase iOS config (CI placeholder)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          cp ios/Runner/GoogleService-Info.plist.example ios/Runner/GoogleService-Info.plist
+
+      - name: Get Flutter dependencies
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: flutter pub get
+
+      - name: Analyze Dart (catch dependency/API issues before CocoaPods)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: flutter analyze --no-fatal-infos
+
+      - name: Install CocoaPods dependencies
+        working-directory: ${{ steps.flutter_path.outputs.path }}/ios
+        run: |
+          sudo gem install cocoapods
+          pod install --repo-update
+
+      - name: Configure alternate bundle identifier and app name
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          PROFILE="${{ steps.resolve_env.outputs.profile }}"
+
+          if [ "$PROFILE" = "staging" ]; then
+            SUFFIX=".staging"
+          elif [ "$PROFILE" = "demo" ]; then
+            SUFFIX=".demo"
+          elif [ "$PROFILE" = "development" ]; then
+            SUFFIX=".dev"
+          else
+            SUFFIX=""
+          fi
+
+          if [ -n "$SUFFIX" ]; then
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" ios/Runner.xcodeproj/project.pbxproj
+            sed -i '' "s/group\.com\.hum\.databank/group.com.hum.databank${SUFFIX}/g" ios/Runner/Runner.entitlements
+            sed -i '' "s/com\.hum\.databank/com.hum.databank${SUFFIX}/g" android/app/build.gradle
+          fi
+
+          if [ "$PROFILE" = "staging" ]; then
+            ENV_DISPLAY_NAME="IFRC Databank (Staging)"
+          elif [ "$PROFILE" = "demo" ]; then
+            ENV_DISPLAY_NAME="Humanitarian Databank (Demo)"
+          else
+            ORG="${{ inputs.organization_config }}"
+            if [ "$ORG" = "ifrc" ]; then
+              ENV_DISPLAY_NAME="IFRC Databank"
+            else
+              ENV_DISPLAY_NAME="Humanitarian Databank (CI - $PROFILE)"
+            fi
+          fi
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" ios/Runner/Info.plist > /dev/null 2>&1 && \
+            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName '$ENV_DISPLAY_NAME'" ios/Runner/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string '$ENV_DISPLAY_NAME'" ios/Runner/Info.plist
+
+      - name: Import Code Signing Certificate
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+
+      - name: Build IPA
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) ENV_FLAG="PRODUCTION=true" ;;
+            staging)    ENV_FLAG="STAGING=true" ;;
+            demo)       ENV_FLAG="DEMO=true" ;;
+            *)          ENV_FLAG="DEVELOPMENT=true" ;;
+          esac
+
+          ORG_CONFIG=""
+          if [ -n "${{ inputs.organization_config }}" ]; then
+            ORG_CONFIG="--dart-define=ORGANIZATION_CONFIG=${{ inputs.organization_config }}"
+          fi
+
+          flutter build ipa --release \
+            --dart-define=$ENV_FLAG \
+            --dart-define=BACKEND_URL="${{ inputs.backend_url }}" \
+            --dart-define=FRONTEND_URL="https://website-databank.fly.dev" \
+            $ORG_CONFIG \
+            --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
+            --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}" \
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-ipa-${{ github.run_number }}
+          path: ${{ steps.flutter_path.outputs.path }}/build/ios/ipa/*.ipa
+          retention-days: 90
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-logs
+          path: |
+            ${{ steps.flutter_path.outputs.path }}/build/ios/**/*.log
+          retention-days: 7

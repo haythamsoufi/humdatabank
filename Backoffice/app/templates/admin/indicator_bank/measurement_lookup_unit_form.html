@@ -1,0 +1,59 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "macros/delete_confirm_modal.html" import delete_confirm_modal %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=title,
+    icon='fas fa-balance-scale',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+        {'name': _('Types & units'), 'url': url_for('system_admin.manage_measurement_lookups')},
+        {'name': title}
+    ],
+) }}
+
+<div class="max-w-3xl mx-auto px-4 py-6">
+  {% if form_action_url is not defined or not form_action_url %}
+  {% if is_edit and row %}
+  {% set form_action_url = url_for("system_admin.edit_measurement_unit", uid=row.id) %}
+  {% else %}
+  {% set form_action_url = url_for("system_admin.new_measurement_unit") %}
+  {% endif %}
+  {% endif %}
+  {% set modal = false %}
+  {% include "admin/indicator_bank/measurement_lookup_unit_form_partial.html" with context %}
+</div>
+
+{% if is_edit and row and usage_count is defined and usage_count == 0 and not (modal|default(true)) %}
+<form id="deleteMeasurementUnitForm" method="post" action="{{ url_for('system_admin.delete_measurement_unit', uid=row.id) }}" class="hidden" aria-hidden="true">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{{ delete_confirm_modal(
+    modal_id='deleteMeasurementUnitModal',
+    modal_title=_('Delete unit'),
+    message=_('Are you sure you want to delete this unit? This cannot be undone.'),
+    confirm_button_id='deleteMeasurementUnitConfirm',
+    confirm_text=_('Delete'),
+) }}
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  var openBtn = document.getElementById('deleteMeasurementUnitOpen');
+  var modal = document.getElementById('deleteMeasurementUnitModal');
+  var confirmBtn = document.getElementById('deleteMeasurementUnitConfirm');
+  var form = document.getElementById('deleteMeasurementUnitForm');
+  if (!openBtn || !modal || !confirmBtn || !form) return;
+  openBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    modal.classList.remove('hidden');
+  });
+  confirmBtn.addEventListener('click', function () {
+    form.submit();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

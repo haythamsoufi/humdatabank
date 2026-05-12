@@ -1,0 +1,925 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ _('Assignments Timeline') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Timeline Chart - Tailwind Compatible Styles */
+
+        /* Custom components that work with existing Tailwind */
+        .timeline-controls-grid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+            gap: 1rem !important;
+        }
+
+        @media (min-width: 1024px) {
+            .timeline-controls-grid {
+                grid-template-columns: repeat(4, 1fr) !important;
+            }
+        }
+
+        .timeline-chart-container {
+            min-height: 500px;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background: white;
+            position: relative;
+        }
+
+        #gantt-chart { position: relative; }
+
+
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=_('Assignments Timeline'),
+    icon='fas fa-chart-gantt',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Assignment Management'), 'url': url_for('assignment_management.manage_assignments')},
+        {'name': _('Timeline View')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Back'),
+            'url': url_for('assignment_management.manage_assignments'),
+            'icon': 'fas fa-arrow-left',
+            'classes': 'professional-action-btn'
+        }
+    ]
+) }}
+
+<!-- Timeline Container -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+    {% if grouped_assignments %}
+        <!-- Statistics -->
+        <div class="px-6 py-4 bg-white">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center hover:shadow-md transition-shadow cursor-pointer hover:border-blue-300" data-filter="total">
+                    <div class="text-2xl font-bold text-gray-900 mb-1">{{ grouped_assignments|map(attribute='assignments')|map('length')|sum }}</div>
+                    <div class="text-sm text-gray-600 font-medium">{{ _('Total Assignments') }}</div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center hover:shadow-md transition-shadow cursor-pointer hover:border-blue-300" data-filter="active">
+                    <div class="text-2xl font-bold text-gray-900 mb-1">{{ grouped_assignments|sum(attribute='active_count') }}</div>
+                    <div class="text-sm text-gray-600 font-medium">{{ _('Active Public') }}</div>
+            </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center hover:shadow-md transition-shadow cursor-pointer hover:border-blue-300" data-filter="countries">
+                    <div class="text-2xl font-bold text-gray-900 mb-1">{{ total_unique_countries }}</div>
+                    <div class="text-sm text-gray-600 font-medium">{{ _('Unique Countries') }}</div>
+            </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center hover:shadow-md transition-shadow cursor-pointer hover:border-blue-300" data-filter="templates">
+                    <div class="text-2xl font-bold text-gray-900 mb-1">{{ grouped_assignments|length }}</div>
+                    <div class="text-sm text-gray-600 font-medium">{{ _('Templates') }}</div>
+            </div>
+            </div>
+    </div>
+
+        <!-- Controls -->
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700" for="status-filter">{{ _('Status') }}</label>
+                    <select id="status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">{{ _('All Statuses') }}</option>
+                        <option value="active">{{ _('Active Public') }}</option>
+                        <option value="inactive">{{ _('Inactive Public') }}</option>
+                        <option value="no-url">{{ _('No Public URL') }}</option>
+                    </select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700" for="template-filter">{{ _('Template') }}</label>
+                    <select id="template-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">{{ _('All Templates') }}</option>
+                        {% for group in grouped_assignments %}
+                        <option value="{{ group.template_name }}">{{ group.template_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700" for="date-from">{{ _('From Date') }}</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="date-from-year" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></select>
+                        <select id="date-from-month" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">{{ _('All Months') }}</option>
+                            <option value="1">Jan</option>
+                            <option value="2">Feb</option>
+                            <option value="3">Mar</option>
+                            <option value="4">Apr</option>
+                            <option value="5">May</option>
+                            <option value="6">Jun</option>
+                            <option value="7">Jul</option>
+                            <option value="8">Aug</option>
+                            <option value="9">Sep</option>
+                            <option value="10">Oct</option>
+                            <option value="11">Nov</option>
+                            <option value="12">Dec</option>
+                        </select>
+                    </div>
+                    <input type="hidden" id="date-from">
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700" for="date-to">{{ _('To Date') }}</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="date-to-year" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></select>
+                        <select id="date-to-month" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">{{ _('All Months') }}</option>
+                            <option value="1">Jan</option>
+                            <option value="2">Feb</option>
+                            <option value="3">Mar</option>
+                            <option value="4">Apr</option>
+                            <option value="5">May</option>
+                            <option value="6">Jun</option>
+                            <option value="7">Jul</option>
+                            <option value="8">Aug</option>
+                            <option value="9">Sep</option>
+                            <option value="10">Oct</option>
+                            <option value="11">Nov</option>
+                            <option value="12">Dec</option>
+                        </select>
+                    </div>
+                    <input type="hidden" id="date-to">
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-between items-center gap-3 pt-4 border-t border-gray-200">
+                <div class="flex gap-2">
+                    <button type="button" id="reset-filters" class="btn btn-secondary btn-sm inline-flex gap-2">
+                        <i class="fas fa-undo"></i>
+                        {{ _('Reset') }}
+                    </button>
+                    <button id="toggle-view" class="btn btn-primary">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>{{ _('Show All Years') }}</span>
+                    </button>
+                </div>
+                <div class="flex gap-2">
+                    <button id="export-btn" class="btn btn-dark border-gray-600">
+                        <i class="fas fa-download"></i>
+                        {{ _('Export') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Alert -->
+        <div id="filter-alert" class="hidden mx-6 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p id="filter-text" class="text-sm text-blue-800 m-0"></p>
+        </div>
+
+        <!-- Chart -->
+        <div class="px-6 py-4">
+            <div class="flex flex-wrap justify-between items-center mb-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex gap-3 items-center">
+                    <span id="view-info" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded-full text-gray-600">{{ _('Current Year View') }}</span>
+                    <span id="count-info" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded-full text-gray-600">{{ _('Loading...') }}</span>
+                </div>
+            </div>
+
+            <div class="timeline-chart-container">
+                <div id="chart-loading" class="hidden absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10">
+                    <div class="flex items-center gap-3 text-gray-600">
+                        <div class="loading-spinner"></div>
+                        <span>{{ _('Loading timeline...') }}</span>
+            </div>
+            </div>
+                <div id="gantt-chart" class="w-full"></div>
+            </div>
+        </div>
+
+
+    {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-16 px-4">
+            <div class="text-gray-300 mb-4">
+                <i class="fas fa-chart-gantt text-6xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-600 mb-2">{{ _('No Assignments Found') }}</h3>
+            <p class="text-gray-500 mb-6">{{ _('Create your first assignment to see the timeline view.') }}</p>
+            <a href="{{ url_for('assignment_management.manage_assignments') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                {{ _('Create Assignment') }}
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Export Modal -->
+<div id="export-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">{{ _('Export Timeline') }}</h3>
+            <button type="button" id="modal-close" class="btn btn-close-icon text-xl leading-none" aria-label="{{ _('Close') }}">&times;</button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2" for="export-format">{{ _('Format') }}</label>
+                <select id="export-format" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="png">{{ _('PNG Image') }}</option>
+                    <option value="pdf">{{ _('PDF Document') }}</option>
+                </select>
+            </div>
+            <div class="flex gap-3 justify-end pt-4">
+                <button id="export-cancel" class="btn btn-secondary btn-sm">{{ _('Cancel') }}</button>
+                <button id="export-confirm" class="btn btn-primary">{{ _('Export') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/**
+ * Timeline Chart - Production Ready Implementation
+ */
+class TimelineChart {
+    constructor() {
+        this.originalData = {{ grouped_assignments|tojson|safe }};
+        this.filteredData = this.originalData;
+        this.chart = null;
+        this.dataTable = null;
+        this.currentView = 'current-year';
+        this.filters = {
+            status: '',
+            template: '',
+            dateFrom: '',
+            dateTo: ''
+        };
+
+        this.init();
+    }
+
+    init() {
+        this.bindEvents();
+        this.loadChart();
+        this.setDateDefaults();
+        this.updateFilterInfo();
+    }
+
+    bindEvents() {
+        // Filter controls
+        document.getElementById('status-filter').addEventListener('change', () => this.handleFilterChange());
+        document.getElementById('template-filter').addEventListener('change', () => this.handleFilterChange());
+        // Year/Month selectors -> hidden inputs -> handleFilterChange
+        const syncDates = () => {
+            const fy = document.getElementById('date-from-year').value;
+            const fm = document.getElementById('date-from-month').value;
+            const ty = document.getElementById('date-to-year').value;
+            const tm = document.getElementById('date-to-month').value;
+
+            // Build YYYY-MM-01 when month is selected, otherwise YYYY-01-01
+            const fromVal = fy ? `${fy}-${String(fm || 1).padStart(2, '0')}-01` : '';
+            // For 'to' date, if month selected, set to last day of that month
+            let toVal = '';
+            if (ty) {
+                const month = Number(tm || 12);
+                const lastDay = new Date(ty, month, 0).getDate();
+                toVal = `${ty}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            }
+
+            document.getElementById('date-from').value = fromVal;
+            document.getElementById('date-to').value = toVal;
+        };
+
+        ['date-from-year','date-from-month','date-to-year','date-to-month'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', () => { syncDates(); this.handleFilterChange(); });
+            }
+        });
+
+        // Action buttons
+        document.getElementById('reset-filters').addEventListener('click', () => this.resetFilters());
+        document.getElementById('toggle-view').addEventListener('click', () => this.toggleView());
+        document.getElementById('export-btn').addEventListener('click', () => this.showExportModal());
+
+        // Modal controls
+        document.getElementById('modal-close').addEventListener('click', () => this.hideExportModal());
+        document.getElementById('export-cancel').addEventListener('click', () => this.hideExportModal());
+        document.getElementById('export-confirm').addEventListener('click', () => this.performExport());
+
+        // Close modal on overlay click
+        document.getElementById('export-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'export-modal') this.hideExportModal();
+        });
+    }
+
+    setDateDefaults() {
+        // Set default date range based on data
+        let minDate = null, maxDate = null;
+
+        this.originalData.forEach(group => {
+            group.assignments.forEach(assignment => {
+                const start = new Date(assignment.start_date);
+                const end = new Date(assignment.end_date);
+
+                if (!minDate || start < minDate) minDate = start;
+                if (!maxDate || end > maxDate) maxDate = end;
+            });
+        });
+
+        if (minDate && maxDate) {
+            // Populate year selectors range
+            const minYear = minDate.getFullYear();
+            const maxYear = maxDate.getFullYear();
+
+            const fillYears = (selectId) => {
+                const sel = document.getElementById(selectId);
+                if (!sel) return;
+                sel.innerHTML = '<option value="">'+ '{{ _("All Years") }}' +'</option>';
+                for (let y = minYear; y <= maxYear; y++) {
+                    const opt = document.createElement('option');
+                    opt.value = y;
+                    opt.textContent = y;
+                    sel.appendChild(opt);
+                }
+            };
+
+            fillYears('date-from-year');
+            fillYears('date-to-year');
+
+            // Defaults to overall min/max
+            document.getElementById('date-from-year').value = String(minYear);
+            document.getElementById('date-to-year').value = String(maxYear);
+            document.getElementById('date-from-month').value = '';
+            document.getElementById('date-to-month').value = '';
+
+            // Sync hidden inputs
+            const lastDay = new Date(maxYear, 12, 0).getDate();
+            document.getElementById('date-from').value = `${minYear}-01-01`;
+            document.getElementById('date-to').value = `${maxYear}-12-${String(lastDay).padStart(2, '0')}`;
+        }
+    }
+
+    loadChart() {
+        if (typeof google !== 'undefined' && google.charts) {
+            google.charts.load('current', { packages: ['timeline'] });
+            google.charts.setOnLoadCallback(() => this.renderChart());
+        } else {
+            // Fallback to load Google Charts
+            const script = document.createElement('script');
+            script.src = 'https://www.gstatic.com/charts/loader.js';
+            script.onload = () => {
+                google.charts.load('current', { packages: ['timeline'] });
+                google.charts.setOnLoadCallback(() => this.renderChart());
+            };
+            document.head.appendChild(script);
+        }
+    }
+
+    handleFilterChange() {
+        // Get current filter values
+        this.filters.status = document.getElementById('status-filter').value;
+        this.filters.template = document.getElementById('template-filter').value;
+        this.filters.dateFrom = document.getElementById('date-from').value;
+        this.filters.dateTo = document.getElementById('date-to').value;
+
+        this.applyFilters();
+        this.renderChart();
+    }
+
+    applyFilters() {
+        // First, narrow to the selected template (if any)
+        const templateFiltered = this.originalData.filter(templateGroup => {
+            if (this.filters.template && templateGroup.template_name !== this.filters.template) {
+                return false;
+            }
+            return true;
+        });
+
+        // Then, filter each group's assignments based on status and date filters
+        const mapped = templateFiltered.map(templateGroup => {
+            const filteredAssignments = templateGroup.assignments.filter(assignment => {
+                // Status filter
+                if (this.filters.status) {
+                    const status = assignment.public_active ? 'active' : (assignment.has_public_url ? 'inactive' : 'no-url');
+                    if (status !== this.filters.status) {
+                        return false;
+                    }
+                }
+
+                // Date range filters (keep assignments fully within range)
+                if (this.filters.dateFrom) {
+                    const startDate = new Date(assignment.start_date);
+                    if (startDate < new Date(this.filters.dateFrom)) {
+                        return false;
+                    }
+                }
+
+                if (this.filters.dateTo) {
+                const endDate = new Date(assignment.end_date);
+                    if (endDate > new Date(this.filters.dateTo)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            return { ...templateGroup, assignments: filteredAssignments };
+        });
+
+        // Keep only groups that still have at least one assignment
+        this.filteredData = mapped.filter(group => group.assignments.length > 0);
+
+        this.updateFilterInfo();
+    }
+
+    updateFilterInfo() {
+        const totalFiltered = this.filteredData.reduce((sum, group) => sum + group.assignments.length, 0);
+        const totalOriginal = this.originalData.reduce((sum, group) => sum + group.assignments.length, 0);
+
+        // Update info badge
+        document.getElementById('count-info').textContent = `${totalFiltered} assignments`;
+
+        // Show filter alert if filters are active
+        const alertEl = document.getElementById('filter-alert');
+        const textEl = document.getElementById('filter-text');
+
+        if (totalFiltered < totalOriginal) {
+            textEl.textContent = `Showing ${totalFiltered} of ${totalOriginal} assignments (filtered)`;
+            alertEl.classList.remove('hidden');
+            } else {
+            alertEl.classList.add('hidden');
+        }
+    }
+
+    getTemplateColor(templateName) {
+        // Generate a consistent color for each template based on its position in sorted list
+        const colors = [
+            '#2563eb', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+            '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1',
+            '#14b8a6', '#f43f5e', '#a855f7', '#0ea5e9', '#22c55e',
+            '#f97316', '#ec4899', '#6366f1', '#14b8a6', '#f43f5e',
+            '#a855f7', '#0ea5e9', '#22c55e', '#2563eb', '#ef4444',
+            '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#84cc16'
+        ];
+
+        // Get all unique template names and sort them for consistent ordering
+        if (!this.templateColorMap) {
+            this.templateColorMap = {};
+            const uniqueTemplates = [...new Set(this.originalData.map(group => group.template_name))].sort();
+
+            uniqueTemplates.forEach((template, index) => {
+                this.templateColorMap[template] = colors[index % colors.length];
+            });
+        }
+
+        return this.templateColorMap[templateName] || colors[0];
+    }
+
+    resetFilters() {
+        this.filters = { status: '', template: '', dateFrom: '', dateTo: '' };
+
+        document.getElementById('status-filter').value = '';
+        document.getElementById('template-filter').value = '';
+        document.getElementById('date-from').value = '';
+        document.getElementById('date-to').value = '';
+
+        this.filteredData = this.originalData;
+        this.setDateDefaults();
+        this.updateFilterInfo();
+        this.renderChart();
+    }
+
+    toggleView() {
+        const btn = document.getElementById('toggle-view');
+        const span = btn.querySelector('span');
+        const info = document.getElementById('view-info');
+
+        if (this.currentView === 'current-year') {
+            this.currentView = 'all-years';
+            span.textContent = '{{ _("Show Current Year") }}';
+            info.textContent = '{{ _("All Years View") }}';
+        } else {
+            this.currentView = 'current-year';
+            span.textContent = '{{ _("Show All Years") }}';
+            info.textContent = '{{ _("Current Year View") }}';
+        }
+
+        this.renderChart();
+    }
+
+    renderChart() {
+        if (!this.filteredData.length) {
+            document.getElementById('gantt-chart').innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; height: 300px; color: #6b7280;">
+                    <div style="text-align: center;">
+                        <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>No assignments match the current filters</p>
+                    </div>
+                </div>`;
+            return;
+        }
+
+        this.showLoading();
+
+        try {
+            // Create data table for Timeline
+            this.rowAssignmentIds = [];
+            this.dataTable = new google.visualization.DataTable();
+            this.dataTable.addColumn({ type: 'string', id: 'Template' });
+            this.dataTable.addColumn({ type: 'string', id: 'Assignment' });
+            this.dataTable.addColumn({ type: 'date', id: 'Start' });
+            this.dataTable.addColumn({ type: 'date', id: 'End' });
+            this.dataTable.addColumn({ type: 'string', role: 'style' });
+            this.dataTable.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+
+            const prepared = this.prepareChartData();
+            const rows = prepared.rows;
+            this.rowAssignmentIds = prepared.assignmentIds;
+            this.minStartMs = prepared.minStartMs;
+            this.maxEndMs = prepared.maxEndMs;
+            this.dataTable.addRows(rows);
+
+            // Chart options for Timeline
+            const templateCount = new Set(rows.map(r => r[0])).size;
+            const options = {
+                height: Math.max(360, templateCount * 46 + 120),
+                tooltip: { isHtml: true },
+                timeline: {
+                    groupByRowLabel: true,
+                    colorByRowLabel: false,
+                    barLabelStyle: { fontName: 'Inter', fontSize: 12, color: '#374151' },
+                    rowLabelStyle: { fontName: 'Inter', fontSize: 13, color: '#1f2937', fontWeight: '600' }
+            },
+            backgroundColor: 'white',
+                hAxis: {
+                    textStyle: { color: '#6b7280', fontSize: 12 },
+                    // Force the horizontal axis to show the full year range for current year view
+                    ...(this.currentView === 'current-year' ? {
+                        viewWindowMode: 'explicit',
+                        viewWindow: {
+                            min: this.minStartMs,
+                            max: this.maxEndMs
+                        }
+                    } : {})
+                }
+            };
+
+            // Create chart
+            this.chart = new google.visualization.Timeline(document.getElementById('gantt-chart'));
+
+            // Add event listener for clicks using row-to-id mapping
+            google.visualization.events.addListener(this.chart, 'select', () => {
+                const selection = this.chart.getSelection();
+                if (selection.length > 0) {
+                    const rowIndex = selection[0].row;
+                    const assignmentId = this.rowAssignmentIds[rowIndex];
+                    // Only navigate if it's a real assignment (not dummy data)
+                    if (assignmentId && !isNaN(assignmentId) && assignmentId !== null) {
+                            window.location.href = `/admin/assignments/edit/${assignmentId}`;
+                        }
+                    // If assignmentId is null, it's dummy data - do nothing
+                }
+            });
+
+            // Chart ready event
+            google.visualization.events.addListener(this.chart, 'ready', () => {
+                // Chart is ready
+            });
+
+            this.chart.draw(this.dataTable, options);
+
+            // Window resize handler removed - no longer needed
+            this.hideLoading();
+
+    } catch (error) {
+            console.error('Chart rendering error:', error);
+            this.hideLoading();
+            document.getElementById('gantt-chart').innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; height: 300px; color: #ef4444;">
+                    <div style="text-align: center;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>Error loading chart. Please try again.</p>
+                    </div>
+                </div>`;
+        }
+    }
+
+    prepareChartData() {
+        const rows = [];
+        const assignmentIds = [];
+        let minStartMs = Infinity;
+        let maxEndMs = -Infinity;
+        const currentYear = new Date().getFullYear();
+
+        // Group all assignments by template name first
+        const templateGroups = {};
+
+        this.filteredData.forEach(templateGroup => {
+            if (!templateGroups[templateGroup.template_name]) {
+                templateGroups[templateGroup.template_name] = [];
+            }
+
+            templateGroup.assignments.forEach(assignment => {
+                const startDate = new Date(assignment.start_date);
+                const endDate = new Date(assignment.end_date);
+
+                // Apply year filtering for current year view
+                if (this.currentView === 'current-year') {
+                    const assignmentYear = startDate.getFullYear();
+                    if (assignmentYear !== currentYear && endDate.getFullYear() !== currentYear) {
+                        return; // Skip this assignment
+                    }
+                }
+
+                templateGroups[templateGroup.template_name].push({
+                    ...assignment,
+                    startDate,
+                    endDate,
+                    templateName: templateGroup.template_name
+                });
+                });
+            });
+
+        // Create individual bars for each assignment on a single row per template (Timeline groups by first column)
+        Object.keys(templateGroups).sort().forEach(templateName => {
+            const assignments = templateGroups[templateName];
+
+            if (assignments.length === 0) return;
+
+            // Sort assignments by start date within each template
+            assignments.sort((a, b) => a.startDate - b.startDate);
+
+            // Create individual bars for each assignment
+            assignments.forEach((assignment, index) => {
+                const duration = Math.ceil((assignment.endDate - assignment.startDate) / (1000 * 60 * 60 * 24));
+                const status = assignment.public_active ? 'Active' :
+                             assignment.has_public_url ? 'Inactive' : 'No URL';
+
+                // Color based on template (consistent for all assignments in same template)
+                const color = this.getTemplateColor(templateName);
+                const style = `color: ${color}`;
+
+                const tooltip = `
+                    <div style="padding:10px; border-radius:8px; background:#111827; color:#fff;">
+                        <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(templateName)} · ${escapeHtml(assignment.name)}</div>
+                        <div style="opacity:.9;">Status: ${escapeHtml(status)}</div>
+                        <div style="opacity:.9;">Countries: ${parseInt(assignment.countries_count, 10) || 0}</div>
+                        <div style="opacity:.9; margin-top:4px;">${escapeHtml(assignment.startDate.toDateString())} – ${escapeHtml(assignment.endDate.toDateString())}</div>
+                    </div>
+                `;
+
+                rows.push([
+                    templateName,               // Row label (template)
+                    assignment.name,            // Bar label (assignment)
+                    assignment.startDate,       // Start
+                    assignment.endDate,         // End
+                    style,                      // Style (color)
+                    tooltip                     // Tooltip
+                ]);
+                assignmentIds.push(assignment.id);
+                // Track global range for today line
+                const s = assignment.startDate.getTime();
+                const e = assignment.endDate.getTime();
+                if (s < minStartMs) minStartMs = s;
+                if (e > maxEndMs) maxEndMs = e;
+            });
+        });
+
+        // For current year view, ensure we show the full year even if no assignments exist
+        if (this.currentView === 'current-year') {
+            const yearStart = new Date(currentYear, 0, 1); // January 1st
+            const yearEnd = new Date(currentYear, 11, 31); // December 31st
+
+            // Set the range to the full year
+            minStartMs = yearStart.getTime();
+            maxEndMs = yearEnd.getTime();
+        }
+
+        // Sort rows by row label (template) then by start date within template
+        rows.sort((a, b) => {
+            const rowLabelA = a[0];
+            const rowLabelB = b[0];
+            if (rowLabelA === rowLabelB) {
+                const startA = a[2];
+                const startB = b[2];
+                return startA - startB;
+            }
+            return rowLabelA.localeCompare(rowLabelB);
+        });
+
+        return { rows, assignmentIds, minStartMs, maxEndMs };
+    }
+
+
+    showLoading() {
+        document.getElementById('chart-loading').classList.remove('hidden');
+    }
+
+    hideLoading() {
+        document.getElementById('chart-loading').classList.add('hidden');
+    }
+
+    showExportModal() {
+        document.getElementById('export-modal').classList.remove('hidden');
+    }
+
+    hideExportModal() {
+        document.getElementById('export-modal').classList.add('hidden');
+    }
+
+    performExport() {
+        const format = document.getElementById('export-format').value;
+
+        if (format === 'png') {
+            this.exportAsPNG();
+        } else if (format === 'pdf') {
+            // For PDF export, you'd need to implement server-side functionality
+            if (window.showAlert) window.showAlert('PDF export functionality would be implemented server-side', 'info');
+            else window.__clientLog && window.__clientLog('PDF export would be server-side');
+        }
+
+        this.hideExportModal();
+    }
+
+    exportAsPNG() {
+        // Check if chart is available and has data
+        if (!this.chart) {
+            if (window.showAlert) window.showAlert('Chart is not ready. Please wait for it to load completely.', 'warning');
+            else window.__clientWarn && window.__clientWarn('Chart not ready');
+            return;
+        }
+
+        if (!this.dataTable || this.dataTable.getNumberOfRows() === 0) {
+            if (window.showAlert) window.showAlert('No data available to export.', 'warning');
+            else window.__clientWarn && window.__clientWarn('No data');
+            return;
+        }
+
+        // Check if html2canvas is available, if not try to load it
+        if (typeof html2canvas === 'undefined') {
+            this.loadHtml2Canvas().then(() => {
+                this.performHtml2CanvasExport();
+            }).catch(() => {
+                if (window.showAlert) window.showAlert('Failed to load export library. Please check your internet connection and try again.', 'error');
+                else console.error('Failed to load export library');
+            });
+            return;
+        }
+
+        this.performHtml2CanvasExport();
+    }
+
+    loadHtml2Canvas() {
+        return new Promise((resolve, reject) => {
+            // Check if already loaded
+            if (typeof html2canvas !== 'undefined') {
+                resolve();
+                return;
+            }
+
+            // Try primary CDN first
+            this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')
+                .then(() => resolve())
+                .catch(() => {
+                    // Fallback to jsDelivr CDN
+                    this.loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js')
+                        .then(() => resolve())
+                        .catch(() => {
+                            // Final fallback to unpkg CDN
+                            this.loadScript('https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js')
+                                .then(() => resolve())
+                                .catch(() => reject(new Error('Failed to load html2canvas from any CDN')));
+                        });
+                });
+        });
+    }
+
+    loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = () => {
+                if (typeof html2canvas !== 'undefined') {
+                    resolve();
+                } else {
+                    reject(new Error('html2canvas failed to load'));
+                }
+            };
+            script.onerror = () => {
+                reject(new Error('Failed to load html2canvas script'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    performHtml2CanvasExport() {
+        try {
+            // Show loading state
+            const exportBtn = document.getElementById('export-confirm');
+            const originalText = exportBtn.textContent;
+            exportBtn.textContent = 'Exporting...';
+            exportBtn.disabled = true;
+
+            // Generate filename with timestamp and filter info
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filterInfo = this.getFilterInfo();
+            const filename = `timeline-chart-${filterInfo}-${timestamp}.png`;
+
+            // Get the chart container element
+            const chartElement = document.getElementById('gantt-chart');
+
+            // Use html2canvas to capture the chart as an image
+            html2canvas(chartElement, {
+                backgroundColor: '#ffffff',
+                scale: 2, // Higher resolution
+                useCORS: true,
+                allowTaint: true,
+                logging: false
+            }).then(canvas => {
+                // Convert canvas to data URL
+                const imageURI = canvas.toDataURL('image/png');
+
+                // Create download link
+                const link = document.createElement('a');
+                link.href = imageURI;
+                link.download = filename;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // Reset button state
+                exportBtn.textContent = originalText;
+                exportBtn.disabled = false;
+            }).catch(error => {
+                console.error('html2canvas failed:', error);
+                if (window.showAlert) window.showAlert('Failed to export chart. Please try again.', 'error');
+                else console.error('Export failed');
+
+                // Reset button state
+                exportBtn.textContent = originalText;
+                exportBtn.disabled = false;
+            });
+
+        } catch (error) {
+            console.error('Export failed:', error);
+            if (window.showAlert) window.showAlert('Failed to export chart. Please try again.', 'error');
+            else console.error('Failed to export chart');
+
+            // Reset button state
+            const exportBtn = document.getElementById('export-confirm');
+            exportBtn.textContent = 'Export';
+            exportBtn.disabled = false;
+        }
+    }
+
+    getFilterInfo() {
+        const filters = [];
+        if (this.filters.status) filters.push(this.filters.status);
+        if (this.filters.template) filters.push(this.filters.template);
+        if (this.filters.dateFrom) filters.push('from-' + this.filters.dateFrom);
+        if (this.filters.dateTo) filters.push('to-' + this.filters.dateTo);
+
+        return filters.length > 0 ? filters.join('-') : 'all';
+    }
+
+
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    new TimelineChart();
+    });
+</script>
+{% endblock %}

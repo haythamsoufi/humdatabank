@@ -1,0 +1,148 @@
+/* Dashboard-specific styles */
+
+/* Force sharp corners within the dashboard only */
+.sharp-ui * { border-radius: 0 !important; }
+/* Preserve circular avatars */
+.sharp-ui .avatar-circle, .sharp-ui .avatar-circle * { border-radius: 9999px !important; }
+/* Assignment grid cards: keep rounded container + pill badges (exception to sharp-ui) */
+.sharp-ui .dashboard-assignment-card {
+    border-radius: 0.5rem !important;
+}
+.sharp-ui .dashboard-assignment-card .rounded-full {
+    border-radius: 9999px !important;
+}
+.sharp-ui .dashboard-assignment-card .rounded-lg {
+    border-radius: 0.5rem !important;
+}
+
+/* Dashboard-specific header styling (extends executive-header.css) */
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.control-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: none;
+    letter-spacing: 0.05em;
+}
+
+.control-wrapper select,
+.control-wrapper input {
+    background: #ffffff !important;
+    border: 1.5px solid #d1d5db !important;
+    border-radius: 4px !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+    min-width: 180px !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+.control-wrapper select:focus,
+.control-wrapper input:focus {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1) !important;
+    outline: none !important;
+}
+
+.control-wrapper select:hover,
+.control-wrapper input:hover {
+    border-color: #9ca3af !important;
+}
+
+
+/* Dropdown positioning for create report button */
+#self-report-templates-dropdown {
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+}
+
+/* Country search dropdown positioning */
+.control-wrapper .enhanced-search-dropdown #search_dropdown {
+    z-index: 9999 !important;
+    position: absolute !important;
+}
+
+/* Entity dropdown positioning - ensure spacing from right edge */
+#entity_search_dropdown {
+    right: 0;
+    max-width: min(24rem, calc(100vw - 2rem));
+    /* Allow JavaScript to override positioning */
+    position: absolute;
+}
+
+/* Ensure dropdown doesn't extend beyond viewport on small screens */
+@media (max-width: 1024px) {
+    #entity_search_dropdown {
+        max-width: calc(100vw - 2rem);
+    }
+}
+
+/* Ensure header content doesn't clip dropdowns */
+.header-content-wrapper {
+    overflow: visible;
+}
+
+.action-controls {
+    overflow: visible;
+}
+
+.control-group {
+    overflow: visible;
+}
+
+.control-wrapper {
+    overflow: visible;
+}
+
+/* Ensure the enhanced search dropdown container allows overflow */
+.enhanced-search-dropdown {
+    overflow: visible;
+}
+
+.enhanced-search-dropdown .relative {
+    overflow: visible;
+}
+
+/* Profile icon tooltip - only show on hover of the icon container */
+.profile-icon-tooltip-container:hover .profile-icon-tooltip {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Contributor avatar stack (used on dashboard cards) */
+.contributor-avatar-stack .profile-icon-circle {
+    margin-right: 0 !important; /* override profile_icon macro spacing */
+}
+
+.contributor-avatar {
+    position: relative;
+}
+
+.contributor-avatar + .contributor-avatar {
+    /* Show ~20% of each previous avatar (md is 32px, overlap ~26px) */
+    margin-left: -26px;
+}
+
+.contributor-avatar .profile-icon {
+    margin: 0 !important;
+}
+
+.contributor-avatar .profile-icon-circle {
+    border: 2px solid #ffffff; /* separation between stacked circles */
+}
+
+/* Dashboard-specific responsive adjustments */
+@media (max-width: 768px) {
+    .control-wrapper select,
+    .control-wrapper input {
+        min-width: 100% !important;
+    }
+}

@@ -1,0 +1,502 @@
+{# Entity Dropdown Component - Wrapper for Enhanced Search Dropdown #}
+{#
+  Usage:
+  {% include 'components/entity_dropdown.html' %}
+
+  Required variables:
+  - user_entities: List of entity dictionaries with 'entity_type', 'entity_id', and 'entity' keys
+  - selected_entity: Currently selected entity object (optional)
+  - selected_entity_type: Currently selected entity type (optional)
+  - selected_entity_id: Currently selected entity ID (optional)
+  - form_action: URL for form submission
+  - csrf_token: CSRF token for form
+#}
+
+<div class="enhanced-search-dropdown relative">
+    <div class="flex items-center gap-2">
+        <label for="entity_search_input" class="control-label flex-shrink-0">{{ _('Entity') }}:</label>
+        <div class="relative">
+            <input type="text"
+                   id="entity_search_input"
+                   placeholder="{{ _('Search entities...') }}"
+                   class="block w-64 py-2 px-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                   autocomplete="off">
+            <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                <button type="button"
+                        id="entity_clear_search"
+                        class="text-gray-400 hover:text-gray-600 mr-1 hidden"
+                        title="{{ _('Clear search') }}">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    {# Hidden form for submission #}
+    <form id="entity_search_form" method="POST" action="{{ form_action }}" class="hidden">
+        <input type="hidden" id="entity_search_select" name="entity_select" value="">
+        {% if csrf_token %}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% endif %}
+    </form>
+
+    {# Dropdown with search results #}
+    <div id="entity_search_dropdown" class="absolute z-50 w-96 max-w-screen-sm mt-1 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-96 overflow-y-auto overflow-x-hidden">
+        <div id="entity_search_list" class="py-1">
+            {# Define entity type order and labels #}
+            {% set entity_type_order = ['country', 'national_society', 'ns_branch', 'ns_subbranch', 'ns_localunit', 'division', 'department', 'regional_office', 'cluster_office'] %}
+
+            {# Display groups in predefined order #}
+            {% for entity_type in entity_type_order %}
+                {% set entities_in_type = user_entities | selectattr('entity_type', 'equalto', entity_type) | list %}
+                {% if entities_in_type | length > 0 %}
+                    {# Get entity type label and icon #}
+                    {% set type_label = '' %}
+                    {% set type_icon = '' %}
+                    {% if entity_type == 'country' %}
+                        {% set type_label = _('Country') %}
+                        {% set type_icon = 'fa-globe' %}
+                    {% elif entity_type == 'national_society' %}
+                        {% set type_label = _('National Society') %}
+                        {% set type_icon = 'fa-flag' %}
+                    {% elif entity_type == 'ns_branch' %}
+                        {% set type_label = _('NS Branch') %}
+                        {% set type_icon = 'fa-sitemap' %}
+                    {% elif entity_type == 'ns_subbranch' %}
+                        {% set type_label = _('NS Sub-branch') %}
+                        {% set type_icon = 'fa-code-branch' %}
+                    {% elif entity_type == 'ns_localunit' %}
+                        {% set type_label = _('NS Local Unit') %}
+                        {% set type_icon = 'fa-map-marker-alt' %}
+                    {% elif entity_type == 'division' %}
+                        {% set type_label = _('Division') %}
+                        {% set type_icon = 'fa-building' %}
+                    {% elif entity_type == 'department' %}
+                        {% set type_label = _('Department') %}
+                        {% set type_icon = 'fa-briefcase' %}
+                    {% else %}
+                        {% set type_label = entity_type | replace('_', ' ') | title %}
+                        {% set type_icon = 'fa-folder' %}
+                    {% endif %}
+
+                    {# Group header #}
+                    <div class="entity-group-header px-3 py-2 bg-gray-50 border-b border-gray-200 sticky top-0 z-10 cursor-pointer" role="button" tabindex="0" aria-expanded="true">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas {{ type_icon }} mr-2 text-gray-600"></i>
+                                <span class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                    {{ type_label }}
+                                </span>
+                                <span class="ml-2 text-xs text-gray-500">
+                                    ({{ entities_in_type | length }})
+                                </span>
+                            </div>
+                            <i class="fas fa-chevron-up text-gray-500 transition-transform duration-150 chevron-icon"></i>
+                        </div>
+                    </div>
+
+                    {# Entities in this group - sorted alphabetically by localized name #}
+                    {% set sorted_entities = [] %}
+                    {% for entity_item in entities_in_type %}
+                        {% set entity = entity_item.entity %}
+                        {% set entity_type = entity_item.entity_type %}
+                        {% set entity_id = entity_item.entity_id %}
+                        {% set entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
+                        {% set __ = sorted_entities.append({
+                            'entity': entity,
+                            'entity_type': entity_type,
+                            'entity_id': entity_id,
+                            'entity_name': entity_name,
+                            'entity_item': entity_item
+                        }) %}
+                    {% endfor %}
+                    {% set sorted_entities = sorted_entities | sort(attribute='entity_name') %}
+                    <div class="entity-group-items">
+                    {% for entity_data in sorted_entities %}
+                        {% set entity = entity_data.entity %}
+                        {% set entity_type = entity_data.entity_type %}
+                        {% set entity_id = entity_data.entity_id %}
+                        {% set entity_name = entity_data.entity_name %}
+                        {% set is_selected = selected_entity_type == entity_type and selected_entity_id == entity_id %}
+
+                        <div class="dropdown-option px-3 py-2 pl-6 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-start justify-between"
+                             data-item-id="{{ entity_type }}:{{ entity_id }}"
+                             data-item-name="{{ entity_name }}"
+                             data-item-type="{{ entity_type }}"
+                             data-group-header="{{ type_label }}"
+                             {% if is_selected %}data-selected="true"{% endif %}>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-gray-900 whitespace-normal break-words item-name">
+                                    {{ entity_name }}
+                                </div>
+                            </div>
+                            {% if is_selected %}
+                                <svg class="h-4 w-4 text-blue-600 flex-shrink-0 ml-2 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            {# Display any entity types not in the predefined order #}
+            {% set all_types = user_entities | map(attribute='entity_type') | unique | list %}
+            {% for entity_type in all_types %}
+                {% if entity_type not in entity_type_order %}
+                    {% set entities_in_type = user_entities | selectattr('entity_type', 'equalto', entity_type) | list %}
+                    {# Get entity type label and icon #}
+                    {% set type_label = entity_type | replace('_', ' ') | title %}
+                    {% set type_icon = 'fa-folder' %}
+
+                    {# Group header #}
+                    <div class="entity-group-header px-3 py-2 bg-gray-50 border-b border-gray-200 sticky top-0 z-10 cursor-pointer" role="button" tabindex="0" aria-expanded="true">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas {{ type_icon }} mr-2 text-gray-600"></i>
+                                <span class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                    {{ type_label }}
+                                </span>
+                                <span class="ml-2 text-xs text-gray-500">
+                                    ({{ entities_in_type | length }})
+                                </span>
+                            </div>
+                            <i class="fas fa-chevron-up text-gray-500 transition-transform duration-150 chevron-icon"></i>
+                        </div>
+                    </div>
+
+                    {# Entities in this group - sorted alphabetically by localized name #}
+                    {% set sorted_entities = [] %}
+                    {% for entity_item in entities_in_type %}
+                        {% set entity = entity_item.entity %}
+                        {% set entity_type = entity_item.entity_type %}
+                        {% set entity_id = entity_item.entity_id %}
+                        {% set entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
+                        {% set __ = sorted_entities.append({
+                            'entity': entity,
+                            'entity_type': entity_type,
+                            'entity_id': entity_id,
+                            'entity_name': entity_name,
+                            'entity_item': entity_item
+                        }) %}
+                    {% endfor %}
+                    {% set sorted_entities = sorted_entities | sort(attribute='entity_name') %}
+                    <div class="entity-group-items">
+                    {% for entity_data in sorted_entities %}
+                        {% set entity = entity_data.entity %}
+                        {% set entity_type = entity_data.entity_type %}
+                        {% set entity_id = entity_data.entity_id %}
+                        {% set entity_name = entity_data.entity_name %}
+                        {% set is_selected = selected_entity_type == entity_type and selected_entity_id == entity_id %}
+
+                        <div class="dropdown-option px-3 py-2 pl-6 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-start justify-between"
+                             data-item-id="{{ entity_type }}:{{ entity_id }}"
+                             data-item-name="{{ entity_name }}"
+                             data-item-type="{{ entity_type }}"
+                             data-group-header="{{ type_label }}"
+                             {% if is_selected %}data-selected="true"{% endif %}>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-gray-900 whitespace-normal break-words item-name">
+                                    {{ entity_name }}
+                                </div>
+                            </div>
+                            {% if is_selected %}
+                                <svg class="h-4 w-4 text-blue-600 flex-shrink-0 ml-2 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <div id="entity_no_results" class="px-3 py-2 text-sm text-gray-500 hidden">
+            <div class="text-center py-2">
+                <svg class="mx-auto h-6 w-6 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                {{ _('No entities found matching your search.') }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    // Entity Dropdown functionality - similar to country dropdown but for entities
+    const searchInput = document.getElementById('entity_search_input');
+    const searchDropdown = document.getElementById('entity_search_dropdown');
+    const searchList = document.getElementById('entity_search_list');
+    const noResults = document.getElementById('entity_no_results');
+    const clearBtn = document.getElementById('entity_clear_search');
+    const searchForm = document.getElementById('entity_search_form');
+    const searchSelect = document.getElementById('entity_search_select');
+
+    if (!searchInput || !searchDropdown || !searchList) return;
+
+    let selectedEntityId = null;
+    let selectedEntityName = null;
+    let highlightedIndex = -1; // For keyboard navigation
+
+    // Set initial value if entity is selected
+    {% if selected_entity_type and selected_entity_id %}
+        {% set selected_display_name = EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) %}
+        selectedEntityId = '{{ selected_entity_type }}:{{ selected_entity_id }}';
+        selectedEntityName = {{ selected_display_name | tojson }};
+        searchInput.value = {{ selected_display_name | tojson }};
+    {% endif %}
+
+    // Filter options on input
+    searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        const options = searchList.querySelectorAll('.dropdown-option');
+        const groupHeaders = searchList.querySelectorAll('.entity-group-header');
+        const groupContainers = searchList.querySelectorAll('.entity-group-items');
+        let visibleCount = 0;
+
+        // Ensure dropdown is visible and positioned correctly
+        if (searchDropdown.classList.contains('hidden')) {
+            searchDropdown.classList.remove('hidden');
+        }
+        setTimeout(positionDropdown, 0);
+
+        // Filter entities
+        options.forEach(function(option) {
+            const name = option.querySelector('.item-name').textContent.toLowerCase();
+            const type = option.dataset.itemType || '';
+            const groupHeader = option.dataset.groupHeader || '';
+            const searchText = name + ' ' + type + ' ' + groupHeader;
+
+            if (query === '' || searchText.includes(query)) {
+                option.style.display = '';
+                visibleCount++;
+            } else {
+                option.style.display = 'none';
+            }
+        });
+
+        // Show/hide group headers and containers based on visible entities
+        groupHeaders.forEach(function(header) {
+            const container = header.nextElementSibling && header.nextElementSibling.classList.contains('entity-group-items')
+                ? header.nextElementSibling
+                : null;
+            if (!container) return;
+            const visibleInGroup = Array.from(container.querySelectorAll('.dropdown-option')).some(function(opt) {
+                return opt.style.display !== 'none';
+            });
+            if (visibleInGroup || query === '') {
+                header.style.display = '';
+                // During search, expand groups that have matches, but remember prior collapsed state
+                if (query !== '') {
+                    if (container.classList.contains('hidden') && !container.dataset.wasCollapsed) {
+                        container.dataset.wasCollapsed = 'true';
+                    }
+                    container.classList.remove('hidden');
+                    const chev = header.querySelector('.chevron-icon');
+                    if (chev) chev.classList.remove('rotate-180');
+                    header.setAttribute('aria-expanded', 'true');
+                } else {
+                    // When query cleared, restore previous collapsed state if it was collapsed before search
+                    if (container.dataset.wasCollapsed) {
+                        container.classList.add('hidden');
+                        const chev = header.querySelector('.chevron-icon');
+                        if (chev) chev.classList.add('rotate-180');
+                        header.setAttribute('aria-expanded', 'false');
+                        delete container.dataset.wasCollapsed;
+                    }
+                }
+            } else {
+                header.style.display = 'none';
+                container.classList.add('hidden');
+            }
+        });
+
+        // Show/hide no results message
+        if (visibleCount === 0 && query) {
+            noResults.classList.remove('hidden');
+            searchList.classList.add('hidden');
+        } else {
+            noResults.classList.add('hidden');
+            searchList.classList.remove('hidden');
+        }
+
+        // Show/hide clear button
+        if (query) {
+            clearBtn.classList.remove('hidden');
+        } else {
+            clearBtn.classList.add('hidden');
+        }
+    });
+
+    // Clear search
+    clearBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        // Clear the input value
+        searchInput.value = '';
+        // Explicitly show all options and group headers
+        const options = searchList.querySelectorAll('.dropdown-option');
+        const groupHeaders = searchList.querySelectorAll('.entity-group-header');
+
+        options.forEach(function(option) {
+            option.style.display = '';
+            // Remove any highlight classes
+            option.classList.remove('bg-blue-100');
+        });
+
+        groupHeaders.forEach(function(header) {
+            header.style.display = '';
+        });
+
+        // Hide no results message and show list
+        noResults.classList.add('hidden');
+        searchList.classList.remove('hidden');
+
+        // Hide clear button
+        clearBtn.classList.add('hidden');
+
+        // Reset keyboard navigation
+        highlightedIndex = -1;
+
+        // Focus the input
+        searchInput.focus();
+    });
+
+    // Function to position dropdown to avoid right edge
+    function positionDropdown() {
+        // Get the input's position relative to viewport
+        const inputRect = searchInput.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const minMargin = 16; // Minimum margin from viewport edge in pixels
+        const dropdownWidth = 384; // w-96 = 24rem = 384px (default width)
+
+        // Calculate where the dropdown would end if right-aligned to input
+        const dropdownRightEdge = inputRect.right;
+
+        // Check if dropdown would extend beyond right edge
+        if (dropdownRightEdge > viewportWidth - minMargin) {
+            // Use fixed positioning to position relative to viewport
+            searchDropdown.style.position = 'fixed';
+            searchDropdown.style.top = (inputRect.bottom + window.scrollY + 4) + 'px';
+            searchDropdown.style.left = Math.max(minMargin, viewportWidth - dropdownWidth - minMargin) + 'px';
+            searchDropdown.style.right = 'auto';
+        } else {
+            // Default: absolute positioning, right-align to input
+            searchDropdown.style.position = 'absolute';
+            searchDropdown.style.right = '0';
+            searchDropdown.style.left = 'auto';
+            searchDropdown.style.top = 'auto';
+        }
+    }
+
+    // Show dropdown on focus
+    searchInput.addEventListener('focus', function() {
+        if (searchInput.value.trim()) {
+            searchInput.dispatchEvent(new Event('input'));
+        }
+        searchDropdown.classList.remove('hidden');
+        // Position dropdown after it's shown
+        setTimeout(positionDropdown, 0);
+    });
+
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+            searchDropdown.classList.add('hidden');
+        }
+    });
+
+    // Toggle group collapse/expand
+    searchList.addEventListener('click', function(e) {
+        const header = e.target.closest('.entity-group-header');
+        if (!header) return;
+        const container = header.nextElementSibling && header.nextElementSibling.classList.contains('entity-group-items')
+            ? header.nextElementSibling
+            : null;
+        if (!container) return;
+        const isHidden = container.classList.toggle('hidden');
+        const chev = header.querySelector('.chevron-icon');
+        if (chev) chev.classList.toggle('rotate-180', isHidden);
+        header.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
+    });
+    searchList.addEventListener('keydown', function(e) {
+        const header = e.target.closest('.entity-group-header');
+        if (!header) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            header.click();
+        }
+    });
+
+    // Handle option selection
+    searchList.addEventListener('click', function(e) {
+        const option = e.target.closest('.dropdown-option');
+        if (!option) return;
+
+        selectedEntityId = option.dataset.itemId;
+        selectedEntityName = option.dataset.itemName;
+        searchInput.value = selectedEntityName;
+
+        // Update selected state
+        searchList.querySelectorAll('.dropdown-option').forEach(function(opt) {
+            opt.removeAttribute('data-selected');
+        });
+        option.setAttribute('data-selected', 'true');
+
+        // Submit form
+        searchSelect.value = selectedEntityId;
+        searchForm.submit();
+    });
+
+    // Keyboard navigation
+    const options = Array.from(searchList.querySelectorAll('.dropdown-option:not([style*="display: none"])'));
+
+    searchInput.addEventListener('keydown', function(e) {
+        const visibleOptions = Array.from(searchList.querySelectorAll('.dropdown-option')).filter(function(opt) {
+            const group = opt.closest('.entity-group-items');
+            const groupCollapsed = group && group.classList.contains('hidden');
+            return opt.style.display !== 'none' && !groupCollapsed;
+        });
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            highlightedIndex = Math.min(highlightedIndex + 1, visibleOptions.length - 1);
+            updateHighlight(visibleOptions);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            highlightedIndex = Math.max(highlightedIndex - 1, -1);
+            updateHighlight(visibleOptions);
+        } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+            e.preventDefault();
+            visibleOptions[highlightedIndex].click();
+        } else if (e.key === 'Escape') {
+            searchDropdown.classList.add('hidden');
+            highlightedIndex = -1;
+        }
+    });
+
+    function updateHighlight(visibleOptions) {
+        visibleOptions.forEach(function(opt, idx) {
+            if (idx === highlightedIndex) {
+                opt.classList.add('bg-blue-100');
+            } else {
+                opt.classList.remove('bg-blue-100');
+            }
+        });
+    }
+
+    // Reposition dropdown on window resize if it's visible
+    window.addEventListener('resize', function() {
+        if (!searchDropdown.classList.contains('hidden')) {
+            positionDropdown();
+        }
+    });
+})();
+</script>

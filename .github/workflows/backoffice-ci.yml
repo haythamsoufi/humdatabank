@@ -1,0 +1,134 @@
+# Backoffice CI
+# Runs on pull requests touching Backoffice/**.
+# Three parallel jobs: fast code guards, Bandit static analysis, pytest suite.
+
+name: Backoffice CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'Backoffice/**'
+      - '.github/workflows/backoffice-ci.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ── Fast code guards ────────────────────────────────────────────────────────
+  # Runs in seconds; catches template and JS safety regressions before anything
+  # heavier spins up.
+  guards:
+    name: Code guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history required so git diff can compare against base commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Block __consoleSaved.* in Jinja templates
+        run: python Backoffice/scripts/check_no_console_saved_bypass.py
+
+      - name: No inline JS / CSP-risk patterns in diff
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::warning::No base SHA available (first push to branch?) — skipping diff check"
+          else
+            python Backoffice/scripts/check_no_inline_js_in_diff.py --base-ref "$BASE"
+          fi
+
+  # ── Bandit static security analysis ────────────────────────────────────────
+  bandit:
+    name: Bandit (Python security)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit
+        run: |
+          # pyproject.toml at repo root holds [tool.bandit] config (exclude_dirs etc.)
+          if [ -f pyproject.toml ]; then
+            CFG="-c pyproject.toml"
+          else
+            echo "::warning::pyproject.toml not found — running Bandit without config"
+            CFG=""
+          fi
+          # shellcheck disable=SC2086
+          bandit $CFG -r Backoffice/app -ll
+
+  # ── pytest suite ────────────────────────────────────────────────────────────
+  tests:
+    name: pytest
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: Backoffice/requirements.txt
+
+      - name: Install dependencies
+        working-directory: Backoffice
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        working-directory: Backoffice
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          FLASK_CONFIG: testing
+          SECRET_KEY: test-secret-key-for-ci
+          WTF_CSRF_ENABLED: 'false'
+        run: pytest
+
+      - name: Upload test results and coverage
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: test-results
+          path: |
+            Backoffice/coverage.xml
+            Backoffice/test_results.xml
+          retention-days: 14

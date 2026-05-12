@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title or _('Public Submission') }}</title>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ title or _('Submission Details') }}</h1>
+
+        <div class="form-section">
+            <div class="form-section-title">{{ _('Submitter Information') }}</div>
+            <div class="space-y-4">
+                <div class="form-group">
+                    <span class="form-item-label">{{ _('Country') }}</span>
+                    <div class="form-item-input">{{ country_form.country_id.data.name if country_form and country_form.country_id and country_form.country_id.data else (submission.country.name if submission and submission.country else '') }}</div>
+                </div>
+                <div class="form-group">
+                    <span class="form-item-label">{{ _('Name') }}</span>
+                    <div class="form-item-input">{{ form.name.data if form and form.name else '' }}</div>
+                </div>
+                <div class="form-group">
+                    <span class="form-item-label">{{ _('Email') }}</span>
+                    <div class="form-item-input">{{ form.email.data if form and form.email else '' }}</div>
+                </div>
+                <div class="form-group">
+                    <span class="form-item-label">{{ _('Submitted At') }}</span>
+                    <div class="form-item-input">{{ submission.submitted_at|datetime_local('datetime') if submission and submission.submitted_at else '' }}</div>
+                </div>
+            </div>
+        </div>
+
+        {% if sections %}
+            {% for sec in sections %}
+                <div class="form-section">
+                    <div class="form-section-title">{{ sec.section.display_name if sec.section and sec.section.display_name else (sec.section.name if sec.section else _('Section')) }}</div>
+                    <div class="space-y-4">
+                        {% for entry in sec.entries %}
+                            <div class="form-group">
+                                {% set item = entry.item %}
+                                <span class="form-item-label">{{ item.display_label if item and item.display_label else (item.label if item and item.label else _('Field')) }}</span>
+                                <div class="form-item-input">
+                                    {% if entry.value is mapping or entry.value is sequence and entry.value is not string %}
+                                        {{ format_activity_value(entry.value) }}
+                                    {% else %}
+                                        {{ entry.value if entry.value is not none else '' }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if document_sections %}
+            {% for dsec in document_sections %}
+                <div class="form-section">
+                    <div class="form-section-title">{{ dsec.section.display_name if dsec.section and dsec.section.display_name else (dsec.section.name if dsec.section else _('Documents')) }}</div>
+                    <div class="space-y-4">
+                        {% for doc in dsec.documents %}
+                            <div class="form-group">
+                                <span class="form-item-label">{{ _('Document') }}</span>
+                                <div class="form-item-input">
+                                    {{ doc.filename }}{% if doc.language %} — {{ doc.language|upper }}{% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</body>
+<!-- Note: This template is intentionally minimal and JS-free for PDF rendering. -->
+</html>

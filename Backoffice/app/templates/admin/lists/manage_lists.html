@@ -1,0 +1,399 @@
+{% extends "core/layout.html" %}
+{% from "macros/modal_shell.html" import modal_shell %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title=title,
+        icon='fas fa-list',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Template Management', 'url': url_for('form_builder.manage_templates')},
+            {'name': 'Lists'}
+        ],
+        actions=[
+            {
+                'type': 'button',
+                'text': 'Import List',
+                'icon': 'fas fa-upload',
+                'classes': 'professional-action-btn professional-action-btn-blue',
+                'attributes': {'id': 'page-header-open-import-modal-btn'}
+            },
+            {
+                'type': 'button',
+                'text': 'Create Manual List',
+                'icon': 'fas fa-plus',
+                'classes': 'professional-action-btn professional-action-btn-green',
+                'attributes': {'id': 'page-header-open-create-modal-btn'}
+            }
+        ]
+    ) }}
+
+    <!-- Lists Table -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        {% if lists or system_lists %}
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Columns</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rows</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {# Render global system lists that are read-only #}
+                {% if system_lists %}
+                {% for sl in system_lists %}
+                <tr class="bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">
+                            <a href="{{ sl.url }}" class="hover:text-blue-600">{{ sl.name }}</a>
+                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">System</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm text-gray-500">{{ sl.description }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">{{ sl.columns }} columns</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">{{ sl.rows }} rows</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-400 italic">Managed in own page</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+                {% for list in lists %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">
+                            <a href="{{ url_for('system_admin.view_lookup_list', list_id=list.id) }}" class="hover:text-blue-600">{{ list.name }}</a>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm text-gray-500">{{ list.description or '-' }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">
+                            {% if list.columns_config %}
+                                {{ list.columns_config|length }} columns
+                            {% else %}
+                                0 columns
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">{{ list.rows.count() }} rows</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ list.created_at|datetime_local('date') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex items-center space-x-2">
+                            <button data-list-id="{{ list.id }}"
+                                    data-list-name="{{ list.name }}"
+                                    data-list-description="{{ list.description or '' }}"
+                                    data-list-columns="{% if list.columns_config %}{% for col in list.columns_config %}{{ col.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}"
+                                    class="edit-list-btn text-blue-600 hover:text-blue-900">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            <button data-list-id="{{ list.id }}"
+                                    data-list-name="{{ (list.name|tojson|e) if list.name else '""' }}"
+                                    class="delete-list-btn text-red-600 hover:text-red-900">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No lists</h3>
+            <p class="mt-1 text-sm text-gray-500">Get started by importing a list or creating a manual one.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Import Modal -->
+{% call modal_shell('importModal', 'Import List from File', max_width='max-w-xl', close_id='close-import-modal-btn') %}
+            <form action="{{ url_for('system_admin.import_lookup_list') }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                <div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                    <p class="font-medium text-gray-900">File format</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600">
+                        <li>Row 1 must be column headers — these become the list column names (rename them to whatever you need).</li>
+                        <li>Each following row is one entry in the list.</li>
+                        <li>For Excel, only the <strong>first worksheet</strong> is read (use that sheet for your table).</li>
+                        <li>For CSV, use UTF-8 and a comma-separated header row (same idea as Excel).</li>
+                    </ul>
+                    <p class="mt-3 text-xs text-gray-600">
+                        Download a starter file:
+                        <a href="{{ url_for('system_admin.download_lookup_list_import_template', format='xlsx') }}"
+                           class="font-medium text-blue-600 hover:text-blue-800">Excel (.xlsx)</a>
+                        <span class="text-gray-400">·</span>
+                        <a href="{{ url_for('system_admin.download_lookup_list_import_template', format='csv') }}"
+                           class="font-medium text-blue-600 hover:text-blue-800">CSV</a>
+                        <span class="text-gray-500">(example columns; edit or replace before importing).</span>
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <label for="import_name" class="block text-sm font-medium text-gray-700">List Name</label>
+                    <input type="text" id="import_name" name="name" required
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+
+                <div class="mb-4">
+                    <label for="import_description" class="block text-sm font-medium text-gray-700">Description (optional)</label>
+                    <textarea id="import_description" name="description" rows="2"
+                              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="import_file" class="block text-sm font-medium text-gray-700">File (CSV, XLS, XLSX)</label>
+                    <input type="file" id="import_file" name="file" accept=".csv,.xls,.xlsx" required
+                           class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="close-import-modal-btn"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Import
+                    </button>
+                </div>
+            </form>
+{% endcall %}
+
+<!-- Create Manual List Modal -->
+{% call modal_shell('createModal', 'Create Manual List', max_width='max-w-lg', close_id='close-create-modal-btn') %}
+            <form action="{{ url_for('system_admin.create_lookup_list') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                <div class="mb-4">
+                    <label for="create_name" class="block text-sm font-medium text-gray-700">List Name</label>
+                    <input type="text" id="create_name" name="name" required
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+
+                <div class="mb-4">
+                    <label for="create_description" class="block text-sm font-medium text-gray-700">Description (optional)</label>
+                    <textarea id="create_description" name="description" rows="2"
+                              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="create_columns" class="block text-sm font-medium text-gray-700">Columns (comma-separated)</label>
+                    <input type="text" id="create_columns" name="columns" required placeholder="e.g. Country, Code, Region"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-xs text-gray-500">Enter column names separated by commas</p>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="close-create-modal-btn"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="btn btn-success">
+                        Create
+                    </button>
+                </div>
+            </form>
+{% endcall %}
+
+<!-- Edit List Modal -->
+{% call modal_shell('editModal', 'Edit List', max_width='max-w-lg', close_id='close-edit-modal-btn') %}
+            <form id="editForm" action="" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                <div class="mb-4">
+                    <label for="edit_name" class="block text-sm font-medium text-gray-700">List Name</label>
+                    <input type="text" id="edit_name" name="name" required
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+
+                <div class="mb-4">
+                    <label for="edit_description" class="block text-sm font-medium text-gray-700">Description (optional)</label>
+                    <textarea id="edit_description" name="description" rows="2"
+                              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="edit_columns" class="block text-sm font-medium text-gray-700">Columns (comma-separated)</label>
+                    <input type="text" id="edit_columns" name="columns" required placeholder="e.g. Country, Code, Region"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-xs text-gray-500">Enter column names separated by commas</p>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="close-edit-modal-btn"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Update
+                    </button>
+                </div>
+            </form>
+{% endcall %}
+
+<script nonce="{{ csp_nonce() }}">
+function openImportModal() {
+    document.getElementById('importModal').classList.remove('hidden');
+}
+
+function closeImportModal() {
+    document.getElementById('importModal').classList.add('hidden');
+}
+
+function openCreateModal() {
+    document.getElementById('createModal').classList.remove('hidden');
+}
+
+function closeCreateModal() {
+    document.getElementById('createModal').classList.add('hidden');
+}
+
+function openEditModal(listId, listName, listDescription, listColumns) {
+    document.getElementById('editModal').classList.remove('hidden');
+
+    const nameField = document.getElementById('edit_name');
+    const descField = document.getElementById('edit_description');
+    const colsField = document.getElementById('edit_columns');
+
+    if (nameField) nameField.value = listName || '';
+    if (descField) descField.value = listDescription || '';
+    if (colsField) colsField.value = listColumns || '';
+
+    // Set the form action to the edit endpoint
+    document.getElementById('editForm').action = `/admin/lists/edit/${listId}`;
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+    // Clear form fields
+    document.getElementById('edit_name').value = '';
+    document.getElementById('edit_description').value = '';
+    document.getElementById('edit_columns').value = '';
+}
+
+function confirmDeleteList(listId, listName) {
+    const msg = `Are you sure you want to delete the list "${listName}"? This action cannot be undone.`;
+    const doDelete = () => {
+        // Create a form dynamically
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/lists/delete/${listId}`;
+
+        // Add CSRF token
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = '{{ csrf_token() }}';
+        form.appendChild(csrfInput);
+
+        // Add form to document and submit
+        document.body.appendChild(form);
+        form.submit();
+    };
+    if (window.showDangerConfirmation) {
+        window.showDangerConfirmation(msg, doDelete, null, 'Delete', 'Cancel', 'Delete List?');
+    } else if (window.showConfirmation) {
+        window.showConfirmation(msg, doDelete, null, 'Delete', 'Cancel', 'Delete List?');
+    } else {
+        doDelete();
+    }
+}
+
+// Add event listeners for edit and delete buttons
+document.addEventListener('DOMContentLoaded', function() {
+    const headerImportBtn = document.getElementById('page-header-open-import-modal-btn');
+    if (headerImportBtn) {
+        headerImportBtn.addEventListener('click', openImportModal);
+    }
+    const headerCreateBtn = document.getElementById('page-header-open-create-modal-btn');
+    if (headerCreateBtn) {
+        headerCreateBtn.addEventListener('click', openCreateModal);
+    }
+
+    document.querySelectorAll('.edit-list-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const listId = this.getAttribute('data-list-id');
+            const listName = this.getAttribute('data-list-name') || '';
+            const listDescription = this.getAttribute('data-list-description') || '';
+            const listColumns = this.getAttribute('data-list-columns') || '';
+
+            openEditModal(listId, listName, listDescription, listColumns);
+        });
+    });
+
+    document.querySelectorAll('.delete-list-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const listId = this.getAttribute('data-list-id');
+            const listName = this.getAttribute('data-list-name');
+            confirmDeleteList(listId, listName);
+        });
+    });
+});
+
+// Close modals when clicking outside
+document.getElementById('importModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeImportModal();
+    }
+});
+
+document.getElementById('createModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeCreateModal();
+    }
+});
+
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeEditModal();
+    }
+});
+
+// Event listeners for modal buttons
+document.addEventListener('DOMContentLoaded', function() {
+    const closeImportBtn = document.getElementById('close-import-modal-btn');
+    if (closeImportBtn) {
+        closeImportBtn.addEventListener('click', closeImportModal);
+    }
+
+    const closeCreateBtn = document.getElementById('close-create-modal-btn');
+    if (closeCreateBtn) {
+        closeCreateBtn.addEventListener('click', closeCreateModal);
+    }
+
+    const closeEditBtn = document.getElementById('close-edit-modal-btn');
+    if (closeEditBtn) {
+        closeEditBtn.addEventListener('click', closeEditModal);
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,5 @@
+# Interactive Map Plugin Dependencies
+# This file lists optional dependencies for the interactive map plugin
+
+# For advanced geometry validation and calculations
+shapely>=1.8.0

@@ -1,0 +1,29 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=title,
+    icon='fas fa-shapes',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+        {'name': _('Types & units'), 'url': url_for('system_admin.manage_measurement_lookups')},
+        {'name': title}
+    ],
+) }}
+
+<div class="max-w-3xl mx-auto px-4 py-6">
+  {% if form_action_url is not defined or not form_action_url %}
+  {% if is_edit and row %}
+  {% set form_action_url = url_for("system_admin.edit_measurement_type", tid=row.id) %}
+  {% else %}
+  {% set form_action_url = url_for("system_admin.new_measurement_type") %}
+  {% endif %}
+  {% endif %}
+  {% set modal = false %}
+  {% include "admin/indicator_bank/measurement_lookup_type_form_partial.html" with context %}
+</div>
+{% endblock %}

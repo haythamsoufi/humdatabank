@@ -1,0 +1,12 @@
+{% macro empty_state(icon="fas fa-inbox", title="No items found", message="", action_url="", action_text="") %}
+<div class="text-center py-12">
+    <i class="{{ icon }} fa-3x text-gray-300 mb-4"></i>
+    <p class="text-gray-500 text-lg">{{ title }}</p>
+    {% if message %}
+    <p class="text-gray-400 text-sm mt-1">{{ message }}</p>
+    {% endif %}
+    {% if action_url and action_text %}
+    <a href="{{ action_url }}" class="text-blue-500 hover:text-blue-600 text-sm mt-2 inline-block">{{ action_text }}</a>
+    {% endif %}
+</div>
+{% endmacro %}

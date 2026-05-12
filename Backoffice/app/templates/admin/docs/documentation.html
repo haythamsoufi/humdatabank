@@ -1,0 +1,1271 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ title if title is defined else _('Documentation') }}{% endblock %}
+
+{% block content %}
+{% set current_lang = (session.get('language', 'en')|string|lower).split('-')[0] %}
+{% set is_rtl = current_lang in ['ar', 'fa', 'he', 'ur'] %}
+<style nonce="{{ csp_style_nonce() }}">
+/* Documentation-specific styles */
+.docs-prose {
+    max-width: none;
+    color: #334155;
+    line-height: 1.7;
+    font-size: 1rem;
+}
+
+.docs-prose::selection {
+    background: rgba(99, 102, 241, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .docs-prose *,
+    .docs-container * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Headings - Clean, readable hierarchy */
+.docs-prose h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e2e8f0;
+    letter-spacing: -0.025em;
+}
+
+.docs-prose h1:first-child {
+    margin-top: 0;
+}
+
+.docs-prose h1 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.docs-prose h1 a:hover {
+    color: #4f46e5;
+}
+
+.docs-prose h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-top: 2.25rem;
+    margin-bottom: 0.875rem;
+    padding: 0.5rem 0;
+    border-left: 4px solid #6366f1;
+    padding-left: 1rem;
+}
+
+.docs-prose h2:first-of-type {
+    margin-top: 0;
+}
+
+.docs-prose h2 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.docs-prose h2 a:hover {
+    color: #4f46e5;
+}
+
+.docs-prose h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #334155;
+    margin-top: 1.75rem;
+    margin-bottom: 0.625rem;
+}
+
+.docs-prose h3 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.docs-prose h3 a:hover {
+    color: #4f46e5;
+}
+
+.docs-prose h4 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: #475569;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.docs-prose h4 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.docs-prose h4 a:hover {
+    color: #4f46e5;
+}
+
+.docs-prose h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.docs-prose h6 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 1rem;
+    margin-bottom: 0.375rem;
+}
+
+.docs-prose p {
+    color: #334155;
+    line-height: 1.7;
+    margin-bottom: 1.125rem;
+}
+
+.docs-prose ul, .docs-prose ol {
+    margin-bottom: 1.125rem;
+    padding-left: 1.5rem;
+}
+
+.docs-prose ul {
+    list-style-type: disc;
+}
+
+.docs-prose ul li::marker {
+    color: #6366f1;
+}
+
+.docs-prose ol {
+    list-style-type: decimal;
+}
+
+.docs-prose ol li::marker {
+    color: #6366f1;
+    font-weight: 600;
+}
+
+.docs-prose li {
+    margin-bottom: 0.5rem;
+    color: #334155;
+    line-height: 1.65;
+}
+
+.docs-prose li > p {
+    margin-bottom: 0.375rem;
+}
+
+/* Inline code - softer, more readable */
+.docs-prose code {
+    background-color: #f1f5f9;
+    color: #7c3aed;
+    padding: 0.2rem 0.45rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.docs-prose pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 1.25rem 1.5rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.docs-prose pre::-webkit-scrollbar {
+    height: 6px;
+}
+
+.docs-prose pre::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.5);
+}
+
+.docs-prose pre::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.5);
+    border-radius: 3px;
+}
+
+.docs-prose pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+/* Mermaid diagram styling */
+.docs-prose .mermaid {
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    margin: 1.5rem 0;
+    border: 1px solid #e2e8f0;
+    overflow-x: auto;
+    text-align: center;
+}
+
+.docs-prose .mermaid svg {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Ensure mermaid diagrams are centered */
+.docs-prose .mermaid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.docs-prose blockquote {
+    border-left: 4px solid #818cf8;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    background: #f8fafc;
+    border-radius: 0 0.375rem 0.375rem 0;
+    color: #475569;
+}
+
+.docs-prose blockquote p {
+    margin-bottom: 0.5rem;
+    color: inherit;
+}
+
+.docs-prose blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+.docs-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.docs-prose thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.docs-prose th {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.625rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #334155;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.docs-prose td {
+    border-bottom: 1px solid #f1f5f9;
+    padding: 0.75rem 1rem;
+    color: #334155;
+    background: #fff;
+}
+
+.docs-prose tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.docs-prose tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.docs-prose tbody tr:hover td {
+    background: #f1f5f9 !important;
+}
+
+/* Link styling */
+.docs-prose a {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px solid rgba(79, 70, 229, 0.3);
+}
+
+.docs-prose a:hover {
+    color: #4338ca;
+    border-bottom-color: #4338ca;
+}
+
+.docs-prose a:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+    border-radius: 0.125rem;
+}
+
+.docs-prose a:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Links in headings - no underline */
+.docs-prose h1 a,
+.docs-prose h2 a,
+.docs-prose h3 a,
+.docs-prose h4 a,
+.docs-prose h5 a,
+.docs-prose h6 a {
+    border-bottom: none;
+}
+
+.docs-prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin: 1.5rem 0;
+    border: 1px solid #e2e8f0;
+}
+
+.docs-prose hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 2rem 0;
+}
+
+/* Improve nested lists */
+.docs-prose ul ul,
+.docs-prose ol ol,
+.docs-prose ul ol,
+.docs-prose ol ul {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Better spacing for list items with multiple paragraphs */
+.docs-prose li p {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Definition lists (term : definition) */
+.docs-prose dl {
+    margin-bottom: 1.25rem;
+}
+
+.docs-prose dt {
+    font-weight: 600;
+    color: #1e293b;
+    margin-top: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.docs-prose dt:first-child {
+    margin-top: 0;
+}
+
+.docs-prose dd {
+    margin-left: 1.5rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid #e2e8f0;
+    color: #475569;
+    line-height: 1.75;
+}
+
+.docs-prose dd + dt {
+    margin-top: 1rem;
+}
+
+/* Footnotes */
+.docs-prose .footnote {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+.docs-prose .footnote ol {
+    padding-left: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.docs-prose .footnote-ref {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.docs-prose sup .footnote-ref {
+    font-weight: 500;
+}
+
+/* Code blocks inside highlight wrapper (codehilite output) */
+.docs-prose .highlight {
+    margin-bottom: 1.5rem;
+}
+
+.docs-prose .highlight pre {
+    margin-bottom: 0;
+}
+
+/* Style for strong/emphasized text */
+.docs-prose strong {
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.docs-prose em {
+    color: #475569;
+    font-style: italic;
+}
+
+.docs-prose del, .docs-prose s {
+    color: #94a3b8;
+    text-decoration: line-through;
+}
+
+.docs-prose ins {
+    text-decoration: underline;
+}
+
+.docs-prose kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.8125rem;
+    padding: 0.15rem 0.4rem;
+    background-color: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 0 #cbd5e1;
+}
+
+/* Collapsible details/summary */
+.docs-prose details {
+    margin: 1rem 0;
+    padding: 1rem 1.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+}
+
+.docs-prose summary {
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+}
+
+.docs-prose details[open] summary {
+    margin-bottom: 0.75rem;
+}
+
+/* Table of contents (from toc extension) */
+.docs-prose .toc {
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+}
+
+.docs-prose .toc ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.docs-prose .toc ul ul {
+    padding-left: 1rem;
+    margin-top: 0.25rem;
+}
+
+.docs-prose .toc a {
+    font-size: 0.9375rem;
+}
+
+/* Improve paragraph spacing after headings */
+.docs-prose h1 + p,
+.docs-prose h2 + p,
+.docs-prose h3 + p,
+.docs-prose h4 + p,
+.docs-prose h5 + p,
+.docs-prose h6 + p {
+    margin-top: 0.5rem;
+}
+
+/* Hide the ¶ (paragraph) symbols added by markdown TOC extension */
+.docs-prose h1 .headerlink,
+.docs-prose h2 .headerlink,
+.docs-prose h3 .headerlink,
+.docs-prose h4 .headerlink,
+.docs-prose h5 .headerlink,
+.docs-prose h6 .headerlink {
+    display: none !important;
+}
+
+/* Also hide any ¶ symbols that might appear as text content */
+.docs-prose h1,
+.docs-prose h2,
+.docs-prose h3,
+.docs-prose h4,
+.docs-prose h5,
+.docs-prose h6 {
+    position: relative;
+}
+
+.docs-prose h1::after,
+.docs-prose h2::after,
+.docs-prose h3::after,
+.docs-prose h4::after,
+.docs-prose h5::after,
+.docs-prose h6::after {
+    content: none !important;
+}
+
+/* Documentation layout */
+.docs-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .docs-container:not([dir="rtl"]) {
+        flex-direction: row;
+    }
+}
+
+.docs-sidebar {
+    width: 100%;
+    flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+    .docs-sidebar {
+        width: 20rem;
+    }
+}
+
+.docs-sidebar-inner {
+    background: #fff;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+    padding: 1rem;
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.docs-sidebar-inner::-webkit-scrollbar {
+    width: 6px;
+}
+
+.docs-sidebar-inner::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.docs-sidebar-inner::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.docs-sidebar-inner::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.docs-content {
+    flex: 1;
+    min-width: 0;
+    order: 2; /* Default: content appears second (right) */
+}
+
+@media (min-width: 1024px) {
+    .docs-content {
+        order: 2; /* Explicitly set for desktop */
+    }
+}
+
+/* Navigation styles */
+.nav-category {
+    margin-bottom: 0.5rem;
+}
+
+.nav-category-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-width: 0;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    background-color: #f9fafb;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+    user-select: none;
+}
+
+/* Keep icon + chevron fixed width so the label gets the remaining row (avoids spurious wrap). */
+.nav-category-header > i {
+    flex-shrink: 0;
+}
+
+.nav-category-title {
+    flex: 1 1 0%;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-category-header:hover {
+    background-color: #f3f4f6;
+}
+
+.nav-category-icon {
+    font-size: 0.75rem;
+    color: #6b7280;
+    transition: transform 0.2s ease-in-out;
+    transform: rotate(90deg); /* Expanded by default */
+}
+
+.nav-category-icon.expanded {
+    transform: rotate(90deg);
+}
+
+.nav-category-items {
+    margin-top: 0.25rem;
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid #e5e7eb;
+    display: none;
+    overflow: hidden;
+}
+
+.nav-category-items.expanded {
+    display: block;
+}
+
+/* Subgroup header styling - simple colored underline */
+.nav-subgroup-header {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 2px solid #3b82f6;
+}
+
+.nav-subgroup-header:first-child {
+    margin-top: 0.5rem;
+}
+
+.nav-subgroup-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1e40af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Subgroup items container */
+.nav-subgroup-items {
+    margin-bottom: 0.5rem;
+}
+
+.nav-subgroup-items:last-child {
+    margin-bottom: 0;
+}
+
+.nav-item {
+    display: block;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 2.75rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    text-decoration: none;
+}
+
+.nav-item:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.nav-item-active {
+    background: linear-gradient(90deg, #eef2ff 0%, #e0e7ff 100%);
+    color: #4338ca;
+    font-weight: 500;
+    border-left: 2px solid #3b82f6;
+    margin-left: -0.5rem;
+    padding-left: 1rem;
+}
+
+.nav-item-inactive {
+    color: #374151;
+}
+
+.nav-item-inactive:hover {
+    background-color: #f9fafb;
+    color: #111827;
+}
+
+.nav-item-title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nav-item-path {
+    font-size: 0.625rem;
+    color: #9ca3af;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 0.125rem;
+    display: none;
+}
+
+/* Content area */
+.docs-content-inner {
+    background: #fff;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+    padding: 1.5rem;
+    position: relative;
+}
+
+@media (min-width: 1024px) {
+    .docs-content-inner {
+        padding: 2rem 2.5rem;
+    }
+}
+
+/* Smooth transitions for content updates */
+.docs-content-inner {
+    transition: opacity 0.2s ease;
+}
+
+.docs-content-inner[aria-busy="true"] {
+    opacity: 0.6;
+}
+
+.docs-loading-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 4rem;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(2px);
+    border-radius: 0.5rem;
+    z-index: 10;
+}
+
+.docs-content-inner[aria-busy="true"] .docs-loading-overlay {
+    display: flex;
+}
+
+.docs-loading-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    color: #111827;
+    font-weight: 600;
+    user-select: none;
+}
+
+.docs-spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    border: 4px solid #e5e7eb;
+    border-top-color: #6366f1;
+    animation: docsSpin 0.9s linear infinite;
+}
+
+@keyframes docsSpin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .docs-spinner { animation: none; }
+}
+
+.docs-content-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.docs-content-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+}
+
+
+.docs-tour-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px 0 rgba(99, 102, 241, 0.3);
+    white-space: nowrap;
+}
+
+.docs-tour-button:hover {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    box-shadow: 0 4px 8px 0 rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.docs-tour-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px 0 rgba(99, 102, 241, 0.3);
+}
+
+.docs-tour-button i {
+    font-size: 0.875rem;
+}
+
+/* Search bar styles */
+.docs-search-container {
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+.docs-search-input {
+    width: 100%;
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: white;
+    color: #374151;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.docs-search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.docs-search-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.docs-search-clear {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    cursor: pointer;
+    display: none;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+}
+
+.docs-search-clear:hover {
+    color: #374151;
+    background-color: #f3f4f6;
+}
+
+.docs-search-clear.visible {
+    display: block;
+}
+
+.nav-item.hidden {
+    display: none;
+}
+
+.nav-category.hidden {
+    display: none;
+}
+
+/* Back to top button */
+.docs-back-to-top {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    z-index: 50;
+    transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.docs-back-to-top:hover {
+    color: #4f46e5;
+    background: #f8fafc;
+    border-color: #c7d2fe;
+}
+
+.docs-back-to-top:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.docs-back-to-top.visible {
+    display: flex;
+}
+
+.nav-category-header.highlight {
+    background-color: #fef3c7;
+}
+
+/* Expand/Collapse all buttons */
+.nav-control-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    background-color: white;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    font-size: 0.75rem;
+}
+
+.nav-control-btn:hover {
+    background-color: #f3f4f6;
+    color: #374151;
+    border-color: #9ca3af;
+}
+
+.nav-control-btn:active {
+    background-color: #e5e7eb;
+    transform: scale(0.95);
+}
+
+/* RTL styles are now in rtl.css */
+</style>
+
+{% set _header_title = header_title if header_title is defined else _('Documentation') %}
+{% set _breadcrumbs = breadcrumbs if breadcrumbs is defined else [
+    {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+    {'name': _('Documentation')}
+] %}
+{{ page_header(
+    title=_header_title,
+    icon='fas fa-book',
+    breadcrumbs=_breadcrumbs
+) }}
+
+<div class="docs-container{% if is_rtl %} docs-rtl{% endif %}"{% if is_rtl %} dir="rtl"{% endif %}>
+    <!-- Left Sidebar Navigation -->
+    <aside class="docs-sidebar">
+        <div class="docs-sidebar-inner">
+            <div class="text-sm font-semibold text-gray-700 mb-4 flex items-center justify-between gap-2 pb-2 border-b border-gray-200">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-list"></i>
+                    {{ _('Navigation') }}
+                </div>
+                <div class="flex items-center gap-1">
+                    <button type="button"
+                            id="expand-all-btn"
+                            class="nav-control-btn"
+                            aria-label="{{ _('Expand all') }}"
+                            title="{{ _('Expand all') }}">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button type="button"
+                            id="collapse-all-btn"
+                            class="nav-control-btn"
+                            aria-label="{{ _('Collapse all') }}"
+                            title="{{ _('Collapse all') }}">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="docs-search-container">
+                <input type="text"
+                       id="docs-search-input"
+                       class="docs-search-input"
+                       placeholder="{{ _('Search documentation...') }}"
+                       autocomplete="off">
+                <i class="fas fa-search docs-search-icon" id="docs-search-icon"></i>
+                <button type="button"
+                        class="docs-search-clear"
+                        id="docs-search-clear"
+                        aria-label="{{ _('Clear search') }}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <nav class="space-y-1" id="docs-nav">
+                {% for category in nav_categories %}
+                <div class="nav-category">
+                    <div class="nav-category-header"
+                         data-category="{{ category.name }}"
+                         role="button"
+                         tabindex="0">
+                        {% if category.icon %}
+                        <i class="{{ category.icon }} text-xs"></i>
+                        {% endif %}
+                        <span class="nav-category-title">{{ category.display_name }}</span>
+                        <i class="fas fa-chevron-right nav-category-icon" id="icon-{{ category.name }}"></i>
+                    </div>
+                    <div class="nav-category-items" id="category-{{ category.name }}">
+                        {% set show_group_headers = (category.groups|length > 1) %}
+                        {% for group in category.groups %}
+                            {% if show_group_headers %}
+                                <div class="nav-subgroup-header">
+                                    <span class="nav-subgroup-title">{{ group.display_name }}</span>
+                                </div>
+                            {% endif %}
+                            <div class="nav-subgroup-items">
+                            {% for item in group.items %}
+                                {% set is_active = (item.rel_path == current_rel) %}
+                                <a href="{{ item.url }}"
+                                   class="nav-item {% if is_active %}nav-item-active{% else %}nav-item-inactive{% endif %}"
+                                   title="{{ item.title }}"
+                                   data-search-text="{{ (item.title ~ ' ' ~ item.rel_path)|lower }}">
+                                    <span class="nav-item-title">{{ item.title }}</span>
+                                    <span class="nav-item-path">{{ item.rel_path }}</span>
+                                </a>
+                            {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </nav>
+        </div>
+    </aside>
+
+    <!-- Right Content Area -->
+    <section class="docs-content">
+        <div class="docs-content-inner">
+            <div class="docs-loading-overlay" aria-hidden="true">
+                <div class="docs-loading-indicator" role="status" aria-live="polite" aria-label="{{ _('Loading documentation') }}">
+                    <div class="docs-spinner"></div>
+                    <div>{{ _('Loading…') }}</div>
+                </div>
+            </div>
+            <!-- Page Header -->
+            <div class="docs-content-header">
+                <div class="flex items-center justify-between gap-4 flex-wrap" id="docs-header-bar">
+                    <h1 class="docs-content-title">{{ page_title }}</h1>
+                    <div id="docs-header-actions">
+                        {% if workflow_id is defined and workflow_id %}
+                        <button type="button"
+                                id="start-tour-btn"
+                                class="docs-tour-button"
+                                data-workflow="{{ workflow_id }}"
+                                title="{{ _('Start interactive tour for this guide') }}">
+                            <i class="fas fa-compass mr-2"></i>
+                            <span>{{ _('Take the Tour') }}</span>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documentation Content -->
+            <div class="docs-prose" id="docs-prose"{% if is_rtl %} dir="rtl"{% endif %}>
+                {{ content_html }}
+            </div>
+        </div>
+    </section>
+</div>
+
+<button type="button"
+        class="docs-back-to-top"
+        id="docs-back-to-top"
+        aria-label="{{ _('Back to top') }}"
+        title="{{ _('Back to top') }}">
+    <i class="fas fa-chevron-up"></i>
+</button>
+
+<!-- Mermaid.js for diagram rendering -->
+<script src="{{ url_for('static', filename='libs/mermaid.min.js') }}" nonce="{{ csp_nonce() }}"></script>
+
+<!-- Documentation JavaScript files -->
+<script src="{{ url_for('static', filename='js/docs-mermaid.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ url_for('static', filename='js/docs-navigation.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ url_for('static', filename='js/docs-search.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ url_for('static', filename='js/docs-tour.js') }}" nonce="{{ csp_nonce() }}"></script>
+
+<!-- Template-specific initialization for active category expansion -->
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    'use strict';
+
+    // Apply RTL layout via JavaScript (fallback if CSS doesn't apply)
+    function applyRTLLayout() {
+        const container = document.querySelector('.docs-container');
+        if (!container) return;
+
+        const isRTL = container.getAttribute('dir') === 'rtl' || container.classList.contains('docs-rtl');
+        if (!isRTL) return;
+
+        const sidebar = document.querySelector('.docs-sidebar');
+        const content = document.querySelector('.docs-content');
+
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+            // Use CSS Grid for desktop
+            container.style.display = 'grid';
+            container.style.gridTemplateColumns = '1fr 20rem';
+            container.style.gap = '1.5rem';
+            container.style.flexDirection = 'unset';
+            container.style.flexWrap = 'unset';
+            container.style.direction = 'ltr'; // Prevent grid column reversal
+
+            if (content) {
+                content.style.gridColumn = '1';
+                content.style.gridRow = '1';
+                content.style.order = 'unset';
+                content.style.flex = 'unset';
+            }
+            if (sidebar) {
+                sidebar.style.gridColumn = '2';
+                sidebar.style.gridRow = '1';
+                sidebar.style.order = 'unset';
+                sidebar.style.flexShrink = 'unset';
+            }
+        } else {
+            // Use flexbox order for mobile
+            if (sidebar) {
+                sidebar.style.order = '2';
+                sidebar.style.webkitOrder = '2';
+            }
+            if (content) {
+                content.style.order = '1';
+                content.style.webkitOrder = '1';
+            }
+        }
+    }
+
+    // Apply RTL layout after DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(applyRTLLayout, 100);
+        });
+    } else {
+        setTimeout(applyRTLLayout, 100);
+    }
+
+    // Expand category containing current page
+    function expandActiveCategory() {
+        let activeCategoryFound = false;
+
+        {% for category in nav_categories %}
+            {% set has_active = false %}
+            {% for group in category.groups %}
+                {% for item in group.items %}
+                    {% if item.rel_path == current_rel %}
+                        {% set has_active = true %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+
+            {% if has_active %}
+                if (!activeCategoryFound && window.DocsNavigation) {
+                    const activeCategory = document.getElementById('category-{{ category.name }}');
+                    const activeIcon = document.getElementById('icon-{{ category.name }}');
+                    if (activeCategory && activeIcon) {
+                        activeCategory.classList.add('expanded');
+                        activeIcon.classList.add('expanded');
+                        activeCategoryFound = true;
+                    }
+                }
+            {% endif %}
+        {% endfor %}
+
+        // Scroll active item into view if category was found
+        if (activeCategoryFound) {
+            const activeItem = document.querySelector('.nav-item-active');
+            if (activeItem) {
+                setTimeout(function() {
+                    activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
+        }
+    }
+
+    // Run after navigation is initialized
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', expandActiveCategory);
+    } else {
+        setTimeout(expandActiveCategory, 100);
+    }
+
+    // Back to top button (listens to main content scroll container, not window)
+    (function() {
+        const btn = document.getElementById('docs-back-to-top');
+        if (!btn) return;
+
+        const main = document.querySelector('main');
+        const scrollEl = main && getComputedStyle(main).overflowY !== 'visible' ? main : document.documentElement;
+
+        function toggleVisibility() {
+            const scrollTop = scrollEl === main ? main.scrollTop : window.scrollY;
+            if (scrollTop > 400) {
+                btn.classList.add('visible');
+            } else {
+                btn.classList.remove('visible');
+            }
+        }
+
+        btn.addEventListener('click', function() {
+            if (scrollEl === main) {
+                main.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+
+        scrollEl.addEventListener('scroll', toggleVisibility, { passive: true });
+        toggleVisibility();
+    })();
+})();
+</script>
+{% endblock %}

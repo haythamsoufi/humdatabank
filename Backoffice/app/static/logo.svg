@@ -1,0 +1,32 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Same emblem as Website/public/ns_logo_placeholder.svg (NSLogo demo asset). -->
+  <!-- White filled circle -->
+  <circle cx="200" cy="200" r="170" fill="white"/>
+
+  <!-- Double outer ring -->
+  <circle cx="200" cy="200" r="178" fill="none" stroke="#C8102E" stroke-width="6"/>
+  <circle cx="200" cy="200" r="164" fill="none" stroke="#C8102E" stroke-width="2"/>
+
+  <!-- Left half clip -->
+  <clipPath id="leftHalf">
+    <rect x="0" y="0" width="200" height="400"/>
+  </clipPath>
+
+  <!-- Right half clip -->
+  <clipPath id="rightHalf">
+    <rect x="200" y="0" width="200" height="400"/>
+  </clipPath>
+
+  <!-- Larger Red Cross -->
+  <g clip-path="url(#leftHalf)" fill="#C8102E">
+    <rect x="160" y="90" width="80" height="220"/>
+    <rect x="90" y="160" width="220" height="80"/>
+  </g>
+
+  <!-- Larger Red Crescent -->
+  <g clip-path="url(#rightHalf)">
+    <circle cx="250" cy="200" r="96" fill="#C8102E"/>
+    <circle cx="278" cy="200" r="76" fill="white"/>
+  </g>
+
+</svg>

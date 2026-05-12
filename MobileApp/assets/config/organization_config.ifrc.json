@@ -1,0 +1,35 @@
+{
+  "organization": {
+    "name": "IFRC",
+    "fullName": "International Federation of Red Cross and Red Crescent Societies",
+    "shortName": "IFRC",
+    "description": "IFRC Network Databank Mobile Application",
+    "website": "https://www.ifrc.org",
+    "supportEmail": "haythamsoufi@outlook.com",
+    "contactEmail": "haythamsoufi@outlook.com"
+  },
+  "branding": {
+    "primaryColor": "#011E41",
+    "secondaryColor": "#C8102E",
+    "accentColor": "#C8102E",
+    "navyColor": "#011E41",
+    "redColor": "#C8102E",
+    "darkRedColor": "#A50D25",
+    "logoPath": "assets/images/app_icon.png"
+  },
+  "app": {
+    "name": "IFRC Network Databank",
+    "packageName": "com.ifrc.databank",
+    "displayName": "IFRC Network Databank",
+    "description": "IFRC Network Databank Mobile Application for humanitarian data management"
+  },
+  "azure": {
+    "b2cTenant": "ifrcorgb2cprod.onmicrosoft.com",
+    "b2cPolicy": "B2C_1A_PROD_MASTER_SIGNUP_SIGNIN",
+    "redirectScheme": "ifrcdatabank"
+  },
+  "features": {
+    "showOrganizationName": true,
+    "customBranding": true
+  }
+}

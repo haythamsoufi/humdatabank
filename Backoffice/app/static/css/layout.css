@@ -1,0 +1,990 @@
+/* Core Layout Styles */
+
+/* Import Tajawal font for Arabic */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html {
+    scroll-behavior: smooth;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Desktop Sidebar Styles */
+.admin-sidebar {
+    width: 240px;
+    transition: width 0.3s ease-in-out, transform 0.3s ease-in-out;
+    z-index: 40;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-sidebar.collapsed {
+    width: 72px;
+}
+
+.admin-sidebar.collapsed #sidebarToggle {
+    margin: 0 auto;
+    display: block;
+}
+
+.admin-sidebar.collapsed .sidebar-text,
+.admin-sidebar.collapsed .admin-panel-title,
+.admin-sidebar.collapsed .sidebar-section-title {
+    display: none;
+}
+
+.admin-sidebar.collapsed .collapsable-category-title {
+    display: none;
+}
+
+/* Group separators when collapsed */
+.admin-sidebar.collapsed [data-category]:not(:last-child)::after {
+    content: '';
+    display: block;
+    width: 60%;
+    height: 1px;
+    background-color: #4a5568;
+    margin: 0.75rem auto;
+    opacity: 0.6;
+}
+
+/* Hide divider if category group is collapsed (hidden in expanded mode) */
+.admin-sidebar.collapsed [data-category]:has(.collapsable-content.hidden-collapse)::after {
+    display: none;
+}
+
+.admin-sidebar.collapsed [data-category]:has(.collapsable-content.hidden-collapse) {
+    display: none;
+}
+
+.admin-sidebar.collapsed [data-category]:last-child::after {
+    display: none;
+}
+
+.admin-sidebar.collapsed .sidebar-icon {
+    margin-right: 0;
+    margin-left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+}
+
+.admin-sidebar.collapsed .sidebar-icon svg {
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+    color: currentColor;
+}
+
+.admin-sidebar.collapsed .sidebar-item-container > i.sidebar-icon,
+.admin-sidebar.collapsed .sidebar-item-container i.fas.sidebar-icon {
+    font-size: 1.1rem;
+    width: 1.35rem !important;
+}
+
+.admin-sidebar.collapsed .sidebar-item-container {
+    justify-content: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.admin-sidebar .sidebar-item-container {
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.admin-sidebar .sidebar-item-container .sidebar-text {
+    margin-top: 2px;
+}
+
+.admin-sidebar .sidebar-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    margin-right: 0.625rem;
+}
+
+.admin-sidebar .sidebar-icon svg {
+    color: currentColor;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+}
+
+/* FontAwesome icon sizing in sidebar (fa-* icons via <i> tags) */
+.admin-sidebar .sidebar-item-container > i.sidebar-icon,
+.admin-sidebar .sidebar-item-container i.fas.sidebar-icon {
+    font-size: 1.1rem;
+    width: 1.25rem !important;
+    height: auto !important;
+    text-align: center;
+}
+
+.admin-sidebar .sidebar-item-container.active {
+    background-color: #4a5568; /* Tailwind gray-700 */
+    color: #fff;
+    font-weight: 600;
+    border-left: 4px solid #f56565; /* Red border */
+    padding-left: calc(1rem - 4px);
+}
+
+.admin-sidebar.collapsed .sidebar-item-container.active .sidebar-icon {
+    color: #f56565;
+}
+
+.admin-sidebar.collapsed .sidebar-item-container.active {
+    padding-left: 1rem;
+    border-left: none;
+}
+
+/* Keep sidebar content aligned while moving scrollbar to the outer edge */
+.admin-sidebar #adminSidebarNav {
+    margin-right: -1rem;
+    padding-right: 1rem;
+}
+
+/* Main Content Margins for Desktop Sidebar */
+#mainContent.content-with-sidebar {
+    margin-left: 240px;
+    transition: margin-left 0.3s ease-in-out;
+}
+
+#mainContent.content-with-collapsed-sidebar {
+    margin-left: 72px;
+    transition: margin-left 0.3s ease-in-out;
+}
+
+/* Enhanced Content Spacing - Ensure proper padding from sidebar */
+#pageContentContainer {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    min-width: 0; /* flex descendants: allow shrink below wide intrinsic content */
+}
+
+/* Additional left padding when sidebar is present to create visual separation */
+#mainContent.content-with-sidebar #pageContentContainer {
+    padding-left: 2rem !important;
+}
+
+#mainContent.content-with-collapsed-sidebar #pageContentContainer {
+    padding-left: 2rem !important;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+    margin-top: auto;
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.admin-sidebar.collapsed .sidebar-footer {
+    display: none;
+}
+
+/* Centralized Scrollbar Styles */
+
+/* Dark theme scrollbar (for sidebars, dark containers) */
+.scrollbar-dark::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+    background: #1a202c;
+    border-radius: 3px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:active {
+    background: #9ca3af;
+}
+
+/* Light theme scrollbar (for modals, forms, light containers) */
+.scrollbar-light::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.scrollbar-light::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb:active {
+    background: #64748b;
+}
+
+/* Medium scrollbar (for larger containers) */
+.scrollbar-medium::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.scrollbar-medium::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.scrollbar-medium::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    transition: background-color 0.2s ease;
+}
+
+.scrollbar-medium::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.scrollbar-medium::-webkit-scrollbar-thumb:active {
+    background: #64748b;
+}
+
+/* Large scrollbar (for wide containers) */
+.scrollbar-large::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.scrollbar-large::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 8px;
+}
+
+.scrollbar-large::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 8px;
+    border: 2px solid #e5e7eb;
+    transition: background-color 0.2s ease;
+}
+
+.scrollbar-large::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+.scrollbar-large::-webkit-scrollbar-thumb:active {
+    background: #475569;
+}
+
+/* Hidden scrollbar (for clean look) */
+.scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+}
+
+.scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Firefox scrollbar support */
+.scrollbar-dark {
+    scrollbar-width: thin;
+    scrollbar-color: #4a5568 #1a202c;
+}
+
+.scrollbar-light {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.scrollbar-medium {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.scrollbar-large {
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+/* Apply scrollbar classes to existing elements */
+.admin-sidebar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.admin-sidebar::-webkit-scrollbar-track {
+    background: #1a202c;
+    border-radius: 3px;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb:active {
+    background: #9ca3af;
+}
+
+#mobileFloatingMenuNav::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+#mobileFloatingMenuNav::-webkit-scrollbar-track {
+    background: #1a202c;
+    border-radius: 3px;
+}
+
+#mobileFloatingMenuNav::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+#mobileFloatingMenuNav::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+#mobileFloatingMenuNav::-webkit-scrollbar-thumb:active {
+    background: #9ca3af;
+}
+
+/* Collapsable Categories in Sidebar */
+.collapsable-category-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    transition: background-color 0.2s ease-in-out;
+    color: #a0aec0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.2rem;
+}
+
+.collapsable-category-title:hover {
+    background-color: #4a5568;
+    color: #fff;
+}
+
+.collapsable-icon {
+    transition: transform 0.2s ease-in-out;
+}
+
+.collapsable-icon.rotated {
+    transform: rotate(90deg);
+}
+
+.collapsable-content {
+    display: block;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+}
+
+.collapsable-content.hidden-collapse {
+    max-height: 0;
+}
+
+/* Navigation Menu Button Styles */
+#navContainer {
+    height: 100%;
+    align-items: stretch;
+}
+
+.nav-focal-point {
+    background-color: #0a1f44;
+}
+
+.nav-system-manager {
+    /* Modern minimal design for system managers */
+    background-color: #1f2937; /* gray-800 - clean dark background */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(8px);
+}
+
+.nav-system-manager::before {
+    display: none;
+}
+
+.nav-system-manager::after {
+    display: none;
+}
+
+.nav-system-manager > * {
+    position: relative;
+    z-index: 1;
+}
+
+.nav-system-manager .nav-brand-title {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.nav-system-manager .nav-menu-button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+
+.system-manager-badge {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    backdrop-filter: blur(4px);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    flex-shrink: 0;
+}
+
+/* Let org title use remaining width after icon-only badge (label hidden below 1280px in layout.html) */
+.nav-system-manager .nav-brand-cluster {
+    min-width: 0;
+}
+
+.nav-system-manager .nav-brand-cluster .nav-brand-title {
+    min-width: 0;
+}
+
+/* Tighter icon-only badge padding when “System Manager” label is hidden */
+@media (max-width: 1279px) {
+    .nav-system-manager .system-manager-badge {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+    }
+}
+
+@keyframes pulse-glow {
+    /* Removed animation for minimal design */
+}
+
+/* System Manager top-nav buttons - minimal modern style */
+.nav-system-manager .nav-menu-button {
+    background: transparent;
+    color: #f3f4f6; /* gray-100 */
+    transition: all 0.2s ease;
+}
+
+.nav-system-manager .nav-menu-button:hover {
+    color: #ffffff;
+}
+
+.nav-system-manager .nav-menu-button + .nav-menu-button {
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav-system-manager .nav-menu-group {
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav-menu-wrapper {
+    align-items: stretch;
+    height: 100%;
+}
+
+.nav-menu-group {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+    border-right: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* Ensure nav menu group is hidden on mobile/tablet */
+@media (max-width: 1023px) {
+    .nav-menu-group {
+        display: none !important;
+    }
+}
+
+.nav-utilities {
+    align-items: center;
+    position: relative; /* Ensure popups can position relative to this */
+    overflow: visible; /* Allow dropdowns to overflow */
+}
+
+/* Ensure nav element doesn't clip dropdowns */
+nav[class*="nav-"] {
+    overflow: visible !important;
+}
+
+/* Ensure nav container doesn't clip dropdowns */
+#navContainer {
+    overflow: visible !important;
+}
+
+.nav-menu-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1.5rem;
+    border-radius: 0;
+    background: #0a1f44;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    gap: 0.5rem;
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    align-self: stretch;
+    height: 100%;
+}
+
+.nav-menu-button + .nav-menu-button {
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.nav-menu-button:hover {
+    background: #102a5c;
+    border-color: #102a5c;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.nav-menu-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.nav-menu-button svg {
+    opacity: 1;
+    transition: opacity 0.2s ease-in-out;
+    display: block;
+    vertical-align: middle;
+}
+
+.nav-menu-button > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* lg–xl: icon-only Dashboard/Documentation so brand title keeps one line longer (before xl, same band as .system-manager-label) */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+    .nav-menu-button > .nav-menu-button-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+    }
+
+    .nav-menu-button {
+        position: relative;
+        padding-left: 0.875rem;
+        padding-right: 0.875rem;
+        gap: 0;
+    }
+}
+
+.nav-menu-button:hover svg {
+    opacity: 1;
+}
+
+/* Organization Logo */
+.org-logo-img {
+    height: 2.25rem;
+    width: auto;
+    margin-right: 0.75rem;
+}
+
+/* Organization logo placeholder (shown when no logo image is configured or fails to load) */
+.org-logo-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.5rem;
+    width: 2.5rem;
+    margin-right: 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    letter-spacing: 0.025em;
+    user-select: none;
+}
+
+/* Ensure popups render above other UI and are positioned correctly */
+#notifications-dropdown {
+    z-index: 1100 !important;
+    position: absolute !important; /* Ensure absolute positioning */
+}
+
+/* Actor avatar + action badge (bell dropdown) */
+.notification-item-actor {
+    position: relative;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+}
+
+.notification-item-actor-badge {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.notification-item-actor-badge-icon {
+    font-size: 0.5rem;
+    line-height: 1;
+    color: #64748b;
+}
+
+/* Action-only circle (no user actor): type/action icon centered */
+.notification-item-action-circle {
+    background-color: #f3f4f6;
+    flex-shrink: 0;
+}
+
+.profile-popup {
+    position: absolute;
+    right: 0;
+    top: calc(100% - 4px);
+    margin-top: 0;
+    z-index: 1100;
+}
+
+/* Ensure all relative containers in nav allow overflow for dropdowns */
+nav .relative {
+    overflow: visible !important;
+}
+
+/* Navbar brand title uses Montserrat */
+.nav-brand-title {
+    font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ===== Select2 – Tailwind-aligned base theme ===== */
+.select2-container--default .select2-selection--single {
+    border-radius: 0.375rem;          /* rounded-md */
+    border: 1px solid #d1d5db;        /* border-gray-300 */
+    height: 2.25rem;                  /* h-9, matches Tailwind form defaults */
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;              /* text-sm */
+    line-height: 1.25rem;
+    background-color: #fff;
+    transition: border-color 150ms, box-shadow 150ms;
+}
+
+.select2-container--default .select2-selection--single:focus,
+.select2-container--default.select2-container--focus .select2-selection--single,
+.select2-container--default.select2-container--open .select2-selection--single {
+    border-color: #3b82f6;            /* focus:border-blue-500 */
+    box-shadow: 0 0 0 1px #3b82f6;   /* focus:ring-blue-500 */
+    outline: none;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: inherit;
+    padding: 0;
+    color: inherit;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__placeholder {
+    color: #9ca3af;                   /* text-gray-400 */
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 100%;
+    right: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.select2-dropdown {
+    border-radius: 0.375rem;
+    border: 1px solid #d1d5db;
+    z-index: 1050;
+}
+
+.select2-container .select2-search--dropdown .select2-search__field {
+    border-radius: 0.25rem;
+    border: 1px solid #d1d5db;
+}
+
+.select2-results__option--highlighted.select2-results__option--selectable {
+    background-color: #3b82f6;
+    color: white;
+}
+
+/* --- Modifier: compact (matches chip height: text-sm + py-1 + border) --- */
+.select2-compact .select2-selection--single {
+    height: 34px;
+    padding: 0 0.5rem;
+}
+.select2-compact .select2-selection--single .select2-selection__arrow {
+    right: 0.25rem;
+}
+
+/* --- Modifier: dashed border --- */
+.select2-container--default.select2-dashed .select2-selection--single {
+    border-style: dashed;
+}
+
+/* --- Modifier: muted placeholder text --- */
+.select2-muted .select2-selection--single .select2-selection__rendered {
+    color: #9ca3af;
+}
+
+/* ===== Select2 multi-select – match single theme (Tailwind-aligned) ===== */
+.select2-container--default .select2-selection--multiple {
+    border-radius: 0.375rem;
+    border: 1px solid #d1d5db;
+    min-height: 2.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    background-color: #fff;
+    transition: border-color 150ms, box-shadow 150ms;
+}
+
+.select2-container--default .select2-selection--multiple:focus,
+.select2-container--default.select2-container--focus .select2-selection--multiple,
+.select2-container--default.select2-container--open .select2-selection--multiple {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+    outline: none;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    border: none;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.5rem 0.125rem calc(1.25em + 0.5rem);
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    color: #1d4ed8;
+    margin: 0;
+    padding: 0;
+    position: absolute;
+    left: 0.125rem;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-shrink: 0;
+    width: 1.25em;
+    min-width: 1.25em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1em;
+    line-height: 1;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: #1e40af;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__rendered {
+    padding: 0;
+}
+
+.select2-container--default .select2-selection--multiple .select2-search--inline {
+    margin-left: 0.25rem;
+}
+
+.select2-container--default .select2-selection--multiple .select2-search__field {
+    margin: 0;
+    padding: 0;
+    font-size: 0.875rem;
+}
+
+/* Hide native select before Select2 initializes to avoid flash of unformatted list */
+.select2-country-wrap {
+    min-height: 2.25rem;
+    position: relative;
+}
+
+/* Placeholder box shown until Select2 container exists */
+.select2-country-wrap:not(:has(.select2-container))::before {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2.25rem;
+    border-radius: 0.375rem;
+    border: 1px solid #d1d5db;
+    background-color: #fff;
+    pointer-events: none;
+}
+
+/* Hide native select until Select2 has run (then Select2 hides it itself) */
+.select2-country-wrap select:not(.select2-hidden-accessible) {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2.25rem;
+    width: 100%;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Once Select2 is active, the container fills the wrap */
+.select2-country-wrap .select2-container {
+    width: 100% !important;
+}
+
+/* Prevent sidebar flicker by applying collapsed state immediately */
+.sidebar-initially-collapsed .admin-sidebar {
+    width: 72px;
+}
+
+/* Apply initial collapsed margin only when an admin sidebar exists */
+.sidebar-initially-collapsed .admin-sidebar + #mainContent {
+    margin-left: 72px;
+}
+
+/* Ensure floating buttons don't overlap collapsed admin sidebar */
+/* This applies to all screen sizes where admin sidebar is visible */
+.content-with-collapsed-sidebar #mobile-nav-toggle-button,
+.content-with-collapsed-sidebar #sidebar-expand-button {
+    left: 96px !important; /* 72px (collapsed sidebar) + 24px spacing */
+}
+
+.content-with-collapsed-sidebar #fab-menu {
+    left: 96px !important; /* 72px (collapsed sidebar) + 24px spacing */
+}
+
+.sidebar-initially-collapsed .sidebar-text,
+.sidebar-initially-collapsed .admin-panel-title,
+.sidebar-initially-collapsed .sidebar-section-title {
+    display: none;
+}
+
+.sidebar-initially-collapsed .collapsable-category-title {
+    display: none;
+}
+
+.sidebar-initially-collapsed .sidebar-icon {
+    margin-right: 0;
+    margin-left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+}
+
+.sidebar-initially-collapsed .sidebar-icon svg {
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+    color: currentColor;
+}
+
+.sidebar-initially-collapsed .sidebar-item-container {
+    justify-content: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.sidebar-initially-collapsed [data-category]:not(:last-child)::after {
+    content: '';
+    display: block;
+    width: 60%;
+    height: 1px;
+    background-color: #4a5568;
+    margin: 0.75rem auto;
+    opacity: 0.6;
+}
+
+/* Hide divider if category group is collapsed (hidden in expanded mode) */
+.sidebar-initially-collapsed [data-category]:has(.collapsable-content.hidden-collapse)::after {
+    display: none;
+}
+
+.sidebar-initially-collapsed [data-category]:has(.collapsable-content.hidden-collapse) {
+    display: none;
+}
+
+.sidebar-initially-collapsed [data-category]:last-child::after {
+    display: none;
+}
+
+/* PowerPoint Presentation Modal - Responsive sizing and layout */
+#powerpointModal > div {
+    width: 92vw;           /* Wide on desktop */
+    max-width: 1400px;     /* Cap extremely large screens */
+    height: 88vh;          /* Tall enough to fit slides */
+    display: flex;         /* Make header and body stack and size correctly */
+    flex-direction: column;
+}
+
+/* Ensure the content area fills remaining height below header */
+#powerpointModal > div .flex-1 {
+    flex: 1 1 auto;
+    min-height: 0;         /* Required for proper flex scrolling behavior */
+}
+
+/* Make embedded viewers fit the modal content area */
+#powerpointContent {
+    height: 100% !important;
+}
+
+#powerpointContent iframe,
+#powerpointContent embed,
+#powerpointContent object {
+    width: 100% !important;
+    height: 100% !important;
+    border: 0;
+}

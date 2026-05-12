@@ -1,0 +1,719 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}Emergency Operations Plugin Settings{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {{ page_header(
+        title="Emergency Operations Plugin Settings",
+        icon='fas fa-flag',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Plugins', 'url': url_for('admin.plugin_management')},
+            {'name': 'Emergency Operations Settings'}
+        ]
+    ) }}
+
+    <!-- ── Data Cache Panel ───────────────────────────────────────────────── -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
+        <div class="flex items-center gap-3 mb-5">
+            <h3 class="text-lg font-semibold text-gray-800">
+                <i class="fas fa-database text-indigo-600 mr-2"></i>
+                Data Cache
+            </h3>
+            <span id="cache-status-badge" class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Loading…</span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-600">Source</span>
+                <div class="flex items-center gap-4">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="data-source" value="file" id="data-source-file"
+                               class="form-radio h-4 w-4 text-indigo-600 border-gray-300">
+                        <span class="text-sm">File cache</span>
+                    </label>
+                    <select id="cache-schedule-select" class="text-sm border-gray-300 rounded py-1.5 pl-2 pr-8 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="off">Off</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                    <button type="button" id="eo-refresh-cache-btn" style="display: none"
+                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50">
+                        <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                        Pull from GO
+                    </button>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="data-source" value="live" id="data-source-live"
+                               class="form-radio h-4 w-4 text-indigo-600 border-gray-300">
+                        <span class="text-sm">Live API</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 ml-8 md:ml-12">
+                <button type="button" id="eo-save-cache-settings-btn"
+                        class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Save
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-gray-100 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <span><span class="text-gray-500">Records</span> <span class="font-medium text-gray-800" id="cache-record-count">—</span></span>
+            <span><span class="text-gray-500">Last pulled</span> <span class="font-medium text-gray-800" id="cache-fetched-at">—</span></span>
+            <span><span class="text-gray-500">Age</span> <span class="font-medium text-gray-800" id="cache-age">—</span></span>
+            <span><span class="text-gray-500">Next</span> <span class="font-medium text-gray-800" id="cache-next-refresh">—</span></span>
+        </div>
+
+        <div id="cache-action-msg" class="hidden mt-4 text-sm rounded px-3 py-2"></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <!-- Plugin Information -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                Plugin Information
+            </h3>
+
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Name:</span>
+                    <span class="font-medium">Emergency Operations Plugin</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Version:</span>
+                    <span class="font-medium">1.0.0</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Author:</span>
+                    <span class="font-medium">IFRC Development Team</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">License:</span>
+                    <span class="font-medium">MIT</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Status:</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Active
+                    </span>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm text-gray-600">
+                    This plugin provides emergency operations field types for forms, allowing users to fetch and display
+                    appeals data from the IFRC GO platform.
+                </p>
+            </div>
+        </div>
+
+        <!-- Plugin Actions -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                <i class="fas fa-cogs text-gray-600 mr-2"></i>
+                Plugin Actions
+            </h3>
+
+            <div class="space-y-3">
+                <button type="button"
+                        id="eo-reload-plugin-btn"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Reload Plugin
+                </button>
+
+                <button type="button"
+                        id="eo-check-updates-btn"
+                        class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-600">
+                    <i class="fas fa-download mr-2"></i>
+                    Check for Updates
+                </button>
+
+                <button type="button"
+                        id="eo-uninstall-plugin-btn"
+                        class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600">
+                    <i class="fas fa-trash mr-2"></i>
+                    Uninstall Plugin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Settings -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            <i class="fas fa-sliders-h text-green-600 mr-2"></i>
+            Configuration Settings
+        </h3>
+
+        <form id="plugin-settings-form" class="space-y-6">
+            <!-- API Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label for="eo-api-base-url" class="block text-sm font-medium text-gray-700 mb-2">
+                        GO API Base URL
+                    </label>
+                    <input type="text"
+                           id="eo-api-base-url"
+                           name="api_base_url"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                           placeholder="https://goadmin.ifrc.org/api/v2/appeal/">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Base URL for the IFRC GO API to fetch appeals data
+                    </p>
+                </div>
+
+                <div>
+                    <label for="eo-api-timeout" class="block text-sm font-medium text-gray-700 mb-2">
+                        Request Timeout (seconds)
+                    </label>
+                    <input type="number"
+                           id="eo-api-timeout"
+                           name="api_timeout"
+                           min="1"
+                           max="60"
+                           value="10"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Timeout for API requests in seconds (1-60)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Query Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="eo-query-end-date" class="block text-sm font-medium text-gray-700 mb-2">
+                        Default End Date Filter
+                    </label>
+                    <input type="text"
+                           id="eo-query-end-date"
+                           name="query_end_date"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                           placeholder="2023-12-31">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Filter appeals with end dates greater than this date (YYYY-MM-DD)
+                    </p>
+                </div>
+
+                <div>
+                    <label for="eo-query-limit" class="block text-sm font-medium text-gray-700 mb-2">
+                        Query Limit
+                    </label>
+                    <input type="number"
+                           id="eo-query-limit"
+                           name="query_limit"
+                           min="1"
+                           max="10000"
+                           value="1000"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Maximum number of appeals to fetch per request
+                    </p>
+                </div>
+            </div>
+
+            <!-- Display Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="eo-display-max-items" class="block text-sm font-medium text-gray-700 mb-2">
+                        Maximum Items Displayed
+                    </label>
+                    <input type="number"
+                           id="eo-display-max-items"
+                           name="display_max_items"
+                           min="1"
+                           max="100"
+                           value="10"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Maximum number of appeals to display in form fields (1-100)
+                    </p>
+                </div>
+
+                <div>
+                    <label for="eo-cache-duration" class="block text-sm font-medium text-gray-700 mb-2">
+                        Cache Duration (seconds)
+                    </label>
+                    <input type="number"
+                           id="eo-cache-duration"
+                           name="cache_duration"
+                           min="0"
+                           max="86400"
+                           value="3600"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="mt-1 text-xs text-gray-500">
+                        How long to cache API responses (0-86400 seconds, 0 = no cache)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Display Options -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Display Options</label>
+                    <div class="space-y-2">
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="eo-display-funded"
+                                   name="display_funded"
+                                   checked
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="eo-display-funded" class="ml-2 block text-sm text-gray-900">
+                                Show funded amount
+                            </label>
+                        </div>
+
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="eo-display-requested"
+                                   name="display_requested"
+                                   checked
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="eo-display-requested" class="ml-2 block text-sm text-gray-900">
+                                Show requested amount
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="eo-display-coverage"
+                                   name="display_coverage"
+                                   checked
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="eo-display-coverage" class="ml-2 block text-sm text-gray-900">
+                                Show coverage
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="eo-display-closed"
+                                   name="display_closed"
+                                   checked
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="eo-display-closed" class="ml-2 block text-sm text-gray-900">
+                                Show closed operations
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600">
+                    <i class="fas fa-save mr-2"></i>
+                    Save Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Usage Statistics -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            <i class="fas fa-chart-bar text-purple-600 mr-2"></i>
+            Usage Statistics
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600" id="total_eo_fields">0</div>
+                <div class="text-sm text-gray-600">Total EO Fields</div>
+            </div>
+
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+                <div class="text-2xl font-bold text-green-600" id="active_forms">0</div>
+                <div class="text-sm text-gray-600">Forms Using EO</div>
+            </div>
+
+            <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                <div class="text-2xl font-bold text-yellow-600" id="total_appeals">0</div>
+                <div class="text-sm text-gray-600">Appeals Fetched</div>
+            </div>
+
+            <div class="text-center p-4 bg-purple-50 rounded-lg">
+                <div class="text-2xl font-bold text-purple-600" id="api_calls">0</div>
+                <div class="text-sm text-gray-600">API Calls Today</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+// Plugin management functions (use centralized showConfirmation/showAlert from confirm-dialogs.js)
+function reloadPlugin() {
+    const msg = 'Are you sure you want to reload the Emergency Operations plugin? This will restart the plugin service.';
+    const doReload = () => {
+        fetch('/admin/api/plugins/reload', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (window.showAlert) window.showAlert('Plugin reloaded successfully!', 'success');
+                else console.log('Plugin reloaded successfully');
+                location.reload();
+            } else {
+                if (window.showAlert) window.showAlert('Failed to reload plugin: ' + data.error, 'error');
+                else console.error('Failed to reload plugin:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (window.showAlert) window.showAlert('Error reloading plugin', 'error');
+        });
+    };
+    if (window.showConfirmation) {
+        window.showConfirmation(msg, doReload, null, 'Reload', 'Cancel', 'Reload Plugin?');
+    } else {
+        doReload();
+    }
+}
+
+function checkForUpdates() {
+    const msg = 'Checking for updates...\n\nThis feature would typically check for plugin updates from a repository.';
+    if (window.showAlert) window.showAlert(msg, 'info');
+    else console.log(msg);
+}
+
+function uninstallPlugin() {
+    const msg1 = 'Are you sure you want to uninstall the Emergency Operations plugin? This action cannot be undone and will remove all EO fields from forms.';
+    const msg2 = 'WARNING: This will permanently remove the plugin and all associated data. Are you absolutely sure?';
+    const doUninstall = () => {
+        fetch('/admin/api/plugins/Emergency Operations Plugin/uninstall', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (window.showAlert) window.showAlert('Plugin uninstalled successfully!', 'success');
+                else console.log('Plugin uninstalled');
+                window.location.href = '/admin/dashboard';
+            } else {
+                if (window.showAlert) window.showAlert('Failed to uninstall plugin: ' + data.error, 'error');
+                else console.error('Failed to uninstall:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (window.showAlert) window.showAlert('Error uninstalling plugin', 'error');
+        });
+    };
+    const step1 = () => {
+        if (window.showDangerConfirmation) {
+            window.showDangerConfirmation(msg2, doUninstall, null, 'Uninstall', 'Cancel', 'Confirm Uninstall');
+        } else {
+            doUninstall();
+        }
+    };
+    if (window.showDangerConfirmation) {
+        window.showDangerConfirmation(msg1, step1, null, 'Uninstall', 'Cancel', 'Uninstall Plugin?');
+    } else {
+        step1();
+    }
+}
+
+// Form submission
+document.getElementById('plugin-settings-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const settings = Object.fromEntries(formData.entries());
+
+    // Convert checkboxes to boolean
+    settings.display_funded = document.getElementById('eo-display-funded').checked;
+    settings.display_requested = document.getElementById('eo-display-requested').checked;
+
+    // Save settings to backend API
+    fetch('/admin/plugins/emergency_operations/api/config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            api: {
+                base_url: settings.api_base_url,
+                timeout: parseInt(settings.api_timeout) || 10
+            },
+            query_defaults: {
+                end_date_gt: settings.query_end_date,
+                limit: parseInt(settings.query_limit) || 1000
+            },
+            display_defaults: {
+                max_items: parseInt(settings.display_max_items) || 10,
+                show_funded_amount: settings.display_funded,
+                show_requested_amount: settings.display_requested,
+                show_coverage: settings.display_coverage,
+                show_closed_operations: settings.display_closed
+            },
+            caching: {
+                cache_duration: parseInt(settings.cache_duration) || 3600
+            }
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const cacheMessage = data.cache_cleared ? ` (${data.cache_cleared} cached entries cleared)` : '';
+            if (window.showAlert) window.showAlert('Settings saved successfully' + cacheMessage + '!', 'success');
+            else console.log('Settings saved');
+            location.reload();
+        } else {
+            if (window.showAlert) window.showAlert('Failed to save settings: ' + (data.message || 'Unknown error'), 'error');
+            else console.error('Failed to save settings:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving settings:', error);
+        if (window.showAlert) window.showAlert('Error saving settings: ' + error.message, 'error');
+        else console.error('Error:', error.message);
+    });
+});
+
+// Load usage statistics
+function loadUsageStats() {
+    fetch('/admin/plugins/emergency_operations/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.stats) {
+                document.getElementById('total_eo_fields').textContent = data.stats.total_eo_fields || '0';
+                document.getElementById('active_forms').textContent = data.stats.active_forms || '0';
+                document.getElementById('total_appeals').textContent = data.stats.total_appeals || '0';
+                document.getElementById('api_calls').textContent = data.stats.api_calls || '0';
+            } else {
+                console.error('Failed to load usage statistics');
+                // Fallback to zeros
+                document.getElementById('total_eo_fields').textContent = '0';
+                document.getElementById('active_forms').textContent = '0';
+                document.getElementById('total_appeals').textContent = '0';
+                document.getElementById('api_calls').textContent = '0';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading usage statistics:', error);
+            // Fallback to zeros
+            document.getElementById('total_eo_fields').textContent = '0';
+            document.getElementById('active_forms').textContent = '0';
+            document.getElementById('total_appeals').textContent = '0';
+            document.getElementById('api_calls').textContent = '0';
+        });
+}
+
+// Load current settings
+function loadCurrentSettings() {
+    fetch('/admin/plugins/emergency_operations/api/config')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.config) {
+                const config = data.config;
+
+                // Populate API settings
+                if (config.api) {
+                    if (config.api.base_url) {
+                        document.getElementById('eo-api-base-url').value = config.api.base_url;
+                    }
+                    if (config.api.timeout) {
+                        document.getElementById('eo-api-timeout').value = config.api.timeout;
+                    }
+                }
+
+                // Populate query settings
+                if (config.query_defaults) {
+                    if (config.query_defaults.end_date_gt) {
+                        document.getElementById('eo-query-end-date').value = config.query_defaults.end_date_gt;
+                    }
+                    if (config.query_defaults.limit) {
+                        document.getElementById('eo-query-limit').value = config.query_defaults.limit;
+                    }
+                }
+
+                // Populate display settings
+                if (config.display_defaults) {
+                    if (config.display_defaults.max_items) {
+                        document.getElementById('eo-display-max-items').value = config.display_defaults.max_items;
+                    }
+                    if (config.display_defaults.show_funded_amount !== undefined) {
+                        document.getElementById('eo-display-funded').checked = config.display_defaults.show_funded_amount;
+                    }
+                    if (config.display_defaults.show_requested_amount !== undefined) {
+                        document.getElementById('eo-display-requested').checked = config.display_defaults.show_requested_amount;
+                    }
+                    if (config.display_defaults.show_coverage !== undefined) {
+                        document.getElementById('eo-display-coverage').checked = config.display_defaults.show_coverage;
+                    }
+                    if (config.display_defaults.show_closed_operations !== undefined) {
+                        document.getElementById('eo-display-closed').checked = config.display_defaults.show_closed_operations;
+                    }
+                }
+
+                // Populate cache settings
+                if (config.caching && config.caching.cache_duration !== undefined) {
+                    document.getElementById('eo-cache-duration').value = config.caching.cache_duration;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading current settings:', error);
+        });
+}
+
+// ── Data Cache helpers ──────────────────────────────────────────────────────
+
+function showCacheMsg(text, isError = false) {
+    const el = document.getElementById('cache-action-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = `mt-3 text-sm rounded-md px-3 py-2 ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
+    el.classList.remove('hidden');
+    clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(() => el.classList.add('hidden'), 8000);
+}
+
+function loadCacheStatus() {
+    fetch('/admin/plugins/emergency_operations/api/data-cache/status')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            const s = data.status;
+
+            // Badge
+            const badge = document.getElementById('cache-status-badge');
+            if (badge) {
+                if (!s.exists) {
+                    badge.textContent = 'No cache';
+                    badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600';
+                } else if (s.is_stale) {
+                    badge.textContent = 'Stale';
+                    badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
+                } else {
+                    badge.textContent = 'Fresh';
+                    badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+                }
+            }
+
+            // Stat cells
+            const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            setText('cache-record-count', s.exists ? s.record_count.toLocaleString() : '—');
+            setText('cache-fetched-at',   s.exists ? s.fetched_at_display : 'Never');
+            setText('cache-age',          s.exists ? s.age_display : '—');
+            setText('cache-next-refresh', s.next_refresh || (s.schedule === 'off' ? 'Off' : '—'));
+
+            // Schedule selector
+            const sel = document.getElementById('cache-schedule-select');
+            if (sel && s.schedule) sel.value = s.schedule;
+
+            // Data source toggle
+            const fileRadio = document.getElementById('data-source-file');
+            const liveRadio = document.getElementById('data-source-live');
+            if (fileRadio && liveRadio) {
+                const useFile = s.use_file_cache !== false;
+                fileRadio.checked = useFile;
+                liveRadio.checked = !useFile;
+            }
+            updateScheduleDropdownState();
+        })
+        .catch(err => console.error('Error loading cache status:', err));
+}
+
+function updateScheduleDropdownState() {
+    const liveRadio = document.getElementById('data-source-live');
+    const sel = document.getElementById('cache-schedule-select');
+    const pullBtn = document.getElementById('eo-refresh-cache-btn');
+    if (sel) sel.disabled = liveRadio ? liveRadio.checked : false;
+    if (pullBtn) pullBtn.style.display = liveRadio && liveRadio.checked ? 'none' : 'inline-flex';
+}
+
+function refreshCache() {
+    const btn = document.getElementById('eo-refresh-cache-btn');
+    const icon = document.getElementById('refresh-icon');
+    if (btn) btn.disabled = true;
+    if (icon) icon.classList.add('fa-spin');
+
+    fetch('/admin/plugins/emergency_operations/api/data-cache/refresh', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showCacheMsg(`✓ Refreshed successfully — ${Number(data.record_count).toLocaleString()} records pulled (${data.fetched_at_display})`);
+            loadCacheStatus();
+        } else {
+            showCacheMsg('Error: ' + (data.error || 'Unknown error'), true);
+        }
+    })
+    .catch(err => showCacheMsg('Network error: ' + err.message, true))
+    .finally(() => {
+        if (btn) btn.disabled = false;
+        if (icon) icon.classList.remove('fa-spin');
+    });
+}
+
+function saveCacheSettings() {
+    const fileRadio = document.getElementById('data-source-file');
+    const scheduleSel = document.getElementById('cache-schedule-select');
+    const useFileCache = fileRadio ? fileRadio.checked : true;
+    const schedule = scheduleSel ? scheduleSel.value : 'off';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const headers = { 'Content-Type': 'application/json', 'X-CSRFToken': csrf };
+
+    Promise.all([
+        fetch('/admin/plugins/emergency_operations/api/data-cache/source', {
+            method: 'POST', headers, body: JSON.stringify({ use_file_cache: useFileCache })
+        }).then(r => r.json()),
+        fetch('/admin/plugins/emergency_operations/api/data-cache/schedule', {
+            method: 'POST', headers, body: JSON.stringify({ schedule })
+        }).then(r => r.json())
+    ])
+    .then(([sourceRes, scheduleRes]) => {
+        if (sourceRes.success && scheduleRes.success) {
+            showCacheMsg('✓ Data cache settings saved');
+            setTimeout(() => location.reload(), 600);
+        } else {
+            showCacheMsg('Error: ' + (sourceRes.error || scheduleRes.error || 'Unknown error'), true);
+        }
+    })
+    .catch(err => showCacheMsg('Network error: ' + err.message, true));
+}
+
+// ── Initialize page ─────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsageStats();
+    loadCurrentSettings();
+    loadCacheStatus();
+
+    document.getElementById('eo-refresh-cache-btn')?.addEventListener('click', refreshCache);
+    document.getElementById('eo-save-cache-settings-btn')?.addEventListener('click', saveCacheSettings);
+
+    document.getElementById('data-source-file')?.addEventListener('change', updateScheduleDropdownState);
+    document.getElementById('data-source-live')?.addEventListener('change', updateScheduleDropdownState);
+
+    const reloadBtn = document.getElementById('eo-reload-plugin-btn');
+    if (reloadBtn) reloadBtn.addEventListener('click', reloadPlugin);
+
+    const checkUpdatesBtn = document.getElementById('eo-check-updates-btn');
+    if (checkUpdatesBtn) checkUpdatesBtn.addEventListener('click', checkForUpdates);
+
+    const uninstallBtn = document.getElementById('eo-uninstall-plugin-btn');
+    if (uninstallBtn) uninstallBtn.addEventListener('click', uninstallPlugin);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,920 @@
+/* Executive Header Styles - Applied to all pages via page_header component */
+
+/*
+ * Sticky header compact transitions change in-flow height; scroll anchoring on the main scroller
+ * can fight that and feel like the scroll position is pulled upward. Disable anchoring here only.
+ */
+.admin-scroll-main {
+    overflow-anchor: none;
+}
+
+/* Professional Page Header Styles (Applied to all pages) */
+.executive-page-header {
+    background: #ffffff;
+    border: 1px solid #e1e5e9;
+    border-radius: 2px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.04);
+    margin: 0 0 0.75rem 0 !important;
+    position: relative;
+    /* Above following main content (e.g. ag-grid) in paint order, so header dropdowns are not
+       covered by grid headers, column resizers, or other overlay-styled elements */
+    z-index: 20;
+    overflow: visible;
+    /* Prevent horizontal overflow on narrow screens */
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow-x: visible;
+}
+
+/* 1px anchor above pinned header — observed by page-header-pin.js (not display:none; needs layout box) */
+.page-header-pin-sentinel {
+    height: 1px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    pointer-events: none;
+    visibility: hidden;
+    flex-shrink: 0;
+}
+
+/* Optional: pin header to scroll container top and compact while scrolled (see page-header-pin.js) */
+.executive-page-header--pin-actions {
+    --header-pin-duration: 0.32s;
+    --header-pin-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    isolation: isolate;
+    /* Contain width during breadcrumb row collapse / flex reflow (avoids brief horizontal “blowout”) */
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    transition:
+        box-shadow var(--header-pin-duration) var(--header-pin-ease),
+        border-radius var(--header-pin-duration) var(--header-pin-ease),
+        border-color var(--header-pin-duration) var(--header-pin-ease),
+        background-color var(--header-pin-duration) var(--header-pin-ease);
+}
+
+/* Let the sticky bar respect the content column (flex/grid parents need min-width: 0 to shrink) */
+.executive-page-header--pin-actions .header-content-wrapper {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.executive-page-header--pin-actions .header-main-content {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Wrapper keeps DOM stable; no layout impact unless collapsible */
+.page-header-breadcrumb-slot:not(.page-header-breadcrumb-slot--collapsible) {
+    display: contents;
+}
+
+.page-header-breadcrumb-slot--collapsible {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows var(--header-pin-duration) var(--header-pin-ease);
+    overflow: hidden;
+    min-height: 0;
+}
+
+.page-header-breadcrumb-slot--collapsible > .breadcrumb-section {
+    overflow: hidden;
+    min-height: 0;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .page-header-breadcrumb-slot--collapsible {
+    grid-template-rows: 0fr;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* Strip all breadcrumb chrome in compact mode (avoids gray bar / hairline under title row) */
+.executive-page-header--pin-actions.is-header-pinned-compact
+    .page-header-breadcrumb-slot--collapsible > .breadcrumb-section {
+    max-height: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-top-width: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    pointer-events: none;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact
+    .page-header-breadcrumb-slot--collapsible .breadcrumb-section nav {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.executive-page-header--pin-actions .header-background-pattern {
+    transition: opacity var(--header-pin-duration) var(--header-pin-ease);
+}
+
+/* Do not transition width/height/min-height on auto-sized flex descendants — browsers interpolate badly and can flash huge widths. */
+.executive-page-header--pin-actions .header-main-content,
+.executive-page-header--pin-actions .brand-icon i,
+.executive-page-header--pin-actions .main-title,
+.executive-page-header--pin-actions .page-subtitle,
+.executive-page-header--pin-actions .title-section,
+.executive-page-header--pin-actions .action-controls,
+.executive-page-header--pin-actions .action-controls button,
+.executive-page-header--pin-actions .action-controls a {
+    transition:
+        padding var(--header-pin-duration) var(--header-pin-ease),
+        font-size var(--header-pin-duration) var(--header-pin-ease),
+        line-height var(--header-pin-duration) var(--header-pin-ease),
+        gap var(--header-pin-duration) var(--header-pin-ease),
+        transform var(--header-pin-duration) var(--header-pin-ease),
+        opacity var(--header-pin-duration) var(--header-pin-ease),
+        border-width var(--header-pin-duration) var(--header-pin-ease);
+}
+
+.executive-page-header--pin-actions .brand-icon {
+    transition:
+        width var(--header-pin-duration) var(--header-pin-ease),
+        height var(--header-pin-duration) var(--header-pin-ease),
+        transform var(--header-pin-duration) var(--header-pin-ease),
+        border-width var(--header-pin-duration) var(--header-pin-ease);
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact {
+    background-color: rgba(255, 255, 255, 0.92);
+    border-color: rgba(15, 23, 42, 0.07);
+    border-radius: 0 0 4px 4px;
+    box-shadow:
+        0 1px 0 rgba(15, 23, 42, 0.05),
+        0 14px 36px -16px rgba(15, 23, 42, 0.18),
+        0 6px 20px -8px rgba(15, 23, 42, 0.1);
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .header-background-pattern {
+    opacity: 0.25;
+}
+
+/* Subtle brand accent when pinned (ties bar to primary actions) */
+.executive-page-header--pin-actions.is-header-pinned-compact::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 0 0 3px 3px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--btn-primary, #0d9488) 55%, transparent) 35%,
+        color-mix(in srgb, var(--btn-primary, #0d9488) 55%, transparent) 65%,
+        transparent 100%
+    );
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 3;
+}
+
+@supports (backdrop-filter: blur(12px)) {
+    .executive-page-header--pin-actions.is-header-pinned-compact {
+        background-color: rgba(255, 255, 255, 0.78);
+        backdrop-filter: saturate(1.4) blur(14px);
+        -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    }
+}
+
+/* color-mix fallback for older engines */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+    .executive-page-header--pin-actions.is-header-pinned-compact::after {
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(13, 148, 136, 0.35) 40%,
+            rgba(13, 148, 136, 0.35) 60%,
+            transparent 100%
+        );
+    }
+}
+
+/* Grid + minmax(0,…) — flex + flex-basis:auto let the actions column resolve to max-content (~1500px) */
+.executive-page-header--pin-actions.is-header-pinned-compact .header-main-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    column-gap: 1.25rem;
+    row-gap: 0.5rem;
+    padding: 0.5625rem 1.125rem;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .page-subtitle {
+    display: none;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .brand-icon {
+    width: 32px;
+    height: 32px;
+    border-width: 1px;
+    transform: scale(0.96);
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .brand-icon i {
+    font-size: 0.8em;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .title-text-group {
+    min-width: 0;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .title-with-info {
+    min-width: 0;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .main-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.9375rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .title-section {
+    gap: 0.75rem;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .action-controls {
+    gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-content: center;
+}
+
+/* Flex items default min-width:auto uses children’s max-content; allow shrink + wrap inside the grid cell */
+.executive-page-header--pin-actions.is-header-pinned-compact .action-controls > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.executive-page-header--pin-actions.is-header-pinned-compact .action-controls button,
+.executive-page-header--pin-actions.is-header-pinned-compact .action-controls a {
+    padding: 0.5rem 1rem;
+    min-height: 2.5rem;
+    font-size: 0.8125rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .executive-page-header--pin-actions,
+    .executive-page-header--pin-actions .header-background-pattern,
+    .executive-page-header--pin-actions .header-main-content,
+    .executive-page-header--pin-actions .brand-icon,
+    .executive-page-header--pin-actions .brand-icon i,
+    .executive-page-header--pin-actions .main-title,
+    .executive-page-header--pin-actions .page-subtitle,
+    .executive-page-header--pin-actions .title-section,
+    .executive-page-header--pin-actions .action-controls,
+    .executive-page-header--pin-actions .action-controls button,
+    .executive-page-header--pin-actions .action-controls a,
+    .page-header-breadcrumb-slot--collapsible {
+        transition: none;
+    }
+}
+
+/* Narrow: same grid; stack to one column so actions never force horizontal overflow */
+@media (max-width: 1024px) {
+    .executive-page-header--pin-actions.is-header-pinned-compact .header-main-content {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: center;
+    }
+
+    .executive-page-header--pin-actions.is-header-pinned-compact .title-section {
+        min-width: 0;
+    }
+
+    .executive-page-header--pin-actions.is-header-pinned-compact .action-controls {
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 768px) {
+    .executive-page-header--pin-actions.is-header-pinned-compact .header-main-content {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .executive-page-header--pin-actions.is-header-pinned-compact .action-controls {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .executive-page-header--pin-actions.is-header-pinned-compact .action-controls button,
+    .executive-page-header--pin-actions.is-header-pinned-compact .action-controls a {
+        min-height: 2.25rem;
+        padding: 0.4375rem 0.75rem;
+    }
+}
+
+/* Normalize spacing with common padded sections following the header */
+.executive-page-header + .py-6,
+.executive-page-header + .pt-6,
+.executive-page-header + .container.py-6,
+.executive-page-header + .container.pt-6 {
+    padding-top: 0.75rem;
+}
+
+.executive-page-header .header-background-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg,
+        rgba(248, 250, 252, 0) 0%,
+        rgba(248, 250, 252, 0.3) 50%,
+        rgba(248, 250, 252, 0) 100%);
+    z-index: 1;
+}
+
+.executive-page-header .header-content-wrapper {
+    position: relative;
+    z-index: 2;
+    overflow: visible;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.executive-page-header .header-main-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 1.5rem 1.5rem;
+    gap: 1rem 2rem;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.executive-page-header .title-section {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    /* Share first row with actions when wide; wrap actions below when not enough inline space */
+    flex: 1 1 14rem;
+    min-width: 0;
+}
+
+.executive-page-header .title-section .brand-icon-wrapper {
+    flex-shrink: 0;
+}
+
+.executive-page-header .brand-icon-wrapper {
+    position: relative;
+}
+
+.executive-page-header .brand-icon {
+    width: 40px;
+    height: 40px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    flex-shrink: 0;
+}
+
+.executive-page-header .brand-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    color: inherit;
+}
+
+/* Font Awesome icon inside the brand-icon box — ensure it's pixel-centered */
+.executive-page-header .brand-icon i {
+    font-size: 1.125rem;
+    line-height: 1;
+    display: block;
+}
+
+.executive-page-header .brand-icon span {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.executive-page-header .title-text-group {
+    flex: 1;
+    min-width: 0;
+}
+
+.executive-page-header .main-title {
+    font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.3;
+    margin: 0;
+    letter-spacing: -0.025em;
+}
+
+.executive-page-header .page-subtitle {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin: 0.25rem 0 0 0;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.executive-page-header .action-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    overflow: visible;
+    flex: 0 1 auto;
+    /* Pin actions to the end of the row when beside the title; full width when wrapped */
+    margin-inline-start: auto;
+    justify-content: flex-end;
+    max-width: 100%;
+}
+
+/* Floating presence banner - fixed bottom-left, clears admin sidebar */
+.presence-floating-banner {
+    position: fixed;
+    bottom: 1rem;
+    left: calc(270px + 1rem);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 380px;
+    transition: left 0.3s ease-in-out;
+}
+
+.presence-floating-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+    color: #e2e8f0;
+}
+
+/* Override Tailwind text utility colors inside dark banner */
+.presence-floating-bar .text-gray-500,
+.presence-floating-bar .text-gray-600 {
+    color: #cbd5e1 !important;
+}
+
+.presence-floating-warning {
+    background: #fffbeb;
+    border: 1px solid #fbbf24;
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Position when sidebar is collapsed */
+#mainContent.content-with-collapsed-sidebar .presence-floating-banner {
+    left: calc(80px + 1rem);
+}
+
+/* Position when sidebar is expanded */
+#mainContent.content-with-sidebar .presence-floating-banner {
+    left: calc(270px + 1rem);
+}
+
+/* Initial collapsed state (before JS toggles classes) */
+.sidebar-initially-collapsed .presence-floating-banner {
+    left: calc(80px + 1rem);
+}
+
+/* No sidebar (non-admin users, public pages) */
+#mainContent:not(.content-with-sidebar):not(.content-with-collapsed-sidebar) .presence-floating-banner {
+    left: 1rem;
+}
+
+/* Mobile: sidebar is hidden, banner at screen edge */
+@media (max-width: 768px) {
+    .presence-floating-banner {
+        left: 1rem !important;
+        max-width: calc(100vw - 2rem);
+    }
+}
+
+.professional-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.125rem;
+    background: #e8ecf1;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 0;
+    font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-transform: none;
+    text-decoration: none;
+}
+
+/* Ensure Montserrat applies even when custom utility classes are used */
+.executive-page-header .action-controls button,
+.executive-page-header .action-controls a {
+    font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.8425rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Prevent icons from collapsing and ensure consistent spacing */
+.executive-page-header .action-controls i,
+.executive-page-header .action-controls svg {
+    flex-shrink: 0;
+}
+
+.professional-action-btn:hover {
+    background: #dce3e9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
+    text-decoration: none;
+    color: #1e293b;
+    border-color: #94a3b8;
+}
+
+.professional-action-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.35);
+}
+
+.professional-action-btn i,
+.professional-action-btn svg {
+    flex-shrink: 0;
+}
+
+/* Color variants for professional action buttons (use theme.css variables for global customization) */
+.professional-action-btn-green {
+    background: var(--btn-success, #16a34a);
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-green:hover {
+    background: var(--btn-success-hover, #15803d);
+    box-shadow: 0 2px 4px var(--btn-success-focus, rgba(22, 163, 74, 0.15));
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-green:active {
+    background: var(--btn-success-active, #166534);
+}
+
+.professional-action-btn-green:focus {
+    box-shadow: 0 0 0 2px var(--btn-success-focus, rgba(22, 163, 74, 0.2));
+}
+
+.professional-action-btn-red {
+    background: var(--btn-danger, #dc2626);
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-red:hover {
+    background: var(--btn-danger-hover, #b91c1c);
+    box-shadow: 0 2px 4px var(--btn-danger-focus, rgba(220, 38, 38, 0.15));
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-red:active {
+    background: var(--btn-danger-active, #991b1b);
+}
+
+.professional-action-btn-red:focus {
+    box-shadow: 0 0 0 2px var(--btn-danger-focus, rgba(220, 38, 38, 0.2));
+}
+
+.professional-action-btn-disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    border-color: #d1d5db;
+    cursor: not-allowed;
+}
+
+.professional-action-btn-disabled:hover {
+    background: #e5e7eb;
+    transform: none;
+    box-shadow: none;
+    color: #9ca3af;
+    border-color: #d1d5db;
+}
+
+.professional-action-btn-purple {
+    background: var(--btn-purple, #9333ea);
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-purple:hover {
+    background: var(--btn-purple-hover, #7e22ce);
+    box-shadow: 0 2px 4px var(--btn-purple-focus, rgba(147, 51, 234, 0.15));
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-purple:active {
+    background: var(--btn-purple-active, #6b21a8);
+}
+
+.professional-action-btn-purple:focus {
+    box-shadow: 0 0 0 2px var(--btn-purple-focus, rgba(147, 51, 234, 0.2));
+}
+
+.professional-action-btn-orange {
+    background: var(--btn-warning, #ea580c);
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-orange:hover {
+    background: var(--btn-warning-hover, #c2410c);
+    box-shadow: 0 2px 4px var(--btn-warning-focus, rgba(234, 88, 12, 0.15));
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-orange:active {
+    background: var(--btn-warning-active, #9a3412);
+}
+
+.professional-action-btn-orange:focus {
+    box-shadow: 0 0 0 2px var(--btn-warning-focus, rgba(234, 88, 12, 0.2));
+}
+
+.professional-action-btn-blue {
+    background: var(--btn-primary, #0d9488);
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-blue:hover {
+    background: var(--btn-primary-hover, #0f766e);
+    box-shadow: 0 2px 4px var(--btn-primary-focus, rgba(13, 148, 136, 0.15));
+    color: white;
+    border-color: transparent;
+}
+
+.professional-action-btn-blue:active {
+    background: var(--btn-primary-active, #115e59);
+}
+
+.professional-action-btn-blue:focus {
+    box-shadow: 0 0 0 2px var(--btn-primary-focus, rgba(13, 148, 136, 0.2));
+}
+
+.breadcrumb-section {
+    padding: 0.375rem 1.5rem 0.5rem;
+    border-top: 1px solid #f1f5f9;
+    background: #fafbfc;
+    position: relative;
+    z-index: 1;
+}
+
+.breadcrumb-section a {
+    pointer-events: auto;
+    color: #3b82f6;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.breadcrumb-section a:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+}
+
+/* Stack header layout at medium widths so buttons don't crowd the title */
+@media (max-width: 1024px) {
+    .executive-page-header .header-main-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .executive-page-header .title-section {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+
+    .executive-page-header .action-controls {
+        width: 100%;
+        max-width: none;
+        margin-inline-start: 0;
+        justify-content: flex-start;
+    }
+}
+
+/* Responsive adjustments for page headers */
+@media (max-width: 768px) {
+    .executive-page-header .header-main-content {
+        padding: 1.5rem 1rem;
+        gap: 1.5rem;
+    }
+
+    .executive-page-header {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .executive-page-header .title-section {
+        justify-content: center;
+        text-align: center;
+    }
+
+    .executive-page-header .brand-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .executive-page-header .main-title {
+        font-size: 1.125rem;
+    }
+
+    /*
+     * Keep actions in a horizontal flow (same as wider viewports); they wrap to the
+     * next line only when needed. Title is centered on small screens — center the
+     * action row to match. Form-wrapped POST buttons stay content-sized like siblings.
+     */
+    .executive-page-header .action-controls {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .executive-page-header .action-controls > form {
+        display: inline-block;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .executive-page-header .action-controls > form button {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .breadcrumb-section {
+        padding: 0.375rem 1rem;
+    }
+
+    .breadcrumb-section a {
+        pointer-events: auto;
+        cursor: pointer;
+    }
+}
+
+@media (max-width: 640px) {
+    .executive-page-header .title-section {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .executive-page-header .title-text-group {
+        text-align: center;
+    }
+}
+
+/* Arabic-specific typography adjustments */
+html[dir='rtl'] .executive-page-header .main-title {
+    font-family: 'Tajawal', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Page header component: title + info tooltip (from _page_header.html) */
+.executive-page-header .title-with-info {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    overflow: visible !important;
+}
+
+.executive-page-header .title-text-group {
+    overflow: visible !important;
+}
+
+.executive-page-header .info-tooltip-wrapper {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    overflow: visible !important;
+}
+
+.executive-page-header .info-tooltip-wrapper i {
+    transition: color 0.2s ease-in-out;
+}
+
+.executive-page-header .custom-tooltip {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #1f2937;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: normal;
+    max-width: 500px;
+    min-width: 300px;
+    width: max-content;
+    text-align: left;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    margin-top: 10px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.executive-page-header .custom-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-bottom-color: #1f2937;
+}
+
+.executive-page-header .info-tooltip-wrapper:hover .custom-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+@media (max-width: 768px) {
+    .executive-page-header .custom-tooltip {
+        left: 0;
+        transform: none;
+        max-width: 400px;
+        min-width: 250px;
+    }
+
+    .executive-page-header .custom-tooltip::after {
+        left: 30px;
+        transform: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .executive-page-header .custom-tooltip {
+        left: -50px;
+        max-width: 350px;
+        min-width: 200px;
+    }
+
+    .executive-page-header .custom-tooltip::after {
+        left: 50px;
+    }
+}

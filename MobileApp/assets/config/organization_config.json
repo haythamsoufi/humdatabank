@@ -1,0 +1,35 @@
+{
+  "organization": {
+    "name": "Humanitarian Databank",
+    "fullName": "Humanitarian Databank",
+    "shortName": "Humanitarian Databank",
+    "description": "Generic Humanitarian Databank Mobile Application",
+    "website": "https://example.org",
+    "supportEmail": "support@example.org",
+    "contactEmail": "contact@example.org"
+  },
+  "branding": {
+    "primaryColor": "#3B82F6",
+    "secondaryColor": "#1E40AF",
+    "accentColor": "#EF4444",
+    "navyColor": "#011E41",
+    "redColor": "#C8102E",
+    "darkRedColor": "#A50D25",
+    "logoPath": "assets/images/app_icon.png"
+  },
+  "app": {
+    "name": "Humanitarian Databank",
+    "packageName": "com.hum.databank",
+    "displayName": "Humanitarian Databank",
+    "description": "Humanitarian Databank Mobile Application for humanitarian data management"
+  },
+  "azure": {
+    "b2cTenant": "",
+    "b2cPolicy": "",
+    "redirectScheme": "humdatabank"
+  },
+  "features": {
+    "showOrganizationName": true,
+    "customBranding": false
+  }
+}

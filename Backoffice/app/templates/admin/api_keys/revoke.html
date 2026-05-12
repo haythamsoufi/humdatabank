@@ -1,0 +1,90 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Revoke API Key') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Revoke API Key'),
+    icon='fas fa-ban',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('API Management'), 'url': url_for('api_management.api_management')},
+        {'name': _('API Key Management'), 'url': url_for('api_key_management.list_api_keys')},
+        {'name': api_key.client_name, 'url': url_for('api_key_management.view_api_key', key_id=api_key.id)},
+        {'name': _('Revoke')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Cancel'),
+            'url': url_for('api_key_management.view_api_key', key_id=api_key.id),
+            'icon': 'fas fa-times',
+            'classes': 'professional-action-btn'
+        }
+    ]
+) }}
+
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 max-w-2xl mx-auto">
+    <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-red-400 text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">{{ _('Warning: This action cannot be undone') }}</h3>
+                <div class="mt-2 text-sm text-red-700">
+                    <p>{{ _('Revoking this API key will immediately disable all API access using this key.') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('API Key Information') }}</h3>
+        <dl class="grid grid-cols-1 gap-4">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">{{ _('Client Name') }}</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ api_key.client_name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">{{ _('Key Prefix') }}</dt>
+                <dd class="mt-1">
+                    <code class="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">{{ api_key.key_prefix }}...</code>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">{{ _('Last Used') }}</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ api_key.last_used_at|datetime_local('datetime') if api_key.last_used_at else _('Never') }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <form method="POST" action="{{ url_for('api_key_management.revoke_api_key', key_id=api_key.id) }}">
+        {{ form.csrf_token }}
+
+        <div class="space-y-6">
+            <div>
+                {{ form.revocation_reason.label(class="block text-sm font-medium text-gray-700 mb-2") }}
+                {{ form.revocation_reason(class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", rows=4) }}
+                {% for error in form.revocation_reason.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+                {% endfor %}
+                <p class="mt-1 text-xs text-gray-500">{{ form.revocation_reason.description }}</p>
+            </div>
+
+            <div class="flex items-center justify-between pt-4">
+                <a href="{{ url_for('api_key_management.view_api_key', key_id=api_key.id) }}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <i class="fas fa-times mr-2"></i>{{ _('Cancel') }}
+                </a>
+                <button type="submit"
+                        class="btn btn-danger">
+                    <i class="fas fa-ban mr-2"></i>{{ _('Revoke API Key') }}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

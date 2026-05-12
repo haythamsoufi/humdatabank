@@ -1,0 +1,71 @@
+{
+  "aliases": {
+    "Europe & CA": "Europe and Central Asia",
+    "Europe & Central Asia": "Europe and Central Asia",
+    "EU & CA": "Europe and Central Asia",
+    "TestRegion": "TestRegion"
+  },
+  "Africa": {
+    "en": "Africa",
+    "fr": "Afrique",
+    "es": "África",
+    "ar": "أفريقيا",
+    "zh": "非洲",
+    "ru": "Африка",
+    "hi": "अफ्रीका"
+  },
+  "Americas": {
+    "en": "Americas",
+    "fr": "Amériques",
+    "es": "Américas",
+    "ar": "الأمريكيتان",
+    "zh": "美洲",
+    "ru": "Америки",
+    "hi": "अमेरिका"
+  },
+  "Asia Pacific": {
+    "en": "Asia Pacific",
+    "fr": "Asie-Pacifique",
+    "es": "Asia Pacífico",
+    "ar": "آسيا والمحيط الهادئ",
+    "zh": "亚太地区",
+    "ru": "Азиатско-Тихоокеанский",
+    "hi": "एशिया-प्रशांत"
+  },
+  "Europe and Central Asia": {
+    "en": "Europe and Central Asia",
+    "fr": "Europe et Asie centrale",
+    "es": "Europa y Asia Central",
+    "ar": "أوروبا وآسيا الوسطى",
+    "zh": "欧洲和中亚",
+    "ru": "Европа и Центральная Азия",
+    "hi": "यूरोप और मध्य एशिया"
+  },
+  "MENA": {
+    "en": "MENA",
+    "fr": "MENA",
+    "es": "MENA",
+    "ar": "الشرق الأوسط وشمال أفريقيا",
+    "zh": "中东和北非",
+    "ru": "Ближний Восток и Северная Африка",
+    "hi": "मध्य पूर्व और उत्तर अफ्रीका"
+  },
+  "Middle East and North Africa": {
+    "en": "Middle East and North Africa",
+    "fr": "Moyen-Orient et Afrique du Nord",
+    "es": "Oriente Medio y Norte de África",
+    "ar": "الشرق الأوسط وشمال أفريقيا",
+    "zh": "中东和北非",
+    "ru": "Ближний Восток и Северная Африка",
+    "hi": "मध्य पूर्व और उत्तर अफ्रीका"
+  },
+  "TestRegion": {
+    "en": "TestRegion",
+    "fr": "Région de Test",
+    "es": "Región de Prueba",
+    "ar": "منطقة الاختبار",
+    "zh": "测试地区",
+    "ru": "Тестовый Регион",
+    "hi": "परीक्षण क्षेत्र"
+  }
+}

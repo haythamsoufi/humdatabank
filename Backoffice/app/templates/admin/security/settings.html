@@ -1,0 +1,24 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Security Settings') }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {{ page_header(
+        title=_('Security Settings'),
+        icon='fas fa-cogs',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Security'), 'url': url_for('security.security_dashboard')},
+            {'name': _('Settings')}
+        ]
+    ) }}
+
+    <div class="bg-white border border-gray-200 shadow-sm p-6">
+        <p class="text-sm text-gray-600">
+            {{ _('Security settings configuration UI is not yet implemented in this view.') }}
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+version: v0.1
+displayName: Databank Load Test
+description: "Backoffice staging load test: health, api/v1, navigation, entry-form, ajax save, optional submit"
+testPlan: locustfile.py
+testType: Locust
+engineInstances: 1
+env:
+  - name: LOADTEST_HOST
+    value: https://databank-stage.ifrc.org
+  - name: LOADTEST_ALLOW_PROD
+    value: 'false'
+  # Optional: focal-point entry form traffic (requires authenticated session cookie).
+  # Example: "123,456" (AssignmentEntityStatus IDs for focal-point assignments)
+  - name: LOADTEST_HELP_DOC_PATH
+    value: ''
+  - name: LOADTEST_ASSIGNMENT_AES_IDS
+    value: ''
+  - name: LOCUST_USERS
+    value: 20
+  - name: LOCUST_SPAWN_RATE
+    value: 1
+  - name: LOCUST_RUN_TIME
+    value: '120'
+  - name: ENABLE_LOGGING
+    value: 'true'
+# Provision LOADTEST_API_KEY (and optionally LOADTEST_SESSION_COOKIE) as a
+# Key Vault secret reference in Azure Load Testing rather than a literal value.
+# Example secret entry (uncomment and set the secretId in the portal/CI):
+# secrets:
+#   - name: LOADTEST_API_KEY
+#     value: https://<your-keyvault>.vault.azure.net/secrets/backoffice-loadtest-api-key
+# For focal-point route testing without Key Vault, LOADTEST_SESSION_COOKIE can be
+# passed as an env value at run/update time (short-lived; staging only).
+resourceId: >-
+  /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/Microsoft.LoadTestService/loadtests/DatabankTest1
+configurationFiles:
+  - requirements.txt
+referenceIdentities:
+  - type: SystemAssigned
+    kind: Metrics
+appComponents:
+  - resourceId: >-
+      /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/ifrc-databank-db-staging-2
+    resourceName: ifrc-databank-db-staging-2
+    resourceType: Microsoft.DBforPostgreSQL/flexibleServers
+    resourceGroup: ifrctgo001rg
+    subscriptionId: f585c1c3-801b-4641-8d7f-145aa50ffb04
+  - resourceId: >-
+      /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/Microsoft.Storage/storageAccounts/ifrcdatabankstorage2
+    resourceName: ifrcdatabankstorage2
+    resourceType: Microsoft.Storage/storageAccounts
+    resourceGroup: ifrctgo001rg
+    subscriptionId: f585c1c3-801b-4641-8d7f-145aa50ffb04
+    kind: StorageV2
+  - resourceId: >-
+      /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/Microsoft.Web/serverFarms/asp-ifrc-databank-staging
+    resourceName: asp-ifrc-databank-staging
+    resourceType: Microsoft.Web/serverFarms
+    resourceGroup: ifrctgo001rg
+    subscriptionId: f585c1c3-801b-4641-8d7f-145aa50ffb04
+    kind: linux
+  - resourceId: >-
+      /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/Microsoft.Web/sites/ifrc-databank-staging-2
+    resourceName: ifrc-databank-staging-2
+    resourceType: Microsoft.Web/sites
+    resourceGroup: ifrctgo001rg
+    subscriptionId: f585c1c3-801b-4641-8d7f-145aa50ffb04
+    kind: app,linux,container
+  - resourceId: >-
+      /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/microsoft.insights/components/Databank-insight-staging
+    resourceName: Databank-insight-staging
+    resourceType: microsoft.insights/components
+    resourceGroup: ifrctgo001rg
+    subscriptionId: f585c1c3-801b-4641-8d7f-145aa50ffb04
+    kind: web
+  - resourceId: >-
+      /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/ifrc-databank-db-staging-2a
+    resourceName: ifrc-databank-db-staging-2a
+    resourceType: Microsoft.DBforPostgreSQL/flexibleServers
+    resourceGroup: ifrctgo001rg
+    subscriptionId: f585c1c3-801b-4641-8d7f-145aa50ffb04
+testId: 47c51031-8a61-41ec-b48d-2018263200f1

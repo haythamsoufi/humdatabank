@@ -1,0 +1,1503 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block head %}
+    {{ super() }}
+    <style nonce="{{ csp_style_nonce() }}">
+        .sector-logo, .subsector-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .sector-card, .subsector-card {
+            transition: all 0.2s ease;
+            border: 1px solid #e5e7eb;
+        }
+
+        .sector-card:hover, .subsector-card:hover {
+            border-color: #d1d5db;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-active {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+
+        .status-inactive {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .file-upload-preview {
+            max-width: 100px;
+            max-height: 100px;
+            margin-top: 10px;
+        }
+
+        .icon-preview {
+            font-size: 24px;
+            margin-top: 10px;
+            display: block;
+        }
+
+        .add-button {
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: 8px;
+            border: 2px solid transparent;
+            font-size: 0.875rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .add-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .add-button.purple {
+            background-color: #9333ea;
+        }
+
+        .add-button.purple:hover {
+            background-color: #7e22ce;
+            border-color: #9333ea;
+        }
+
+        .add-button.indigo {
+            background-color: #4f46e5;
+        }
+
+        .add-button.indigo:hover {
+            background-color: #4338ca;
+            border-color: #4f46e5;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div>
+    {% from "components/_page_header.html" import page_header %}
+
+    {{ page_header(
+        title=title,
+        icon='fas fa-layer-group',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Indicator Bank'), 'url': url_for('system_admin.manage_indicator_bank')},
+            {'name': _('Sectors & Sub-Sectors')}
+        ],
+        actions=[
+            {
+                'type': 'button',
+                'text': _('Toggle View'),
+                'icon': 'fas fa-toggle-on',
+                'classes': 'view-toggle-btn professional-action-btn professional-action-btn-orange'
+            },
+            {
+                'type': 'button',
+                'text': _('Auto Translate All'),
+                'icon': 'fas fa-magic',
+                'classes': 'professional-action-btn professional-action-btn-purple',
+                'attributes': {'id': 'auto-translate-all-btn', 'title': _('Auto-translate blank multilingual names for all sectors and sub-sectors')}
+            },
+            {
+                'type': 'link',
+                'text': _('Back to Indicator Bank'),
+                'url': url_for('system_admin.manage_indicator_bank'),
+                'icon': 'fas fa-arrow-left',
+                'classes': 'professional-action-btn'
+            }
+        ]
+    ) }}
+
+    <div id="splitView" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Sectors Section -->
+        <div class="bg-white p-6 shadow-md border border-gray-200">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-layer-group text-purple-600 mr-2"></i>{{ _('Sectors') }}
+                </h2>
+                <div class="flex items-center">
+                    <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm font-medium">
+                        {{ sectors|length }} {{ _('sector') if sectors|length == 1 else _('sectors') }}
+                    </span>
+                    <button class="new-sector-btn add-button purple" title="{{ _('Add New Sector') }}">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            {% if sectors %}
+                <div class="space-y-3">
+                    {% for sector in sectors %}
+                    <div class="sector-card p-4 rounded-lg bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <!-- Logo or Icon -->
+                                {% if sector.logo_path %}
+                                    <img src="{{ url_for('system_admin.sector_logo', sector_id=sector.id) }}"
+                                         alt="{{ get_localized_sector_name(sector) }} logo"
+                                         class="sector-logo">
+                                {% elif sector.icon_class %}
+                                    <div class="w-8 h-8 flex items-center justify-center bg-purple-100 rounded">
+                                        <i class="{{ sector.icon_class }} text-purple-600"></i>
+                                    </div>
+                                {% else %}
+                                    <div class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded">
+                                        <i class="fas fa-circle text-gray-400"></i>
+                                    </div>
+                                {% endif %}
+
+                                <div>
+                                    <h3 class="font-semibold text-gray-900">{{ get_localized_sector_name(sector) }}</h3>
+                                </div>
+                            </div>
+
+                            <div class="flex space-x-2">
+                                <button class="edit-sector-btn text-blue-600 hover:text-blue-800 transition-colors" data-sector-id="{{ sector.id }}" title="{{ _('Edit') }}">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('system_admin.delete_sector', sector_id=sector.id) }}"
+                                      class="inline delete-sector-form" data-confirm="{{ _('Are you sure you want to delete this sector?') }}" data-confirm-danger="true">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-800 transition-colors" title="{{ _('Delete') }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-8">
+                    <i class="fas fa-layer-group text-gray-400 text-4xl mb-4"></i>
+                    <p class="text-gray-600 mb-4">{{ _('No sectors found.') }}</p>
+                    <button class="new-sector-btn text-purple-600 hover:text-purple-800 font-medium">
+                        {{ _('Create your first sector') }} →
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Sub-Sectors Section -->
+        <div class="bg-white p-6 shadow-md border border-gray-200">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-sitemap text-indigo-600 mr-2"></i>{{ _('Sub-Sectors') }}
+                </h2>
+                <div class="flex items-center">
+                    <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-sm font-medium">
+                        {{ subsectors|length }} {{ _('sub-sector') if subsectors|length == 1 else _('sub-sectors') }}
+                    </span>
+                    <button class="new-subsector-btn add-button indigo" title="{{ _('Add New Sub-Sector') }}">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            {% if subsectors %}
+                <div class="space-y-3">
+                    {% for subsector in subsectors %}
+                    <div class="subsector-card p-4 rounded-lg bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <!-- Logo or Icon -->
+                                {% if subsector.logo_path %}
+                                    <img src="{{ url_for('system_admin.subsector_logo', subsector_id=subsector.id) }}"
+                                         alt="{{ get_localized_subsector_name(subsector) }} logo"
+                                         class="subsector-logo">
+                                {% elif subsector.icon_class %}
+                                    <div class="w-8 h-8 flex items-center justify-center bg-indigo-100 rounded">
+                                        <i class="{{ subsector.icon_class }} text-indigo-600"></i>
+                                    </div>
+                                {% else %}
+                                    <div class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded">
+                                        <i class="fas fa-circle text-gray-400"></i>
+                                    </div>
+                                {% endif %}
+
+                                <div>
+                                    <h3 class="font-semibold text-gray-900">{{ get_localized_subsector_name(subsector) }}</h3>
+                                </div>
+                            </div>
+
+                            <div class="flex space-x-2">
+                                <button class="edit-subsector-btn text-blue-600 hover:text-blue-800 transition-colors" data-subsector-id="{{ subsector.id }}" title="{{ _('Edit') }}">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('system_admin.delete_subsector', subsector_id=subsector.id) }}"
+                                      class="inline delete-subsector-form" data-confirm="{{ _('Are you sure you want to delete this sub-sector?') }}" data-confirm-danger="true">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-800 transition-colors" title="{{ _('Delete') }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-8">
+                    <i class="fas fa-sitemap text-gray-400 text-4xl mb-4"></i>
+                    <p class="text-gray-600 mb-4">{{ _('No sub-sectors found.') }}</p>
+                    <button class="new-subsector-btn text-indigo-600 hover:text-indigo-800 font-medium">
+                        {{ _('Create your first sub-sector') }} →
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="hierarchicalView" class="hidden mt-8">
+        <div class="bg-white p-6 shadow-md border border-gray-200">
+            {% for sector in sectors %}
+            <div class="mb-8 last:mb-0">
+                <div class="bg-gray-50 p-4 rounded-lg mb-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        {% if sector.logo_path %}
+                            <img src="{{ url_for('system_admin.sector_logo', sector_id=sector.id) }}"
+                                 alt="{{ get_localized_sector_name(sector) }}" class="w-10 h-10 rounded-lg object-cover">
+                        {% elif sector.icon_class %}
+                            <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                                <i class="{{ sector.icon_class }} text-purple-600 text-xl"></i>
+                            </div>
+                        {% endif %}
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">{{ get_localized_sector_name(sector) }}</h3>
+                            {% if sector.description %}
+                                <p class="text-sm text-gray-600">{{ sector.description }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="edit-sector-btn text-blue-600 hover:text-blue-800"
+                                data-sector-id="{{ sector.id }}">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <form method="POST" action="{{ url_for('system_admin.delete_sector', sector_id=sector.id) }}"
+                              class="inline" data-confirm="Are you sure?">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="text-red-600 hover:text-red-800">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="pl-14 space-y-3">
+                    {% set sector_subs = (subsectors_by_sector|default({})).get(sector.id, []) %}
+                    {% for subsector in sector_subs %}
+                            <div class="bg-white p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-all flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    {% if subsector.logo_path %}
+                                        <img src="{{ url_for('system_admin.subsector_logo', subsector_id=subsector.id) }}"
+                                             alt="{{ get_localized_subsector_name(subsector) }}" class="w-8 h-8 rounded object-cover">
+                                    {% elif subsector.icon_class %}
+                                        <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center">
+                                            <i class="{{ subsector.icon_class }} text-indigo-600"></i>
+                                        </div>
+                                    {% endif %}
+                                    <div>
+                                        <h4 class="font-medium text-gray-900">{{ get_localized_subsector_name(subsector) }}</h4>
+                                        {% if subsector.description %}
+                                            <p class="text-sm text-gray-600">{{ subsector.description }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="edit-subsector-btn text-blue-600 hover:text-blue-800"
+                                            data-subsector-id="{{ subsector.id }}">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('system_admin.delete_subsector', subsector_id=subsector.id) }}"
+                                          class="inline" data-confirm="Are you sure?">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                    {% endfor %}
+                    {% if sector_subs|length == 0 %}
+                        <div class="text-center py-4 text-gray-500">
+                            <p>{{ _('No sub-sectors found for this sector') }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{# New Sector Modal #}
+<div id="newSectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Add New Sector') }}</h3>
+                        <form id="newSectorForm" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" value="0"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+
+                                <!-- Multilingual Names -->
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-3">{{ _('Multilingual Names') }}</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text"
+                                                   name="name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" checked class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="newSectorForm" class="btn btn-purple w-full sm:ml-3 sm:w-auto sm:text-sm">
+                    {{ _('Create Sector') }}
+                </button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">
+                    {{ _('Cancel') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Edit Sector Modal #}
+<div id="editSectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Edit Sector') }}</h3>
+                        <form id="editSectorForm" method="POST" action="" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" id="edit_sector_name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description" id="edit_sector_description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" id="edit_sector_display_order"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+
+                                <!-- Multilingual Names -->
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('Multilingual Names') }}</h4>
+                                    <div class="mb-3">
+                                        <button type="button"
+                                                class="btn btn-warning btn-sm js-sectorsub-auto-translate"
+                                                data-modal="editSectorModal"
+                                                data-primary-id="edit_sector_name"
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                            <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
+                                            <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
+                                            <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text"
+                                                   name="name_{{ code }}"
+                                                   id="edit_sector_name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" id="edit_sector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" id="edit_sector_is_active" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="editSectorForm" class="btn btn-purple w-full sm:ml-3 sm:w-auto sm:text-sm">
+                    {{ _('Update Sector') }}
+                </button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">
+                    {{ _('Cancel') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# New Subsector Modal #}
+<div id="newSubsectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Add New Sub-Sector') }}</h3>
+                        <form id="newSubsectorForm" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Sector') }}</label>
+                                    <select name="sector_id" required
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">{{ _('Select a sector...') }}</option>
+                                        {% for sector in sectors %}
+                                            <option value="{{ sector.id }}">{{ get_localized_sector_name(sector) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" value="0"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+
+                                <!-- Multilingual Names -->
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-3">{{ _('Multilingual Names') }}</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text"
+                                                   name="name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="newSubsectorForm" class="btn btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm">
+                    {{ _('Create Sub-Sector') }}
+                </button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">
+                    {{ _('Cancel') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Edit Subsector Modal #}
+<div id="editSubsectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Edit Sub-Sector') }}</h3>
+                        <form id="editSubsectorForm" method="POST" action="" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" id="edit_subsector_name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description" id="edit_subsector_description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Sector') }}</label>
+                                    <select name="sector_id" id="edit_subsector_sector_id" required
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">{{ _('Select a sector...') }}</option>
+                                        {% for sector in sectors %}
+                                            <option value="{{ sector.id }}">{{ get_localized_sector_name(sector) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" id="edit_subsector_display_order"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+
+                                <!-- Multilingual Names -->
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('Multilingual Names') }}</h4>
+                                    <div class="mb-3">
+                                        <button type="button"
+                                                class="btn btn-warning btn-sm js-sectorsub-auto-translate"
+                                                data-modal="editSubsectorModal"
+                                                data-primary-id="edit_subsector_name"
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                            <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
+                                            <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
+                                            <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text"
+                                                   name="name_{{ code }}"
+                                                   id="edit_subsector_name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" id="edit_subsector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" id="edit_subsector_is_active" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="editSubsectorForm" class="btn btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm">
+                    {{ _('Update Sub-Sector') }}
+                </button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">
+                    {{ _('Cancel') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Bulk auto-translate (page header) — shared modal #}
+{% set auto_translate_config = {
+    'title': _('Auto-Translate All Sector & Sub-Sector Names'),
+    'description': _('Translate blank multilingual names for all sectors and sub-sectors'),
+    'endpoint': url_for('utilities.api_auto_translate'),
+    'item_type': _('sectors and sub-sectors'),
+    'permission_context': 'organization',
+    'permission_code': 'admin.organization.manage'
+} %}
+<script id="auto-translate-config-json" type="application/json">{{ auto_translate_config | tojson | safe }}</script>
+{% include "components/auto_translate_modal.html" with context %}
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    const configEl = document.getElementById('auto-translate-config-json');
+    if (configEl) {
+        try {
+            const config = JSON.parse(configEl.textContent);
+            window.autoTranslateConfigFromTemplate = {
+                endpoint: config.endpoint || null,
+                itemType: config.item_type || config.itemType || 'items',
+                permission_context: config.permission_context || config.permissionContext || null,
+                permission_code: config.permission_code || config.permissionCode || null
+            };
+        } catch (e) {
+            console.error('Failed to parse auto-translate config:', e);
+            window.autoTranslateConfigFromTemplate = {
+                endpoint: null,
+                itemType: 'items',
+                permission_context: null,
+                permission_code: null
+            };
+        }
+    } else {
+        window.autoTranslateConfigFromTemplate = {
+            endpoint: null,
+            itemType: 'items',
+            permission_context: null,
+            permission_code: null
+        };
+    }
+})();
+</script>
+{% include 'components/auto_translate_modal_js.html' with context %}
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    window.SECTORS_SUBSECTORS_AT_DATA = {
+        sectors: [
+            {% for s in sectors %}
+            {
+                id: {{ s.id }},
+                kind: 'sector',
+                name: {{ (s.name or '')|tojson|safe }},
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                {{ ('name_' ~ code)|tojson|safe }}: {{ ((s.name_translations or {}).get(code) or '')|tojson|safe }}{{ ',' if not loop.last else '' }}
+                {% endfor %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        subsectors: [
+            {% for s in subsectors %}
+            {
+                id: {{ s.id }},
+                kind: 'subsector',
+                name: {{ (s.name or '')|tojson|safe }},
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                {{ ('name_' ~ code)|tojson|safe }}: {{ ((s.name_translations or {}).get(code) or '')|tojson|safe }}{{ ',' if not loop.last else '' }}
+                {% endfor %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
+    };
+
+    const sectorEditUrlTpl = {{ url_for('system_admin.edit_sector', sector_id=0)|tojson|safe }};
+    const subsectorEditUrlTpl = {{ url_for('system_admin.edit_subsector', subsector_id=0)|tojson|safe }};
+
+    function sectorEditUrl(id) {
+        return sectorEditUrlTpl.replace(/\d+$/, String(id));
+    }
+    function subsectorEditUrl(id) {
+        return subsectorEditUrlTpl.replace(/\d+$/, String(id));
+    }
+
+    function getSectorsSubsectorsRows() {
+        const d = window.SECTORS_SUBSECTORS_AT_DATA || { sectors: [], subsectors: [] };
+        const out = [];
+        (d.sectors || []).forEach(function(r) { out.push(r); });
+        (d.subsectors || []).forEach(function(r) { out.push(r); });
+        return out;
+    }
+
+    function nameFieldForLang(lang) {
+        return lang ? ('name_' + lang) : null;
+    }
+
+    window.getPageSpecificTranslationCounts = function(overwriteExisting, selectedMsgids) {
+        overwriteExisting = !!overwriteExisting;
+        const counts = {};
+        {% for lang_code in TRANSLATABLE_LANGUAGES %}
+        counts[{{ lang_code|tojson|safe }}] = 0;
+        {% endfor %}
+        try {
+            getSectorsSubsectorsRows().forEach(function(row) {
+                if (!row || !row.id) return;
+                const englishName = (row.name || '').trim();
+                const hasEnglishName = !!englishName;
+                if (!hasEnglishName) return;
+                Object.keys(counts).forEach(function(lang) {
+                    if (lang === 'en') return;
+                    const nf = nameFieldForLang(lang);
+                    if (!nf || !Object.prototype.hasOwnProperty.call(row, nf)) return;
+                    const nameValue = (row[nf] || '').trim();
+                    const hasNameTranslation = !!nameValue;
+                    if (overwriteExisting) {
+                        counts[lang]++;
+                    } else if (!hasNameTranslation) {
+                        counts[lang]++;
+                    }
+                });
+            });
+        } catch (err) {
+            console.error('Error calculating sector/sub-sector translation counts:', err);
+        }
+        return counts;
+    };
+
+    function patchRowNameFields(job, saveBody) {
+        const rows = getSectorsSubsectorsRows();
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].id === job.id && rows[i].kind === job.kind) {
+                Object.keys(saveBody).forEach(function(k) {
+                    if (k.indexOf('name_') === 0) {
+                        rows[i][k] = saveBody[k];
+                    }
+                });
+                break;
+            }
+        }
+    }
+
+    window.performPageSpecificTranslation = function(selectedLanguages, selectedService) {
+        const overwriteExisting = typeof jQuery !== 'undefined' && jQuery('#overwrite-existing-translations').is(':checked');
+        const counts = window.getPageSpecificTranslationCounts(overwriteExisting);
+        const languagesNeedingTranslation = overwriteExisting
+            ? selectedLanguages
+            : selectedLanguages.filter(function(lang) { return counts[lang] > 0; });
+
+        const jobs = [];
+        getSectorsSubsectorsRows().forEach(function(row) {
+            if (!row || !row.id) return;
+            const englishName = (row.name || '').trim();
+            if (!englishName) return;
+            const langsForRow = [];
+            languagesNeedingTranslation.forEach(function(lang) {
+                if (lang === 'en') return;
+                const nf = nameFieldForLang(lang);
+                if (!nf || !Object.prototype.hasOwnProperty.call(row, nf)) return;
+                const cur = (row[nf] || '').trim();
+                const need = overwriteExisting ? true : !cur;
+                if (need) {
+                    langsForRow.push(lang);
+                }
+            });
+            if (langsForRow.length) {
+                jobs.push({
+                    id: row.id,
+                    kind: row.kind,
+                    text: englishName,
+                    languages: langsForRow
+                });
+            }
+        });
+
+        if (!jobs.length) {
+            if (window.autoTranslateModal) {
+                window.autoTranslateModal.logProgress({{ _('No sectors or sub-sectors found that need translation')|tojson|safe }}, 'info');
+                window.autoTranslateModal.translationState.isRunning = false;
+            }
+            if (typeof jQuery !== 'undefined') {
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+            }
+            return;
+        }
+
+        if (window.autoTranslateModal) {
+            window.autoTranslateModal.translationState.totalItems = jobs.length;
+            window.autoTranslateModal.updateProgress();
+            window.autoTranslateModal.logProgress(
+                {{ _('Starting')|tojson|safe }} + ' ' + jobs.length + ' ' + {{ _('sector/sub-sector batch(es), all selected languages per item...')|tojson|safe }},
+                'info'
+            );
+        }
+
+        processNextSectorsSubsectorJob(jobs, 0, languagesNeedingTranslation, selectedService || 'ifrc');
+    };
+
+    function processNextSectorsSubsectorJob(jobs, index, selectedLanguages, selectedService) {
+        const state = (window.autoTranslateModal && window.autoTranslateModal.translationState) || null;
+        if (index >= jobs.length || (state && state.shouldStop)) {
+            if (window.autoTranslateModal) {
+                window.autoTranslateModal.translationState.isRunning = false;
+                if (state && state.shouldStop) {
+                    window.autoTranslateModal.logProgress({{ _('Translation stopped by user.')|tojson|safe }}, 'info');
+                } else {
+                    window.autoTranslateModal.logProgress({{ _('Translation completed!')|tojson|safe }}, 'success');
+                }
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                if (window.autoTranslateModal.notifyCompletion) {
+                    window.autoTranslateModal.notifyCompletion();
+                }
+            }
+            return;
+        }
+
+        if (state && state.isPaused) {
+            setTimeout(function() {
+                processNextSectorsSubsectorJob(jobs, index, selectedLanguages, selectedService);
+            }, 500);
+            return;
+        }
+
+        const job = jobs[index];
+        const service = selectedService || 'ifrc';
+        const translationPayload = {
+            type: 'section_name',
+            permission_context: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_context)
+                ? window.autoTranslateModal.config.permission_context
+                : 'organization',
+            permission_code: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_code)
+                ? window.autoTranslateModal.config.permission_code
+                : 'admin.organization.manage',
+            text: job.text,
+            target_languages: job.languages,
+            translation_service: service
+        };
+
+        const _payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(translationPayload))));
+        ((window.getFetch && window.getFetch()) || fetch)(window.autoTranslateModal.config.endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': (typeof jQuery !== 'undefined' && jQuery('meta[name=csrf-token]').attr('content')) || ''
+            },
+            body: JSON.stringify({ payload: _payloadB64 })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            window.autoTranslateModal.translationState.processedItems++;
+            window.autoTranslateModal.updateProgress();
+
+            if (data.success && data.translations && typeof data.translations === 'object') {
+                const saveBody = {};
+                job.languages.forEach(function(lang) {
+                    const t = data.translations[lang];
+                    if (t != null && String(t).trim() !== '') {
+                        saveBody['name_' + lang] = String(t).trim();
+                    }
+                });
+                if (!Object.keys(saveBody).length) {
+                    window.autoTranslateModal.translationState.errorCount++;
+                    window.autoTranslateModal.logProgress(
+                        {{ _('Failed to translate')|tojson|safe }} + ' ' + job.kind + ' ' + job.id + ' (' + job.languages.join(', ') + ')',
+                        'error'
+                    );
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function() {
+                        processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                    }, 80);
+                    return;
+                }
+
+                const saveUrl = job.kind === 'sector' ? sectorEditUrl(job.id) : subsectorEditUrl(job.id);
+
+                ((window.getFetch && window.getFetch()) || fetch)(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': (typeof jQuery !== 'undefined' && jQuery('meta[name=csrf-token]').attr('content')) || ''
+                    },
+                    body: JSON.stringify(saveBody)
+                })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(function(saveData) {
+                    if (saveData && saveData.success !== false) {
+                        window.autoTranslateModal.translationState.successCount++;
+                        patchRowNameFields(job, saveBody);
+                        window.autoTranslateModal.logProgress(
+                            {{ _('✓')|tojson|safe }} + ' ' + job.kind + ' ' + job.id + ' → ' + Object.keys(saveBody).map(function(k) { return k.replace(/^name_/, ''); }).join(', '),
+                            'success'
+                        );
+                    } else {
+                        window.autoTranslateModal.translationState.errorCount++;
+                        window.autoTranslateModal.logProgress(
+                            {{ _('Failed to save')|tojson|safe }} + ' ' + job.kind + ' ' + job.id,
+                            'error'
+                        );
+                    }
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function() {
+                        processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                    }, 80);
+                })
+                .catch(function(saveErr) {
+                    window.autoTranslateModal.translationState.errorCount++;
+                    window.autoTranslateModal.logProgress(
+                        (saveErr && saveErr.message ? saveErr.message : {{ _('Save failed')|tojson|safe }}) + ' (' + job.kind + ' ' + job.id + ')',
+                        'error'
+                    );
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function() {
+                        processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                    }, 80);
+                });
+            } else {
+                window.autoTranslateModal.translationState.errorCount++;
+                window.autoTranslateModal.logProgress(
+                    (data && data.message ? data.message : {{ _('Translation failed')|tojson|safe }}) + ' (' + job.kind + ' ' + job.id + ')',
+                    'error'
+                );
+                window.autoTranslateModal.updateProgress();
+                setTimeout(function() {
+                    processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                }, 80);
+            }
+        })
+        .catch(function(err) {
+            window.autoTranslateModal.translationState.processedItems++;
+            window.autoTranslateModal.translationState.errorCount++;
+            window.autoTranslateModal.logProgress(
+                (err && err.message ? err.message : {{ _('Network error')|tojson|safe }}) + ' (' + job.kind + ' ' + job.id + ')',
+                'error'
+            );
+            window.autoTranslateModal.updateProgress();
+            setTimeout(function() {
+                processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+            }, 80);
+        });
+    }
+
+    function waitForJQueryAndHookNotify() {
+        if (typeof jQuery === 'undefined' || !window.autoTranslateModal) {
+            setTimeout(waitForJQueryAndHookNotify, 30);
+            return;
+        }
+        jQuery(document).ready(function() {
+            var _origNotify = window.autoTranslateModal.notifyCompletion;
+            window.autoTranslateModal.notifyCompletion = function() {
+                if (typeof _origNotify === 'function') {
+                    _origNotify.call(window.autoTranslateModal);
+                }
+                window.location.reload();
+            };
+        });
+    }
+    waitForJQueryAndHookNotify();
+})();
+</script>
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal elements
+    const newSectorModal = document.getElementById('newSectorModal');
+    const editSectorModal = document.getElementById('editSectorModal');
+    const newSubsectorModal = document.getElementById('newSubsectorModal');
+    const editSubsectorModal = document.getElementById('editSubsectorModal');
+
+    // Button elements
+    const newSectorBtns = document.querySelectorAll('.new-sector-btn');
+    const editSectorBtns = document.querySelectorAll('.edit-sector-btn');
+    const newSubsectorBtns = document.querySelectorAll('.new-subsector-btn');
+    const editSubsectorBtns = document.querySelectorAll('.edit-subsector-btn');
+    const modalCloseBtns = document.querySelectorAll('.modal-close');
+
+    // Helper function to show modal
+    function showModal(modal) {
+        modal.classList.remove('hidden');
+    }
+
+    // Helper function to hide modal
+    function hideModal(modal) {
+        modal.classList.add('hidden');
+    }
+
+    // Helper function to hide all modals
+    function hideAllModals() {
+        [newSectorModal, editSectorModal, newSubsectorModal, editSubsectorModal].forEach(modal => {
+            hideModal(modal);
+        });
+    }
+
+    // Add click event listeners for new sector buttons
+    newSectorBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const form = document.getElementById('newSectorForm');
+            form.action = "{{ url_for('system_admin.new_sector') }}";
+            showModal(newSectorModal);
+        });
+    });
+
+    // Add click event listeners for edit sector buttons
+    editSectorBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const sectorId = btn.dataset.sectorId;
+            try {
+                const response = await fetch(`{{ url_for('system_admin.get_sector', sector_id=0) }}`.replace('0', sectorId));
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                // Populate form fields
+                document.getElementById('edit_sector_name').value = data.name;
+                document.getElementById('edit_sector_description').value = data.description;
+                document.getElementById('edit_sector_display_order').value = data.display_order;
+                document.getElementById('edit_sector_icon_class').value = data.icon_class;
+                document.getElementById('edit_sector_is_active').checked = data.is_active;
+
+                // Populate multilingual fields
+                const trans = (data && data.name_translations) ? data.name_translations : {};
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                const el_sector_{{ code|replace('-', '_') }} = document.getElementById('edit_sector_name_{{ code }}');
+                if (el_sector_{{ code|replace('-', '_') }}) el_sector_{{ code|replace('-', '_') }}.value = trans['{{ code }}'] || '';
+                {% endfor %}
+
+                // Handle existing logo display
+                const logoPreview = document.querySelector('#editSectorModal .file-upload-preview');
+                if (data.logo_filename) {
+                    // Show existing logo
+                    const logoUrl = `{{ url_for('system_admin.sector_logo', sector_id=0) }}`.replace('0', sectorId);
+                    if (logoPreview) {
+                        logoPreview.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                    } else {
+                        // Create preview if it doesn't exist
+                        const logoInput = document.querySelector('#editSectorModal input[name="logo_file"]');
+                        const previewDiv = document.createElement('div');
+                        previewDiv.classList.add('file-upload-preview');
+                        previewDiv.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        logoInput.parentNode.insertBefore(previewDiv, logoInput.nextSibling);
+                    }
+                } else {
+                    // Clear preview if no logo
+                    if (logoPreview) {
+                        logoPreview.innerHTML = '';
+                    }
+                }
+
+                // Update form action
+                const form = document.getElementById('editSectorForm');
+                form.action = `{{ url_for('system_admin.edit_sector', sector_id=0) }}`.replace('0', sectorId);
+
+                showModal(editSectorModal);
+            } catch (error) {
+                console.error('Error fetching sector data:', error);
+                if (window.showAlert) window.showAlert('{{ _("Failed to load sector data. Please try again.") }}', 'error');
+                else console.error('Failed to load sector data');
+            }
+        });
+    });
+
+    // Add click event listeners for new subsector buttons
+    newSubsectorBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const form = document.getElementById('newSubsectorForm');
+            form.action = "{{ url_for('system_admin.new_subsector') }}";
+            showModal(newSubsectorModal);
+        });
+    });
+
+    // Add click event listeners for edit subsector buttons
+    editSubsectorBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const subsectorId = btn.dataset.subsectorId;
+            try {
+                const response = await fetch(`{{ url_for('system_admin.get_subsector', subsector_id=0) }}`.replace('0', subsectorId));
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                // Populate form fields
+                document.getElementById('edit_subsector_name').value = data.name;
+                document.getElementById('edit_subsector_description').value = data.description;
+                document.getElementById('edit_subsector_sector_id').value = data.sector_id;
+                document.getElementById('edit_subsector_display_order').value = data.display_order;
+                document.getElementById('edit_subsector_icon_class').value = data.icon_class;
+                document.getElementById('edit_subsector_is_active').checked = data.is_active;
+
+                // Populate multilingual fields
+                const trans = (data && data.name_translations) ? data.name_translations : {};
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                const el_subsector_{{ code|replace('-', '_') }} = document.getElementById('edit_subsector_name_{{ code }}');
+                if (el_subsector_{{ code|replace('-', '_') }}) el_subsector_{{ code|replace('-', '_') }}.value = trans['{{ code }}'] || '';
+                {% endfor %}
+
+                // Handle existing logo display
+                const logoPreview = document.querySelector('#editSubsectorModal .file-upload-preview');
+                if (data.logo_filename) {
+                    // Show existing logo
+                    const logoUrl = `{{ url_for('system_admin.subsector_logo', subsector_id=0) }}`.replace('0', subsectorId);
+                    if (logoPreview) {
+                        logoPreview.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                    } else {
+                        // Create preview if it doesn't exist
+                        const logoInput = document.querySelector('#editSubsectorModal input[name="logo_file"]');
+                        const previewDiv = document.createElement('div');
+                        previewDiv.classList.add('file-upload-preview');
+                        previewDiv.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        logoInput.parentNode.insertBefore(previewDiv, logoInput.nextSibling);
+                    }
+                } else {
+                    // Clear preview if no logo
+                    if (logoPreview) {
+                        logoPreview.innerHTML = '';
+                    }
+                }
+
+                // Update form action
+                const form = document.getElementById('editSubsectorForm');
+                form.action = `{{ url_for('system_admin.edit_subsector', subsector_id=0) }}`.replace('0', subsectorId);
+
+                showModal(editSubsectorModal);
+            } catch (error) {
+                console.error('Error fetching subsector data:', error);
+                if (window.showAlert) window.showAlert('{{ _("Failed to load subsector data. Please try again.") }}', 'error');
+                else console.error('Failed to load subsector data');
+            }
+        });
+    });
+
+    // Add click event listeners for modal close buttons
+    modalCloseBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            hideAllModals();
+        });
+    });
+
+    // Close modal when clicking outside
+    [newSectorModal, editSectorModal, newSubsectorModal, editSubsectorModal].forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideAllModals();
+            }
+        });
+    });
+
+    // Handle delete form confirmations
+    const deleteForms = document.querySelectorAll('.delete-sector-form, .delete-subsector-form');
+    // Delete forms use global confirm handler (components.js) via data-confirm on form
+
+    // Handle form submissions
+    const forms = [
+        document.getElementById('newSectorForm'),
+        document.getElementById('editSectorForm'),
+        document.getElementById('newSubsectorForm'),
+        document.getElementById('editSubsectorForm')
+    ];
+
+    forms.forEach(form => {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrf_token')
+                    }
+                });
+
+                if (response.ok) {
+                    // Reload page to show changes
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    if (window.showAlert) window.showAlert(data.message || '{{ _("An error occurred. Please try again.") }}', 'error');
+                    else console.error(data.message);
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                if (window.showAlert) window.showAlert('{{ _("Failed to submit form. Please try again.") }}', 'error');
+                else console.error('Failed to submit form');
+            }
+        });
+    });
+
+    // Preview uploaded images
+    const imageInputs = document.querySelectorAll('input[type="file"][accept="image/*"]');
+    imageInputs.forEach(input => {
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Create or update preview
+                    let previewDiv = input.nextElementSibling;
+                    if (!previewDiv || !previewDiv.classList.contains('file-upload-preview')) {
+                        previewDiv = document.createElement('div');
+                        previewDiv.classList.add('file-upload-preview');
+                        input.parentNode.insertBefore(previewDiv, input.nextSibling);
+                    }
+                    previewDiv.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100px; max-height: 100px;">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    });
+
+    // Preview icon classes (XSS-safe: sanitize and use DOM APIs instead of innerHTML)
+    function sanitizeIconClass(str) {
+        if (!str || typeof str !== 'string') return '';
+        return str.replace(/[^a-zA-Z0-9\s_-]/g, '').trim().slice(0, 100);
+    }
+    const iconInputs = document.querySelectorAll('input[name="icon_class"]');
+    iconInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            const raw = e.target.value;
+            const iconClass = sanitizeIconClass(raw);
+            let previewDiv = input.nextElementSibling;
+            if (!previewDiv || !previewDiv.classList.contains('icon-preview')) {
+                previewDiv = document.createElement('div');
+                previewDiv.classList.add('icon-preview');
+                input.parentNode.insertBefore(previewDiv, input.nextSibling);
+            }
+            previewDiv.textContent = '';
+            if (iconClass) {
+                const i = document.createElement('i');
+                i.className = iconClass;
+                previewDiv.appendChild(i);
+            }
+        });
+    });
+
+    // Add view toggle functionality
+    const viewToggleBtn = document.querySelector('.view-toggle-btn');
+    const splitView = document.getElementById('splitView');
+    const hierarchicalView = document.getElementById('hierarchicalView');
+    let isHierarchicalView = false;
+
+    // Initialize the view based on localStorage
+    isHierarchicalView = localStorage.getItem('isHierarchicalView') === 'true';
+    updateViewState();
+
+    viewToggleBtn.addEventListener('click', () => {
+        isHierarchicalView = !isHierarchicalView;
+        localStorage.setItem('isHierarchicalView', isHierarchicalView);
+        updateViewState();
+    });
+
+    function updateViewState() {
+        if (isHierarchicalView) {
+            splitView.classList.add('hidden');
+            hierarchicalView.classList.remove('hidden');
+            viewToggleBtn.querySelector('i').classList.replace('fa-toggle-on', 'fa-toggle-off');
+        } else {
+            splitView.classList.remove('hidden');
+            hierarchicalView.classList.add('hidden');
+            viewToggleBtn.querySelector('i').classList.replace('fa-toggle-off', 'fa-toggle-on');
+        }
+    }
+
+    // Auto-translate multilingual names (edit sector / edit sub-sector modals) — same API pattern as manage_translations
+    const translatableLanguages = {{ TRANSLATABLE_LANGUAGES|default([])|tojson|safe }};
+    function isRtlLangCode(code) {
+        const base = String(code || '').split('_')[0].toLowerCase();
+        return ['ar', 'fa', 'he', 'ur'].indexOf(base) !== -1;
+    }
+    function setModalAutoTranslateBusy(modalId, busy) {
+        const root = document.getElementById(modalId);
+        if (!root) return;
+        root.querySelectorAll('.js-sectorsub-auto-translate').forEach(function(b) {
+            b.disabled = !!busy;
+            if (busy) b.classList.add('opacity-70', 'cursor-not-allowed');
+            else b.classList.remove('opacity-70', 'cursor-not-allowed');
+        });
+    }
+    function setAutoTranslateButtonLoading(btn, loading) {
+        if (!btn) return;
+        const icon = btn.querySelector('.js-sectorsub-at-icon');
+        const spin = btn.querySelector('.js-sectorsub-at-spinner');
+        const label = btn.querySelector('.js-sectorsub-at-label');
+        if (loading) {
+            if (icon) icon.classList.add('hidden');
+            if (spin) spin.classList.remove('hidden');
+            if (label) {
+                label.dataset.orig = label.textContent;
+                label.textContent = {{ _('Translating...')|tojson|safe }};
+            }
+        } else {
+            if (icon) icon.classList.remove('hidden');
+            if (spin) spin.classList.add('hidden');
+            if (label && label.dataset.orig) {
+                label.textContent = label.dataset.orig;
+                delete label.dataset.orig;
+            }
+        }
+    }
+    async function runSectorsSubsectorsModalAutoTranslate(btn) {
+        const modalId = btn.getAttribute('data-modal');
+        const primaryId = btn.getAttribute('data-primary-id');
+        const modalRoot = document.getElementById(modalId);
+        const primaryEl = primaryId ? document.getElementById(primaryId) : null;
+        const baseText = primaryEl && primaryEl.value ? String(primaryEl.value).trim() : '';
+        if (!baseText) {
+            if (window.showAlert) window.showAlert({{ _('Please enter a primary name to translate from.')|tojson|safe }}, 'warning');
+            return;
+        }
+        if (!modalRoot || !window.AutoTranslateService || typeof window.AutoTranslateService.translate !== 'function') {
+            if (window.showAlert) window.showAlert({{ _('Translation is not available on this page.')|tojson|safe }}, 'error');
+            return;
+        }
+        const inputs = modalRoot.querySelectorAll('input[name^="name_"]');
+        const targetLanguages = [];
+        inputs.forEach(function(inp) {
+            const code = (inp.name || '').replace(/^name_/, '');
+            if (!code || code === 'en') return;
+            if (String(inp.value || '').trim()) return;
+            if (targetLanguages.indexOf(code) === -1) targetLanguages.push(code);
+        });
+        if (!targetLanguages.length) {
+            if (window.showAlert) {
+                window.showAlert({{ _('Nothing to translate — all multilingual name fields already have values.')|tojson|safe }}, 'info');
+            }
+            return;
+        }
+        setModalAutoTranslateBusy(modalId, true);
+        setAutoTranslateButtonLoading(btn, true);
+        try {
+            const data = await window.AutoTranslateService.translate({
+                type: 'section_name',
+                permission_context: 'organization',
+                permission_code: 'admin.organization.manage',
+                text: baseText,
+                target_languages: targetLanguages,
+                translation_service: 'ifrc'
+            });
+            const translations = data && data.translations;
+            if (translations && typeof translations === 'object') {
+                Object.keys(translations).forEach(function(code) {
+                    const inp = modalRoot.querySelector('input[name="name_' + code + '"]');
+                    if (!inp) return;
+                    if (String(inp.value || '').trim()) return;
+                    inp.value = translations[code] != null ? String(translations[code]) : '';
+                    if (isRtlLangCode(code)) inp.setAttribute('dir', 'rtl');
+                    else inp.removeAttribute('dir');
+                });
+            }
+        } catch (e) {
+            var msg = {{ _('Auto-translate failed.')|tojson|safe }} + (e && e.message ? ' ' + e.message : '');
+            if (window.showAlert) window.showAlert(msg, 'error');
+            else console.error(msg);
+        } finally {
+            setAutoTranslateButtonLoading(btn, false);
+            setModalAutoTranslateBusy(modalId, false);
+        }
+    }
+    document.querySelectorAll('.js-sectorsub-auto-translate').forEach(function(b) {
+        b.addEventListener('click', function() {
+            runSectorsSubsectorsModalAutoTranslate(b);
+        });
+    });
+});
+</script>
+{% endblock %}

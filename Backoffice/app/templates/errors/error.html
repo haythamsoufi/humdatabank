@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if error_code %}{{ error_code }}{% endif %} - {{ error_title }} - {{ ORG_NAME }}</title>
+    <link rel="icon" href="{{ static_url('favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
+    <style nonce="{{ csp_style_nonce() }}">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #1f2937;
+        }
+
+        .error-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            max-width: 600px;
+            width: 100%;
+            padding: 48px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .error-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #ef4444 0%, #f97316 50%, #ef4444 100%);
+        }
+
+        .error-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 32px;
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            color: #ef4444;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .error-code {
+            font-size: 72px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            line-height: 1;
+        }
+
+        .error-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 0;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            transform: translateY(-2px);
+        }
+
+        .error-details {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        .error-details-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .error-details-content {
+            font-size: 13px;
+            color: #6b7280;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 640px) {
+            .error-container {
+                padding: 32px 24px;
+            }
+
+            .error-code {
+                font-size: 56px;
+            }
+
+            .error-title {
+                font-size: 24px;
+            }
+
+            .error-icon {
+                width: 100px;
+                height: 100px;
+                font-size: 52px;
+            }
+        }
+
+        /* Specific error code colors */
+        .error-400 .error-icon { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; }
+        .error-400 .error-code { background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .error-400 .error-container::before { background: linear-gradient(90deg, #f59e0b 0%, #f97316 50%, #f59e0b 100%); }
+        .error-400 .btn-primary { background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+
+        .error-401 .error-icon { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #3b82f6; }
+        .error-401 .error-code { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .error-401 .error-container::before { background: linear-gradient(90deg, #3b82f6 0%, #2563eb 50%, #3b82f6 100%); }
+        .error-401 .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+
+        .error-403 .error-icon { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; }
+        .error-403 .error-code { background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .error-403 .error-container::before { background: linear-gradient(90deg, #f59e0b 0%, #f97316 50%, #f59e0b 100%); }
+        .error-403 .btn-primary { background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+
+        .error-404 .error-icon { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #6366f1; }
+        .error-404 .error-code { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .error-404 .error-container::before { background: linear-gradient(90deg, #6366f1 0%, #4f46e5 50%, #6366f1 100%); }
+        .error-404 .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
+        .error-500 .error-icon { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #ef4444; }
+        .error-500 .error-code { background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .error-500 .error-container::before { background: linear-gradient(90deg, #ef4444 0%, #f97316 50%, #ef4444 100%); }
+        .error-500 .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+
+        .error-502 .error-icon { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); color: #ec4899; }
+        .error-502 .error-code { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .error-502 .error-container::before { background: linear-gradient(90deg, #ec4899 0%, #db2777 50%, #ec4899 100%); }
+        .error-502 .btn-primary { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3); }
+
+        .error-503 .error-icon { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; }
+        .error-503 .error-code { background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .error-503 .error-container::before { background: linear-gradient(90deg, #f59e0b 0%, #f97316 50%, #f59e0b 100%); }
+        .error-503 .btn-primary { background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+    </style>
+</head>
+<body class="error-{{ error_code }}">
+    <div class="error-container">
+        <div class="error-icon">
+            {% if error_code == 400 %}
+                <i class="fas fa-exclamation-triangle"></i>
+            {% elif error_code == 401 %}
+                <i class="fas fa-lock"></i>
+            {% elif error_code == 403 %}
+                <i class="fas fa-shield-alt"></i>
+            {% elif error_code == 404 %}
+                <i class="fas fa-search"></i>
+            {% elif error_code == 500 %}
+                <i class="fas fa-exclamation-circle"></i>
+            {% elif error_code == 502 %}
+                <i class="fas fa-server"></i>
+            {% elif error_code == 503 %}
+                <i class="fas fa-tools"></i>
+            {% else %}
+                <i class="fas fa-exclamation-triangle"></i>
+            {% endif %}
+        </div>
+
+        <div class="error-code">{{ error_code }}</div>
+        <h1 class="error-title">{{ error_title }}</h1>
+        <p class="error-message">{{ error_message }}</p>
+
+        {% if error_details %}
+        <div class="error-details">
+            <div class="error-details-title">Error Details (Debug Mode):</div>
+            <div class="error-details-content">{{ error_details }}</div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

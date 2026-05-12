@@ -1,0 +1,3 @@
+# Minimal deps for Azure Load Testing Locust engine (bundled with loadtest.config.yaml).
+locust>=2.24.0
+python-dotenv>=1.0.0

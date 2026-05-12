@@ -1,0 +1,401 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Country Access Requests') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block content %}
+
+{{ page_header(
+    title=_('Country Access Requests'),
+    icon='fas fa-flag',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('User Management'), 'url': url_for('user_management.manage_users')},
+        {'name': _('Country Access Requests')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Back to Users'),
+            'url': url_for('user_management.manage_users'),
+            'icon': 'fas fa-users',
+            'classes': 'professional-action-btn'
+        }
+    ]
+) }}
+
+{% if auto_approve_enabled %}
+<!-- Auto-Approve Warning -->
+<div class="border-l-4 border-amber-400 bg-amber-50 p-4 mb-6 shadow-sm">
+  <div class="flex">
+    <div class="flex-shrink-0">
+      <i class="fas fa-exclamation-triangle text-amber-500 text-lg mt-0.5"></i>
+    </div>
+    <div class="ml-3 flex-1">
+      <h3 class="text-sm font-semibold text-amber-800">{{ _('Auto-Approve is Enabled') }}</h3>
+      <p class="mt-1 text-sm text-amber-700">
+        {{ _('All new country access requests are being automatically approved without admin review. Contact a system administrator to change this setting.') }}
+      </p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if pending_requests %}
+<!-- Approve All -->
+<div class="flex justify-end mb-4">
+  <form action="{{ url_for('user_management.approve_all_access_requests') }}" method="POST"
+        data-confirm="{{ _('Are you sure you want to approve all pending requests?') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-success">
+      <i class="fas fa-check-double mr-2"></i> {{ _('Approve All') }} ({{ pending_requests|length }})
+    </button>
+  </form>
+</div>
+{% endif %}
+
+{% from "components/ag_grid_includes.html" import ag_grid_container %}
+<div class="space-y-6">
+  <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">{{ _('Pending Requests') }}</h3>
+      <div id="pending-column-visibility-button-placeholder" class="flex-shrink-0"></div>
+    </div>
+    {% if pending_requests %}
+      {{ ag_grid_container('pendingRequestsGrid', loading_text=_('Loading requests...'), placeholder_id='pending-column-visibility-button-placeholder', show_placeholder=false, grid_height='600px', include_card=false) }}
+    {% else %}
+      <p class="text-gray-700">{{ _('There are no pending requests.') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">{{ _('Recently Processed') }}</h3>
+      <div id="processed-column-visibility-button-placeholder" class="flex-shrink-0"></div>
+    </div>
+    {% if processed_requests %}
+      {{ ag_grid_container('processedRequestsGrid', loading_text=_('Loading requests...'), placeholder_id='processed-column-visibility-button-placeholder', show_placeholder=false, grid_height='600px', include_card=false) }}
+    {% else %}
+      <p class="text-gray-700">{{ _('No processed requests yet.') }}</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helper instances
+    let pendingGridHelper = null;
+    let pendingGridApi = null;
+    let processedGridHelper = null;
+    let processedGridApi = null;
+
+    // Transform pending requests data for ag-grid
+    const pendingRequestsData = [
+        {% for r in pending_requests %}
+        {
+            id: {{ r.id }},
+            user_id: {{ r.user_id|tojson|safe }},
+            user_name: {{ (r.user.name or '-')|tojson|safe }},
+            user_email: {{ r.user.email|tojson|safe }},
+            user_title: {{ (r.user.title or '')|tojson|safe }},
+            user_active: {{ r.user.active|tojson|safe }},
+            user_profile_color: {{ ((r.user.profile_color if r.user.profile_color else '') or '')|tojson|safe }},
+            country_name: {{ r.country.name|tojson|safe }},
+            created_at: {{ (r.created_at|datetime_iso if r.created_at else '')|tojson|safe }},
+            request_message: {{ (r.request_message or '')|tojson|safe }},
+            approve_url: "{{ url_for('user_management.approve_access_request', request_id=r.id) }}",
+            reject_url: "{{ url_for('user_management.reject_access_request', request_id=r.id) }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Transform processed requests data for ag-grid
+    const processedRequestsData = [
+        {% for r in processed_requests %}
+        {
+            id: {{ r.id }},
+            user_id: {{ r.user_id|tojson|safe }},
+            user_name: {{ (r.user.name or '-')|tojson|safe }},
+            user_email: {{ r.user.email|tojson|safe }},
+            user_title: {{ (r.user.title or '')|tojson|safe }},
+            user_active: {{ r.user.active|tojson|safe }},
+            user_profile_color: {{ ((r.user.profile_color if r.user.profile_color else '') or '')|tojson|safe }},
+            country_name: {{ r.country.name|tojson|safe }},
+            status: {{ r.status|tojson|safe }},
+            processed_by_id: {{ (r.processed_by_user_id if r.processed_by_user_id else None)|tojson|safe }},
+            processed_by_email: {{ (r.processed_by.email if r.processed_by else '-')|tojson|safe }},
+            processed_by_name: {{ ((r.processed_by.name if r.processed_by else '') or '')|tojson|safe }},
+            processed_by_active: {{ (r.processed_by.active if r.processed_by else True)|tojson|safe }},
+            processed_by_profile_color: {{ ((r.processed_by.profile_color if r.processed_by and r.processed_by.profile_color else '') or '')|tojson|safe }},
+            processed_at: {{ (r.processed_at|datetime_iso if r.processed_at else '')|tojson|safe }},
+            request_message: {{ (r.request_message or '')|tojson|safe }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for pending requests grid
+    const pendingColumnDefs = [
+        {
+            field: 'id',
+            headerName: '{{ _("Request ID") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'user_name',
+            headerName: '{{ _("User") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'user_id',
+                    nameField: 'user_name',
+                    emailField: 'user_email',
+                    titleField: 'user_title',
+                    activeField: 'user_active',
+                    profileColorField: 'user_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: true
+                });
+            }
+        },
+        {
+            field: 'user_email',
+            headerName: '{{ _("Email") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'country_name',
+            headerName: '{{ _("Country") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'created_at',
+            headerName: '{{ _("Requested At") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateTime
+        },
+        {
+            field: 'request_message',
+            headerName: '{{ _("Message") }}',
+            width: 300,
+            minWidth: 200,
+            flex: 1,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellRenderer: function(params) {
+                if (!params.value || params.value === '') {
+                    return '<span class="text-gray-400">—</span>';
+                }
+                return '<div class="text-gray-700 whitespace-pre-wrap">' + (params.value || '') + '</div>';
+            }
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 200,
+            minWidth: 180,
+            maxWidth: 250,
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const approveUrl = params.data.approve_url || '';
+                const rejectUrl = params.data.reject_url || '';
+                return '<div class="flex items-center justify-center gap-2">' +
+                    '<form action="' + approveUrl + '" method="POST" class="inline-block">' +
+                    '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
+                    '<button type="submit" class="btn btn-success btn-sm">' +
+                    '<i class="fas fa-check mr-1"></i> {{ _("Approve") }}' +
+                    '</button>' +
+                    '</form>' +
+                    '<form action="' + rejectUrl + '" method="POST" class="inline-block">' +
+                    '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
+                    '<button type="submit" class="btn btn-danger btn-sm">' +
+                    '<i class="fas fa-times mr-1"></i> {{ _("Reject") }}' +
+                    '</button>' +
+                    '</form>' +
+                    '</div>';
+            }
+        }
+    ];
+
+    // Column definitions for processed requests grid
+    const processedColumnDefs = [
+        {
+            field: 'id',
+            headerName: '{{ _("Request ID") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'user_name',
+            headerName: '{{ _("User") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'user_id',
+                    nameField: 'user_name',
+                    emailField: 'user_email',
+                    titleField: 'user_title',
+                    activeField: 'user_active',
+                    profileColorField: 'user_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: true
+                });
+            }
+        },
+        {
+            field: 'user_email',
+            headerName: '{{ _("Email") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'country_name',
+            headerName: '{{ _("Country") }}',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'status',
+            headerName: '{{ _("Status") }}',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.approvalStatus,
+            cellStyle: { 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }
+        },
+        {
+            field: 'processed_by_email',
+            headerName: '{{ _("Processed By") }}',
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'processed_by_id',
+                    nameField: 'processed_by_name',
+                    emailField: 'processed_by_email',
+                    activeField: 'processed_by_active',
+                    profileColorField: 'processed_by_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: false
+                });
+            }
+        },
+        {
+            field: 'processed_at',
+            headerName: '{{ _("Processed At") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 250,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'request_message',
+            headerName: '{{ _("Message") }}',
+            width: 300,
+            minWidth: 200,
+            flex: 1,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellRenderer: function(params) {
+                if (!params.value || params.value === '') {
+                    return '<span class="text-gray-400">—</span>';
+                }
+                return '<div class="text-gray-700 whitespace-pre-wrap">' + (params.value || '') + '</div>';
+            }
+        }
+    ];
+
+    function initializePendingGrid() {
+        if (pendingRequestsData.length === 0) return;
+        var result = AgGridHelper.create('pendingRequestsGrid', 'pending-access-requests', pendingColumnDefs, pendingRequestsData, {
+            columnVisibility: { enableExport: true, buttonPlaceholderId: 'pending-column-visibility-button-placeholder' }
+        });
+        pendingGridHelper = result.helper;
+        pendingGridApi = result.api;
+        window.pendingGridApi = pendingGridApi;
+        window.pendingGridHelper = pendingGridHelper;
+    }
+
+    function initializeProcessedGrid() {
+        if (processedRequestsData.length === 0) return;
+        var result = AgGridHelper.create('processedRequestsGrid', 'processed-access-requests', processedColumnDefs, processedRequestsData, {
+            columnVisibility: { enableExport: true, buttonPlaceholderId: 'processed-column-visibility-button-placeholder' }
+        });
+        processedGridHelper = result.helper;
+        processedGridApi = result.api;
+        window.processedGridApi = processedGridApi;
+        window.processedGridHelper = processedGridHelper;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePendingGrid();
+            initializeProcessedGrid();
+        });
+    } else {
+        initializePendingGrid();
+        initializeProcessedGrid();
+    }
+    </script>
+{% endblock %}

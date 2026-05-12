@@ -1,0 +1,25 @@
+{# Centralized action icons: Edit and Trash (Delete) must be identical across the app. #}
+{# Use these macros or the canonical Font Awesome classes below in JS. #}
+{#
+  Canonical classes (use these when building HTML in JavaScript):
+    Edit:  fas fa-pen
+    Trash: fas fa-trash
+#}
+{% from "components/_svg_icons.html" import svg_icon %}
+
+{% macro action_icon_edit(class="w-4 h-4") %}
+<i class="fas fa-pen {{ class }}" aria-hidden="true"></i>
+{% endmacro %}
+
+{% macro action_icon_trash(class="w-4 h-4") %}
+<i class="fas fa-trash {{ class }}" aria-hidden="true"></i>
+{% endmacro %}
+
+{# Optional: use SVG instead of Font Awesome for icon-only contexts (e.g. sidebar) #}
+{% macro action_icon_edit_svg(class="w-4 h-4") %}
+{{ svg_icon('edit', class) }}
+{% endmacro %}
+
+{% macro action_icon_trash_svg(class="w-4 h-4") %}
+{{ svg_icon('trash', class) }}
+{% endmacro %}

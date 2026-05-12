@@ -1,0 +1,748 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('AI Reasoning Traces') }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('AI Reasoning Traces'),
+    icon='fas fa-project-diagram',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'AI System', 'url': url_for('ai_management.ai_dashboard')},
+        {'name': 'Reasoning Traces'}
+    ],
+    actions=[
+        {'type': 'link', 'url': url_for('ai_management.ai_review_queue'), 'text': _('Review Queue'), 'icon': 'fas fa-clipboard-check'}
+    ]
+) }}
+
+{% if error %}
+<div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <i class="fas fa-exclamation-circle text-red-400"></i>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm text-red-700">{{ error }}</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not llm_quality_judge_enabled %}
+<div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <i class="fas fa-exclamation-triangle text-amber-500"></i>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm text-amber-800">
+                {{ _('LLM Quality Judge is currently disabled in AI settings, so quality verdicts and scores may be unavailable in this view.') }}
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Stat cards: same pattern as admin/api_management.html #}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Total Traces') }}</h3>
+            <i class="fas fa-project-diagram text-purple-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-purple-600 tabular-nums">{{ stats.total_traces or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('All recorded agent traces') }}</p>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Success rate') }}</h3>
+            <i class="fas fa-chart-line text-blue-500" aria-hidden="true"></i>
+        </div>
+        {% if stats.recent_traces and stats.success_rate_pct is not none %}
+        <p class="text-2xl font-bold tabular-nums {% if stats.success_rate_pct >= 85 %}text-green-600{% elif stats.success_rate_pct >= 60 %}text-amber-600{% else %}text-red-600{% endif %}">{{ stats.success_rate_pct }}%</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('%(completed)s completed · %(failed)s failed · %(total)s traces', completed=stats.filtered_completed, failed=stats.filtered_failed, total=stats.recent_traces) }}</p>
+        {% else %}
+        <p class="text-2xl font-bold text-gray-400 tabular-nums">—</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('No traces match the current filters') }}</p>
+        {% endif %}
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Cost (30d)') }}</h3>
+            <i class="fas fa-dollar-sign text-green-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-green-600 tabular-nums">${{ "%.4f"|format(stats.total_cost_30d or 0) }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Estimated spend (rolling 30 days)') }}</p>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{{ _('Avg Cost') }}</h3>
+            <i class="fas fa-receipt text-orange-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-orange-600 tabular-nums">${{ "%.6f"|format(stats.avg_cost or 0) }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Mean cost per trace (last 30 days)') }}</p>
+    </div>
+</div>
+
+<!-- Top Tools -->
+{% if stats.top_tools %}
+<div class="bg-white shadow rounded-lg p-4 mb-6">
+    <h3 class="text-sm font-semibold text-gray-600 mb-3">{{ _('Top Tools Used') }}</h3>
+    <div class="flex flex-wrap gap-2">
+        {% for tool in stats.top_tools %}
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800">
+            <code class="mr-2">{{ tool.name }}</code>
+            <span class="font-semibold">{{ tool.count }}</span>
+        </span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="bg-white shadow rounded-lg p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <input type="hidden" name="view" value="{{ view_mode or 'message' }}">
+        <select name="days" class="border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-sm">
+            <option value="7" {% if days_filter == 7 %}selected{% endif %}>{{ _('Last 7 days') }}</option>
+            <option value="30" {% if days_filter == 30 %}selected{% endif %}>{{ _('Last 30 days') }}</option>
+            <option value="90" {% if days_filter == 90 %}selected{% endif %}>{{ _('Last 90 days') }}</option>
+            <option value="0" {% if days_filter == 0 %}selected{% endif %}>{{ _('All time') }}</option>
+        </select>
+        <select name="status" class="border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-sm">
+            <option value="">{{ _('All Status') }}</option>
+            {% for status in statuses or [] %}
+            <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>{{ status }}</option>
+            {% endfor %}
+        </select>
+        <span class="text-sm text-gray-600">{{ _('View') }}:</span>
+        <a href="{{ url_for('ai_management.reasoning_traces', view='message', days=days_filter, status=current_status) }}" class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium {{ 'bg-purple-100 text-purple-800' if (view_mode or 'message') == 'message' else 'text-gray-600 hover:bg-gray-100' }}">
+            <i class="fas fa-comment-alt mr-1"></i> {{ _('By message') }}
+        </a>
+        <a href="{{ url_for('ai_management.reasoning_traces', view='conversation', days=days_filter, status=current_status) }}" class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium {{ 'bg-purple-100 text-purple-800' if view_mode == 'conversation' else 'text-gray-600 hover:bg-gray-100' }}">
+            <i class="fas fa-comments mr-1"></i> {{ _('By conversation') }}
+        </a>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter mr-2"></i> {{ _('Apply') }}
+        </button>
+        {% if current_status or days_filter != 0 %}
+        <a href="{{ url_for('ai_management.reasoning_traces', view=view_mode or 'message') }}" class="text-sm text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times mr-1"></i> {{ _('Reset') }}
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- By message: Traces Grid -->
+<div class="bg-white shadow rounded-lg p-4 reasoning-traces-grid-wrapper relative" id="reasoning-traces-by-message" style="{{ 'display: none;' if view_mode == 'conversation' else '' }}">
+    <div class="flex justify-between items-center flex-wrap gap-3 mb-4">
+        <div class="flex-1 min-w-0">
+            <div id="reasoning-traces-bulk-actions" class="hidden flex items-center gap-3 flex-wrap p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <span id="reasoning-traces-selected-count" class="text-sm font-semibold text-gray-800">0 {{ _('selected') }}</span>
+                <button type="button" id="reasoning-traces-bulk-delete-btn" class="btn btn-danger">
+                    <i class="fas fa-trash mr-1"></i> {{ _('Delete selected') }}
+                </button>
+            </div>
+        </div>
+        <div id="reasoning-traces-column-visibility-placeholder"></div>
+    </div>
+    <div id="reasoningTracesGrid-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;">
+        <div class="flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            <span class="text-gray-700 font-medium text-base">{{ _('Loading...') }}</span>
+        </div>
+    </div>
+    <div id="reasoningTracesGrid-container" class="overflow-x-auto" style="display: none;">
+        <div id="reasoningTracesGrid" class="ag-theme-alpine" style="width: 100%;" data-placeholder-id="reasoning-traces-column-visibility-placeholder"></div>
+    </div>
+</div>
+
+<!-- By conversation: AG Grid (same pagination pattern as By message) -->
+<div class="bg-white shadow rounded-lg p-4 reasoning-traces-conv-grid-wrapper relative" id="reasoning-traces-by-conversation" style="{{ 'display: none;' if (view_mode or 'message') != 'conversation' else '' }}">
+    {% if view_mode == 'conversation' and conversation_total and conversation_total > (conversations|length) %}
+    <div class="bg-amber-50 border-l-4 border-amber-400 p-3 mb-4 rounded-r" role="status">
+        <p class="text-sm text-amber-900">
+            {{ _('Showing the %(shown)d most recent conversations matching your filters (%(total)d total). Narrow filters or time range to see a smaller set.', shown=conversations|length, total=conversation_total) }}
+        </p>
+    </div>
+    {% endif %}
+    <div class="flex justify-end items-center flex-wrap gap-3 mb-4">
+        <div id="reasoning-traces-conv-column-visibility-placeholder"></div>
+    </div>
+    <div id="reasoningTracesConversationsGrid-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;">
+        <div class="flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            <span class="text-gray-700 font-medium text-base">{{ _('Loading...') }}</span>
+        </div>
+    </div>
+    <div id="reasoningTracesConversationsGrid-container" class="overflow-x-auto" style="display: none;">
+        <div id="reasoningTracesConversationsGrid" class="ag-theme-alpine" style="width: 100%;" data-placeholder-id="reasoning-traces-conv-column-visibility-placeholder"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% from "components/ag_grid_includes.html" import ag_grid_js %}
+{{ ag_grid_js() }}
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    'use strict';
+
+    const viewMode = {{ (view_mode or 'message')|tojson|safe }};
+
+    // Row data for ag-grid (only used when viewMode === 'message')
+    const tracesData = [
+        {% for trace in traces %}
+        {
+            id: {{ trace.id }},
+            query: {{ (trace.query or '')|tojson|safe }},
+            user_id: {{ (trace.user_id if trace.user_id else None)|tojson|safe }},
+            user_display: {{ (trace.user.name or trace.user.email if trace.user else '')|tojson|safe }},
+            user_email: {{ (trace.user.email if trace.user else '')|tojson|safe }},
+            user_title: {{ (trace.user.title if trace.user else '')|tojson|safe }},
+            user_active: {{ (trace.user.active if trace.user else True)|tojson|safe }},
+            user_profile_color: {{ ((trace.user.profile_color if trace.user and trace.user.profile_color else '') or '')|tojson|safe }},
+            tools_used: {{ (trace.tools_used or [])|tojson|safe }},
+            status: {{ (trace.status or '')|tojson|safe }},
+            user_rating: {{ (trace.user_rating or '')|tojson|safe }},
+            llm_quality_score: {{ trace.llm_quality_score if trace.llm_quality_score is not none else 'null' }},
+            llm_quality_verdict: {{ (trace.llm_quality_verdict or '')|tojson|safe }},
+            llm_needs_review: {{ (trace.llm_needs_review if trace.llm_needs_review is not none else None)|tojson|safe }},
+            actual_iterations: {{ trace.actual_iterations or 0 }},
+            total_cost_usd: {{ trace.total_cost_usd if trace.total_cost_usd is not none else 'null' }},
+            execution_time_ms: {{ trace.execution_time_ms if trace.execution_time_ms is not none else 'null' }},
+            created_at: {{ trace.created_at.strftime('%Y-%m-%d %H:%M')|tojson|safe }},
+            view_url: {{ url_for('ai_management.trace_detail', trace_id=trace.id)|tojson|safe }},
+            query_suspicious: {{ trace._admin_query_security.suspicious|tojson|safe }},
+            query_security_summary: {{ trace._admin_query_security.summary|tojson|safe }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const conversationsData = [
+        {% for conv in conversations %}
+        {
+            conversation_id: {{ conv.conversation_id|tojson|safe }},
+            conversation_title: {{ (conv.conversation_title or '')|tojson|safe }},
+            trace_count: {{ conv.trace_count|int }},
+            first_query_preview: {{ (conv.first_query_preview or '')|tojson|safe }},
+            query_suspicious: {{ conv.first_query_security.suspicious|default(false)|tojson|safe }},
+            query_security_summary: {{ (conv.first_query_security.summary or '')|tojson|safe }},
+            activity_range: {{ (conv.activity_range or '')|tojson|safe }},
+            total_cost_usd: {{ conv.total_cost_usd if conv.total_cost_usd is not none else 'null' }},
+            conversation_url: {{ url_for('ai_management.conversation_traces', conversation_id=conv.conversation_id)|tojson|safe }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const toTitleCaseLabel = function(value) {
+        if (value == null) return '';
+        return String(value)
+            .replace(/_/g, ' ')
+            .trim()
+            .replace(/\s+/g, ' ')
+            .replace(/\b\w/g, function(chr) { return chr.toUpperCase(); });
+    };
+
+    const statusLabel = function(status) {
+        if (status === 'completed') return '{{ _("Completed") }}';
+        if (status === 'error') return '{{ _("Error") }}';
+        if (status === 'cost_limit_exceeded') return '{{ _("Cost Limit") }}';
+        if (status === 'max_iterations_exceeded') return '{{ _("Max Iterations") }}';
+        return toTitleCaseLabel(status);
+    };
+
+    const escapeHtml = function(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    };
+
+    const truncateText = function(value, maxLength) {
+        const text = String(value || '');
+        if (text.length <= maxLength) return text;
+        return text.slice(0, maxLength).trimEnd() + '…';
+    };
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        { field: 'id', headerName: '{{ _("ID") }}', width: 90, minWidth: 80, maxWidth: 120, filter: 'agNumberColumnFilter', sortable: true, cellClass: 'font-mono', wrapText: false, autoHeight: false, cellStyle: { 'white-space': 'nowrap' } },
+        {
+            field: 'query',
+            headerName: '{{ _("Query") }}',
+            flex: 1,
+            minWidth: 180,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            tooltipField: 'query',
+            wrapText: true,
+            autoHeight: true,
+            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.35' },
+            cellRenderer: function(params) {
+                const query = params.value;
+                const url = params.data && params.data.view_url;
+                const suspicious = params.data && params.data.query_suspicious;
+                const secSummary = params.data && params.data.query_security_summary;
+                const text = (query == null || query === '') ? '—' : escapeHtml(truncateText(query, 120));
+                const shieldTitle = suspicious && secSummary ? escapeHtml(secSummary) : '';
+                const shield = suspicious
+                    ? '<span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-100 text-amber-800 flex-shrink-0" style="margin-right:0.35rem;margin-top:0.1rem;" title="' + shieldTitle + '"><i class="fas fa-shield-alt text-xs" aria-hidden="true"></i></span>'
+                    : '';
+                const inner = '<span style="display:flex;align-items:flex-start;gap:0;min-width:0;">' + shield + '<span style="min-width:0;flex:1 1 auto;">' + text + '</span></span>';
+                if (url) {
+                    const safeUrl = escapeHtml(url);
+                    return '<a href="' + safeUrl + '" class="text-purple-600 hover:text-purple-900 hover:underline" style="display:block;word-break:break-word;overflow-wrap:break-word;white-space:normal;line-height:1.35;">' + inner + '</a>';
+                }
+                return '<span style="display:block;word-break:break-word;overflow-wrap:break-word;white-space:normal;line-height:1.35;">' + inner + '</span>';
+            }
+        },
+        {
+            field: 'user_display',
+            headerName: '{{ _("User") }}',
+            width: 180,
+            minWidth: 140,
+            filter: 'customSetFilter',
+            sortable: true,
+            valueFormatter: AgGridRenderers.dashIfEmpty,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'user_id',
+                    nameField: 'user_display',
+                    emailField: 'user_email',
+                    titleField: 'user_title',
+                    activeField: 'user_active',
+                    profileColorField: 'user_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: false
+                });
+            }
+        },
+        {
+            field: 'tools_used',
+            headerName: '{{ _("Tools") }}',
+            width: 200,
+            minWidth: 140,
+            filter: 'agTextColumnFilter',
+            sortable: false,
+            valueFormatter: function(p) {
+                const v = p.value;
+                return Array.isArray(v) ? v.join(', ') : (v != null ? String(v) : '');
+            },
+            filterValueGetter: function(params) {
+                const v = params.data && params.data.tools_used;
+                return Array.isArray(v) ? v.join(', ') : (v != null ? String(v) : '');
+            },
+            cellRenderer: function(params) {
+                const tools = params.value;
+                if (!tools || !tools.length) return '<span class="text-gray-400">—</span>';
+                const maxShow = 5;
+                let html = '<div class="flex flex-wrap gap-1">';
+                for (let i = 0; i < Math.min(tools.length, maxShow); i++) {
+                    const t = String(tools[i]).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    html += '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600 font-mono">' + t + '</span>';
+                }
+                if (tools.length > maxShow) html += '<span class="text-xs text-gray-400">+' + (tools.length - maxShow) + '</span>';
+                html += '</div>';
+                return html;
+            }
+        },
+        {
+            field: 'status',
+            headerName: '{{ _("Status") }}',
+            width: 160,
+            minWidth: 130,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const s = params.value;
+                if (!s) return '';
+                const label = statusLabel(s);
+                let cls = 'bg-gray-100 text-gray-800';
+                let icon = 'fa-circle';
+                if (s === 'completed') { cls = 'bg-green-100 text-green-800'; icon = 'fa-check-circle'; }
+                else if (s === 'error') { cls = 'bg-red-100 text-red-800'; icon = 'fa-times-circle'; }
+                else if (s === 'cost_limit_exceeded') { cls = 'bg-yellow-100 text-yellow-800'; icon = 'fa-exclamation-triangle'; }
+                else if (s === 'max_iterations_exceeded') { cls = 'bg-orange-100 text-orange-800'; icon = 'fa-redo'; }
+                return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + cls + '"><i class="fas ' + icon + ' mr-1"></i> ' + (label.replace(/</g, '&lt;').replace(/>/g, '&gt;')) + '</span>';
+            },
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'user_rating',
+            headerName: '{{ _("Rating") }}',
+            width: 120,
+            minWidth: 110,
+            filter: 'customSetFilter',
+            sortable: true,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap', wordBreak: 'normal', overflowWrap: 'normal' },
+            cellRenderer: function(params) {
+                const r = params.value;
+                if (!r || r === '') return '<span class="text-gray-400">—</span>';
+                const safe = String(r).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                if (r === 'like') return '<span class="inline-flex items-center text-green-700" title="{{ _("Like") }}"><i class="fas fa-thumbs-up mr-1"></i> {{ _("Like") }}</span>';
+                if (r === 'dislike') return '<span class="inline-flex items-center text-red-700" title="{{ _("Dislike") }}"><i class="fas fa-thumbs-down mr-1"></i> {{ _("Dislike") }}</span>';
+                return '<span class="text-gray-600">' + safe + '</span>';
+            }
+        },
+        {
+            field: 'llm_quality_verdict',
+            headerName: '{{ _("LLM Quality") }}',
+            width: 140,
+            minWidth: 140,
+            filter: 'customSetFilter',
+            sortable: true,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' },
+            cellRenderer: function(params) {
+                var verdict = params.value;
+                var score = params.data && params.data.llm_quality_score;
+                var needsReview = params.data && params.data.llm_needs_review;
+                if ((!verdict || verdict === '') && score == null) return '<span class="text-gray-400">—</span>';
+                var cls = 'bg-gray-100 text-gray-800';
+                if (verdict === 'excellent') cls = 'bg-green-100 text-green-800';
+                else if (verdict === 'good') cls = 'bg-blue-100 text-blue-800';
+                else if (verdict === 'acceptable') cls = 'bg-yellow-100 text-yellow-800';
+                else if (verdict === 'poor') cls = 'bg-orange-100 text-orange-800';
+                else if (verdict === 'incorrect') cls = 'bg-red-100 text-red-800';
+                var html = '';
+                if (score != null) {
+                    const percent = Math.max(0, Math.min(100, Number(score) * 100));
+                    html += '<span class="text-xs font-mono mr-1">' + percent.toFixed(0) + '%</span>';
+                }
+                if (verdict) html += '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' + cls + '">' + escapeHtml(toTitleCaseLabel(verdict)) + '</span>';
+                if (needsReview) html += ' <i class="fas fa-flag text-amber-500 ml-1" title="{{ _("Flagged for review") }}"></i>';
+                return '<div class="flex items-center gap-1">' + html + '</div>';
+            }
+        },
+        { field: 'actual_iterations', headerName: '{{ _("Steps") }}', width: 90, minWidth: 75, filter: 'agNumberColumnFilter', sortable: true, valueFormatter: function(p) { return p.value != null ? p.value : 0; } },
+        {
+            field: 'total_cost_usd',
+            headerName: '{{ _("Cost") }}',
+            width: 100,
+            minWidth: 90,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            valueFormatter: function(p) {
+                if (p.value == null || p.value === null) return '—';
+                return '$' + Number(p.value).toFixed(4);
+            }
+        },
+        {
+            field: 'execution_time_ms',
+            headerName: '{{ _("Time") }}',
+            width: 90,
+            minWidth: 80,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            valueFormatter: function(p) { return p.value != null ? (Number(p.value) / 1000).toFixed(1) + 's' : '—'; }
+        },
+        {
+            field: 'created_at',
+            headerName: '{{ _("Created") }}',
+            width: 130,
+            minWidth: 125,
+            filter: 'agDateColumnFilter',
+            filterParams: AgGridRenderers.dateFilterParams,
+            sortable: true
+        }
+    ];
+
+    let gridHelper = null;
+
+    var allPageSizeLabel = {{ _('All')|tojson|safe }};
+
+    function customizeReasoningTracesPageSizeSelector(gridDomId) {
+        var gid = gridDomId || 'reasoningTracesGrid';
+        var selectors = [
+            '#' + gid + ' .ag-paging-page-size select',
+            '#' + gid + ' select.ag-paging-page-size',
+            '#' + gid + ' .ag-paging-panel select'
+        ];
+
+        function updatePageSizeSelect() {
+            var pageSizeSelect = null;
+            for (var i = 0; i < selectors.length; i++) {
+                pageSizeSelect = document.querySelector(selectors[i]);
+                if (pageSizeSelect) break;
+            }
+            if (!pageSizeSelect) return false;
+
+            var allOption = pageSizeSelect.querySelector('option[value="10000"]');
+            if (allOption && allOption.textContent !== allPageSizeLabel) {
+                allOption.textContent = allPageSizeLabel;
+                return true;
+            }
+
+            var allOptions = pageSizeSelect.querySelectorAll('option');
+            for (var j = 0; j < allOptions.length; j++) {
+                var option = allOptions[j];
+                if (option.value === '10000' || option.textContent === '10000') {
+                    option.textContent = allPageSizeLabel;
+                    if (option.value !== '10000') option.value = '10000';
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        if (updatePageSizeSelect()) return;
+
+        var gridContainer = document.querySelector('#' + gid);
+        if (!gridContainer) return;
+
+        var observer = new MutationObserver(function() {
+            if (updatePageSizeSelect()) observer.disconnect();
+        });
+        observer.observe(gridContainer, { childList: true, subtree: true });
+        setTimeout(function() { observer.disconnect(); }, 5000);
+    }
+
+    const conversationColumnDefs = [
+        {
+            colId: 'conversation_primary',
+            headerName: '{{ _("Conversation") }}',
+            flex: 1,
+            minWidth: 200,
+            filter: 'agTextColumnFilter',
+            filterValueGetter: function(params) {
+                var d = params.data;
+                if (!d) return '';
+                return ((d.conversation_title || '') + ' ' + (d.conversation_id || '')).trim();
+            },
+            sortable: true,
+            valueGetter: function(params) {
+                var d = params.data;
+                if (!d) return '';
+                var t = (d.conversation_title || '').trim();
+                return t || (d.conversation_id || '');
+            },
+            wrapText: true,
+            autoHeight: true,
+            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.35' },
+            cellRenderer: function(params) {
+                var d = params.data;
+                if (!d) return '';
+                var id = d.conversation_id != null ? String(d.conversation_id) : '';
+                var title = (d.conversation_title != null && String(d.conversation_title).trim()) ? String(d.conversation_title).trim() : '';
+                var url = d.conversation_url;
+                var tipParts = [];
+                if (title) tipParts.push(title);
+                if (id) tipParts.push('ID: ' + id);
+                var tipEsc = escapeHtml(tipParts.join('\n'));
+                var line1;
+                var line2 = '';
+                if (title) {
+                    line1 = escapeHtml(truncateText(title, 100));
+                    var idShort = id.length > 40 ? id.slice(0, 40) + '…' : id;
+                    line2 = '<span class="block text-xs text-gray-500 font-mono mt-0.5">' + escapeHtml(idShort) + '</span>';
+                } else {
+                    var shortId = id.length > 40 ? id.slice(0, 40) + '…' : id;
+                    line1 = escapeHtml(shortId);
+                }
+                if (url) {
+                    var safeUrl = escapeHtml(url);
+                    var inner = '<span class="block min-w-0"><span class="text-sm font-medium">' + line1 + '</span>' + line2 + '</span>';
+                    return '<a href="' + safeUrl + '" class="text-purple-600 hover:text-purple-900 hover:underline block" title="' + tipEsc + '">' + inner + '</a>';
+                }
+                var innerPlain = '<span class="block min-w-0"><span class="text-sm text-gray-900">' + line1 + '</span>' + line2 + '</span>';
+                return '<span title="' + tipEsc + '">' + innerPlain + '</span>';
+            }
+        },
+        {
+            field: 'trace_count',
+            headerName: '{{ _("Messages") }}',
+            width: 110,
+            minWidth: 90,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            valueFormatter: function(p) { return p.value != null ? p.value : 0; }
+        },
+        {
+            field: 'first_query_preview',
+            headerName: '{{ _("First query") }}',
+            flex: 1.2,
+            minWidth: 200,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            tooltipField: 'first_query_preview',
+            wrapText: true,
+            autoHeight: true,
+            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.35' },
+            cellRenderer: function(params) {
+                var preview = params.value;
+                var suspicious = params.data && params.data.query_suspicious;
+                var secSummary = params.data && params.data.query_security_summary;
+                var text = (preview == null || preview === '') ? '—' : escapeHtml(truncateText(preview, 120));
+                var shieldTitle = suspicious && secSummary ? escapeHtml(secSummary) : '';
+                var shield = suspicious
+                    ? '<span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-100 text-amber-800 flex-shrink-0" style="margin-right:0.35rem;margin-top:0.1rem;" title="' + shieldTitle + '"><i class="fas fa-shield-alt text-xs" aria-hidden="true"></i></span>'
+                    : '';
+                return '<span style="display:flex;align-items:flex-start;gap:0;min-width:0;">' + shield + '<span style="min-width:0;flex:1 1 auto;">' + text + '</span></span>';
+            }
+        },
+        {
+            field: 'activity_range',
+            headerName: '{{ _("Date range") }}',
+            width: 220,
+            minWidth: 160,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            valueFormatter: AgGridRenderers.dashIfEmpty
+        },
+        {
+            field: 'total_cost_usd',
+            headerName: '{{ _("Total cost") }}',
+            width: 120,
+            minWidth: 100,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            valueFormatter: function(p) {
+                if (p.value == null || p.value === null) return '—';
+                return '$' + Number(p.value).toFixed(4);
+            }
+        }
+    ];
+
+    function initializeGrid() {
+        var result = AgGridHelper.create('reasoningTracesGrid', 'admin-ai-reasoning-traces', columnDefs, tracesData, {
+            gridOptions: {
+                pagination: true,
+                paginationPageSize: 25,
+                paginationPageSizeSelector: [25, 50, 100, 200, 10000],
+                suppressCellFocus: false,
+                enableCellTextSelection: true,
+                ensureDomOrder: true,
+                defaultColDef: {
+                    cellStyle: {
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        minWidth: 0,
+                        lineHeight: '1.35'
+                    }
+                }
+            },
+            columnVisibility: {
+                buttonPlaceholderId: 'reasoning-traces-column-visibility-placeholder'
+            },
+            onReady: function() {
+                customizeReasoningTracesPageSizeSelector('reasoningTracesGrid');
+            }
+        });
+        gridHelper = result.helper;
+    }
+
+    function initializeConversationsGrid() {
+        var result = AgGridHelper.create('reasoningTracesConversationsGrid', 'admin-ai-reasoning-traces-conversations', conversationColumnDefs, conversationsData, {
+            gridOptions: {
+                pagination: true,
+                paginationPageSize: 25,
+                paginationPageSizeSelector: [25, 50, 100, 200, 10000],
+                suppressCellFocus: false,
+                enableCellTextSelection: true,
+                ensureDomOrder: true,
+                defaultColDef: {
+                    cellStyle: {
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        minWidth: 0,
+                        lineHeight: '1.35'
+                    }
+                }
+            },
+            columnVisibility: {
+                buttonPlaceholderId: 'reasoning-traces-conv-column-visibility-placeholder'
+            },
+            onReady: function() {
+                customizeReasoningTracesPageSizeSelector('reasoningTracesConversationsGrid');
+            }
+        });
+    }
+
+    function updateBulkActionsBar(detail) {
+        var bulkBar = document.getElementById('reasoning-traces-bulk-actions');
+        var countEl = document.getElementById('reasoning-traces-selected-count');
+        if (!bulkBar || !countEl) return;
+        var n = (detail && detail.selectedCount) ? detail.selectedCount : 0;
+        if (n > 0) {
+            bulkBar.classList.remove('hidden');
+            bulkBar.classList.add('flex');
+            countEl.textContent = n + ' {{ _("selected") }}';
+        } else {
+            bulkBar.classList.add('hidden');
+            bulkBar.classList.remove('flex');
+            countEl.textContent = '0 {{ _("selected") }}';
+        }
+    }
+
+    document.addEventListener('ag-grid-selection-changed', function(e) {
+        if (!e || !e.detail || e.detail.gridId !== 'reasoningTracesGrid') return;
+        updateBulkActionsBar(e.detail);
+    });
+
+    document.getElementById('reasoning-traces-bulk-delete-btn')?.addEventListener('click', function() {
+        if (!gridHelper) return;
+        var snapshot = gridHelper.getSelectionSnapshot('id');
+        var ids = (snapshot && snapshot.selectedIds) ? snapshot.selectedIds : [];
+        if (ids.length === 0) return;
+        var msg = '{{ _("Are you sure you want to delete") }} ' + ids.length + ' {{ _("selected trace(s)? This cannot be undone.") }}';
+        var doDelete = function() {
+            var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+            fetchFn('{{ url_for("ai_management.traces_bulk_delete") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
+                body: JSON.stringify({ trace_ids: ids })
+            }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+              .then(function(result) {
+                  if (result.ok && result.data && result.data.deleted !== undefined) {
+                      window.location.reload();
+                  } else {
+                      var m = (result.data && result.data.message) || '{{ _("Failed to delete traces.") }}';
+                      if (window.showAlert) window.showAlert(m, 'error');
+                  }
+              })
+              .catch(function() {
+                  if (window.showAlert) window.showAlert('{{ _("Request failed.") }}', 'error');
+              });
+        };
+        if (window.showConfirmation) {
+            window.showConfirmation(msg, doDelete, function() {}, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete selected traces") }}');
+        } else if (window.confirm(msg)) {
+            doDelete();
+        }
+    });
+
+    if (viewMode === 'message') {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeGrid);
+        } else {
+            initializeGrid();
+        }
+    } else if (viewMode === 'conversation') {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeConversationsGrid);
+        } else {
+            initializeConversationsGrid();
+        }
+    }
+})();
+</script>
+{% endblock %}

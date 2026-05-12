@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 400 400" role="img" aria-label="Red Cross Red Crescent">
+  <!-- Same Movement emblem as app/static/logo.svg and Website/public/ns_logo_placeholder.svg -->
+  <circle cx="200" cy="200" r="170" fill="white"/>
+
+  <circle cx="200" cy="200" r="178" fill="none" stroke="#C8102E" stroke-width="6"/>
+  <circle cx="200" cy="200" r="164" fill="none" stroke="#C8102E" stroke-width="2"/>
+
+  <clipPath id="faviconLeftHalf">
+    <rect x="0" y="0" width="200" height="400"/>
+  </clipPath>
+
+  <clipPath id="faviconRightHalf">
+    <rect x="200" y="0" width="200" height="400"/>
+  </clipPath>
+
+  <g clip-path="url(#faviconLeftHalf)" fill="#C8102E">
+    <rect x="160" y="90" width="80" height="220"/>
+    <rect x="90" y="160" width="220" height="80"/>
+  </g>
+
+  <g clip-path="url(#faviconRightHalf)">
+    <circle cx="250" cy="200" r="96" fill="#C8102E"/>
+    <circle cx="278" cy="200" r="76" fill="white"/>
+  </g>
+</svg>

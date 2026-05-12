@@ -1,0 +1,1117 @@
+{% extends "core/layout.html" %}
+{% from "components/_form_helpers.html" import render_field %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{% if resource %}Edit Resource{% else %}Upload New Resource{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style nonce="{{ csp_style_nonce() }}">
+/* Language tab show/hide */
+div.language-tab { display: none !important; }
+div.language-tab.active-tab { display: block !important; }
+
+/* Tab badge */
+.tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 9999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    margin-left: .35rem;
+    vertical-align: middle;
+}
+.tab-badge-filled   { background: #16a34a; color: #fff; }
+.tab-badge-partial  { background: #d97706; color: #fff; }
+.tab-badge-empty    { background: #e5e7eb; color: #6b7280; }
+
+/* Arabic RTL */
+input[name*="title_ar"], textarea[name*="description_ar"] {
+    font-family: 'Tajawal', Arial, sans-serif;
+    direction: rtl;
+    text-align: right;
+}
+
+/* Hidden native input trigger */
+.file-input-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+/* Lightbox */
+#thumb-lightbox { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.75); align-items:center; justify-content:center; cursor:zoom-out; }
+#thumb-lightbox.open { display:flex; }
+#thumb-lightbox img { max-width:90vw; max-height:90vh; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.6); cursor:default; }
+#thumb-lightbox-close { position:absolute; top:1rem; right:1.25rem; color:#fff; font-size:1.75rem; line-height:1; cursor:pointer; opacity:.8; }
+#thumb-lightbox-close:hover { opacity:1; }
+/* Thumbnail trigger */
+img[data-thumbnail-preview] { cursor:zoom-in; transition:opacity .15s; }
+img[data-thumbnail-preview]:hover { opacity:.8; }
+/* Pending-delete state */
+.thumb-pending-delete img[data-thumbnail-preview] { opacity: .25; filter: grayscale(1); }
+.thumb-delete-notice { display: none; align-items: center; gap: .4rem; font-size: .75rem; color: #b45309; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 5px; padding: .25rem .6rem; }
+.thumb-pending-delete .thumb-delete-notice { display: inline-flex; }
+/* Selected-file indicator */
+.file-selected-name { display: none; align-items: center; gap: .35rem; font-size: .75rem; color: #374151; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 5px; padding: .2rem .6rem; max-width: 14rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.file-selected-name.visible { display: inline-flex; }
+.file-selected-name button { background: none; border: none; cursor: pointer; color: #9ca3af; padding: 0; line-height: 1; flex-shrink: 0; }
+.file-selected-name button:hover { color: #ef4444; }
+
+/* Saved-file pill */
+.saved-file-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: .35rem .75rem;
+    font-size: .8125rem;
+    color: #1d4ed8;
+    max-width: 100%;
+}
+.saved-file-pill i { color: #3b82f6; flex-shrink: 0; }
+.saved-file-pill a { color: inherit; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-file-pill a:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title="Edit Resource" if resource else "Upload New Resource",
+    icon='fas fa-' + ('edit' if resource else 'plus'),
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'Resource Management', 'url': url_for('content_management.manage_resources')},
+        {'name': 'Edit Resource' if resource else 'Upload New Resource'}
+    ],
+    actions=[
+        {
+            'type': 'button',
+            'text': 'Auto Translate All',
+            'icon': 'fas fa-magic',
+            'classes': 'professional-action-btn professional-action-btn-orange',
+            'attributes': {'id': 'auto-translate-all-btn', 'title': 'Auto-translate blank fields across all languages from English'}
+        },
+        {
+            'type': 'link',
+            'text': 'Back',
+            'url': url_for('content_management.manage_resources'),
+            'icon': 'fas fa-arrow-left',
+            'classes': 'professional-action-btn'
+        }
+    ]
+) }}
+
+<div class="w-full max-w-none min-w-0 px-4 sm:px-6 py-6">
+<form method="POST" enctype="multipart/form-data">
+{{ form.csrf_token }}
+
+{# ── Metadata card ─────────────────────────────────────────────────────── #}
+<div class="bg-white border border-gray-200 rounded-lg shadow-sm p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Resource Details</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 items-start">
+        <div class="min-w-0">
+            {{ form.resource_type.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+            {{ form.resource_type(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500") }}
+            {% for error in form.resource_type.errors %}
+                <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+            {% endfor %}
+        </div>
+        <div class="min-w-0">
+            {{ form.resource_subcategory_id.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+            {{ form.resource_subcategory_id(id="resource_subcategory_id", class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500") }}
+            {% for error in form.resource_subcategory_id.errors %}
+                <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+            {% endfor %}
+        </div>
+        <div class="min-w-0">
+            {{ form.publication_date.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+            {{ form.publication_date(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500") }}
+            {% for error in form.publication_date.errors %}
+                <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{# ── Multilingual content card ─────────────────────────────────────────── #}
+<div class="bg-white border border-gray-200 rounded-lg shadow-sm">
+
+    {# Tab bar #}
+    <div class="border-b border-gray-200 px-6">
+        <nav class="-mb-px flex flex-wrap gap-0" aria-label="Language tabs">
+
+            {# English tab — compute badge state #}
+            {% set en_tr = resource.get_translation('en') if resource else none %}
+            {% if en_tr and en_tr.has_uploaded_document and (resource.default_title or en_tr.title) %}
+                {% set en_badge = 'filled' %}
+            {% elif resource and (resource.default_title or (en_tr and en_tr.has_uploaded_document)) %}
+                {% set en_badge = 'partial' %}
+            {% else %}
+                {% set en_badge = 'empty' %}
+            {% endif %}
+
+            <button type="button" id="btn-en"
+                    class="tab-btn border-b-2 border-blue-500 py-3 px-4 text-sm font-semibold text-blue-600 cursor-pointer whitespace-nowrap">
+                <i class="fas fa-globe-americas mr-1 opacity-70"></i>English
+                {% if en_badge != 'empty' %}
+                <span class="tab-badge tab-badge-{{ en_badge }}" title="English content status">
+                    {% if en_badge == 'filled' %}<i class="fas fa-check"></i>
+                    {% else %}<i class="fas fa-minus"></i>{% endif %}
+                </span>
+                {% endif %}
+            </button>
+
+            {% for lang_code in form.languages %}
+                {% if lang_code != 'en' %}
+                    {% set ltr = resource.get_translation(lang_code) if resource else none %}
+                    {% if ltr and (ltr.title or '') | trim and ltr.has_uploaded_document %}
+                        {% set lbadge = 'filled' %}
+                    {% elif ltr and ((ltr.title or '') | trim or ltr.has_uploaded_document) %}
+                        {% set lbadge = 'partial' %}
+                    {% else %}
+                        {% set lbadge = 'empty' %}
+                    {% endif %}
+                    <button type="button" id="btn-{{ lang_code }}"
+                            class="tab-btn border-b-2 border-transparent py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 cursor-pointer whitespace-nowrap">
+                        {{ (LANGUAGE_DISPLAY_NAMES.get(lang_code) or ALL_LANGUAGES_DISPLAY_NAMES.get(lang_code) or lang_code.upper()) }}
+                        {% if lbadge != 'empty' %}
+                        <span class="tab-badge tab-badge-{{ lbadge }}" title="{{ lang_code.upper() }} content status">
+                            {% if lbadge == 'filled' %}<i class="fas fa-check"></i>
+                            {% else %}<i class="fas fa-minus"></i>{% endif %}
+                        </span>
+                        {% endif %}
+                    </button>
+                {% endif %}
+            {% endfor %}
+        </nav>
+    </div>
+
+    {# Tab contents #}
+    <div class="p-6">
+
+        {# ── English tab ──────────────────────────────────────────────── #}
+        <div id="tab-en" class="language-tab active-tab">
+            {% set en_tr = resource.get_translation('en') if resource else none %}
+
+            {# Title + Description #}
+            <div class="space-y-4 mb-6">
+                <div>
+                    {{ form.default_title.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+                    {{ form.default_title(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", placeholder="Enter resource title in English") }}
+                    {% for error in form.default_title.errors %}
+                        <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                <div>
+                    {{ form.default_description.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+                    {{ form.default_description(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", rows="3", placeholder="Short description (optional)") }}
+                    {% for error in form.default_description.errors %}
+                        <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# Document + Thumbnail side by side #}
+            <div class="grid grid-cols-1 md:grid-cols-2" style="gap:1.5rem">
+
+                {# Document #}
+                {% set doc_field_en = form['document_en'] %}
+                <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i class="fas fa-file-alt text-gray-400"></i>
+                        <span class="text-sm font-semibold text-gray-700">Document File</span>
+                        {% if not resource %}
+                            <span class="ml-auto text-xs text-red-600 font-medium">Required</span>
+                        {% endif %}
+                    </div>
+
+                    {% if en_tr and en_tr.has_uploaded_document %}
+                        <div class="saved-file-pill mb-3">
+                            <i class="fas fa-{% if en_tr.source_document_is_pdf %}file-pdf{% else %}file{% endif %}"></i>
+                            <a href="{{ url_for('content_management.download_resource_file_admin', resource_id=resource.id, language='en') }}"
+                               title="Download {{ en_tr.document_display_name }}">{{ en_tr.document_display_name }}</a>
+                            <i class="fas fa-external-link-alt text-xs opacity-50 ml-auto flex-shrink-0"></i>
+                        </div>
+                    {% elif resource %}
+                        <p class="text-xs text-amber-700 mb-3"><i class="fas fa-info-circle mr-1"></i>No document saved yet.</p>
+                    {% endif %}
+
+                    {{ doc_field_en(id="doc-input-en", class="file-input-hidden") }}
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <label for="doc-input-en"
+                               class="btn btn-secondary btn-sm cursor-pointer"
+                               title="{{ 'Replace document' if (en_tr and en_tr.has_uploaded_document) else 'Upload document' }}">
+                            <i class="fas fa-{% if en_tr and en_tr.has_uploaded_document %}sync-alt{% else %}upload{% endif %} mr-1.5"></i>
+                            {{ 'Replace' if (en_tr and en_tr.has_uploaded_document) else 'Upload File' }}
+                        </label>
+                        <span id="doc-selected-en" class="file-selected-name">
+                            <i class="fas fa-paperclip text-gray-400"></i>
+                            <span class="name-text"></span>
+                            <button type="button" title="Clear selection" aria-label="Clear selection"><i class="fas fa-times"></i></button>
+                        </span>
+                    </div>
+                    {% for error in doc_field_en.errors %}
+                        <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                    {% endfor %}
+                </div>
+
+                {# Thumbnail #}
+                {% set thumb_field_en = form['thumbnail_en'] %}
+                <div class="thumbnail-upload-container border border-gray-200 rounded-lg p-4 bg-gray-50"
+                     data-entity-id="{{ resource.id if resource else '' }}"
+                     data-entity-type="resource"
+                     data-language-code="en"
+                     data-i18n-generating="{{ _('Generating...') }}"
+                     data-i18n-generating-thumb="{{ _('Generating thumbnail...') }}"
+                     data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail') }}"
+                     data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail') }}"
+                     data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.') }}"
+                     data-i18n-deleting="{{ _('Deleting...') }}"
+                     data-i18n-deleting-thumb="{{ _('Deleting thumbnail...') }}"
+                     data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!') }}"
+                     data-i18n-generated-success="{{ _('Thumbnail generated successfully!') }}"
+                     data-i18n-error-prefix="{{ _('Error:') }}"
+                     data-i18n-network-error="{{ _('Network error occurred') }}"
+                     data-i18n-generated-automatically="{{ _('Generated automatically') }}"
+                     data-i18n-current-thumbnail="{{ _('Current thumbnail:') }}"
+                     data-i18n-delete-label="{{ _('Delete') }}"
+                     data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.') }}">
+
+                    <div class="flex items-center gap-2 mb-3">
+                        <i class="fas fa-image text-gray-400"></i>
+                        <span class="text-sm font-semibold text-gray-700">Thumbnail Image</span>
+                        <span class="text-xs text-gray-400 ml-auto">Optional</span>
+                    </div>
+
+                    {# hidden delete flag — submitted with the form if user marks thumbnail for deletion #}
+                    {% if en_tr and en_tr.thumbnail_relative_path %}
+                        <input type="hidden" name="delete_thumbnail_en" id="delete-thumb-flag-en" value="">
+                    {% endif %}
+
+                    <div id="thumb-preview-en" class="{% if en_tr and en_tr.thumbnail_relative_path %}mb-3{% endif %}">
+                        {% if en_tr and en_tr.thumbnail_relative_path %}
+                            <img src="{{ url_for('content_management.download_resource_thumbnail_admin', resource_id=resource.id, language='en') }}"
+                                 alt="Thumbnail" data-thumbnail-preview="true"
+                                 class="border rounded shadow-sm mb-2 block"
+                                 style="max-height:4rem;max-width:5rem;object-fit:cover;">
+                            <span class="thumb-delete-notice">
+                                <i class="fas fa-clock"></i>Will be removed on save
+                                <button type="button" class="thumb-undo-btn ml-1 text-blue-600 hover:underline font-medium" data-lang="en">Undo</button>
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    {{ thumb_field_en(id="thumb-input-en", class="file-input-hidden") }}
+                    <div class="flex items-center gap-2 flex-wrap" id="thumb-actions-en">
+                        {% if en_tr and en_tr.thumbnail_relative_path %}
+                            <label for="thumb-input-en" class="btn btn-secondary btn-sm cursor-pointer" title="Replace thumbnail">
+                                <i class="fas fa-sync-alt mr-1.5"></i>Replace
+                            </label>
+                            <button type="button"
+                                    class="btn btn-ghost-danger btn-sm thumb-mark-delete-btn"
+                                    data-lang="en"
+                                    title="Remove thumbnail on save">
+                                <i class="fas fa-trash mr-1"></i>Remove
+                            </button>
+                        {% else %}
+                            <label for="thumb-input-en" class="btn btn-secondary btn-sm cursor-pointer" title="Upload thumbnail">
+                                <i class="fas fa-upload mr-1.5"></i>Upload
+                            </label>
+                        {% endif %}
+                        <span id="thumb-selected-en" class="file-selected-name">
+                            <i class="fas fa-paperclip text-gray-400"></i>
+                            <span class="name-text"></span>
+                            <button type="button" title="Clear selection" aria-label="Clear selection"><i class="fas fa-times"></i></button>
+                        </span>
+                        {# Generate from PDF — only when saved doc is a PDF #}
+                        {% if resource %}
+                            {% set en_is_pdf = en_tr and en_tr.source_document_is_pdf %}
+                            <div id="generateThumbnailSection-en"
+                                 class="{% if not en_is_pdf %}hidden{% endif %}"
+                                 data-server-pdf="{{ 'true' if en_is_pdf else 'false' }}">
+                                <button type="button"
+                                        data-action="thumbnail:generate"
+                                        data-entity-id="{{ resource.id }}"
+                                        data-entity-type="resource"
+                                        data-language-code="en"
+                                        id="generate-btn-en"
+                                        class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-magic mr-1.5"></i>
+                                    <span id="generate-text-en"
+                                          data-thumbnail-btn-text="generate"
+                                          data-default-text="{{ _('Generate from PDF') }}">{{ _('Generate from PDF') }}</span>
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div id="generate-status-en" class="mt-2 text-sm" data-thumbnail-status="generate"></div>
+                    {% for error in thumb_field_en.errors %}
+                        <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {# ── Other language tabs ────────────────────────────────────────── #}
+        {% for lang_code in form.languages %}
+            {% if lang_code != 'en' %}
+                {% set lname = LANGUAGE_DISPLAY_NAMES.get(lang_code) or ALL_LANGUAGES_DISPLAY_NAMES.get(lang_code) or lang_code.upper() %}
+                {% set ltr = resource.get_translation(lang_code) if resource else none %}
+
+                <div id="tab-{{ lang_code }}" class="language-tab">
+
+                    {# Tab header #}
+                    <div class="flex items-center gap-2 mb-5 pb-3 border-b border-gray-100">
+                        <i class="fas fa-language text-gray-400"></i>
+                        <span class="text-sm font-semibold text-gray-700">{{ lname }}</span>
+                    </div>
+
+                    {# Title + Description #}
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            {% set title_field = form['title_' + lang_code] %}
+                            {{ title_field.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+                            {{ title_field(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", placeholder="Enter title in " + lname) }}
+                            {% for error in title_field.errors %}
+                                <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        <div>
+                            {% set desc_field = form['description_' + lang_code] %}
+                            {{ desc_field.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+                            {{ desc_field(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", rows="3", placeholder="Short description in " + lname + " (optional)") }}
+                            {% for error in desc_field.errors %}
+                                <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {# Document + Thumbnail side by side #}
+                    <div class="grid grid-cols-1 md:grid-cols-2" style="gap:1.5rem">
+
+                        {# Document #}
+                        {% set doc_field = form['document_' + lang_code] %}
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-file-alt text-gray-400"></i>
+                                <span class="text-sm font-semibold text-gray-700">Document File</span>
+                                <span class="text-xs text-gray-400 ml-auto">Optional</span>
+                            </div>
+
+                            {% if resource %}
+                                {% if ltr and ltr.has_uploaded_document %}
+                                    <div class="saved-file-pill mb-3">
+                                        <i class="fas fa-{% if ltr.source_document_is_pdf %}file-pdf{% else %}file{% endif %}"></i>
+                                        <a href="{{ url_for('content_management.download_resource_file_admin', resource_id=resource.id, language=lang_code) }}"
+                                           title="Download {{ ltr.document_display_name }}">{{ ltr.document_display_name }}</a>
+                                        <i class="fas fa-external-link-alt text-xs opacity-50 ml-auto flex-shrink-0"></i>
+                                    </div>
+                                {% else %}
+                                    <p class="text-xs text-amber-700 mb-3"><i class="fas fa-info-circle mr-1"></i>No document saved yet.</p>
+                                {% endif %}
+                            {% endif %}
+
+                            {{ doc_field(id="doc-input-" + lang_code, class="file-input-hidden") }}
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <label for="doc-input-{{ lang_code }}"
+                                       class="btn btn-secondary btn-sm cursor-pointer">
+                                    <i class="fas fa-{% if ltr and ltr.has_uploaded_document %}sync-alt{% else %}upload{% endif %} mr-1.5"></i>
+                                    {{ 'Replace' if (ltr and ltr.has_uploaded_document) else 'Upload File' }}
+                                </label>
+                                <span id="doc-selected-{{ lang_code }}" class="file-selected-name">
+                                    <i class="fas fa-paperclip text-gray-400"></i>
+                                    <span class="name-text"></span>
+                                    <button type="button" title="Clear selection" aria-label="Clear selection"><i class="fas fa-times"></i></button>
+                                </span>
+                            </div>
+                            {% for error in doc_field.errors %}
+                                <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+
+                        {# Thumbnail #}
+                        {% set thumb_field = form['thumbnail_' + lang_code] %}
+                        <div class="thumbnail-upload-container border border-gray-200 rounded-lg p-4 bg-gray-50"
+                             data-entity-id="{{ resource.id if resource else '' }}"
+                             data-entity-type="resource"
+                             data-language-code="{{ lang_code }}"
+                             data-i18n-generating="{{ _('Generating...') }}"
+                             data-i18n-generating-thumb="{{ _('Generating thumbnail...') }}"
+                             data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail') }}"
+                             data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail') }}"
+                             data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.') }}"
+                             data-i18n-deleting="{{ _('Deleting...') }}"
+                             data-i18n-deleting-thumb="{{ _('Deleting thumbnail...') }}"
+                             data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!') }}"
+                             data-i18n-generated-success="{{ _('Thumbnail generated successfully!') }}"
+                             data-i18n-error-prefix="{{ _('Error:') }}"
+                             data-i18n-network-error="{{ _('Network error occurred') }}"
+                             data-i18n-generated-automatically="{{ _('Generated automatically') }}"
+                             data-i18n-current-thumbnail="{{ _('Current thumbnail:') }}"
+                             data-i18n-delete-label="{{ _('Delete') }}"
+                             data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.') }}">
+
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-image text-gray-400"></i>
+                                <span class="text-sm font-semibold text-gray-700">Thumbnail Image</span>
+                                <span class="text-xs text-gray-400 ml-auto">Optional</span>
+                            </div>
+
+                            {# hidden delete flag #}
+                            {% if resource and ltr and ltr.thumbnail_relative_path %}
+                                <input type="hidden" name="delete_thumbnail_{{ lang_code }}" id="delete-thumb-flag-{{ lang_code }}" value="">
+                            {% endif %}
+
+                            <div id="thumb-preview-{{ lang_code }}" class="{% if resource and ltr and ltr.thumbnail_relative_path %}mb-3{% endif %}">
+                                {% if resource and ltr and ltr.thumbnail_relative_path %}
+                                    <img src="{{ url_for('content_management.download_resource_thumbnail_admin', resource_id=resource.id, language=lang_code) }}"
+                                         alt="Thumbnail" data-thumbnail-preview="true"
+                                         class="border rounded shadow-sm mb-2 block"
+                                         style="max-height:4rem;max-width:5rem;object-fit:cover;">
+                                    <span class="thumb-delete-notice">
+                                        <i class="fas fa-clock"></i>Will be removed on save
+                                        <button type="button" class="thumb-undo-btn ml-1 text-blue-600 hover:underline font-medium" data-lang="{{ lang_code }}">Undo</button>
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            {{ thumb_field(id="thumb-input-" + lang_code, class="file-input-hidden") }}
+                            <div class="flex items-center gap-2 flex-wrap" id="thumb-actions-{{ lang_code }}">
+                                {% if resource %}
+                                    {% if ltr and ltr.thumbnail_relative_path %}
+                                        <label for="thumb-input-{{ lang_code }}" class="btn btn-secondary btn-sm cursor-pointer" title="Replace thumbnail">
+                                            <i class="fas fa-sync-alt mr-1.5"></i>Replace
+                                        </label>
+                                        <button type="button"
+                                                class="btn btn-ghost-danger btn-sm thumb-mark-delete-btn"
+                                                data-lang="{{ lang_code }}"
+                                                title="Remove thumbnail on save">
+                                            <i class="fas fa-trash mr-1"></i>Remove
+                                        </button>
+                                    {% else %}
+                                        <label for="thumb-input-{{ lang_code }}" class="btn btn-secondary btn-sm cursor-pointer" title="Upload thumbnail">
+                                            <i class="fas fa-upload mr-1.5"></i>Upload
+                                        </label>
+                                    {% endif %}
+                                {% else %}
+                                    <label for="thumb-input-{{ lang_code }}" class="btn btn-secondary btn-sm cursor-pointer">
+                                        <i class="fas fa-upload mr-1.5"></i>Upload
+                                    </label>
+                                {% endif %}
+                                <span id="thumb-selected-{{ lang_code }}" class="file-selected-name">
+                                    <i class="fas fa-paperclip text-gray-400"></i>
+                                    <span class="name-text"></span>
+                                    <button type="button" title="Clear selection" aria-label="Clear selection"><i class="fas fa-times"></i></button>
+                                </span>
+                                {% if resource %}
+                                    {% set lang_is_pdf = ltr and ltr.source_document_is_pdf %}
+                                    <div id="generateThumbnailSection-{{ lang_code }}"
+                                         class="{% if not lang_is_pdf %}hidden{% endif %}"
+                                         data-server-pdf="{{ 'true' if lang_is_pdf else 'false' }}">
+                                        <button type="button"
+                                                data-action="thumbnail:generate"
+                                                data-entity-id="{{ resource.id }}"
+                                                data-entity-type="resource"
+                                                data-language-code="{{ lang_code }}"
+                                                id="generate-btn-{{ lang_code }}"
+                                                class="btn btn-secondary btn-sm">
+                                            <i class="fas fa-magic mr-1.5"></i>
+                                            <span id="generate-text-{{ lang_code }}"
+                                                  data-thumbnail-btn-text="generate"
+                                                  data-default-text="{{ _('Generate from PDF') }}">{{ _('Generate from PDF') }}</span>
+                                        </button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div id="generate-status-{{ lang_code }}" class="mt-2 text-sm" data-thumbnail-status="generate"></div>
+                            {% for error in thumb_field.errors %}
+                                <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+
+                    </div>{# /grid #}
+                </div>{# /tab #}
+            {% endif %}
+        {% endfor %}
+
+    </div>{# /tab contents #}
+
+    {# Form footer #}
+    <div class="flex items-center px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-lg">
+        {# Auto Translate — shown only when a non-English tab is active #}
+        <button type="button"
+                id="footer-auto-translate-btn"
+                class="btn btn-warning btn-sm hidden"
+                title="Auto-translate title and description from English">
+            <i class="fas fa-magic mr-1.5"></i>Auto Translate
+        </button>
+        <div class="flex items-center gap-3 ml-auto">
+            <a href="{{ url_for('content_management.manage_resources') }}" class="btn btn-secondary">Cancel</a>
+            {{ form.submit(class="btn btn-success") }}
+        </div>
+    </div>
+
+</div>{# /multilingual card #}
+
+</form>
+</div>
+
+{# Lightbox overlay (shared for all thumbnails on this page) #}
+<div id="thumb-lightbox" role="dialog" aria-modal="true" aria-label="Thumbnail preview">
+    <span id="thumb-lightbox-close" title="Close" aria-label="Close">&times;</span>
+    <img src="" alt="Thumbnail preview">
+</div>
+
+{% set resource_subcategories = resource_subcategories|default([]) %}
+{% include 'admin/resources/_resource_subcategories_modal.html' %}
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    'use strict';
+
+    // ── Tab switching ──────────────────────────────────────────────────────
+    const INACTIVE = 'tab-btn border-b-2 border-transparent py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 cursor-pointer whitespace-nowrap';
+    const ACTIVE   = 'tab-btn border-b-2 border-blue-500 py-3 px-4 text-sm font-semibold text-blue-600 cursor-pointer whitespace-nowrap';
+
+    const footerAutoTranslateBtn  = document.getElementById('footer-auto-translate-btn');
+    const footerAutoTranslateLang = document.getElementById('footer-auto-translate-lang');
+
+    var subSel = document.getElementById('resource_subcategory_id');
+    var optsUrl = {{ url_for('content_management.resource_subcategory_select_options') | tojson }};
+    var subcatApiCreateUrl = {{ url_for('content_management.resource_subcategory_api_create') | tojson }};
+    var subcatApiMutateUrlTemplate = {{ url_for('content_management.resource_subcategory_api_update', subcategory_id=0) | tojson }};
+
+    function subcatMutateUrl(id) {
+        return subcatApiMutateUrlTemplate.replace(/\/0$/, '/' + id);
+    }
+
+    function refreshResourceSubcategorySelect() {
+        if (!subSel || !optsUrl) return;
+        var previous = subSel.value;
+        var doFetch = (window.getFetch && window.getFetch()) || fetch;
+        doFetch(optsUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (body) {
+                var rows = body.subcategories;
+                if (!Array.isArray(rows)) return;
+                subSel.innerHTML = '';
+                var o0 = document.createElement('option');
+                o0.value = '0';
+                o0.textContent = '— None —';
+                subSel.appendChild(o0);
+                rows.forEach(function (row) {
+                    var o = document.createElement('option');
+                    o.value = String(row.id);
+                    o.textContent = row.name;
+                    subSel.appendChild(o);
+                });
+                var om = document.createElement('option');
+                om.value = '-1';
+                om.textContent = '+ Manage subcategories…';
+                subSel.appendChild(om);
+                if (previous && previous !== '-1') {
+                    subSel.value = previous;
+                    if (subSel.value !== previous) subSel.value = '0';
+                } else {
+                    subSel.value = '0';
+                }
+            })
+            .catch(function () {});
+    }
+
+    function toggleSubcatEmptyRow() {
+        var tb = document.getElementById('resource-subcategories-tbody');
+        var emptyEl = document.getElementById('resource-subcategories-empty');
+        if (!tb || !emptyEl) return;
+        var has = tb.querySelectorAll('tr[data-subcategory-id]').length > 0;
+        emptyEl.classList.toggle('hidden', has);
+    }
+
+    function appendSubcategoryRow(sub) {
+        var tb = document.getElementById('resource-subcategories-tbody');
+        if (!tb || !sub || sub.id == null) return;
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-subcategory-id', String(sub.id));
+        var tdOrder = document.createElement('td');
+        tdOrder.className = 'px-4 py-2 whitespace-nowrap text-gray-700 subcat-cell-order';
+        tdOrder.textContent = String(sub.display_order != null ? sub.display_order : 0);
+        var tdName = document.createElement('td');
+        tdName.className = 'px-4 py-2 text-gray-900 font-medium subcat-cell-name';
+        tdName.textContent = sub.name || '';
+        var tdAct = document.createElement('td');
+        tdAct.className = 'px-4 py-2 whitespace-nowrap text-right space-x-2';
+        var editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'subcat-edit-btn text-indigo-600 hover:text-indigo-900 p-1';
+        editBtn.title = 'Edit';
+        editBtn.setAttribute('data-id', String(sub.id));
+        editBtn.setAttribute('data-name', sub.name || '');
+        editBtn.setAttribute('data-order', String(sub.display_order != null ? sub.display_order : 0));
+        editBtn.innerHTML = '<i class="fas fa-pen"></i>';
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'subcat-delete-btn text-red-600 hover:text-red-900 p-1';
+        delBtn.title = 'Delete';
+        delBtn.setAttribute('data-id', String(sub.id));
+        delBtn.setAttribute('data-name', sub.name || '');
+        delBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        tdAct.appendChild(editBtn);
+        tdAct.appendChild(delBtn);
+        tr.appendChild(tdOrder);
+        tr.appendChild(tdName);
+        tr.appendChild(tdAct);
+        tb.appendChild(tr);
+        toggleSubcatEmptyRow();
+    }
+
+    function updateSubcategoryRow(sub) {
+        if (!sub || sub.id == null) return;
+        var tr = document.querySelector('#resource-subcategories-tbody tr[data-subcategory-id="' + sub.id + '"]');
+        if (!tr) return;
+        var o = tr.querySelector('.subcat-cell-order');
+        var n = tr.querySelector('.subcat-cell-name');
+        if (o) o.textContent = String(sub.display_order != null ? sub.display_order : 0);
+        if (n) n.textContent = sub.name || '';
+        var editBtn = tr.querySelector('.subcat-edit-btn');
+        if (editBtn) {
+            editBtn.setAttribute('data-name', sub.name || '');
+            editBtn.setAttribute('data-order', String(sub.display_order != null ? sub.display_order : 0));
+        }
+        var delBtn = tr.querySelector('.subcat-delete-btn');
+        if (delBtn) delBtn.setAttribute('data-name', sub.name || '');
+    }
+
+    function removeSubcategoryRow(id) {
+        var tr = document.querySelector('#resource-subcategories-tbody tr[data-subcategory-id="' + id + '"]');
+        if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+        toggleSubcatEmptyRow();
+    }
+
+    function showTab(lang) {
+        document.querySelectorAll('.language-tab').forEach(t => {
+            t.classList.remove('active-tab');
+            t.style.display = 'none';
+        });
+        document.querySelectorAll('.tab-btn').forEach(b => { b.className = INACTIVE; });
+
+        const tab = document.getElementById('tab-' + lang);
+        const btn = document.getElementById('btn-' + lang);
+        if (!tab || !btn) return;
+
+        tab.classList.add('active-tab');
+        tab.style.display = 'block';
+        btn.className = ACTIVE;
+
+        // Show/hide footer auto-translate for non-English tabs
+        if (footerAutoTranslateBtn) {
+            if (lang === 'en') {
+                footerAutoTranslateBtn.classList.add('hidden');
+                footerAutoTranslateBtn.dataset.activeLang = '';
+            } else {
+                footerAutoTranslateBtn.classList.remove('hidden');
+                footerAutoTranslateBtn.dataset.activeLang = lang;
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Subcategory: “+ Manage subcategories…” opens modal (sentinel -1; reset so it is never submitted)
+        if (subSel) {
+            var prevSub = subSel.value;
+            subSel.addEventListener('focus', function () { prevSub = subSel.value; });
+            subSel.addEventListener('change', function () {
+                if (subSel.value === '-1') {
+                    subSel.value = prevSub;
+                    if (window.ResourceSubcategoriesModal && typeof window.ResourceSubcategoriesModal.openModal === 'function') {
+                        window.ResourceSubcategoriesModal.openModal();
+                    }
+                } else {
+                    prevSub = subSel.value;
+                }
+            });
+        }
+        var refreshSubcatBtn = document.getElementById('resource-subcategories-refresh-btn');
+        if (refreshSubcatBtn) {
+            refreshSubcatBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                refreshResourceSubcategorySelect();
+            });
+        }
+        toggleSubcatEmptyRow();
+
+        var subcatModalEl = document.getElementById('resource-subcategories-modal');
+        if (subcatModalEl && window.ModalUtils && typeof window.ModalUtils.makeModal === 'function') {
+            window.ResourceSubcategoriesModal = window.ModalUtils.makeModal(subcatModalEl);
+        }
+        var subcatEditModalEl = document.getElementById('resource-subcategory-edit-modal');
+        if (subcatEditModalEl && window.ModalUtils && typeof window.ModalUtils.makeModal === 'function') {
+            window.ResourceSubcategoryEditModal = window.ModalUtils.makeModal(subcatEditModalEl);
+        }
+
+        var addBtn = document.getElementById('subcat-add-btn');
+        if (addBtn && subcatApiCreateUrl) {
+            addBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var nameInp = document.getElementById('subcat-add-name');
+                var orderInp = document.getElementById('subcat-add-order');
+                var name = nameInp ? nameInp.value.trim() : '';
+                if (!name) {
+                    window.showAlert && window.showAlert('Enter a name for the subcategory.', 'warning');
+                    return;
+                }
+                var order = orderInp ? parseInt(orderInp.value, 10) : 0;
+                if (isNaN(order)) order = 0;
+                addBtn.disabled = true;
+                var apiFetch = (window.getApiFetch && window.getApiFetch());
+                if (!apiFetch) return;
+                apiFetch(subcatApiCreateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, display_order: order })
+                }).then(function (data) {
+                    if (data && data.subcategory) {
+                        appendSubcategoryRow(data.subcategory);
+                        if (nameInp) nameInp.value = '';
+                        if (orderInp) orderInp.value = '0';
+                        refreshResourceSubcategorySelect();
+                    }
+                }).catch(function (err) {
+                    window.showAlert && window.showAlert(err.message || 'Could not add subcategory.', 'error');
+                }).finally(function () {
+                    addBtn.disabled = false;
+                });
+            });
+        }
+
+        document.addEventListener('click', function (e) {
+            var editBtn = e.target.closest('.subcat-edit-btn');
+            if (editBtn) {
+                e.preventDefault();
+                var id = editBtn.getAttribute('data-id');
+                var nm = editBtn.getAttribute('data-name') || '';
+                var ord = editBtn.getAttribute('data-order') || '0';
+                var idField = document.getElementById('subcat-edit-id');
+                var nameField = document.getElementById('subcat-edit-name');
+                var orderField = document.getElementById('subcat-edit-order');
+                if (idField) idField.value = id;
+                if (nameField) nameField.value = nm;
+                if (orderField) orderField.value = ord;
+                if (window.ResourceSubcategoryEditModal && window.ResourceSubcategoryEditModal.openModal) {
+                    window.ResourceSubcategoryEditModal.openModal();
+                }
+                return;
+            }
+            var delBtn = e.target.closest('.subcat-delete-btn');
+            if (delBtn) {
+                e.preventDefault();
+                var sid = delBtn.getAttribute('data-id');
+                var snm = delBtn.getAttribute('data-name') || '';
+                var doDel = function () {
+                    var apiFetch = (window.getApiFetch && window.getApiFetch());
+                    if (!apiFetch) return;
+                    apiFetch(subcatMutateUrl(sid), { method: 'DELETE' }).then(function () {
+                        removeSubcategoryRow(sid);
+                        refreshResourceSubcategorySelect();
+                    }).catch(function (err) {
+                        window.showAlert && window.showAlert(err.message || 'Could not delete.', 'error');
+                    });
+                };
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(
+                        'Delete subcategory “' + snm + '”? Resources will be unassigned from this subcategory.',
+                        doDel, null, 'Delete', 'Cancel', 'Confirm delete'
+                    );
+                } else {
+                    doDel();
+                }
+            }
+        });
+
+        var saveEditBtn = document.getElementById('subcat-edit-save-btn');
+        if (saveEditBtn) {
+            saveEditBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var idField = document.getElementById('subcat-edit-id');
+                var nameField = document.getElementById('subcat-edit-name');
+                var orderField = document.getElementById('subcat-edit-order');
+                var id = idField ? idField.value : '';
+                var name = nameField ? nameField.value.trim() : '';
+                if (!id || !name) {
+                    window.showAlert && window.showAlert('Name is required.', 'warning');
+                    return;
+                }
+                var order = orderField ? parseInt(orderField.value, 10) : 0;
+                if (isNaN(order)) order = 0;
+                saveEditBtn.disabled = true;
+                var apiFetch = (window.getApiFetch && window.getApiFetch());
+                if (!apiFetch) return;
+                apiFetch(subcatMutateUrl(id), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, display_order: order })
+                }).then(function (data) {
+                    if (data && data.subcategory) {
+                        updateSubcategoryRow(data.subcategory);
+                        refreshResourceSubcategorySelect();
+                    }
+                    if (window.ResourceSubcategoryEditModal && window.ResourceSubcategoryEditModal.closeModal) {
+                        window.ResourceSubcategoryEditModal.closeModal();
+                    }
+                }).catch(function (err) {
+                    window.showAlert && window.showAlert(err.message || 'Could not save.', 'error');
+                }).finally(function () {
+                    saveEditBtn.disabled = false;
+                });
+            });
+        }
+
+        // Wire tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                showTab(this.id.replace('btn-', ''));
+            });
+        });
+
+        // Force correct initial state
+        document.querySelectorAll('.language-tab').forEach(t => { t.style.display = 'none'; });
+        showTab('en');
+
+        // PDF generate-section visibility (server-state only)
+        const langs = {{ form.languages | tojson | safe }};
+        langs.forEach(function (lang) {
+            const sec = document.getElementById('generateThumbnailSection-' + lang);
+            if (!sec) return;
+            if (sec.getAttribute('data-server-pdf') === 'true') {
+                sec.classList.remove('hidden');
+            } else {
+                sec.classList.add('hidden');
+            }
+        });
+
+        // ── Compact file-input wiring ──────────────────────────────────────
+        function wireFileInput(inputId, indicatorId) {
+            const inp = document.getElementById(inputId);
+            const ind = document.getElementById(indicatorId);
+            if (!inp || !ind) return;
+            const nameEl  = ind.querySelector('.name-text');
+            const clearBtn = ind.querySelector('button');
+
+            inp.addEventListener('change', function () {
+                if (inp.files && inp.files.length > 0) {
+                    nameEl.textContent = inp.files[0].name;
+                    ind.classList.add('visible');
+                } else {
+                    ind.classList.remove('visible');
+                    nameEl.textContent = '';
+                }
+            });
+
+            clearBtn && clearBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                inp.value = '';
+                ind.classList.remove('visible');
+                nameEl.textContent = '';
+            });
+        }
+
+        langs.forEach(function (lang) {
+            wireFileInput('doc-input-'   + lang, 'doc-selected-'   + lang);
+            wireFileInput('thumb-input-' + lang, 'thumb-selected-' + lang);
+        });
+
+        // ── Thumbnail lightbox ─────────────────────────────────────────────
+        const lightbox     = document.getElementById('thumb-lightbox');
+        const lightboxImg  = lightbox && lightbox.querySelector('img');
+        const lightboxClose = document.getElementById('thumb-lightbox-close');
+
+        function openLightbox(src, alt) {
+            if (!lightbox || !lightboxImg) return;
+            lightboxImg.src = src + (src.includes('?') ? '&' : '?') + 't=' + Date.now();
+            lightboxImg.alt = alt || 'Thumbnail preview';
+            lightbox.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeLightbox() {
+            if (!lightbox) return;
+            lightbox.classList.remove('open');
+            document.body.style.overflow = '';
+            if (lightboxImg) { lightboxImg.src = ''; }
+        }
+
+        lightboxClose && lightboxClose.addEventListener('click', closeLightbox);
+        lightbox && lightbox.addEventListener('click', function (e) {
+            if (e.target === lightbox) closeLightbox();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeLightbox();
+        });
+        document.addEventListener('click', function (e) {
+            const img = e.target.closest('img[data-thumbnail-preview="true"]');
+            if (img && !img.closest('.thumb-pending-delete')) {
+                openLightbox(img.src, img.alt);
+            }
+        });
+
+        // ── Thumbnail mark-for-deletion (takes effect on Save) ────────────
+        function markThumbForDeletion(lang) {
+            const flag    = document.getElementById('delete-thumb-flag-' + lang);
+            const preview = document.getElementById('thumb-preview-' + lang);
+            const actions = document.getElementById('thumb-actions-' + lang);
+            if (!flag) return;
+            flag.value = '1';
+            if (preview) preview.classList.add('thumb-pending-delete');
+            // Hide Remove button, keep Replace (user can still pick a new file)
+            if (actions) {
+                actions.querySelectorAll('.thumb-mark-delete-btn').forEach(b => { b.style.display = 'none'; });
+            }
+        }
+
+        function undoThumbDelete(lang) {
+            const flag    = document.getElementById('delete-thumb-flag-' + lang);
+            const preview = document.getElementById('thumb-preview-' + lang);
+            const actions = document.getElementById('thumb-actions-' + lang);
+            if (!flag) return;
+            flag.value = '';
+            if (preview) preview.classList.remove('thumb-pending-delete');
+            if (actions) {
+                actions.querySelectorAll('.thumb-mark-delete-btn').forEach(b => { b.style.display = ''; });
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            const markBtn = e.target.closest('.thumb-mark-delete-btn');
+            if (markBtn) { markThumbForDeletion(markBtn.dataset.lang); return; }
+            const undoBtn = e.target.closest('.thumb-undo-btn');
+            if (undoBtn) { undoThumbDelete(undoBtn.dataset.lang); return; }
+        });
+
+        // ── Auto-translate wiring ──────────────────────────────────────────
+        const allBtn = document.getElementById('auto-translate-all-btn');
+        if (allBtn) {
+            allBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (!document.querySelector('input[name="default_title"]').value.trim()) {
+                    window.showAlert && window.showAlert('Please enter an English title first.', 'warning');
+                    return;
+                }
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Translating…';
+                autoTranslateResource();
+                setTimeout(() => {
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-magic mr-2"></i>Auto Translate All';
+                }, 3500);
+            });
+        }
+
+        // Footer auto-translate button delegates to the currently active language
+        if (footerAutoTranslateBtn) {
+            footerAutoTranslateBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const lang = this.dataset.activeLang;
+                if (lang) autoTranslateResource(lang);
+            });
+        }
+
+        // ── Base64 WAF bypass: encode text fields before POST ──────────────
+        // Natural-language text (apostrophes, accented chars, ampersands) can
+        // trigger WAF SQL-injection / HTML-injection false positives.  We
+        // base64-encode every title and description field on submit so the
+        // wire payload is plain ASCII.  The Flask route decodes the values
+        // before WTForms validation, so server-side logic is unaffected.
+        (function () {
+            var SKIP = { csrf_token: 1, publication_date: 1 };
+            function toB64(str) {
+                try { return btoa(unescape(encodeURIComponent(str))); }
+                catch (_) { return str; }
+            }
+            var frm = document.querySelector('form[enctype="multipart/form-data"]');
+            if (frm) {
+                frm.addEventListener('submit', function () {
+                    frm.querySelectorAll('input[type="text"], textarea').forEach(function (el) {
+                        if (!SKIP[el.name] && el.value) {
+                            el.value = toB64(el.value);
+                        }
+                    });
+                });
+            }
+        }());
+    });
+
+    // ── Auto-translate logic ───────────────────────────────────────────────
+    function autoTranslateResource(targetLanguage) {
+        const titleEl = document.querySelector('input[name="default_title"]');
+        const descEl  = document.querySelector('textarea[name="default_description"]');
+        const title   = titleEl ? titleEl.value.trim() : '';
+        const desc    = descEl  ? descEl.value.trim()  : '';
+
+        if (!title) {
+            window.showAlert && window.showAlert('Please enter an English title first before auto-translating.', 'warning');
+            return;
+        }
+
+        const allLangs     = {{ form.languages | tojson | safe }};
+        const targetLangs  = targetLanguage ? [targetLanguage] : allLangs.filter(l => l !== 'en');
+        const svc          = window.AutoTranslateService;
+        if (!svc) return;
+
+        const translate = (text, type) => svc.translate({
+            type: 'form_item',
+            permission_context: 'resources',
+            permission_code: 'admin.resources.manage',
+            text, definition: '', target_languages: targetLangs
+        }).then(data => {
+            const map = data?.translations?.label_translations || {};
+            targetLangs.forEach(code => {
+                if (!map[code]) return;
+                const name  = type === 'title' ? 'title_' + code : 'description_' + code;
+                const field = document.querySelector(`input[name="${name}"], textarea[name="${name}"]`);
+                if (field && (!field.value.trim() || targetLanguage)) field.value = map[code];
+            });
+            return { ok: true };
+        });
+
+        // Set loading state on the footer button
+        if (footerAutoTranslateBtn && targetLanguage) {
+            footerAutoTranslateBtn.disabled = true;
+            footerAutoTranslateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Translating…';
+        }
+
+        const promises = [];
+        if (title) promises.push(translate(title, 'title'));
+        if (desc)  promises.push(translate(desc,  'description'));
+
+        Promise.allSettled(promises).then(results => {
+            if (targetLanguage) {
+                const hasOk  = results.some(r => r.status === 'fulfilled');
+                const hasErr = results.some(r => r.status === 'rejected');
+                const btn = document.getElementById('auto-translate-' + targetLanguage + '-btn');
+                if (btn && btn.parentNode) {
+                    const d = document.createElement('div');
+                    d.className = hasOk && !hasErr
+                        ? 'mt-2 p-2 bg-green-50 border border-green-300 text-green-700 rounded text-xs'
+                        : hasOk
+                            ? 'mt-2 p-2 bg-yellow-50 border border-yellow-300 text-yellow-700 rounded text-xs'
+                            : 'mt-2 p-2 bg-red-50 border border-red-300 text-red-700 rounded text-xs';
+                    d.innerHTML = hasOk && !hasErr
+                        ? '<i class="fas fa-check-circle mr-1"></i>Translated successfully!'
+                        : hasOk
+                            ? '<i class="fas fa-exclamation-triangle mr-1"></i>Partially translated.'
+                            : '<i class="fas fa-times-circle mr-1"></i>Translation failed.';
+                    btn.parentNode.insertBefore(d, btn.nextSibling);
+                    setTimeout(() => d.parentNode && d.remove(), 4000);
+                }
+            }
+        }).finally(() => {
+            if (footerAutoTranslateBtn) {
+                footerAutoTranslateBtn.disabled = false;
+                footerAutoTranslateBtn.innerHTML = '<i class="fas fa-magic mr-1.5"></i>Auto Translate';
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,3075 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_manage_org = current_is_system_manager or has_permission('admin.organization.manage') %}
+{% set can_manage_countries = current_is_system_manager or has_permission('admin.countries.edit') or has_permission('admin.organization.manage') %}
+{% set can_view_countries = can_manage_countries or (current_is_system_manager or has_permission('admin.countries.view')) %}
+
+{% block title %}{{ _('Organization Management') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes, admin_underline_subtab_btn_classes, admin_underline_subtab_count_classes %}
+
+<div class="pr-6">
+{{ page_header(
+    title=_('Organization Management'),
+    icon='fas fa-sitemap',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Organization Management')}
+    ]
+) }}
+</div>
+
+{% set resolved_entity_groups = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
+{% set has_countries = 'countries' in resolved_entity_groups %}
+{% set has_ns_structure = 'ns_structure' in resolved_entity_groups %}
+{% set has_secretariat = 'secretariat' in resolved_entity_groups %}
+
+<!-- Tabs Navigation (match System Configuration underline tabs: settings-tab + primary/teal accent) -->
+<div class="bg-white shadow-md border border-gray-200 mb-6 mr-6">
+        {% call scroll_tab_bar(inner_id='organization-tabs', aria_label=_('Organization sections')) %}
+            {% if has_countries %}
+            <!-- Countries Tab -->
+            <button type="button"
+                    id="countries-tab-btn"
+                    role="tab"
+                    data-tab="countries"
+                    class="{{ admin_underline_tab_btn_classes(active_tab == 'countries') }}">
+                <i class="fas fa-flag mr-1.5"></i>
+                {{ _('Countries') }}
+                <span class="{{ admin_underline_tab_badge_classes(active_tab == 'countries') }}">
+                    {{ countries_count }}
+                </span>
+            </button>
+
+            <!-- National Societies Tab -->
+            <button type="button"
+                    id="nss-tab-btn"
+                    role="tab"
+                    data-tab="nss"
+                    class="{{ admin_underline_tab_btn_classes(active_tab == 'nss') }}">
+                <span class="mr-1.5 inline-flex items-center shrink-0 opacity-90" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" class="w-4 h-4" focusable="false" aria-hidden="true">
+                        <path fill="currentColor" d="M10 3h4v18h-4zM3 10h18v4H3z"/>
+                    </svg>
+                    <svg viewBox="0 0 24 24" class="w-4 h-4 ml-1" focusable="false" aria-hidden="true">
+                        <path fill="currentColor" d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
+                    </svg>
+                </span>
+                {{ _('National Societies') }}
+                <span class="{{ admin_underline_tab_badge_classes(active_tab == 'nss') }}">
+                    {{ nss_count }}
+                </span>
+            </button>
+            {% endif %}
+
+            {% if has_ns_structure %}
+            <!-- NS Structure Tab -->
+            <button type="button"
+                    id="ns-structure-tab-btn"
+                    role="tab"
+                    data-tab="ns-structure"
+                    class="{{ admin_underline_tab_btn_classes(active_tab == 'ns-structure') }}">
+                <i class="fas fa-project-diagram mr-1.5"></i>
+                {{ _('NS Structure') }}
+                <span class="{{ admin_underline_tab_badge_classes(active_tab == 'ns-structure') }}">
+                    {{ branches_count + subbranches_count + localunits_count }}
+                </span>
+            </button>
+            {% endif %}
+
+            {% if has_secretariat %}
+            <!-- Secretariat Tab -->
+            <button type="button"
+                    id="secretariat-tab-btn"
+                    role="tab"
+                    data-tab="secretariat"
+                    class="{{ admin_underline_tab_btn_classes(active_tab == 'secretariat') }}">
+                <i class="fas fa-building mr-1.5"></i>
+                {{ _('Secretariat') }}
+                <span class="{{ admin_underline_tab_badge_classes(active_tab == 'secretariat') }}">
+                    {{ divisions_count + departments_count }}
+                </span>
+            </button>
+            {% endif %}
+        {% endcall %}
+</div>
+
+<!-- Tab Content -->
+<div class="tab-content pr-6">
+    {# Countries Tab Content #}
+    {% if has_countries %}
+    <div id="countries-tab-panel" class="tab-panel {% if active_tab != 'countries' %}hidden{% endif %}">
+        {% set new_country_endpoint_name = 'organization.new_country' %}
+        {% set delete_endpoint_name = 'organization.delete_country' %}
+        {% include 'admin/organization/_countries_component.html' %}
+    </div>
+    {% endif %}
+
+    {% if has_countries %}
+    {# NSs Tab Content #}
+    <div id="nss-tab-panel" class="tab-panel {% if active_tab != 'nss' %}hidden{% endif %}">
+        {% include 'admin/organization/_nss_component.html' %}
+    </div>
+    {% endif %}
+
+    {% if has_ns_structure %}
+    {# NS Structure Tab Content #}
+    <div id="ns-structure-tab-panel" class="tab-panel {% if active_tab != 'ns-structure' %}hidden{% endif %}">
+        {% include "admin/organization/manage_ns_hierarchy.html" %}
+    </div>
+    {% endif %}
+
+    {% if has_secretariat %}
+    {# Secretariat Tab Content #}
+    <div id="secretariat-tab-panel" class="tab-panel {% if active_tab != 'secretariat' %}hidden{% endif %}">
+        <!-- Tabs and Division Filter Row -->
+        <div class="mb-4 flex flex-col lg:flex-row lg:items-center gap-3">
+            <!-- Tabs for Divisions, Departments, Regions, and Clusters -->
+            {% call scroll_tab_bar(border_bottom=False, aria_label=_('Secretariat structure'), wrapper_class='min-w-0 w-full lg:flex-1', inner_class='space-x-4') %}
+                <button type="button" role="tab" id="divisions-tab" class="{{ admin_underline_subtab_btn_classes(true) }}" data-tab="divisions">
+                    <i class="fas fa-building mr-1.5"></i> {{ _('Divisions') }}
+                    <span class="{{ admin_underline_subtab_count_classes() }}">{{ divisions|length }}</span>
+                </button>
+                <button type="button" role="tab" id="departments-tab" class="{{ admin_underline_subtab_btn_classes(false) }}" data-tab="departments">
+                    <i class="fas fa-sitemap mr-1.5"></i> {{ _('Departments') }}
+                    <span class="{{ admin_underline_subtab_count_classes() }}">{{ departments|length }}</span>
+                </button>
+                <button type="button" role="tab" id="regions-tab" class="{{ admin_underline_subtab_btn_classes(false) }}" data-tab="regions">
+                    <i class="fas fa-globe-europe mr-1.5"></i> {{ _('Regions') }}
+                    <span class="{{ admin_underline_subtab_count_classes() }}">{{ regions|length if regions is defined else 0 }}</span>
+                </button>
+                <button type="button" role="tab" id="clusters-tab" class="{{ admin_underline_subtab_btn_classes(false) }}" data-tab="clusters">
+                    <i class="fas fa-project-diagram mr-1.5"></i> {{ _('Clusters') }}
+                    <span class="{{ admin_underline_subtab_count_classes() }}">{{ clusters|length if clusters is defined else 0 }}</span>
+                </button>
+            {% endcall %}
+
+            <!-- Division Filter - Pushed to right edge (only show if divisions available) -->
+            {% if divisions %}
+            <div class="ml-auto">
+                <select id="divisionFilter" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md min-w-40 py-1.5 px-2">
+                    <option value="">{{ _('All Divisions') }}</option>
+                    {% for division in divisions %}
+                    <option value="{{ division.id }}">{{ division.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Divisions Tab Content -->
+        <div id="divisions" class="tab-content bg-white p-4 sm:p-6 shadow-md border border-gray-200" style="display: none;">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Divisions') }}</h3>
+                    {% if can_manage_org %}
+                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                            <i class="fas fa-language text-sm" aria-hidden="true"></i>
+                        </button>
+                    {% endif %}
+                </div>
+                <div class="flex gap-2 items-center flex-wrap">
+                    <div id="divisions-column-visibility-button-placeholder"></div>
+                    {% if can_manage_org %}
+                        <a href="{{ url_for('organization.new_secretariat_division') }}"
+                           class="btn btn-success">
+                            <i class="fas fa-plus mr-2"></i>
+                            {{ _('Add New Division') }}
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% if divisions %}
+                <div id="divisions-table-container" class="overflow-x-auto">
+                    <div id="divisionsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="divisions-column-visibility-button-placeholder"></div>
+                </div>
+            {% else %}
+                <p class="text-gray-700 text-sm">{{ _('No divisions found.') }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Departments Tab Content -->
+        <div id="departments" class="tab-content bg-white p-4 sm:p-6 shadow-md border border-gray-200" style="display: none;">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Departments') }}</h3>
+                    {% if can_manage_org %}
+                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                            <i class="fas fa-language text-sm" aria-hidden="true"></i>
+                        </button>
+                    {% endif %}
+                </div>
+                <div class="flex gap-2 items-center flex-wrap">
+                    <div id="departments-column-visibility-button-placeholder"></div>
+                    {% if can_manage_org %}
+                        <a href="{{ url_for('organization.new_secretariat_department') }}"
+                           class="btn btn-success">
+                            <i class="fas fa-plus mr-2"></i>
+                            {{ _('Add New Department') }}
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% if departments %}
+                <div id="departments-table-container" class="overflow-x-auto">
+                    <div id="departmentsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="departments-column-visibility-button-placeholder"></div>
+                </div>
+            {% else %}
+                <p class="text-gray-700 text-sm">{{ _('No departments found.') }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Regions Tab Content -->
+        <div id="regions" class="tab-content bg-white p-4 sm:p-6 shadow-md border border-gray-200" style="display: none;">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Regional Offices') }}</h3>
+                    {% if can_manage_org %}
+                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                            <i class="fas fa-language text-sm" aria-hidden="true"></i>
+                        </button>
+                    {% endif %}
+                </div>
+                <div class="flex gap-2 items-center flex-wrap">
+                    <div id="regions-column-visibility-button-placeholder"></div>
+                    {% if can_manage_org %}
+                        <a href="{{ url_for('organization.new_secretariat_regional_office') }}"
+                           class="btn btn-success">
+                            <i class="fas fa-plus mr-2"></i>
+                            {{ _('Add New Regional Office') }}
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% if regions %}
+                <div id="regions-table-container" class="overflow-x-auto">
+                    <div id="regionsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="regions-column-visibility-button-placeholder"></div>
+                </div>
+            {% else %}
+                <p class="text-gray-700 text-sm">{{ _('No regional offices found.') }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Clusters Tab Content -->
+        <div id="clusters" class="tab-content bg-white p-4 sm:p-6 shadow-md border border-gray-200" style="display: none;">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Cluster Offices') }}</h3>
+                    {% if can_manage_org %}
+                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                            <i class="fas fa-language text-sm" aria-hidden="true"></i>
+                        </button>
+                    {% endif %}
+                </div>
+                <div class="flex gap-2 items-center flex-wrap">
+                    <div id="clusters-column-visibility-button-placeholder"></div>
+                    {% if can_manage_org %}
+                        <a href="{{ url_for('organization.new_secretariat_cluster_office') }}"
+                           class="btn btn-success">
+                            <i class="fas fa-plus mr-2"></i>
+                            {{ _('Add New Cluster Office') }}
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% if clusters %}
+                <div id="clusters-table-container" class="overflow-x-auto">
+                    <div id="clustersGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="clusters-column-visibility-button-placeholder"></div>
+                </div>
+            {% else %}
+                <p class="text-gray-700 text-sm">{{ _('No cluster offices found.') }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+
+{# Auto-Translate Modal Configuration - Dynamic based on active tab #}
+{% if can_manage_org %}
+{% set auto_translate_config = {
+    'title': _('Auto-Translate All Organization Entities'),
+    'description': _('Translate all blank organization names to all languages'),
+    'endpoint': url_for('organization.api_auto_translate_organizations'),
+    'item_type': 'organization entities'
+} %}
+
+<!-- Debug: Auto-translate config -->
+<script id="auto-translate-config-json" type="application/json">{{ auto_translate_config | tojson | safe }}</script>
+<script nonce="{{ csp_nonce() }}">
+const atcEl = document.getElementById('auto-translate-config-json');
+try {
+    window.autoTranslateConfigFromTemplate = atcEl ? JSON.parse(atcEl.textContent) : {};
+} catch (e) {
+    window.autoTranslateConfigFromTemplate = {};
+}
+</script>
+
+{# Include centralized auto-translate modal #}
+{% include "components/auto_translate_modal.html" with context %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+    {# Include centralized auto-translate modal JavaScript #}
+    {% if can_manage_org %}
+        {% include 'components/auto_translate_modal_js.html' with context %}
+    {% endif %}
+
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+
+    <script nonce="{{ csp_nonce() }}">
+    // AG Grid helpers for organization tables
+    let countriesGridHelper = null;
+    let nssGridHelper = null;
+    let divisionsGridHelper = null;
+    let departmentsGridHelper = null;
+    let regionsGridHelper = null;
+    let clustersGridHelper = null;
+
+    // UI permissions for this screen (routes remain authoritative)
+    const UI_PERMS = {
+        canManageOrg: {{ can_manage_org|default(false)|tojson|safe }},
+        canManageCountries: {{ can_manage_countries|default(false)|tojson|safe }}
+    };
+
+    // ------------------------------------------------------------------
+    // Simple toast (avoid native alert)
+    // ------------------------------------------------------------------
+    let toastTimer = null;
+    function showToast(message, type = 'error', timeoutMs = 6000) {
+        try {
+            let toast = document.getElementById('org-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'org-toast';
+                toast.className = 'fixed top-4 right-4 z-[10000] hidden max-w-sm';
+                toast.innerHTML = '<div id="org-toast-inner" class="rounded-lg shadow-lg border px-4 py-3 text-sm"></div>';
+                document.body.appendChild(toast);
+            }
+            const inner = document.getElementById('org-toast-inner');
+            const stylesByType = {
+                success: 'bg-green-50 border-green-200 text-green-800',
+                error: 'bg-red-50 border-red-200 text-red-800',
+                warning: 'bg-amber-50 border-amber-200 text-amber-900',
+                info: 'bg-blue-50 border-blue-200 text-blue-800'
+            };
+            inner.className = `rounded-lg shadow-lg border px-4 py-3 text-sm ${stylesByType[type] || stylesByType.error}`;
+            inner.textContent = String(message || '');
+            toast.classList.remove('hidden');
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+                toastTimer = null;
+            }
+            toastTimer = setTimeout(() => toast.classList.add('hidden'), timeoutMs);
+        } catch (e) {
+            try { console.error('Toast error:', e); } catch (_) {}
+        }
+    }
+
+    // Transform countries data for ag-grid
+    const countriesData = [
+        {% for country in countries %}
+        {
+            id: {{ country.id }},
+            name: {{ (country.name or '')|tojson|safe }},
+            short_name: {{ (country.short_name or '')|tojson|safe }},
+            iso3: {{ (country.iso3 or '')|tojson|safe }},
+            status: {{ (country.status or '')|tojson|safe }},
+            preferred_language: {{ (country.preferred_language_code or '')|tojson|safe }},
+            currency_code: {{ (country.currency_code or '')|tojson|safe }},
+            {% set _cn = country.name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            name_{{ code }}: {{ ((_cn.get(code) if _cn else '') or '')|tojson|safe }},
+            {% endfor %}
+            edit_url: {{ ('/admin/countries/' ~ country.id ~ '/data')|tojson|safe if can_manage_countries else '""' }},
+            delete_url: {{ (url_for(delete_endpoint_name if delete_endpoint_name is defined else 'system_admin.delete_country', country_id=country.id))|tojson|safe if can_manage_countries else '""' }},
+            delete_confirm: "{{ _('Are you sure you want to delete this country? This action cannot be undone and may fail if the country is in use.') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for countries grid
+    // Column definitions for Countries table
+    // Order: ID, all name columns (name + name_*), other columns, actions (pinned last)
+    const countriesColumnDefs = [
+        {
+            field: 'id',
+            headerName: {{ _("ID") | tojson }},
+            width: 100,
+            minWidth: 80,
+            maxWidth: 120,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        // All name columns grouped together
+        {
+            field: 'name',
+            headerName: {{ _("Country Name") | tojson }},
+            width: 280,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'font-weight': '500', 'color': '#111827' }
+        },
+        {
+            field: 'short_name',
+            headerName: {{ _("Short Name") | tojson }},
+            width: 140,
+            minWidth: 100,
+            maxWidth: 200,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value ? params.value : '<span class="text-gray-400">-</span>';
+            }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'name_{{ code }}',
+            headerName: {{ (_('Country Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // Other columns
+        {
+            field: 'iso3',
+            headerName: {{ _("ISO3 Code") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value ? params.value.toUpperCase() : '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'status',
+            headerName: {{ _("Status") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400">-</span>';
+                const status = params.value.toLowerCase();
+                const statusLabel = String(params.value)
+                    .replace(/_/g, ' ')
+                    .trim()
+                    .replace(/\s+/g, ' ')
+                    .replace(/\b\w/g, function(chr) { return chr.toUpperCase(); });
+                let bgClass, textColor, icon;
+                if (status === 'active') {
+                    bgClass = 'bg-green-100';
+                    textColor = 'text-green-800';
+                    icon = '✓ ';
+                } else if (status === 'inactive' || status === 'dissolved') {
+                    bgClass = 'bg-red-100';
+                    textColor = 'text-red-800';
+                    icon = '✕ ';
+                } else if (status === 'suspended') {
+                    bgClass = 'bg-yellow-100';
+                    textColor = 'text-yellow-800';
+                    icon = '⚠ ';
+                } else {
+                    bgClass = 'bg-gray-100';
+                    textColor = 'text-gray-800';
+                    icon = '';
+                }
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + ' ' + textColor + '">' + icon + statusLabel + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'preferred_language',
+            headerName: {{ _("Preferred Language") | tojson }},
+            width: 220,
+            minWidth: 180,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value || params.value === '-') return '<span class="text-gray-400">-</span>';
+                const languages = params.value.split(',').map(l => l.trim()).filter(l => l);
+                if (languages.length === 0) return '<span class="text-gray-400">-</span>';
+                return languages.map(lang => '<div class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mb-1">' + lang + '</div>').join('');
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word' }
+        },
+        {
+            field: 'currency_code',
+            headerName: {{ _("Currency Code") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value ? params.value.toUpperCase() : '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'actions',
+            headerName: {{ _("Actions") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const countryId = params.data.id;
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || {{ _("Are you sure you want to delete this country?") | tojson }};
+                const editTitle = {{ _("Edit") | tojson }};
+                const deleteTitle = {{ _("Delete") | tojson }};
+                if (!UI_PERMS.canManageCountries) {
+                    return '-';
+                }
+                let html = '<div class="flex items-center justify-center gap-2">';
+                html += '<button type="button" class="edit-country-btn text-blue-600 hover:text-blue-900 transition-colors" data-country-id="' + countryId + '" title="' + editTitle + '"><i class="fas fa-pen fa-fw"></i></button>';
+                if (deleteUrl) {
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm-message="' + deleteConfirm.replace(/'/g, "\\'") + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" class="text-red-600 hover:text-red-900 transition-colors" title="' + deleteTitle + '"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize countries grid
+    function initializeCountriesGrid() {
+        if (!countriesData || countriesData.length === 0) return;
+        if (countriesGridHelper) return; // Already initialized
+
+        // Check if grid already exists in container
+        const container = document.getElementById('countriesGrid');
+        if (!container) return;
+
+        // Check if AG Grid already initialized in this container
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Countries grid already exists in container, skipping initialization');
+            return;
+        }
+
+        // Clear container in case of previous initialization
+        container.innerHTML = '';
+
+        countriesGridHelper = new AgGridHelper({
+            containerId: 'countriesGrid',
+            templateId: 'organization-countries',
+            columnDefs: countriesColumnDefs,
+            rowData: countriesData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = countriesGridHelper.initialize();
+        window.countriesGridHelper = countriesGridHelper;
+        window.countriesGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+                const desiredOrder = ['id', 'name']
+                    .concat(nameColumns)
+                    .concat(['iso3', 'status', 'preferred_language', 'currency_code'])
+                    .concat(['actions']);
+
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for countries:', e);
+        }
+
+        // Re-attach edit button handlers after grid is initialized
+        if (UI_PERMS.canManageCountries) {
+            setTimeout(function() {
+                $(document).off('click', '.edit-country-btn').on('click', '.edit-country-btn', function() {
+                    var countryId = $(this).data('country-id');
+                    var container = $('#countriesComponentRoot');
+                    var errorLoadingData = container.data('error-loading');
+                    var editModal = $('#editCountryModal');
+                    var editForm = $('#editCountryForm');
+
+                    $.get('/admin/countries/' + countryId + '/data')
+                        .done(function(data) {
+                            $('#edit_name').val(data.name);
+                            $('#edit_short_name').val(data.short_name || '');
+                            $('#edit_iso3').val(data.iso3);
+                            $('#edit_status').val(data.status);
+                            $('#edit_preferred_language').val(data.preferred_language);
+                            $('#edit_currency_code').val(data.currency_code);
+                            var trans = (data && data.name_translations) ? data.name_translations : {};
+                            {% for code in TRANSLATABLE_LANGUAGES %}
+                            $('#edit_name_{{ code }}').val(trans['{{ code }}'] || '');
+                            {% endfor %}
+                            editForm.attr('action', '/admin/countries/edit/' + countryId);
+                            editModal.removeClass('hidden');
+                        })
+                        .fail(function() { showToast(errorLoadingData, 'error', 7000); });
+                });
+            }, 100);
+        }
+    }
+
+    // Transform NSs data for ag-grid
+    const nssData = [
+        {% for ns in nss %}
+        {
+            id: {{ ns.id }},
+            name: {{ (ns.name or '')|tojson|safe }},
+            {% set _nt = ns.name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            name_{{ code }}: {{ ((_nt.get(code) if _nt else '') or '')|tojson|safe }},
+            {% endfor %}
+            country_name: {{ (ns.country.name if ns.country else '')|tojson|safe }},
+            is_active: {{ ns.is_active|tojson|safe }},
+            display_order: {{ ns.display_order or 0 }},
+            part_of: {{ (ns.part_of or [])|tojson|safe }},
+            edit_url: "{{ url_for('organization.edit_national_society', ns_id=ns.id) if can_manage_org else '' }}",
+            delete_url: "{{ url_for('organization.delete_national_society', ns_id=ns.id) if can_manage_org else '' }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this National Society?') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // List of available categories (each becomes a column)
+    let availableCategories = [];
+
+    // Load categories list on page load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCategoriesList();
+        });
+    } else {
+        // DOM already loaded, load immediately
+        setTimeout(loadCategoriesList, 100);
+    }
+
+    // Load the list of available categories
+    function loadCategoriesList() {
+        fetch("{{ url_for('organization.api_get_part_of_programs') }}", {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && (data.categories || data.programs)) {
+                availableCategories = data.categories || data.programs;
+                // Rebuild grid columns if grid is already initialized
+                if (window.nssGridApi && nssGridHelper) {
+                    rebuildGridColumns();
+                } else if (!nssGridHelper && nssData && nssData.length > 0) {
+                    // Grid not initialized yet, but data is ready - initialize it
+                    // This will be handled by initializeNssGrid when called
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading categories list:', error);
+        });
+    }
+
+    /**
+     * Re-apply persisted column visibility after dynamic columns are injected.
+     *
+     * The NSs "Category" columns are added after grid init (async). The ColumnVisibilityManager
+     * applies its saved state only once during initialization, so newly-added columns would
+     * otherwise revert to default visibility on reload.
+     */
+    function reapplyNssPersistedColumnState() {
+        try {
+            if (!nssGridHelper || !nssGridHelper.columnVisibilityManager) return;
+
+            const mgr = nssGridHelper.columnVisibilityManager;
+            if (typeof mgr.loadSavedState === 'function') {
+                mgr.loadSavedState();
+            }
+            if (typeof mgr.applyColumnState === 'function') {
+                mgr.applyColumnState();
+            }
+            if (typeof mgr.updatePanel === 'function' && mgr.panelElement && mgr.isPanelVisible) {
+                mgr.updatePanel();
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not re-apply NSs persisted column state:', e);
+        }
+    }
+
+    // Rebuild grid columns with category columns
+    function rebuildGridColumns() {
+        if (!window.nssGridApi || !nssGridHelper) return;
+
+        // Get base column definitions (without part_of and actions columns - we'll add actions at the end)
+        const baseColumns = nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions');
+
+        // Create category columns
+        const categoryColumns = availableCategories.map(category => ({
+            field: `part_of_${category.replace(/[^a-zA-Z0-9]/g, '_')}`,
+            headerName: category,
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            sortable: false,
+            filter: 'customSetFilter',
+            valueGetter: function(params) {
+                const partOf = params.data && params.data.part_of || [];
+                return partOf.includes(category) ? 'Yes' : 'No';
+            },
+            editable: false,
+            cellRenderer: function(params) {
+                const nsId = params.data.id;
+                const currentPartOf = params.data.part_of || [];
+                const isChecked = currentPartOf.includes(category);
+                const checkboxId = `part_of_${nsId}_${category.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+                return `
+                    <div class="flex items-center justify-center p-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox"
+                                   class="part-of-checkbox"
+                                   data-ns-id="${nsId}"
+                                   data-category-name="${category.replace(/"/g, '&quot;')}"
+                                   ${isChecked ? 'checked' : ''}
+                                   id="${checkboxId}">
+                            <span class="text-sm"></span>
+                        </label>
+                    </div>
+                `;
+            },
+            cellStyle: { 'text-align': 'center', 'padding': '4px' }
+        }));
+
+        // Get actions column (only once)
+        const actionsColumn = nssColumnDefs.find(col => col.field === 'actions');
+
+        // Combine: base columns + category columns + actions (only once)
+        const allColumns = baseColumns.concat(categoryColumns);
+        if (actionsColumn) {
+            allColumns.push(actionsColumn);
+        }
+
+        // Update grid with new columns
+        window.nssGridApi.setGridOption('columnDefs', allColumns);
+
+        // Ensure Actions column is pinned right
+        try {
+            if (window.nssGridApi && typeof window.nssGridApi.applyColumnState === 'function') {
+                const state = allColumns.map((col) => ({
+                    colId: col.field,
+                    pinned: col.field === 'actions' ? 'right' : null
+                }));
+                window.nssGridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column state:', e);
+        }
+
+        // Dynamic columns were just injected; re-apply saved visibility (hide/show) now that they exist.
+        // Delay slightly to allow AG Grid to register the new columnDefs.
+        setTimeout(reapplyNssPersistedColumnState, 80);
+    }
+
+    // Column definitions for NSs grid
+    // Column definitions for NSs table
+    // Order: id, all name columns (name + name_*), other columns, actions (pinned last)
+    const nssColumnDefs = [
+        {
+            field: 'id',
+            headerName: {{ _("ID") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 180,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        // All name columns grouped together
+        {
+            field: 'name',
+            headerName: {{ _("National Society Name") | tojson }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'font-weight': '500', 'color': '#111827' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'name_{{ code }}',
+            headerName: {{ (_('NS Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 400,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // Other columns
+        {
+            field: 'country_name',
+            headerName: {{ _("Country") | tojson }},
+            width: 220,
+            minWidth: 180,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'is_active',
+            headerName: {{ _("Status") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                const text = isActive ? {{ _("Active") | tojson }} : {{ _("Inactive") | tojson }};
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'display_order',
+            headerName: {{ _("Display Order") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            hide: true,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || 0;
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'actions',
+            headerName: {{ _("Actions") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || {{ _("Are you sure you want to delete this National Society?") | tojson }};
+                const editTitle = {{ _("Edit") | tojson }};
+                const deleteTitle = {{ _("Delete") | tojson }};
+                if (!UI_PERMS.canManageOrg || (!editUrl && !deleteUrl)) {
+                    return '-';
+                }
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (editUrl) {
+                    html += '<a href="' + editUrl + '" title="' + editTitle + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (deleteUrl) {
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize NSs grid
+    function initializeNssGrid() {
+        if (!nssData || nssData.length === 0) return;
+        if (nssGridHelper) return; // Already initialized
+
+        // Check if grid already exists in container
+        const container = document.getElementById('nssGrid');
+        if (!container) return;
+
+        // Check if AG Grid already initialized in this container
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('NSs grid already exists in container, skipping initialization');
+            return;
+        }
+
+        // Clear container in case of previous initialization
+        container.innerHTML = '';
+
+        // Build complete column definitions including category columns
+        // Filter out 'part_of' (old single column) and 'actions' (we'll add it at the end)
+        const baseColumns = nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions');
+        const categoryColumns = availableCategories.map(category => ({
+            field: `part_of_${category.replace(/[^a-zA-Z0-9]/g, '_')}`,
+            headerName: category,
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            sortable: false,
+            filter: 'customSetFilter',
+            valueGetter: function(params) {
+                const partOf = params.data && params.data.part_of || [];
+                return partOf.includes(category) ? 'Yes' : 'No';
+            },
+            editable: false,
+            cellRenderer: function(params) {
+                const nsId = params.data.id;
+                const currentPartOf = params.data.part_of || [];
+                const isChecked = currentPartOf.includes(category);
+                const checkboxId = `part_of_${nsId}_${category.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+                return `
+                    <div class="flex items-center justify-center p-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox"
+                                   class="part-of-checkbox"
+                                   data-ns-id="${nsId}"
+                                   data-category-name="${category.replace(/"/g, '&quot;')}"
+                                   ${isChecked ? 'checked' : ''}
+                                   id="${checkboxId}">
+                            <span class="text-sm"></span>
+                        </label>
+                    </div>
+                `;
+            },
+            cellStyle: { 'text-align': 'center', 'padding': '4px' }
+        }));
+        // Get actions column (only once)
+        const actionsColumn = nssColumnDefs.find(col => col.field === 'actions');
+        // Combine: base + categories + actions (only once)
+        const allColumnDefs = baseColumns.concat(categoryColumns);
+        if (actionsColumn) {
+            allColumnDefs.push(actionsColumn);
+        }
+
+        nssGridHelper = new AgGridHelper({
+            containerId: 'nssGrid',
+            templateId: 'organization-nss',
+            columnDefs: allColumnDefs,
+            rowData: nssData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = nssGridHelper.initialize();
+        window.nssGridHelper = nssGridHelper;
+        window.nssGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+                const categoryColIds = availableCategories.map(p => `part_of_${p.replace(/[^a-zA-Z0-9]/g, '_')}`);
+                const desiredOrder = ['id', 'name']
+                    .concat(nameColumns)
+                    .concat(['country_name', 'is_active', 'display_order'])
+                    .concat(categoryColIds)
+                    .concat(['actions']);
+
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for NSs:', e);
+        }
+
+        // Set up event delegation for part_of checkboxes
+        setupPartOfCheckboxHandlers();
+
+        // Set up add category button handler
+        setupAddCategoryButton();
+
+        // If categories are already loaded, rebuild columns; otherwise they'll be added when loaded
+        if (availableCategories.length > 0) {
+            rebuildGridColumns();
+        }
+    }
+
+    // Set up add category button and modal
+    function setupAddCategoryButton() {
+        const addBtn = document.getElementById('add-category-btn');
+        const modal = document.getElementById('add-category-modal');
+        const closeBtn = document.getElementById('close-add-category-modal-btn');
+        const cancelBtn = document.getElementById('cancel-add-category-btn');
+        const form = document.getElementById('add-category-form');
+        const input = document.getElementById('category-name-input');
+
+        if (!addBtn || !modal) return;
+
+        // Open modal
+        addBtn.addEventListener('click', function() {
+            modal.classList.remove('hidden');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        });
+
+        // Close modal handlers
+        function closeModal() {
+            modal.classList.add('hidden');
+            if (input) {
+                input.value = '';
+            }
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeModal);
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeModal);
+        }
+
+        // Close on backdrop click
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // Handle form submission
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                if (!input || !input.value || !input.value.trim()) {
+                    var m = {{ _('Please enter a category name') | tojson }};
+                    if (window.showAlert) window.showAlert(m, 'warning');
+                    return;
+                }
+
+                const categoryName = input.value.trim();
+
+                // Check if category already exists
+                if (availableCategories.includes(categoryName)) {
+                    var m = {{ _('This category already exists') | tojson }};
+                    if (window.showAlert) window.showAlert(m, 'warning');
+                    input.focus();
+                    return;
+                }
+
+                // Add the category
+                addCategory(categoryName);
+
+                // Close modal
+                closeModal();
+            });
+        }
+    }
+
+    // Add a new category
+    function addCategory(categoryName) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch("{{ url_for('organization.api_add_part_of_program') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                category_name: categoryName,
+                program_name: categoryName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                availableCategories = data.categories || data.programs;
+                rebuildGridColumns();
+            } else {
+                var m = {{ _('Error adding category:') | tojson }} + ' ' + (data.message || 'Unknown error');
+                if (window.showAlert) window.showAlert(m, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error adding category:', error);
+            var m = {{ _('Error adding category') | tojson }};
+            if (window.showAlert) window.showAlert(m, 'error');
+        });
+    }
+
+    // Set up event handlers for part_of checkboxes
+    function setupPartOfCheckboxHandlers() {
+        // Use event delegation since checkboxes are dynamically created
+        const gridContainer = document.getElementById('nssGrid');
+        if (!gridContainer) return;
+
+        // Remove existing listener if any (using named function for proper removal)
+        gridContainer.removeEventListener('change', handlePartOfCheckboxChange);
+
+        // Add event listener for checkbox changes
+        gridContainer.addEventListener('change', handlePartOfCheckboxChange);
+    }
+
+    // Handle checkbox change for part_of field
+    function handlePartOfCheckboxChange(event) {
+        if (!event.target.classList.contains('part-of-checkbox')) {
+            return;
+        }
+
+        const checkbox = event.target;
+        const nsId = parseInt(checkbox.getAttribute('data-ns-id'));
+        const categoryName = checkbox.getAttribute('data-category-name') || checkbox.getAttribute('data-program-name');
+        const isChecked = checkbox.checked;
+
+        if (!nsId || !categoryName) {
+            console.error('Invalid checkbox data:', { nsId, categoryName });
+            return;
+        }
+
+        // Get current part_of array from grid data
+        let rowNode = null;
+        window.nssGridApi.forEachNode(node => {
+            if (node.data && node.data.id === nsId) {
+                rowNode = node;
+            }
+        });
+
+        if (!rowNode || !rowNode.data) {
+            console.error('Could not find row data for NS ID:', nsId);
+            checkbox.checked = !isChecked; // Revert checkbox
+            return;
+        }
+
+        let currentPartOf = rowNode.data.part_of || [];
+        if (!Array.isArray(currentPartOf)) {
+            currentPartOf = [];
+        }
+
+        // Update the array
+        if (isChecked) {
+            if (!currentPartOf.includes(categoryName)) {
+                currentPartOf.push(categoryName);
+            }
+        } else {
+            currentPartOf = currentPartOf.filter(item => item !== categoryName);
+        }
+
+        // Update the row data
+        rowNode.data.part_of = currentPartOf;
+
+        // Save to server
+        savePartOfField(nsId, currentPartOf, categoryName, isChecked);
+    }
+
+    // Save part_of field to server
+    function savePartOfField(nsId, partOfArray, categoryName, isChecked) {
+        const url = `{{ url_for('organization.api_update_ns_part_of', ns_id=0) }}`.replace('/0/', `/${nsId}/`);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                part_of: partOfArray
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update the grid cell to reflect the change
+                if (window.nssGridApi) {
+                    const categoryField = `part_of_${categoryName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    window.nssGridApi.refreshCells({
+                        columns: [categoryField],
+                        force: true
+                    });
+                }
+            } else {
+                console.error('Error saving part_of field:', data.message);
+                // Revert checkbox state
+                const checkbox = document.querySelector(`.part-of-checkbox[data-ns-id="${nsId}"][data-category-name="${categoryName.replace(/"/g, '&quot;')}"], .part-of-checkbox[data-ns-id="${nsId}"][data-program-name="${categoryName.replace(/"/g, '&quot;')}"]`);
+                if (checkbox) {
+                    checkbox.checked = !isChecked;
+                }
+                // Revert row data
+                let rowNode = null;
+                window.nssGridApi.forEachNode(node => {
+                    if (node.data && node.data.id === nsId) {
+                        rowNode = node;
+                    }
+                });
+                if (rowNode && rowNode.data) {
+                    let currentPartOf = rowNode.data.part_of || [];
+                    if (isChecked) {
+                        currentPartOf = currentPartOf.filter(item => item !== categoryName);
+                    } else {
+                        if (!currentPartOf.includes(categoryName)) {
+                            currentPartOf.push(categoryName);
+                        }
+                    }
+                    rowNode.data.part_of = currentPartOf;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error saving part_of field:', error);
+            // Revert checkbox state on error
+            const checkbox = document.querySelector(`.part-of-checkbox[data-ns-id="${nsId}"][data-category-name="${categoryName.replace(/"/g, '&quot;')}"], .part-of-checkbox[data-ns-id="${nsId}"][data-program-name="${categoryName.replace(/"/g, '&quot;')}"]`);
+            if (checkbox) {
+                checkbox.checked = !isChecked;
+            }
+            // Revert row data
+            let rowNode = null;
+            window.nssGridApi.forEachNode(node => {
+                if (node.data && node.data.id === nsId) {
+                    rowNode = node;
+                }
+            });
+            if (rowNode && rowNode.data) {
+                let currentPartOf = rowNode.data.part_of || [];
+                if (isChecked) {
+                    currentPartOf = currentPartOf.filter(item => item !== categoryName);
+                } else {
+                    if (!currentPartOf.includes(categoryName)) {
+                        currentPartOf.push(categoryName);
+                    }
+                }
+                rowNode.data.part_of = currentPartOf;
+            }
+        });
+    }
+
+    // Transform divisions data for ag-grid
+    const divisionsData = [
+        {% for division in divisions %}
+        {
+            id: {{ division.id }},
+            code: {{ (division.code or '')|tojson|safe }},
+            name: {{ (division.name or '')|tojson|safe }},
+            {% set _dv = division.name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            name_{{ code }}: {{ ((_dv.get(code) if _dv else '') or '')|tojson|safe }},
+            {% endfor %}
+            description: {{ (division.description or '')|tojson|safe }},
+            departments_count: {{ division.departments.count() }},
+            is_active: {{ division.is_active|tojson|safe }},
+            display_order: {{ division.display_order or 0 }},
+            edit_url: "{{ url_for('organization.edit_secretariat_division', division_id=division.id) if can_manage_org else '' }}",
+            delete_url: "{{ url_for('organization.delete_secretariat_division', division_id=division.id) if can_manage_org else '' }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this division? All departments in this division will also be deleted.') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for divisions grid
+    // Order: code, all name columns (name + name_*), other columns, actions (pinned last)
+    const divisionsColumnDefs = [
+        {
+            field: 'code',
+            headerName: {{ _("Code") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        // All name columns grouped together
+        {
+            field: 'name',
+            headerName: {{ _("Division Name") | tojson }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'name_{{ code }}',
+            headerName: {{ (_('Division Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // Other columns
+        {
+            field: 'description',
+            headerName: '{{ _("Description") }}',
+            width: 300,
+            minWidth: 250,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400">-</span>';
+                const desc = params.value;
+                const truncated = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+                return '<span title="' + (desc || '').replace(/"/g, '&quot;') + '">' + truncated.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'departments_count',
+            headerName: {{ _("Departments") | tojson }},
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const count = params.value || 0;
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">' + count + '</span>';
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'is_active',
+            headerName: '{{ _("Status") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                const text = isActive ? {{ _("Active") | tojson }} : {{ _("Inactive") | tojson }};
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            }
+        },
+        {
+            field: 'display_order',
+            headerName: {{ _("Display Order") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || 0;
+            }
+        },
+        {
+            field: 'actions',
+            headerName: {{ _("Actions") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || {{ _("Are you sure you want to delete this division?") | tojson }};
+                const editTitle = {{ _("Edit") | tojson }};
+                const deleteTitle = {{ _("Delete") | tojson }};
+                if (!UI_PERMS.canManageOrg || (!editUrl && !deleteUrl)) {
+                    return '-';
+                }
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (editUrl) {
+                    html += '<a href="' + editUrl + '" title="' + editTitle + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (deleteUrl) {
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Transform departments data for ag-grid
+    const departmentsData = [
+        {% for department in departments %}
+        {
+            id: {{ department.id }},
+            code: {{ (department.code or '')|tojson|safe }},
+            name: {{ (department.name or '')|tojson|safe }},
+            {% set _dp = department.name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            name_{{ code }}: {{ ((_dp.get(code) if _dp else '') or '')|tojson|safe }},
+            {% endfor %}
+            division_id: {{ department.division.id if department.division else 'null' }},
+            division_name: {{ (department.division.name if department.division else '')|tojson|safe }},
+            description: {{ (department.description or '')|tojson|safe }},
+            is_active: {{ department.is_active|tojson|safe }},
+            display_order: {{ department.display_order or 0 }},
+            edit_url: "{{ url_for('organization.edit_secretariat_department', department_id=department.id) if can_manage_org else '' }}",
+            delete_url: "{{ url_for('organization.delete_secretariat_department', department_id=department.id) if can_manage_org else '' }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this department?') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for departments grid
+    // Order: division_id (hidden), code, all name columns (name + name_*), other columns, actions (pinned last)
+    const departmentsColumnDefs = [
+        {
+            field: 'division_id',
+            headerName: {{ _("Division ID") | tojson }},
+            hide: true,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            wrapText: false,
+            autoHeight: false,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'code',
+            headerName: {{ _("Code") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        // All name columns grouped together
+        {
+            field: 'name',
+            headerName: {{ _("Department Name") | tojson }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'name_{{ code }}',
+            headerName: {{ (_('Department Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // Other columns
+        {
+            field: 'division_name',
+            headerName: {{ _("Division") | tojson }},
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'description',
+            headerName: '{{ _("Description") }}',
+            width: 300,
+            minWidth: 250,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400">-</span>';
+                const desc = params.value;
+                const truncated = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+                return '<span title="' + (desc || '').replace(/"/g, '&quot;') + '">' + truncated.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'is_active',
+            headerName: '{{ _("Status") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                const text = isActive ? {{ _("Active") | tojson }} : {{ _("Inactive") | tojson }};
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            }
+        },
+        {
+            field: 'display_order',
+            headerName: {{ _("Display Order") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || 0;
+            }
+        },
+        {
+            field: 'actions',
+            headerName: {{ _("Actions") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || {{ _("Are you sure you want to delete this department?") | tojson }};
+                const editTitle = {{ _("Edit") | tojson }};
+                const deleteTitle = {{ _("Delete") | tojson }};
+                if (!UI_PERMS.canManageOrg || (!editUrl && !deleteUrl)) {
+                    return '-';
+                }
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (editUrl) {
+                    html += '<a href="' + editUrl + '" title="' + editTitle + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (deleteUrl) {
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Transform regions data for ag-grid
+    const regionsData = [
+        {% for region in regions %}
+        {
+            id: {{ region.id }},
+            code: {{ (region.code or '')|tojson|safe }},
+            name: {{ (region.name or '')|tojson|safe }},
+            {% set _rg = region.name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            name_{{ code }}: {{ ((_rg.get(code) if _rg else '') or '')|tojson|safe }},
+            {% endfor %}
+            description: {{ (region.description or '')|tojson|safe }},
+            is_active: {{ region.is_active|tojson|safe }},
+            display_order: {{ region.display_order or 0 }},
+            edit_url: "{{ url_for('organization.edit_secretariat_regional_office', region_id=region.id) if can_manage_org else '' }}",
+            delete_url: "{{ url_for('organization.delete_secretariat_regional_office', region_id=region.id) if can_manage_org else '' }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this regional office? All cluster offices under it will also be deleted.') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for regions grid
+    // Order: code, all name columns (name + name_*), other columns, actions (pinned last)
+    const regionsColumnDefs = [
+        {
+            field: 'code',
+            headerName: {{ _("Code") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        // All name columns grouped together
+        {
+            field: 'name',
+            headerName: {{ _("Regional Office Name") | tojson }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'name_{{ code }}',
+            headerName: {{ (_('Regional Office Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // Other columns
+        {
+            field: 'description',
+            headerName: '{{ _("Description") }}',
+            width: 300,
+            minWidth: 250,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400">-</span>';
+                const desc = params.value;
+                const truncated = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+                return '<span title="' + (desc || '').replace(/"/g, '&quot;') + '">' + truncated.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'is_active',
+            headerName: '{{ _("Status") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                const text = isActive ? {{ _("Active") | tojson }} : {{ _("Inactive") | tojson }};
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            }
+        },
+        {
+            field: 'display_order',
+            headerName: {{ _("Display Order") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || 0;
+            }
+        },
+        {
+            field: 'actions',
+            headerName: {{ _("Actions") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || {{ _("Are you sure you want to delete this regional office?") | tojson }};
+                const editTitle = {{ _("Edit") | tojson }};
+                const deleteTitle = {{ _("Delete") | tojson }};
+                if (!UI_PERMS.canManageOrg || (!editUrl && !deleteUrl)) {
+                    return '-';
+                }
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (editUrl) {
+                    html += '<a href="' + editUrl + '" title="' + editTitle + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (deleteUrl) {
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Transform clusters data for ag-grid
+    const clustersData = [
+        {% for cluster in clusters %}
+        {
+            id: {{ cluster.id }},
+            code: {{ (cluster.code or '')|tojson|safe }},
+            name: {{ (cluster.name or '')|tojson|safe }},
+            {% set _cl = cluster.name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            name_{{ code }}: {{ ((_cl.get(code) if _cl else '') or '')|tojson|safe }},
+            {% endfor %}
+            regional_office_id: {{ cluster.regional_office.id if cluster.regional_office else 'null' }},
+            regional_office_name: {{ (cluster.regional_office.name if cluster.regional_office else '')|tojson|safe }},
+            description: {{ (cluster.description or '')|tojson|safe }},
+            is_active: {{ cluster.is_active|tojson|safe }},
+            display_order: {{ cluster.display_order or 0 }},
+            edit_url: "{{ url_for('organization.edit_secretariat_cluster_office', cluster_id=cluster.id) if can_manage_org else '' }}",
+            delete_url: "{{ url_for('organization.delete_secretariat_cluster_office', cluster_id=cluster.id) if can_manage_org else '' }}",
+            delete_confirm: "{{ _('Are you sure you want to delete this cluster office?') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Column definitions for clusters grid
+    // Order: code, all name columns (name + name_*), other columns, actions (pinned last)
+    const clustersColumnDefs = [
+        {
+            field: 'code',
+            headerName: {{ _("Code") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        // All name columns grouped together
+        {
+            field: 'name',
+            headerName: {{ _("Cluster Office Name") | tojson }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'name_{{ code }}',
+            headerName: {{ (_('Cluster Office Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 250,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        // Other columns
+        {
+            field: 'regional_office_name',
+            headerName: {{ _("Regional Office") | tojson }},
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'description',
+            headerName: '{{ _("Description") }}',
+            width: 300,
+            minWidth: 250,
+            maxWidth: 400,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '<span class="text-gray-400">-</span>';
+                const desc = params.value;
+                const truncated = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+                return '<span title="' + (desc || '').replace(/"/g, '&quot;') + '">' + truncated.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'is_active',
+            headerName: '{{ _("Status") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                const text = isActive ? {{ _("Active") | tojson }} : {{ _("Inactive") | tojson }};
+                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+            }
+        },
+        {
+            field: 'display_order',
+            headerName: {{ _("Display Order") | tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || 0;
+            }
+        },
+        {
+            field: 'actions',
+            headerName: {{ _("Actions") | tojson }},
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            pinned: 'right',
+            lockPinned: true,
+            suppressMovable: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const editUrl = params.data.edit_url || '';
+                const deleteUrl = params.data.delete_url || '';
+                const deleteConfirm = params.data.delete_confirm || {{ _("Are you sure you want to delete this cluster office?") | tojson }};
+                const editTitle = {{ _("Edit") | tojson }};
+                const deleteTitle = {{ _("Delete") | tojson }};
+                if (!UI_PERMS.canManageOrg || (!editUrl && !deleteUrl)) {
+                    return '-';
+                }
+                let html = '<div class="flex items-center justify-center gap-2">';
+                if (editUrl) {
+                    html += '<a href="' + editUrl + '" title="' + editTitle + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>';
+                }
+                if (deleteUrl) {
+                    html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
+                    html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '</form>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize divisions grid
+    function initializeDivisionsGrid() {
+        if (divisionsData.length === 0) return;
+        if (divisionsGridHelper) return; // Already initialized
+
+        // Check if grid already exists in container
+        const container = document.getElementById('divisionsGrid');
+        if (!container) return;
+
+        // Check if AG Grid already initialized in this container
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Divisions grid already exists in container, skipping initialization');
+            return;
+        }
+
+        // Clear container in case of previous initialization
+        container.innerHTML = '';
+
+        divisionsGridHelper = new AgGridHelper({
+            containerId: 'divisionsGrid',
+            templateId: 'organization-divisions',
+            columnDefs: divisionsColumnDefs,
+            rowData: divisionsData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = divisionsGridHelper.initialize();
+        window.divisionsGridHelper = divisionsGridHelper;
+        window.divisionsGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+                const desiredOrder = ['code', 'name']
+                    .concat(nameColumns)
+                    .concat(['description', 'departments_count', 'is_active', 'display_order'])
+                    .concat(['actions']);
+
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for divisions:', e);
+        }
+    }
+
+    // Initialize departments grid
+    function initializeDepartmentsGrid() {
+        if (departmentsData.length === 0) return;
+        if (departmentsGridHelper) return; // Already initialized
+
+        // Check if grid already exists in container
+        const container = document.getElementById('departmentsGrid');
+        if (!container) return;
+
+        // Check if AG Grid already initialized in this container
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Departments grid already exists in container, skipping initialization');
+            return;
+        }
+
+        // Clear container in case of previous initialization
+        container.innerHTML = '';
+
+        departmentsGridHelper = new AgGridHelper({
+            containerId: 'departmentsGrid',
+            templateId: 'organization-departments',
+            columnDefs: departmentsColumnDefs,
+            rowData: departmentsData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = departmentsGridHelper.initialize();
+        window.departmentsGridHelper = departmentsGridHelper;
+        window.departmentsGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+                const desiredOrder = ['division_id', 'code', 'name']
+                    .concat(nameColumns)
+                    .concat(['division_name', 'description', 'is_active', 'display_order'])
+                    .concat(['actions']);
+
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for departments:', e);
+        }
+    }
+
+    // Initialize regions grid
+    function initializeRegionsGrid() {
+        if (regionsData.length === 0) return;
+        if (regionsGridHelper) return; // Already initialized
+
+        // Check if grid already exists in container
+        const container = document.getElementById('regionsGrid');
+        if (!container) return;
+
+        // Check if AG Grid already initialized in this container
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Regions grid already exists in container, skipping initialization');
+            return;
+        }
+
+        // Clear container in case of previous initialization
+        container.innerHTML = '';
+
+        regionsGridHelper = new AgGridHelper({
+            containerId: 'regionsGrid',
+            templateId: 'organization-regions',
+            columnDefs: regionsColumnDefs,
+            rowData: regionsData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = regionsGridHelper.initialize();
+        window.regionsGridHelper = regionsGridHelper;
+        window.regionsGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+                const desiredOrder = ['code', 'name']
+                    .concat(nameColumns)
+                    .concat(['description', 'is_active', 'display_order'])
+                    .concat(['actions']);
+
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for regions:', e);
+        }
+    }
+
+    // Initialize clusters grid
+    function initializeClustersGrid() {
+        if (clustersData.length === 0) return;
+        if (clustersGridHelper) return; // Already initialized
+
+        // Check if grid already exists in container
+        const container = document.getElementById('clustersGrid');
+        if (!container) return;
+
+        // Check if AG Grid already initialized in this container
+        if (container.querySelector('.ag-root-wrapper') || container.querySelector('[role="grid"]')) {
+            window.__clientWarn && window.__clientWarn('Clusters grid already exists in container, skipping initialization');
+            return;
+        }
+
+        // Clear container in case of previous initialization
+        container.innerHTML = '';
+
+        clustersGridHelper = new AgGridHelper({
+            containerId: 'clustersGrid',
+            templateId: 'organization-clusters',
+            columnDefs: clustersColumnDefs,
+            rowData: clustersData,
+            columnVisibilityOptions: {
+                enableExport: false,
+                enableReset: true
+            }
+        });
+
+        const gridApi = clustersGridHelper.initialize();
+        window.clustersGridHelper = clustersGridHelper;
+        window.clustersGridApi = gridApi;
+
+        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
+        try {
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+                const desiredOrder = ['code', 'name']
+                    .concat(nameColumns)
+                    .concat(['regional_office_name', 'description', 'is_active', 'display_order'])
+                    .concat(['actions']);
+
+                const state = desiredOrder.map((colId) => ({
+                    colId,
+                    pinned: colId === 'actions' ? 'right' : null
+                }));
+
+                gridApi.applyColumnState({
+                    state,
+                    defaultState: { pinned: null },
+                    applyOrder: true
+                });
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not apply column order for clusters:', e);
+        }
+    }
+
+        // Tab switching functionality
+        function switchTab(tabName) {
+            window.__clientLog && window.__clientLog('[DEBUG] switchTab called with tabName:', tabName);
+            // Update URL with tab parameter without page reload
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabName);
+            window.history.pushState({}, '', url);
+
+            // Hide all tab panels
+            const allPanels = document.querySelectorAll('.tab-panel');
+            window.__clientLog && window.__clientLog('[DEBUG] Found', allPanels.length, 'tab panels');
+            allPanels.forEach(panel => {
+                window.__clientLog && window.__clientLog('[DEBUG] Hiding panel:', panel.id, 'has hidden class:', panel.classList.contains('hidden'));
+                panel.classList.add('hidden');
+            });
+
+            // Remove active styling from all tab buttons
+            const AU = window.AdminUnderlineTabs;
+            document.querySelectorAll('[id$="-tab-btn"]').forEach(btn => {
+                if (AU) AU.setOrgMainTabButton(btn, false);
+            });
+
+            // Show selected tab panel
+            const selectedPanel = document.getElementById(tabName + '-tab-panel');
+            window.__clientLog && window.__clientLog('[DEBUG] Selected panel:', selectedPanel ? selectedPanel.id : 'NOT FOUND');
+            if (selectedPanel) {
+                selectedPanel.classList.remove('hidden');
+                window.__clientLog && window.__clientLog('[DEBUG] Removed hidden class from panel. Has hidden:', selectedPanel.classList.contains('hidden'));
+                window.__clientLog && window.__clientLog('[DEBUG] Panel computed display:', window.getComputedStyle(selectedPanel).display);
+
+                // Initialize grid when tab becomes visible
+                setTimeout(function() {
+                    if (tabName === 'countries' && typeof initializeCountriesGrid === 'function' && !countriesGridHelper) {
+                        initializeCountriesGrid();
+                    } else if (tabName === 'nss' && typeof initializeNssGrid === 'function' && !nssGridHelper) {
+                        initializeNssGrid();
+                    }
+                }, 100);
+
+                // Check for table containers in the panel
+                setTimeout(function() {
+                    const tableContainers = selectedPanel.querySelectorAll('[id$="-table-container"]');
+                    window.__clientLog && window.__clientLog('[DEBUG] Found', tableContainers.length, 'table containers in panel');
+                    tableContainers.forEach(function(container) {
+                        const display = window.getComputedStyle(container).display;
+                        const hasInlineStyle = container.style.display;
+                        window.__clientLog && window.__clientLog('[DEBUG] Table container:', container.id, 'display:', display, 'inline style:', hasInlineStyle);
+                    });
+                }, 100);
+            } else {
+                window.__clientWarn && window.__clientWarn('[DEBUG] Panel not found for tab:', tabName);
+            }
+
+            // Add active styling to selected tab button
+            const selectedBtn = document.getElementById(tabName + '-tab-btn');
+            if (selectedBtn && AU) {
+                AU.setOrgMainTabButton(selectedBtn, true);
+            }
+
+            // Initialize sub-tabs if needed
+            if (tabName === 'secretariat') {
+                // Determine initial sub-tab from server-provided value or default
+                const initialSecretariatTab = '{{ secretariat_tab }}' || 'divisions';
+                window.__clientLog && window.__clientLog('[DEBUG] Initializing secretariat sub-tab:', initialSecretariatTab);
+                // Use requestAnimationFrame to ensure DOM is ready
+                requestAnimationFrame(function() {
+                    window.__clientLog && window.__clientLog('[DEBUG] Calling secretariatSwitchTab for:', initialSecretariatTab);
+                    secretariatSwitchTab(initialSecretariatTab);
+                    // Initialize grid when tab becomes visible (only if not already initialized)
+                    if (initialSecretariatTab === 'divisions' && typeof initializeDivisionsGrid === 'function' && !divisionsGridHelper) {
+                        setTimeout(initializeDivisionsGrid, 100);
+                    } else if (initialSecretariatTab === 'departments' && typeof initializeDepartmentsGrid === 'function' && !departmentsGridHelper) {
+                        setTimeout(initializeDepartmentsGrid, 100);
+                    } else if (initialSecretariatTab === 'regions' && typeof initializeRegionsGrid === 'function' && !regionsGridHelper) {
+                        setTimeout(initializeRegionsGrid, 100);
+                    } else if (initialSecretariatTab === 'clusters' && typeof initializeClustersGrid === 'function' && !clustersGridHelper) {
+                        setTimeout(initializeClustersGrid, 100);
+                    }
+                });
+            } else if (tabName === 'ns-structure') {
+                // Initialize NS Structure sub-tabs
+                window.__clientLog && window.__clientLog('[DEBUG] Initializing NS Structure sub-tab: branches');
+                // Use requestAnimationFrame to ensure DOM is ready
+                requestAnimationFrame(function() {
+                    window.__clientLog && window.__clientLog('[DEBUG] Calling nsSwitchTab for: branches');
+                    if (typeof window.nsSwitchTab === 'function') {
+                        window.nsSwitchTab('branches');
+                        // Initialize branches grid when tab becomes visible (only if not already initialized)
+                        if (typeof initializeBranchesGrid === 'function' && !window.branchesGridHelper) {
+                            setTimeout(function() {
+                                if (typeof initializeBranchesGrid === 'function') {
+                                    initializeBranchesGrid();
+                                }
+                            }, 100);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Secretariat sub-tab switching within Secretariat panel
+        function secretariatSwitchTab(tabName) {
+            window.__clientLog && window.__clientLog('[DEBUG] secretariatSwitchTab called with tabName:', tabName);
+            // Check if secretariat panel is visible
+            const secretariatPanel = document.getElementById('secretariat-tab-panel');
+            if (secretariatPanel) {
+                const panelDisplay = window.getComputedStyle(secretariatPanel).display;
+                const hasHidden = secretariatPanel.classList.contains('hidden');
+                window.__clientLog && window.__clientLog('[DEBUG] Secretariat panel state - display:', panelDisplay, 'has hidden class:', hasHidden);
+            } else {
+                window.__clientWarn && window.__clientWarn('[DEBUG] Secretariat panel not found!');
+            }
+            // Hide all Secretariat tab contents
+            const allSubTabs = document.querySelectorAll('#secretariat-tab-panel .tab-content');
+            window.__clientLog && window.__clientLog('[DEBUG] Found', allSubTabs.length, 'sub-tabs in secretariat panel');
+            allSubTabs.forEach((el, index) => {
+                window.__clientLog && window.__clientLog('[DEBUG] Sub-tab', index, '- id:', el.id, 'display:', window.getComputedStyle(el).display, 'has inline style:', el.style.display);
+                if (el.id === 'divisions' || el.id === 'departments' || el.id === 'regions' || el.id === 'clusters') {
+                    window.__clientLog && window.__clientLog('[DEBUG] Hiding sub-tab:', el.id, 'current display:', window.getComputedStyle(el).display);
+                    el.style.display = 'none';
+                    window.__clientLog && window.__clientLog('[DEBUG] After hiding, display:', window.getComputedStyle(el).display);
+                }
+            });
+            // Reset tab button styles
+            const AU = window.AdminUnderlineTabs;
+            document.querySelectorAll('#secretariat-tab-panel .tab-button').forEach(btn => {
+                if (AU) AU.setSubTabButton(btn, false);
+            });
+            // Show selected content
+            const panel = document.querySelector('#' + tabName);
+            window.__clientLog && window.__clientLog('[DEBUG] Selected sub-tab panel:', panel ? panel.id : 'NOT FOUND');
+            if (panel) {
+                panel.style.display = '';
+                window.__clientLog && window.__clientLog('[DEBUG] Set display to empty string. Computed display:', window.getComputedStyle(panel).display);
+
+                // Initialize grid when tab becomes visible
+                setTimeout(function() {
+                    if (tabName === 'divisions' && typeof initializeDivisionsGrid === 'function' && !divisionsGridHelper) {
+                        initializeDivisionsGrid();
+                    } else if (tabName === 'departments' && typeof initializeDepartmentsGrid === 'function' && !departmentsGridHelper) {
+                        initializeDepartmentsGrid();
+                    } else if (tabName === 'regions' && typeof initializeRegionsGrid === 'function' && !regionsGridHelper) {
+                        initializeRegionsGrid();
+                    } else if (tabName === 'clusters' && typeof initializeClustersGrid === 'function' && !clustersGridHelper) {
+                        initializeClustersGrid();
+                    }
+                }, 100);
+
+                // Check if table container exists and is visible
+                const tableContainer = panel.querySelector('[id$="-table-container"]');
+                if (tableContainer) {
+                    window.__clientLog && window.__clientLog('[DEBUG] Table container found:', tableContainer.id, 'display:', window.getComputedStyle(tableContainer).display);
+                } else {
+                    window.__clientWarn && window.__clientWarn('[DEBUG] No table container found in panel:', tabName);
+                }
+                const grid = panel.querySelector('[id$="Grid"]');
+                if (grid) {
+                    window.__clientLog && window.__clientLog('[DEBUG] Grid found:', grid.id, 'display:', window.getComputedStyle(grid).display);
+                } else {
+                    window.__clientWarn && window.__clientWarn('[DEBUG] No grid found in panel:', tabName);
+                }
+            } else {
+                window.__clientWarn && window.__clientWarn('[DEBUG] Panel not found for sub-tab:', tabName);
+            }
+            const btn = document.querySelector('#' + tabName + '-tab');
+            if (btn && AU) {
+                AU.setSubTabButton(btn, true);
+                window.__clientLog && window.__clientLog('[DEBUG] Updated button styles for:', tabName + '-tab');
+            } else {
+                window.__clientWarn && window.__clientWarn('[DEBUG] Button not found for:', tabName + '-tab');
+            }
+
+            // Show/hide division filter based on active tab
+            const divisionFilter = document.getElementById('divisionFilter');
+            if (divisionFilter) {
+                const filterContainer = divisionFilter.closest('.ml-auto');
+                if (filterContainer) {
+                    if (tabName === 'departments') {
+                        filterContainer.style.display = '';
+                        window.__clientLog && window.__clientLog('[DEBUG] Showing division filter');
+                    } else {
+                        filterContainer.style.display = 'none';
+                        window.__clientLog && window.__clientLog('[DEBUG] Hiding division filter');
+                    }
+                }
+            }
+        }
+
+        // Bind Secretariat sub-tab buttons (CSP-safe: no inline onclick)
+        document.addEventListener('DOMContentLoaded', function() {
+            const ids = ['divisions', 'departments', 'regions', 'clusters'];
+            ids.forEach(function(tab) {
+                const btn = document.getElementById(tab + '-tab');
+                if (!btn) return;
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const t = btn.getAttribute('data-tab') || tab;
+                    secretariatSwitchTab(t);
+                });
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            window.__clientLog && window.__clientLog('[DEBUG] DOMContentLoaded - initializing tab functionality');
+            // Add click handlers to tab buttons
+            const tabButtons = document.querySelectorAll('[id$="-tab-btn"]');
+            window.__clientLog && window.__clientLog('[DEBUG] Found', tabButtons.length, 'tab buttons');
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tabName = this.dataset.tab;
+                    window.__clientLog && window.__clientLog('[DEBUG] Tab button clicked:', tabName);
+                    switchTab(tabName);
+                });
+            });
+
+            const activeTab = '{{ active_tab }}';
+            window.__clientLog && window.__clientLog('[DEBUG] Initial active tab:', activeTab || 'countries (default)');
+            // Ensure initial tab is shown
+            switchTab(activeTab || 'countries');
+
+            // Initialize countries grid if countries tab is active
+            if ((activeTab || 'countries') === 'countries') {
+                setTimeout(function() {
+                    if (typeof initializeCountriesGrid === 'function') {
+                        initializeCountriesGrid();
+                    }
+                }, 200);
+            }
+
+            // Initialize NSs grid if nss tab is active
+            if (activeTab === 'nss') {
+                setTimeout(function() {
+                    if (typeof initializeNssGrid === 'function') {
+                        initializeNssGrid();
+                    }
+                }, 200);
+            }
+
+            // Initialize grids if secretariat tab is active (only if not already initialized)
+            if (activeTab === 'secretariat') {
+                const secretariatTab = '{{ secretariat_tab }}' || 'divisions';
+                setTimeout(function() {
+                    if (secretariatTab === 'divisions' && typeof initializeDivisionsGrid === 'function' && !divisionsGridHelper) {
+                        initializeDivisionsGrid();
+                    } else if (secretariatTab === 'departments' && typeof initializeDepartmentsGrid === 'function' && !departmentsGridHelper) {
+                        initializeDepartmentsGrid();
+                    } else if (secretariatTab === 'regions' && typeof initializeRegionsGrid === 'function' && !regionsGridHelper) {
+                        initializeRegionsGrid();
+                    } else if (secretariatTab === 'clusters' && typeof initializeClustersGrid === 'function' && !clustersGridHelper) {
+                        initializeClustersGrid();
+                    }
+                }, 200);
+            }
+
+            // Initialize grids if ns-structure tab is active (only if not already initialized)
+            if (activeTab === 'ns-structure') {
+                setTimeout(function() {
+                    if (typeof window.nsSwitchTab === 'function') {
+                        window.nsSwitchTab('branches');
+                        if (typeof initializeBranchesGrid === 'function' && !window.branchesGridHelper) {
+                            setTimeout(function() {
+                                if (typeof initializeBranchesGrid === 'function') {
+                                    initializeBranchesGrid();
+                                }
+                            }, 100);
+                        }
+                    }
+                }, 200);
+            }
+
+            // Bind division filter for departments grid (only needs to be done once)
+            const divisionFilter = document.getElementById('divisionFilter');
+            if (divisionFilter && !divisionFilter.dataset.listenerAttached) {
+                divisionFilter.addEventListener('change', function() {
+                    const selected = this.value;
+                    if (departmentsGridHelper && departmentsGridHelper.gridApi) {
+                        // Apply filter to AG Grid using division_id field
+                        if (selected) {
+                            const divisionId = parseInt(selected);
+                            departmentsGridHelper.gridApi.setFilterModel({
+                                division_id: {
+                                    type: 'equals',
+                                    filter: divisionId
+                                }
+                            });
+                        } else {
+                            // Clear filter
+                            const currentFilter = departmentsGridHelper.gridApi.getFilterModel() || {};
+                            delete currentFilter.division_id;
+                            if (Object.keys(currentFilter).length === 0) {
+                                departmentsGridHelper.gridApi.setFilterModel(null);
+                            } else {
+                                departmentsGridHelper.gridApi.setFilterModel(currentFilter);
+                            }
+                        }
+                    }
+                });
+                divisionFilter.dataset.listenerAttached = '1';
+            }
+        });
+
+        // Auto-translate functionality for organization entities
+        let currentEntityType = null; // Track which entity type tab is active
+        let pendingCountsRequest = null; // Track pending API request to cancel if needed
+
+        // Function to get translation counts for the modal
+        window.getPageSpecificTranslationCounts = function() {
+            const counts = {};
+            {% if TRANSLATABLE_LANGUAGES %}
+            {% for lang_code in TRANSLATABLE_LANGUAGES %}
+            counts[{{ lang_code | tojson }}] = 0;
+            {% endfor %}
+            {% endif %}
+
+            if (!currentEntityType) {
+                return counts;
+            }
+
+            // Cancel any pending request
+            if (pendingCountsRequest) {
+                // Note: fetch doesn't support cancellation directly, but we'll track the entity type
+                pendingCountsRequest = null;
+            }
+
+            // Make API call asynchronously to avoid permissions policy violations
+            // Return initial counts immediately, then update when API responds
+            try {
+                const apiUrl = {{ url_for("organization.api_get_translation_counts") | tojson }};
+                if (!apiUrl || apiUrl === null || apiUrl === 'null') {
+                    console.error('API URL not found');
+                    return counts;
+                }
+                const csrfToken = document.querySelector('meta[name="csrf-token"]');
+                if (!csrfToken) {
+                    console.error('CSRF token not found');
+                    return counts;
+                }
+
+                // Store the entity type for this request to ensure we only update if it matches
+                const requestEntityType = currentEntityType;
+
+                // Fetch counts asynchronously and update modal when ready
+                const fetchPromise = fetch(apiUrl + '?entity_type=' + encodeURIComponent(requestEntityType), {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken.getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    window.__clientLog && window.__clientLog('Translation counts API response:', data);
+                    // Only update if this request is still for the current entity type
+                    if (requestEntityType === currentEntityType && data.success && data.counts) {
+                        const updatedCounts = {};
+                        Object.keys(data.counts).forEach(lang => {
+                            if (counts.hasOwnProperty(lang)) {
+                                updatedCounts[lang] = data.counts[lang] || 0;
+                            } else {
+                                updatedCounts[lang] = data.counts[lang] || 0;
+                            }
+                        });
+                        window.__clientLog && window.__clientLog('Updated counts for modal:', updatedCounts);
+                        // Update modal if it's already open and entity type matches
+                        if (window.autoTranslateModal && window.autoTranslateModal.updateLanguageCounts) {
+                            window.autoTranslateModal.updateLanguageCounts(updatedCounts);
+                        }
+                    } else {
+                        window.__clientWarn && window.__clientWarn('Counts update skipped:', { requestEntityType, currentEntityType, success: data.success, hasCounts: !!data.counts });
+                    }
+                    pendingCountsRequest = null;
+                })
+                .catch(error => {
+                    console.error('Error calculating translation counts:', error);
+                    pendingCountsRequest = null;
+                });
+
+                pendingCountsRequest = fetchPromise;
+            } catch (error) {
+                console.error('Error calculating translation counts:', error);
+                pendingCountsRequest = null;
+            }
+
+            return counts;
+        };
+
+        // Store current translation request state for pause/resume
+        const bulkTranslationWebSocketEnabled = {{ 'true' if websocket_enabled else 'false' }};
+        let currentTranslationReader = null;
+        let currentTranslationAbortController = null;
+        let currentTranslationParams = null;
+        let itemsProcessedBeforePause = 0; // Track items processed before pause for resume
+        let successCountBeforePause = 0; // Track success count before pause
+        let errorCountBeforePause = 0; // Track error count before pause
+        let originalTotalItems = 0; // Store original total to maintain correct progress calculation
+
+        // Override the generic translation function with organization-specific logic
+        window.performPageSpecificTranslation = function(selectedLanguages, selectedService) {
+            if (!bulkTranslationWebSocketEnabled) {
+                const streamingDisabledMsg = {{ _("Live translation streaming is disabled in this environment. Please enable WebSocket to use this feature.") | tojson }};
+                if (window.autoTranslateModal && window.autoTranslateModal.logProgress) {
+                    window.autoTranslateModal.logProgress(streamingDisabledMsg, 'error');
+                    window.autoTranslateModal.translationState.isRunning = false;
+                    window.autoTranslateModal.translationState.isPaused = false;
+                    jQuery('#auto-translate-stop-btn').addClass('hidden');
+                    jQuery('#auto-translate-close-btn').removeClass('hidden');
+                } else {
+                    showToast(streamingDisabledMsg, 'error', 8000);
+                }
+                return;
+            }
+
+            // Ensure modal is initialized
+            if (!window.autoTranslateModal) {
+                console.error('Auto-translate modal not initialized');
+                return;
+            }
+
+            // Pre-define all translated strings to avoid syntax errors
+            const noEntityTypeSelectedMsg = {{ _("No entity type selected") | tojson }};
+            const translatedLabel = {{ _("Translated") | tojson }};
+            const entityLabel = {{ _("entity") | tojson }};
+            const toLabel = {{ _("to") | tojson }};
+            const failedLabel = {{ _("Failed to translate") | tojson }};
+            const unknownErrorLabel = {{ _("Unknown error") | tojson }};
+            const completedLabel = {{ _("Translation completed!") | tojson }};
+            const failedMessageLabel = {{ _("Translation failed") | tojson }};
+            const errorLabel = {{ _("Error during translation") | tojson }};
+            const apiUrl = {{ url_for("organization.api_auto_translate_organizations") | tojson }};
+
+            if (!currentEntityType) {
+                if (window.autoTranslateModal && window.autoTranslateModal.logProgress) {
+                    window.autoTranslateModal.logProgress(noEntityTypeSelectedMsg, 'error');
+                }
+                if (window.autoTranslateModal && window.autoTranslateModal.translationState) {
+                    window.autoTranslateModal.translationState.isRunning = false;
+                }
+                return;
+            }
+
+            // Store parameters for resume
+            currentTranslationParams = {
+                selectedLanguages: selectedLanguages,
+                selectedService: selectedService
+            };
+
+            // Create abort controller for this request
+            currentTranslationAbortController = new AbortController();
+            const signal = currentTranslationAbortController.signal;
+
+            // Use HTTP streaming for real-time progress updates
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'text/event-stream'
+                },
+                body: JSON.stringify({
+                    entity_type: currentEntityType,
+                    target_languages: selectedLanguages,
+                    translation_service: selectedService
+                }),
+                signal: signal  // Allow cancellation
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                currentTranslationReader = reader; // Store for pause/resume
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function readStream() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            // Stream ended - if we're still running and haven't received a complete message,
+                            // mark as complete (handles edge cases where stream ends unexpectedly)
+                            if (window.autoTranslateModal.translationState.isRunning && !window.autoTranslateModal.translationState.isPaused) {
+                                window.autoTranslateModal.translationState.isRunning = false;
+                                window.autoTranslateModal.translationState.isPaused = false; // Clear pause state when stream ends
+                                // Only log completion if we actually processed items
+                                if (window.autoTranslateModal.translationState.processedItems > 0) {
+                                    window.autoTranslateModal.logProgress(completedLabel, 'success');
+                                    if (window.autoTranslateModal.notifyCompletion) {
+                                        window.autoTranslateModal.notifyCompletion();
+                                    }
+                                }
+                                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                                // Reset pause tracking
+                                itemsProcessedBeforePause = 0;
+                                originalTotalItems = 0;
+                            }
+                            // Clear reader reference
+                            currentTranslationReader = null;
+                            currentTranslationAbortController = null;
+                            return;
+                        }
+
+                        // Check if translation was stopped
+                        if (window.autoTranslateModal.translationState.shouldStop) {
+                            reader.cancel();
+                            currentTranslationAbortController.abort();
+                            window.autoTranslateModal.translationState.isRunning = false;
+                            window.autoTranslateModal.translationState.isPaused = false; // Clear pause state when stopped
+                            window.autoTranslateModal.logProgress('Translation stopped by user.', 'info');
+                            jQuery('#auto-translate-pause-btn').addClass('hidden');
+                            jQuery('#auto-translate-resume-btn').addClass('hidden');
+                            jQuery('#auto-translate-stop-btn').addClass('hidden');
+                            jQuery('#auto-translate-close-btn').removeClass('hidden');
+                            if (window.autoTranslateModal.notifyCompletion) {
+                                window.autoTranslateModal.notifyCompletion();
+                            }
+                            // Reset pause tracking
+                            itemsProcessedBeforePause = 0;
+                            originalTotalItems = 0;
+                            currentTranslationReader = null;
+                            currentTranslationAbortController = null;
+                            return;
+                        }
+
+                        // Decode the chunk
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                        // Process complete lines
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.substring(6));
+
+                                    if (data.type === 'start') {
+                                        // Initialize with total count
+                                        // If resuming (itemsProcessedBeforePause > 0), keep original total and preserve current counts
+                                        if (itemsProcessedBeforePause > 0) {
+                                            // We're resuming - backend sent new total (remaining items)
+                                            // Keep the original total, backend will process remaining items
+                                            // The new total from backend is just for remaining items, we keep originalTotalItems
+                                            window.autoTranslateModal.translationState.totalItems = originalTotalItems;
+                                            // Preserve current counts (they were set before pause)
+                                            // Don't reset processedItems, successCount, or errorCount
+                                        } else {
+                                            // First time starting - store as original total
+                                            originalTotalItems = data.total || 0;
+                                            window.autoTranslateModal.translationState.totalItems = originalTotalItems;
+                                            // Reset counts only on first start
+                                            window.autoTranslateModal.translationState.processedItems = 0;
+                                            window.autoTranslateModal.translationState.successCount = 0;
+                                            window.autoTranslateModal.translationState.errorCount = 0;
+                                        }
+                                        window.autoTranslateModal.updateProgress();
+                                    } else if (data.type === 'progress') {
+                                        // Update progress for each translation
+                                        const result = data.result;
+                                        // If resuming, backend's processed count is relative to remaining items
+                                        // So we need to add itemsProcessedBeforePause to get absolute count
+                                        if (itemsProcessedBeforePause > 0) {
+                                            // Backoffice counts from 0 after resume, so add our previous counts
+                                            window.autoTranslateModal.translationState.processedItems = itemsProcessedBeforePause + (data.processed || 0);
+                                            window.autoTranslateModal.translationState.successCount = successCountBeforePause + (data.success || 0);
+                                            window.autoTranslateModal.translationState.errorCount = errorCountBeforePause + (data.error || 0);
+                                        } else {
+                                            // First time running - use backend counts directly
+                                            window.autoTranslateModal.translationState.processedItems = data.processed || window.autoTranslateModal.translationState.processedItems;
+                                            window.autoTranslateModal.translationState.successCount = data.success || window.autoTranslateModal.translationState.successCount;
+                                            window.autoTranslateModal.translationState.errorCount = data.error || window.autoTranslateModal.translationState.errorCount;
+                                        }
+
+                                        if (result.success) {
+                                            window.autoTranslateModal.logProgress(
+                                                translatedLabel + ' ' + (result.entity_type || entityLabel) + ' ' + (result.entity_id || '') + ' ' + toLabel + ' ' + (result.language || ''),
+                                                'success'
+                                            );
+                                        } else {
+                                            const errorMsg = failedLabel + ' ' + (result.entity_type || entityLabel) + ' ' + (result.entity_id || '') + ': ' + (result.error || unknownErrorLabel);
+                                            window.autoTranslateModal.translationState.errors.push(errorMsg);
+                                            window.autoTranslateModal.logProgress(errorMsg, 'error');
+                                        }
+
+                                        window.autoTranslateModal.updateProgress();
+                                    } else if (data.type === 'complete') {
+                                        // Translation complete
+                                        window.autoTranslateModal.translationState.isRunning = false;
+                                        window.autoTranslateModal.translationState.isPaused = false; // Clear pause state on completion
+                                        // If resuming, add itemsProcessedBeforePause to get final count
+                                        if (itemsProcessedBeforePause > 0) {
+                                            window.autoTranslateModal.translationState.processedItems = itemsProcessedBeforePause + (data.processed || 0);
+                                            window.autoTranslateModal.translationState.successCount = successCountBeforePause + (data.success || 0);
+                                            window.autoTranslateModal.translationState.errorCount = errorCountBeforePause + (data.error || 0);
+                                        } else {
+                                            window.autoTranslateModal.translationState.processedItems = data.processed || window.autoTranslateModal.translationState.processedItems;
+                                            window.autoTranslateModal.translationState.successCount = data.success || window.autoTranslateModal.translationState.successCount;
+                                            window.autoTranslateModal.translationState.errorCount = data.error || window.autoTranslateModal.translationState.errorCount;
+                                        }
+                                        window.autoTranslateModal.updateProgress();
+                                        window.autoTranslateModal.logProgress(completedLabel, 'success');
+                                        jQuery('#auto-translate-pause-btn').addClass('hidden');
+                                        jQuery('#auto-translate-resume-btn').addClass('hidden');
+                                        jQuery('#auto-translate-stop-btn').addClass('hidden');
+                                        jQuery('#auto-translate-close-btn').removeClass('hidden');
+                                        if (window.autoTranslateModal.notifyCompletion) {
+                                            window.autoTranslateModal.notifyCompletion();
+                                        }
+                                        // Reset pause tracking
+                                        itemsProcessedBeforePause = 0;
+                                        successCountBeforePause = 0;
+                                        errorCountBeforePause = 0;
+                                        originalTotalItems = 0;
+                                        currentTranslationReader = null;
+                                        currentTranslationAbortController = null;
+                                        return;
+                                    } else if (data.type === 'error') {
+                                        // Error occurred
+                                        window.autoTranslateModal.logProgress(data.message || failedMessageLabel, 'error');
+                                        window.autoTranslateModal.translationState.isRunning = false;
+                                        window.autoTranslateModal.translationState.isPaused = false; // Clear pause state on error
+                                        jQuery('#auto-translate-pause-btn').addClass('hidden');
+                                        jQuery('#auto-translate-resume-btn').addClass('hidden');
+                                        jQuery('#auto-translate-stop-btn').addClass('hidden');
+                                        jQuery('#auto-translate-close-btn').removeClass('hidden');
+                                        // Reset pause tracking
+                                        itemsProcessedBeforePause = 0;
+                                        originalTotalItems = 0;
+                                        currentTranslationReader = null;
+                                        currentTranslationAbortController = null;
+                                        return;
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing streaming data:', e, line);
+                                }
+                            }
+                        }
+
+                        // Continue reading
+                        readStream();
+                    }).catch(error => {
+                        // Handle abort errors gracefully
+                        if (error.name === 'AbortError') {
+                            // Request was cancelled (paused or stopped) - this is expected
+                            // Don't reset pause tracking here - it's needed for resume
+                            return;
+                        }
+                        console.error('Error reading stream:', error);
+                        window.autoTranslateModal.logProgress(errorLabel + ': ' + error.message, 'error');
+                        window.autoTranslateModal.translationState.isRunning = false;
+                        window.autoTranslateModal.translationState.isPaused = false; // Clear pause state on error
+                        jQuery('#auto-translate-pause-btn').addClass('hidden');
+                        jQuery('#auto-translate-resume-btn').addClass('hidden');
+                        jQuery('#auto-translate-stop-btn').addClass('hidden');
+                        jQuery('#auto-translate-close-btn').removeClass('hidden');
+                        // Reset pause tracking
+                        itemsProcessedBeforePause = 0;
+                        originalTotalItems = 0;
+                        currentTranslationReader = null;
+                        currentTranslationAbortController = null;
+                    });
+                }
+
+                // Start reading the stream
+                readStream();
+            })
+            .catch(error => {
+                // Handle abort errors gracefully
+                if (error.name === 'AbortError') {
+                    // Request was cancelled (paused or stopped) - this is expected
+                    // Don't reset pause tracking here - it's needed for resume
+                    return;
+                }
+                console.error('Translation error:', error);
+                window.autoTranslateModal.logProgress(errorLabel + ': ' + error.message, 'error');
+                window.autoTranslateModal.translationState.isRunning = false;
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                // Reset pause tracking
+                itemsProcessedBeforePause = 0;
+                successCountBeforePause = 0;
+                errorCountBeforePause = 0;
+                originalTotalItems = 0;
+                currentTranslationReader = null;
+                currentTranslationAbortController = null;
+            });
+        };
+
+        // Set up button handlers for each tab
+        function openAutoTranslateModal(entityType) {
+            // Cancel any active translation when opening modal
+            if (currentTranslationReader) {
+                currentTranslationReader.cancel();
+                currentTranslationReader = null;
+            }
+            if (currentTranslationAbortController) {
+                currentTranslationAbortController.abort();
+                currentTranslationAbortController = null;
+            }
+
+            // Reset state when switching entity types
+            if (currentEntityType !== entityType) {
+                // Reset translation state if modal is already initialized
+                if (window.autoTranslateModal && window.autoTranslateModal.translationState) {
+                    window.autoTranslateModal.translationState.isRunning = false;
+                    window.autoTranslateModal.translationState.isPaused = false;
+                    window.autoTranslateModal.translationState.processedItems = 0;
+                    window.autoTranslateModal.translationState.successCount = 0;
+                    window.autoTranslateModal.translationState.errorCount = 0;
+                    window.autoTranslateModal.translationState.errors = [];
+                }
+
+                // Cancel any pending counts request
+                pendingCountsRequest = null;
+                currentTranslationParams = null;
+                // Reset pause tracking
+                itemsProcessedBeforePause = 0;
+                successCountBeforePause = 0;
+                errorCountBeforePause = 0;
+                originalTotalItems = 0;
+            }
+
+            // Set the current entity type
+            currentEntityType = entityType;
+
+            // Reset modal UI state
+            jQuery('#confirmation-section').show();
+            jQuery('#progress-section').hide();
+            jQuery('#confirmation-buttons').show();
+            jQuery('#progress-buttons').hide();
+            jQuery('#auto-translate-pause-btn').addClass('hidden');
+            jQuery('#auto-translate-resume-btn').addClass('hidden');
+            jQuery('#auto-translate-stop-btn').removeClass('hidden');
+            jQuery('#auto-translate-close-btn').addClass('hidden');
+            jQuery('#translation-log').empty();
+
+            // Get translation counts for the selected entity type
+            if (window.getPageSpecificTranslationCounts) {
+                const counts = window.getPageSpecificTranslationCounts();
+                if (window.autoTranslateModal && window.autoTranslateModal.updateLanguageCounts) {
+                    window.autoTranslateModal.updateLanguageCounts(counts);
+                }
+            } else {
+                // Fallback: show modal without counts
+                const fallbackMessage = {{ _("Click 'Start Translation' to begin translating blank organization entities.") | tojson }};
+                if (jQuery('#translation-summary').length) {
+                    jQuery('#translation-summary').html(fallbackMessage);
+                }
+                if (jQuery('#auto-translate-start-btn').length) {
+                    jQuery('#auto-translate-start-btn').prop('disabled', false);
+                }
+            }
+
+            // Show modal
+            jQuery('#auto-translate-modal').removeClass('hidden');
+
+            // Update estimated time
+            if (window.autoTranslateModal && typeof window.autoTranslateModal.updateEstimatedTime === 'function') {
+                window.autoTranslateModal.updateEstimatedTime();
+            }
+        }
+
+        // Override pause/resume handlers to actually cancel/restart the backend stream
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait for jQuery
+            function waitForjQuery() {
+                if (typeof jQuery === 'undefined') {
+                    setTimeout(waitForjQuery, 50);
+                    return;
+                }
+
+                // Override pause button handler to cancel backend stream
+                jQuery(document).off('click', '#auto-translate-pause-btn').on('click', '#auto-translate-pause-btn', function() {
+                    window.autoTranslateModal.translationState.isPaused = true;
+                    jQuery('#auto-translate-pause-btn').addClass('hidden');
+                    jQuery('#auto-translate-resume-btn').removeClass('hidden');
+                    const pausedMsg = {{ _("Translation paused by user. Backoffice processing stopped.") | tojson }};
+                    window.autoTranslateModal.logProgress(pausedMsg, 'info');
+
+                    // Store current progress before pausing
+                    itemsProcessedBeforePause = window.autoTranslateModal.translationState.processedItems || 0;
+                    successCountBeforePause = window.autoTranslateModal.translationState.successCount || 0;
+                    errorCountBeforePause = window.autoTranslateModal.translationState.errorCount || 0;
+
+                    // Cancel the backend stream
+                    if (currentTranslationReader) {
+                        currentTranslationReader.cancel();
+                        currentTranslationReader = null;
+                    }
+                    if (currentTranslationAbortController) {
+                        currentTranslationAbortController.abort();
+                        currentTranslationAbortController = null;
+                    }
+                });
+
+                // Override resume button handler to restart backend stream
+                jQuery(document).off('click', '#auto-translate-resume-btn').on('click', '#auto-translate-resume-btn', function() {
+                    window.autoTranslateModal.translationState.isPaused = false;
+                    jQuery('#auto-translate-pause-btn').removeClass('hidden');
+                    jQuery('#auto-translate-resume-btn').addClass('hidden');
+                    const resumedMsg = {{ _("Translation resumed by user. Restarting backend processing...") | tojson }};
+                    window.autoTranslateModal.logProgress(resumedMsg, 'info');
+
+                    // Restart translation (backend will skip already-translated items)
+                    // Note: We preserve processedItems, successCount, errorCount - they will be updated as new items are processed
+                    if (currentTranslationParams) {
+                        // Ensure running state is set
+                        window.autoTranslateModal.translationState.isRunning = true;
+                        window.performPageSpecificTranslation(
+                            currentTranslationParams.selectedLanguages,
+                            currentTranslationParams.selectedService
+                        );
+                    } else {
+                        const noParamsMsg = {{ _("Cannot resume: translation parameters not found.") | tojson }};
+                        window.autoTranslateModal.logProgress(noParamsMsg, 'error');
+                        window.autoTranslateModal.translationState.isRunning = false;
+                        window.autoTranslateModal.translationState.isPaused = false;
+                        jQuery('#auto-translate-pause-btn').addClass('hidden');
+                        jQuery('#auto-translate-resume-btn').addClass('hidden');
+                    }
+                });
+
+                // Override stop button handler to immediately show Done button
+                jQuery(document).off('click', '#auto-translate-stop-btn').on('click', '#auto-translate-stop-btn', function() {
+                    const stopConfirmMsg = {{ _("Are you sure you want to stop the translation?") | tojson }};
+                    function doStop() {
+                        window.autoTranslateModal.translationState.shouldStop = true;
+                        window.autoTranslateModal.translationState.isRunning = false;
+                        window.autoTranslateModal.translationState.isPaused = false;
+                        const stoppedMsg = {{ _("Translation stopped by user.") | tojson }};
+                        window.autoTranslateModal.logProgress(stoppedMsg, 'info');
+
+                        // Immediately cancel backend stream and show Done button
+                        if (currentTranslationReader) {
+                            currentTranslationReader.cancel();
+                            currentTranslationReader = null;
+                        }
+                        if (currentTranslationAbortController) {
+                            currentTranslationAbortController.abort();
+                            currentTranslationAbortController = null;
+                        }
+
+                        // Show Done button immediately
+                        jQuery('#auto-translate-pause-btn').addClass('hidden');
+                        jQuery('#auto-translate-resume-btn').addClass('hidden');
+                        jQuery('#auto-translate-stop-btn').addClass('hidden');
+                        jQuery('#auto-translate-close-btn').removeClass('hidden');
+
+                        // Reset pause tracking
+                        itemsProcessedBeforePause = 0;
+                        originalTotalItems = 0;
+                    }
+                    if (window.showConfirmation) {
+                        window.showConfirmation(stopConfirmMsg, doStop, null, {{ _("Stop") | tojson }}, {{ _("Cancel") | tojson }}, {{ _("Stop Translation?") | tojson }});
+                    } else {
+                        doStop();
+                    }
+                });
+
+                // Countries button
+                jQuery('#auto-translate-all-countries-btn').on('click', function() {
+                    openAutoTranslateModal('countries');
+                });
+
+                // NSs button
+                jQuery('#auto-translate-all-nss-btn').on('click', function() {
+                    openAutoTranslateModal('national_societies');
+                });
+
+                // NS Structure button
+                jQuery('#auto-translate-all-ns-structure-btn').on('click', function() {
+                    openAutoTranslateModal('ns_structure');
+                });
+
+                // Secretariat button
+                jQuery('#auto-translate-all-secretariat-btn').on('click', function() {
+                    openAutoTranslateModal('secretariat');
+                });
+            }
+            waitForjQuery();
+        });
+    </script>
+{% endblock %}

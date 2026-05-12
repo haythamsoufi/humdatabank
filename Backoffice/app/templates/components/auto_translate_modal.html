@@ -1,0 +1,564 @@
+{# Auto-Translate All Modal Component #}
+{#
+Usage:
+{% set auto_translate_config = {
+    'title': 'Auto-Translate All Template Items',
+    'description': 'Translate all blank document fields and questions to all languages',
+    'endpoint': url_for('utilities.api_auto_translate'),
+    'item_type': 'template items'
+} %}
+#}
+
+<!-- Auto-Translate All Modal -->
+<style>
+    .language-checkbox-label.opacity-50 {
+        opacity: 0.5;
+        cursor: not-allowed !important;
+        background-color: #f9fafb !important;
+    }
+    .language-checkbox-label.opacity-50:hover {
+        background-color: #f9fafb !important;
+    }
+    .language-checkbox:disabled {
+        cursor: not-allowed;
+    }
+    /* .btn:disabled state is handled globally in components.css */
+    #translation-service-select option:disabled,
+    #translation-service-select option[disabled] {
+        color: #9ca3af;
+        font-style: italic;
+    }
+    /* Header actions: icons only — vertically centred in header, FA for consistent weight */
+    .autotrans-header-actions {
+        position: absolute;
+        top: 50%;
+        right: 1.25rem;
+        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+    .autotrans-header-action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: transparent !important;
+        color: #4b5563;
+        cursor: pointer;
+        transition: color 0.15s ease;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    .autotrans-header-action-btn i {
+        font-size: 1rem;
+        line-height: 1;
+        width: 1.0625rem;
+        text-align: center;
+        display: inline-block;
+    }
+    .autotrans-header-action-btn:focus {
+        outline: none;
+    }
+    .autotrans-header-action-btn:focus-visible {
+        outline: 2px solid var(--btn-primary, #0d9488);
+        outline-offset: 2px;
+    }
+    .autotrans-header-action-btn--minimize:hover {
+        color: var(--btn-primary, #0d9488);
+    }
+    .autotrans-header-action-btn--close:hover {
+        color: var(--btn-danger, #dc2626);
+    }
+    /* Modal header (readable size; buttons anchored top-right) */
+    #auto-translate-modal-header {
+        position: relative;   /* anchors the absolute button group */
+        cursor: grab;
+        user-select: none;
+        padding: 0.875rem 1.25rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    #auto-translate-modal-header .autotrans-modal-header-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+        line-height: 1.3;
+        margin: 0;
+    }
+    #auto-translate-modal-header .autotrans-modal-header-desc {
+        font-size: 0.8125rem;
+        color: #6b7280;
+        line-height: 1.4;
+        margin: 0.35rem 0 0 0;
+    }
+    #auto-translate-modal-header .autotrans-header-action-btn {
+        cursor: pointer !important;
+    }
+    /* Mini-banner — positioned via CSS so no Tailwind recompile needed */
+    #auto-translate-mini-banner {
+        position: fixed;
+        bottom: 1.25rem;
+        left: 1.25rem;
+        z-index: 9999;
+        width: 300px;
+    }
+    #auto-translate-mini-banner .mini-inner {
+        background: #fff;
+        border-radius: 0.5rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.18);
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+    }
+    #auto-translate-mini-banner .mini-header {
+        background: #4f46e5;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 1rem;
+        gap: 0.5rem;
+    }
+    #auto-translate-mini-banner .mini-header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+    #auto-translate-mini-banner .mini-header-right {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+    #auto-translate-mini-banner .mini-title {
+        color: #fff;
+        font-size: 0.875rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #mini-banner-percent {
+        color: #c7d2fe;
+        font-size: 0.75rem;
+        font-family: monospace;
+    }
+    #auto-translate-mini-banner .mini-track {
+        background: #e0e7ff;
+        height: 3px;
+    }
+    #mini-banner-progress-bar {
+        background: #6366f1;
+        height: 3px;
+        transition: width 0.3s ease;
+        width: 0%;
+    }
+    #auto-translate-mini-banner .mini-footer {
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.4rem 1rem;
+    }
+    #mini-banner-status {
+        font-size: 0.75rem;
+        color: #4b5563;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #mini-banner-counts {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        font-family: monospace;
+        flex-shrink: 0;
+        margin-left: 0.5rem;
+    }
+    #restore-auto-translate-modal-btn {
+        color: #c7d2fe !important;
+    }
+    #restore-auto-translate-modal-btn:hover {
+        color: #fff !important;
+    }
+
+    /* ── Modal body density: comfortable (between original huge and over-tight) ─ */
+    #auto-translate-modal-panel.autotrans-compact {
+        max-width: min(96vw, 42rem);
+    }
+    #auto-translate-modal-panel.autotrans-compact #confirmation-section,
+    #auto-translate-modal-panel.autotrans-compact #progress-section {
+        padding: 1rem 1.25rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #auto-translate-modal-footer {
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-summary-box {
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-summary-box h4 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-summary-box .fas {
+        font-size: 1rem;
+        margin-top: 0.15rem;
+        margin-right: 0.625rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #translation-summary {
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-stack > * + * {
+        margin-top: 0.75rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-card {
+        padding: 0.75rem 1rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-lang-block > .autotrans-card-head {
+        margin-bottom: 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-card-head .fas {
+        font-size: 0.9375rem;
+        margin-right: 0.625rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-card-head span.font-medium {
+        font-size: 0.875rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-lang-grid {
+        gap: 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .language-checkbox-label {
+        padding: 0.45rem 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .language-checkbox-label img {
+        width: 1.125rem !important;
+        height: 1.125rem !important;
+        margin-right: 0.45rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .language-checkbox-label .font-medium {
+        font-size: 0.875rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #translation-service-select {
+        font-size: 0.875rem;
+        padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+        max-width: 16rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #estimated-time {
+        font-size: 0.875rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-row-hint {
+        font-size: 0.75rem;
+        max-width: none;
+        line-height: 1.35;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-service-row {
+        flex-wrap: wrap;
+        gap: 0.35rem 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-overwrite-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.25rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-overwrite-row .autotrans-row-hint {
+        max-width: none;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-progress-head {
+        margin-bottom: 0.75rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-progress-head h4 {
+        font-size: 0.9375rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #progress-text {
+        font-size: 0.875rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-progress-track {
+        height: 0.5rem;
+        border-radius: 9999px;
+    }
+    #auto-translate-modal-panel.autotrans-compact #progress-bar {
+        height: 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-stat-grid {
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-stat-card {
+        padding: 0.65rem 0.75rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-stat-card .font-medium {
+        font-size: 0.875rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #success-count,
+    #auto-translate-modal-panel.autotrans-compact #error-count {
+        font-size: 1.5rem;
+        line-height: 1.2;
+    }
+    #auto-translate-modal-panel.autotrans-compact #error-details {
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.75rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #error-details h5 {
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #error-list {
+        font-size: 0.875rem;
+        max-height: 10rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-log-wrap {
+        padding: 0.75rem 1rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact .autotrans-log-wrap h5 {
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+    #auto-translate-modal-panel.autotrans-compact #translation-log {
+        font-size: 0.8125rem;
+        max-height: 6.5rem;
+        padding: 0.5rem 0.65rem;
+    }
+</style>
+<div id="auto-translate-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div id="auto-translate-modal-panel" class="autotrans-compact bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform transition-all">
+        <!-- Header — draggable; grab handle communicated via cursor -->
+        <div id="auto-translate-modal-header" title="{{ _('Drag to move') }}">
+            <!-- Title + description; right-padding clears the icon buttons -->
+            <div style="padding-right: 6.5rem;">
+                <h3 class="autotrans-modal-header-title">
+                    {% if auto_translate_config and auto_translate_config.title %}
+                        {{ _(auto_translate_config.title) }}
+                    {% else %}
+                        {{ _('Auto-Translate All Items') }}
+                    {% endif %}
+                </h3>
+                <p class="autotrans-modal-header-desc">
+                    {% if auto_translate_config and auto_translate_config.description %}
+                        {{ _(auto_translate_config.description) }}
+                    {% else %}
+                        {{ _('Translate all blank items to all languages') }}
+                    {% endif %}
+                </p>
+            </div>
+            <!-- Plain icon actions — centred vertically in header -->
+            <div id="auto-translate-modal-header-actions" class="autotrans-header-actions">
+                <button type="button" id="minimize-auto-translate-modal-btn"
+                        class="autotrans-header-action-btn autotrans-header-action-btn--minimize"
+                        aria-label="{{ _('Minimize') }}" title="{{ _('Minimize — translation keeps running in background') }}">
+                    <i class="fas fa-minus" aria-hidden="true"></i>
+                </button>
+                <button type="button" id="close-auto-translate-modal-btn"
+                        class="autotrans-header-action-btn autotrans-header-action-btn--close"
+                        aria-label="{{ _('Close') }}" title="{{ _('Close') }}">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Confirmation Section -->
+        <div id="confirmation-section" class="flex-1 overflow-y-auto">
+            <div class="autotrans-summary-box bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-blue-500 flex-shrink-0"></i>
+                    <div class="min-w-0">
+                        <h4 class="font-medium text-blue-900">{{ _('Translation Summary') }}</h4>
+                        <div id="translation-summary" class="text-sm text-blue-700">
+                            <!-- Summary will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="autotrans-stack">
+                <!-- Language Selection -->
+                <div class="autotrans-lang-block autotrans-card bg-gray-50 rounded-lg">
+                    <div class="autotrans-card-head flex items-center">
+                        <i class="fas fa-language text-indigo-600 flex-shrink-0"></i>
+                        <span class="font-medium">{{ _('Select languages to translate') }}</span>
+                        <div class="ml-auto flex gap-2">
+                            <button type="button" id="select-all-languages" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline">
+                                {{ _("Select All") }}
+                            </button>
+                            <button type="button" id="deselect-all-languages" class="text-xs font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline">
+                                {{ _("Deselect All") }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="autotrans-lang-grid grid grid-cols-2 gap-3">
+                        {% for lang_code in TRANSLATABLE_LANGUAGES %}
+                            {% set _lc_norm = (lang_code|string|lower|replace('-', '_')) %}
+                            {% set _lc_base = (_lc_norm.split('_')[0] if _lc_norm else lang_code) %}
+                            {% set lang_display = (language_endonym(_lc_base) or LANGUAGE_DISPLAY_NAMES.get(_lc_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(_lc_base) or _lc_base.upper()) %}
+                        <label class="flex items-center p-2 bg-white rounded border hover:bg-gray-50 cursor-pointer transition-colors language-checkbox-label">
+                            <input type="checkbox" class="language-checkbox mr-3" value="{{ _lc_base }}" checked>
+                            <span class="flex items-center">
+                                {% if SHOW_LANGUAGE_FLAGS %}
+                                <img src="{{ url_for('main.language_flag_svg', language=_lc_base) }}" alt="" class="inline-block w-5 h-5 mr-2 align-text-bottom" loading="lazy" decoding="async">
+                                {% endif %}
+                                <span class="font-medium">{{ lang_display }}</span>
+                                <span class="text-xs text-gray-500 ml-2" id="{{ _lc_base }}-count">0</span>
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="autotrans-card autotrans-service-row flex items-center justify-between bg-gray-50 rounded-lg">
+                    <div class="autotrans-card-head flex items-center min-w-0">
+                        <i class="fas fa-magic text-indigo-600 flex-shrink-0"></i>
+                        <span class="font-medium">{{ _('Translation service') }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <select id="translation-service-select" class="text-sm border border-gray-300 rounded-md px-3 pr-8 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
+                            <option value="" selected disabled>{{ _('Loading services...') }}</option>
+                        </select>
+                        <span id="service-loading-message" class="text-xs text-gray-500">{{ _('Loading services...') }}</span>
+                    </div>
+                </div>
+
+                <div class="autotrans-card autotrans-overwrite-row flex items-start justify-between gap-2 bg-gray-50 rounded-lg">
+                    <div class="autotrans-card-head flex items-center min-w-0">
+                        <i class="fas fa-pen text-indigo-600 flex-shrink-0"></i>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="overwrite-existing-translations" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="font-medium">{{ _('Overwrite existing translations') }}</span>
+                        </label>
+                    </div>
+                    <span class="text-xs text-gray-500 autotrans-row-hint">{{ _('When enabled, all translations will be re-translated, including those that already have values') }}</span>
+                </div>
+
+                <div class="autotrans-card flex items-center justify-between bg-gray-50 rounded-lg">
+                    <div class="autotrans-card-head flex items-center">
+                        <i class="fas fa-clock text-indigo-600 flex-shrink-0"></i>
+                        <span class="font-medium">{{ _('Estimated time') }}</span>
+                    </div>
+                    <span id="estimated-time" class="text-sm text-gray-600">{{ _('Calculating...') }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Section (Hidden initially) -->
+        <div id="progress-section" class="flex-1 overflow-y-auto hidden">
+            <div class="autotrans-progress-head">
+                <div class="flex items-center justify-between mb-1">
+                    <h4 class="font-medium text-gray-900">{{ _('Translation Progress') }}</h4>
+                    <span id="progress-text" class="text-sm text-gray-600">0/0</span>
+                </div>
+                <div class="autotrans-progress-track w-full bg-gray-200 rounded-full">
+                    <div id="progress-bar" class="bg-indigo-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="autotrans-stat-grid grid grid-cols-3">
+                <div class="autotrans-stat-card bg-green-50 border border-green-200 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-600 mr-2 text-sm"></i>
+                        <span class="font-medium text-green-900">{{ _('Success') }}</span>
+                    </div>
+                    <div id="success-count" class="text-2xl font-bold text-green-700">0</div>
+                </div>
+                <div class="autotrans-stat-card bg-amber-50 border border-amber-200 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-minus-circle text-amber-600 mr-2 text-sm"></i>
+                        <span class="font-medium text-amber-900">{{ _('Skipped') }}</span>
+                    </div>
+                    <div id="skipped-count" class="text-2xl font-bold text-amber-700">0</div>
+                </div>
+                <div class="autotrans-stat-card bg-red-50 border border-red-200 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-600 mr-2 text-sm"></i>
+                        <span class="font-medium text-red-900">{{ _('Errors') }}</span>
+                    </div>
+                    <div id="error-count" class="text-2xl font-bold text-red-700">0</div>
+                </div>
+            </div>
+
+            <!-- Error Details -->
+            <div id="error-details" class="hidden bg-red-50 border border-red-200 rounded-lg">
+                <h5 class="font-medium text-red-900">{{ _('Error Details') }}</h5>
+                <div id="error-list" class="text-sm text-red-700 max-h-40 overflow-y-auto">
+                    <!-- Error messages will be populated here -->
+                </div>
+            </div>
+
+            <!-- Real-time Log -->
+            <div class="autotrans-log-wrap bg-gray-50 border border-gray-200 rounded-lg">
+                <h5 class="font-medium text-gray-900">{{ _('Translation Log') }}</h5>
+                <div id="translation-log" class="text-sm text-gray-700 font-mono space-y-1 max-h-24 overflow-y-auto bg-white rounded border">
+                    <!-- Log messages will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Buttons -->
+        <div id="auto-translate-modal-footer" class="bg-gray-50 flex justify-end gap-2 flex-shrink-0">
+            <!-- Confirmation buttons -->
+            <div id="confirmation-buttons" class="flex gap-2">
+                <button id="auto-translate-cancel-btn" class="btn btn-secondary">
+                    {{ _('Cancel') }}
+                </button>
+                <button id="auto-translate-start-btn" class="btn btn-warning" disabled>
+                    <i class="fas fa-magic"></i>
+                    {{ _('Start Translation') }}
+                </button>
+            </div>
+
+            <!-- Progress buttons -->
+            <div id="progress-buttons" class="hidden flex gap-2 flex-wrap justify-end">
+                <button id="auto-translate-pause-btn" class="btn btn-ghost-danger hidden">
+                    <i class="fas fa-pause"></i>
+                    {{ _('Pause') }}
+                </button>
+                <button id="auto-translate-resume-btn" class="btn btn-ghost hidden">
+                    <i class="fas fa-play"></i>
+                    {{ _('Resume') }}
+                </button>
+                <button id="auto-translate-stop-btn" class="btn btn-danger">
+                    <i class="fas fa-stop"></i>
+                    {{ _('Stop Translation') }}
+                </button>
+                <button id="auto-translate-close-btn" class="btn btn-success hidden">
+                    <i class="fas fa-check"></i>
+                    {{ _('Close') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Auto-Translate Mini Banner (shown when modal is minimised) -->
+<div id="auto-translate-mini-banner" style="display: none;">
+    <div class="mini-inner">
+        <!-- Coloured title bar -->
+        <div class="mini-header">
+            <div class="mini-header-left">
+                <i class="fas fa-language" style="color:#fff; font-size:0.875rem; flex-shrink:0;"></i>
+                <span class="mini-title">{{ _('Auto-Translate') }}</span>
+            </div>
+            <div class="mini-header-right">
+                <span id="mini-banner-percent">0%</span>
+                <button type="button" id="restore-auto-translate-modal-btn"
+                        class="btn-close-icon"
+                        aria-label="{{ _('Restore') }}" title="{{ _('Restore') }}">
+                    <i class="fas fa-expand-alt" style="font-size: 0.65rem;"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Thin progress bar -->
+        <div class="mini-track">
+            <div id="mini-banner-progress-bar"></div>
+        </div>
+        <!-- Status row -->
+        <div class="mini-footer">
+            <span id="mini-banner-status">{{ _('Running in background\u2026') }}</span>
+            <span id="mini-banner-counts">0/0</span>
+        </div>
+    </div>
+</div>

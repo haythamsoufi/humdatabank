@@ -1,0 +1,578 @@
+/* Responsive Styles */
+
+/* Mobile Specific Styles - FAB and Floating Menu */
+@media (max-width: 768px) {
+    /* Clamp primary containers to viewport width to prevent horizontal overflow */
+    #mainContent,
+    #mainContent > main,
+    #pageContentContainer {
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box;
+    }
+    #table-container {
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: auto !important;
+    }
+    /* Allow vertical scrolling on small screens and prevent horizontal overflow */
+    html, body {
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: auto;
+    }
+
+    /* Allow horizontal scrolling inside specific containers when needed */
+    .overflow-x-auto {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-sidebar {
+        transform: translateX(-100%);
+        width: 0;
+        padding: 0;
+        visibility: hidden;
+    }
+
+    .admin-sidebar #sidebarToggle {
+        display: none !important;
+    }
+
+    #mainContent,
+    #mainContent.content-with-sidebar,
+    #mainContent.content-with-collapsed-sidebar {
+        margin-left: 0 !important;
+    }
+
+    #mobileMenuFAB {
+        display: flex !important;
+        /* Lock to chatbot FAB baseline; beats legacy inline bottom from flash-messages.js */
+        bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    /* Hide mobile menu FAB when in Flutter mobile app - must use !important to override media query */
+    /* Higher specificity: html element + attribute + ID */
+    html[data-mobile-app="true"] #mobileMenuFAB,
+    html.mobile-app #mobileMenuFAB,
+    html[data-mobile-app="true"] #mobileMenuScrim,
+    html.mobile-app #mobileMenuScrim,
+    html[data-mobile-app="true"] #mobileFloatingMenu,
+    html.mobile-app #mobileFloatingMenu {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    #mobileFloatingMenu.menu-open {
+        transform: translateY(0);
+    }
+}
+
+/* Enhanced Content Spacing - Responsive adjustments */
+@media (max-width: 1024px) {
+    #pageContentContainer {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    #mainContent.content-with-sidebar #pageContentContainer,
+    #mainContent.content-with-collapsed-sidebar #pageContentContainer {
+        padding-left: 1.5rem !important;
+    }
+}
+
+@media (max-width: 768px) {
+    #pageContentContainer {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+}
+
+/* Mobile Menu FAB */
+#mobileMenuFAB {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    left: calc(1.5rem + env(safe-area-inset-left, 0px));
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0 !important;
+    box-sizing: border-box;
+    background-color: #c53030;
+    color: white;
+    border-radius: 50%;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2), 0 2px 5px rgba(0,0,0,0.1);
+    z-index: 1000;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+#mobileMenuFAB:hover {
+    background-color: #a02c2c;
+    transform: scale(1.05) translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 4px 8px rgba(0,0,0,0.15);
+}
+
+#mobileMenuFAB.fab-active {
+    background-color: #742a2a;
+    transform: scale(1.05) translateY(-2px);
+}
+
+#mobileMenuFAB i {
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#mobileFloatingMenu {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 80vh;
+    background-color: #2d3748;
+    color: white;
+    z-index: 1010;
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-direction: column;
+    padding-top: 1rem;
+}
+
+#mobileMenuScrim {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1005;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+#mobileMenuScrim.scrim-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+#mobileFloatingMenuNav {
+    overflow-y: auto;
+    flex-grow: 1;
+    padding: 0 1rem 1rem 1rem;
+}
+
+#mobileFloatingMenuNav .sidebar-item-container {
+    display: flex;
+    align-items: center;
+    font-size: 1rem;
+    padding: 0.75rem 0.5rem;
+    border-radius: 0.375rem;
+    transition: background-color 0.2s ease-in-out;
+}
+
+#mobileFloatingMenuNav .sidebar-item-container:hover {
+    background-color: #4a5568;
+}
+
+#mobileFloatingMenuNav .sidebar-item-container.active {
+    background-color: #4a5568;
+    color: #fff;
+    font-weight: 600;
+}
+
+#mobileFloatingMenuNav .sidebar-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.75rem;
+}
+
+#mobileFloatingMenuNav .collapsable-category-title {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+#mobileFloatingMenuNav .collapsable-content a.sidebar-item-container:first-child {
+    padding-top: 0.5rem;
+}
+
+#mobileFloatingMenu .sidebar-footer {
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #9ca3af;
+    border-top: 1px solid #4a5568;
+}
+
+@media (max-width: 768px) {
+    #mobileFloatingMenu {
+        display: flex;
+    }
+}
+
+/* Language selector mobile adjustments */
+@media (max-width: 768px) {
+    .language-dropdown {
+        min-width: 140px;
+        right: 0;
+        left: auto;
+    }
+}
+
+/* Tablet adjustments */
+@media (max-width: 1024px) {
+    #powerpointModal > div {
+        width: 95vw;
+        height: 90vh;
+        max-width: none;
+    }
+}
+
+/* Mobile adjustments for PowerPoint modal */
+@media (max-width: 640px) {
+    #powerpointModal > div {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+
+/* Hide FAB on larger screens for focal points */
+@media (min-width: 769px) {
+    .focal-point #mobileMenuFAB,
+    .focal-point #mobileFloatingMenu,
+    .focal-point #mobileMenuScrim {
+        display: none !important;
+    }
+}
+
+/* Mobile adjustments for chatbot */
+@media (max-width: 768px) {
+    #aiChatWidget {
+        width: calc(100vw - 1rem) !important;
+        height: calc(100vh - 8rem) !important;
+        bottom: 1rem;
+        right: 0.5rem;
+        left: 0.5rem;
+    }
+
+    #aiChatbotFAB {
+        /* Same baseline as #mobileMenuFAB; !important overrides inline bottom from flash adjustments */
+        bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+        width: 3.5rem; /* Same size as mobile menu FAB */
+        height: 3.5rem; /* Same size as mobile menu FAB */
+        /* Match #mobileMenuFAB ring so the two controls share the same outer box (avoids optical “float”) */
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        box-sizing: border-box;
+    }
+
+    /* LTR positioning for mobile */
+    html[dir="ltr"] #aiChatbotFAB {
+        right: calc(1.5rem + env(safe-area-inset-right, 0px));
+        left: auto;
+    }
+
+    /* RTL positioning for mobile */
+    html[dir="rtl"] #aiChatbotFAB {
+        left: calc(1.5rem + env(safe-area-inset-left, 0px)) !important;
+        right: auto !important;
+    }
+
+    /* Ensure flash messages don't overlap with mobile menu FAB on left */
+    .flash-messages {
+        bottom: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: calc(100vw - 2rem); /* Account for padding */
+        width: calc(100vw - 2rem);
+    }
+}
+
+/* Mobile adjustments for notifications dropdown */
+@media (max-width: 768px) {
+    #notifications-dropdown {
+        /* Fit safely on very small screens without causing horizontal overflow */
+        width: calc(100vw - 2rem);
+        max-width: 420px;
+        min-width: 0;
+        right: 1rem;
+        left: 1rem;
+        position: fixed !important; /* Anchor to viewport, not the button container */
+        top: calc(4rem + 0.5rem); /* navbar height (h-16) + small gap */
+        max-height: calc(100vh - 6rem); /* keep some space at bottom */
+        overflow-y: hidden; /* list inside will scroll */
+        overflow-x: hidden; /* prevent horizontal scrollbar */
+    }
+    /* Make the notifications list scroll within the fixed dropdown */
+    #notifications-dropdown #notifications-list {
+        /* flex-1 will handle the height, but keep overflow for scrolling */
+        overflow-y: auto;
+        overflow-x: hidden; /* prevent horizontal scrollbar */
+        -webkit-overflow-scrolling: touch;
+    }
+    /* Apply light scrollbar to notifications list */
+    #notifications-dropdown #notifications-list {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar {
+        width: 6px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+        transition: background-color 0.2s ease;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    /* Ensure long content doesn't cause horizontal overflow */
+    #notifications-dropdown .notification-item {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    /* Force wrap long text in notification content */
+    #notifications-dropdown .notification-item h4,
+    #notifications-dropdown .notification-item p,
+    #notifications-dropdown .notification-item span {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 100%;
+    }
+
+    /* Hide logo on all mobile screens */
+    .org-logo-img {
+        display: none !important;
+    }
+}
+
+/* Tablet and small laptop adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #notifications-dropdown {
+        width: 50vw; /* Half of screen width */
+        right: 1rem;
+        min-width: 400px;
+        max-width: 600px;
+        max-height: 80vh; /* Constrain height on tablet too */
+        overflow: hidden; /* Let list handle scrolling */
+    }
+    /* Ensure notifications list scrolls on tablet */
+    #notifications-dropdown #notifications-list {
+        max-height: calc(80vh - 4rem); /* Account for header */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar {
+        width: 6px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+        transition: background-color 0.2s ease;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    /* Force wrap long text in notification content on tablet */
+    #notifications-dropdown .notification-item h4,
+    #notifications-dropdown .notification-item p,
+    #notifications-dropdown .notification-item span {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 100%;
+    }
+}
+
+/* Laptop and desktop adjustments */
+@media (min-width: 1025px) {
+    #notifications-dropdown {
+        width: 33.33vw; /* 1/3 of screen width */
+        right: 1rem;
+        min-width: 450px; /* At least 1/3 of typical laptop screen */
+        max-width: 650px; /* Cap at reasonable size */
+        max-height: 80vh; /* Constrain height on desktop too */
+        overflow: hidden; /* Let list handle scrolling */
+    }
+    /* Ensure notifications list scrolls on desktop */
+    #notifications-dropdown #notifications-list {
+        max-height: calc(80vh - 4rem); /* Account for header */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar {
+        width: 6px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+        transition: background-color 0.2s ease;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    /* Force wrap long text in notification content on desktop */
+    #notifications-dropdown .notification-item h4,
+    #notifications-dropdown .notification-item p,
+    #notifications-dropdown .notification-item span {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 100%;
+    }
+}
+
+/* Large desktop adjustments */
+@media (min-width: 1440px) {
+    #notifications-dropdown {
+        width: 25vw; /* 1/4 of screen width for very large screens */
+        min-width: 500px;
+        max-width: 700px;
+        max-height: 80vh; /* Constrain height on large desktop too */
+        overflow: hidden; /* Let list handle scrolling */
+    }
+    /* Ensure notifications list scrolls on large desktop */
+    #notifications-dropdown #notifications-list {
+        max-height: calc(80vh - 4rem); /* Account for header */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar {
+        width: 6px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+        transition: background-color 0.2s ease;
+    }
+    #notifications-dropdown #notifications-list::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    /* Force wrap long text in notification content on large desktop */
+    #notifications-dropdown .notification-item h4,
+    #notifications-dropdown .notification-item p,
+    #notifications-dropdown .notification-item span {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 100%;
+    }
+}
+
+/* Extra-small screen hardening: prevent navbar overflow */
+@media (max-width: 640px) {
+    #navContainer {
+        /* Never wrap — utilities must stay on the same row as the brand */
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
+    /* Left cluster (logo + title + badge) fills available space and shrinks */
+    .nav-menu-wrapper {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+    }
+    /* Right cluster (language, notifications, profile) never shrinks off-bar */
+    .nav-utilities {
+        flex-shrink: 0;
+    }
+    .org-logo-img {
+        display: none; /* Hide logo on mobile screens */
+    }
+    .nav-brand-title {
+        font-size: 1.125rem;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        /* Reserve enough room for the utilities cluster (~5.5rem icons + gap) */
+        max-width: calc(100vw - 5.5rem);
+    }
+    /* Icon-only system manager badge needs a touch more space */
+    .nav-system-manager .nav-brand-title {
+        max-width: calc(100vw - 7rem);
+    }
+}
+
+@media (max-width: 360px) {
+    .nav-brand-title {
+        font-size: 1rem;
+        max-width: calc(100vw - 5rem);
+    }
+    .nav-system-manager .nav-brand-title {
+        max-width: calc(100vw - 6.5rem);
+    }
+}
+
+/* Let main content use natural height on very small screens to avoid clipping */
+@media (max-width: 640px) {
+    #mainContent > main {
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: visible !important;
+    }
+}
+
+/* Responsive fixes for data grids and tables on small screens */
+@media (max-width: 768px) {
+    /* Ensure horizontal scrolling is available inside grid/table containers */
+    .overflow-x-auto,
+    #table-container,
+    .ag-theme-alpine,
+    .ag-theme-balham,
+    .ag-theme-material,
+    .ag-theme-quartz {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100vw !important;
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Further responsive adjustments for very small screens */
+    .ag-theme-alpine,
+    .ag-theme-balham,
+    .ag-theme-material,
+    .ag-theme-quartz {
+        font-size: 12px !important;
+    }
+}
+
+/* Moved popup z-index rules to layout.css for global consistency */

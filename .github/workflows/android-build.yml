@@ -1,0 +1,300 @@
+name: Android Build
+
+# Reduces parallel jobs fighting over flutter-action / Gradle cache keys (same pattern as ios-build.yml).
+concurrency:
+  group: android-build-${{ github.repository }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: 'Backend URL (databank.ifrc.org → production; *.fly.dev → Humanitarian Databank demo; IFRC *-stage.ifrc.org → staging; localhost → development)'
+        required: true
+        type: choice
+        options:
+          - http://localhost:5000
+          - http://10.0.2.2:5000
+          - https://backoffice-databank.fly.dev
+          - https://databank-stage.ifrc.org
+          - https://databank.ifrc.org
+        default: 'https://databank.ifrc.org'
+      frontend_url:
+        description: 'Frontend/Website URL'
+        required: true
+        type: choice
+        options:
+          - http://localhost:3000
+          - http://10.0.2.2:3000
+          - https://website-databank.fly.dev
+        default: 'https://website-databank.fly.dev'
+      organization_config:
+        description: 'Organization configuration (determines branding and app name)'
+        required: true
+        type: choice
+        options:
+          - ifrc
+          - ''
+        default: 'ifrc'
+      build_app_bundle:
+        description: 'Run flutter build appbundle after APK (Play Store .aab; saves several minutes of Gradle when disabled)'
+        required: false
+        type: boolean
+        default: true
+      run_flutter_analyze:
+        description: 'Run flutter analyze before Gradle builds (saves ~30s when disabled)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # APK builds need JDK 17 (AGP / Kotlin); avoid relying on runner defaults
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.6 stable ships Dart 3.11.4.
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          cache: true
+
+      - name: Determine Flutter project path
+        id: flutter_path
+        run: |
+          if [ -f "MobileApp/pubspec.yaml" ]; then
+            echo "path=MobileApp" >> $GITHUB_OUTPUT
+          elif [ -f "pubspec.yaml" ]; then
+            echo "path=." >> $GITHUB_OUTPUT
+          else
+            echo "Error: Could not find Flutter project"
+            exit 1
+          fi
+
+      # Speed: reuse downloaded dependencies + build cache between runs (APK + bundle Gradle phases).
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('MobileApp/android/gradle/wrapper/gradle-wrapper.properties', 'MobileApp/android/settings.gradle', 'MobileApp/android/build.gradle', 'MobileApp/android/app/build.gradle', 'MobileApp/android/gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Resolve build profile from backend URL
+        id: resolve_env
+        run: |
+          BACKEND="${{ inputs.backend_url }}"
+          # Local / emulator → development (quick login, WebView localhost rules)
+          if [[ "$BACKEND" == *"localhost"* ]] || [[ "$BACKEND" == *"127.0.0.1"* ]] || [[ "$BACKEND" == *"10.0.2.2"* ]]; then
+            PROFILE=development
+          elif [[ "$BACKEND" == *"fly.dev"* ]]; then
+            PROFILE=demo
+          elif [[ "$BACKEND" == *"-stage.ifrc.org"* ]]; then
+            PROFILE=staging
+          # Production IFRC backoffice
+          elif [[ "$BACKEND" == *"databank.ifrc.org"* ]]; then
+            PROFILE=production
+          else
+            echo "Unknown BACKEND_URL, defaulting profile to production: $BACKEND" >&2
+            PROFILE=production
+          fi
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          echo "Resolved build profile: $PROFILE"
+
+      - name: Resolve environment-specific API key
+        id: env_secrets
+        run: |
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) API_KEY="${{ secrets.MOBILE_APP_API_KEY_PRODUCTION }}" ;;
+            staging)    API_KEY="${{ secrets.MOBILE_APP_API_KEY_STAGING }}" ;;
+            demo)       API_KEY="${{ secrets.MOBILE_APP_API_KEY_LOCAL_DEV }}" ;;
+            *)          API_KEY="${{ secrets.MOBILE_APP_API_KEY_DEVELOPMENT }}" ;;
+          esac
+          echo "api_key=${API_KEY:-${{ secrets.MOBILE_APP_API_KEY }}}" >> "$GITHUB_OUTPUT"
+
+      - name: Create .env file with configuration
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          echo "BACKEND_URL=${{ inputs.backend_url }}" > .env
+          echo "FRONTEND_URL=${{ inputs.frontend_url }}" >> .env
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) echo "PRODUCTION=true" >> .env ;;
+            staging)    echo "STAGING=true" >> .env ;;
+            demo)       echo "DEMO=true" >> .env ;;
+            *)          echo "DEVELOPMENT=true" >> .env ;;
+          esac
+          echo "Created .env (profile=${{ steps.resolve_env.outputs.profile }}):"
+          echo "  BACKEND_URL=${{ inputs.backend_url }}"
+          echo "  FRONTEND_URL=${{ inputs.frontend_url }}"
+          cat .env
+
+      - name: Prepare Firebase Android config (CI placeholder)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          cp android/app/google-services.json.example android/app/google-services.json
+
+      - name: Get Flutter dependencies
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: flutter pub get
+
+      - name: Analyze Dart (catch dependency/API issues before Gradle)
+        if: github.event_name != 'workflow_dispatch' || inputs.run_flutter_analyze
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        # --no-pub: pub get already ran; avoids a second full resolve (~10–20s in CI logs).
+        run: flutter analyze --no-fatal-infos --no-pub
+
+      - name: Configure alternate package name and app name
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: |
+          PROFILE="${{ steps.resolve_env.outputs.profile }}"
+
+          # Non-production profiles get a distinct package name so they can be installed alongside production
+          # Base applicationId matches MobileApp android/app/build.gradle
+          if [ -f "android/app/build.gradle" ]; then
+            if [ "$PROFILE" = "staging" ]; then
+              sed -i 's/applicationId "com\.hum\.databank"/applicationId "com.hum.databank.staging"/g' android/app/build.gradle
+            elif [ "$PROFILE" = "demo" ]; then
+              sed -i 's/applicationId "com\.hum\.databank"/applicationId "com.hum.databank.demo"/g' android/app/build.gradle
+            elif [ "$PROFILE" = "development" ]; then
+              sed -i 's/applicationId "com\.hum\.databank"/applicationId "com.hum.databank.dev"/g' android/app/build.gradle
+            fi
+          fi
+
+          if [ "$PROFILE" = "staging" ]; then
+            ENV_DISPLAY_NAME="IFRC Databank (Staging)"
+          elif [ "$PROFILE" = "demo" ]; then
+            ENV_DISPLAY_NAME="Humanitarian Databank (Demo)"
+          else
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              ORG="${{ inputs.organization_config }}"
+            else
+              ORG=ifrc
+            fi
+            if [ "$ORG" = "ifrc" ]; then
+              ENV_DISPLAY_NAME="IFRC Databank"
+            else
+              ENV_DISPLAY_NAME="Humanitarian Databank (CI - $PROFILE)"
+            fi
+          fi
+
+          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+            sed -i "s/android:label=\"[^\"]*\"/android:label=\"$ENV_DISPLAY_NAME\"/g" android/app/src/main/AndroidManifest.xml || true
+            if ! grep -q 'android:label' android/app/src/main/AndroidManifest.xml; then
+              sed -i "s/<application\([^>]*\)>/<application android:label=\"$ENV_DISPLAY_NAME\"\1>/g" android/app/src/main/AndroidManifest.xml
+            fi
+          fi
+
+      - name: Build APK (release)
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        env:
+          IFRC_API_USER: ${{ secrets.IFRC_API_USER }}
+          IFRC_API_PASSWORD: ${{ secrets.IFRC_API_PASSWORD }}
+        run: |
+          # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step)
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) ENV_FLAG="PRODUCTION=true" ;;
+            staging)    ENV_FLAG="STAGING=true" ;;
+            demo)       ENV_FLAG="DEMO=true" ;;
+            *)          ENV_FLAG="DEVELOPMENT=true" ;;
+          esac
+
+          # Build with organization config if specified
+          ORG_CONFIG=""
+          if [ -n "${{ inputs.organization_config }}" ]; then
+            ORG_CONFIG="--dart-define=ORGANIZATION_CONFIG=${{ inputs.organization_config }}"
+          fi
+
+          flutter build apk --release --no-pub \
+            --dart-define=$ENV_FLAG \
+            $ORG_CONFIG \
+            --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
+            --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}" \
+            --dart-define=IFRC_API_USER="$IFRC_API_USER" \
+            --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+
+      - name: Build App Bundle (Play Store .aab)
+        if: github.event_name != 'workflow_dispatch' || inputs.build_app_bundle
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        env:
+          IFRC_API_USER: ${{ secrets.IFRC_API_USER }}
+          IFRC_API_PASSWORD: ${{ secrets.IFRC_API_PASSWORD }}
+        run: |
+          # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step)
+          case "${{ steps.resolve_env.outputs.profile }}" in
+            production) ENV_FLAG="PRODUCTION=true" ;;
+            staging)    ENV_FLAG="STAGING=true" ;;
+            demo)       ENV_FLAG="DEMO=true" ;;
+            *)          ENV_FLAG="DEVELOPMENT=true" ;;
+          esac
+
+          # Build with organization config if specified
+          ORG_CONFIG=""
+          if [ -n "${{ inputs.organization_config }}" ]; then
+            ORG_CONFIG="--dart-define=ORGANIZATION_CONFIG=${{ inputs.organization_config }}"
+          fi
+
+          flutter build appbundle --release --no-pub \
+            --dart-define=$ENV_FLAG \
+            $ORG_CONFIG \
+            --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
+            --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}" \
+            --dart-define=IFRC_API_USER="$IFRC_API_USER" \
+            --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+
+      # APK + AAB when build_app_bundle is enabled; otherwise APK only (manual runs).
+      - name: Archive Android build artifacts (APK + AAB)
+        if: github.event_name != 'workflow_dispatch' || inputs.build_app_bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-build-ci
+          path: |
+            ${{ steps.flutter_path.outputs.path }}/build/app/outputs/flutter-apk/*.apk
+            ${{ steps.flutter_path.outputs.path }}/build/app/outputs/bundle/release/*.aab
+          retention-days: 30
+
+      - name: Archive Android build artifacts (APK only)
+        if: github.event_name == 'workflow_dispatch' && inputs.build_app_bundle == false
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-build-ci
+          path: ${{ steps.flutter_path.outputs.path }}/build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
+
+      # Optional: Build signed APK (requires keystore)
+      # Uncomment and configure the following steps if you have signing keys
+      # - name: Create keystore properties
+      #   run: |
+      #     echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #     echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #     echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #     echo "storeFile=${{ secrets.ANDROID_KEYSTORE_FILE }}" >> ${{ steps.flutter_path.outputs.path }}/android/key.properties
+      #
+      # - name: Build signed APK
+      #   working-directory: ${{ steps.flutter_path.outputs.path }}
+      #   run: |
+      #     flutter build apk --release --dart-define=PRODUCTION=true
+      #
+      # - name: Upload signed APK
+      #   uses: actions/upload-artifact@v6
+      #   with:
+      #     name: android-apk-signed
+      #     path: ${{ steps.flutter_path.outputs.path }}/build/app/outputs/flutter-apk/*.apk
+      #     retention-days: 30

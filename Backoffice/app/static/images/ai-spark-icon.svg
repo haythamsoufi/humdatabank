@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d0fe"/>
+      <stop offset="50%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#g)">
+    <!-- 8-point spark: main rays -->
+    <polygon points="12,1 14,8 21,10 14,12 12,19 10,12 3,10 10,8"/>
+  </g>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "last_sync": "2026-04-13T16:35:34.812Z",
+  "sync_timestamp": 1776098134813,
+  "version": 1776098134813,
+  "total_items": 33884,
+  "data_count": 33876,
+  "form_items_count": 52,
+  "countries_count": 192,
+  "indicators_count": 474,
+  "templates_count": 9,
+  "common_words_count": 130,
+  "resources_count": 1,
+  "submitted_documents_count": 0,
+  "embed_content_count": 3,
+  "api_url": "http://localhost:5000"
+}

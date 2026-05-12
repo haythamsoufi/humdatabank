@@ -1,0 +1,281 @@
+{% from "macros/empty_state.html" import empty_state %}
+{# user_analytics_embedded: True when loaded via fetch into user form (default). False for /admin/analytics/user/<id> full page. #}
+{% set user_analytics_embedded = (user_analytics_embedded is not defined) or user_analytics_embedded %}
+{# Use <a href="#"> not <button> when embedded: HTML is inserted via SafeDom.sanitizeHtml() which strips buttons. #}
+<div class="space-y-6">
+    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5">
+        <p class="text-sm font-semibold text-gray-800 mb-3">
+            <i class="fas fa-calendar-alt mr-2 text-blue-600"></i>{{ _('Time period') }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+            {% if user_analytics_embedded %}
+            <a href="#"
+               data-analytics-days="7"
+               class="user-analytics-period-btn px-3 py-2 rounded-md text-sm font-medium border transition-colors {% if selected_days == 7 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">
+                {{ _('Last 7 days') }}
+            </a>
+            <a href="#"
+               data-analytics-days="30"
+               class="user-analytics-period-btn px-3 py-2 rounded-md text-sm font-medium border transition-colors {% if selected_days == 30 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">
+                {{ _('Last 30 days') }}
+            </a>
+            <a href="#"
+               data-analytics-days="90"
+               class="user-analytics-period-btn px-3 py-2 rounded-md text-sm font-medium border transition-colors {% if selected_days == 90 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">
+                {{ _('Last 90 days') }}
+            </a>
+            {% else %}
+            <a href="{{ url_for('analytics.user_analytics', user_id=user.id, days=7) }}"
+               class="user-analytics-period-btn px-3 py-2 rounded-md text-sm font-medium border transition-colors {% if selected_days == 7 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">
+                {{ _('Last 7 days') }}
+            </a>
+            <a href="{{ url_for('analytics.user_analytics', user_id=user.id, days=30) }}"
+               class="user-analytics-period-btn px-3 py-2 rounded-md text-sm font-medium border transition-colors {% if selected_days == 30 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">
+                {{ _('Last 30 days') }}
+            </a>
+            <a href="{{ url_for('analytics.user_analytics', user_id=user.id, days=90) }}"
+               class="user-analytics-period-btn px-3 py-2 rounded-md text-sm font-medium border transition-colors {% if selected_days == 90 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">
+                {{ _('Last 90 days') }}
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
+             title="{{ _('Number of successful login events recorded for this user in the selected period.') }}">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Total logins') }}</h3>
+                <i class="fas fa-sign-in-alt text-blue-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-blue-600 tabular-nums">{{ login_analytics.total_logins if login_analytics else 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Successful logins in period') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
+             title="{{ _('Number of failed login attempts (wrong password, unknown account, etc.) for this user in the selected period.') }}">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Failed logins') }}</h3>
+                <i class="fas fa-times-circle text-red-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-red-600 tabular-nums">{{ (login_analytics.failed_attempts or 0) if login_analytics else 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Wrong password / unknown account') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
+             title="{{ _('All tracked actions in the selected period: page views, form saves/submits, data edits, file uploads, data exports, profile updates, AI interactions, API key events, and more.') }}">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Total activities') }}</h3>
+                <i class="fas fa-chart-line text-green-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-green-600 tabular-nums">{{ activity_analytics.total_activities if activity_analytics else 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Page views, saves, uploads & more') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
+             title="{{ _('Total active time across all sessions in the selected period, measured from session start to last recorded activity — excludes idle timeout padding.') }}">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Active time (total)') }}</h3>
+                <i class="fas fa-hourglass-half text-teal-500"></i>
+            </div>
+            {% if total_active_time_minutes is defined %}{% set ttm = total_active_time_minutes %}{% elif total_time_minutes is defined %}{% set ttm = total_time_minutes %}{% else %}{% set ttm = 0 %}{% endif %}
+            {% if ttm >= 60 %}
+                {% set hours = (ttm // 60) %}{% set mins = (ttm % 60) %}
+                <p class="text-2xl font-bold text-teal-600 tabular-nums">{{ hours }}h{% if mins %} {{ mins }}m{% endif %}</p>
+            {% elif ttm > 0 %}
+                <p class="text-2xl font-bold text-teal-600 tabular-nums">{{ ttm }}m</p>
+            {% else %}
+                <p class="text-2xl font-bold text-teal-600 tabular-nums">—</p>
+            {% endif %}
+            <p class="text-xs text-gray-500 mt-1">{{ _('Session start to last activity') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
+             title="{{ _('Total login sessions started by this user in the selected period. The table below shows the 10 most recent.') }}">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Sessions') }}</h3>
+                <i class="fas fa-layer-group text-purple-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-purple-600 tabular-nums">{{ total_sessions_count if total_sessions_count is defined else recent_sessions|length }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Login sessions in period') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
+             title="{{ _('Sum of session page-view counters for this user in the selected period (same basis as page path analytics).') }}">
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-sm font-semibold text-gray-700 min-w-0">{{ _('Total page views') }}</h3>
+                <a href="{{ url_for('analytics.page_path_analytics', user_id=user.id, days=selected_days) }}"
+                   class="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-900"
+                   title="{{ _('View page path breakdown') }}"
+                   {% if user_analytics_embedded %}target="_blank" rel="noopener noreferrer"{% endif %}
+                   aria-label="{{ _('View page path breakdown') }}">
+                    <i class="fas fa-route" aria-hidden="true"></i>
+                </a>
+            </div>
+            <p class="text-2xl font-bold text-amber-600 tabular-nums">{{ total_page_views if total_page_views is defined else 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Session-tracked page loads') }}</p>
+        </div>
+    </div>
+
+    <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-800">
+                <i class="fas fa-history mr-2 text-blue-600"></i>{{ _('Recent sessions') }}
+            </h3>
+            {% if total_sessions_count is defined and total_sessions_count > recent_sessions|length %}
+            <span class="text-xs text-gray-500">{{ _('Showing %(shown)s of %(total)s', shown=recent_sessions|length, total=total_sessions_count) }}</span>
+            {% endif %}
+        </div>
+        <div class="p-0">
+            {% if recent_sessions %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Session start') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                title="{{ _('Wall clock from login to session close, including idle after last activity until timeout or logout.') }}">
+                                {{ _('Session length') }}
+                            </th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                title="{{ _('From login to last recorded activity; excludes idle after last activity.') }}">
+                                {{ _('Active time') }}
+                            </th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Page views') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                title="{{ _('Actions performed during this session (form saves/submits, data edits, file uploads, etc.) — excludes page views.') }}">
+                                {{ _('Actions') }} <i class="fas fa-info-circle text-gray-400 ml-1 text-xs cursor-help"></i>
+                            </th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for session in recent_sessions %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {{ session.session_start|datetime_local('datetime', 'text-sm text-gray-900') }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% set wall = session|session_effective_duration_minutes %}
+                                {% if wall is not none %}
+                                <span class="text-sm text-gray-900">{{ wall }} min</span>
+                                {% else %}
+                                <span class="text-sm text-gray-500">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% set act = session|session_effective_active_duration_minutes %}
+                                {% if act is not none %}
+                                <span class="text-sm text-gray-900">{{ act }} min</span>
+                                {% else %}
+                                <span class="text-sm text-gray-500">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="text-sm text-gray-900">{{ session.page_views or 0 }}</span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="text-sm text-gray-900">{{ session.audit_visible_activity_count if session.audit_visible_activity_count is defined else (session.actions_performed or 0) }}</span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if session.is_active %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    <i class="fas fa-circle mr-1"></i> {{ _('Active') }}
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    {{ _('Ended') }}
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            {{ empty_state(icon="fas fa-clock", title=_('No recent sessions found.')) }}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-sm font-semibold text-gray-800">
+                <i class="fas fa-key mr-2 text-blue-600"></i>{{ _('Recent login attempts') }}
+            </h3>
+        </div>
+        <div class="p-0">
+            {% if recent_logins %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Timestamp') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Event') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('IP address') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Device') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for login in recent_logins %}
+                        <tr class="{% if login.is_suspicious %}bg-yellow-50 hover:bg-yellow-100{% else %}hover:bg-gray-50{% endif %}">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {{ login.timestamp|datetime_local('datetime', 'text-sm text-gray-900') }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if login.event_type == 'login_success' %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    <i class="fas fa-check-circle mr-1"></i> {{ _('Login') }}
+                                </span>
+                                {% elif login.event_type == 'logout' %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    <i class="fas fa-door-open mr-1"></i> {{ _('Logout') }}
+                                </span>
+                                {% elif login.event_type == 'login_failed' %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    <i class="fas fa-times-circle mr-1"></i> {{ _('Failed login') }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <div class="text-sm text-gray-900 font-mono">{{ login.ip_address }}</div>
+                                {% if login.location %}
+                                <div class="text-xs text-gray-500">{{ login.location }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if login.device_type %}
+                                <div class="text-sm text-gray-900">{{ login.device_type|title }}</div>
+                                {% if login.device_name %}
+                                <div class="text-xs text-gray-500">{{ login.device_name }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-sm text-gray-500">{{ _('Unknown') }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if login.is_suspicious %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i> {{ _('Suspicious') }}
+                                </span>
+                                {% elif login.is_successful %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">{{ _('Success') }}</span>
+                                {% elif login.is_logout %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{{ _('Completed') }}</span>
+                                {% else %}
+                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">{{ _('Failed') }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            {{ empty_state(icon="fas fa-sign-in-alt", title=_('No recent login attempts found.')) }}
+            {% endif %}
+        </div>
+    </div>
+</div>

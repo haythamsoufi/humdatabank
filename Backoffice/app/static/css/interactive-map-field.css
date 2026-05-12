@@ -1,0 +1,295 @@
+/* Backoffice/plugins/interactive_map/static/css/map_field.css */
+
+/* Interactive Map Field Styles */
+
+.interactive-map-field {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Map Container */
+.map-container {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.map-field {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.map-field:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.map-field:focus-within {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Map Instructions */
+.map-instructions {
+    margin-bottom: 1rem;
+}
+
+.map-instructions .alert {
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 0.75rem;
+    color: #1e40af;
+}
+
+.map-instructions .alert i {
+    color: #3b82f6;
+}
+
+/* Map Controls */
+.map-controls {
+    margin-bottom: 1rem;
+}
+
+.map-controls .input-group {
+    margin-bottom: 0.5rem;
+}
+
+.map-controls .input-group input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.map-controls .input-group-append .btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 0;
+}
+
+.map-controls .btn-group .btn {
+    margin-right: 0.25rem;
+}
+
+.map-controls .btn-group .btn:last-child {
+    margin-right: 0;
+}
+
+/* Map Info Cards */
+.map-info .card {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.map-info .card-header {
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.map-info .card-header i {
+    margin-right: 0.5rem;
+}
+
+.map-info .card-body {
+    padding: 0.75rem;
+}
+
+.map-info .font-monospace {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875rem;
+    color: #6b7280;
+    background-color: #f9fafb;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+}
+
+/* Marker List */
+.marker-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.marker-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.marker-item:hover {
+    background-color: #f9fafb;
+}
+
+.marker-item:last-child {
+    border-bottom: none;
+}
+
+.marker-item .font-monospace {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+/* Leaflet Map Customizations */
+.leaflet-container {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.leaflet-popup-content {
+    margin: 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.leaflet-popup-content p {
+    margin: 0.25rem 0;
+}
+
+.leaflet-popup-content .btn {
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.leaflet-popup-tip {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Marker Popup Customizations */
+.marker-popup {
+    text-align: center;
+}
+
+.marker-popup p {
+    margin: 0.25rem 0;
+}
+
+.marker-popup .btn-danger {
+    background-color: #dc2626;
+    border-color: #dc2626;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.marker-popup .btn-danger:hover {
+    background-color: #b91c1c;
+    border-color: #b91c1c;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .map-info .row > div {
+        margin-bottom: 1rem;
+    }
+
+    .map-info .row > div:last-child {
+        margin-bottom: 0;
+    }
+
+    .map-controls .btn-group {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .map-controls .btn-group .btn {
+        margin-right: 0;
+        margin-bottom: 0.25rem;
+        border-radius: 4px !important;
+    }
+
+    .map-controls .btn-group .btn:last-child {
+        margin-bottom: 0;
+    }
+}
+
+/* Loading States */
+.map-field.loading {
+    position: relative;
+    min-height: 200px;
+}
+
+.map-field.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    margin: -20px 0 0 -20px;
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Error States */
+.map-field.error {
+    border-color: #dc2626;
+    background-color: #fef2f2;
+}
+
+.map-field.error::after {
+    content: 'Error loading map';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #dc2626;
+    font-weight: 500;
+}
+
+/* Accessibility */
+.map-field:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.map-controls .btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .map-field {
+        border-width: 3px;
+    }
+
+    .map-info .card {
+        border-width: 2px;
+    }
+
+    .map-controls .btn {
+        border-width: 2px;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    .map-field,
+    .map-controls .btn,
+    .marker-item {
+        transition: none;
+    }
+
+    .map-field.loading::after {
+        animation: none;
+    }
+}

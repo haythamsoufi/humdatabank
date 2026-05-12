@@ -1,0 +1,37 @@
+{# templates/public_submission_success.html #}
+{% extends "core/layout.html" %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{{ page_header(
+    title=title,
+    icon='fas fa-check-circle',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Public Submissions')}
+    ]
+) }}
+
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 text-center"> {# Styled container #}
+        <div class="text-green-500 mb-4">
+            <i class="fas fa-check-circle fa-5x"></i> {# Large checkmark icon #}
+        </div>
+        <h2 class="text-2xl font-semibold mb-4 text-gray-700">Submission Successful!</h2> {# Success message heading #}
+        <p class="text-gray-700 mb-6">Thank you for submitting the form. Your data has been received.</p> {# Confirmation text #}
+
+        <div class="flex flex-col items-center space-y-4">
+            <a href="{{ url_for('main.download_submission_pdf', submission_id=submission.id) }}"
+               class="btn btn-primary">
+                <i class="fas fa-file-pdf mr-2"></i>
+                Download PDF Copy
+            </a>
+
+            <p class="text-sm text-gray-600">
+                <i class="fas fa-info-circle mr-1"></i>
+                You can download a PDF copy of your submission for your records
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

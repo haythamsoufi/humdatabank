@@ -1,0 +1,1019 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumbs as build_breadcrumbs %}
+{% from "macros/empty_state.html" import empty_state %}
+{# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
+{% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
+{% set can_manage_documents = current_is_system_manager or has_permission('admin.documents.manage') %}
+{# Upload/edit/delete on this page requires the Assignment "Documents (Upload)" capability #}
+{% set can_upload_documents = can_manage_documents or has_permission('assignment.documents.upload') %}
+{# Shared by grid card toolbar + extra_js (must be outside blocks for Jinja scope). #}
+{% set DOCUMENTS_GRID_COLVIS_PH = 'documentsGrid-colvis-placeholder' %}
+{%- macro doc_modal_optgroup_label(entity_type) -%}
+{%- set match = (document_entity_types or []) | selectattr('value', 'equalto', entity_type) | list | first -%}
+{%- if match -%}{{ match.label }}{%- else -%}{{ entity_type | replace('_', ' ') | title }}{%- endif -%}
+{%- endmacro -%}
+
+{% block head %}
+    {{ super() }}
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <style nonce="{{ csp_style_nonce() }}">
+        /* Ensure filename column wraps text properly */
+        .break-words {
+            word-wrap: break-word !important;
+            word-break: break-all !important;
+            white-space: normal !important;
+            overflow-wrap: break-word !important;
+        }
+        /* Entity selector in grid card toolbar (focal /documents) */
+        .docs-grid-toolbar .docs-entity-toolbar .enhanced-search-dropdown {
+            max-width: 100%;
+        }
+    </style>
+{% endblock %}
+
+{#
+This block defines the breadcrumb navigation for the page.
+It helps users understand their location within the site structure.
+#}
+{% block breadcrumbs %}
+{{ build_breadcrumbs([
+    {'text': 'Home', 'url': url_for('main.index')},
+    {'text': (page_title if page_title is defined and page_title else 'Document Management'), 'active': True}
+]) }}
+{% endblock %}
+
+{#
+Main content block for the document management page.
+It features a full-bleed card layout with a clean header and a responsive table.
+#}
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{# Precompute assigned country IDs for per-document UI gating #}
+{% set _user_countries = (current_user.countries.all() if current_user.is_authenticated and hasattr(current_user, 'countries') and hasattr(current_user.countries, 'all') else (current_user.countries if current_user.is_authenticated and hasattr(current_user, 'countries') else [])) %}
+{% set current_user_country_ids = _user_countries | map(attribute='id') | list %}
+
+{% set _doc_page_title = (page_title if page_title is defined and page_title else _('Document Management')) %}
+{% set _doc_header_actions = [
+    {
+        'type': 'button',
+        'text': _('Upload Document'),
+        'icon': 'fas fa-upload',
+        'classes': 'professional-action-btn professional-action-btn-green',
+        'attributes': {'data-action': 'open-modal'}
+    } if current_user.is_authenticated and can_upload_documents else None
+] | reject('none') | list %}
+
+{{ page_header(title=_doc_page_title, icon='fas fa-file-alt', actions=_doc_header_actions) }}
+
+<div>
+    <div id="docConfig" data-show-country="{{ 'true' if show_country_column else 'false' }}" class="hidden"></div>
+
+    {% from "components/ag_grid_includes.html" import ag_grid_container %}
+    <!-- Main Table Card -->
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
+        {% if user_entities is defined and user_entities %}
+        <div class="docs-grid-toolbar flex flex-wrap items-start sm:items-center justify-between gap-3 mb-4">
+            <div class="min-w-0 flex-1 docs-entity-toolbar">
+                {% if show_entity_select is defined and show_entity_select and user_entities %}
+                    {% with form_action=url_for('main.documents_submit'), csrf_token=csrf_token() %}
+                        {% include 'components/entity_dropdown.html' %}
+                    {% endwith %}
+                {% elif documents_entity_repo_label is defined and documents_entity_repo_label %}
+                    <p class="text-sm text-gray-800 font-medium leading-snug m-0 pr-2">{{ documents_entity_repo_label }}</p>
+                {% endif %}
+            </div>
+            {% if documents %}
+            <div id="{{ DOCUMENTS_GRID_COLVIS_PH }}" class="flex-shrink-0 self-start sm:self-center"></div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if documents %}
+            {% if user_entities is defined and user_entities %}
+            {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), grid_height='600px', include_card=false, show_placeholder=false, placeholder_id=DOCUMENTS_GRID_COLVIS_PH) }}
+            {% else %}
+            {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), grid_height='600px', include_card=false) }}
+            {% endif %}
+        {% else %}
+            {{ empty_state(icon="fas fa-file-alt", title=_('No Documents Found'), message=_('Documents are uploaded through form submissions.')) }}
+        {% endif %}
+    </div>
+</div>
+
+{% if can_upload_documents %}
+{% from "macros/delete_confirm_modal.html" import delete_confirm_modal %}
+{{ delete_confirm_modal(
+    modal_id='deleteConfirmationModal',
+    modal_title=_('Confirm Deletion'),
+    message=_('Are you sure you want to delete this document? This action cannot be undone.'),
+    confirm_button_id='confirmDeleteButton'
+) }}
+
+{# Document Modal (for both upload and edit) #}
+<div class="fixed z-50 inset-0 overflow-y-auto hidden" id="documentModal" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <form id="documentForm" method="POST" enctype="multipart/form-data"
+                  data-upload-action="{{ upload_action_url if upload_action_url is defined and upload_action_url else url_for('content_management.upload_document') }}"
+                  {% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and show_entity_select is defined and show_entity_select and selected_entity_type is defined and selected_entity_id is defined %}data-default-entity-value="{{ selected_entity_type }}:{{ selected_entity_id }}"{% endif %}>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title"
+                                data-upload-text="{{ _('Upload New Document') }}"
+                                data-edit-text="{{ _('Edit Document') }}">
+                                {{ _('Upload New Document') }}
+                            </h3>
+                            <div class="mt-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <!-- Left Column -->
+                                    <div class="space-y-4">
+                                        {% if documents_modal_entity_choices is defined and documents_modal_entity_choices %}
+                                        <div>
+                                            <label for="documentModalEntitySelect" class="block text-sm font-medium text-gray-700">{{ _('Entity') }}</label>
+                                            <select id="documentModalEntitySelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md"{% if not (documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav) %} required{% endif %}>
+                                                {% if not (documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav) %}
+                                                <option value="">{{ _('Select an entity') }}</option>
+                                                {% endif %}
+                                                {% set doc_modal_og = namespace(prev=None, open=False) %}
+                                                {% for row in documents_modal_entity_choices %}
+                                                    {% if row.entity_type != doc_modal_og.prev %}
+                                                        {% if doc_modal_og.open %}</optgroup>{% endif %}
+                                                        <optgroup label="{{ doc_modal_optgroup_label(row.entity_type) }}">
+                                                        {% set doc_modal_og.prev = row.entity_type %}
+                                                        {% set doc_modal_og.open = True %}
+                                                    {% endif %}
+                                                    <option value="{{ row.entity_type }}:{{ row.entity_id }}"
+                                                            data-entity-type="{{ row.entity_type }}"
+                                                            data-entity-id="{{ row.entity_id }}"
+                                                            {% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_id is defined and row.entity_type == selected_entity_type and (row.entity_id|int) == (selected_entity_id|int) %}selected{% endif %}>
+                                                        {{ row.label }}
+                                                    </option>
+                                                {% endfor %}
+                                                {% if doc_modal_og.open %}</optgroup>{% endif %}
+                                            </select>
+                                        </div>
+                                        <input type="hidden" name="linked_entity_type" id="linkedEntityTypeHidden" value="{% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined %}{{ selected_entity_type }}{% endif %}">
+                                        <input type="hidden" name="linked_entity_id" id="linkedEntityIdHidden" value="{% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_id is defined %}{{ selected_entity_id }}{% endif %}">
+                                        <input type="hidden" name="country_id" id="countryIdHidden"
+                                               value="{% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_type == 'country' and selected_entity_id is defined %}{{ selected_entity_id }}{% endif %}"
+                                               {% if not (documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_type == 'country') %}disabled{% endif %}>
+                                        {% elif documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_id is defined %}
+                                        <input type="hidden" name="linked_entity_type" id="linkedEntityTypeHidden" value="{{ selected_entity_type }}">
+                                        {% if selected_entity_type == 'country' %}
+                                        <input type="hidden" name="country_id" id="countryIdHidden" value="{{ selected_entity_id }}">
+                                        {% endif %}
+                                        <input type="hidden" name="linked_entity_id" id="linkedEntityIdHidden" value="{{ selected_entity_id }}">
+                                        {% else %}
+                                        <div>
+                                            <label for="linkedEntityType" class="block text-sm font-medium text-gray-700">{{ _('Linked entity type') }}</label>
+                                            <select id="linkedEntityType" name="linked_entity_type" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                {% for et in (document_entity_types or []) %}
+                                                    <option value="{{ et.value }}">{{ et.label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div id="countrySelectWrap">
+                                            <label for="country" class="block text-sm font-medium text-gray-700">{{ _('Country') }}</label>
+                                            <select id="country" name="country_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select a country') }}</option>
+                                                {% for country in countries %}
+                                                    <option value="{{ country.id }}">{{ country.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div id="linkedEntityIdWrap" class="hidden">
+                                            <label for="linkedEntityId" class="block text-sm font-medium text-gray-700">{{ _('Entity') }}</label>
+                                            <select id="linkedEntityId" name="linked_entity_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select an entity') }}</option>
+                                            </select>
+                                        </div>
+                                        {% endif %}
+                                        <div>
+                                            <label for="documentType" class="block text-sm font-medium text-gray-700">{{ _('Document Type') }}</label>
+                                            <select id="documentType" name="document_type" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select document type') }}</option>
+                                                {% for doc_type in config.DOCUMENT_TYPES %}
+                                                    <option value="{{ doc_type }}">{{ doc_type }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div id="languageSection">
+                                            <label for="language" class="block text-sm font-medium text-gray-700">{{ _('Language') }}</label>
+                                            <select id="language" name="language" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select language') }}</option>
+                                                {# Pin supported languages first, in admin-configured order #}
+                                                {% set pinned_codes = ['en'] %}
+                                                {% for code in (SUPPORTED_LANGUAGES or []) %}
+                                                    {% set code_norm = (code|string|lower|replace('-', '_')) %}
+                                                    {% set base = (code_norm.split('_')[0] if code_norm else code) %}
+                                                    {% if base != 'en' and base not in pinned_codes %}
+                                                        {% set __ = pinned_codes.append(base) %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {% for code in pinned_codes %}
+                                                    {% if code in ALL_LANGUAGES_DISPLAY_NAMES %}
+                                                        <option value="{{ code }}">{{ (language_endonym(code) or ALL_LANGUAGES_DISPLAY_NAMES[code]) }}</option>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {# Show all other languages sorted alphabetically (keeps full list available) #}
+                                                {% set other_languages = [] %}
+                                                {% for code, name in ALL_LANGUAGES_DISPLAY_NAMES.items() %}
+                                                    {% if code not in pinned_codes %}
+                                                        {% set __ = other_languages.append({'code': code, 'name': name}) %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {% for lang in other_languages|sort(attribute='name') %}
+                                                    <option value="{{ lang.code }}">{{ (language_endonym(lang.code) or lang.name) }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- Right Column -->
+                                    <div class="space-y-4">
+                                        <div id="yearSection">
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Period/Year Covered') }}</label>
+                                            <div class="space-y-3">
+                                                <!-- Period Type Selection -->
+                                                <div>
+                                                    <select id="period-type" class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md">
+                                                        <option value="single-year">{{ _('Single Year') }}</option>
+                                                        <option value="year-range">{{ _('Year Range') }}</option>
+                                                        <option value="month-range">{{ _('Month Range') }}</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Single Year -->
+                                                <div id="single-year-fields" class="period-fields">
+                                                    <select id="single-year"
+                                                            class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                            data-year-select="true"
+                                                            data-year-min="2000"
+                                                            data-year-max="2100">
+                                                        <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Year Range -->
+                                                <div id="year-range-fields" class="period-fields hidden">
+                                                    <div class="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('Start Year') }}</label>
+                                                            <select id="start-year"
+                                                                    class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                    data-year-select="true"
+                                                                    data-year-min="2000"
+                                                                    data-year-max="2100">
+                                                                <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('End Year') }}</label>
+                                                            <select id="end-year"
+                                                                    class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                    data-year-select="true"
+                                                                    data-year-min="2000"
+                                                                    data-year-max="2100">
+                                                                <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Month Range -->
+                                                <div id="month-range-fields" class="period-fields hidden">
+                                                    <div class="space-y-2">
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('Start Period') }}</label>
+                                                            <div class="grid grid-cols-2 gap-1">
+                                                                <select id="start-month-year"
+                                                                        class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                        data-year-select="true"
+                                                                        data-year-min="2000"
+                                                                        data-year-max="2100">
+                                                                    <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                                </select>
+                                                                <select id="start-month" class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md">
+                                                                    <option value="01">{{ _('Jan') }}</option>
+                                                                    <option value="02">{{ _('Feb') }}</option>
+                                                                    <option value="03">{{ _('Mar') }}</option>
+                                                                    <option value="04">{{ _('Apr') }}</option>
+                                                                    <option value="05">{{ _('May') }}</option>
+                                                                    <option value="06">{{ _('Jun') }}</option>
+                                                                    <option value="07">{{ _('Jul') }}</option>
+                                                                    <option value="08">{{ _('Aug') }}</option>
+                                                                    <option value="09">{{ _('Sep') }}</option>
+                                                                    <option value="10">{{ _('Oct') }}</option>
+                                                                    <option value="11">{{ _('Nov') }}</option>
+                                                                    <option value="12">{{ _('Dec') }}</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('End Period') }}</label>
+                                                            <div class="grid grid-cols-2 gap-1">
+                                                                <select id="end-month-year"
+                                                                        class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                        data-year-select="true"
+                                                                        data-year-min="2000"
+                                                                        data-year-max="2100">
+                                                                    <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                                </select>
+                                                                <select id="end-month" class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md">
+                                                                    <option value="01">{{ _('Jan') }}</option>
+                                                                    <option value="02">{{ _('Feb') }}</option>
+                                                                    <option value="03">{{ _('Mar') }}</option>
+                                                                    <option value="04">{{ _('Apr') }}</option>
+                                                                    <option value="05">{{ _('May') }}</option>
+                                                                    <option value="06">{{ _('Jun') }}</option>
+                                                                    <option value="07">{{ _('Jul') }}</option>
+                                                                    <option value="08">{{ _('Aug') }}</option>
+                                                                    <option value="09">{{ _('Sep') }}</option>
+                                                                    <option value="10">{{ _('Oct') }}</option>
+                                                                    <option value="11">{{ _('Nov') }}</option>
+                                                                    <option value="12">{{ _('Dec') }}</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Hidden field to store the generated period name -->
+                                                <input type="hidden" name="year" id="year" required>
+                                            </div>
+                                        </div>
+                                        <div id="statusSection" class="hidden">
+                                            <label for="status" class="block text-sm font-medium text-gray-700">{{ _('Document Status') }}</label>
+                                            <select id="status" name="status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="Pending">{{ _('Pending Review') }}</option>
+                                                <option value="Approved">{{ _('Approved') }}</option>
+                                                <option value="Rejected">{{ _('Rejected') }}</option>
+                                            </select>
+                                            <p class="mt-1 text-sm text-gray-500">{{ _('Change the approval status of this document') }}</p>
+                                        </div>
+                                        <div class="flex items-start space-x-3">
+                                            <div class="flex items-center h-5">
+                                                <input id="is_public" name="is_public" type="checkbox" class="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded">
+                                            </div>
+                                            <div class="ml-3 text-sm">
+                                                <label for="is_public" class="font-medium text-gray-700">{{ _('Public Document') }}</label>
+                                                <p class="text-gray-500" id="publicHelpText"
+                                                   data-default-text="{{ _('Check this box to make the document publicly accessible') }}"
+                                                   data-cover-text="{{ _('Cover images are always public and visible on country pages') }}">
+                                                    {{ _('Check this box to make the document publicly accessible') }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- File Upload and Thumbnail Sections - Side by Side -->
+                                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <!-- File Upload Section -->
+                                    <div id="fileUploadSection">
+                                        <label for="document" class="block text-sm font-medium text-gray-700">{{ _('Document File') }}</label>
+                                        <div id="documentFileDropZone" class="mt-1 flex justify-center px-4 py-4 sm:px-5 sm:py-5 border-2 border-gray-300 border-dashed rounded-md">
+                                            <div id="documentUploadEmptyState" class="space-y-1 text-center w-full">
+                                                <i class="fas fa-upload text-gray-400 text-3xl mb-3" aria-hidden="true"></i>
+                                                <div class="flex flex-col items-center gap-1.5 text-sm text-gray-600 w-full">
+                                                    <label for="document" class="relative cursor-pointer bg-white rounded-md font-medium text-red-600 hover:text-red-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-red-500">
+                                                        <span id="documentUploadTriggerLabel">{{ _('Upload a file') }}</span>
+                                                    </label>
+                                                    <div class="text-center text-gray-500 leading-tight space-y-0.5 max-w-md mx-auto">
+                                                        <p class="text-sm m-0">{{ _('or drag and drop') }}</p>
+                                                        <p id="documentFileSizeHelp" class="text-xs m-0"
+                                                           data-default-text="{{ _('Any file up to 10MB') }}"
+                                                           data-image-text="{{ _('Image files only (PNG, JPG, etc.) up to 10MB') }}">{{ _('Any file up to 10MB') }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div id="documentCurrentFileState" class="hidden w-full text-left flex flex-col gap-2">
+                                                <div class="flex items-start gap-3 min-w-0">
+                                                    <i class="fas fa-file-alt text-gray-500 text-2xl flex-shrink-0 mt-0.5" aria-hidden="true"></i>
+                                                    <div class="min-w-0">
+                                                        <a id="currentDocumentFileLink" href="#"
+                                                           class="text-sm font-semibold text-blue-600 hover:text-blue-800 break-all leading-snug hidden focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 rounded-sm"
+                                                           target="_blank" rel="noopener noreferrer"
+                                                           aria-label="{{ _('Download document') }}"></a>
+                                                        <span id="currentDocumentFileNamePlain" class="text-sm font-semibold text-gray-900 break-all leading-snug hidden"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col gap-1.5 w-full pt-2 border-t border-gray-200">
+                                                    <label for="document" class="relative cursor-pointer bg-white rounded-md text-sm font-medium text-red-600 hover:text-red-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-red-500 w-fit">
+                                                        <span>{{ _('Replace file') }}</span>
+                                                    </label>
+                                                    <div class="text-gray-500 leading-tight space-y-0.5">
+                                                        <p class="text-sm m-0">{{ _('or drag and drop') }}</p>
+                                                        <p id="documentFileSizeHelpEdit" class="text-xs m-0"
+                                                           data-default-text="{{ _('Any file up to 10MB') }}"
+                                                           data-image-text="{{ _('Image files only (PNG, JPG, etc.) up to 10MB') }}">{{ _('Any file up to 10MB') }}</p>
+                                                    </div>
+                                                </div>
+                                                <div id="documentPendingReplaceRow" class="hidden mt-2 pt-2 border-t border-gray-200 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                                                    <div class="min-w-0 flex-1">
+                                                        <span class="text-xs text-gray-500">{{ _('New file selected') }}</span>
+                                                        <span class="text-sm font-medium text-gray-800 break-all block sm:inline sm:ml-1" id="documentPendingReplaceName"></span>
+                                                    </div>
+                                                    <button type="button" id="documentClearReplaceBtn" class="text-xs text-red-600 hover:text-red-800 underline flex-shrink-0">{{ _('Clear selection') }}</button>
+                                                </div>
+                                            </div>
+                                            <input id="document" name="document" type="file" class="sr-only" autocomplete="off">
+                                        </div>
+                                    </div>
+                                    <!-- Thumbnail Upload Section - Only show for public documents -->
+                                    <div id="thumbnailSection" class="hidden">
+                                        <label for="thumbnail" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Thumbnail Image') }}</label>
+                                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md thumbnail-upload-container"
+                                             data-entity-type="document"
+                                             data-i18n-generating="{{ _('Generating...') }}"
+                                             data-i18n-generating-thumb="{{ _('Generating thumbnail...') }}"
+                                             data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail') }}"
+                                             data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail') }}"
+                                             data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.') }}"
+                                             data-i18n-deleting="{{ _('Deleting...') }}"
+                                             data-i18n-deleting-thumb="{{ _('Deleting thumbnail...') }}"
+                                             data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!') }}"
+                                             data-i18n-generated-success="{{ _('Thumbnail generated successfully!') }}"
+                                             data-i18n-error-prefix="{{ _('Error:') }}"
+                                             data-i18n-network-error="{{ _('Network error occurred') }}"
+                                             data-i18n-generated-automatically="{{ _('Generated automatically') }}"
+                                             data-i18n-current-thumbnail="{{ _('Current thumbnail:') }}"
+                                             data-i18n-delete-label="{{ _('Delete') }}"
+                                             data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.') }}">
+                                            <div class="space-y-1 text-center w-full">
+                                                <div id="currentThumbnailDisplay" class="mb-3" style="display: none;">
+                                                    <div class="flex justify-between items-start mb-1">
+                                                        <p class="text-sm text-gray-600">{{ _('Current thumbnail:') }}</p>
+                                                        <button type="button"
+                                                                data-action="thumbnail:delete"
+                                                                data-entity-type="document"
+                                                                data-entity-id=""
+                                                                data-language-code=""
+                                                                id="delete-thumb-btn"
+                                                                class="inline-flex items-center px-2 py-1 border border-red-300 shadow-sm text-xs leading-4 font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                                title="{{ _('Delete thumbnail') }}">
+                                                            <i class="fas fa-trash mr-1"></i>
+                                                            <span id="delete-thumb-text"
+                                                                  data-default-text="{{ _('Delete') }}"
+                                                                  data-thumbnail-btn-text="delete"
+                                                                  data-deleting-text="{{ _('Deleting...') }}">{{ _('Delete') }}</span>
+                                                        </button>
+                                                    </div>
+                                                    <img id="currentThumbnailImg" src="" alt="{{ _('Current thumbnail') }}" class="max-w-full max-h-48 border rounded-md shadow-sm mx-auto">
+                                                    <p id="currentThumbnailFilename" class="text-xs text-gray-500 mt-1"
+                                                       data-prefix="{{ _('Original name:') }}"
+                                                       data-thumbnail-filename="true"
+                                                       data-generated-text="{{ _('Generated automatically') }}"></p>
+                                                    <div id="delete-thumb-status" class="mt-2 text-sm"
+                                                         data-thumbnail-status="delete"
+                                                         data-confirm-text="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.') }}"
+                                                         data-deleting-text="{{ _('Deleting thumbnail...') }}"
+                                                         data-success-text="{{ _('Thumbnail deleted successfully!') }}"
+                                                         data-error-prefix="{{ _('Error:') }}"
+                                                         data-network-error="{{ _('Network error occurred') }}"></div>
+                                                </div>
+
+                                                <i class="fas fa-image text-gray-400 text-3xl mb-3"></i>
+                                                <div class="flex text-sm text-gray-600 justify-center">
+                                                    <label for="thumbnail" class="relative cursor-pointer bg-white rounded-md font-medium text-red-600 hover:text-red-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-red-500">
+                                                        <span>{{ _('Upload image') }}</span>
+                                                        <input type="file"
+                                                               name="thumbnail"
+                                                               id="thumbnail"
+                                                               accept="image/*"
+                                                               class="sr-only">
+                                                    </label>
+                                                    <p class="pl-1">{{ _('or drag and drop') }}</p>
+                                                </div>
+                                                <p id="thumbnailHelpText" class="text-xs text-gray-500"
+                                                   data-default-text="{{ _('Image files only (PNG, JPG, etc.)') }}"
+                                                   data-replace-text="{{ _('To replace the current thumbnail, choose a new image below.') }}">
+                                                    {{ _('Image files only (PNG, JPG, etc.)') }}
+                                                </p>
+
+                                                <div id="generateThumbnailSection" class="mt-3" style="display: none;">
+                                                    <button type="button"
+                                                            data-action="thumbnail:generate"
+                                                            data-entity-type="document"
+                                                            data-entity-id=""
+                                                            data-language-code=""
+                                                            id="generate-btn"
+                                                            class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                        <i class="fas fa-image mr-2"></i>
+                                                        <span id="generate-text"
+                                                              data-default-text="{{ _('Generate PDF Thumbnail') }}"
+                                                              data-thumbnail-btn-text="generate"
+                                                              data-generating-text="{{ _('Generating...') }}"
+                                                              data-regenerate-text="{{ _('Regenerate Thumbnail') }}">{{ _('Generate PDF Thumbnail') }}</span>
+                                                    </button>
+                                                    <div id="generate-status" class="mt-2 text-sm"
+                                                         data-thumbnail-status="generate"
+                                                         data-generating-text="{{ _('Generating thumbnail...') }}"
+                                                         data-success-text="{{ _('Thumbnail generated successfully!') }}"
+                                                         data-error-prefix="{{ _('Error:') }}"
+                                                         data-network-error="{{ _('Network error occurred') }}"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" id="submitButton"
+                            data-upload-btn-text="{{ _('Upload') }}"
+                            data-update-text="{{ _('Update') }}"
+                            class="btn btn-success w-full sm:ml-3 sm:w-auto sm:text-sm">
+                        {{ _('Upload') }}
+                    </button>
+                    <button type="button" class="btn btn-secondary mt-3 w-full sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" data-action="close-modal">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+    {{ super() }}
+    <!-- AG Grid JS -->
+    {% from "components/ag_grid_includes.html" import ag_grid_js %}
+    {{ ag_grid_js() }}
+    <script src="{{ static_url('js/documents/document-modal.js') }}"></script>
+
+    <script nonce="{{ csp_nonce() }}">
+    // Add CSRF token and user role to global scope for the modal manager
+    window.csrfToken = "{{ csrf_token() }}";
+    window.isAdmin = {{ can_manage_documents|default(false)|tojson|safe }};
+    window.documentsNextUrl = {{ (next_url if next_url is defined else '')|tojson|safe }};
+    window.standaloneEntityOptionsUrl = {{ (standalone_entity_options_url if standalone_entity_options_url is defined else '')|tojson|safe }};
+    window.documentsModalLockEntityToNav = {{ (documents_modal_lock_entity_to_nav if documents_modal_lock_entity_to_nav is defined else false)|tojson|safe }};
+    const showCountryColumn = {{ 'true' if show_country_column else 'false' }};
+    const canUploadDocuments = {{ can_upload_documents|default(false)|tojson|safe }};
+    const isAdminOrSystemManager = {{ can_manage_documents|default(false)|tojson|safe }};
+
+    // AG Grid helper instance
+    let gridHelper = null;
+    let gridApi = null;
+
+    // Transform documents data for ag-grid
+    const documentsData = [
+        {% for doc, status, country, user, uploaded_at, assignment_period, entity_access in documents %}
+        {% set doc_country_id = (country.id if country else None) %}
+        {% set is_owner = (current_user.is_authenticated and (doc.uploaded_by_user_id == current_user.id)) %}
+        {% set has_entity_access = entity_access %}
+        {% set doc_review_status = ((status if status is not none else doc.status) or '')|trim|lower %}
+        {% set is_approved_doc = doc_review_status == 'approved' %}
+        {% set team_pending_edit = documents_repo_team_pending_edit is defined and documents_repo_team_pending_edit %}
+        {% set can_edit_doc = can_manage_documents or (can_upload_documents and has_entity_access and not is_approved_doc and (is_owner or team_pending_edit)) %}
+        {% set can_delete_doc = can_manage_documents or (can_upload_documents and has_entity_access and not is_approved_doc and (is_owner or team_pending_edit)) %}
+        {% set entity_display_name = (doc.standalone_linked_display or (country.name if country else '') or '') %}
+        {
+            id: {{ doc.id }},
+            country_name: {{ entity_display_name|tojson|safe }},
+            country_id: {{ (country.id if country else none)|tojson|safe }},
+            linked_entity_type: {{ (doc.linked_entity_type or 'country')|tojson|safe }},
+            linked_entity_id: {{ (doc.linked_entity_id if doc.linked_entity_id is not none else (doc.country_id if doc.country_id is not none else none))|tojson|safe }},
+            document_type: {{ (doc.document_label or '')|tojson|safe }},
+            filename: {{ (doc.filename or '')|tojson|safe }},
+            download_url: "{{ url_for('content_management.download_document', doc_id=doc.id) }}",
+            language: {{ (doc.language or '')|tojson|safe }},
+            language_display: {{ ((LANGUAGE_DISPLAY_NAMES.get((doc.language or '').split('_')[0].split('-')[0]) or ALL_LANGUAGES_DISPLAY_NAMES.get((doc.language or '').split('_')[0].split('-')[0]) or (doc.language or _('N/A'))))|tojson|safe }},
+            period: {{ ((doc.period or '')|trim or assignment_period or _('N/A'))|tojson|safe }},
+            is_public: {{ doc.is_public|tojson|safe }},
+            uploaded_by_user_id: {{ (doc.uploaded_by_user_id if doc.uploaded_by_user_id else None)|tojson|safe }},
+            uploaded_by: {{ ((user.name or user.email) if user and not (user is string) else (user if user is string else ''))|tojson|safe }},
+            uploaded_by_email: {{ ((user.email if user and not (user is string) else '') or '')|tojson|safe }},
+            uploaded_by_title: {{ ((user.title if user and not (user is string) else '') or '')|tojson|safe }},
+            uploaded_by_active: {{ (user.active if user and not (user is string) else True)|tojson|safe }},
+            uploaded_by_profile_color: {{ ((user.profile_color if user and not (user is string) and user.profile_color else '') or '')|tojson|safe }},
+            uploaded_at: {{ uploaded_at|datetime_iso|tojson|safe }},
+            status: {{ (status or '')|tojson|safe }},
+            can_edit: {{ can_edit_doc|default(false)|tojson|safe }},
+            can_delete: {{ can_delete_doc|default(false)|tojson|safe }},
+            delete_url: "{{ (url_for('content_management.delete_document', doc_id=doc.id, next=next_url) if next_url is defined and next_url else url_for('content_management.delete_document', doc_id=doc.id)) if can_delete_doc else '' }}",
+            approve_url: "{{ (url_for('content_management.approve_document', doc_id=doc.id) if can_manage_documents else '') }}",
+            decline_url: "{{ '' }}",
+            has_thumbnail: {{ 'true' if doc.thumbnail_relative_path else 'false' }},
+            thumbnail_filename: {{ (doc.thumbnail_filename or '')|tojson|safe }},
+            _debug: {
+                doc_id: {{ doc.id }},
+                uploaded_by_user_id: {{ (doc.uploaded_by_user_id if doc.uploaded_by_user_id else none)|tojson|safe }},
+                current_user_id: {{ (current_user.id if current_user.is_authenticated else none)|tojson|safe }},
+                is_owner: {{ is_owner|tojson|safe }},
+                entity_access: {{ has_entity_access|tojson|safe }},
+                doc_review_status: {{ doc_review_status|tojson|safe }},
+                is_approved_doc: {{ is_approved_doc|tojson|safe }},
+                can_manage_documents: {{ can_manage_documents|tojson|safe }},
+                can_upload_documents: {{ can_upload_documents|tojson|safe }},
+                can_edit_computed: {{ can_edit_doc|tojson|safe }},
+                can_delete_computed: {{ can_delete_doc|tojson|safe }},
+                doc_row_status_field: {{ (status or '')|tojson|safe }},
+                doc_model_status: {{ (doc.status or '')|tojson|safe }}
+            }
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    (function logDocumentsGridActionsDebug() {
+        var summary = {
+            rowCount: documentsData.length,
+            currentUserId: {{ (current_user.id if current_user.is_authenticated else none)|tojson|safe }},
+            can_upload_documents: canUploadDocuments,
+            can_manage_documents: isAdminOrSystemManager
+        };
+        window.__documentsActionsDebug = [];
+        documentsData.forEach(function(row) {
+            if (row._debug) {
+                window.__documentsActionsDebug.push(row._debug);
+            }
+        });
+        try {
+            if (window.__clientLog) {
+                window.__clientLog('[documentsGrid] actions summary', summary);
+                window.__documentsActionsDebug.forEach(function(d) {
+                    window.__clientLog('[documentsGrid] doc ' + d.doc_id, d);
+                });
+            }
+        } catch (e) {
+            if (typeof console !== 'undefined' && console.error) {
+                console.error('[documentsGrid] logDocumentsGridActionsDebug failed', e);
+            }
+        }
+    })();
+
+    // Column definitions for ag-grid
+    const columnDefs = [
+        {% if show_country_column %}
+        {
+            field: 'country_name',
+            headerName: '{{ _("Entity") }}',
+            flex: 1,
+            minWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            }
+        },
+        {% endif %}
+        {
+            field: 'document_type',
+            headerName: '{{ _("Document Type") }}',
+            flex: 1,
+            minWidth: 200,
+            filter: 'customSetFilter',
+            sortable: true
+        },
+        {
+            field: 'filename',
+            headerName: '{{ _("Filename") }}',
+            flex: 2,
+            minWidth: 280,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const url = params.data.download_url || '#';
+                return '<a href="' + url + '" class="text-blue-600 hover:text-blue-800 break-words">' + (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</a>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'language_display',
+            headerName: '{{ _("Language") }}',
+            minWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true
+        },
+        {
+            field: 'period',
+            headerName: '{{ _("Period") }}',
+            flex: 1,
+            width: 200,
+            minWidth: 140,
+            maxWidth: 260,
+            suppressSizeToFit: true,
+            filter: 'agTextColumnFilter',
+            sortable: true
+        },
+        {
+            field: 'is_public',
+            headerName: '{{ _("Privacy") }}',
+            width: 120,
+            minWidth: 120,
+            maxWidth: 180,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.privacyBadge,
+            cellStyle: { 'text-align': 'center', 'white-space': 'nowrap' }
+        },
+        {
+            field: 'uploaded_by',
+            headerName: '{{ _("Uploaded By") }}',
+            flex: 1,
+            minWidth: 220,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'uploaded_by_user_id',
+                    nameField: 'uploaded_by',
+                    emailField: 'uploaded_by_email',
+                    titleField: 'uploaded_by_title',
+                    activeField: 'uploaded_by_active',
+                    profileColorField: 'uploaded_by_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: false
+                });
+            }
+        },
+        {
+            field: 'uploaded_at',
+            headerName: '{{ _("Upload Date") }}',
+            minWidth: 180,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateTime
+        },
+        {
+            field: 'status',
+            headerName: '{{ _("Status") }}',
+            flex: 1,
+            minWidth: 240,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const statusRaw = (params.data && params.data.status) ? String(params.data.status) : '';
+                const status = statusRaw.trim().toLowerCase();
+                if (status === 'approved') {
+                    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>{{ _("Approved") }}</span>';
+                } else if (status === 'rejected') {
+                    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><i class="fas fa-times-circle mr-1"></i>{{ _("Rejected") }}</span>';
+                } else {
+                    if (isAdminOrSystemManager) {
+                        const docId = params.data.id;
+                        return '<div class="flex items-center justify-center space-x-1">' +
+                            '<button class="btn btn-success btn-sm approve-document" data-doc-id="' + docId + '" title="{{ _("Approve Document") }}">' +
+                            '<i class="fas fa-check mr-1"></i>{{ _("Approve") }}</button>' +
+                            '<button class="btn btn-danger btn-sm decline-document" data-doc-id="' + docId + '" title="{{ _("Decline Document") }}">' +
+                            '<i class="fas fa-times mr-1"></i>{{ _("Decline") }}</button>' +
+                            '</div>';
+                    } else {
+                        return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"><i class="fas fa-clock mr-1"></i>{{ _("Pending Review") }}</span>';
+                    }
+                }
+            },
+            cellStyle: { 'text-align': 'center', 'white-space': 'nowrap' }
+        },
+        {
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                if (!canUploadDocuments) {
+                    if (!window.__documentsGridLoggedNoUpload) {
+                        window.__documentsGridLoggedNoUpload = true;
+                        try {
+                            if (window.__clientLog) {
+                                window.__clientLog('[documentsGrid] Actions column shows "-" because canUploadDocuments is false');
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                    return '-';
+                }
+                const doc = params.data;
+                let html = '<div class="flex items-center justify-center space-x-2">';
+                if (doc.can_edit) {
+                    html += '<a href="#" class="text-gray-600 hover:text-yellow-600 transition-colors duration-200 edit-document" ' +
+                        'data-doc-id="' + doc.id + '" ' +
+                        'data-country-id="' + (doc.country_id || '') + '" ' +
+                        'data-linked-entity-type="' + String(doc.linked_entity_type || 'country').replace(/"/g, '&quot;') + '" ' +
+                        'data-linked-entity-id="' + (doc.linked_entity_id != null && doc.linked_entity_id !== '' ? doc.linked_entity_id : (doc.country_id || '')) + '" ' +
+                        'data-document-type="' + String(doc.document_type || '').replace(/"/g, '&quot;') + '" ' +
+                        'data-language="' + (doc.language || '') + '" ' +
+                        'data-year="' + String(doc.period || '').replace(/"/g, '&quot;') + '" ' +
+                        'data-is-public="' + doc.is_public + '" ' +
+                        'data-status="' + (doc.status || '') + '" ' +
+                        'data-filename="' + String(doc.filename || '').replace(/"/g, '&quot;') + '" ' +
+                        'data-download-url="' + String(doc.download_url || '').replace(/"/g, '&quot;') + '" ' +
+                        'data-has-thumbnail="' + doc.has_thumbnail + '" ' +
+                        'data-thumbnail-filename="' + String(doc.thumbnail_filename || '').replace(/"/g, '&quot;') + '" ' +
+                        'title="{{ _("Edit") }}"><i class="fas fa-pen"></i></a>';
+                }
+                if (doc.can_delete && doc.delete_url) {
+                    html += '<a href="#" class="text-gray-600 hover:text-red-600 transition-colors duration-200 delete-document" ' +
+                        'data-delete-url="' + String(doc.delete_url || '').replace(/"/g, '&quot;') + '" ' +
+                        'title="{{ _("Delete") }}"><i class="fas fa-trash"></i></a>';
+                }
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    // Initialize grid using helper
+    function initializeGrid() {
+        var result = AgGridHelper.create('documentsGrid', 'documents', columnDefs, documentsData, {
+            {% if user_entities is defined and user_entities %}
+            columnVisibility: { buttonPlaceholderId: '{{ DOCUMENTS_GRID_COLVIS_PH }}' },
+            {% endif %}
+            onReady: function(api, helper) {
+                // Ensure column order is correct (period after language, actions last)
+                try {
+                    if (api && typeof api.applyColumnState === 'function') {
+                        var desiredOrder = []
+                            {% if show_country_column %}
+                            .concat(['country_name'])
+                            {% endif %}
+                            .concat(['document_type', 'filename', 'language_display', 'period', 'is_public', 'uploaded_by', 'uploaded_at', 'status', 'actions']);
+
+                        var state = desiredOrder.map(function(colId) {
+                            return { colId: colId, pinned: colId === 'actions' ? 'right' : null };
+                        });
+
+                        api.applyColumnState({ state: state, defaultState: { pinned: null }, applyOrder: true });
+                    }
+                } catch (e) {
+                    window.__clientWarn && window.__clientWarn('Could not apply column order:', e);
+                }
+            }
+        });
+        gridHelper = result.helper;
+        gridApi = result.api;
+        window.gridApi = gridApi;
+        window.gridHelper = gridHelper;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+
+    // ------------------------------------------------------------------
+    // Non-blocking toast notifications (avoid native alert)
+    // ------------------------------------------------------------------
+    let toastTimer = null;
+    function showToast(message, type = 'error', timeoutMs = 6000) {
+        try {
+            let $toast = $('#documents-toast');
+            if ($toast.length === 0) {
+                $('body').append(
+                    '<div id="documents-toast" class="fixed top-4 right-4 z-[10000] hidden max-w-sm">' +
+                    '  <div id="documents-toast-inner" class="rounded-lg shadow-lg border px-4 py-3 text-sm"></div>' +
+                    '</div>'
+                );
+                $toast = $('#documents-toast');
+            }
+            const $inner = $('#documents-toast-inner');
+            const stylesByType = {
+                success: 'bg-green-50 border-green-200 text-green-800',
+                error: 'bg-red-50 border-red-200 text-red-800',
+                warning: 'bg-amber-50 border-amber-200 text-amber-900',
+                info: 'bg-blue-50 border-blue-200 text-blue-800'
+            };
+            $inner
+                .attr('class', `rounded-lg shadow-lg border px-4 py-3 text-sm ${stylesByType[type] || stylesByType.error}`)
+                .text(String(message || ''));
+
+            $toast.removeClass('hidden');
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+                toastTimer = null;
+            }
+            toastTimer = setTimeout(() => $toast.addClass('hidden'), timeoutMs);
+        } catch (e) {
+            // If something goes wrong, fail silently (don't block UX).
+            try { console.error('Toast error:', e); } catch (_) {}
+        }
+    }
+
+    // Handle delete document clicks
+    $(document).on('click', '.delete-document', function(e) {
+        e.preventDefault();
+        const deleteUrl = $(this).data('delete-url');
+
+        // Update the confirm button click handler
+        $('#confirmDeleteButton').off('click').on('click', function(e) {
+            e.preventDefault();
+            const button = $(this);
+
+            // Prevent double-clicks
+            if (button.prop('disabled')) return;
+            button.prop('disabled', true);
+            button.addClass('opacity-50 cursor-not-allowed');
+
+            // Store original text and show loading
+            const originalText = button.text();
+            button.html('<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Deleting...") }}');
+
+            // Make a POST request with CSRF token
+            $.ajax({
+                url: deleteUrl,
+                type: 'POST',
+                data: {
+                    'csrf_token': window.csrfToken
+                },
+                success: function(response) {
+                    location.reload();
+                },
+                error: function(xhr, status, error) {
+                    showToast({{ _("Error deleting document:")|tojson|safe }} + ' ' + (error || ''), 'error', 7000);
+                    // Re-enable button on error
+                    button.prop('disabled', false);
+                    button.removeClass('opacity-50 cursor-not-allowed');
+                    button.text(originalText);
+                }
+            });
+            // Hide the modal
+            $('#deleteConfirmationModal').addClass('hidden');
+        });
+
+        // Show the modal
+        $('#deleteConfirmationModal').removeClass('hidden');
+    });
+
+    // Handle approve document clicks
+    $(document).on('click', '.approve-document', function(e) {
+        e.preventDefault();
+        const docId = $(this).data('doc-id');
+        const button = $(this);
+
+        // Disable button to prevent double-clicks
+        button.prop('disabled', true);
+
+        $.ajax({
+            url: `/admin/documents/approve/${docId}`,
+            type: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: {
+                'csrf_token': window.csrfToken
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Reload the page to reflect the status change
+                    location.reload();
+                } else {
+                    showToast({{ _("Error approving document:")|tojson|safe }} + ' ' + (response.message || {{ _("Unknown error")|tojson|safe }}), 'error', 7000);
+                    button.prop('disabled', false);
+                }
+            },
+            error: function(xhr, status, error) {
+                showToast({{ _("Error approving document:")|tojson|safe }} + ' ' + (error || ''), 'error', 7000);
+                button.prop('disabled', false);
+            }
+        });
+    });
+
+    // Handle decline document clicks
+    $(document).on('click', '.decline-document', function(e) {
+        e.preventDefault();
+        const docId = $(this).data('doc-id');
+        const button = $(this);
+
+        // Disable button to prevent double-clicks
+        button.prop('disabled', true);
+
+        $.ajax({
+            url: `/admin/documents/decline/${docId}`,
+            type: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: {
+                'csrf_token': window.csrfToken
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Reload the page to reflect the status change
+                    location.reload();
+                } else {
+                    showToast({{ _("Error declining document:")|tojson|safe }} + ' ' + (response.message || {{ _("Unknown error")|tojson|safe }}), 'error', 7000);
+                    button.prop('disabled', false);
+                }
+            },
+            error: function(xhr, status, error) {
+                showToast({{ _("Error declining document:")|tojson|safe }} + ' ' + (error || ''), 'error', 7000);
+                button.prop('disabled', false);
+            }
+        });
+    });
+    </script>
+{% endblock %}

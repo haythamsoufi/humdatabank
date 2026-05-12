@@ -1,0 +1,47 @@
+{# Excel Import/Export Modal #}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}
+{% call modal_shell('excel-options-modal', excel_title, aria_label=_('Excel Options'), max_width='max-w-lg', title_safe=true) %}
+        <div class="flex flex-col space-y-4">
+            {# Export Section #}
+            <div>
+                <a href="{{ url_for('form_builder.export_template_excel', template_id=template.id) }}{{ '?version_id=' + active_version_id|string if active_version_id else '' }}"
+                   class="btn btn-success w-full"
+                   aria-label="{{ _('Export Template Structure') }}">
+                    <i class="fas fa-download mr-2"></i> {{ _('Export Template Structure (.xlsx)') }}
+                </a>
+            </div>
+
+            {# Import Section #}
+            <div>
+                <form method="POST" action="{{ url_for('form_builder.import_template_excel', template_id=template.id) }}" enctype="multipart/form-data" id="import-excel-form" class="flex flex-col space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="version_id" value="{{ active_version_id if active_version_id else '' }}"/>
+                    <div class="file-upload-wrapper relative h-40 border-2 border-dashed border-gray-300 rounded-lg">
+                        <input type="file" name="excel_file" id="excel_file" accept=".xlsx,.xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select Excel file') }}">
+                        <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
+                            <div class="text-center">
+                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                <p class="text-sm text-gray-500">{{ _('Click or drag Excel file here to import') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% if selected_version_status == 'published' %}
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-2" role="alert" aria-live="polite">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-yellow-600 mt-0.5 mr-2" aria-hidden="true"></i>
+                            <div class="text-sm text-yellow-800">
+                                <p class="font-semibold mb-1">{{ _('Note:') }}</p>
+                                <p>{{ _('A new draft version will be created automatically for this import.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <p class="mt-2 text-sm text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        {{ _('Supported formats: .xlsx, .xls') }}
+                    </p>
+                </form>
+            </div>
+        </div>
+{% endcall %}

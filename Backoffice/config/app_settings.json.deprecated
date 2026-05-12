@@ -1,0 +1,44 @@
+{
+  "languages": [
+    "en",
+    "fr",
+    "es",
+    "ar",
+    "ru",
+    "zh"
+  ],
+  "document_types": [
+    "Annual Report",
+    "Audited Financial Statement",
+    "Unaudited Financial Statement",
+    "Strategic Plan",
+    "Operational Plan",
+    "Evaluation Report",
+    "Policy Document",
+    "Unified Network Plan",
+    "Unified Network Annual Report",
+    "Unified Network Midyear Report",
+    "Legal Document",
+    "Cover Image",
+    "Agreement",
+    "Other"
+  ],
+  "age_groups": [
+    "<5",
+    "5-17",
+    "18-49",
+    "50+",
+    "Unknown"
+  ],
+  "sex_categories": [
+    "Male",
+    "Female",
+    "Non-binary",
+    "Unknown"
+  ],
+  "enabled_entity_types": [
+    "countries",
+    "ns_structure",
+    "secretariat"
+  ]
+}

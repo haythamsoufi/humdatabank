@@ -1,0 +1,384 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Conversation traces') }}: {{ conversation_id[:20] }}…{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Conversation traces'),
+    icon='fas fa-comments',
+    breadcrumbs=[
+        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+        {'name': 'AI System', 'url': url_for('ai_management.ai_dashboard')},
+        {'name': 'Traces', 'url': url_for('ai_management.reasoning_traces')},
+        {'name': 'Conversation ' ~ conversation_id[:16] ~ '…'}
+    ],
+    actions=[
+        {'type': 'link', 'url': url_for('ai_management.reasoning_traces', view='conversation'), 'text': _('Back to Traces'), 'icon': 'fas fa-arrow-left'}
+    ]
+) }}
+
+{# Same styles as trace_detail for consistent look #}
+<style nonce="{{ csp_style_nonce() }}">
+{% include "admin/ai/_trace_detail_styles.html" %}
+.conv-exchange { margin-bottom: 2.5rem; }
+</style>
+
+<div class="trace-detail-page min-w-0 w-full max-w-full">
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+        <code class="bg-gray-100 px-2 py-1 rounded font-mono text-sm break-all">{{ conversation_id }}</code>
+        <span class="text-sm text-gray-500">{{ traces|length }} {{ _('exchange(s)') }}</span>
+        <button type="button" id="convCopyFull" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy full thread (queries, answers, reasoning steps)') }}">
+            <i class="fas fa-copy mr-0.5" aria-hidden="true"></i>
+            <span id="convCopyFullLabel">{{ _('Copy full') }}</span>
+        </button>
+        <button type="button" id="convCopySummary" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy summary (queries + answers + meta only)') }}">
+            <i class="fas fa-file-alt mr-0.5" aria-hidden="true"></i>
+            <span id="convCopySummaryLabel">{{ _('Copy summary') }}</span>
+        </button>
+    </div>
+
+    <script type="application/json" id="convSummaryData">{{ conversation_summary_data|tojson }}</script>
+    <script type="application/json" id="convFullData">{{ conversation_full_data|tojson }}</script>
+
+    {% for trace in traces %}
+    <div class="conv-exchange" data-trace-id="{{ trace.id }}">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 bg-white shadow rounded-lg p-6 min-w-0">
+                <div class="flex items-start gap-3 mb-6">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 rounded-full bg-gray-400 text-white text-xs font-semibold flex items-center justify-center shadow-sm"><i class="fas fa-user"></i></div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold text-gray-700">{{ _('User') }}</span>
+                            <span class="text-xs text-gray-400">{{ trace.created_at.strftime('%Y-%m-%d %H:%M') }} · {{ _('Trace') }} #{{ trace.id }}</span>
+                        </div>
+                        <div class="chat-bubble bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                            <p class="text-gray-700 whitespace-pre-wrap mb-0">{{ trace.query }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {% if trace.display_answer or trace.final_answer or trace.error_message %}
+                <div class="flex items-start gap-3 mb-6">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb);">
+                        <i class="fas fa-robot text-white" style="font-size: 1rem;"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold text-gray-700">{{ _('AI Assistant') }}</span>
+                            <span class="text-xs text-gray-400">{{ trace.actual_iterations or 0 }} {{ _('steps') }}{% if trace.execution_time_ms %} · {{ (trace.execution_time_ms / 1000)|round(1) }}s{% endif %}{% if trace.total_cost_usd is not none %} · ${{ "%.6f"|format(trace.total_cost_usd) }}{% endif %}{% if trace.status %} · {{ trace.status }}{% endif %}</span>
+                        </div>
+                        {% if trace.display_answer or trace.final_answer %}
+                        <div class="chat-bubble trace-final-answer bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                            <div class="trace-final-answer-wrapper trace-step-content">
+                                <p class="text-gray-700 whitespace-pre-wrap mb-0">{{ trace.display_answer or trace.final_answer }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if trace.error_message %}
+                <h3 class="text-lg font-semibold text-red-600 mt-6 mb-4">{{ _('Error') }}</h3>
+                <div class="trace-final-answer bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
+                    {{ trace.error_message }}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ _('Details') }}</h3>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm text-gray-500">{{ _('Status') }}</dt>
+                        <dd class="mt-1">
+                            {% if trace.status == 'completed' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> {{ trace.status }}</span>
+                            {% elif trace.status == 'error' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><i class="fas fa-times-circle mr-1"></i> {{ trace.status }}</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ trace.status }}</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm text-gray-500">{{ _('Created') }}</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ trace.created_at.strftime('%Y-%m-%d %H:%M:%S') if trace.created_at else '-' }}</dd>
+                    </div>
+                    <div class="border-t pt-3">
+                        <dt class="text-sm text-gray-500">{{ _('Iterations') }}</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ trace.actual_iterations }} / {{ trace.max_iterations }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm text-gray-500">{{ _('Tool Calls') }}</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ trace.tool_call_count or 0 }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm text-gray-500">{{ _('Execution Time') }}</dt>
+                        <dd class="text-sm font-medium text-gray-900">{% if trace.execution_time_ms %}{{ (trace.execution_time_ms / 1000)|round(2) }}s{% else %}-{% endif %}</dd>
+                    </div>
+                    <div class="border-t pt-3">
+                        <dt class="text-sm text-gray-500">{{ _('Total Cost') }}</dt>
+                        <dd class="text-lg font-bold text-blue-600">{% if trace.total_cost_usd %}${{ "%.6f"|format(trace.total_cost_usd) }}{% else %}-{% endif %}</dd>
+                    </div>
+                </dl>
+                {% if trace.tools_used %}
+                <h4 class="text-sm font-semibold text-gray-600 mt-6 mb-2">{{ _('Tools Used') }}</h4>
+                <div class="flex flex-wrap gap-1">
+                    {% for tool in trace.tools_used %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-mono">{{ tool }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if trace.steps %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6 min-w-0">
+            <h3 class="text-lg font-semibold text-gray-800 mb-6"><i class="fas fa-list-ol text-purple-500 mr-2"></i>{{ _('Reasoning Steps') }} ({{ trace.steps|length }})</h3>
+            <div class="space-y-4 pl-4">
+                {% for step in trace.steps %}
+                <div class="step-card trace-step-content {% if step.action == 'finish' %}step-finish{% else %}step-action{% endif %} pl-6 py-3 bg-gray-50 rounded-r-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ _('Step') }} {{ step.step or loop.index }}</span>
+                        {% if step.timestamp %}<span class="text-xs text-gray-400">{{ step.timestamp }}</span>{% endif %}
+                    </div>
+                    {% if step.thought %}
+                    <div class="mb-3">
+                        <div class="text-xs font-semibold text-blue-600 uppercase mb-1">{{ _('Thought') }}</div>
+                        <p class="text-sm text-gray-700">{{ step.thought }}</p>
+                    </div>
+                    {% endif %}
+                    {% if step.action %}
+                    <div class="mb-3">
+                        <div class="text-xs font-semibold text-purple-600 uppercase mb-1">{{ _('Action') }}</div>
+                        <code class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-sm">{{ step.action }}</code>
+                        {% if step.action_input %}
+                        <div class="trace-json-wrap mt-2 min-w-0"><pre class="json-display">{{ step.action_input | tojson(indent=2) }}</pre></div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if step.observation is defined and step.observation is not none %}
+                    <details class="step-observation-details group min-w-0 max-w-full">
+                        <summary class="text-xs font-semibold text-green-600 uppercase mb-1 cursor-pointer list-none flex items-center gap-1 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded">
+                            <i class="fas fa-chevron-right text-green-500 transition-transform group-open:rotate-90"></i>
+                            <span>{{ _('Observation') }}</span>
+                        </summary>
+                        <div class="trace-json-wrap bg-green-50 rounded p-3 mt-1">
+                            {% if step.observation is mapping or step.observation is sequence %}
+                            <pre class="json-display text-green-800">{{ step.observation | tojson(indent=2) }}</pre>
+                            {% else %}
+                            <p class="text-sm text-green-800 whitespace-pre-wrap mb-0">{{ step.observation }}</p>
+                            {% endif %}
+                        </div>
+                    </details>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if tool_usages_by_trace %}
+    <div class="bg-white shadow rounded-lg p-6 mt-6 min-w-0">
+        <h3 class="text-lg font-semibold text-gray-800 mb-6"><i class="fas fa-tools text-gray-500 mr-2"></i>{{ _('Tool Usage Details') }}</h3>
+        {% for trace in traces %}
+        {% set tool_usages = tool_usages_by_trace.get(trace.id, []) %}
+        {% if tool_usages %}
+        <div class="mb-8 last:mb-0">
+            <h4 class="text-sm font-semibold text-gray-600 mb-3">{{ _('Message') }} {{ loop.index }} · {{ _('Trace') }} #{{ trace.id }}</h4>
+            <div class="overflow-x-auto min-w-0">
+                <table class="trace-tool-usage-table min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Tool') }}</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Status') }}</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Time') }}</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ _('Input') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for usage in tool_usages %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3"><code class="text-sm font-mono text-purple-700">{{ usage.tool_name }}</code></td>
+                            <td class="px-4 py-3">
+                                {% if usage.success %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i> {{ _('Success') }}</span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-100 text-red-700" title="{{ usage.error_message or '' }}"><i class="fas fa-times mr-1"></i> {{ _('Failed') }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-500">{% if usage.execution_time_ms %}{{ usage.execution_time_ms }}ms{% else %}-{% endif %}</td>
+                            <td class="px-4 py-3 min-w-0 max-w-md">
+                                {% if usage.tool_input %}
+                                <button type="button" class="js-trace-toggle-input text-xs text-blue-600 hover:text-blue-800"><i class="fas fa-eye mr-1"></i> {{ _('Show') }}</button>
+                                <div class="trace-json-wrap mt-2"><pre class="json-display hidden text-xs">{{ usage.tool_input | tojson(indent=2) }}</pre></div>
+                                {% else %}<span class="text-gray-400">-</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function () {
+    // Tool usage Show/Hide (same behavior as trace_detail)
+    document.body.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest && e.target.closest('button.js-trace-toggle-input');
+        if (!btn) return;
+        var wrap = btn.nextElementSibling;
+        var pre = wrap && wrap.querySelector ? wrap.querySelector('pre.json-display') : null;
+        if (!pre) return;
+        if (pre.classList.contains('hidden')) {
+            pre.classList.remove('hidden');
+            btn.innerHTML = '<i class="fas fa-eye-slash mr-1"></i> {{ _("Hide") }}';
+        } else {
+            pre.classList.add('hidden');
+            btn.innerHTML = '<i class="fas fa-eye mr-1"></i> {{ _("Show") }}';
+        }
+    });
+
+    var convId = document.querySelector('code') ? document.querySelector('code').textContent.trim() : '';
+    var fullEl = document.getElementById('convFullData');
+    var summaryEl = document.getElementById('convSummaryData');
+    var copyFullBtn = document.getElementById('convCopyFull');
+    var copyFullLabel = document.getElementById('convCopyFullLabel');
+    var copySummaryBtn = document.getElementById('convCopySummary');
+    var copySummaryLabel = document.getElementById('convCopySummaryLabel');
+
+    function setFeedback(btn, label, icon, text, ok) {
+        var orig = label.textContent;
+        label.textContent = text;
+        icon.className = ok ? 'fas fa-check text-green-600' : 'fas fa-copy';
+        setTimeout(function () { label.textContent = orig; btn.querySelector('i').className = 'fas fa-copy'; }, 2000);
+    }
+
+    function stepToText(step, idx, obsMaxLines) {
+        var n = (step.step != null ? step.step : idx + 1);
+        var lines = ['--- Step ' + n + ' ---'];
+        if (step.timestamp) lines.push('Timestamp: ' + step.timestamp);
+        if (step.thought) { lines.push('Thought:'); lines.push(step.thought); }
+        if (step.action) {
+            lines.push('Action: ' + step.action);
+            if (step.action_input != null) lines.push('Action input: ' + (typeof step.action_input === 'string' ? step.action_input : JSON.stringify(step.action_input, null, 2)));
+        }
+        if (step.observation != null) {
+            var obs = typeof step.observation === 'string' ? step.observation : JSON.stringify(step.observation, null, 2);
+            if (obsMaxLines && obs.split('\n').length > obsMaxLines) {
+                obs = obs.split('\n').slice(0, obsMaxLines).join('\n') + '\n... (truncated)';
+            }
+            lines.push('Observation:'); lines.push(obs);
+        }
+        return lines.join('\n');
+    }
+
+    if (copyFullBtn && copyFullLabel && fullEl) {
+        copyFullBtn.addEventListener('click', function () {
+            try {
+                var data = JSON.parse(fullEl.textContent || '[]');
+                var lines = ['Conversation: ' + convId, '', '=========='];
+                data.forEach(function (t, idx) {
+                    lines.push('Message ' + (idx + 1) + ' (Trace #' + t.id + ')');
+                    lines.push('==========');
+                    var metaParts = [];
+                    if (t.execution_path) metaParts.push(t.execution_path);
+                    if (t.llm_model) metaParts.push(t.llm_model);
+                    if (metaParts.length) lines.push(metaParts.join(' | '));
+                    lines.push('');
+                    if (t.original_query) {
+                        lines.push('Original query:');
+                        lines.push(t.original_query.trim());
+                        lines.push('');
+                        lines.push('Rewritten query:');
+                    } else {
+                        lines.push('User:');
+                    }
+                    lines.push((t.query || '').trim() || '—');
+                    lines.push('');
+                    lines.push('Agent:');
+                    lines.push((t.final_answer || '').trim() || '—');
+                    if (t.error_message) lines.push('Error: ' + t.error_message);
+                    if (t.grounding_score != null) {
+                        lines.push('Grounding: ' + t.grounding_score.toFixed(2) + (t.confidence_level ? ' (' + t.confidence_level + ')' : ''));
+                    }
+                    lines.push('');
+                    lines.push('Reasoning (' + (t.actual_iterations || 0) + ' steps' + (t.execution_time_ms ? ', ' + (t.execution_time_ms / 1000).toFixed(1) + 's' : '') + (t.total_cost_usd != null ? ', $' + t.total_cost_usd.toFixed(6) : '') + '):');
+                    (t.steps || []).forEach(function (step, i) {
+                        lines.push(stepToText(step, i, 0));
+                        lines.push('');
+                    });
+                    lines.push('');
+                });
+                var text = lines.join('\n').trim();
+                navigator.clipboard.writeText(text).then(function () {
+                    setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), '{{ _("Copied!") }}', true);
+                }).catch(function () {
+                    setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+                });
+            } catch (e) {
+                setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+            }
+        });
+    }
+
+    if (copySummaryBtn && copySummaryLabel && summaryEl) {
+        copySummaryBtn.addEventListener('click', function () {
+            try {
+                var data = JSON.parse(summaryEl.textContent || '[]');
+                var lines = ['Conversation: ' + convId, '', '---'];
+                data.forEach(function (t, idx) {
+                    lines.push('Message ' + (idx + 1) + ' (Trace #' + t.id + ')');
+                    lines.push('---');
+                    if (t.original_query) {
+                        lines.push('Original query:');
+                        lines.push(t.original_query.trim());
+                        lines.push('Rewritten query:');
+                    } else {
+                        lines.push('User:');
+                    }
+                    lines.push((t.query || '').trim() || '—');
+                    lines.push('');
+                    lines.push('Agent:');
+                    lines.push((t.final_answer || '').trim() || '—');
+                    if (t.error_message) lines.push('Error: ' + t.error_message);
+                    lines.push('');
+                    var meta = [];
+                    if (t.actual_iterations != null) meta.push(t.actual_iterations + ' steps');
+                    if (t.execution_time_ms != null) meta.push((t.execution_time_ms / 1000).toFixed(1) + 's');
+                    if (t.total_cost_usd != null) meta.push('$' + t.total_cost_usd.toFixed(6));
+                    if (t.execution_path) meta.push(t.execution_path);
+                    if (t.llm_model) meta.push(t.llm_model);
+                    if (t.grounding_score != null) meta.push('grounding=' + t.grounding_score.toFixed(2) + (t.confidence_level ? ' (' + t.confidence_level + ')' : ''));
+                    if (meta.length) {
+                        lines.push('Meta: ' + meta.join(', '));
+                        lines.push('');
+                    }
+                });
+                var text = lines.join('\n').trim();
+                navigator.clipboard.writeText(text).then(function () {
+                    setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), '{{ _("Copied!") }}', true);
+                }).catch(function () {
+                    setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+                });
+            } catch (e) {
+                setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

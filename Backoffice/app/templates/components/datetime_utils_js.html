@@ -1,0 +1,70 @@
+{#
+    DateTime Utils JavaScript Include Component
+
+    This component includes the DateTimeUtils.js library for client-side
+    timezone conversion and date formatting.
+
+    Usage in templates:
+
+    1. In the head block or extra_js block:
+        {% from "components/datetime_utils_js.html" import datetime_utils_js %}
+        {{ datetime_utils_js() }}
+
+    2. In your HTML, use data-datetime attributes:
+        <span data-datetime="{{ some_datetime|datetime_iso }}" data-datetime-format="datetime">
+            {{ some_datetime|format_datetime_localized('short', 'short') }}
+        </span>
+
+    3. Or use the datetime_local filter for automatic conversion:
+        {{ some_datetime|datetime_local }}
+        {{ some_datetime|datetime_local('date') }}
+        {{ some_datetime|datetime_local('datetime', 'text-sm') }}
+
+    Available format types:
+        - datetime      : Full date and time (Jan 15, 2024, 10:30 AM)
+        - datetimeFull  : Full date and time with seconds
+        - datetimeShort : Short format (1/15/24, 10:30 AM)
+        - date          : Date only (Jan 15, 2024)
+        - dateShort     : Short date (1/15/24)
+        - dateISO       : ISO-style date (2024-01-15)
+        - time          : Time only (10:30 AM)
+        - timeFull      : Time with seconds
+        - relative      : Relative time (2 hours ago)
+
+    The script automatically:
+        1. Converts all elements with data-datetime on page load
+        2. Observes DOM changes to convert dynamically added elements
+        3. Uses the user's browser locale for formatting
+#}
+
+{% macro datetime_utils_js() %}
+<script src="{{ url_for('static', filename='js/lib/datetime-utils.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% endmacro %}
+
+{#
+    Macro to add datetime cell renderers to AG Grid configuration
+
+    Usage in templates with AG Grid:
+        {% from "components/datetime_utils_js.html" import datetime_utils_js, ag_grid_datetime_renderer %}
+
+        // In columnDefs:
+        {
+            field: 'created_at',
+            headerName: 'Created',
+            cellRenderer: function(params) {
+                return DateTimeUtils.agGridRenderer(params, 'datetime');
+            }
+        }
+
+        // Or for dual-line display (date on top, time below):
+        {
+            field: 'updated_at',
+            headerName: 'Updated',
+            cellRenderer: function(params) {
+                return DateTimeUtils.agGridDualLineRenderer(params);
+            }
+        }
+#}
+{% macro ag_grid_datetime_renderer() %}
+{# This macro is for documentation purposes - the actual renderers are in DateTimeUtils #}
+{% endmacro %}

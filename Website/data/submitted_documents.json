@@ -1,0 +1,90 @@
+[
+  {
+    "id": 18,
+    "filename": "Syria_INP_2025.pdf",
+    "document_type": "Unified Network Plan",
+    "language": "en",
+    "year": 2025,
+    "is_public": true,
+    "status": "approved",
+    "uploaded_at": "2025-10-06T13:22:01.400091",
+    "download_url": "http://localhost:5000/admin/documents/download/18",
+    "display_url": null,
+    "thumbnail_url": "http://localhost:5000/documents/thumbnail/18",
+    "has_thumbnail": true,
+    "country_info": {
+      "id": 167,
+      "name": "Syria",
+      "iso3": "SYR",
+      "national_society_name": "Syrian Arab Red Crescent",
+      "region": "MENA"
+    },
+    "has_file": true
+  },
+  {
+    "id": 17,
+    "filename": "Syria_INP_AR_2024.pdf",
+    "document_type": "Unified Network Annual Report",
+    "language": "en",
+    "year": 2024,
+    "is_public": true,
+    "status": "approved",
+    "uploaded_at": "2025-10-06T13:21:32.685170",
+    "download_url": "http://localhost:5000/admin/documents/download/17",
+    "display_url": null,
+    "thumbnail_url": "http://localhost:5000/documents/thumbnail/17",
+    "has_thumbnail": true,
+    "country_info": {
+      "id": 167,
+      "name": "Syria",
+      "iso3": "SYR",
+      "national_society_name": "Syrian Arab Red Crescent",
+      "region": "MENA"
+    },
+    "has_file": true
+  },
+  {
+    "id": 16,
+    "filename": "Syria_INP_2024.pdf",
+    "document_type": "Unified Network Plan",
+    "language": "en",
+    "year": 2024,
+    "is_public": true,
+    "status": "approved",
+    "uploaded_at": "2025-10-06T13:19:48.607118",
+    "download_url": "http://localhost:5000/admin/documents/download/16",
+    "display_url": null,
+    "thumbnail_url": "http://localhost:5000/documents/thumbnail/16",
+    "has_thumbnail": true,
+    "country_info": {
+      "id": 167,
+      "name": "Syria",
+      "iso3": "SYR",
+      "national_society_name": "Syrian Arab Red Crescent",
+      "region": "MENA"
+    },
+    "has_file": true
+  },
+  {
+    "id": 15,
+    "filename": "sarc.jpg",
+    "document_type": "Cover Image",
+    "language": null,
+    "year": null,
+    "is_public": true,
+    "status": "approved",
+    "uploaded_at": "2025-10-06T13:19:25.210450",
+    "download_url": "http://localhost:5000/admin/documents/download/15",
+    "display_url": "http://localhost:5000/documents/display/15",
+    "thumbnail_url": null,
+    "has_thumbnail": false,
+    "country_info": {
+      "id": 167,
+      "name": "Syria",
+      "iso3": "SYR",
+      "national_society_name": "Syrian Arab Red Crescent",
+      "region": "MENA"
+    },
+    "has_file": true
+  }
+]

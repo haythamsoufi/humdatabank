@@ -1,0 +1,135 @@
+# Manual k6 load testing — Backoffice only.
+#
+# This workflow runs scripts under the repo-root k6-load-tests/ directory against a
+# user-supplied BASE_URL (typically a staging host). It is *strictly* manual
+# (workflow_dispatch) — never attached to PR or push triggers — so it cannot
+# accidentally generate load.
+#
+# Secrets / inputs are read from a GitHub Environment (default: "staging")
+# so the workflow inherits any environment protection rules / approvals.
+#
+# To add Website / Mobile k6 scenarios in the future (Phase 2), add new
+# entries to the `scenario` choice list and corresponding run blocks below.
+
+name: k6 load test (Backoffice)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'GitHub Environment to read secrets from'
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+      scenario:
+        description: 'k6 scenario to run'
+        required: true
+        type: choice
+        default: smoke
+        options:
+          - smoke                  # Phase 1: /health + /api/ai/v2/health
+          - api-v1-reads           # Phase 1: 1-2 /api/v1 GETs
+          - api-v1-reads-extended  # Phase 1.5: round-robin across non-rate-limited GETs
+          - documents              # Phase 1.5: public document/thumbnail downloads
+          - ai-chat                # Phase 1.5 (opt-in, cost-guarded)
+          - write                  # Phase 1.5 (opt-in, throwaway staging only)
+          - mixed                  # Phase 1.5: combined scenarios block
+      base_url:
+        description: 'BASE_URL override (Backoffice origin only). If empty, uses BASE_URL secret.'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    name: k6 (${{ inputs.scenario }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve BASE_URL
+        id: resolve_base_url
+        env:
+          INPUT_BASE_URL: ${{ inputs.base_url }}
+          SECRET_BASE_URL: ${{ secrets.BASE_URL }}
+        run: |
+          if [ -n "$INPUT_BASE_URL" ]; then
+            echo "base_url=$INPUT_BASE_URL" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SECRET_BASE_URL" ]; then
+            echo "base_url=$SECRET_BASE_URL" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No BASE_URL provided (neither input nor environment secret)."
+            exit 1
+          fi
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run scenario - smoke
+        if: ${{ inputs.scenario == 'smoke' }}
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          K6_PROFILE: staging
+        run: k6 run k6-load-tests/scenarios/smoke-backoffice.js
+
+      - name: Run scenario - api-v1-reads
+        if: ${{ inputs.scenario == 'api-v1-reads' }}
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          K6_PROFILE: staging
+          K6_BACKOFFICE_API_KEY: ${{ secrets.K6_BACKOFFICE_API_KEY }}
+        run: k6 run k6-load-tests/scenarios/api-v1-reads.js
+
+      - name: Run scenario - api-v1-reads-extended
+        if: ${{ inputs.scenario == 'api-v1-reads-extended' }}
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          K6_PROFILE: staging
+          K6_BACKOFFICE_API_KEY: ${{ secrets.K6_BACKOFFICE_API_KEY }}
+        run: k6 run k6-load-tests/scenarios/api-v1-reads-extended.js
+
+      - name: Run scenario - documents
+        if: ${{ inputs.scenario == 'documents' }}
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          K6_PROFILE: staging
+          K6_DOC_IDS: ${{ secrets.K6_DOC_IDS }}
+          K6_RESOURCE_IDS: ${{ secrets.K6_RESOURCE_IDS }}
+        run: k6 run k6-load-tests/scenarios/document-download.js
+
+      - name: Run scenario - ai-chat (opt-in, cost-guarded)
+        if: ${{ inputs.scenario == 'ai-chat' }}
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          K6_PROFILE: staging
+          K6_AI_TOKEN: ${{ secrets.K6_AI_TOKEN }}
+          K6_AI_CHAT_ENABLED: 'true'
+        run: k6 run k6-load-tests/scenarios/ai-chat-smoke.js
+
+      - name: Run scenario - write (opt-in, throwaway staging only)
+        if: ${{ inputs.scenario == 'write' }}
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          K6_PROFILE: staging
+          K6_BACKOFFICE_API_KEY: ${{ secrets.K6_BACKOFFICE_API_KEY }}
+          K6_WRITE_ENABLED: 'true'
+          K6_WRITE_PATH: ${{ vars.K6_WRITE_PATH || '/api/v1/indicator-suggestions' }}
+        run: k6 run k6-load-tests/scenarios/write-smoke.js
+
+      - name: Run scenario - mixed
+        if: ${{ inputs.scenario == 'mixed' }}
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          K6_PROFILE: staging
+          K6_BACKOFFICE_API_KEY: ${{ secrets.K6_BACKOFFICE_API_KEY }}
+          K6_DOC_IDS: ${{ secrets.K6_DOC_IDS }}
+        run: k6 run k6-load-tests/scenarios/mixed-realistic.js

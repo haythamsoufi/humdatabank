@@ -1,0 +1,4610 @@
+[
+  {
+    "id": 1,
+    "name": "Afghanistan",
+    "iso3": "AFG",
+    "iso2": "AF",
+    "national_society_name": "Afghan Red Crescent",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "AFN",
+    "multilingual_names": {
+      "es": "Afganistán",
+      "fr": "Afghanistan",
+      "ar": "أفغانستان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 2,
+    "name": "Albania",
+    "iso3": "ALB",
+    "iso2": "AL",
+    "national_society_name": "Albanian Red Cross",
+    "region": "Europe & CA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ALL",
+    "multilingual_names": {
+      "es": "Albania",
+      "fr": "Albanie",
+      "ar": "ألبانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 3,
+    "name": "Algeria",
+    "iso3": "DZA",
+    "iso2": "DZ",
+    "national_society_name": "Algerian Red Crescent",
+    "region": "MENA",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "DZD",
+    "multilingual_names": {
+      "es": "Argelia",
+      "fr": "Algérie",
+      "ar": "الجزائر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 4,
+    "name": "Andorra",
+    "iso3": "AND",
+    "iso2": "AD",
+    "national_society_name": "Andorran Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Andorra",
+      "fr": "Andorre",
+      "ar": "أندورا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 5,
+    "name": "Angola",
+    "iso3": "AGO",
+    "iso2": "AO",
+    "national_society_name": "Angola Red Cross",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "AOA",
+    "multilingual_names": {
+      "es": "Angola",
+      "fr": "Angola",
+      "ar": "أنغولا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 6,
+    "name": "Antigua and Barbuda",
+    "iso3": "ATG",
+    "iso2": "AG",
+    "national_society_name": "Antigua and Barbuda Red Cross",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "XCD",
+    "multilingual_names": {
+      "es": "Antigua y Barbuda",
+      "fr": "Antigua-et-Barbuda",
+      "ar": "أنتيغوا وباربودا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 7,
+    "name": "Argentina",
+    "iso3": "ARG",
+    "iso2": "AR",
+    "national_society_name": "Argentine Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ARS",
+    "multilingual_names": {
+      "es": "Argentina",
+      "fr": "Argentine",
+      "ar": "الأرجنتين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 8,
+    "name": "Armenia",
+    "iso3": "ARM",
+    "iso2": "AM",
+    "national_society_name": "Armenian Red Cross Society",
+    "region": "Europe & CA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "AMD",
+    "multilingual_names": {
+      "es": "Armenia",
+      "fr": "Arménie",
+      "ar": "أرمينيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 9,
+    "name": "Australia",
+    "iso3": "AUS",
+    "iso2": "AU",
+    "national_society_name": "Australian Red Cross",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "AUD",
+    "multilingual_names": {
+      "es": "Australia",
+      "fr": "Australie",
+      "ar": "أستراليا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 10,
+    "name": "Austria",
+    "iso3": "AUT",
+    "iso2": "AT",
+    "national_society_name": "Austrian Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Austria",
+      "fr": "Autriche",
+      "ar": "النمسا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 11,
+    "name": "Azerbaijan",
+    "iso3": "AZE",
+    "iso2": "AZ",
+    "national_society_name": "Red Crescent Society of Azerbaijan",
+    "region": "Europe & CA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "AZN",
+    "multilingual_names": {
+      "es": "Azerbaiyán",
+      "fr": "Azerbaïdjan",
+      "ar": "أذربيجان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 18,
+    "name": "Bahamas",
+    "iso3": "BHS",
+    "iso2": "BS",
+    "national_society_name": "The Bahamas Red Cross Society",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BSD",
+    "multilingual_names": {
+      "es": "Bahamas",
+      "fr": "Bahamas",
+      "ar": "جزر البهاما",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 12,
+    "name": "Bahrain",
+    "iso3": "BHR",
+    "iso2": "BH",
+    "national_society_name": "Bahrain Red Crescent Society",
+    "region": "MENA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BHD",
+    "multilingual_names": {
+      "es": "Baréin",
+      "fr": "Bahreïn",
+      "ar": "البحرين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 13,
+    "name": "Bangladesh",
+    "iso3": "BGD",
+    "iso2": "BD",
+    "national_society_name": "Bangladesh Red Crescent Society",
+    "region": "Asia Pacific",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BDT",
+    "multilingual_names": {
+      "es": "Bangladés",
+      "fr": "Bangladesh",
+      "ar": "بنغلاديش",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 14,
+    "name": "Barbados",
+    "iso3": "BRB",
+    "iso2": "BB",
+    "national_society_name": "The Barbados Red Cross Society",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BBD",
+    "multilingual_names": {
+      "es": "Barbados",
+      "fr": "Barbade",
+      "ar": "باربادوس",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 15,
+    "name": "Belarus",
+    "iso3": "BLR",
+    "iso2": "BY",
+    "national_society_name": "Belarus Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Suspended",
+    "preferred_language": "English",
+    "currency_code": "BYR",
+    "multilingual_names": {
+      "es": "Bielorrusia",
+      "fr": "Biélorussie",
+      "ar": "بيلاروس",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 16,
+    "name": "Belgium",
+    "iso3": "BEL",
+    "iso2": "BE",
+    "national_society_name": "Belgian Red Cross",
+    "region": "Europe & CA",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Bélgica",
+      "fr": "Belgique",
+      "ar": "بلجيكا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 17,
+    "name": "Belize",
+    "iso3": "BLZ",
+    "iso2": "BZ",
+    "national_society_name": "Belize Red Cross Society",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BZD",
+    "multilingual_names": {
+      "es": "Belice",
+      "fr": "Belize",
+      "ar": "بليز",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 19,
+    "name": "Benin",
+    "iso3": "BEN",
+    "iso2": "BJ",
+    "national_society_name": "Red Cross of Benin",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Benín",
+      "fr": "Bénin",
+      "ar": "بنين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 20,
+    "name": "Bhutan",
+    "iso3": "BTN",
+    "iso2": "BT",
+    "national_society_name": "Bhutan Red Cross",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BTN",
+    "multilingual_names": {
+      "es": "Bután",
+      "fr": "Bhoutan",
+      "ar": "بوتان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 21,
+    "name": "Bolivia, Plurinational State of",
+    "iso3": "BOL",
+    "iso2": "BO",
+    "national_society_name": "Bolivian Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BOB",
+    "multilingual_names": {
+      "es": "Bolivia",
+      "fr": "Bolivie",
+      "ar": "بوليفيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 22,
+    "name": "Bosnia and Herzegovina",
+    "iso3": "BIH",
+    "iso2": "BA",
+    "national_society_name": "The Red Cross Society of Bosnia and Herzegovina",
+    "region": "Europe & CA",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BAM",
+    "multilingual_names": {
+      "es": "Bosnia y Herzegovina",
+      "fr": "Bosnie-Herzégovine",
+      "ar": "البوسنة والهرسك",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 23,
+    "name": "Botswana",
+    "iso3": "BWA",
+    "iso2": "BW",
+    "national_society_name": "Botswana Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BWP",
+    "multilingual_names": {
+      "es": "Botsuana",
+      "fr": "Botswana",
+      "ar": "بوتسوانا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 24,
+    "name": "Brazil",
+    "iso3": "BRA",
+    "iso2": "BR",
+    "national_society_name": "Brazilian Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BRL",
+    "multilingual_names": {
+      "es": "Brasil",
+      "fr": "Brésil",
+      "ar": "البرازيل",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 25,
+    "name": "Brunei Darussalam",
+    "iso3": "BRN",
+    "iso2": "BN",
+    "national_society_name": "Brunei Darussalam Red Crescent Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BND",
+    "multilingual_names": {
+      "es": "Brunéi",
+      "fr": "Brunei",
+      "ar": "بروناي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 32,
+    "name": "Bulgaria",
+    "iso3": "BGR",
+    "iso2": "BG",
+    "national_society_name": "Bulgarian Red Cross",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "BGN",
+    "multilingual_names": {
+      "es": "Bulgaria",
+      "fr": "Bulgarie",
+      "ar": "بلغاريا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 26,
+    "name": "Burkina Faso",
+    "iso3": "BFA",
+    "iso2": "BF",
+    "national_society_name": "Burkinabe Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Burkina Faso",
+      "fr": "Burkina Faso",
+      "ar": "بوركينا فاسو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 27,
+    "name": "Burundi",
+    "iso3": "BDI",
+    "iso2": "BI",
+    "national_society_name": "Burundi Red Cross",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "BIF",
+    "multilingual_names": {
+      "es": "Burundi",
+      "fr": "Burundi",
+      "ar": "بوروندي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 28,
+    "name": "Cambodia",
+    "iso3": "KHM",
+    "iso2": "KH",
+    "national_society_name": "Cambodian Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "KHR",
+    "multilingual_names": {
+      "es": "Camboya",
+      "fr": "Cambodge",
+      "ar": "كمبوديا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 29,
+    "name": "Cameroon",
+    "iso3": "CMR",
+    "iso2": "CM",
+    "national_society_name": "Cameroon Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XAF",
+    "multilingual_names": {
+      "es": "Camerún",
+      "fr": "Cameroun",
+      "ar": "الكاميرون",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 30,
+    "name": "Canada",
+    "iso3": "CAN",
+    "iso2": "CA",
+    "national_society_name": "The Canadian Red Cross Society",
+    "region": "Americas",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CAD",
+    "multilingual_names": {
+      "es": "Canadá",
+      "fr": "Canada",
+      "ar": "كندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 31,
+    "name": "Cape Verde",
+    "iso3": "CPV",
+    "iso2": "CV",
+    "national_society_name": "Red Cross of Cape Verde",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "CVE",
+    "multilingual_names": {
+      "es": "Cabo Verde",
+      "fr": "Cap-Vert",
+      "ar": "الرأس الأخضر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 33,
+    "name": "Central African Republic",
+    "iso3": "CAF",
+    "iso2": "CF",
+    "national_society_name": "Central African Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XAF",
+    "multilingual_names": {
+      "es": "República Centroafricana",
+      "fr": "République centrafricaine",
+      "ar": "جمهورية إفريقيا الوسطى",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 34,
+    "name": "Chad",
+    "iso3": "TCD",
+    "iso2": "TD",
+    "national_society_name": "Red Cross of Chad",
+    "region": "Africa",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XAF",
+    "multilingual_names": {
+      "es": "Chad",
+      "fr": "Tchad",
+      "ar": "تشاد",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 35,
+    "name": "Chile",
+    "iso3": "CHL",
+    "iso2": "CL",
+    "national_society_name": "Chilean Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CLP",
+    "multilingual_names": {
+      "es": "Chile",
+      "fr": "Chili",
+      "ar": "تشيلي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 36,
+    "name": "China",
+    "iso3": "CHN",
+    "iso2": "CN",
+    "national_society_name": "Red Cross Society of China",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CNY",
+    "multilingual_names": {
+      "es": "China",
+      "fr": "Chine",
+      "ar": "الصين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 37,
+    "name": "Colombia",
+    "iso3": "COL",
+    "iso2": "CO",
+    "national_society_name": "Colombian Red Cross Society",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "COP",
+    "multilingual_names": {
+      "es": "Colombia",
+      "fr": "Colombie",
+      "ar": "كولومبيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 38,
+    "name": "Comoros",
+    "iso3": "COM",
+    "iso2": "KM",
+    "national_society_name": "The Comoros Red Crescent",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "KMF",
+    "multilingual_names": {
+      "es": "Comoras",
+      "fr": "Comores",
+      "ar": "جزر القمر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 39,
+    "name": "Congo",
+    "iso3": "COG",
+    "iso2": "CG",
+    "national_society_name": "Congolese Red Cross",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XAF",
+    "multilingual_names": {
+      "es": "República del Congo",
+      "fr": "République du Congo",
+      "ar": "جمهورية الكونغو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 46,
+    "name": "Congo, the Democratic Republic of the",
+    "iso3": "COD",
+    "iso2": "CD",
+    "national_society_name": "Red Cross of the Democratic Republic of the Congo",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "CDF",
+    "multilingual_names": {
+      "es": "República Democrática del Congo",
+      "fr": "République démocratique du Congo",
+      "ar": "جمهورية الكونغو الديمقراطية",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 41,
+    "name": "Cook Islands",
+    "iso3": "COK",
+    "iso2": "CK",
+    "national_society_name": "Cook Islands Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "NZD",
+    "multilingual_names": {
+      "es": "Islas Cook",
+      "fr": "Îles Cook",
+      "ar": "جزر كوك",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 42,
+    "name": "Costa Rica",
+    "iso3": "CRI",
+    "iso2": "CR",
+    "national_society_name": "Costa Rican Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CRC",
+    "multilingual_names": {
+      "es": "Costa Rica",
+      "fr": "Costa Rica",
+      "ar": "كوستاريكا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 43,
+    "name": "Croatia",
+    "iso3": "HRV",
+    "iso2": "HR",
+    "national_society_name": "Croatian Red Cross",
+    "region": "Europe & CA",
+    "partof": "Ukraine Emergency, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "HRK",
+    "multilingual_names": {
+      "es": "Croacia",
+      "fr": "Croatie",
+      "ar": "كرواتيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 44,
+    "name": "Cuba",
+    "iso3": "CUB",
+    "iso2": "CU",
+    "national_society_name": "Cuban Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CUP",
+    "multilingual_names": {
+      "es": "Cuba",
+      "fr": "Cuba",
+      "ar": "كوبا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 45,
+    "name": "Cyprus",
+    "iso3": "CYP",
+    "iso2": "CY",
+    "national_society_name": "Cyprus Red Cross Society",
+    "region": "Europe & CA",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Chipre",
+      "fr": "Chypre",
+      "ar": "قبرص",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 47,
+    "name": "Czech Republic",
+    "iso3": "CZE",
+    "iso2": "CZ",
+    "national_society_name": "Czech Red Cross",
+    "region": "Europe & CA",
+    "partof": "Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CZK",
+    "multilingual_names": {
+      "es": "República Checa",
+      "fr": "Tchéquie",
+      "ar": "جمهورية التشيك",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 48,
+    "name": "Côte d'Ivoire",
+    "iso3": "CIV",
+    "iso2": "CI",
+    "national_society_name": "Red Cross Society of Côte d'Ivoire",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "fr",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Costa de Marfil",
+      "fr": "Côte d'Ivoire",
+      "ar": "ساحل العاج",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 49,
+    "name": "Denmark",
+    "iso3": "DNK",
+    "iso2": "DK",
+    "national_society_name": "Danish Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "DKK",
+    "multilingual_names": {
+      "es": "Dinamarca",
+      "fr": "Danemark",
+      "ar": "الدنمارك",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 50,
+    "name": "Djibouti",
+    "iso3": "DJI",
+    "iso2": "DJ",
+    "national_society_name": "Red Crescent Society of Djibouti",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "DJF",
+    "multilingual_names": {
+      "es": "Yibuti",
+      "fr": "Djibouti",
+      "ar": "جيبوتي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 51,
+    "name": "Dominica",
+    "iso3": "DMA",
+    "iso2": "DM",
+    "national_society_name": "Dominica Red Cross Society",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "XCD",
+    "multilingual_names": {
+      "es": "Dominica",
+      "fr": "Dominique",
+      "ar": "دومينيكا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 52,
+    "name": "Dominican Republic",
+    "iso3": "DOM",
+    "iso2": "DO",
+    "national_society_name": "Dominican Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "DOP",
+    "multilingual_names": {
+      "es": "República Dominicana",
+      "fr": "République dominicaine",
+      "ar": "جمهورية الدومينيكان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 53,
+    "name": "Ecuador",
+    "iso3": "ECU",
+    "iso2": "EC",
+    "national_society_name": "Ecuadorian Red Cross",
+    "region": "Americas",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "USD",
+    "multilingual_names": {
+      "es": "Ecuador",
+      "fr": "Équateur",
+      "ar": "الإكوادور",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 54,
+    "name": "Egypt",
+    "iso3": "EGY",
+    "iso2": "EG",
+    "national_society_name": "Egyptian Red Crescent Society",
+    "region": "MENA",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "EGP",
+    "multilingual_names": {
+      "es": "Egipto",
+      "fr": "Égypte",
+      "ar": "مصر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 55,
+    "name": "El Salvador",
+    "iso3": "SLV",
+    "iso2": "SV",
+    "national_society_name": "Salvadorean Red Cross Society",
+    "region": "Americas",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "USD",
+    "multilingual_names": {
+      "es": "El Salvador",
+      "fr": "Salvador",
+      "ar": "السلفادور",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 56,
+    "name": "Equatorial Guinea",
+    "iso3": "GNQ",
+    "iso2": "GQ",
+    "national_society_name": "Red Cross of Equatorial Guinea",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "Spanish",
+    "currency_code": "XAF",
+    "multilingual_names": {
+      "es": "Guinea Ecuatorial",
+      "fr": "Guinée équatoriale",
+      "ar": "غينيا الاستوائية",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 57,
+    "name": "Estonia",
+    "iso3": "EST",
+    "iso2": "EE",
+    "national_society_name": "Estonia Red Cross",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Estonia",
+      "fr": "Estonie",
+      "ar": "إستونيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 58,
+    "name": "Eswatini, the Kingdom of",
+    "iso3": "SWZ",
+    "iso2": "SZ",
+    "national_society_name": "Baphalali Eswatini Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SZL",
+    "multilingual_names": {
+      "es": "Suazilandia",
+      "fr": "Eswatini",
+      "ar": "إسواتيني",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 59,
+    "name": "Ethiopia",
+    "iso3": "ETH",
+    "iso2": "ET",
+    "national_society_name": "Ethiopian Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ETB",
+    "multilingual_names": {
+      "es": "Etiopía",
+      "fr": "Éthiopie",
+      "ar": "إثيوبيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 40,
+    "name": "Fiji",
+    "iso3": "FJI",
+    "iso2": "FJ",
+    "national_society_name": "Fiji Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "FJD",
+    "multilingual_names": {
+      "es": "Fiyi",
+      "fr": "Fidji",
+      "ar": "فيجي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 60,
+    "name": "Finland",
+    "iso3": "FIN",
+    "iso2": "FI",
+    "national_society_name": "Finnish Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Finlandia",
+      "fr": "Finlande",
+      "ar": "فنلندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 61,
+    "name": "France",
+    "iso3": "FRA",
+    "iso2": "FR",
+    "national_society_name": "French Red Cross",
+    "region": "Europe & CA",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Francia",
+      "fr": "France",
+      "ar": "فرنسا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 62,
+    "name": "Gabon",
+    "iso3": "GAB",
+    "iso2": "GA",
+    "national_society_name": "Gabonese Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XAF",
+    "multilingual_names": {
+      "es": "Gabón",
+      "fr": "Gabon",
+      "ar": "الغابون",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 63,
+    "name": "Gambia",
+    "iso3": "GMB",
+    "iso2": "GM",
+    "national_society_name": "The Gambia Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "GMD",
+    "multilingual_names": {
+      "es": "Gambia",
+      "fr": "Gambie",
+      "ar": "غامبيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 64,
+    "name": "Georgia",
+    "iso3": "GEO",
+    "iso2": "GE",
+    "national_society_name": "Red Cross Society of Georgia",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "GEL",
+    "multilingual_names": {
+      "es": "Georgia",
+      "fr": "Géorgie",
+      "ar": "جورجيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 65,
+    "name": "Germany",
+    "iso3": "DEU",
+    "iso2": "DE",
+    "national_society_name": "German Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Alemania",
+      "fr": "Allemagne",
+      "ar": "ألمانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 66,
+    "name": "Ghana",
+    "iso3": "GHA",
+    "iso2": "GH",
+    "national_society_name": "Ghana Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "GHS",
+    "multilingual_names": {
+      "es": "Ghana",
+      "fr": "Ghana",
+      "ar": "غانا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 67,
+    "name": "Greece",
+    "iso3": "GRC",
+    "iso2": "GR",
+    "national_society_name": "Hellenic Red Cross",
+    "region": "Europe & CA",
+    "partof": "Ukraine Emergency, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Grecia",
+      "fr": "Grèce",
+      "ar": "اليونان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 74,
+    "name": "Grenada",
+    "iso3": "GRD",
+    "iso2": "GD",
+    "national_society_name": "Grenada Red Cross Society",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "XCD",
+    "multilingual_names": {
+      "es": "Granada",
+      "fr": "Grenade",
+      "ar": "غرينادا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 68,
+    "name": "Guatemala",
+    "iso3": "GTM",
+    "iso2": "GT",
+    "national_society_name": "Guatemalan Red Cross",
+    "region": "Americas",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "GTQ",
+    "multilingual_names": {
+      "es": "Guatemala",
+      "fr": "Guatemala",
+      "ar": "غواتيمالا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 69,
+    "name": "Guinea",
+    "iso3": "GIN",
+    "iso2": "GN",
+    "national_society_name": "Red Cross Society of Guinea",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "GNF",
+    "multilingual_names": {
+      "es": "Guinea",
+      "fr": "Guinée",
+      "ar": "غينيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 70,
+    "name": "Guinea-Bissau",
+    "iso3": "GNB",
+    "iso2": "GW",
+    "national_society_name": "Red Cross Society of Guinea-Bissau",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Guinea-Bisáu",
+      "fr": "Guinée-Bissau",
+      "ar": "غينيا بيساو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 71,
+    "name": "Guyana",
+    "iso3": "GUY",
+    "iso2": "GY",
+    "national_society_name": "The Guyana Red Cross Society",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "GYD",
+    "multilingual_names": {
+      "es": "Guyana",
+      "fr": "Guyana",
+      "ar": "غيانا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 72,
+    "name": "Haiti",
+    "iso3": "HTI",
+    "iso2": "HT",
+    "national_society_name": "Haiti Red Cross Society",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "HTG",
+    "multilingual_names": {
+      "es": "Haití",
+      "fr": "Haïti",
+      "ar": "هايتي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 73,
+    "name": "Honduras",
+    "iso3": "HND",
+    "iso2": "HN",
+    "national_society_name": "Honduran Red Cross",
+    "region": "Americas",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "HNL",
+    "multilingual_names": {
+      "es": "Honduras",
+      "fr": "Honduras",
+      "ar": "هندوراس",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 75,
+    "name": "Hungary",
+    "iso3": "HUN",
+    "iso2": "HU",
+    "national_society_name": "Hungarian Red Cross",
+    "region": "Europe & CA",
+    "partof": "Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "HUF",
+    "multilingual_names": {
+      "es": "Hungría",
+      "fr": "Hongrie",
+      "ar": "المجر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 76,
+    "name": "Iceland",
+    "iso3": "ISL",
+    "iso2": "IS",
+    "national_society_name": "Icelandic Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ISK",
+    "multilingual_names": {
+      "es": "Islandia",
+      "fr": "Islande",
+      "ar": "آيسلندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 77,
+    "name": "India",
+    "iso3": "IND",
+    "iso2": "IN",
+    "national_society_name": "Indian Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "INR",
+    "multilingual_names": {
+      "es": "India",
+      "fr": "Inde",
+      "ar": "الهند",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 78,
+    "name": "Indonesia",
+    "iso3": "IDN",
+    "iso2": "ID",
+    "national_society_name": "Indonesian Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "IDR",
+    "multilingual_names": {
+      "es": "Indonesia",
+      "fr": "Indonésie",
+      "ar": "إندونيسيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 79,
+    "name": "Iran, Islamic Republic of",
+    "iso3": "IRN",
+    "iso2": "IR",
+    "national_society_name": "Red Crescent Society of the Islamic Republic of Iran",
+    "region": "MENA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "IRR",
+    "multilingual_names": {
+      "es": "Irán",
+      "fr": "Iran",
+      "ar": "إيران",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 80,
+    "name": "Iraq",
+    "iso3": "IRQ",
+    "iso2": "IQ",
+    "national_society_name": "Iraqi Red Crescent Society",
+    "region": "MENA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "IQD",
+    "multilingual_names": {
+      "es": "Irak",
+      "fr": "Irak",
+      "ar": "العراق",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 81,
+    "name": "Ireland",
+    "iso3": "IRL",
+    "iso2": "IE",
+    "national_society_name": "Irish Red Cross Society",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Irlanda",
+      "fr": "Irlande",
+      "ar": "أيرلندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 82,
+    "name": "Israel",
+    "iso3": "ISR",
+    "iso2": "IL",
+    "national_society_name": "Israel - Magen David Adom in Israel",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ILS",
+    "multilingual_names": {
+      "es": "Israel",
+      "fr": "Israël",
+      "ar": "إسرائيل",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 88,
+    "name": "Italy",
+    "iso3": "ITA",
+    "iso2": "IT",
+    "national_society_name": "Italian Red Cross",
+    "region": "Europe & CA",
+    "partof": "Both",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Italia",
+      "fr": "Italie",
+      "ar": "إيطاليا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 89,
+    "name": "Jamaica",
+    "iso3": "JAM",
+    "iso2": "JM",
+    "national_society_name": "Jamaica Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "JMD",
+    "multilingual_names": {
+      "es": "Jamaica",
+      "fr": "Jamaïque",
+      "ar": "جامايكا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 83,
+    "name": "Japan",
+    "iso3": "JPN",
+    "iso2": "JP",
+    "national_society_name": "Japanese Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "JPY",
+    "multilingual_names": {
+      "es": "Japón",
+      "fr": "Japon",
+      "ar": "اليابان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 84,
+    "name": "Jordan",
+    "iso3": "JOR",
+    "iso2": "JO",
+    "national_society_name": "Jordan National Red Crescent Society",
+    "region": "MENA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "JOD",
+    "multilingual_names": {
+      "es": "Jordania",
+      "fr": "Jordanie",
+      "ar": "الأردن",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 85,
+    "name": "Kazakhstan",
+    "iso3": "KAZ",
+    "iso2": "KZ",
+    "national_society_name": "Kazakh Red Crescent",
+    "region": "Europe & CA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "KZT",
+    "multilingual_names": {
+      "es": "Kazajistán",
+      "fr": "Kazakhstan",
+      "ar": "كازاخستان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 86,
+    "name": "Kenya",
+    "iso3": "KEN",
+    "iso2": "KE",
+    "national_society_name": "Kenya Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "KES",
+    "multilingual_names": {
+      "es": "Kenia",
+      "fr": "Kenya",
+      "ar": "كينيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 87,
+    "name": "Kiribati",
+    "iso3": "KIR",
+    "iso2": "KI",
+    "national_society_name": "Kiribati Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "AUD",
+    "multilingual_names": {
+      "es": "Kiribati",
+      "fr": "Kiribati",
+      "ar": "كيريباتي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 90,
+    "name": "Korea, Democratic People's Republic of",
+    "iso3": "PRK",
+    "iso2": "KP",
+    "national_society_name": "Red Cross Society of the Democratic People's Republic of Korea",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "KPW",
+    "multilingual_names": {
+      "es": "Corea del Norte",
+      "fr": "Corée du Nord",
+      "ar": "كوريا الشمالية",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 91,
+    "name": "Korea, Republic of",
+    "iso3": "KOR",
+    "iso2": "KR",
+    "national_society_name": "The Republic of Korea National Red Cross",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "KRW",
+    "multilingual_names": {
+      "es": "Corea del Sur",
+      "fr": "Corée du Sud",
+      "ar": "كوريا الجنوبية",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 92,
+    "name": "Kuwait",
+    "iso3": "KWT",
+    "iso2": "KW",
+    "national_society_name": "Kuwait Red Crescent Society",
+    "region": "MENA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "KWD",
+    "multilingual_names": {
+      "es": "Kuwait",
+      "fr": "Koweït",
+      "ar": "الكويت",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 93,
+    "name": "Kyrgyzstan",
+    "iso3": "KGZ",
+    "iso2": "KG",
+    "national_society_name": "Red Crescent Society of Kyrgyzstan",
+    "region": "Europe & CA",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "KGS",
+    "multilingual_names": {
+      "es": "Kirguistán",
+      "fr": "Kirghizistan",
+      "ar": "قرغيزستان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 94,
+    "name": "Lao People's Democratic Republic",
+    "iso3": "LAO",
+    "iso2": "LA",
+    "national_society_name": "Lao Red Cross",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "LAK",
+    "multilingual_names": {
+      "es": "Laos",
+      "fr": "Laos",
+      "ar": "لاوس",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 95,
+    "name": "Latvia",
+    "iso3": "LVA",
+    "iso2": "LV",
+    "national_society_name": "Latvian Red Cross",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Letonia",
+      "fr": "Lettonie",
+      "ar": "لاتفيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 101,
+    "name": "Lebanon",
+    "iso3": "LBN",
+    "iso2": "LB",
+    "national_society_name": "Lebanese Red Cross",
+    "region": "MENA",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "LBP",
+    "multilingual_names": {
+      "es": "Líbano",
+      "fr": "Liban",
+      "ar": "لبنان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 102,
+    "name": "Lesotho",
+    "iso3": "LSO",
+    "iso2": "LS",
+    "national_society_name": "Lesotho Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "LSL",
+    "multilingual_names": {
+      "es": "Lesoto",
+      "fr": "Lesotho",
+      "ar": "ليسوتو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 96,
+    "name": "Liberia",
+    "iso3": "LBR",
+    "iso2": "LR",
+    "national_society_name": "Liberian Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "LRD",
+    "multilingual_names": {
+      "es": "Liberia",
+      "fr": "Liberia",
+      "ar": "ليبيريا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 97,
+    "name": "Libya",
+    "iso3": "LBY",
+    "iso2": "LY",
+    "national_society_name": "Libyan Red Crescent",
+    "region": "MENA",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "LYD",
+    "multilingual_names": {
+      "es": "Libia",
+      "fr": "Libye",
+      "ar": "ليبيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 98,
+    "name": "Liechtenstein",
+    "iso3": "LIE",
+    "iso2": "LI",
+    "national_society_name": "Liechtenstein Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CHF",
+    "multilingual_names": {
+      "es": "Liechtenstein",
+      "fr": "Liechtenstein",
+      "ar": "ليختنشتاين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 99,
+    "name": "Lithuania",
+    "iso3": "LTU",
+    "iso2": "LT",
+    "national_society_name": "Lithuanian Red Cross Society",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Lituania",
+      "fr": "Lituanie",
+      "ar": "ليتوانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 100,
+    "name": "Luxembourg",
+    "iso3": "LUX",
+    "iso2": "LU",
+    "national_society_name": "Luxembourg Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Luxemburgo",
+      "fr": "Luxembourg",
+      "ar": "لوكسمبورغ",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 109,
+    "name": "Madagascar",
+    "iso3": "MDG",
+    "iso2": "MG",
+    "national_society_name": "Malagasy Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "MGA",
+    "multilingual_names": {
+      "es": "Madagascar",
+      "fr": "Madagascar",
+      "ar": "مدغشقر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 103,
+    "name": "Malawi",
+    "iso3": "MWI",
+    "iso2": "MW",
+    "national_society_name": "Malawi Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MWK",
+    "multilingual_names": {
+      "es": "Malaui",
+      "fr": "Malawi",
+      "ar": "مالاوي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 104,
+    "name": "Malaysia",
+    "iso3": "MYS",
+    "iso2": "MY",
+    "national_society_name": "Malaysian Red Crescent Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MYR",
+    "multilingual_names": {
+      "es": "Malasia",
+      "fr": "Malaisie",
+      "ar": "ماليزيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 105,
+    "name": "Maldives",
+    "iso3": "MDV",
+    "iso2": "MV",
+    "national_society_name": "Maldivian Red Crescent",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MVR",
+    "multilingual_names": {
+      "es": "Maldivas",
+      "fr": "Maldives",
+      "ar": "جزر المالديف",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 106,
+    "name": "Mali",
+    "iso3": "MLI",
+    "iso2": "ML",
+    "national_society_name": "Mali Red Cross",
+    "region": "Africa",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Mali",
+      "fr": "Mali",
+      "ar": "مالي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 107,
+    "name": "Malta",
+    "iso3": "MLT",
+    "iso2": "MT",
+    "national_society_name": "Malta Red Cross Society",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Malta",
+      "fr": "Malte",
+      "ar": "مالطا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 108,
+    "name": "Marshall Islands",
+    "iso3": "MHL",
+    "iso2": "MH",
+    "national_society_name": "Marshall Islands Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "USD",
+    "multilingual_names": {
+      "es": "Islas Marshall",
+      "fr": "Îles Marshall",
+      "ar": "جزر مارشال",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 110,
+    "name": "Mauritania",
+    "iso3": "MRT",
+    "iso2": "MR",
+    "national_society_name": "Mauritanian Red Crescent",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "MRO",
+    "multilingual_names": {
+      "es": "Mauritania",
+      "fr": "Mauritanie",
+      "ar": "موريتانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 111,
+    "name": "Mauritius",
+    "iso3": "MUS",
+    "iso2": "MU",
+    "national_society_name": "Mauritius Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "MUR",
+    "multilingual_names": {
+      "es": "Mauricio",
+      "fr": "Maurice",
+      "ar": "موريشيوس",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 112,
+    "name": "Mexico",
+    "iso3": "MEX",
+    "iso2": "MX",
+    "national_society_name": "Mexican Red Cross",
+    "region": "Americas",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "Spanish",
+    "currency_code": "MXN",
+    "multilingual_names": {
+      "es": "México",
+      "fr": "Mexique",
+      "ar": "المكسيك",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 113,
+    "name": "Micronesia, Federated States of",
+    "iso3": "FSM",
+    "iso2": "FM",
+    "national_society_name": "Micronesia Red Cross",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "USD",
+    "multilingual_names": {
+      "es": "Micronesia",
+      "fr": "États fédérés de Micronésie",
+      "ar": "ولايات ميكرونيسيا المتحدة",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 114,
+    "name": "Moldova, Republic of",
+    "iso3": "MDA",
+    "iso2": "MD",
+    "national_society_name": "Red Cross Society of the Republic of Moldova",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MDL",
+    "multilingual_names": {
+      "es": "Moldavia",
+      "fr": "Moldavie",
+      "ar": "مولدوفا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 115,
+    "name": "Monaco",
+    "iso3": "MCO",
+    "iso2": "MC",
+    "national_society_name": "Red Cross of Monaco",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Mónaco",
+      "fr": "Monaco",
+      "ar": "موناكو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 116,
+    "name": "Mongolia",
+    "iso3": "MNG",
+    "iso2": "MN",
+    "national_society_name": "Mongolian Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MNT",
+    "multilingual_names": {
+      "es": "Mongolia",
+      "fr": "Mongolie",
+      "ar": "منغوليا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 117,
+    "name": "Montenegro",
+    "iso3": "MNE",
+    "iso2": "ME",
+    "national_society_name": "Red Cross of Montenegro",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Montenegro",
+      "fr": "Monténégro",
+      "ar": "الجبل الأسود",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 118,
+    "name": "Morocco",
+    "iso3": "MAR",
+    "iso2": "MA",
+    "national_society_name": "Moroccan Red Crescent",
+    "region": "MENA",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "MAD",
+    "multilingual_names": {
+      "es": "Marruecos",
+      "fr": "Maroc",
+      "ar": "المغرب",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 119,
+    "name": "Mozambique",
+    "iso3": "MOZ",
+    "iso2": "MZ",
+    "national_society_name": "Mozambique Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MZN",
+    "multilingual_names": {
+      "es": "Mozambique",
+      "fr": "Mozambique",
+      "ar": "موزمبيق",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 120,
+    "name": "Myanmar",
+    "iso3": "MMR",
+    "iso2": "MM",
+    "national_society_name": "Myanmar Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MMK",
+    "multilingual_names": {
+      "es": "Birmania",
+      "fr": "Birmanie",
+      "ar": "ميانمار",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 121,
+    "name": "Namibia",
+    "iso3": "NAM",
+    "iso2": null,
+    "national_society_name": "Namibia Red Cross",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "NAD",
+    "multilingual_names": {
+      "es": "Namibia",
+      "fr": "Namibie",
+      "ar": "ناميبيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 122,
+    "name": "Nepal",
+    "iso3": "NPL",
+    "iso2": "NP",
+    "national_society_name": "Nepal Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "NPR",
+    "multilingual_names": {
+      "es": "Nepal",
+      "fr": "Népal",
+      "ar": "نيبال",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 123,
+    "name": "Netherlands",
+    "iso3": "NLD",
+    "iso2": "NL",
+    "national_society_name": "The Netherlands Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Países Bajos",
+      "fr": "Pays-Bas",
+      "ar": "هولندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 125,
+    "name": "New Zealand",
+    "iso3": "NZL",
+    "iso2": "NZ",
+    "national_society_name": "New Zealand Red Cross",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "NZD",
+    "multilingual_names": {
+      "es": "Nueva Zelanda",
+      "fr": "Nouvelle-Zélande",
+      "ar": "نيوزيلندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 126,
+    "name": "Nicaragua",
+    "iso3": "NIC",
+    "iso2": "NI",
+    "national_society_name": "Nicaraguan Red Cross* dissolved 9 May 2023",
+    "region": "Americas",
+    "partof": null,
+    "status": "Dissolved",
+    "preferred_language": "English",
+    "currency_code": "NIO",
+    "multilingual_names": {
+      "es": "Nicaragua",
+      "fr": "Nicaragua",
+      "ar": "نيكاراغوا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 127,
+    "name": "Niger",
+    "iso3": "NER",
+    "iso2": "NE",
+    "national_society_name": "Red Cross Society of Niger",
+    "region": "Africa",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Níger",
+      "fr": "Niger",
+      "ar": "النيجر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 128,
+    "name": "Nigeria",
+    "iso3": "NGA",
+    "iso2": "NG",
+    "national_society_name": "Nigerian Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "NGN",
+    "multilingual_names": {
+      "es": "Nigeria",
+      "fr": "Nigeria",
+      "ar": "نيجيريا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 129,
+    "name": "North Macedonia",
+    "iso3": "MKD",
+    "iso2": "MK",
+    "national_society_name": "Red Cross of North Macedonia",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "MKD",
+    "multilingual_names": {
+      "es": "Macedonia del Norte",
+      "fr": "Macédoine du Nord",
+      "ar": "مقدونيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 130,
+    "name": "Norway",
+    "iso3": "NOR",
+    "iso2": "NO",
+    "national_society_name": "Norwegian Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "NOK",
+    "multilingual_names": {
+      "es": "Noruega",
+      "fr": "Norvège",
+      "ar": "النرويج",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 131,
+    "name": "Pakistan",
+    "iso3": "PAK",
+    "iso2": "PK",
+    "national_society_name": "Pakistan Red Crescent",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "PKR",
+    "multilingual_names": {
+      "es": "Pakistán",
+      "fr": "Pakistan",
+      "ar": "باكستان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 124,
+    "name": "Palau",
+    "iso3": "PLW",
+    "iso2": "PW",
+    "national_society_name": "Palau Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "USD",
+    "multilingual_names": {
+      "es": "Palaos",
+      "fr": "Palaos",
+      "ar": "بالاو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 138,
+    "name": "Palestine, State of",
+    "iso3": "PSE",
+    "iso2": "PS",
+    "national_society_name": "The Palestine Red Crescent Society",
+    "region": "MENA",
+    "partof": "PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ILS",
+    "multilingual_names": {
+      "es": "Palestina",
+      "fr": "Palestine",
+      "ar": "فلسطين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 132,
+    "name": "Panama",
+    "iso3": "PAN",
+    "iso2": "PA",
+    "national_society_name": "Red Cross Society of Panama",
+    "region": "Americas",
+    "partof": "UP, PPP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "PAB",
+    "multilingual_names": {
+      "es": "Panamá",
+      "fr": "Panama",
+      "ar": "بنما",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 133,
+    "name": "Papua New Guinea",
+    "iso3": "PNG",
+    "iso2": "PG",
+    "national_society_name": "Papua New Guinea Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "PGK",
+    "multilingual_names": {
+      "es": "Papúa Nueva Guinea",
+      "fr": "Papouasie-Nouvelle-Guinée",
+      "ar": "بابوا غينيا الجديدة",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 134,
+    "name": "Paraguay",
+    "iso3": "PRY",
+    "iso2": "PY",
+    "national_society_name": "Paraguayan Red Cross",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "PYG",
+    "multilingual_names": {
+      "es": "Paraguay",
+      "fr": "Paraguay",
+      "ar": "باراغواي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 135,
+    "name": "Peru",
+    "iso3": "PER",
+    "iso2": "PE",
+    "national_society_name": "Peruvian Red Cross",
+    "region": "Americas",
+    "partof": "GRBMP",
+    "status": "Suspended",
+    "preferred_language": "English",
+    "currency_code": "PEN",
+    "multilingual_names": {
+      "es": "Perú",
+      "fr": "Pérou",
+      "ar": "بيرو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 136,
+    "name": "Philippines",
+    "iso3": "PHL",
+    "iso2": "PH",
+    "national_society_name": "Philippine Red Cross",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "PHP",
+    "multilingual_names": {
+      "es": "Filipinas",
+      "fr": "Philippines",
+      "ar": "الفلبين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 137,
+    "name": "Poland",
+    "iso3": "POL",
+    "iso2": "PL",
+    "national_society_name": "Polish Red Cross",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "PLN",
+    "multilingual_names": {
+      "es": "Polonia",
+      "fr": "Pologne",
+      "ar": "بولندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 139,
+    "name": "Portugal",
+    "iso3": "PRT",
+    "iso2": "PT",
+    "national_society_name": "Portuguese Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Portugal",
+      "fr": "Portugal",
+      "ar": "البرتغال",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 140,
+    "name": "Qatar",
+    "iso3": "QAT",
+    "iso2": "QA",
+    "national_society_name": "Qatar Red Crescent Society",
+    "region": "MENA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "QAR",
+    "multilingual_names": {
+      "es": "Catar",
+      "fr": "Qatar",
+      "ar": "قطر",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 141,
+    "name": "Romania",
+    "iso3": "ROU",
+    "iso2": "RO",
+    "national_society_name": "Romanian Red Cross",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "RON",
+    "multilingual_names": {
+      "es": "Rumania",
+      "fr": "Roumanie",
+      "ar": "رومانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 142,
+    "name": "Russian Federation",
+    "iso3": "RUS",
+    "iso2": "RU",
+    "national_society_name": "The Russian Red Cross Society",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "RUB",
+    "multilingual_names": {
+      "es": "Rusia",
+      "fr": "Russie",
+      "ar": "روسيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 143,
+    "name": "Rwanda",
+    "iso3": "RWA",
+    "iso2": "RW",
+    "national_society_name": "Rwandan Red Cross",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "RWF",
+    "multilingual_names": {
+      "es": "Ruanda",
+      "fr": "Rwanda",
+      "ar": "رواندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 144,
+    "name": "Saint Kitts and Nevis",
+    "iso3": "KNA",
+    "iso2": "KN",
+    "national_society_name": "Saint Kitts and Nevis Red Cross Society",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "XCD",
+    "multilingual_names": {
+      "es": "San Cristóbal y Nieves",
+      "fr": "Saint-Christophe-et-Niévès",
+      "ar": "سانت كيتس ونيفيس",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 145,
+    "name": "Saint Lucia",
+    "iso3": "LCA",
+    "iso2": "LC",
+    "national_society_name": "Saint Lucia Red Cross",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "XCD",
+    "multilingual_names": {
+      "es": "Santa Lucía",
+      "fr": "Sainte-Lucie",
+      "ar": "سانت لوسيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 151,
+    "name": "Saint Vincent and the Grenadines",
+    "iso3": "VCT",
+    "iso2": "VC",
+    "national_society_name": "Saint Vincent and the Grenadines Red Cross",
+    "region": "Americas",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "XCD",
+    "multilingual_names": {
+      "es": "San Vicente y las Granadinas",
+      "fr": "Saint-Vincent-et-les-Grenadines",
+      "ar": "سانت فينسنت والغرينادين",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 146,
+    "name": "Samoa",
+    "iso3": "WSM",
+    "iso2": "WS",
+    "national_society_name": "Samoa Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "WST",
+    "multilingual_names": {
+      "es": "Samoa",
+      "fr": "Samoa",
+      "ar": "ساموا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 147,
+    "name": "San Marino",
+    "iso3": "SMR",
+    "iso2": "SM",
+    "national_society_name": "Red Cross of the Republic of San Marino",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "San Marino",
+      "fr": "Saint-Marin",
+      "ar": "سان مارينو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 148,
+    "name": "Sao Tome and Principe",
+    "iso3": "STP",
+    "iso2": "ST",
+    "national_society_name": "Sao Tome and Principe Red Cross",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "STD",
+    "multilingual_names": {
+      "es": "Santo Tomé y Príncipe",
+      "fr": "Sao Tomé-et-Principe",
+      "ar": "ساو تومي وبرينسيب",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 149,
+    "name": "Saudi Arabia",
+    "iso3": "SAU",
+    "iso2": "SA",
+    "national_society_name": "Saudi Red Crescent Authority",
+    "region": "MENA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "SAR",
+    "multilingual_names": {
+      "es": "Arabia Saudita",
+      "fr": "Arabie saoudite",
+      "ar": "السعودية",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 150,
+    "name": "Senegal",
+    "iso3": "SEN",
+    "iso2": "SN",
+    "national_society_name": "Senegalese Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Senegal",
+      "fr": "Sénégal",
+      "ar": "السنغال",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 152,
+    "name": "Serbia",
+    "iso3": "SRB",
+    "iso2": "RS",
+    "national_society_name": "The Red Cross of Serbia",
+    "region": "Europe & CA",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "RSD",
+    "multilingual_names": {
+      "es": "Serbia",
+      "fr": "Serbie",
+      "ar": "صربيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 153,
+    "name": "Seychelles",
+    "iso3": "SYC",
+    "iso2": "SC",
+    "national_society_name": "Seychelles Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SCR",
+    "multilingual_names": {
+      "es": "Seychelles",
+      "fr": "Seychelles",
+      "ar": "سيشل",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 154,
+    "name": "Sierra Leone",
+    "iso3": "SLE",
+    "iso2": "SL",
+    "national_society_name": "Sierra Leone Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SLL",
+    "multilingual_names": {
+      "es": "Sierra Leona",
+      "fr": "Sierra Leone",
+      "ar": "سيراليون",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 155,
+    "name": "Singapore",
+    "iso3": "SGP",
+    "iso2": "SG",
+    "national_society_name": "Singapore Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SGD",
+    "multilingual_names": {
+      "es": "Singapur",
+      "fr": "Singapour",
+      "ar": "سنغافورة",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 156,
+    "name": "Slovakia",
+    "iso3": "SVK",
+    "iso2": "SK",
+    "national_society_name": "Slovak Red Cross",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Eslovaquia",
+      "fr": "Slovaquie",
+      "ar": "سلوفاكيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 157,
+    "name": "Slovenia",
+    "iso3": "SVN",
+    "iso2": "SI",
+    "national_society_name": "Slovenian Red Cross",
+    "region": "Europe & CA",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "Eslovenia",
+      "fr": "Slovénie",
+      "ar": "سلوفينيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 158,
+    "name": "Solomon Islands",
+    "iso3": "SLB",
+    "iso2": "SB",
+    "national_society_name": "The Solomon Islands Red Cross",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SBD",
+    "multilingual_names": {
+      "es": "Islas Salomón",
+      "fr": "Îles Salomon",
+      "ar": "جزر سليمان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 165,
+    "name": "Somalia",
+    "iso3": "SOM",
+    "iso2": "SO",
+    "national_society_name": "Somali Red Crescent Society",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SOS",
+    "multilingual_names": {
+      "es": "Somalia",
+      "fr": "Somalie",
+      "ar": "الصومال",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 159,
+    "name": "South Africa",
+    "iso3": "ZAF",
+    "iso2": "ZA",
+    "national_society_name": "The South African Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ZAR",
+    "multilingual_names": {
+      "es": "Sudáfrica",
+      "fr": "Afrique du Sud",
+      "ar": "جنوب إفريقيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 160,
+    "name": "South Sudan",
+    "iso3": "SSD",
+    "iso2": "SS",
+    "national_society_name": "South Sudan Red Cross",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SSP",
+    "multilingual_names": {
+      "es": "Sudán del Sur",
+      "fr": "Soudan du Sud",
+      "ar": "جنوب السودان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 161,
+    "name": "Spain",
+    "iso3": "ESP",
+    "iso2": "ES",
+    "national_society_name": "Spanish Red Cross",
+    "region": "Europe & CA",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "Spanish",
+    "currency_code": "EUR",
+    "multilingual_names": {
+      "es": "España",
+      "fr": "Espagne",
+      "ar": "إسبانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 162,
+    "name": "Sri Lanka",
+    "iso3": "LKA",
+    "iso2": "LK",
+    "national_society_name": "Sri Lanka Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "LKR",
+    "multilingual_names": {
+      "es": "Sri Lanka",
+      "fr": "Sri Lanka",
+      "ar": "سريلانكا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 163,
+    "name": "Sudan",
+    "iso3": "SDN",
+    "iso2": "SD",
+    "national_society_name": "The Sudanese Red Crescent",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "SDG",
+    "multilingual_names": {
+      "es": "Sudán",
+      "fr": "Soudan",
+      "ar": "السودان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 164,
+    "name": "Suriname",
+    "iso3": "SUR",
+    "iso2": "SR",
+    "national_society_name": "Suriname Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SRD",
+    "multilingual_names": {
+      "es": "Surinam",
+      "fr": "Suriname",
+      "ar": "سورينام",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 172,
+    "name": "Sweden",
+    "iso3": "SWE",
+    "iso2": "SE",
+    "national_society_name": "Swedish Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "SEK",
+    "multilingual_names": {
+      "es": "Suecia",
+      "fr": "Suède",
+      "ar": "السويد",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 166,
+    "name": "Switzerland",
+    "iso3": "CHE",
+    "iso2": "CH",
+    "national_society_name": "Swiss Red Cross",
+    "region": "Europe & CA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "CHF",
+    "multilingual_names": {
+      "es": "Suiza",
+      "fr": "Suisse",
+      "ar": "سويسرا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 167,
+    "name": "Syrian Arab Republic",
+    "iso3": "SYR",
+    "iso2": "SY",
+    "national_society_name": "Syrian Arab Red Crescent",
+    "region": "MENA",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "SYP",
+    "multilingual_names": {
+      "es": "Siria",
+      "fr": "Syrie",
+      "ar": "سوريا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 168,
+    "name": "Tajikistan",
+    "iso3": "TJK",
+    "iso2": "TJ",
+    "national_society_name": "Red Crescent Society of Tajikistan",
+    "region": "Europe & CA",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "TJS",
+    "multilingual_names": {
+      "es": "Tayikistán",
+      "fr": "Tadjikistan",
+      "ar": "طاجيكستان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 169,
+    "name": "Tanzania, United Republic of",
+    "iso3": "TZA",
+    "iso2": "TZ",
+    "national_society_name": "Tanzania Red Cross National Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "TZS",
+    "multilingual_names": {
+      "es": "Tanzania",
+      "fr": "Tanzanie",
+      "ar": "تنزانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 170,
+    "name": "Thailand",
+    "iso3": "THA",
+    "iso2": "TH",
+    "national_society_name": "The Thai Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "THB",
+    "multilingual_names": {
+      "es": "Tailandia",
+      "fr": "Thaïlande",
+      "ar": "تايلاند",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 171,
+    "name": "Timor-Leste",
+    "iso3": "TLS",
+    "iso2": "TL",
+    "national_society_name": "Timor-Leste Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "IDR",
+    "multilingual_names": {
+      "es": "Timor Oriental",
+      "fr": "Timor oriental",
+      "ar": "تيمور الشرقية",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 173,
+    "name": "Togo",
+    "iso3": "TGO",
+    "iso2": "TG",
+    "national_society_name": "Togolese Red Cross",
+    "region": "Africa",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "XOF",
+    "multilingual_names": {
+      "es": "Togo",
+      "fr": "Togo",
+      "ar": "توغو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 174,
+    "name": "Tonga",
+    "iso3": "TON",
+    "iso2": "TO",
+    "national_society_name": "Tonga Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "TOP",
+    "multilingual_names": {
+      "es": "Tonga",
+      "fr": "Tonga",
+      "ar": "تونغا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 175,
+    "name": "Trinidad and Tobago",
+    "iso3": "TTO",
+    "iso2": "TT",
+    "national_society_name": "The Trinidad and Tobago Red Cross Society",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "TTD",
+    "multilingual_names": {
+      "es": "Trinidad y Tobago",
+      "fr": "Trinité-et-Tobago",
+      "ar": "ترينيداد وتوباغو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 176,
+    "name": "Tunisia",
+    "iso3": "TUN",
+    "iso2": "TN",
+    "national_society_name": "Tunisian Red Crescent",
+    "region": "MENA",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "French",
+    "currency_code": "TND",
+    "multilingual_names": {
+      "es": "Túnez",
+      "fr": "Tunisie",
+      "ar": "تونس",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 177,
+    "name": "Turkmenistan",
+    "iso3": "TKM",
+    "iso2": "TM",
+    "national_society_name": "Red Crescent Society of Turkmenistan",
+    "region": "Europe & CA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "TMT",
+    "multilingual_names": {
+      "es": "Turkmenistán",
+      "fr": "Turkménistan",
+      "ar": "تركمانستان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 178,
+    "name": "Tuvalu",
+    "iso3": "TUV",
+    "iso2": "TV",
+    "national_society_name": "Tuvalu Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "TVD",
+    "multilingual_names": {
+      "es": "Tuvalu",
+      "fr": "Tuvalu",
+      "ar": "توفالو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 179,
+    "name": "Türkiye",
+    "iso3": "TUR",
+    "iso2": "TR",
+    "national_society_name": "Turkish Red Crescent Society",
+    "region": "Europe & CA",
+    "partof": "UP, Ukraine Emergency, GRBMP",
+    "status": "Active",
+    "preferred_language": "en",
+    "currency_code": "TRY",
+    "multilingual_names": {
+      "es": "Turquía",
+      "fr": "Turquie",
+      "ar": "تركيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 184,
+    "name": "Uganda",
+    "iso3": "UGA",
+    "iso2": "UG",
+    "national_society_name": "The Uganda Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "UGX",
+    "multilingual_names": {
+      "es": "Uganda",
+      "fr": "Ouganda",
+      "ar": "أوغندا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 185,
+    "name": "Ukraine",
+    "iso3": "UKR",
+    "iso2": "UA",
+    "national_society_name": "Ukrainian Red Cross Society",
+    "region": "Europe & CA",
+    "partof": "Ukraine Emergency",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "UAH",
+    "multilingual_names": {
+      "es": "Ucrania",
+      "fr": "Ukraine",
+      "ar": "أوكرانيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 180,
+    "name": "United Arab Emirates",
+    "iso3": "ARE",
+    "iso2": "AE",
+    "national_society_name": "Red Crescent Society of the United Arab Emirates",
+    "region": "MENA",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "AED",
+    "multilingual_names": {
+      "es": "Emiratos Árabes Unidos",
+      "fr": "Émirats arabes unis",
+      "ar": "الإمارات العربية المتحدة",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 181,
+    "name": "United Kingdom",
+    "iso3": "GBR",
+    "iso2": "GB",
+    "national_society_name": "British Red Cross",
+    "region": "Europe & CA",
+    "partof": "GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "GBP",
+    "multilingual_names": {
+      "es": "Reino Unido",
+      "fr": "Royaume-Uni",
+      "ar": "المملكة المتحدة",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 182,
+    "name": "United States",
+    "iso3": "USA",
+    "iso2": "US",
+    "national_society_name": "American Red Cross",
+    "region": "Americas",
+    "partof": null,
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "USD",
+    "multilingual_names": {
+      "es": "Estados Unidos",
+      "fr": "États-Unis",
+      "ar": "الولايات المتحدة",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 183,
+    "name": "Uruguay",
+    "iso3": "URY",
+    "iso2": "UY",
+    "national_society_name": "Uruguayan Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "UYU",
+    "multilingual_names": {
+      "es": "Uruguay",
+      "fr": "Uruguay",
+      "ar": "الأوروغواي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 186,
+    "name": "Uzbekistan",
+    "iso3": "UZB",
+    "iso2": "UZ",
+    "national_society_name": "Red Crescent Society of Uzbekistan",
+    "region": "Europe & CA",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "UZS",
+    "multilingual_names": {
+      "es": "Uzbekistán",
+      "fr": "Ouzbékistan",
+      "ar": "أوزبكستان",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 187,
+    "name": "Vanuatu",
+    "iso3": "VUT",
+    "iso2": "VU",
+    "national_society_name": "Vanuatu Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "VUV",
+    "multilingual_names": {
+      "es": "Vanuatu",
+      "fr": "Vanuatu",
+      "ar": "فانواتو",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 188,
+    "name": "Venezuela, Bolivarian Republic of",
+    "iso3": "VEN",
+    "iso2": "VE",
+    "national_society_name": "Venezuelan Red Cross",
+    "region": "Americas",
+    "partof": "UP, GRBMP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "VEB",
+    "multilingual_names": {
+      "es": "Venezuela",
+      "fr": "Venezuela",
+      "ar": "فنزويلا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 189,
+    "name": "Viet Nam",
+    "iso3": "VNM",
+    "iso2": "VN",
+    "national_society_name": "Vietnam Red Cross Society",
+    "region": "Asia Pacific",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "VND",
+    "multilingual_names": {
+      "es": "Vietnam",
+      "fr": "Viêt Nam",
+      "ar": "فيتنام",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 190,
+    "name": "Yemen",
+    "iso3": "YEM",
+    "iso2": "YE",
+    "national_society_name": "Yemen Red Crescent Society",
+    "region": "MENA",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "Arabic",
+    "currency_code": "YER",
+    "multilingual_names": {
+      "es": "Yemen",
+      "fr": "Yémen",
+      "ar": "اليمن",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 191,
+    "name": "Zambia",
+    "iso3": "ZMB",
+    "iso2": "ZM",
+    "national_society_name": "Zambia Red Cross Society",
+    "region": "Africa",
+    "partof": "UP, PPP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ZMW",
+    "multilingual_names": {
+      "es": "Zambia",
+      "fr": "Zambie",
+      "ar": "زامبيا",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  },
+  {
+    "id": 192,
+    "name": "Zimbabwe",
+    "iso3": "ZWE",
+    "iso2": "ZW",
+    "national_society_name": "Zimbabwe Red Cross Society",
+    "region": "Africa",
+    "partof": "UP",
+    "status": "Active",
+    "preferred_language": "English",
+    "currency_code": "ZWD",
+    "multilingual_names": {
+      "es": "Zimbabue",
+      "fr": "Zimbabwe",
+      "ar": "زيمبابوي",
+      "hu": null
+    },
+    "multilingual_national_society_names": {
+      "es": null,
+      "fr": null,
+      "ar": null,
+      "hu": null
+    }
+  }
+]

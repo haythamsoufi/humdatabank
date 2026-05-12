@@ -1,0 +1,554 @@
+name: Load Database Dump to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_tables:
+        description: 'Comma-separated list of tables to include in restore (e.g., user,form_template). If specified, only these tables will be imported. Leave empty to import all tables.'
+        required: false
+        default: ''
+        type: string
+      debug_restore:
+        description: 'Enable extra restore debug output (pg_restore list + constraint/index inspection)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  load-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Check if database_dump.backup exists
+        id: check-backup
+        run: |
+          if [ -f "database_dump.backup" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ database_dump.backup found"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "❌ database_dump.backup not found"
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Parse DATABASE_URL
+        id: parse-db-url
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python3 << 'EOF'
+          import os
+          import sys
+          from urllib.parse import urlparse, unquote
+
+          db_url = os.environ.get('DATABASE_URL', '').strip()
+
+          # Validate DATABASE_URL is set
+          if not db_url:
+              print("❌ ERROR: DATABASE_URL secret is not set!")
+              print("")
+              print("Please configure the DATABASE_URL secret in GitHub:")
+              print("1. Go to: Repository Settings → Secrets and variables → Actions")
+              print("2. Click 'New repository secret'")
+              print("3. Name: DATABASE_URL")
+              print("4. Value: postgresql+psycopg2://username:password@host:port/database?sslmode=require")
+              print("")
+              print("Example format:")
+              print("  postgresql+psycopg2://user:pass@host.example.com:5432/dbname?sslmode=require")
+              sys.exit(1)
+
+          # Remove +psycopg2 if present
+          db_url = db_url.replace('+psycopg2', '')
+
+          # Parse the URL
+          parsed = urlparse(db_url)
+
+          # Extract components
+          db_host = parsed.hostname or ''
+          db_port = str(parsed.port) if parsed.port else '5432'
+          db_name = parsed.path.lstrip('/').split('?')[0] if parsed.path else ''
+          db_user = unquote(parsed.username) if parsed.username else ''
+          db_pass = unquote(parsed.password) if parsed.password else ''
+
+          # Validate parsed components
+          if not db_host:
+              print("❌ ERROR: Could not parse database host from DATABASE_URL")
+              print(f"   URL format: postgresql://user:password@host:port/database")
+              sys.exit(1)
+
+          if not db_name:
+              print("❌ ERROR: Could not parse database name from DATABASE_URL")
+              print(f"   URL format: postgresql://user:password@host:port/database")
+              sys.exit(1)
+
+          if not db_user:
+              print("❌ ERROR: Could not parse database user from DATABASE_URL")
+              print(f"   URL format: postgresql://user:password@host:port/database")
+              sys.exit(1)
+
+          # Write to outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"host={db_host}\n")
+              f.write(f"port={db_port}\n")
+              f.write(f"database={db_name}\n")
+              f.write(f"user={db_user}\n")
+              f.write(f"password={db_pass}\n")
+
+          print(f"✅ Parsed database connection (host: {db_host}, port: {db_port}, database: {db_name}, user: {db_user})")
+          EOF
+
+      - name: Wait for database connection
+        env:
+          PGHOST: ${{ steps.parse-db-url.outputs.host }}
+          PGPORT: ${{ steps.parse-db-url.outputs.port }}
+          PGDATABASE: ${{ steps.parse-db-url.outputs.database }}
+          PGUSER: ${{ steps.parse-db-url.outputs.user }}
+          PGPASSWORD: ${{ steps.parse-db-url.outputs.password }}
+        run: |
+          echo "Waiting for database connection..."
+          for i in {1..30}; do
+            if pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE"; then
+              echo "✅ Database is ready"
+              exit 0
+            fi
+            echo "Attempt $i/30: Database not ready yet, waiting 2 seconds..."
+            sleep 2
+          done
+          echo "❌ Database connection timeout"
+          exit 1
+
+      - name: Drop existing schema objects
+        env:
+          PGHOST: ${{ steps.parse-db-url.outputs.host }}
+          PGPORT: ${{ steps.parse-db-url.outputs.port }}
+          PGDATABASE: ${{ steps.parse-db-url.outputs.database }}
+          PGUSER: ${{ steps.parse-db-url.outputs.user }}
+          PGPASSWORD: ${{ steps.parse-db-url.outputs.password }}
+        run: |
+          set -e
+          set -o pipefail
+
+          echo "🗑️  Dropping existing objects in public schema..."
+          echo "⚠️  WARNING: This will delete all existing data in the database!"
+          echo "ℹ️  If other clients are connected, we will terminate them to avoid deadlocks."
+
+          # On Azure Flexible Server, active connections (apps, dashboards, etc.) can deadlock with DROP SCHEMA CASCADE.
+          # Best-effort: terminate other sessions, then drop+recreate public. Retry a few times.
+          for attempt in 1 2 3 4 5; do
+            echo ""
+            echo "Attempt $attempt/5: terminating other sessions and resetting public schema..."
+
+            # Best-effort termination (ignore errors if we lack privileges)
+            psql \
+              --host="$PGHOST" \
+              --port="$PGPORT" \
+              --username="$PGUSER" \
+              --dbname="$PGDATABASE" \
+              --set ON_ERROR_STOP=on \
+              --command="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();" \
+              --quiet >/dev/null 2>&1 || true
+
+            # Drop/recreate schema (must succeed)
+            if psql \
+              --host="$PGHOST" \
+              --port="$PGPORT" \
+              --username="$PGUSER" \
+              --dbname="$PGDATABASE" \
+              --set ON_ERROR_STOP=on \
+              --command="DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO \"${PGUSER}\";" \
+              --quiet
+            then
+              echo "✅ Schema cleaned successfully"
+              break
+            fi
+
+            echo "⚠️  Schema reset failed (likely due to concurrent connections). Waiting 3 seconds before retry..."
+            sleep 3
+
+            if [ "$attempt" = "5" ]; then
+              echo "❌ Failed to reset schema after multiple attempts."
+              exit 1
+            fi
+          done
+
+      - name: Parse included tables
+        id: parse-tables
+        run: |
+          INCLUDE_TABLES="${{ inputs.include_tables }}"
+
+          if [ -z "$INCLUDE_TABLES" ]; then
+            echo "include_count=0" >> $GITHUB_OUTPUT
+            echo "include_flags=" >> $GITHUB_OUTPUT
+            echo "✅ No tables specified for inclusion (will import all tables)"
+          else
+            # Split comma-separated list and build include flags
+            IFS=',' read -ra TABLES <<< "$INCLUDE_TABLES"
+            INCLUDE_COUNT=${#TABLES[@]}
+            INCLUDE_FLAGS=""
+
+            for table in "${TABLES[@]}"; do
+              # Trim whitespace
+              table=$(echo "$table" | xargs)
+              if [ -n "$table" ]; then
+                INCLUDE_FLAGS="$INCLUDE_FLAGS --table=$table"
+                echo "  ✅ Will include table: $table"
+              fi
+            done
+
+            echo "include_count=$INCLUDE_COUNT" >> $GITHUB_OUTPUT
+            echo "include_flags=$INCLUDE_FLAGS" >> $GITHUB_OUTPUT
+            echo "✅ Configured to include $INCLUDE_COUNT table(s)"
+          fi
+
+      - name: Load database dump
+        env:
+          PGHOST: ${{ steps.parse-db-url.outputs.host }}
+          PGPORT: ${{ steps.parse-db-url.outputs.port }}
+          PGDATABASE: ${{ steps.parse-db-url.outputs.database }}
+          PGUSER: ${{ steps.parse-db-url.outputs.user }}
+          PGPASSWORD: ${{ steps.parse-db-url.outputs.password }}
+        run: |
+          set -e
+          set -o pipefail
+
+          echo "🔄 Loading database_dump.backup into database..."
+
+          if [ "${{ steps.parse-tables.outputs.include_count }}" != "0" ]; then
+            echo "📋 Note: Only specified tables will be imported"
+          fi
+
+          # Use pg_restore for custom format backups, or psql for plain SQL
+          if pg_restore --version > /dev/null 2>&1; then
+            # Check if it's a custom format backup
+            if pg_restore --list database_dump.backup > /dev/null 2>&1; then
+              echo "📦 Detected custom format backup, using pg_restore..."
+
+              if [ -n "${{ steps.parse-tables.outputs.include_flags }}" ]; then
+                echo "⚠️  Warning: Importing specific tables may fail if dependencies are missing"
+                echo "   Consider including related tables (e.g., foreign key dependencies)"
+                echo ""
+                echo "1/3 Restoring schema (pre-data) for all tables..."
+                pg_restore \
+                  --host="$PGHOST" \
+                  --port="$PGPORT" \
+                  --username="$PGUSER" \
+                  --dbname="$PGDATABASE" \
+                  --verbose \
+                  --exit-on-error \
+                  --single-transaction \
+                  --no-owner \
+                  --no-acl \
+                  --section=pre-data \
+                  database_dump.backup
+
+                echo ""
+                echo "2/3 Restoring data for specified tables..."
+                pg_restore \
+                  --host="$PGHOST" \
+                  --port="$PGPORT" \
+                  --username="$PGUSER" \
+                  --dbname="$PGDATABASE" \
+                  --verbose \
+                  --exit-on-error \
+                  --single-transaction \
+                  --no-owner \
+                  --no-acl \
+                  --section=data \
+                  ${{ steps.parse-tables.outputs.include_flags }} \
+                  database_dump.backup
+
+                echo ""
+                echo "3/3 Restoring constraints/indexes (post-data) for all tables..."
+                pg_restore \
+                  --host="$PGHOST" \
+                  --port="$PGPORT" \
+                  --username="$PGUSER" \
+                  --dbname="$PGDATABASE" \
+                  --verbose \
+                  --exit-on-error \
+                  --single-transaction \
+                  --no-owner \
+                  --no-acl \
+                  --section=post-data \
+                  database_dump.backup
+              else
+                pg_restore \
+                  --host="$PGHOST" \
+                  --port="$PGPORT" \
+                  --username="$PGUSER" \
+                  --dbname="$PGDATABASE" \
+                  --verbose \
+                  --exit-on-error \
+                  --single-transaction \
+                  --no-owner \
+                  --no-acl \
+                  database_dump.backup
+              fi
+            else
+              echo "📄 Detected plain SQL backup, using psql..."
+              echo "⚠️  Note: Table inclusion is only supported for custom format backups (pg_restore)"
+              echo "   All tables will be restored from plain SQL backup"
+              psql \
+                --host="$PGHOST" \
+                --port="$PGPORT" \
+                --username="$PGUSER" \
+                --dbname="$PGDATABASE" \
+                --set ON_ERROR_STOP=on \
+                --file=database_dump.backup \
+                --quiet
+            fi
+          else
+            echo "📄 Using psql to load backup..."
+            echo "⚠️  Note: Table inclusion is only supported for custom format backups (pg_restore)"
+            echo "   All tables will be restored from plain SQL backup"
+            psql \
+              --host="$PGHOST" \
+              --port="$PGPORT" \
+              --username="$PGUSER" \
+              --dbname="$PGDATABASE" \
+              --set ON_ERROR_STOP=on \
+              --file=database_dump.backup \
+              --quiet
+          fi
+
+          echo "✅ Database dump loaded successfully!"
+
+      - name: Reset sequences (serial/identity)
+        env:
+          PGHOST: ${{ steps.parse-db-url.outputs.host }}
+          PGPORT: ${{ steps.parse-db-url.outputs.port }}
+          PGDATABASE: ${{ steps.parse-db-url.outputs.database }}
+          PGUSER: ${{ steps.parse-db-url.outputs.user }}
+          PGPASSWORD: ${{ steps.parse-db-url.outputs.password }}
+        run: |
+          set -e
+          set -o pipefail
+
+          echo "🔁 Resetting owned sequences to match table max values..."
+
+          # This fixes cases where sequences end up behind after restore
+          # (especially common after selective restores, but safe for full restores too).
+          psql \
+            --host="$PGHOST" \
+            --port="$PGPORT" \
+            --username="$PGUSER" \
+            --dbname="$PGDATABASE" \
+            --set ON_ERROR_STOP=on \
+            --quiet <<'SQL'
+          DO $$
+          DECLARE
+            r RECORD;
+            seq_name TEXT;
+            max_val BIGINT;
+          BEGIN
+            FOR r IN
+              SELECT
+                c.table_schema,
+                c.table_name,
+                c.column_name
+              FROM information_schema.columns c
+              WHERE c.table_schema = 'public'
+                AND (
+                  c.column_default LIKE 'nextval(%'
+                  OR c.is_identity = 'YES'
+                )
+              ORDER BY c.table_schema, c.table_name, c.ordinal_position
+            LOOP
+              seq_name := pg_get_serial_sequence(format('%I.%I', r.table_schema, r.table_name), r.column_name);
+              IF seq_name IS NULL THEN
+                CONTINUE;
+              END IF;
+
+              EXECUTE format('SELECT MAX(%I) FROM %I.%I', r.column_name, r.table_schema, r.table_name) INTO max_val;
+
+              IF max_val IS NULL OR max_val < 1 THEN
+                -- Empty table: make nextval() return 1
+                EXECUTE format('SELECT setval(%L, 1, false)', seq_name);
+              ELSE
+                -- Non-empty: make nextval() return max+1
+                EXECUTE format('SELECT setval(%L, %s, true)', seq_name, max_val);
+              END IF;
+            END LOOP;
+          END
+          $$;
+          SQL
+
+          echo "✅ Sequences reset"
+
+      - name: Restore diagnostics (debug)
+        if: ${{ inputs.debug_restore == true }}
+        env:
+          PGHOST: ${{ steps.parse-db-url.outputs.host }}
+          PGPORT: ${{ steps.parse-db-url.outputs.port }}
+          PGDATABASE: ${{ steps.parse-db-url.outputs.database }}
+          PGUSER: ${{ steps.parse-db-url.outputs.user }}
+          PGPASSWORD: ${{ steps.parse-db-url.outputs.password }}
+        run: |
+          set -e
+          set -o pipefail
+
+          echo "🧾 Debug: Inspecting backup contents (pg_restore --list)..."
+          if pg_restore --list database_dump.backup > /dev/null 2>&1; then
+            pg_restore --list database_dump.backup > restore_list.txt
+            echo "✅ Wrote restore list to restore_list.txt"
+
+            echo ""
+            echo "📦 Debug: high-level counts from archive list"
+            echo "  - TABLE entries:      $(grep -cE ' TABLE ' restore_list.txt || true)"
+            echo "  - TABLE DATA entries: $(grep -cE ' TABLE DATA ' restore_list.txt || true)"
+            echo "  - CONSTRAINT entries: $(grep -cE ' CONSTRAINT ' restore_list.txt || true)"
+            echo "  - INDEX entries:      $(grep -cE ' INDEX ' restore_list.txt || true)"
+
+            echo ""
+            echo "👤 Debug: archive entries related to public.\"user\" (best-effort grep)"
+            grep -nE 'TABLE( DATA)? .* (public\.)?user(\s|$)|user_pkey|CONSTRAINT .* (public\.)?user(\s|$)|INDEX .* (public\.)?user(\s|$)' restore_list.txt || true
+          else
+            echo "⚠️  Backup does not look like a custom archive (pg_restore --list failed). Skipping archive inspection."
+          fi
+
+          echo ""
+          echo "🧪 Debug: database metadata for public.\"user\" after restore"
+          echo "  - Primary key constraints:"
+          psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "
+            SELECT conname, pg_get_constraintdef(c.oid) AS definition
+            FROM pg_constraint c
+            WHERE c.conrelid = 'public.\"user\"'::regclass
+              AND c.contype = 'p';
+          "
+
+          echo "  - Unique constraints:"
+          psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "
+            SELECT conname, pg_get_constraintdef(c.oid) AS definition
+            FROM pg_constraint c
+            WHERE c.conrelid = 'public.\"user\"'::regclass
+              AND c.contype = 'u'
+            ORDER BY conname;
+          "
+
+          echo "  - Indexes:"
+          psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "
+            SELECT indexname, indexdef
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename = 'user'
+            ORDER BY indexname;
+          "
+
+          echo "  - Column defaults (id / sequences):"
+          psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'user'
+              AND column_name IN ('id')
+            ORDER BY column_name;
+          "
+          psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "
+            SELECT pg_get_serial_sequence('public.\"user\"', 'id') AS serial_sequence;
+          "
+
+      - name: Verify database restore
+        env:
+          PGHOST: ${{ steps.parse-db-url.outputs.host }}
+          PGPORT: ${{ steps.parse-db-url.outputs.port }}
+          PGDATABASE: ${{ steps.parse-db-url.outputs.database }}
+          PGUSER: ${{ steps.parse-db-url.outputs.user }}
+          PGPASSWORD: ${{ steps.parse-db-url.outputs.password }}
+        run: |
+          set -e
+          set -o pipefail
+
+          echo "🔍 Verifying database restore..."
+          TABLE_COUNT=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "0")
+          echo "📊 Found $TABLE_COUNT tables in the database"
+
+          echo "🔑 Checking for tables missing a primary key..."
+          INCLUDE_TABLES="${{ inputs.include_tables }}"
+
+          if [ -z "$INCLUDE_TABLES" ]; then
+            MISSING_PK=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -t -A -c "
+              SELECT t.table_name
+              FROM information_schema.tables t
+              WHERE t.table_schema = 'public'
+                AND t.table_type = 'BASE TABLE'
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM information_schema.table_constraints tc
+                  WHERE tc.table_schema = t.table_schema
+                    AND tc.table_name = t.table_name
+                    AND tc.constraint_type = 'PRIMARY KEY'
+                )
+              ORDER BY t.table_name;
+            " 2>/dev/null || true)
+          else
+            # Check only the specified tables (best-effort; ignores whitespace)
+            MISSING_PK=""
+            IFS=',' read -ra TABLES <<< "$INCLUDE_TABLES"
+            for table in "${TABLES[@]}"; do
+              table=$(echo "$table" | xargs)
+              if [ -z "$table" ]; then
+                continue
+              fi
+              HAS_PK=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -t -A -c "
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM information_schema.table_constraints tc
+                  WHERE tc.table_schema = 'public'
+                    AND tc.table_name = '$table'
+                    AND tc.constraint_type = 'PRIMARY KEY'
+                );
+              " 2>/dev/null || echo "f")
+              if [ "$HAS_PK" != "t" ]; then
+                MISSING_PK="${MISSING_PK}${table}"$'\n'
+              fi
+            done
+          fi
+
+          if [ -n "$(echo "$MISSING_PK" | tr -d '[:space:]')" ]; then
+            echo "❌ Tables missing a primary key:"
+            echo "$MISSING_PK" | sed '/^\s*$/d' | sed 's/^/  - /'
+            echo ""
+            echo "This usually means pg_restore failed to apply constraints/indexes (post-data)."
+            echo "Check the restore logs above for the first error."
+            exit 1
+          else
+            echo "✅ All checked tables have a primary key"
+          fi
+
+          echo ""
+          echo "👤 Verifying that \"user\" primary key is on column id..."
+          USER_PK_COLS=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -t -A -c "
+            SELECT COALESCE(string_agg(kcu.column_name, ',' ORDER BY kcu.ordinal_position), '')
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+             AND tc.table_schema = kcu.table_schema
+             AND tc.table_name = kcu.table_name
+            WHERE tc.table_schema = 'public'
+              AND tc.table_name = 'user'
+              AND tc.constraint_type = 'PRIMARY KEY';
+          " 2>/dev/null || true)
+
+          if [ -z "$USER_PK_COLS" ]; then
+            echo "❌ \"user\" table has no PRIMARY KEY constraint."
+            exit 1
+          fi
+
+          if ! echo "$USER_PK_COLS" | tr ',' '\n' | grep -qx "id"; then
+            echo "❌ \"user\" PRIMARY KEY is not on column id. PK columns: $USER_PK_COLS"
+            exit 1
+          fi
+          echo "✅ \"user\" primary key includes id (PK columns: $USER_PK_COLS)"
+
+          echo "✅ Database restore verification complete"

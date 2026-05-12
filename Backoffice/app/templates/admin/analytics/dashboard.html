@@ -1,0 +1,593 @@
+{% extends "core/layout.html" %}
+{% from "macros/breadcrumbs.html" import breadcrumb %}
+
+{% block title %}{{ _('User Analytics Dashboard') }}{% endblock %}
+
+{% block head %}
+{{ super() }} {# Includes styles from layout.html, including Tailwind #}
+<style nonce="{{ csp_style_nonce() }}">
+    /* Custom styles specific to this dashboard, if any, can go here.
+       However, the goal is to use Tailwind utilities as much as possible. */
+
+    .chart-container {
+        height: 300px; /* Or use Tailwind's h-72, h-80, h-96 etc. */
+        position: relative;
+    }
+
+    /* You might still need some specific styles for Chart.js if Tailwind doesn't cover all needs,
+       but try to minimize this. */
+
+    .device-dist-chart-wrap {
+        position: relative;
+        height: 240px;
+        width: 100%;
+    }
+    @media (min-width: 1024px) {
+        .device-dist-chart-wrap {
+            height: 260px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% from "components/_page_header.html" import page_header %}
+
+{# Device category: icon + bar colour index (matches Chart.js palette order) #}
+{% macro device_dist_icon(device) -%}
+  {% set d = (device or 'unknown')|lower|trim %}
+  {%- if d == 'mobile' or 'phone' in d -%}<i class="fas fa-mobile-alt text-emerald-600" aria-hidden="true"></i>
+  {%- elif d == 'tablet' -%}<i class="fas fa-tablet-alt text-amber-500" aria-hidden="true"></i>
+  {%- elif d == 'desktop' -%}<i class="fas fa-desktop text-blue-600" aria-hidden="true"></i>
+  {%- elif 'tv' in d -%}<i class="fas fa-tv text-purple-600" aria-hidden="true"></i>
+  {%- elif 'watch' in d -%}<i class="fas fa-clock text-rose-500" aria-hidden="true"></i>
+  {%- elif d == 'unknown' or not device -%}<i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+  {%- else -%}<i class="fas fa-laptop text-slate-600" aria-hidden="true"></i>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro device_dist_label(device) -%}
+  {% set d = (device or '')|lower|trim %}
+  {%- if d == 'desktop' -%}{{ _('Desktop') }}
+  {%- elif d == 'mobile' -%}{{ _('Mobile') }}
+  {%- elif d == 'tablet' -%}{{ _('Tablet') }}
+  {%- elif d == 'unknown' or not device -%}{{ _('Unknown') }}
+  {%- else -%}{{ device }}
+  {%- endif -%}
+{%- endmacro %}
+
+{# Chart + row accents (inline styles — avoids Tailwind remap/purge issues on dynamic classes) #}
+{% set device_dist_series_rgba = [
+  'rgba(59, 130, 246, 0.88)',
+  'rgba(16, 185, 129, 0.88)',
+  'rgba(245, 158, 11, 0.88)',
+  'rgba(239, 68, 68, 0.88)',
+  'rgba(168, 85, 247, 0.88)',
+  'rgba(100, 116, 139, 0.88)',
+  'rgba(236, 72, 153, 0.88)',
+] %}
+
+    {{ page_header(
+        title=_('Analytics Dashboard'),
+        icon='fas fa-chart-line',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Analytics'}
+        ]
+    ) }}
+
+    {# Time Range Filter #}
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 mb-8">
+        <form method="GET" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <label for="days" class="text-sm font-medium text-gray-700">{{ _('Time Range:') }}</label>
+                <select name="days" id="days" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 px-3">
+                    <option value="7" {% if selected_days == 7 %}selected{% endif %}>{{ _('Last 7 days') }}</option>
+                    <option value="30" {% if selected_days == 30 %}selected{% endif %}>{{ _('Last 30 days') }}</option>
+                    <option value="90" {% if selected_days == 90 %}selected{% endif %}>{{ _('Last 90 days') }}</option>
+                    <option value="365" {% if selected_days == 365 %}selected{% endif %}>{{ _('Last year') }}</option>
+                </select>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ url_for('analytics.login_logs') }}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-list mr-2"></i> {{ _('View Detailed Logs') }}
+                </a>
+            </div>
+        </form>
+    </div>
+
+    {# Key Metrics Overview — same stat-card pattern as admin/api_management.html #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Total Logins') }}</h3>
+                <i class="fas fa-sign-in-alt text-blue-500"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums text-blue-600">{{ login_analytics.total_logins }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ login_analytics.failed_attempts }} {{ _('failed') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('User Activities') }}</h3>
+                <i class="fas fa-history text-green-500"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums text-green-600">{{ activity_analytics.total_activities }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ session_stats.total_page_views }} {{ _('page views') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Active Sessions') }}</h3>
+                <i class="fas fa-users-cog text-indigo-500"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums text-indigo-600">{{ session_stats.active_sessions }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ session_stats.average_duration }}{{ _('m avg duration') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Security Events') }}</h3>
+                <i class="fas fa-shield-alt {% if security_summary.unresolved_events > 0 %}text-red-500{% else %}text-green-500{% endif %}"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums {% if security_summary.unresolved_events > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ security_summary.unresolved_events }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ login_analytics.suspicious_attempts }} {{ _('suspicious') }}</p>
+        </div>
+    </div>
+
+    {# Security Alerts Section #}
+    {% if security_summary.high_priority_events %}
+    <div class="mb-8">
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 border-l-4 border-l-red-500">
+            <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
+                {{ _('High Priority Security Events') }}
+                <span class="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">
+                    {{ _('Requires Attention') }}
+                </span>
+            </h5>
+            <div class="space-y-3">
+                {% for event in security_summary.high_priority_events %}
+                <div class="p-4 rounded-md flex justify-between items-center
+                            {% if event.severity == 'critical' %}bg-red-50 border border-red-200
+                            {% else %}bg-yellow-50 border border-yellow-200{% endif %}">
+                    <div class="flex-grow">
+                        <div class="flex items-center gap-2 mb-1">
+                            <strong class="font-semibold text-gray-800">{{ event.type|title }}</strong>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+                                         {% if event.severity == 'critical' %}bg-red-100 text-red-800
+                                         {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                {{ event.severity|upper }}
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-1">{{ event.description }}</p>
+                        <small class="text-xs text-gray-500">{{ event.timestamp|datetime_local('datetime') }}</small>
+                    </div>
+                    <a href="{{ url_for('analytics.security_events', unresolved_only=True) }}"
+                       class="btn btn-danger ml-4">
+                        {{ _('View Details') }}
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Charts Section #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-chart-line mr-2 text-blue-500"></i> {{ _('Login Activity Over Time') }}
+            </h5>
+            <div class="chart-container">
+                <canvas id="loginChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-chart-pie mr-2 text-purple-500"></i> {{ _('Device Distribution') }}
+            </h5>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Share of successful logins in this period, by detected device category.') }}</p>
+
+            {% if device_dist_total > 0 %}
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:gap-6 lg:items-start">
+                <div class="lg:col-span-2 device-dist-chart-wrap">
+                    <canvas id="deviceChart" aria-label="{{ _('Device distribution chart') }}"></canvas>
+                </div>
+                <div class="lg:col-span-3 space-y-2.5 min-w-0">
+                    {% for row in device_dist_rows %}
+                    {% set bi = loop.index0 % (device_dist_series_rgba|length) %}
+                    <div class="flex items-stretch gap-3 p-3 bg-gray-50 border border-gray-200"
+                         style="border-left: 4px solid {{ device_dist_series_rgba[bi] }}">
+                        <div class="flex-shrink-0 w-10 flex items-center justify-center bg-white border border-gray-200 text-lg leading-none" aria-hidden="true">
+                            {{ device_dist_icon(row.device) }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between gap-2 mb-1.5">
+                                <span class="text-sm font-semibold text-gray-800 truncate">{{ device_dist_label(row.device) }}</span>
+                                <span class="text-sm tabular-nums text-gray-700 whitespace-nowrap shrink-0">
+                                    <strong>{{ row.count }}</strong>
+                                    <span class="text-gray-400 font-normal">({{ row.pct }}%)</span>
+                                </span>
+                            </div>
+                            <div class="h-2 w-full bg-gray-200 overflow-hidden border border-gray-100">
+                                <div class="h-full max-w-full"
+                                     style="width: {{ row.pct }}%; background-color: {{ device_dist_series_rgba[bi] }};"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-gray-200 bg-gray-50">
+                <div class="flex items-end justify-center gap-3 mb-4 text-gray-300">
+                    <i class="fas fa-desktop text-3xl"></i>
+                    <i class="fas fa-mobile-alt text-4xl text-gray-400"></i>
+                    <i class="fas fa-tablet-alt text-3xl"></i>
+                </div>
+                <p class="text-sm font-medium text-gray-600">{{ _('No device breakdown yet') }}</p>
+                <p class="text-xs text-gray-500 mt-1 max-w-sm">{{ _('Successful logins will include device type when it can be detected from the browser or client.') }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Detailed Information Section #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+        {# Most Active Users #}
+        <div class="lg:col-span-2 bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-4">
+                <h5 class="text-xl font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-users mr-2 text-teal-500"></i> {{ _('Most Active Users') }}
+                </h5>
+            </div>
+            {% if top_users %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('User') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Role') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Activities') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for user in top_users %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">
+                                <div class="text-sm font-medium text-gray-900">{{ user.name or user.email }}</div>
+                                {% if user.name %}<div class="text-xs text-gray-500">{{ user.email }}</div>{% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                {% set lvl = user_access_level(user) %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                {% if lvl in ['admin', 'system_manager'] %}bg-red-100 text-red-800
+                                {% elif lvl == 'focal_point' %}bg-blue-100 text-blue-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% if lvl == 'system_manager' %}{{ _('System Manager') }}
+                                    {% elif lvl == 'admin' %}{{ _('Admin') }}
+                                    {% elif lvl == 'focal_point' %}{{ _('Focal Point') }}
+                                    {% else %}{{ _('User') }}{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-500">{{ user.activity_count }}</td>
+                            <td class="px-4 py-3 text-sm font-medium">
+                                <a href="{{ url_for('analytics.user_analytics', user_id=user.id) }}"
+                                   class="text-blue-600 hover:text-blue-800">{{ _('View Details') }}</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-users text-4xl text-gray-300 mb-2"></i>
+                <p class="text-gray-500">{{ _('No user activity data available for the selected time period.') }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {# Quick Access & System Stats #}
+        <div class="space-y-6">
+
+            {# Quick Access Links #}
+            <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+                <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-external-link-alt mr-2 text-gray-500"></i> {{ _('Quick Access') }}
+                </h5>
+                <div class="space-y-3">
+                    <a href="{{ url_for('analytics.login_logs') }}"
+                       class="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                        <div class="flex items-center">
+                            <i class="fas fa-sign-in-alt text-blue-500 mr-3"></i>
+                            <span class="text-sm font-medium">{{ _('Login Logs') }}</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-gray-400"></i>
+                    </a>
+
+                    <a href="{{ url_for('analytics.page_path_analytics', days=selected_days) }}"
+                       class="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-colors">
+                        <div class="flex items-center">
+                            <i class="fas fa-route text-teal-600 mr-3"></i>
+                            <span class="text-sm font-medium">{{ _('Page path analytics') }}</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-gray-400"></i>
+                    </a>
+
+                    <a href="{{ url_for('analytics.audit_trail') }}"
+                       class="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-colors">
+                        <div class="flex items-center">
+                            <i class="fas fa-history text-purple-500 mr-3"></i>
+                            <span class="text-sm font-medium">{{ _('Audit Trail') }}</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-gray-400"></i>
+                    </a>
+
+                    <a href="{{ url_for('analytics.session_logs') }}"
+                       class="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:border-green-400 hover:bg-green-50 transition-colors">
+                        <div class="flex items-center">
+                            <i class="fas fa-users-cog text-green-500 mr-3"></i>
+                            <span class="text-sm font-medium">{{ _('Session Logs') }}</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-gray-400"></i>
+                    </a>
+
+                    <a href="{{ url_for('analytics.security_events') }}"
+                       class="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:border-red-400 hover:bg-red-50 transition-colors">
+                        <div class="flex items-center">
+                            <i class="fas fa-shield-alt text-red-500 mr-3"></i>
+                            <span class="text-sm font-medium">{{ _('Security Events') }}</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-gray-400"></i>
+                    </a>
+                </div>
+            </div>
+
+            {# System Statistics #}
+            <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+                <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-server mr-2 text-orange-500"></i> System Statistics
+                </h5>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-sm text-gray-600">Total Sessions</span>
+                        <span class="font-semibold text-gray-800">{{ session_stats.total_sessions }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-sm text-gray-600">Unique IP Addresses</span>
+                        <span class="font-semibold text-gray-800">{{ login_analytics.unique_ips }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-sm text-gray-600">Failed Login Attempts</span>
+                        <span class="font-semibold {% if login_analytics.failed_attempts > 0 %}text-yellow-600{% else %}text-gray-800{% endif %}">
+                            {{ login_analytics.failed_attempts }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center py-2">
+                        <span class="text-sm text-gray-600">Suspicious Activities</span>
+                        <span class="font-semibold {% if login_analytics.suspicious_attempts > 0 %}text-red-600{% else %}text-gray-800{% endif %}">
+                            {{ login_analytics.suspicious_attempts }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Recent Security Events Table - Only show if there are events #}
+    {% if recent_security_events %}
+    <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+        <div class="flex items-center justify-between mb-4">
+            <h5 class="text-xl font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-clock mr-2 text-gray-500"></i> Recent Security Events
+            </h5>
+            <a href="{{ url_for('analytics.security_events') }}" class="text-sm text-blue-600 hover:text-blue-800">
+                View All Events
+            </a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for event in recent_security_events[:10] %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm text-gray-500">{{ event.timestamp|datetime_local('datetimeShort') }}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ event.event_type|replace('_', ' ')|title }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            {% if event.severity == 'critical' %}bg-red-100 text-red-800
+                            {% elif event.severity == 'high' %}bg-yellow-100 text-yellow-800
+                            {% elif event.severity == 'medium' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ event.severity|upper }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-500 max-w-xs">
+                            <div class="truncate" title="{{ event.description }}">
+                                {{ event.description[:80] }}{% if event.description|length > 80 %}...{% endif %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if event.is_resolved %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Resolved</span>
+                            {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Open</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+<!-- Chart.js Library -->
+<script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
+
+<!-- Analytics Data -->
+<script nonce="{{ csp_nonce() }}">
+    window.analyticsData = {
+        loginData: JSON.parse('{{ login_analytics.daily_activity|tojson|safe }}'),
+        deviceData: JSON.parse('{{ login_analytics.device_breakdown|tojson|safe }}'),
+        deviceChartLabels: {{ device_dist_rows|map(attribute='device')|list|tojson|safe }},
+        deviceChartValues: {{ device_dist_rows|map(attribute='count')|list|tojson|safe }},
+        deviceChartColors: {{ device_dist_series_rgba|tojson|safe }}
+    };
+</script>
+
+<!-- Chart Initialization Script -->
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js not loaded');
+        return;
+    }
+
+    const loginDataRaw = window.analyticsData.loginData;
+    const deviceChartLabels = window.analyticsData.deviceChartLabels || [];
+    const deviceChartValues = window.analyticsData.deviceChartValues || [];
+
+    // Login Activity Chart
+    const loginCtx = document.getElementById('loginChart');
+    if (loginCtx) {
+        const loginData = (typeof loginDataRaw === 'object' && loginDataRaw !== null && !Array.isArray(loginDataRaw)) ? loginDataRaw : {};
+        const sortedDates = Object.keys(loginData).sort();
+
+        new Chart(loginCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: sortedDates,
+                datasets: [{
+                    label: 'Successful Logins',
+                    data: sortedDates.map(date => loginData[date] ? (loginData[date].logins || 0) : 0),
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                    fill: true
+                }, {
+                    label: 'Failed Attempts',
+                    data: sortedDates.map(date => loginData[date] ? (loginData[date].failures || 0) : 0),
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#6b7280', precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    x: {
+                        ticks: { color: '#6b7280' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#374151', usePointStyle: true }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                    }
+                }
+            }
+        });
+    }
+
+    // Device Types Chart (labels/order aligned with server-side infographic)
+    const deviceCtx = document.getElementById('deviceChart');
+    if (deviceCtx && deviceChartLabels.length > 0) {
+        let devicePalette = window.analyticsData.deviceChartColors;
+        if (!Array.isArray(devicePalette) || !devicePalette.length) {
+            devicePalette = [
+                'rgba(59, 130, 246, 0.88)',
+                'rgba(16, 185, 129, 0.88)',
+                'rgba(245, 158, 11, 0.88)',
+                'rgba(239, 68, 68, 0.88)',
+                'rgba(168, 85, 247, 0.88)',
+                'rgba(100, 116, 139, 0.88)',
+                'rgba(236, 72, 153, 0.88)'
+            ];
+        }
+        const bgColors = deviceChartLabels.map(function (_, i) {
+            return devicePalette[i % devicePalette.length];
+        });
+
+        new Chart(deviceCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: deviceChartLabels,
+                datasets: [{
+                    data: deviceChartValues,
+                    backgroundColor: bgColors,
+                    borderColor: '#fff',
+                    borderWidth: 3,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '52%',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        callbacks: {
+                            label: function(context) {
+                                var total = context.dataset.data.reduce(function (a, b) {
+                                    return a + b;
+                                }, 0);
+                                var percentage = total ? ((context.parsed / total) * 100).toFixed(1) : '0';
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Days filter auto-submit
+    const daysSelect = document.getElementById('days');
+    if (daysSelect) {
+        daysSelect.addEventListener('change', function() {
+            this.form.submit();
+        });
+    }
+});
+</script>
+{% endblock %}

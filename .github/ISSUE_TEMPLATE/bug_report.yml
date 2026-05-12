@@ -1,0 +1,44 @@
+name: Bug report
+description: Something is not working as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a bug.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Backoffice (Flask)
+        - Website (Next.js)
+        - Mobile app (Flutter)
+        - CI / tooling
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see? What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, environment (OS, browser, app version) if relevant.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Redact secrets and personal data.
+    validations:
+      required: false

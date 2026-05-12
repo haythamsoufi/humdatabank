@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart'
-    show kDebugMode, kProfileMode;
+    show ValueNotifier, kDebugMode, kProfileMode;
 
 // Android logcat lines such as:
 //   I/VRI[MainActivity]@…: call setFrameRateCategory …
@@ -16,11 +16,58 @@ enum LogLevel {
   error,
 }
 
+/// A single captured warn/error log entry for the in-app debug panel.
+class LogEntry {
+  final DateTime time;
+  final LogLevel level;
+  final String tag;
+  final String message;
+
+  const LogEntry({
+    required this.time,
+    required this.level,
+    required this.tag,
+    required this.message,
+  });
+
+  @override
+  String toString() {
+    final h = time.hour.toString().padLeft(2, '0');
+    final m = time.minute.toString().padLeft(2, '0');
+    final s = time.second.toString().padLeft(2, '0');
+    final lvl = level == LogLevel.warn ? 'WARN' : 'ERROR';
+    return '$h:$m:$s [$lvl][$tag] $message';
+  }
+}
+
 /// Centralized logging utility with log levels and sensitive data masking
 /// Automatically disabled in release builds for security and performance
 class DebugLogger {
   // Automatically disable in release builds
   static bool get enabled => kDebugMode || kProfileMode;
+
+  // In-app debug panel: captures warn + error entries so the overlay can display
+  // them without needing a connected debugger.  Capped at [_maxLogEntries].
+  static const int _maxLogEntries = 300;
+  static final List<LogEntry> _logBuffer = [];
+
+  /// Live list of captured warn/error [LogEntry] objects.
+  /// Listen with [ValueListenableBuilder] in the debug overlay widget.
+  static final ValueNotifier<List<LogEntry>> logNotifier =
+      ValueNotifier(const []);
+
+  /// Remove all captured log entries and reset the notifier.
+  static void clearLogBuffer() {
+    _logBuffer.clear();
+    logNotifier.value = const [];
+  }
+
+  static void _captureEntry(String tag, String message, LogLevel level) {
+    final entry = LogEntry(time: DateTime.now(), level: level, tag: tag, message: message);
+    if (_logBuffer.length >= _maxLogEntries) _logBuffer.removeAt(0);
+    _logBuffer.add(entry);
+    logNotifier.value = List.unmodifiable(_logBuffer);
+  }
 
   /// True when verbose DEBUG logging is enabled (`VERBOSE_LOGS` via define or `.env`).
   static bool verboseDebugLogs = false;
@@ -64,6 +111,11 @@ class DebugLogger {
 
     final levelPrefix = _getLevelPrefix(level);
     print('[$levelPrefix][$tag] $safeMessage');
+
+    // Capture warn/error entries for the in-app debug overlay panel.
+    if (level.index >= LogLevel.warn.index) {
+      _captureEntry(tag, safeMessage, level);
+    }
   }
 
   /// Get level prefix for log output

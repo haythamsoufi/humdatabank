@@ -50,6 +50,7 @@ import 'services/organization_config_service.dart';
 import 'utils/theme.dart';
 import 'utils/layout_scale.dart';
 import 'widgets/session_expiration_warning.dart';
+import 'widgets/debug_log_overlay.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
@@ -449,7 +450,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
               return Theme(
                 data: scaled,
-                child: child ?? const SizedBox.shrink(),
+                child: DebugLogOverlay(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               );
             },
             locale: locale,

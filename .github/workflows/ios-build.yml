@@ -40,11 +40,12 @@ on:
           - simulator
         default: 'device'
       build_mode:
-        description: 'Build mode for device target: release (smaller, no debug banner) or debug (debug banner, verbose stack traces, asserts enabled — useful for on-device session/auth debugging)'
+        description: 'Build mode for device target. profile = AOT + debug banner visible + works with AltStore/Sideloadly (recommended for on-device debugging without a paid developer account). release = smallest/fastest. debug = requires a paid developer provisioning profile — will crash at launch with ad-hoc/AltStore signing.'
         required: false
         type: choice
         options:
           - release
+          - profile
           - debug
         default: 'release'
       run_flutter_analyze:
@@ -313,8 +314,15 @@ jobs:
             # enables asserts, and gives full stack traces — useful for on-device debugging
             # (e.g. session invalidation root-cause). Install the unsigned IPA via
             # AltStore or Sideloadly (free Apple ID, 7-day cert).
+            # profile = AOT-compiled + profiling hooks; kReleaseMode is false so debug
+            # banners show. Works with AltStore/Sideloadly (no get-task-allow entitlement).
+            # debug  = requires a real developer provisioning profile; crashes at launch
+            #          with ad-hoc re-signing (AltStore/Sideloadly) — avoid without a
+            #          paid Apple Developer account.
             BUILD_MODE="${{ inputs.build_mode }}"
-            if [ "$BUILD_MODE" = "debug" ]; then
+            if [ "$BUILD_MODE" = "profile" ]; then
+              MODE_FLAG="--profile"
+            elif [ "$BUILD_MODE" = "debug" ]; then
               MODE_FLAG="--debug"
             else
               MODE_FLAG="--release"
@@ -348,7 +356,7 @@ jobs:
         if: steps.ios_target.outputs.target == 'device'
         uses: actions/upload-artifact@v6
         with:
-          name: ios-build-ci-${{ inputs.build_mode || 'release' }}
+          name: ios-build-ci-${{ inputs.build_mode == 'profile' && 'profile' || inputs.build_mode == 'debug' && 'debug' || 'release' }}
           path: |
             ${{ steps.flutter_path.outputs.path }}/build/ios/iphoneos/Runner.app
             ${{ steps.flutter_path.outputs.path }}/build/ios/ipa/*.ipa

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kProfileMode, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_animate/flutter_animate.dart';
@@ -60,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Copy button so the text can easily be pasted into a bug report.
   Widget _buildSessionInvalidationBanner(AuthProvider authProvider) {
     final reason = authProvider.sessionInvalidationReason;
-    if (kReleaseMode || reason == null || reason.isEmpty) return const SizedBox.shrink();
+    if ((!kDebugMode && !kProfileMode) || reason == null || reason.isEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

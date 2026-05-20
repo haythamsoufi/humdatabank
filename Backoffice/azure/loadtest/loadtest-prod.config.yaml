@@ -1,0 +1,70 @@
+version: v0.1
+displayName: Databank Load Test — Production
+description: "Backoffice production load test: health, api/v1, navigation, entry-form, ajax save, optional submit"
+testPlan: locustfile.py
+testType: Locust
+engineInstances: 1
+env:
+  - name: LOADTEST_HOST
+    value: https://databank.ifrc.org
+  - name: LOADTEST_ALLOW_PROD
+    value: 'true'
+  # Optional: focal-point entry form traffic (requires authenticated session cookie).
+  # Example: "123,456" (AssignmentEntityStatus IDs for focal-point assignments)
+  - name: LOADTEST_HELP_DOC_PATH
+    value: ''
+  - name: LOADTEST_ASSIGNMENT_AES_IDS
+    value: ''
+  # Conservative production defaults — start here and scale up only with ops approval.
+  - name: LOCUST_USERS
+    value: 10
+  - name: LOCUST_SPAWN_RATE
+    value: 1
+  - name: LOCUST_RUN_TIME
+    value: '60'
+  - name: ENABLE_LOGGING
+    value: 'true'
+# Provision LOADTEST_API_KEY (and optionally LOADTEST_SESSION_COOKIE) as a
+# Key Vault secret reference in Azure Load Testing rather than a literal value.
+# Example secret entry (uncomment and set the secretId in the portal/CI):
+# secrets:
+#   - name: LOADTEST_API_KEY
+#     value: https://<your-keyvault>.vault.azure.net/secrets/backoffice-loadtest-api-key-prod
+# For focal-point route testing without Key Vault, LOADTEST_SESSION_COOKIE can be
+# passed as an env override at run/update time (short-lived; production session).
+resourceId: >-
+  /subscriptions/f585c1c3-801b-4641-8d7f-145aa50ffb04/resourceGroups/ifrctgo001rg/providers/Microsoft.LoadTestService/loadtests/DatabankTest1
+configurationFiles:
+  - requirements.txt
+referenceIdentities:
+  - type: SystemAssigned
+    kind: Metrics
+# appComponents: add production resource IDs here for server-side metrics correlation
+# in the Azure Load Testing portal (DB CPU, App Service requests, etc.).
+# Replace the placeholders with actual production resource IDs from the Azure Portal.
+# Omitting this section does not affect test execution — only portal dashboards.
+#
+# appComponents:
+#   - resourceId: >-
+#       /subscriptions/<prod-subscription>/resourceGroups/<prod-rg>/providers/Microsoft.DBforPostgreSQL/flexibleServers/<prod-db>
+#     resourceName: <prod-db>
+#     resourceType: Microsoft.DBforPostgreSQL/flexibleServers
+#     resourceGroup: <prod-rg>
+#     subscriptionId: <prod-subscription>
+#   - resourceId: >-
+#       /subscriptions/<prod-subscription>/resourceGroups/<prod-rg>/providers/Microsoft.Web/sites/<prod-app>
+#     resourceName: <prod-app>
+#     resourceType: Microsoft.Web/sites
+#     resourceGroup: <prod-rg>
+#     subscriptionId: <prod-subscription>
+#     kind: app,linux,container
+#   - resourceId: >-
+#       /subscriptions/<prod-subscription>/resourceGroups/<prod-rg>/providers/microsoft.insights/components/<prod-insights>
+#     resourceName: <prod-insights>
+#     resourceType: microsoft.insights/components
+#     resourceGroup: <prod-rg>
+#     subscriptionId: <prod-subscription>
+#     kind: web
+# Separate testId from staging so prod and staging runs never overwrite each other.
+# This test is created automatically on first run via 'az load test create'.
+testId: b8f71042-9e72-4c3a-a25e-3129374311f2

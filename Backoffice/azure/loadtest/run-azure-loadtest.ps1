@@ -2,26 +2,42 @@ param()
 
 $ErrorActionPreference = "Continue"
 
-$Subscription = "f585c1c3-801b-4641-8d7f-145aa50ffb04"
-$ResourceGroup = "ifrctgo001rg"
+$Subscription     = "f585c1c3-801b-4641-8d7f-145aa50ffb04"
+$ResourceGroup    = "ifrctgo001rg"
 $LoadTestResource = "DatabankTest1"
-$TestId = "47c51031-8a61-41ec-b48d-2018263200f1"
-$ConfigFile = "loadtest.config.yaml"
+
+# ---------------------------------------------------------------------------
+# Environment definitions  - add / edit entries here to support more targets.
+# ---------------------------------------------------------------------------
+$Environments = [ordered]@{
+    staging = [pscustomobject]@{
+        Name       = "Staging"
+        Host       = "https://databank-stage.ifrc.org"
+        AllowProd  = "false"
+        ConfigFile = "loadtest.config.yaml"
+        TestId     = "47c51031-8a61-41ec-b48d-2018263200f1"
+        DefaultVus = 20
+        DefaultSec = 120
+    }
+    prod    = [pscustomobject]@{
+        Name       = "Production"
+        Host       = "https://databank.ifrc.org"
+        AllowProd  = "true"
+        ConfigFile = "loadtest-prod.config.yaml"
+        TestId     = "b8f71042-9e72-4c3a-a25e-3129374311f2"
+        DefaultVus = 10
+        DefaultSec = 60
+    }
+}
+
+# Active environment  - defaults to staging; change via menu option E.
+$script:ActiveEnv = $Environments["staging"]
 
 Set-Location -LiteralPath $PSScriptRoot
 
 function Pause-Menu {
     Write-Host ""
     Read-Host "Press Enter to continue" | Out-Null
-}
-
-function Invoke-Az {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]] $ArgsList
-    )
-    & az @ArgsList
-    return $LASTEXITCODE
 }
 
 function Ensure-AzureTools {
@@ -60,19 +76,206 @@ function Ensure-AzureTools {
     return $true
 }
 
-function Show-RecentRuns {
-    if (-not (Ensure-AzureTools)) {
-        Pause-Menu
-        return
+# ---------------------------------------------------------------------------
+# Environment selection
+# ---------------------------------------------------------------------------
+function Select-Environment {
+    Write-Host ""
+    Write-Host "Select target environment:"
+    Write-Host "  1. Staging     ($($Environments['staging'].Host))"
+    Write-Host "  2. Production  ($($Environments['prod'].Host))"
+    Write-Host "  Q. Cancel"
+    Write-Host ""
+    $envChoice = (Read-Host "Environment [1/2/Q]").ToUpper().Trim()
+
+    switch ($envChoice) {
+        "1" {
+            $script:ActiveEnv = $Environments["staging"]
+            Write-Host ""
+            Write-Host "Environment set to: Staging" -ForegroundColor Green
+            Pause-Menu
+        }
+        "2" {
+            $script:ActiveEnv = $Environments["prod"]
+            Write-Host ""
+            Write-Host "Environment set to: PRODUCTION" -ForegroundColor Red
+            Pause-Menu
+        }
+        default {
+            Write-Host "No change  - environment remains: $($script:ActiveEnv.Name)"
+            Pause-Menu
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Session cookie capture  - browser-assisted or manual paste
+# ---------------------------------------------------------------------------
+
+function Invoke-BrowserCookieCapture {
+    <#
+    .SYNOPSIS
+        Run capture_session_cookie.py in a visible Chromium window.
+        Returns the captured "session=<value>" string, or "" on failure.
+
+    .NOTES
+        stdout from the Python script (the cookie) is redirected to a temp file
+        so PowerShell can read it cleanly.  stderr (status messages) flows directly
+        to the console so the user sees progress while waiting for login.
+    #>
+    $captureScript = Join-Path $PSScriptRoot "capture_session_cookie.py"
+    if (-not (Test-Path -LiteralPath $captureScript)) {
+        Write-Host "  [warn] capture_session_cookie.py not found  - falling back to manual entry." -ForegroundColor Yellow
+        return ""
+    }
+
+    $py = if (Get-Command python  -ErrorAction SilentlyContinue) { "python"  }
+          elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" }
+          else { $null }
+
+    if (-not $py) {
+        Write-Host "  [warn] Python not found on PATH  - falling back to manual entry." -ForegroundColor Yellow
+        return ""
+    }
+
+    # Check playwright; offer to install if missing.
+    & $py -c "import playwright" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "  playwright is not installed (needed for browser-based capture)." -ForegroundColor Yellow
+        Write-Host "  Install: pip install playwright && playwright install chromium" -ForegroundColor Yellow
+        Write-Host ""
+        $install = (Read-Host "  Install playwright now? (y/N)").Trim().ToLower()
+        if ($install -match "^(y|yes)$") {
+            Write-Host "  Installing playwright ..."
+            & $py -m pip install playwright
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  Installing Chromium browser ..."
+                & $py -m playwright install chromium
+            }
+        }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [warn] Install failed  - falling back to manual entry." -ForegroundColor Yellow
+            return ""
+        }
     }
 
     Write-Host ""
-    Write-Host "Recent runs for test ${TestId}:"
+    Write-Host "  Opening browser  - log in to capture your session cookie automatically." -ForegroundColor Cyan
+    Write-Host "  (Close the browser window to cancel and fall back to manual paste.)" -ForegroundColor Cyan
+    Write-Host ""
+
+    # Redirect stdout to a temp file; stderr stays attached to this console so the
+    # user sees the [login] progress messages while waiting for the browser.
+    $tempOut = [System.IO.Path]::GetTempFileName()
+    try {
+        $proc = Start-Process `
+            -FilePath $py `
+            -ArgumentList @($captureScript, "--host", $script:ActiveEnv.Host) `
+            -RedirectStandardOutput $tempOut `
+            -NoNewWindow `
+            -PassThru `
+            -Wait
+        $cookie = (Get-Content $tempOut -Raw -ErrorAction SilentlyContinue | Out-String).Trim()
+    } finally {
+        Remove-Item $tempOut -ErrorAction SilentlyContinue
+    }
+
+    if ($proc.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($cookie) -or $cookie -notmatch "=") {
+        Write-Host "  [warn] Automatic capture failed or was cancelled." -ForegroundColor Yellow
+        return ""
+    }
+
+    $masked = $cookie -replace "=.*", "=***"
+    Write-Host "  Session cookie captured: $masked" -ForegroundColor Green
+    return $cookie
+}
+
+function Get-SessionCookie {
+    <#
+    .SYNOPSIS
+        Prompt the user for a session cookie via browser login, manual paste, or skip.
+    .PARAMETER Required
+        When set, "skip" is not offered and the function always returns a non-empty value
+        (or the caller must handle the empty-string fallback separately).
+    #>
+    param([switch] $Required)
+
+    # If already set in the environment, use it without prompting.
+    $existing = ($env:LOADTEST_SESSION_COOKIE | Out-String).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($existing)) {
+        return $existing
+    }
+
+    Write-Host ""
+    if ($Required) {
+        Write-Host "  A session cookie is required for this operation." -ForegroundColor Yellow
+    } else {
+        Write-Host "  A session cookie enables authenticated routes (navigation, entry-form, auto-setup)."
+        Write-Host "  Omit it to run health + API-key-only tests."
+    }
+    Write-Host "  [B] Open browser to log in  - cookie captured automatically  (recommended)"
+    Write-Host "  [P] Paste a session=<value> cookie manually"
+    if (-not $Required) {
+        Write-Host "  [S] Skip (proceed without a session cookie)"
+    }
+    Write-Host ""
+
+    $skipHint = if ($Required) { "" } else { "/S" }
+    $opt = (Read-Host "  Choice [B/P$skipHint, default=B]").ToUpper().Trim()
+
+    # Default to browser on blank input.
+    if ([string]::IsNullOrWhiteSpace($opt)) { $opt = "B" }
+
+    switch ($opt) {
+        "B" {
+            $cookie = Invoke-BrowserCookieCapture
+            if ([string]::IsNullOrWhiteSpace($cookie)) {
+                $cookie = (Read-Host "  Paste session=<value> cookie (or press Enter to skip)").Trim()
+            }
+            return $cookie
+        }
+        "P" {
+            return (Read-Host "  Paste session=<value> cookie").Trim()
+        }
+        "S" {
+            if ($Required) {
+                Write-Host "  Cookie is required  - opening browser ..." -ForegroundColor Yellow
+                $cookie = Invoke-BrowserCookieCapture
+                if ([string]::IsNullOrWhiteSpace($cookie)) {
+                    $cookie = (Read-Host "  Paste session=<value> cookie").Trim()
+                }
+                return $cookie
+            }
+            return ""
+        }
+        default {
+            if ($Required) {
+                Write-Host "  Cookie is required  - opening browser ..." -ForegroundColor Yellow
+                $cookie = Invoke-BrowserCookieCapture
+                if ([string]::IsNullOrWhiteSpace($cookie)) {
+                    $cookie = (Read-Host "  Paste session=<value> cookie").Trim()
+                }
+                return $cookie
+            }
+            return ""
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Core Azure Load Testing operations
+# ---------------------------------------------------------------------------
+function Show-RecentRuns {
+    if (-not (Ensure-AzureTools)) { Pause-Menu; return }
+
+    Write-Host ""
+    Write-Host "Recent runs for test $($script:ActiveEnv.TestId) [$($script:ActiveEnv.Name)]:"
     & az load test-run list `
         --load-test-resource $LoadTestResource `
         --resource-group $ResourceGroup `
-        --test-id $TestId `
-        --query "reverse(sort_by([].{run:testRunId, status:status, start:startDateTime, duration_s:duration}, &start))[:5]" `
+        --test-id $script:ActiveEnv.TestId `
+        --query 'reverse(sort_by([].{run:testRunId, status:status, start:startDateTime, duration_s:duration}, &start))[:5]' `
         -o table
 
     Pause-Menu
@@ -85,107 +288,81 @@ function Sync-Test {
         [string] $ApiKey,
         [string] $SessionCookie,
         [string] $AssignmentAesIds,
-        [string] $SubmitAesIds,
         [string] $DocumentIds,
         [string] $DiSectionId,
         [string] $DiIndicatorBankId,
-        # Auto-setup params
         [string] $AutoSetup,
         [string] $SetupTemplateId,
         [string] $SetupCountryIds,
         [string] $SetupCount
     )
 
-    if (-not (Test-Path -LiteralPath $ConfigFile)) {
-        Write-Host "[error] $ConfigFile not found in $(Get-Location)." -ForegroundColor Red
+    $configFile = $script:ActiveEnv.ConfigFile
+    if (-not (Test-Path -LiteralPath $configFile)) {
+        Write-Host "[error] $configFile not found in $(Get-Location)." -ForegroundColor Red
         return $false
     }
 
     Write-Host ""
-    Write-Host "Syncing test definition + scripts to Azure Load Testing ..."
+    Write-Host "Syncing test definition + scripts to Azure Load Testing [$($script:ActiveEnv.Name)] ..."
 
-    $args = @(
+    $azArgs = @(
         "load", "test", "update",
         "--load-test-resource", $LoadTestResource,
         "--resource-group", $ResourceGroup,
-        "--test-id", $TestId,
-        "--load-test-config-file", $ConfigFile
+        "--test-id", $script:ActiveEnv.TestId,
+        "--load-test-config-file", $configFile
     )
 
-    $envOverrides = @()
+    # Always inject the target host and allow-prod flag so the YAML defaults
+    # cannot accidentally run against the wrong environment.
+    $envOverrides = @(
+        "LOADTEST_HOST=$($script:ActiveEnv.Host)",
+        "LOADTEST_ALLOW_PROD=$($script:ActiveEnv.AllowProd)"
+    )
+
     if ($Vus -gt 0 -and $RunTimeSeconds -gt 0) {
         $envOverrides += @("LOCUST_USERS=$Vus", "LOCUST_RUN_TIME=$RunTimeSeconds")
     }
-    if (-not [string]::IsNullOrWhiteSpace($ApiKey)) {
-        $envOverrides += "LOADTEST_API_KEY=$ApiKey"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($SessionCookie)) {
-        $envOverrides += "LOADTEST_SESSION_COOKIE=$SessionCookie"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($AssignmentAesIds)) {
-        $envOverrides += "LOADTEST_ASSIGNMENT_AES_IDS=$AssignmentAesIds"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($SubmitAesIds)) {
-        $envOverrides += "LOADTEST_SUBMIT_AES_IDS=$SubmitAesIds"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($DocumentIds)) {
-        $envOverrides += "LOADTEST_DOCUMENT_IDS=$DocumentIds"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($DiSectionId)) {
-        $envOverrides += "LOADTEST_DI_SECTION_ID=$DiSectionId"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($DiIndicatorBankId)) {
-        $envOverrides += "LOADTEST_DI_INDICATOR_BANK_ID=$DiIndicatorBankId"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($AutoSetup)) {
-        $envOverrides += "LOADTEST_AUTO_SETUP=$AutoSetup"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($SetupTemplateId)) {
-        $envOverrides += "LOADTEST_SETUP_TEMPLATE_ID=$SetupTemplateId"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($SetupCountryIds)) {
-        $envOverrides += "LOADTEST_SETUP_COUNTRY_IDS=$SetupCountryIds"
-    }
-    if (-not [string]::IsNullOrWhiteSpace($SetupCount)) {
-        $envOverrides += "LOADTEST_SETUP_COUNT=$SetupCount"
-    }
-    if ($envOverrides.Count -gt 0) {
-        $args += @("--env") + $envOverrides
-    }
+    if (-not [string]::IsNullOrWhiteSpace($ApiKey))            { $envOverrides += "LOADTEST_API_KEY=$ApiKey" }
+    if (-not [string]::IsNullOrWhiteSpace($SessionCookie))     { $envOverrides += "LOADTEST_SESSION_COOKIE=$SessionCookie" }
+    if (-not [string]::IsNullOrWhiteSpace($AssignmentAesIds))  { $envOverrides += "LOADTEST_ASSIGNMENT_AES_IDS=$AssignmentAesIds" }
+    if (-not [string]::IsNullOrWhiteSpace($DocumentIds))       { $envOverrides += "LOADTEST_DOCUMENT_IDS=$DocumentIds" }
+    if (-not [string]::IsNullOrWhiteSpace($DiSectionId))       { $envOverrides += "LOADTEST_DI_SECTION_ID=$DiSectionId" }
+    if (-not [string]::IsNullOrWhiteSpace($DiIndicatorBankId)) { $envOverrides += "LOADTEST_DI_INDICATOR_BANK_ID=$DiIndicatorBankId" }
+    if (-not [string]::IsNullOrWhiteSpace($AutoSetup))         { $envOverrides += "LOADTEST_AUTO_SETUP=$AutoSetup" }
+    if (-not [string]::IsNullOrWhiteSpace($SetupTemplateId))   { $envOverrides += "LOADTEST_SETUP_TEMPLATE_ID=$SetupTemplateId" }
+    if (-not [string]::IsNullOrWhiteSpace($SetupCountryIds))   { $envOverrides += "LOADTEST_SETUP_COUNTRY_IDS=$SetupCountryIds" }
+    if (-not [string]::IsNullOrWhiteSpace($SetupCount))        { $envOverrides += "LOADTEST_SETUP_COUNT=$SetupCount" }
 
-    & az @args
-    if ($LASTEXITCODE -eq 0) {
-        return $true
-    }
+    $azArgs += @("--env") + $envOverrides
+
+    & az @azArgs
+    if ($LASTEXITCODE -eq 0) { return $true }
 
     # Optional bootstrap fallback for brand-new test IDs.
-    # In normal use this test already exists, so update is the right default.
     Write-Host ""
     Write-Host "'az load test update' failed. Retrying with 'az load test create' ..." -ForegroundColor Yellow
-    $args[2] = "create"
-    & az @args
+    $azArgs[2] = "create"
+    & az @azArgs
     return ($LASTEXITCODE -eq 0)
 }
 
 function Start-TestRun {
-    param(
-        [Parameter(Mandatory = $true)] [string] $DisplayName
-    )
+    param([Parameter(Mandatory = $true)] [string] $DisplayName)
 
     $runId = "run-{0}" -f (Get-Date -Format "yyyyMMdd-HHmmss")
 
-    $runDisplayName = $DisplayName
-
     Write-Host ""
-    Write-Host "Triggering run $runId ($runDisplayName) ..."
+    Write-Host "Triggering run $runId ($DisplayName) [$($script:ActiveEnv.Name)] ..."
     & az load test-run create `
         --load-test-resource $LoadTestResource `
         --resource-group $ResourceGroup `
-        --test-id $TestId `
+        --test-id $script:ActiveEnv.TestId `
         --test-run-id $runId `
-        --display-name $runDisplayName `
+        --display-name $DisplayName `
         --description "Triggered via Backoffice Azure load test runner" `
-        --query "{runId:testRunId,status:status,portalUrl:portalUrl}" `
+        --query '{runId:testRunId,status:status,portalUrl:portalUrl}' `
         -o json
 
     if ($LASTEXITCODE -ne 0) {
@@ -199,9 +376,7 @@ function Start-TestRun {
     Write-Host ""
 
     $tail = Read-Host "Tail status until done? (y/N)"
-    if ($tail -notmatch "^(y|yes)$") {
-        return
-    }
+    if ($tail -notmatch "^(y|yes)$") { return }
 
     do {
         $status = (& az load test-run show `
@@ -211,9 +386,7 @@ function Start-TestRun {
             --query status `
             -o tsv 2>$null)
         Write-Host "  status: $status"
-        if ($status -in @("DONE", "FAILED", "CANCELLED")) {
-            break
-        }
+        if ($status -in @("DONE", "FAILED", "CANCELLED")) { break }
         Start-Sleep -Seconds 15
     } while ($true)
 }
@@ -226,13 +399,9 @@ function Invoke-RunProfile {
         [bool] $Run
     )
 
-    if (-not (Ensure-AzureTools)) {
-        Pause-Menu
-        return
-    }
+    if (-not (Ensure-AzureTools)) { Pause-Menu; return }
 
-    # --- Two prompts only. Everything else comes from env vars or is auto-discovered. ---
-
+    # Extra confirmation gate for every production run.
     $apiKey = $env:LOADTEST_API_KEY
     if ([string]::IsNullOrWhiteSpace($apiKey) -and $Run) {
         $apiKey = Read-Host "API key (optional - leave blank for health-only run)"
@@ -240,30 +409,28 @@ function Invoke-RunProfile {
 
     $sessionCookie = $env:LOADTEST_SESSION_COOKIE
     if ([string]::IsNullOrWhiteSpace($sessionCookie) -and $Run) {
-        $sessionCookie = Read-Host "Session cookie (optional - enables entry-form tasks and auto-setup)"
+        $sessionCookie = Get-SessionCookie
     }
     $hasSessionCookie = -not [string]::IsNullOrWhiteSpace($sessionCookie)
 
-    # --- Auto-setup: on by default when a session cookie is provided. ---
-    # Override by setting LOADTEST_AUTO_SETUP=false in env before running.
+    # Auto-setup: on by default when a session cookie is provided on staging.
+    # On production it is off by default  - require LOADTEST_AUTO_SETUP=true explicitly.
     $autoSetupOverride = ($env:LOADTEST_AUTO_SETUP | Out-String).Trim()
     $autoSetupDisabled = ($autoSetupOverride -match "^(0|false|no|off)$")
-    $useAutoSetup = $hasSessionCookie -and -not $autoSetupDisabled
+    $autoSetupEnabled  = ($autoSetupOverride -match "^(1|true|yes|on)$")
 
-    # Advanced env-var-only options (no prompts -- set in env before running if needed):
-    #   LOADTEST_SETUP_TEMPLATE_ID   auto-discovered when blank
-    #   LOADTEST_SETUP_COUNTRY_IDS   auto-discovered when blank
-    #   LOADTEST_SETUP_COUNT         default 3
-    #   LOADTEST_SUBMIT_AES_IDS      submit/reopen cycle pool
-    #   LOADTEST_DOCUMENT_IDS        document download pool
-    #   LOADTEST_DI_SECTION_ID       dynamic indicator section
-    #   LOADTEST_DI_INDICATOR_BANK_ID
+    $useAutoSetup = $hasSessionCookie -and -not $autoSetupDisabled
+    if ($useAutoSetup -and $script:ActiveEnv.AllowProd -eq "true" -and -not $autoSetupEnabled) {
+        $useAutoSetup = $false
+        Write-Host ""
+        Write-Host "  Auto-setup disabled by default on production." -ForegroundColor Yellow
+        Write-Host "  Set LOADTEST_AUTO_SETUP=true to enable (creates real data on prod DB)." -ForegroundColor Yellow
+    }
 
     $setupTemplateId   = ($env:LOADTEST_SETUP_TEMPLATE_ID    | Out-String).Trim()
     $setupCountryIds   = ($env:LOADTEST_SETUP_COUNTRY_IDS    | Out-String).Trim()
     $setupCount        = ($env:LOADTEST_SETUP_COUNT           | Out-String).Trim()
     $assignmentAesIds  = ($env:LOADTEST_ASSIGNMENT_AES_IDS   | Out-String).Trim()
-    $submitAesIds      = ($env:LOADTEST_SUBMIT_AES_IDS        | Out-String).Trim()
     $documentIds       = ($env:LOADTEST_DOCUMENT_IDS          | Out-String).Trim()
     $diSectionId       = ($env:LOADTEST_DI_SECTION_ID         | Out-String).Trim()
     $diIndicatorBankId = ($env:LOADTEST_DI_INDICATOR_BANK_ID  | Out-String).Trim()
@@ -272,15 +439,16 @@ function Invoke-RunProfile {
 
     if ($Run) {
         Write-Host ""
+        Write-Host "  Target:        $($script:ActiveEnv.Name) ($($script:ActiveEnv.Host))"
         Write-Host "  API key:       $(if (-not [string]::IsNullOrWhiteSpace($apiKey)) { 'provided' } else { 'not set (health-only)' })"
         Write-Host "  Session:       $(if ($hasSessionCookie) { 'provided' } else { 'not set (entry-form tasks disabled)' })"
         if ($useAutoSetup) {
-            $tmplDisplay = if ([string]::IsNullOrWhiteSpace($setupTemplateId)) { 'auto-discover' } else { $setupTemplateId }
+            $tmplDisplay  = if ([string]::IsNullOrWhiteSpace($setupTemplateId)) { 'auto-discover' } else { $setupTemplateId }
             $cntryDisplay = if ([string]::IsNullOrWhiteSpace($setupCountryIds)) { 'auto-discover' } else { $setupCountryIds }
-            $countDisplay = if ([string]::IsNullOrWhiteSpace($setupCount)) { '3' } else { $setupCount }
+            $countDisplay = if ([string]::IsNullOrWhiteSpace($setupCount))      { '3' }             else { $setupCount }
             Write-Host "  Auto-setup:    ON  (template=$tmplDisplay  countries=$cntryDisplay  count=$countDisplay)" -ForegroundColor Cyan
         } else {
-            Write-Host "  Auto-setup:    OFF  (set LOADTEST_AUTO_SETUP=false to keep this behaviour)"
+            Write-Host "  Auto-setup:    OFF  (set LOADTEST_AUTO_SETUP=true to enable)"
         }
         Write-Host ""
     }
@@ -291,7 +459,6 @@ function Invoke-RunProfile {
             -ApiKey $apiKey `
             -SessionCookie $sessionCookie `
             -AssignmentAesIds $assignmentAesIds `
-            -SubmitAesIds $submitAesIds `
             -DocumentIds $documentIds `
             -DiSectionId $diSectionId `
             -DiIndicatorBankId $diIndicatorBankId `
@@ -305,7 +472,7 @@ function Invoke-RunProfile {
     }
 
     if ($Run) {
-        Start-TestRun -DisplayName $DisplayName
+        Start-TestRun -DisplayName "$DisplayName [$($script:ActiveEnv.Name)]"
     }
 
     Pause-Menu
@@ -321,7 +488,6 @@ function Invoke-SetupTeardown {
         [Parameter(Mandatory = $true)] [ValidateSet("setup","teardown")] [string] $Mode
     )
 
-    # Resolve python executable
     $py = if (Get-Command python -ErrorAction SilentlyContinue) { "python" }
           elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" }
           else {
@@ -337,13 +503,15 @@ function Invoke-SetupTeardown {
 
     $sessionCookie = $env:LOADTEST_SESSION_COOKIE
     if ([string]::IsNullOrWhiteSpace($sessionCookie)) {
-        $sessionCookie = Read-Host "LOADTEST_SESSION_COOKIE (required - captured post-B2C session cookie)"
+        $sessionCookie = Get-SessionCookie -Required
     }
     if ([string]::IsNullOrWhiteSpace($sessionCookie)) {
         Write-Host "[error] Session cookie is required." -ForegroundColor Red
         Pause-Menu; return
     }
     $env:LOADTEST_SESSION_COOKIE = $sessionCookie
+    $env:LOADTEST_HOST           = $script:ActiveEnv.Host
+    $env:LOADTEST_ALLOW_PROD     = $script:ActiveEnv.AllowProd
 
     if ($Mode -eq "setup") {
         $templateId = $env:LOADTEST_SETUP_TEMPLATE_ID
@@ -364,11 +532,11 @@ function Invoke-SetupTeardown {
         $env:LOADTEST_SETUP_COUNT       = $count
 
         Write-Host ""
-        Write-Host "Running setup_loadtest_data.py setup ..."
+        Write-Host "Running setup_loadtest_data.py setup [$($script:ActiveEnv.Name)] ..."
         & $py $script setup
     } else {
         Write-Host ""
-        Write-Host "Running setup_loadtest_data.py teardown ..."
+        Write-Host "Running setup_loadtest_data.py teardown [$($script:ActiveEnv.Name)] ..."
         & $py $script teardown
     }
 
@@ -376,19 +544,15 @@ function Invoke-SetupTeardown {
 }
 
 function Get-RunLogs {
-    if (-not (Ensure-AzureTools)) {
-        Pause-Menu
-        return
-    }
+    if (-not (Ensure-AzureTools)) { Pause-Menu; return }
 
-    # Let user pick a run, defaulting to the most recent.
     Write-Host ""
-    Write-Host "Recent runs:"
+    Write-Host "Recent runs [$($script:ActiveEnv.Name)]:"
     & az load test-run list `
         --load-test-resource $LoadTestResource `
         --resource-group $ResourceGroup `
-        --test-id $TestId `
-        --query "reverse(sort_by([].{run:testRunId,status:status,start:startDateTime}, &start))[:10]" `
+        --test-id $script:ActiveEnv.TestId `
+        --query 'reverse(sort_by([].{run:testRunId,status:status,start:startDateTime}, &start))[:10]' `
         -o table
 
     Write-Host ""
@@ -398,8 +562,8 @@ function Get-RunLogs {
         $runId = (& az load test-run list `
             --load-test-resource $LoadTestResource `
             --resource-group $ResourceGroup `
-            --test-id $TestId `
-            --query "reverse(sort_by([].testRunId, &@))[0]" `
+            --test-id $script:ActiveEnv.TestId `
+            --query 'reverse(sort_by([].testRunId, &@))[0]' `
             -o tsv 2>$null)
         if ([string]::IsNullOrWhiteSpace($runId)) {
             Write-Host "[error] Could not determine latest run ID." -ForegroundColor Red
@@ -409,7 +573,6 @@ function Get-RunLogs {
         Write-Host "  Using latest run: $runId"
     }
 
-    # Show run summary first so we know what we're looking at.
     Write-Host ""
     Write-Host "Run details:" -ForegroundColor Cyan
     $runJson = (& az load test-run show `
@@ -435,7 +598,6 @@ function Get-RunLogs {
         return
     }
 
-    # Download all artifacts for this run into a local folder.
     $outDir = Join-Path $PSScriptRoot "logs\$runId"
     Write-Host ""
     Write-Host "Downloading artifacts for $runId -> $outDir ..."
@@ -445,9 +607,7 @@ function Get-RunLogs {
         --test-run-id $runId `
         --path $outDir `
         --force
-    # Non-zero exit here just means no files; don't abort - fall through to check dir.
 
-    # Azure Load Testing delivers artifacts as ZIP files. Extract any found.
     $zips = @(Get-ChildItem -Recurse -File $outDir -Filter "*.zip" -ErrorAction SilentlyContinue)
     if ($zips.Count -gt 0) {
         Write-Host ""
@@ -465,7 +625,6 @@ function Get-RunLogs {
         Write-Host "  $($_.FullName.Substring($outDir.Length + 1))  ($([Math]::Round($_.Length/1KB,1)) KB)"
     }
 
-    # Collect log / text files (including those extracted from ZIPs above).
     $logFiles = @(Get-ChildItem -Recurse -File $outDir | Where-Object {
         $_.Extension -in '.log', '.txt' -or $_.Name -match '(?i)log'
     } | Where-Object { $_.Extension -ne '.zip' })
@@ -485,7 +644,6 @@ function Get-RunLogs {
         Write-Host " $($lf.Name)" -ForegroundColor Cyan
         Write-Host "--------------------------------------------------" -ForegroundColor Cyan
         Get-Content $lf.FullName | ForEach-Object {
-            # Colour-code key lines for quick scanning.
             if ($_ -match '\bERROR\b|\bFAILED\b|\bexception\b' -and $_ -notmatch 'INFO') {
                 Write-Host $_ -ForegroundColor Red
             } elseif ($_ -match '\bWARN(ING)?\b') {
@@ -503,7 +661,9 @@ function Get-RunLogs {
     Pause-Menu
 }
 
-
+# ---------------------------------------------------------------------------
+# Main menu loop
+# ---------------------------------------------------------------------------
 while ($true) {
     Clear-Host
     Write-Host ""
@@ -511,17 +671,27 @@ while ($true) {
     Write-Host " Humanitarian Databank - Azure Load Testing runner"
     Write-Host "=============================================================="
     Write-Host " Resource : $LoadTestResource   RG: $ResourceGroup"
-    Write-Host " Test ID  : $TestId"
-    Write-Host " Config   : $ConfigFile"
+    Write-Host " Test ID  : $($script:ActiveEnv.TestId)"
+    Write-Host " Config   : $($script:ActiveEnv.ConfigFile)"
+    if ($script:ActiveEnv.AllowProd -eq "true") {
+        Write-Host " Target   : *** PRODUCTION ***  $($script:ActiveEnv.Host)" -ForegroundColor Red
+    } else {
+        Write-Host " Target   : Staging  $($script:ActiveEnv.Host)" -ForegroundColor Green
+    }
     Write-Host "=============================================================="
     Write-Host "  1. Smoke       (5 VUs,  60s)  - sync + run"
-    Write-Host "  2. Default     (20 VUs, 120s) - sync + run  (matches YAML)"
-    Write-Host "  3. Heavy       (50 VUs, 300s) - sync + run  (coordinate w/ ops)"
+    Write-Host "  2. Default     ($($script:ActiveEnv.DefaultVus) VUs, $($script:ActiveEnv.DefaultSec)s) - sync + run"
+    if ($script:ActiveEnv.AllowProd -eq "true") {
+        Write-Host "  3. Heavy       (50 VUs, 300s) - sync + run  [REQUIRES OPS APPROVAL]" -ForegroundColor Red
+    } else {
+        Write-Host "  3. Heavy       (50 VUs, 300s) - sync + run  (coordinate w/ ops)"
+    }
     Write-Host "  4. Custom      (enter VUs + duration) - sync + run"
     Write-Host "  5. Sync only   (upload YAML + locustfile, no run)"
     Write-Host "  6. Show last 5 runs"
     Write-Host "  7. Open test in portal"
     Write-Host "  8. Fetch & show logs for a run"
+    Write-Host "  E. Switch environment  (currently: $($script:ActiveEnv.Name))"
     Write-Host "  Q. Quit"
     Write-Host "=============================================================="
     Write-Host "  Auto-setup: set LOADTEST_AUTO_SETUP=true to create and"
@@ -529,22 +699,23 @@ while ($true) {
     Write-Host "=============================================================="
     Write-Host ""
 
-    $choice = Read-Host "Select option [1-8 / Q]"
+    $choice = Read-Host "Select option [1-8 / E / Q]"
     switch ($choice.ToUpper()) {
         "1" { Invoke-RunProfile -DisplayName "Smoke" -Vus 5 -RunTimeSeconds 60 -Run $true }
-        "2" { Invoke-RunProfile -DisplayName "Default staging" -Vus 20 -RunTimeSeconds 120 -Run $true }
-        "3" { Invoke-RunProfile -DisplayName "Heavy staging" -Vus 50 -RunTimeSeconds 300 -Run $true }
+        "2" { Invoke-RunProfile -DisplayName "Default $($script:ActiveEnv.Name)" -Vus $script:ActiveEnv.DefaultVus -RunTimeSeconds $script:ActiveEnv.DefaultSec -Run $true }
+        "3" { Invoke-RunProfile -DisplayName "Heavy $($script:ActiveEnv.Name)" -Vus 50 -RunTimeSeconds 300 -Run $true }
         "4" {
-            $vusInput = Read-Host "  Number of VUs [20]"
-            $timeInput = Read-Host "  Run time in seconds [120]"
-            $vus = if ([string]::IsNullOrWhiteSpace($vusInput)) { 20 } else { [int]$vusInput }
-            $runTime = if ([string]::IsNullOrWhiteSpace($timeInput)) { 120 } else { [int]$timeInput }
-            Invoke-RunProfile -DisplayName "Custom ($vus VUs / ${runTime}s)" -Vus $vus -RunTimeSeconds $runTime -Run $true
+            $vusInput  = Read-Host "  Number of VUs [$($script:ActiveEnv.DefaultVus)]"
+            $timeInput = Read-Host "  Run time in seconds [$($script:ActiveEnv.DefaultSec)]"
+            $vus     = if ([string]::IsNullOrWhiteSpace($vusInput))  { $script:ActiveEnv.DefaultVus } else { [int]$vusInput }
+            $runTime = if ([string]::IsNullOrWhiteSpace($timeInput)) { $script:ActiveEnv.DefaultSec } else { [int]$timeInput }
+            Invoke-RunProfile -DisplayName "Custom $($script:ActiveEnv.Name) ($vus VUs / ${runTime}s)" -Vus $vus -RunTimeSeconds $runTime -Run $true
         }
         "5" { Invoke-RunProfile -DisplayName "Sync only" -Vus 0 -RunTimeSeconds 0 -Run $false }
         "6" { Show-RecentRuns }
         "7" { Open-Portal }
         "8" { Get-RunLogs }
+        "E" { Select-Environment }
         "Q" { exit 0 }
         default {
             Write-Host "Invalid choice."

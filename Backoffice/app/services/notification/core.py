@@ -2322,6 +2322,15 @@ def notify_assignment_created(assignment_entity_status):
     template = FormTemplate.query.get(assigned_form.template_id) if assigned_form and assigned_form.template_id else None
     template_name = template.name if template else "Unknown Template"
 
+    # Suppress all notifications and emails for load-test assignments so that
+    # automated runs do not spam focal points or admins.
+    if assigned_form and (assigned_form.period_name or "").startswith("[LOADTEST]"):
+        current_app.logger.debug(
+            "[NOTIFY] Suppressing notify_assignment_created for [LOADTEST] assignment "
+            "(period=%r, aes_id=%s)", assigned_form.period_name, aes.id
+        )
+        return []
+
     # Debug: Log template lookup to help diagnose any issues
     if assigned_form and template:
         current_app.logger.debug(
@@ -2422,6 +2431,15 @@ def notify_assignment_submitted(assignment_entity_status):
     assigned_form = aes.assigned_form
     template = FormTemplate.query.get(assigned_form.template_id) if assigned_form and assigned_form.template_id else None
     template_name = template.name if template else "Unknown Template"
+
+    # Suppress all notifications and emails for load-test assignments so that
+    # automated runs do not spam focal points or admins.
+    if assigned_form and (assigned_form.period_name or "").startswith("[LOADTEST]"):
+        current_app.logger.debug(
+            "[NOTIFY] Suppressing notify_assignment_submitted for [LOADTEST] assignment "
+            "(period=%r, aes_id=%s)", assigned_form.period_name, aes.id
+        )
+        return []
 
     # Log activity for the entity
     log_entity_activity(

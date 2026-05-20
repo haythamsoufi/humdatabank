@@ -57,6 +57,19 @@ import json
 
 bp = Blueprint('analytics', __name__, url_prefix='/admin/analytics')
 
+
+def _audit_trail_risk_level_for_activity_row(activity_log: UserActivityLog) -> str:
+    """
+    Risk shown on the unified audit trail for rows backed only by UserActivityLog.
+
+    Most such rows default to low; a few endpoints mirror material data / security impact
+    comparable to medium admin actions.
+    """
+    if (activity_log.endpoint or "") == "template_special.run_fdrs_sync":
+        return "medium"
+    return "low"
+
+
 @bp.route('/dashboard')
 @permission_required('admin.analytics.view')
 def analytics_dashboard():
@@ -925,7 +938,7 @@ def audit_trail():
                 'http_method': log.http_method,
                 'ip_address': log.ip_address,
                 'response_status_code': log.response_status_code,
-                'risk_level': 'low',
+                'risk_level': _audit_trail_risk_level_for_activity_row(log),
                 'requires_review': False,
                 'context_data': log.context_data,
                 'entity_type': entity_type,

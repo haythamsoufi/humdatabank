@@ -711,6 +711,9 @@ def create_app(config_name=None):
 
             return send_from_directory(static_folder_path, filename)
 
+    from app.middleware import register_coming_soon_lock_middleware
+    register_coming_soon_lock_middleware(app)
+
     # Memory monitoring for requests
     @app.before_request
     def serve_root_health_probe_fast_path():

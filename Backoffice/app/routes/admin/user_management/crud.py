@@ -1050,7 +1050,7 @@ def delete_user(user_id):
                 'email': user_email,
                 'name': user_name,
             },
-            risk_level='high'
+            risk_level='medium'
         )
 
         flash(f"User {user_email} deleted successfully.", "success")

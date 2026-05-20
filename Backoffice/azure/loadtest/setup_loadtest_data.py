@@ -5,6 +5,14 @@ without polluting real staging data.  Deleting the assignments on teardown also
 cascades to FormData, notifications, and entity statuses (all handled by the
 existing /admin/assignments/delete/<id> route).
 
+Notification / email suppression
+---------------------------------
+Assignments whose period_name starts with "[LOADTEST]" are silenced server-side:
+``notify_assignment_created`` and ``notify_assignment_submitted`` return early
+without dispatching any in-app notifications or emails.  This means neither the
+setup phase (Pending → In Progress activation) nor any focal-point save traffic
+during the run will ever send messages to real users or admins.
+
 HTTP flow
 ---------
 setup:
@@ -61,6 +69,27 @@ except ImportError:
 
 STATE_FILE = Path(__file__).parent / ".loadtest-state.json"
 DEFAULT_HOST = "https://databank-stage.ifrc.org"
+PROD_HOST_FRAGMENTS = ("databank.ifrc.org",)
+
+
+def _is_prod(host: str) -> bool:
+    """Return True when *host* resolves to the production environment."""
+    from urllib.parse import urlsplit  # noqa: PLC0415
+    netloc = (urlsplit(host).netloc or host).lower()
+    return any(frag in netloc for frag in PROD_HOST_FRAGMENTS) and "stage" not in netloc
+
+
+def _require_not_prod(host: str) -> None:
+    """Abort when the target is production and LOADTEST_ALLOW_PROD is not set."""
+    if not _is_prod(host):
+        return
+    allow = (os.getenv("LOADTEST_ALLOW_PROD") or "").strip().lower()
+    if allow not in ("1", "true", "yes", "on"):
+        print(
+            f"[error] Refusing to create/delete load-test data on production host {host!r}.\n"
+            "        Set LOADTEST_ALLOW_PROD=true to override (requires ops sign-off)."
+        )
+        sys.exit(1)
 
 # Matches both hidden-input and meta-tag CSRF patterns used in Backoffice admin.
 _CSRF_RE = re.compile(
@@ -257,6 +286,7 @@ def _discover_country_id(session: requests.Session, host: str) -> int:
 
 def cmd_setup(args: argparse.Namespace) -> None:
     host = (os.getenv("LOADTEST_HOST") or DEFAULT_HOST).rstrip("/")
+    _require_not_prod(host)
     session_cookie = (os.getenv("LOADTEST_SESSION_COOKIE") or "").strip()
     template_id = args.template_id or int(os.getenv("LOADTEST_SETUP_TEMPLATE_ID") or 0)
     raw_ids = os.getenv("LOADTEST_SETUP_COUNTRY_IDS") or ""
@@ -365,6 +395,7 @@ def cmd_teardown(args: argparse.Namespace) -> None:  # noqa: ARG001
 
     state: dict = json.loads(STATE_FILE.read_text())
     host: str = state["host"]
+    _require_not_prod(host)
     assignments: list[dict] = state.get("assignments", [])
     run_label: str = state.get("run_label", "?")
 

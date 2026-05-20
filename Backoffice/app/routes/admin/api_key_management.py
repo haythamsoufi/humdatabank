@@ -139,6 +139,7 @@ def create_api_key():
                         form.expires_at.data.isoformat() if form.expires_at.data else None
                     ),
                 },
+                risk_level='high',
             )
 
             # Flash success with the key (only shown once!)

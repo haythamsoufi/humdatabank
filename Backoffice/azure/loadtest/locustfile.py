@@ -53,12 +53,6 @@ collide with existing ``HOST``/``API_KEY`` values in ``Backoffice/.env``):
                                    "In Progress" for save/document
                                    traffic (e.g. "123,456").  These must NOT
                                    be submitted during the run.
-    LOADTEST_SUBMIT_AES_IDS        comma-separated AES IDs used exclusively
-                                   for submit traffic. Keep these
-                                   separate from LOADTEST_ASSIGNMENT_AES_IDS
-                                   so save tasks never hit a locked form.
-                                   The session holder must have permission to
-                                   submit for these assignments.
     LOADTEST_DOCUMENT_IDS          comma-separated submitted_document_id values
                                    to exercise GET /forms/download_document/<id>
     LOADTEST_DI_SECTION_ID         a single section_id whose section_type is
@@ -72,6 +66,9 @@ collide with existing ``HOST``/``API_KEY`` values in ``Backoffice/.env``):
                                    and LOADTEST_SETUP_COUNTRY_IDS.  When enabled,
                                    LOADTEST_ASSIGNMENT_AES_IDS is set automatically
                                    and must NOT be set manually.
+                                   Assignments created with a ``[LOADTEST]`` period
+                                   name prefix are silenced server-side: no
+                                   notifications or emails are dispatched for them.
     LOADTEST_SETUP_TEMPLATE_ID     FormTemplate ID to use when auto-creating assignments
                                    (must have a published version).
     LOADTEST_SETUP_COUNTRY_IDS     Comma-separated country IDs added per assignment
@@ -80,14 +77,24 @@ collide with existing ``HOST``/``API_KEY`` values in ``Backoffice/.env``):
     LOADTEST_ALLOW_PROD            set to ``true`` to allow targeting production
     ENABLE_LOGGING                 ``true``/``false`` to toggle DEBUG logging
 
+Notification / email suppression
+---------------------------------
+All assignments created with a ``[LOADTEST]`` period-name prefix are silenced
+server-side: ``notify_assignment_created`` and ``notify_assignment_submitted``
+return early without dispatching any in-app notifications or emails.  This
+means setup, teardown, and every focal-point action exercised during the run
+will never trigger messages to real users.
+
+Full form submission (``action=submit``) is intentionally excluded from the
+load test because it is an infrequent workflow-completion action and the
+primary source of admin email notifications.  The test targets only the
+high-frequency focal-point interactions: page loads and AJAX data saves.
+
 When both ``LOADTEST_SESSION_COOKIE`` and ``LOADTEST_ASSIGNMENT_AES_IDS`` are
-provided, the script exercises the full focal-point entry-form surface:
+provided, the script exercises the focal-point entry-form surface:
     - GET  /forms/assignment/<aes_id>                           (page load)
     - GET  /forms/assignment/<aes_id>?ajax=1                    (document-upload state refresh)
     - POST /forms/assignment/<aes_id>?ajax=1  (action=save)     (AJAX auto-save)
-
-When ``LOADTEST_SUBMIT_AES_IDS`` is also provided:
-    - POST /forms/assignment/<aes_id>           (action=submit, full submission)
 
 When ``LOADTEST_DOCUMENT_IDS`` is provided:
     - GET  /forms/download_document/<doc_id>    (document file download)
@@ -532,10 +539,6 @@ class BackofficeUser(HttpUser):
         self._assignment_rr_idx = -1
         self._entry_csrf_tokens: dict[int, str] = {}
 
-        # --- Submit pool (separate from save pool to avoid lock collisions) ---
-        self.submit_aes_ids = _int_list_env("LOADTEST_SUBMIT_AES_IDS")
-        self._submit_rr_idx = -1
-
         # --- Document download pool ---
         self.document_ids = _int_list_env("LOADTEST_DOCUMENT_IDS")
         self._document_rr_idx = -1
@@ -552,11 +555,33 @@ class BackofficeUser(HttpUser):
         # Session + entry-form traffic flags
         self.navigation_focus_enabled = bool(self.session_cookie)
         self.entry_focus_enabled = bool(self.assignment_aes_ids and self.session_cookie)
-        self.submit_focus_enabled = bool(self.submit_aes_ids and self.session_cookie)
         self.document_focus_enabled = bool(self.document_ids and self.session_cookie)
         self.di_focus_enabled = bool(
             self._di_section_id and self._di_indicator_bank_id and self.session_cookie
         )
+
+        if self.session_cookie:
+            # Validate the cookie is latin-1 safe before injecting it.
+            # HTTP header values (including Cookie:) must be latin-1 encodable;
+            # non-ASCII characters cause a UnicodeEncodeError on every request.
+            # This can happen when a cookie is copy-pasted with invisible Unicode
+            # chars, or when Azure Load Testing env-var injection corrupts the value.
+            try:
+                self.session_cookie.encode("latin-1")
+            except UnicodeEncodeError as exc:
+                bad_char = self.session_cookie[exc.start]
+                logging.getLogger("locust").error(
+                    "[locust] LOADTEST_SESSION_COOKIE contains a non-ASCII character "
+                    "(U+%04X %r) at position %d — the cookie is invalid and will be "
+                    "ignored.  Re-capture a fresh session cookie and retry.",
+                    ord(bad_char), bad_char, exc.start,
+                )
+                self.session_cookie = ""
+                self.navigation_focus_enabled = False
+                self.entry_focus_enabled = False
+                self.submit_focus_enabled = False
+                self.document_focus_enabled = False
+                self.di_focus_enabled = False
 
         if self.session_cookie:
             # Inject a previously captured post-B2C Flask session cookie
@@ -582,11 +607,6 @@ class BackofficeUser(HttpUser):
             logging.getLogger("locust").warning(
                 "[locust] LOADTEST_ASSIGNMENT_AES_IDS provided but LOADTEST_SESSION_COOKIE is missing; "
                 "entry-form focal-point tasks are disabled."
-            )
-        if self.submit_aes_ids and not self.session_cookie:
-            logging.getLogger("locust").warning(
-                "[locust] LOADTEST_SUBMIT_AES_IDS provided but LOADTEST_SESSION_COOKIE is missing; "
-                "submit task is disabled."
             )
         if self.document_ids and not self.session_cookie:
             logging.getLogger("locust").warning(
@@ -657,12 +677,6 @@ class BackofficeUser(HttpUser):
             return None
         self._assignment_rr_idx = (self._assignment_rr_idx + 1) % len(self.assignment_aes_ids)
         return self.assignment_aes_ids[self._assignment_rr_idx]
-
-    def _next_submit_aes_id(self) -> int | None:
-        if not self.submit_aes_ids:
-            return None
-        self._submit_rr_idx = (self._submit_rr_idx + 1) % len(self.submit_aes_ids)
-        return self.submit_aes_ids[self._submit_rr_idx]
 
     def _next_document_id(self) -> int | None:
         if not self.document_ids:
@@ -864,78 +878,6 @@ class BackofficeUser(HttpUser):
             accept=(200,),
             accept_header="text/html,application/json",
         )
-
-    # ------------------- Full form submission (action=submit) -------------------
-    # This is the heaviest single action a focal-point performs: validates all
-    # fields, writes final status, and triggers downstream notifications.
-    # Uses LOADTEST_SUBMIT_AES_IDS (separate pool from save pool) to avoid
-    # locking assignments used by the AJAX save tasks.
-    # Accepts 200 (validation errors kept on page) and 302 (successful redirect).
-
-    @task(1)
-    def assignment_entry_form_submit(self) -> None:
-        if not self.submit_focus_enabled:
-            return
-        aes_id = self._next_submit_aes_id()
-        if aes_id is None:
-            return
-
-        # Ensure we have a CSRF token for this assignment.
-        csrf_token = self._entry_csrf_tokens.get(aes_id)
-        if not csrf_token:
-            # Fetch the page to get a token; use a dedicated slot in the cache
-            # so we do not pollute the save-pool cache.
-            path = f"/forms/assignment/{aes_id}"
-            with self.client.get(
-                path,
-                headers=self._headers(with_auth=False, accept="text/html"),
-                name="GET /forms/assignment/[submit_aes_id] (csrf-fetch)",
-                catch_response=True,
-                timeout=self.timeout_duration,
-            ) as response:
-                if response.status_code != 200:
-                    response.failure(
-                        f"CSRF fetch for submit failed aes_id={aes_id}: "
-                        f"status={response.status_code}"
-                    )
-                    return
-                match = CSRF_TOKEN_RE.search(response.text or "")
-                if not match:
-                    response.failure(
-                        f"CSRF token missing on submit form page aes_id={aes_id}"
-                    )
-                    return
-                self._entry_csrf_tokens[aes_id] = match.group(1)
-                response.success()
-
-        csrf_token = self._entry_csrf_tokens.get(aes_id)
-        if not csrf_token:
-            return
-
-        payload = {"action": "submit", "csrf_token": csrf_token}
-        with self.client.post(
-            f"/forms/assignment/{aes_id}",
-            data=payload,
-            headers=self._headers(
-                with_auth=False,
-                accept="text/html,application/json",
-                extra={"X-Requested-With": "XMLHttpRequest"},
-            ),
-            name="POST /forms/assignment/[submit_aes_id] (submit)",
-            catch_response=True,
-            allow_redirects=False,
-            timeout=self.timeout_duration,
-        ) as response:
-            # 302 = successful submission redirect; 200 = validation errors shown
-            if response.status_code in (200, 302):
-                # CSRF token is consumed on submit; force refresh on next call.
-                self._entry_csrf_tokens.pop(aes_id, None)
-                response.success()
-            else:
-                self._entry_csrf_tokens.pop(aes_id, None)
-                response.failure(
-                    f"Submit failed for aes_id={aes_id}: status={response.status_code}"
-                )
 
     # -------------------- Document file download ------------------------
     # document-upload.js and the form itself expose download links for

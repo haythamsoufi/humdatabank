@@ -901,6 +901,11 @@ class Config:
     # system-manager auth (and localhost-only in production), so it is safe to leave on.
     ENABLE_DBINFO = _parse_bool(os.environ.get('ENABLE_DBINFO'), default=True)
 
+    # Temporary site lock: show a coming-soon page for all routes except health/static.
+    # Set COMING_SOON_BYPASS_SECRET so the team can visit /?coming_soon_bypass=<secret>.
+    COMING_SOON_LOCK = _parse_bool(os.environ.get('COMING_SOON_LOCK'), default=False)
+    COMING_SOON_BYPASS_SECRET = (os.environ.get('COMING_SOON_BYPASS_SECRET') or '').strip()
+
     # Verbose app/form debug: DEBUG log level, debug_utils helpers, guarded admin debug logs.
     # Env: true/false only (see _parse_bool). Default false; avoid true in production unless troubleshooting.
     VERBOSE_FORM_DEBUG = _parse_bool(os.environ.get("VERBOSE_FORM_DEBUG"), default=False)

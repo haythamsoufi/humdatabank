@@ -14,6 +14,7 @@ from .activity_middleware import init_activity_tracking, track_admin_action
 from .transaction_middleware import init_transaction_middleware
 from .security_headers import init_security_headers
 from .api_tracker import track_api_request, track_api_response, track_api_usage
+from .coming_soon_lock import register_coming_soon_lock_middleware
 
 __all__ = [
     'check_session_timeout',
@@ -26,4 +27,5 @@ __all__ = [
     'track_api_request',
     'track_api_response',
     'track_api_usage',
+    'register_coming_soon_lock_middleware',
 ]

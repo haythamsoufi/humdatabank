@@ -9,6 +9,7 @@ and making the question self-contained and tool-friendly.
 import logging
 import os
 import re
+import time as _time
 from typing import List, Dict, Any, Optional, Tuple
 
 from flask import current_app
@@ -470,133 +471,44 @@ def _minimal_page_context_for_rewriter(page_context: Optional[Dict[str, Any]]) -
     return "; ".join(parts)
 
 
-def rewrite_user_message(
-    message: str,
-    conversation_history: Optional[List[Dict[str, Any]]] = None,
-    preferred_language: str = "en",
-    page_context: Optional[Dict[str, Any]] = None,
+def _looks_truncated(rewritten: str, original: str) -> bool:
+    """Return True if rewritten output looks cut off compared to the original."""
+    if len(rewritten) >= len(original) - 5:
+        return False
+    # Much shorter and ends with a short fragment (incomplete word)
+    last_word = (rewritten.split() or [""])[-1]
+    if len(last_word) <= 3 and len(rewritten) < len(original) * 0.8:
+        return True
+    # Ends with common cut-off patterns
+    r = rewritten.rstrip()
+    if r.endswith(" th") or r.endswith(" docu") or r.endswith(" cou") or r.endswith(" vol"):
+        return True
+    return False
+
+
+def _run_query_rewrite_completion(
+    raw: str,
+    *,
+    conversation_history: Optional[List[Dict[str, Any]]],
+    preferred_language: str,
+    page_context: Optional[Dict[str, Any]],
+    model: str,
+    rewrite_timeout: int,
 ) -> Tuple[str, bool]:
     """
-    Rewrite the user's message into a clear, tool-friendly query using an LLM.
-
-    The rewritten query is used as input to the agent (and direct LLM fallback).
-    The original message is still stored in conversation history for display.
-
-    Args:
-        message: The user's raw message.
-        conversation_history: Optional previous messages (last exchange may be used for context).
-        preferred_language: Preferred language for the rewritten question (hint only).
-        page_context: Optional current page context (currentPage, pageData.pageType) so the
-            rewriter can avoid expanding dashboard UI questions into document-filter queries.
-
-    Returns:
-        (rewritten_or_original_message, is_pure_greeting).
-        When ``is_pure_greeting`` is True, the first value is the user's text unchanged (no rewrite)
-        so traces stay faithful; the caller may answer with a short greeting reply instead of the agent.
+    Single LLM call: rewrite-only (tool-friendly query). Returns (text, ok).
+    On failure ok=False and caller should fall back to *raw*.
     """
-    raw = (message or "").strip()
-    if not raw:
-        return raw, False
-
-    last_user = _last_user_message(conversation_history)
-    last_assistant = _last_assistant_message(conversation_history)
-
-    # Guardrail: if the assistant asked whether to draft a message and the user replies with
-    # a short affirmative (e.g., "yes for Lebanon"), convert it directly into a draft request.
-    # This preserves conversation intent and avoids generic re-expansion into help guidance.
-    if (
-        last_assistant
-        and _DRAFT_OFFER_RE.search(last_assistant)
-        and _AFFIRMATIVE_FOLLOWUP_RE.match(raw)
-    ):
-        target = _extract_draft_target(raw)
-        if target:
-            return (
-                "Draft the access-request message now for "
-                f"{target}. Include role, purpose, duration, and manager details placeholders.",
-                False,
-            )
-        return (
-            "Draft the access-request message now based on the previous context. "
-            "Include role, purpose, duration, and manager details placeholders.",
-            False,
-        )
-
-    # Guardrail: short follow-ups like "key findings" are often *intentionally* contextual.
-    # We've observed LLM rewriters sometimes "helpfully" replace them with the prior full query,
-    # which breaks conversation flow by re-running the same tool path and yielding the same answer.
-    # For these cases, deterministically anchor the follow-up to the most recent user question.
-    if (
-        last_user
-        and last_user.strip()
-        and last_user.strip() != raw
-        and len(raw) <= 64
-        and _FOLLOWUP_SHORT_RE.match(raw)
-    ):
-        # Strip timeseries trigger phrases from the embedded context to avoid unintentionally
-        # biasing downstream heuristics/tools toward chart-only behavior.
-        last_user_ctx = re.sub(
-            r"\b(over\s*time|over\s+the\s+years|time\s*series|timeseries|trend|trends|by\s+year|year\s+over\s+year|yoy|overtime)\b",
-            "",
-            last_user,
-            flags=re.IGNORECASE,
-        )
-        last_user_ctx = re.sub(r"\s+", " ", last_user_ctx).strip(" .,:;")
-        if not last_user_ctx:
-            last_user_ctx = last_user.strip()
-        # Make the follow-up self-contained without turning it back into the previous question.
-        # Avoid "over time" phrasing that can unintentionally bias the agent toward chart-only answers.
-        rewritten = (
-            f"Provide {raw} based on the results of the previous question: {last_user_ctx}. "
-            f"Focus on interpretation, key changes, peaks/drops, and caveats. Answer in text."
-        )
-        try:
-            dbg = current_app.config.get("AI_CHAT_DEBUG_LOGS", None)
-            if dbg is None:
-                dbg = (os.getenv("AI_CHAT_DEBUG_LOGS") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
-            if bool(dbg):
-                logger.debug(
-                    "AI query rewrite short-followup: raw=%r last_user=%r -> %r",
-                    scrub_pii_text(raw)[:120],
-                    scrub_pii_text(last_user)[:200],
-                    scrub_pii_text(rewritten)[:220],
-                )
-        except Exception as e:
-            logger.debug("AI query rewrite: debug log failed: %s", e)
-        return rewritten, False
-
-    # Greeting-only: keep the user's exact words (no rewrite into assistant-role dialogue).
-    if not _heuristic_cannot_be_greeting_only(
-        raw
-    ) and not _is_clearly_substantive_data_query(raw) and classify_greeting_only_llm(
-        raw, conversation_history, preferred_language
-    ):
-        logger.info(
-            "AI query rewrite: greeting-only; skipping rewrite %r",
-            scrub_pii_text(raw)[:100] + ("…" if len(raw) > 100 else ""),
-        )
-        return raw, True
-
-    if not current_app.config.get("AI_QUERY_REWRITE_ENABLED", True):
-        return raw, False
-
-    # Privacy: minimize obvious PII before sending to third-party LLMs.
-    raw_for_llm = scrub_pii_text(raw)
-
     api_key = current_app.config.get("OPENAI_API_KEY")
     if not api_key:
-        logger.debug("AI query rewrite skipped: OPENAI_API_KEY not set")
         return raw, False
-
     try:
         from openai import OpenAI
     except ImportError:
-        logger.debug("AI query rewrite skipped: openai not installed")
         return raw, False
 
-    model = _effective_query_rewrite_model()
-    rewrite_timeout = int(current_app.config.get("AI_QUERY_REWRITE_TIMEOUT_SECONDS", 30))
     client = OpenAI(api_key=api_key, timeout=rewrite_timeout, max_retries=0)
+    raw_for_llm = scrub_pii_text(raw)
 
     page_hint = _minimal_page_context_for_rewriter(page_context)
     dashboard_rule = ""
@@ -655,7 +567,6 @@ def rewrite_user_message(
         + (f"\nCurrent page: {page_hint}\n" + dashboard_rule if page_hint else "")
     )
 
-    # Optional: last exchange for context (e.g. "that country" -> resolve to actual country)
     context = ""
     if conversation_history and len(conversation_history) >= 2:
         last_two = conversation_history[-2:]
@@ -672,7 +583,6 @@ def rewrite_user_message(
 
     user_prompt = f"{context}Current user message to rewrite:\n{raw_for_llm}"
 
-    import time as _time
     try:
         kwargs = {
             "model": model,
@@ -704,23 +614,334 @@ def rewrite_user_message(
             scrub_pii_text(raw[:100] + ("…" if len(raw) > 100 else "")),
             text[:100] + ("…" if len(text) > 100 else ""),
         )
-        return text, False
+        return text, True
     except Exception as e:
         logger.warning("Query rewrite failed (timeout=%ss), using original: %s", rewrite_timeout, e)
 
     return raw, False
 
 
-def _looks_truncated(rewritten: str, original: str) -> bool:
-    """Return True if rewritten output looks cut off compared to the original."""
-    if len(rewritten) >= len(original) - 5:
-        return False
-    # Much shorter and ends with a short fragment (incomplete word)
-    last_word = (rewritten.split() or [""])[-1]
-    if len(last_word) <= 3 and len(rewritten) < len(original) * 0.8:
-        return True
-    # Ends with common cut-off patterns
-    r = rewritten.rstrip()
-    if r.endswith(" th") or r.endswith(" docu") or r.endswith(" cou") or r.endswith(" vol"):
-        return True
-    return False
+def _unified_preflight_llm(
+    raw: str,
+    *,
+    conversation_history: Optional[List[Dict[str, Any]]],
+    preferred_language: str,
+    page_context: Optional[Dict[str, Any]],
+    rewrite_enabled: bool,
+    enforce_scope: bool,
+) -> Tuple[str, bool, bool]:
+    """
+    One LLM JSON call: classify greeting / platform scope AND optionally rewrite query.
+    Returns (query_for_agent, is_greeting_only, in_platform_scope).
+
+    Fallback on parse/API errors: (raw, False, True).
+    """
+    api_key = current_app.config.get("OPENAI_API_KEY")
+    if not api_key:
+        return raw, False, True
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return raw, False, True
+
+    model = _effective_query_rewrite_model()
+    timeout_sec = int(current_app.config.get("AI_QUERY_REWRITE_TIMEOUT_SECONDS", 30))
+    client = OpenAI(api_key=api_key, timeout=timeout_sec, max_retries=0)
+
+    raw_for_llm = scrub_pii_text(raw)
+    ctx = _recent_turns_for_greeting_classify(conversation_history, max_chars=500)
+    lang = (preferred_language or "en").split("-")[0]
+    page_hint = _minimal_page_context_for_rewriter(page_context)
+    user_block = (
+        f"Preferred response language (hint): {lang}\n\n"
+        + (f"Recent conversation:\n{ctx}\n\n" if ctx else "")
+        + (f"Current page (hint): {page_hint}\n\n" if page_hint else "")
+        + f"User message:\n{raw_for_llm}"
+    )
+
+    strict_substantive = _heuristic_cannot_be_greeting_only(raw) or _is_clearly_substantive_data_query(raw)
+
+    rewrite_rules = ""
+    if rewrite_enabled:
+        rewrite_rules = (
+            "When intent is \"data_query\", rewritten_query MUST be one clear tool-friendly question following the rewriter rules: "
+            "preserve numbers, expand FDRS/UPR jargon as in databank docs, preserve language, "
+            "self-contained unless context above helps resolve references.\n"
+        )
+    else:
+        rewrite_rules = (
+            'When intent is "data_query", set rewritten_query to the user message verbatim (trim outer whitespace only) '
+            "- do NOT expand or reinterpret.\n"
+        )
+
+    scope_rules = ""
+    if enforce_scope:
+        scope_rules = (
+            "You classify whether this message relates to humanitarian/country data, databank indicators, Unified Plans/documents "
+            "in this platform, RCRC/National Societies usage, navigation of this product, "
+            "or short follow-ups to such a conversation.\n"
+            '- intent MUST be \"out_of_platform_scope\" ONLY for clearly unrelated general requests '
+            '(e.g. unrelated programming tutorials, celebrity trivia, unrelated homework) '
+            'with NO plausible databank linkage.\n'
+            '- If unsure, prefer intent \"data_query\" or greeting over \"out_of_platform_scope\".\n'
+        )
+    else:
+        scope_rules = "Platform scope enforcement is OFF — NEVER use intent \"out_of_platform_scope\". Use greeting_only or data_query only.\n"
+
+    substantive_bias = ""
+    if strict_substantive:
+        substantive_bias = (
+            "IMPORTANT: This message signals a substantive databank/country/task question "
+            '(keywords, indicator, plans, geography, etc.). NEVER respond with greeting_only '
+            'unless there is ALSO an explicit substantive question.'
+            " Typical outcome: intent \"data_query\".\n"
+        )
+
+    system_prompt = (
+        "You preprocess a single user message for the Humanitarian Databank RCRC assistant.\n"
+        "Return JSON ONLY matching this schema (no prose):\n"
+        '{ "intent": "greeting_only" | "data_query" | "out_of_platform_scope", '
+        '"rewritten_query": "<string>", "confidence": <number between 0 and 1> }\n'
+        "\n"
+        '"intent":\n'
+        '- "greeting_only" — ONLY a greeting/thanks/closing/social line with NO data or task '
+        '(e.g. hello, hi, thanks, bye). NEVER if the message asks for data/plans/indicators/maps '
+        'or mixes greeting with a request.\n'
+        '- "data_query" — Questions or tasks answerable within this databank/document product.\n'
+        '- "out_of_platform_scope" — Only when unrelated general chat/tasks as described below.\n'
+        "\n"
+        f"{scope_rules}"
+        "\n"
+        f"{rewrite_rules}"
+        "\n"
+        f"{substantive_bias}"
+        "- For greeting_only, set rewritten_query to the user\'s wording unchanged.\n"
+    )
+
+    import json as _json
+
+    try:
+        kwargs = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_block},
+            ],
+            "max_completion_tokens": 1100,
+            "response_format": {"type": "json_object"},
+        }
+        if openai_model_supports_sampling_params(model):
+            kwargs["temperature"] = 0.0
+
+        _t0 = _time.time()
+        resp = client.chat.completions.create(**kwargs)
+        text = (resp.choices[0].message.content or "").strip()
+        if not text:
+            return raw, False, True
+
+        parsed = _json.loads(text)
+        if not isinstance(parsed, dict):
+            return raw, False, True
+
+        intent = str(parsed.get("intent") or "data_query").strip().lower()
+        rew = parsed.get("rewritten_query")
+
+        enforce = bool(enforce_scope)
+        if not enforce:
+            intent = intent if intent in {"greeting_only", "data_query"} else "data_query"
+
+        if intent == "greeting_only":
+            return (raw.strip(), True, True)
+
+        if enforce and intent == "out_of_platform_scope":
+            return (raw.strip(), False, False)
+
+        out_q = rew if isinstance(rew, str) and rew.strip() else raw
+        out_q = out_q.strip()
+
+        if not rewrite_enabled:
+            out_q = raw.strip()
+
+        if rewrite_enabled:
+            if _looks_truncated(out_q, raw):
+                logger.warning(
+                    "Unified preflight rewritten_query looked truncated; using original (%r)",
+                    out_q[-40:] if len(out_q) >= 40 else out_q,
+                )
+                out_q = raw.strip()
+            elif not out_q:
+                out_q = raw.strip()
+
+        return (out_q, False, True)
+    except Exception as e:
+        logger.warning("Unified preflight LLM failed: %s", e)
+
+    return raw, False, True
+
+
+def classify_and_rewrite_user_message(
+    message: str,
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+    preferred_language: str = "en",
+    page_context: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, bool, bool]:
+    """
+    Classify greeting / platform scope and rewrite query in minimal LLM round-trips.
+
+    Returns:
+        (query_for_models, is_pure_greeting, in_platform_scope)
+
+    Implements the fast substantive + in-scope heuristic path using a rewrite-only LLM call
+    when eligible; otherwise a single unified JSON preflight replaces separate greeting classify,
+    query rewrite, and scope classify calls.
+
+    Same early-return behaviours as rewrite_user_message (draft follow-ups, short follow-up chains).
+    """
+    raw = (message or "").strip()
+    if not raw:
+        return raw, False, True
+
+    last_user = _last_user_message(conversation_history)
+    last_assistant = _last_assistant_message(conversation_history)
+
+    # Guardrail — draft affirmative
+    if (
+        last_assistant
+        and _DRAFT_OFFER_RE.search(last_assistant)
+        and _AFFIRMATIVE_FOLLOWUP_RE.match(raw)
+    ):
+        target = _extract_draft_target(raw)
+        if target:
+            rw = (
+                "Draft the access-request message now for "
+                f"{target}. Include role, purpose, duration, and manager details placeholders."
+            )
+            return rw, False, True
+        rw = (
+            "Draft the access-request message now based on the previous context. "
+            "Include role, purpose, duration, and manager details placeholders."
+        )
+        return rw, False, True
+
+    # Short analytic follow-ups
+    if (
+        last_user
+        and last_user.strip()
+        and last_user.strip() != raw
+        and len(raw) <= 64
+        and _FOLLOWUP_SHORT_RE.match(raw)
+    ):
+        last_user_ctx = re.sub(
+            r"\b(over\s*time|over\s+the\s+years|time\s*series|timeseries|trend|trends|by\s+year|year\s+over\s+year|yoy|overtime)\b",
+            "",
+            last_user,
+            flags=re.IGNORECASE,
+        )
+        last_user_ctx = re.sub(r"\s+", " ", last_user_ctx).strip(" .,:;")
+        if not last_user_ctx:
+            last_user_ctx = last_user.strip()
+        rewritten = (
+            f"Provide {raw} based on the results of the previous question: {last_user_ctx}. "
+            f"Focus on interpretation, key changes, peaks/drops, and caveats. Answer in text."
+        )
+        try:
+            dbg = current_app.config.get("AI_CHAT_DEBUG_LOGS", None)
+            if dbg is None:
+                dbg = (os.getenv("AI_CHAT_DEBUG_LOGS") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+            if bool(dbg):
+                logger.debug(
+                    "AI classify_and_rewrite short-followup: raw=%r last_user=%r -> %r",
+                    scrub_pii_text(raw)[:120],
+                    scrub_pii_text(last_user)[:200],
+                    scrub_pii_text(rewritten)[:220],
+                )
+        except Exception as e:
+            logger.debug("classify_and_rewrite: debug log failed: %s", e)
+        return rewritten, False, True
+
+    api_key = current_app.config.get("OPENAI_API_KEY")
+    enforce = bool(current_app.config.get("AI_PLATFORM_SCOPE_ENFORCE_ENABLED", True))
+    rewrite_enabled = bool(current_app.config.get("AI_QUERY_REWRITE_ENABLED", True))
+
+    if not api_key:
+        logger.debug("classify_and_rewrite: OPENAI_API_KEY not set; skipping LLMs")
+        return raw, False, True
+
+    # Rewrite OFF + no heuristic need for classify: skip LLM (matches legacy latency).
+    maybe_greeting = (
+        len(raw) <= 128
+        and not _heuristic_cannot_be_greeting_only(raw)
+        and not _is_clearly_substantive_data_query(raw)
+    )
+    needs_scope_llm = enforce and not heuristic_likely_in_platform_scope(raw)
+    if not rewrite_enabled:
+        if not maybe_greeting and not needs_scope_llm:
+            return raw, False, True
+
+    _fast_substantive = (
+        _heuristic_cannot_be_greeting_only(raw) or _is_clearly_substantive_data_query(raw)
+    )
+    _heuristic_in_scope = heuristic_likely_in_platform_scope(raw)
+    fast_rewrite_only = (
+        rewrite_enabled
+        and _fast_substantive
+        and (not enforce or _heuristic_in_scope)
+    )
+
+    model = _effective_query_rewrite_model()
+    rewrite_timeout = int(current_app.config.get("AI_QUERY_REWRITE_TIMEOUT_SECONDS", 30))
+
+    if fast_rewrite_only:
+        text, ok = _run_query_rewrite_completion(
+            raw,
+            conversation_history=conversation_history,
+            preferred_language=preferred_language,
+            page_context=page_context,
+            model=model,
+            rewrite_timeout=rewrite_timeout,
+        )
+        return (text if ok else raw), False, True
+
+    return _unified_preflight_llm(
+        raw,
+        conversation_history=conversation_history,
+        preferred_language=preferred_language,
+        page_context=page_context,
+        rewrite_enabled=rewrite_enabled,
+        enforce_scope=enforce,
+    )
+
+
+def rewrite_user_message(
+    message: str,
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+    preferred_language: str = "en",
+    page_context: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, bool]:
+    """
+    Rewrite the user's message into a clear, tool-friendly query using an LLM.
+
+    The rewritten query is used as input to the agent (and direct LLM fallback).
+    The original message is still stored in conversation history for display.
+
+    Args:
+        message: The user's raw message.
+        conversation_history: Optional previous messages (last exchange may be used for context).
+        preferred_language: Preferred language for the rewritten question (hint only).
+        page_context: Optional current page context (currentPage, pageData.pageType) so the
+            rewriter can avoid expanding dashboard UI questions into document-filter queries.
+
+    Returns:
+        (rewritten_or_original_message, is_pure_greeting).
+        When ``is_pure_greeting`` is True, the first value is the user's text unchanged (no rewrite)
+        so traces stay faithful; the caller may answer with a short greeting reply instead of the agent.
+
+    Implemented via :func:`classify_and_rewrite_user_message` (backward-compatible wrapper).
+    """
+    rew, greeting, _ = classify_and_rewrite_user_message(
+        message,
+        conversation_history=conversation_history,
+        preferred_language=preferred_language,
+        page_context=page_context,
+    )
+    return rew, greeting

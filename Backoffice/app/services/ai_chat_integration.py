@@ -6,7 +6,7 @@ Provides a simple interface to use either the agent or direct LLM based on confi
 """
 
 import logging
-from typing import Callable, Dict, Any, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from flask import current_app
 from flask_login import current_user
@@ -55,26 +55,35 @@ class AIChatIntegration:
     """
 
     def __init__(self):
-        """Initialize the integration service."""
-        self.agent_enabled = current_app.config.get('AI_AGENT_ENABLED', True)
+        """Integration shell; executor is instantiated lazily (see `_ensure_agent_executor`)."""
+        self.agent: Optional[Any] = None
 
-        # Initialize agent if enabled
-        if self.agent_enabled:
-            try:
-                from app.services.ai_agent import AIAgentExecutor
-                self.agent = AIAgentExecutor()
-                logger.info("Agent executor initialized successfully")
-            except Exception as e:
-                logger.warning(
-                    "AI agent disabled due to init failure; chat will use direct LLM only. Error: %s",
-                    e,
-                    exc_info=True,
-                )
-                self.agent = None
-                self.agent_enabled = False
-        else:
+    def _ensure_agent_executor(self) -> bool:
+        """
+        Instantiate the agent lazily while ``AI_AGENT_ENABLED`` is True.
+
+        Flask config is re-read each call so DB-driven AI settings apply without restarting workers.
+        """
+        if not current_app.config.get("AI_AGENT_ENABLED", True):
+            return False
+
+        if self.agent is not None:
+            return True
+
+        try:
+            from app.services.ai_agent import AIAgentExecutor
+
+            self.agent = AIAgentExecutor()
+            logger.info("Agent executor initialized successfully")
+            return True
+        except Exception as e:
+            logger.warning(
+                "AI agent unavailable (init failure); chat will fall back until init succeeds. Error: %s",
+                e,
+                exc_info=True,
+            )
             self.agent = None
-            logger.info("AI agent disabled by config (AI_AGENT_ENABLED=false)")
+            return False
 
     def process_query(
         self,
@@ -109,8 +118,8 @@ class AIChatIntegration:
         user_context['map_requested'] = map_requested
         user_context['chart_requested'] = chart_requested
 
-        # Try agent first if enabled
-        if self.agent_enabled and self.agent:
+        # Try agent first when config enables it and executor instantiated
+        if self._ensure_agent_executor() and self.agent:
             return self._process_with_agent(
                 message=message,
                 conversation_history=conversation_history,
@@ -147,7 +156,7 @@ class AIChatIntegration:
         # called twice (once from the else-branch, once from the except-branch).
         result = None
         try:
-            logger.info(f"Processing query with agent: {message[:100]}...")
+            logger.info("Processing query with agent: %.100s...", message or "")
             result = self.agent.execute(
                 query=message,
                 conversation_history=conversation_history,
@@ -411,3 +420,19 @@ class AIChatIntegration:
             context['page_context'] = page_context
 
         return context
+
+
+_ai_chat_integration_singleton: Optional[AIChatIntegration] = None
+
+
+def get_ai_chat_integration() -> Optional[AIChatIntegration]:
+    """Return a process-wide singleton ``AIChatIntegration`` (cheap vs per-request ctor)."""
+    global _ai_chat_integration_singleton
+    if _ai_chat_integration_singleton is not None:
+        return _ai_chat_integration_singleton
+    try:
+        _ai_chat_integration_singleton = AIChatIntegration()
+        return _ai_chat_integration_singleton
+    except Exception as e:
+        logger.error("get_ai_chat_integration failed: %s", e, exc_info=True)
+        return None

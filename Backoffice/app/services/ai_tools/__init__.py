@@ -22,6 +22,7 @@ from app.services.ai_tools._cache import (
 from app.services.ai_tools._utils import (
     ToolExecutionError,
     tool_wrapper,
+    split_tool_kw_for_call,
     json_sanitize,
     truncate_json_value,
     log_tool_usage,
@@ -41,6 +42,7 @@ __all__ = [
     "AIToolsRegistry",
     "ToolExecutionError",
     "tool_wrapper",
+    "split_tool_kw_for_call",
     "json_sanitize",
     "truncate_json_value",
     "log_tool_usage",

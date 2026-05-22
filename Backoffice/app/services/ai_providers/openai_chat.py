@@ -24,10 +24,16 @@ class OpenAIChatCompletionProvider(ChatCompletionProvider):
             raise ValueError("OPENAI_API_KEY required for OpenAI chat provider")
         try:
             from openai import OpenAI
-            self._client = OpenAI(api_key=api_key, timeout=timeout_sec)
+            # Agent stack disables SDK retries; long multi-step flows handle fallbacks themselves.
+            self._client = OpenAI(api_key=api_key, timeout=timeout_sec, max_retries=0)
         except ImportError:
             raise RuntimeError("OpenAI package not installed. Run: pip install openai")
         self._default_model = default_model
+
+    @property
+    def sdk_client(self):
+        """Underlying OpenAI SDK client (for call sites that still need direct access)."""
+        return self._client
 
     def create(
         self,

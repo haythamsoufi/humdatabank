@@ -6,17 +6,18 @@ from __future__ import annotations
 
 import logging
 
-logger = logging.getLogger(__name__)
 from typing import Any, Dict, Optional
 
 from flask_babel import gettext as _
 
-from app.services.upr.ux import (
-    step_display_message_get_upr_kpi_value,
-    step_display_message_get_upr_kpi_values_for_all_countries,
-    suppress_format_tool_args_detail_for_tool,
-    upr_document_query_display_label,
-)
+logger = logging.getLogger(__name__)
+
+
+def _upr_ux():
+    """Lazy import — keeps `upr` UX hooks out of module import order."""
+    from app.services.upr import ux as _ux
+
+    return _ux
 
 
 def document_query_for_display(raw_query: str) -> str:
@@ -24,7 +25,7 @@ def document_query_for_display(raw_query: str) -> str:
     if not (raw_query or "").strip():
         return ""
     q = (raw_query or "").strip()
-    upr_label = upr_document_query_display_label(q)
+    upr_label = _upr_ux().upr_document_query_display_label(q)
     if upr_label is not None:
         return upr_label
     return q[:50] + ("…" if len(q) > 50 else "")
@@ -59,7 +60,7 @@ def step_display_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
             return _("Looking up country (%(country)s)", country=country)
         return _("Looking up country")
     if tool_name == "get_upr_kpi_value":
-        return step_display_message_get_upr_kpi_value(tool_args)
+        return _upr_ux().step_display_message_get_upr_kpi_value(tool_args)
     if tool_name == "get_indicator_metadata":
         indicator = (tool_args or {}).get("indicator_name") or ""
         indicator_short = (indicator[:40] + ("…" if len(indicator) > 40 else "")) if indicator else ""
@@ -67,7 +68,7 @@ def step_display_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
             return _("Looking up indicator details (%(indicator)s)", indicator=indicator_short)
         return _("Looking up indicator details")
     if tool_name == "get_upr_kpi_values_for_all_countries":
-        return step_display_message_get_upr_kpi_values_for_all_countries(tool_args)
+        return _upr_ux().step_display_message_get_upr_kpi_values_for_all_countries(tool_args)
     if tool_name == "get_indicator_values_for_all_countries":
         indicator = (tool_args or {}).get("indicator_name") or ""
         indicator_short = (indicator[:40] + ("…" if len(indicator) > 40 else "")) if indicator else ""
@@ -85,6 +86,12 @@ def step_display_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
         if indicator:
             return _("Getting data (%(indicator)s)", indicator=indicator_short)
         return _("Getting data")
+    if tool_name == "search_indicator_bank":
+        q = (tool_args or {}).get("query") or ""
+        short = q[:48] + ("…" if len(q) > 48 else "") if q else ""
+        if short:
+            return _("Searching Indicator Bank (%(snippet)s)", snippet=short)
+        return _("Searching Indicator Bank")
     return _("Checking data…")
 
 
@@ -92,7 +99,7 @@ def format_tool_args_detail(tool_name: str, tool_args: Dict[str, Any]) -> str:
     """Short one-line detail for progress panels."""
     if not tool_args:
         return ""
-    if suppress_format_tool_args_detail_for_tool(tool_name):
+    if _upr_ux().suppress_format_tool_args_detail_for_tool(tool_name):
         return ""
     if tool_name in ("search_documents", "search_documents_hybrid"):
         try:

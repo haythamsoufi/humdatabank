@@ -1,11 +1,17 @@
 """
-AI providers – abstract interfaces and implementations for embeddings and chat.
+AI providers – abstract interfaces and implementations for embeddings and ancillary chat completions.
 
-Usage:
+Embedding usage::
+
     from app.services.ai_providers import get_embedding_provider, EmbeddingProvider
     provider = get_embedding_provider()
     embedding, cost = provider.generate_embedding("hello")
+
+**Agent:** ``AIAgentExecutor`` routes completions through ``OpenAIChatCompletionProvider`` inside
+the agent loop while keeping SDK access via ``sdk_client`` for legacy helpers/planner adapters.
 """
+
+import os
 
 from app.services.ai_providers.base import (
     ChatCompletionProvider,
@@ -21,9 +27,28 @@ from app.services.ai_providers.formatting import (
     format_ai_response_for_html,
 )
 
-# Back-compat aliases for code that expects _scrub_* names (e.g. chatbot.py)
-_scrub_pii_text = scrub_pii_text
-_scrub_pii_context = scrub_pii_context
+
+def warn_if_local_embeddings_in_prod(app) -> None:
+    """Log a prominent warning when local (non-semantic) embeddings run outside dev/test."""
+    try:
+        name = ((app.config.get("AI_EMBEDDING_PROVIDER") or "openai") or "").strip().lower()
+    except Exception:
+        name = "openai"
+    if name != "local":
+        return
+    cfg = ((os.environ.get("FLASK_CONFIG") or "") or "").strip().lower()
+    testing = bool(app.config.get("TESTING", False))
+    if cfg in {"testing", "development", "default", ""} or testing:
+        app.logger.warning(
+            "AI_EMBEDDING_PROVIDER=local (deterministic / non-semantic vectors). Acceptable for dev/test "
+            "only — use openai embeddings in staging/production.",
+        )
+        return
+    app.logger.error(
+        "AI_EMBEDDING_PROVIDER=local in a non-development Flask config (%r): document semantic search "
+        "will NOT behave like embeddings. Switch to AI_EMBEDDING_PROVIDER=openai.",
+        cfg or "production",
+    )
 
 
 def get_embedding_provider():
@@ -82,10 +107,9 @@ __all__ = [
     "OpenAIChatCompletionProvider",
     "LocalEmbeddingProvider",
     "get_embedding_provider",
+    "warn_if_local_embeddings_in_prod",
     "scrub_pii_text",
     "scrub_pii_context",
-    "_scrub_pii_text",
-    "_scrub_pii_context",
     "format_provenance_block",
     "format_ai_response_for_html",
 ]

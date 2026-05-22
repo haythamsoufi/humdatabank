@@ -550,6 +550,12 @@ def create_app(config_name=None):
 
     email_val_start = time.time()
     _validate_email_configuration(app)
+    try:
+        from app.services.ai_providers import warn_if_local_embeddings_in_prod
+
+        warn_if_local_embeddings_in_prod(app)
+    except Exception as e:
+        app.logger.debug("AI embedding provider startup check skipped: %s", e)
     email_val_time = time.time() - email_val_start
     if email_val_time > 0.1:
         app.logger.debug(f"Email validation took {email_val_time:.3f}s")

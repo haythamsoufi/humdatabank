@@ -56,19 +56,15 @@ from app.services.user_analytics_service import get_client_ip
 
 # AI Agent integration (RAG + agentic reasoning)
 # Lazy-loaded to avoid import errors if dependencies are missing
-_ai_chat_integration = None
-
 def _get_ai_chat_integration():
-    """Lazy-load AIChatIntegration to avoid import errors at startup."""
-    global _ai_chat_integration
-    if _ai_chat_integration is None:
-        try:
-            from app.services.ai_chat_integration import AIChatIntegration
-            _ai_chat_integration = AIChatIntegration()
-        except (ImportError, Exception) as e:
-            current_app.logger.warning("Failed to initialize AIChatIntegration: %s", e)
-            _ai_chat_integration = False  # Mark as failed, don't retry
-    return _ai_chat_integration if _ai_chat_integration else None
+    """Lazy-load AIChatIntegration singleton to avoid import errors at startup."""
+    try:
+        from app.services.ai_chat_integration import get_ai_chat_integration
+
+        return get_ai_chat_integration()
+    except Exception as e:
+        current_app.logger.warning("Failed to initialize AIChatIntegration: %s", e)
+        return None
 
 
 ai_bp = Blueprint("ai_v2", __name__, url_prefix="/api/ai/v2")

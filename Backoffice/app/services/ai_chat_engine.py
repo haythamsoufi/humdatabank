@@ -345,10 +345,17 @@ def _chart_payload_from_answer_content(answer_content: Any, output_hint: Optiona
     }
 
 
-def _extract_chart_payload_and_clean_text(response_text: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+def _extract_fenced_payload_and_clean_text(
+    response_text: str,
+    coerce_fn: Callable[[Dict[str, Any]], Optional[Dict[str, Any]]],
+    *,
+    log_label: str = "payload",
+) -> Tuple[str, Optional[Dict[str, Any]]]:
+    """Parse first ```json {...}``` fence (or whole-message JSON) and coerce to a payload."""
     text = str(response_text or "")
     if not text.strip():
         return text, None
+
     for match in _JSON_FENCE_RE.finditer(text):
         block = (match.group(1) or "").strip()
         if not block:
@@ -356,20 +363,33 @@ def _extract_chart_payload_and_clean_text(response_text: str) -> Tuple[str, Opti
         try:
             parsed = json.loads(block)
         except Exception as e:
-            logger.debug("chart block json parse failed: %s", e)
+            logger.debug("%s fence json parse failed: %s", log_label, e)
             continue
-        payload = _coerce_chart_payload(parsed)
+        if not isinstance(parsed, dict):
+            continue
+        payload = coerce_fn(parsed)
         if payload:
             cleaned = (text[: match.start()] + text[match.end() :]).strip()
             return (cleaned or text.strip()), payload
+
     try:
         parsed_full = json.loads(text.strip())
-        payload = _coerce_chart_payload(parsed_full)
-        if payload:
-            return "", payload
+        if isinstance(parsed_full, dict):
+            payload = coerce_fn(parsed_full)
+            if payload:
+                return "", payload
     except Exception as e:
-        logger.debug("Chart payload JSON parse failed: %s", e)
+        logger.debug("%s full-message JSON parse failed: %s", log_label, e)
+
     return text, None
+
+
+def _extract_chart_payload_and_clean_text(response_text: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+    return _extract_fenced_payload_and_clean_text(
+        response_text,
+        _coerce_chart_payload,
+        log_label="chart",
+    )
 
 
 def _strip_map_payload_block_from_text(text: str) -> str:
@@ -400,33 +420,11 @@ def _strip_map_payload_block_from_text(text: str) -> str:
 
 
 def _extract_map_payload_and_clean_text(response_text: str) -> Tuple[str, Optional[Dict[str, Any]]]:
-    text = str(response_text or "")
-    if not text.strip():
-        return text, None
-
-    for match in _JSON_FENCE_RE.finditer(text):
-        block = (match.group(1) or "").strip()
-        if not block:
-            continue
-        try:
-            parsed = json.loads(block)
-        except Exception as e:
-            logger.debug("map block json parse (2) failed: %s", e)
-            continue
-        payload = _coerce_map_payload(parsed)
-        if payload:
-            cleaned = (text[: match.start()] + text[match.end() :]).strip()
-            return (cleaned or text.strip()), payload
-
-    try:
-        parsed_full = json.loads(text.strip())
-        payload = _coerce_map_payload(parsed_full)
-        if payload:
-            return "", payload
-    except Exception as e:
-        logger.debug("parse_map_payload: JSON parse failed: %s", e)
-
-    return text, None
+    return _extract_fenced_payload_and_clean_text(
+        response_text,
+        _coerce_map_payload,
+        log_label="map",
+    )
 
 
 def _revise_response_with_llm(
@@ -434,16 +432,25 @@ def _revise_response_with_llm(
     *,
     user_query: str,
     language: str,
+    confidence: Optional[str] = None,
 ) -> str:
     """
     Run the given response text through an LLM for revision (clarity, tone, consistency).
     Returns revised text, or the original on failure/empty/skip.
+    Skips revision for short/high-confidence replies to reduce latency and duplicate LLM cost.
     """
     text = str(text or "").strip()
     if not text:
         return text
     try:
         if not current_app.config.get("AI_RESPONSE_REVISION_ENABLED", False):
+            return text
+        conf_l = str(confidence or "").strip().lower()
+        lc = len(text)
+        # Very short answers rarely need rewriting; trusted high-confidence replies skip an extra completion.
+        if lc <= 120:
+            return text
+        if conf_l == "high" and lc <= 420:
             return text
         api_key = current_app.config.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
         if not api_key:
@@ -709,8 +716,8 @@ class AIChatEngine:
         on_step: Optional[Callable[[str], None]] = None,
         on_delta: Optional[Callable[[str], None]] = None,
         cancelled: Optional[Any] = None,  # threading.Event-like, optional
-        chunk_size: int = 8,
-        chunk_delay_seconds: float = 0.01,
+        chunk_size: int = 96,
+        chunk_delay_seconds: float = 0.0,
     ) -> ChatResult:
         """
         Execute the provider chain. If `on_delta` is provided, stream the HTML response
@@ -760,10 +767,11 @@ class AIChatEngine:
         def _stream_html(full_html: str) -> None:
             if not on_delta:
                 return
-            for i in range(0, len(full_html or ""), int(chunk_size)):
+            _cs = max(1, int(chunk_size))
+            for i in range(0, len(full_html or ""), _cs):
                 if _is_cancelled():
                     break
-                _emit_delta((full_html or "")[i : i + int(chunk_size)])
+                _emit_delta((full_html or "")[i : i + _cs])
                 if chunk_delay_seconds:
                     time.sleep(float(chunk_delay_seconds))
 
@@ -780,14 +788,14 @@ class AIChatEngine:
         # Rewrite user message with LLM before passing to agent or any fallback (when enabled)
         import time as _time
         _rewrite_wall_start = _time.time()
-        from app.services.ai_query_rewriter import rewrite_user_message
-        query_used, is_greeting = rewrite_user_message(
+        from app.services.ai_query_rewriter import classify_and_rewrite_user_message
+        query_used, is_greeting, in_platform_scope = classify_and_rewrite_user_message(
             message,
             conversation_history=conversation_history,
             preferred_language=preferred_language,
             page_context=safe_page_context,
         )
-        logger.info("AIChatEngine: rewrite_user_message returned in %dms",
+        logger.info("AIChatEngine: classify_and_rewrite_user_message returned in %dms",
                      int((_time.time() - _rewrite_wall_start) * 1000))
         if not (query_used and query_used.strip()):
             query_used = (message or "").strip() or ""
@@ -854,13 +862,7 @@ class AIChatEngine:
         # Out-of-scope (general chat / unrelated coding, etc.): refusal before agent — same gate as platform scope classifier
         if current_app.config.get("AI_PLATFORM_SCOPE_ENFORCE_ENABLED", True) and not _is_cancelled():
             try:
-                from app.services.ai_query_rewriter import is_message_in_platform_scope
-
-                if not is_message_in_platform_scope(
-                    safe_query_for_model,
-                    conversation_history=conversation_history,
-                    preferred_language=preferred_language,
-                ):
+                if not in_platform_scope:
                     with force_locale(locale_code):
                         _emit_step(_("Replying…"))
                     reply_text, oos_model = _generate_out_of_scope_reply_llm(
@@ -896,7 +898,7 @@ class AIChatEngine:
         # 1) Agent (tools + reasoning traces)
         if enable_agent and current_app.config.get("AI_AGENT_ENABLED", True) and not _is_cancelled():
             try:
-                from app.services.ai_chat_integration import AIChatIntegration
+                from app.services.ai_chat_integration import get_ai_chat_integration
 
                 with force_locale(locale_code):
                     if safe_query_used and safe_query_used != safe_message:
@@ -905,7 +907,9 @@ class AIChatEngine:
                             detail=safe_query_used[:500] + ("…" if len(safe_query_used) > 500 else ""),
                         )
                     # "Planning approach…" step (with plan detail) is emitted by the executor after plan_simple()
-                    ai = AIChatIntegration()
+                    ai = get_ai_chat_integration()
+                    if ai is None:
+                        raise RuntimeError("AIChatIntegration not initialized")
                     response_text, model_name, function_calls_used, meta = ai.process_query(
                         message=safe_query_for_model,
                         conversation_history=conversation_history,
@@ -968,6 +972,7 @@ class AIChatEngine:
                             cleaned_response_text,
                             user_query=safe_query_used or safe_message,
                             language=preferred_language or "en",
+                            confidence=meta.get("confidence") if isinstance(meta, dict) else None,
                         )
                     html = format_ai_response_for_html(cleaned_response_text) if cleaned_response_text else ""
                     if html:
@@ -1041,6 +1046,7 @@ class AIChatEngine:
                             final_response_text,
                             user_query=safe_query_used or safe_message,
                             language=preferred_language or "en",
+                            confidence="unverified",
                         )
                     html = format_ai_response_for_html(final_response_text)
                     if html:
@@ -1084,6 +1090,7 @@ class AIChatEngine:
                             cleaned_response_text,
                             user_query=safe_query_used or safe_message,
                             language=preferred_language or "en",
+                            confidence="unverified",
                         )
                     html = format_ai_response_for_html(cleaned_response_text)
                     logger.info("Direct LLM fallback used (non-streaming); no verification/grounding performed")

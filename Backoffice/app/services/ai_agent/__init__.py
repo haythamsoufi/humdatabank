@@ -1,17 +1,16 @@
 """
 ai_agent – Sub-package for the AI agent execution pipeline.
 
-Public API:
+Public API::
 
     from app.services.ai_agent import AIAgentExecutor
 
 Module layout
 ─────────────
-_circuit_breaker.py  – Per-run circuit-breaker state for tool failure isolation.
-_loop.py             – Core ReAct iteration helpers (tool-call dispatch, result
-                       parsing, convergence detection).
-executor.py          – AIAgentExecutor class (assembles the above into a full
-                       agent run).
+_circuit_breaker.py    – ``CircuitBreaker`` / ``CircuitBreakerState`` (used per tool execution run).
+executor.py           – ``AIAgentExecutor`` (ReAct / OpenAI native function-calling loop).
+
+``CircuitBreaker`` is also importable for tests and extensions; typical callers use ``AIAgentExecutor`` only.
 """
 
 from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState

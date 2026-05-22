@@ -2134,6 +2134,13 @@ class HumDatabankChatbot {
                     if (isAbort) {
                         throw wsError;
                     }
+                    // The message was already dispatched to the server (agent run started).
+                    // Falling back to SSE would send the same query again and produce a
+                    // duplicate trace. Propagate as a plain connection error instead.
+                    if (wsError && wsError.alreadyDispatchedToServer) {
+                        console.warn('[Chatbot] Transport: WebSocket dropped after send — skipping SSE fallback to prevent duplicate submission');
+                        throw wsError;
+                    }
                     console.warn('[Chatbot] Transport: WebSocket failed, falling back to SSE:', wsError);
                     this.isTyping = true;
                     this.hideTypingIndicator(); // clear any partial WS steps before SSE retries from scratch
@@ -2767,6 +2774,7 @@ class HumDatabankChatbot {
             };
             ctx.finish = finish;
 
+            let messageSent = false; // true once ws.send() has dispatched the query to the server
             ws.onopen = () => {
                 console.info('[Chatbot] WS: connection opened, sending message');
                 const payload = Object.assign(
@@ -2774,6 +2782,7 @@ class HumDatabankChatbot {
                     this._buildUnifiedChatPayload(userMessage, sendOptions)
                 );
                 ws.send(JSON.stringify(payload));
+                messageSent = true;
             };
 
             ws.onmessage = (event) => {
@@ -2798,7 +2807,18 @@ class HumDatabankChatbot {
                     return;
                 }
                 console.error('[Chatbot] WS: connection error:', error);
-                finish(false, 'WebSocket connection error');
+                // If the message was already sent to the server the agent run has started.
+                // Mark the rejection so the caller does NOT re-send via SSE (double-submission).
+                if (messageSent && !done) {
+                    const err = new Error('WebSocket connection error (message already dispatched)');
+                    err.alreadyDispatchedToServer = true;
+                    done = true;
+                    clearTimeout(timeout);
+                    try { ws.close(1000, 'client_error'); } catch (_) {}
+                    reject(err);
+                } else {
+                    finish(false, 'WebSocket connection error');
+                }
             };
 
             ws.onclose = (event) => {
@@ -2815,8 +2835,18 @@ class HumDatabankChatbot {
                 if (ctx.buffer) {
                     // We got some data, consider it a success
                     finish(true);
+                } else if (messageSent) {
+                    // Connection dropped after the query was dispatched but before a complete
+                    // answer arrived.  The agent run is likely in-flight on the server.
+                    // Reject with a flag so handleSendMessage does NOT fall back to SSE —
+                    // that would send the same query again and create a duplicate trace.
+                    const err = new Error(`WebSocket closed before response (code ${event.code}) — message already dispatched`);
+                    err.alreadyDispatchedToServer = true;
+                    done = true;
+                    clearTimeout(timeout);
+                    reject(err);
                 } else {
-                    // Connection closed before any response - fall back to HTTP
+                    // Connection closed before we even sent anything — safe to fall back to SSE.
                     finish(false, `Connection closed (${event.code})`);
                 }
             };

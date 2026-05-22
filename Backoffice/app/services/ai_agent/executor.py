@@ -19,7 +19,6 @@ from datetime import datetime
 
 from flask import current_app, g, has_request_context
 from flask_babel import gettext as _
-from openai import OpenAI
 
 try:
     from openai import APITimeoutError as _OpenAIAPITimeoutError
@@ -73,7 +72,9 @@ from app.services.ai_runtime_utils import (
     estimate_openai_cost as _estimate_openai_cost,
     synthesize_partial_answer as _synthesize_partial_answer,
 )
-from app.services.ai_fastpaths.unified_plans_focus_fastpath import run_unified_plans_focus_fastpath
+from app.services.upr.focus_area_analysis import run_unified_plans_focus_fastpath
+from app.services.ai_agent._tool_circuit_helpers import make_tool_breaker_factory
+from app.services.ai_providers.openai_chat import OpenAIChatCompletionProvider
 from app.services.upr.tool_specs import UPR_BULK_TOOL_NAMES
 from app.services.data_retrieval_form import resolve_indicator_to_primary_id
 from app.utils.ai_utils import openai_model_supports_sampling_params
@@ -108,6 +109,8 @@ def _build_history_context_debug(
     *,
     execution_path: str,
     conversation_history: Optional[List[Dict[str, Any]]],
+    history_window_native: int,
+    history_window_react: int,
 ) -> Dict[str, Any]:
     """
     Build explicit history-window metadata for trace/debug visibility.
@@ -116,9 +119,9 @@ def _build_history_context_debug(
     total_available = len(conversation_history or [])
     mode = str(execution_path or "unknown").strip().lower()
     if mode == "openai_native":
-        window = int(CONVERSATION_HISTORY_MESSAGES)
+        window = max(0, int(history_window_native))
     elif mode == "react":
-        window = int(CONVERSATION_HISTORY_MESSAGES_REACT)
+        window = max(0, int(history_window_react))
     else:
         # Fast path / agent disabled / unknown may not use conversational history in prompt assembly.
         window = 0
@@ -260,6 +263,37 @@ class AIAgentExecutor:
             self.search_docs_pagination_low_score_streak = 2
         if self.search_docs_pagination_low_score_streak < 1:
             self.search_docs_pagination_low_score_streak = 1
+        try:
+            self.conversation_history_messages = max(
+                0,
+                min(
+                    int(current_app.config.get("AI_AGENT_HISTORY_MESSAGES", CONVERSATION_HISTORY_MESSAGES)),
+                    80,
+                ),
+            )
+        except (ValueError, TypeError):
+            self.conversation_history_messages = int(CONVERSATION_HISTORY_MESSAGES)
+        try:
+            self.conversation_history_messages_react = max(
+                0,
+                min(
+                    int(
+                        current_app.config.get(
+                            "AI_AGENT_HISTORY_MESSAGES_REACT",
+                            CONVERSATION_HISTORY_MESSAGES_REACT,
+                        )
+                    ),
+                    80,
+                ),
+            )
+        except (ValueError, TypeError):
+            self.conversation_history_messages_react = int(CONVERSATION_HISTORY_MESSAGES_REACT)
+        try:
+            self.document_list_max_pages = max(
+                1, int(current_app.config.get("AI_AGENT_DOCUMENT_LIST_MAX_PAGES", 10))
+            )
+        except (ValueError, TypeError):
+            self.document_list_max_pages = 10
         # Allow high output for large tables (192-row all-countries tables can need ~30k tokens).
         _max_out = int(current_app.config.get('AI_AGENT_MAX_COMPLETION_TOKENS', 32768))
         self.max_completion_tokens = max(256, min(_max_out, 128000))
@@ -318,6 +352,67 @@ class AIAgentExecutor:
                 return None
             payload = tool_result.get("result")
 
+            if plan.kind == "indicator_search":
+                data = payload if isinstance(payload, dict) else {}
+                matches = data.get("matches") if isinstance(data.get("matches"), list) else []
+                if not matches:
+                    msg = str(data.get("message") or "").strip() or (
+                        _("No matching indicators were returned for this query in the Indicator Bank.")
+                    )
+                    return {
+                        "success": True,
+                        "status": "completed",
+                        "answer": msg,
+                        "steps": [
+                            {
+                                "step": 0,
+                                "thought": _("Fast-path Indicator Bank similarity search"),
+                                "action": plan.tool_name,
+                                "observation": {"matches": 0},
+                                "timestamp": utcnow().isoformat(),
+                            }
+                        ],
+                        "tool_calls": 1,
+                        "iterations": 1,
+                        "answer_content": None,
+                        "output_hint": plan.output_hint or "text",
+                    }
+                lines: List[str] = []
+                lines.append(_("Closest indicators in the Indicator Bank (by semantic similarity):"))
+                lines.append("")
+                lines.append("| # | Indicator | Score | Definition (excerpt) |")
+                lines.append("| --- | --- | --- | --- |")
+                for idx, row in enumerate(matches[:15], start=1):
+                    if not isinstance(row, dict):
+                        continue
+                    name = str(row.get("name") or "—").replace("|", "\\|")
+                    score = row.get("similarity_score", "")
+                    defn_raw = str(row.get("definition") or "—").replace("|", "\\|").replace("\n", " ")
+                    defn = (defn_raw[:200] + "…") if len(defn_raw) > 200 else defn_raw
+                    lines.append(f"| {idx} | {name} | {score} | {defn or '—'} |")
+                lines.append("")
+                lines.append("## Sources")
+                lines.append("- " + _("Indicator Bank (semantic similarity; not country-reported values)"))
+                answer = "\n".join(lines)
+                return {
+                    "success": True,
+                    "status": "completed",
+                    "answer": answer,
+                    "steps": [
+                        {
+                            "step": 0,
+                            "thought": _("Fast-path Indicator Bank similarity search"),
+                            "action": plan.tool_name,
+                            "observation": {"matches": len(matches)},
+                            "timestamp": utcnow().isoformat(),
+                        }
+                    ],
+                    "tool_calls": 1,
+                    "iterations": 1,
+                    "answer_content": {"kind": "indicator_search", "matches": matches},
+                    "output_hint": plan.output_hint or "text",
+                }
+
             if plan.kind == "document_list":
                 # Paginate through all batches so every country is represented.
                 chunks = (payload.get("result") if isinstance(payload, dict) else []) or (payload if isinstance(payload, list) else [])
@@ -326,6 +421,12 @@ class AIAgentExecutor:
                 tool_calls = 1
 
                 while len(chunks) < total_count and batch_limit > 0:
+                    if tool_calls >= self.document_list_max_pages:
+                        logger.warning(
+                            "Document list fast-path: stopped pagination after %s batch(es) (cap AI_AGENT_DOCUMENT_LIST_MAX_PAGES)",
+                            self.document_list_max_pages,
+                        )
+                        break
                     next_args = dict(plan.tool_args or {})
                     next_args["offset"] = len(chunks)
                     next_args["limit"] = batch_limit
@@ -531,7 +632,7 @@ class AIAgentExecutor:
                     }
                     if openai_model_supports_sampling_params(str(self.model)):
                         kwargs["temperature"] = 0.0
-                    resp = self.client.chat.completions.create(**kwargs)
+                    resp = self._agent_chat_completion(**kwargs)
                     obj = AIQueryPlanner._extract_json_object(resp.choices[0].message.content or "")
                     rows = (obj or {}).get("rows") if isinstance(obj, dict) else None
                     rows = rows if isinstance(rows, list) else []
@@ -713,7 +814,7 @@ class AIAgentExecutor:
             }
             if openai_model_supports_sampling_params(str(self.model)):
                 kwargs["temperature"] = 0.0
-            resp = self.client.chat.completions.create(**kwargs)
+            resp = self._agent_chat_completion(**kwargs)
             answer = (resp.choices[0].message.content or "").strip()
             if not answer:
                 return None
@@ -723,20 +824,28 @@ class AIAgentExecutor:
             return None
 
     def _init_llm_client(self):
-        """Initialize LLM client for function calling."""
+        """Initialize chat completion provider + SDK client for planner / legacy helpers."""
         api_key = current_app.config.get('OPENAI_API_KEY')
         if not api_key:
             raise AgentExecutionError("OPENAI_API_KEY not configured")
         self.http_timeout_sec = int(current_app.config.get("AI_HTTP_TIMEOUT_SECONDS", 60))
-        # Disable SDK-level retries entirely for the agent executor. The agent has
-        # its own fallback chain (agent → direct LLM → streaming) so SDK retries
-        # just compound the wait (2 attempts × 120 s = 240 s wasted on a dead call).
-        self.client = OpenAI(api_key=api_key, timeout=self.http_timeout_sec, max_retries=0)
         self.model = current_app.config.get('OPENAI_MODEL', 'gpt-5-mini')
+        self.chat_completion_provider = OpenAIChatCompletionProvider(
+            api_key=api_key,
+            default_model=str(self.model),
+            timeout_sec=self.http_timeout_sec,
+        )
+        self.client = self.chat_completion_provider.sdk_client
         logger.info(
             "LLM client initialized: model=%s http_timeout=%ss max_completion_tokens=%s wall_clock_timeout=%ss",
             self.model, self.http_timeout_sec, self.max_completion_tokens, self.timeout_seconds,
         )
+
+    def _agent_chat_completion(self, **kwargs: Any) -> Any:
+        """Route agent chat completions through :class:`OpenAIChatCompletionProvider`."""
+        messages = kwargs.pop("messages")
+        model = kwargs.pop("model", self.model)
+        return self.chat_completion_provider.create(messages=messages, model=model, **kwargs)
 
     def _unified_plans_focus_fastpath(
         self,
@@ -784,6 +893,8 @@ class AIAgentExecutor:
             p in q_lower for p in _UNIFIED_PLAN_THEME_PATTERNS
         ):
             areas = AIQueryPlanner._extract_theme_areas_from_query(query)
+            if not areas:
+                return original_result
             logger.info(
                 "LLM path failed (status=%s); retrying with unified_plans_focus fast path, areas=%s",
                 original_result.get("status"),
@@ -987,6 +1098,8 @@ class AIAgentExecutor:
             output_payloads["history_context"] = _build_history_context_debug(
                 execution_path=str(result.get("execution_path") or ""),
                 conversation_history=conversation_history,
+                history_window_native=self.conversation_history_messages,
+                history_window_react=self.conversation_history_messages_react,
             )
 
             # Resolve final answer: prefer result['answer'], else from last finish step
@@ -1243,12 +1356,10 @@ class AIAgentExecutor:
         _value_question_force_count = 0
         _tool_json_echo_nudge_count = 0
         _pre_force_answer: Optional[str] = None
-        # Circuit breaker: track consecutive tool failures
-        _cb_tool_failures: Dict[str, int] = {}   # tool_name → consecutive failure count
-        _cb_disabled_tools: Set[str] = set()      # tools disabled for this execution
-        _cb_global_consecutive_failures = 0       # across all tools
-        _CB_TOOL_TRIP_THRESHOLD = 3               # trip individual tool after N consecutive failures
-        _CB_GLOBAL_TRIP_THRESHOLD = 3             # switch to LLM fallback after N cross-tool failures
+        # Per-tool circuit breakers reset each execute(); global counter still guards cross-tool death spirals
+        tool_breaker_factory = make_tool_breaker_factory()
+        _cb_global_consecutive_failures = 0
+        _CB_GLOBAL_TRIP_THRESHOLD = 3
 
         while iterations < self.max_iterations:
             iterations += 1
@@ -1331,7 +1442,7 @@ class AIAgentExecutor:
                     self.http_timeout_sec,
                 )
                 _llm_call_start = time.time()
-                response = self.client.chat.completions.create(**native_kwargs)
+                response = self._agent_chat_completion(**native_kwargs)
 
                 # Track cost and token counts
                 usage = response.usage
@@ -1556,9 +1667,8 @@ class AIAgentExecutor:
                         })
                         continue
 
-                    logger.info(f"Agent calling tool: {tool_name} with args: {tool_args}")
+                    logger.info("Agent calling tool: %s with args: %s", tool_name, tool_args)
 
-                    # Guard: skip redundant search_documents calls beyond the limit.
                     if tool_name in ("search_documents", "search_documents_hybrid"):
                         should_skip, skip_reason = _should_skip_search_pagination(
                             tool_name=tool_name,
@@ -1731,6 +1841,8 @@ class AIAgentExecutor:
                     cache_hit = False
                     primary_id: Optional[int] = None
                     cache_key: Optional[Tuple[int, Optional[str], Optional[float]]] = None
+                    _tb = tool_breaker_factory(tool_name)
+                    circuit_skipped = False
                     if tool_name == "get_indicator_values_for_all_countries":
                         ind_name = (tool_args.get("indicator_name") or "").strip()
                         if ind_name:
@@ -1755,12 +1867,17 @@ class AIAgentExecutor:
                             except Exception as e:
                                 logger.debug("resolve_indicator_to_primary_id failed: %s", e)
 
-                    # Circuit breaker: skip disabled tools
-                    if tool_name in _cb_disabled_tools:
-                        logger.info("Circuit breaker: skipping disabled tool '%s'", tool_name)
-                        tool_result = service_error(f"Tool '{tool_name}' is temporarily disabled after repeated failures.")
-                        observation = _compact_tool_observation_for_llm(tool_name=tool_name, tool_result=tool_result)
-                        cache_hit = True  # Treat as "handled" so we don't retry
+                    # Per-tool circuit breaker (see app.services.ai_agent._circuit_breaker)
+                    if not cache_hit and not _tb.allow_call():
+                        logger.info("Circuit breaker: skipping tool '%s' (OPEN)", tool_name)
+                        tool_result = service_error(
+                            f"Tool '{tool_name}' is temporarily disabled after repeated failures."
+                        )
+                        observation = _compact_tool_observation_for_llm(
+                            tool_name=tool_name, tool_result=tool_result
+                        )
+                        cache_hit = True
+                        circuit_skipped = True
 
                     if not cache_hit:
                         if on_step_callback:
@@ -1826,21 +1943,10 @@ class AIAgentExecutor:
                                 tool_name=tool_name, tool_result=tool_result
                             )
 
-                        # Circuit breaker: track failures/successes per tool
                         tool_failed = not bool(tool_result.get("success", True)) or bool(tool_result.get("error"))
                         if tool_failed:
-                            _cb_tool_failures[tool_name] = _cb_tool_failures.get(tool_name, 0) + 1
+                            _tb.record_failure()
                             _cb_global_consecutive_failures += 1
-                            if _cb_tool_failures[tool_name] >= _CB_TOOL_TRIP_THRESHOLD:
-                                _cb_disabled_tools.add(tool_name)
-                                steps.append({
-                                    "step": _next_step_index(steps),
-                                    "type": "circuit_breaker",
-                                    "thought": f"Circuit breaker: disabling tool '{tool_name}' after {_cb_tool_failures[tool_name]} consecutive failures.",
-                                    "action": "circuit_breaker_trip",
-                                    "observation": {"tool": tool_name, "failures": _cb_tool_failures[tool_name]},
-                                })
-                                logger.warning("Circuit breaker tripped for tool '%s'", tool_name)
                             if _cb_global_consecutive_failures >= _CB_GLOBAL_TRIP_THRESHOLD:
                                 logger.warning(
                                     "Circuit breaker: %d consecutive cross-tool failures, switching to LLM fallback",
@@ -1859,9 +1965,9 @@ class AIAgentExecutor:
                                     'tool_calls': tool_call_count,
                                 }
                         else:
-                            # Reset consecutive failure counters on success
-                            _cb_tool_failures[tool_name] = 0
+                            _tb.record_success()
                             _cb_global_consecutive_failures = 0
+                    # A cache hit (data reuse, not a live call) leaves the breaker state unchanged.
 
                     tool_call_count += 1
                     step_extra = {}
@@ -1963,6 +2069,7 @@ class AIAgentExecutor:
         recent_doc_search_signatures_react: List[Dict[str, Any]] = []
         _bulk_tool_signatures_seen_react: Set[Tuple[str, str]] = set()
         _full_table_requested = _user_expects_full_table(query, conversation_history)
+        tool_breaker_factory_react = make_tool_breaker_factory()
 
         # Hard-filter: for usage-help questions restrict to workflow tools only
         _usage_help_mode = (
@@ -1989,7 +2096,7 @@ class AIAgentExecutor:
 
         # Add conversation history
         if conversation_history:
-            for msg in conversation_history[-CONVERSATION_HISTORY_MESSAGES_REACT:]:
+            for msg in conversation_history[-self.conversation_history_messages_react:]:
                 if msg.get('isUser'):
                     messages.append({"role": "user", "content": msg['message']})
                 else:
@@ -2068,7 +2175,7 @@ class AIAgentExecutor:
                     len(current_messages), _react_msg_chars, self.http_timeout_sec,
                 )
                 _react_call_start = time.time()
-                response = self.client.chat.completions.create(**kwargs)
+                response = self._agent_chat_completion(**kwargs)
 
                 usage = response.usage
                 total_input_tokens += getattr(usage, 'prompt_tokens', 0) or 0
@@ -2127,7 +2234,7 @@ class AIAgentExecutor:
                     tool_name = parsed['action']
                     tool_args = parsed.get('action_input', {})
 
-                    logger.info(f"ReAct calling tool: {tool_name} with args: {tool_args}")
+                    logger.info("ReAct calling tool: %s with args: %s", tool_name, tool_args)
 
                     # Guard: skip redundant search_documents calls beyond the limit.
                     if tool_name in ("search_documents", "search_documents_hybrid"):
@@ -2294,6 +2401,8 @@ class AIAgentExecutor:
                     cache_hit = False
                     primary_id = None
                     cache_key = None
+                    _tb = tool_breaker_factory_react(tool_name)
+                    circuit_skipped = False
                     if tool_name == "get_indicator_values_for_all_countries":
                         ind_name = (tool_args.get("indicator_name") or "").strip()
                         if ind_name:
@@ -2317,6 +2426,17 @@ class AIAgentExecutor:
                                         )
                             except Exception as e:
                                 logger.debug("resolve_indicator_to_primary_id failed: %s", e)
+
+                    if not cache_hit and not _tb.allow_call():
+                        logger.info("Circuit breaker (ReAct): skipping tool '%s' (OPEN)", tool_name)
+                        tool_result = service_error(
+                            f"Tool '{tool_name}' is temporarily disabled after repeated failures."
+                        )
+                        observation = _compact_tool_observation_for_llm(
+                            tool_name=tool_name, tool_result=tool_result
+                        )
+                        cache_hit = True
+                        circuit_skipped = True
 
                     if not cache_hit:
                         if on_step_callback:
@@ -2380,6 +2500,16 @@ class AIAgentExecutor:
                             observation = _compact_tool_observation_for_llm(
                                 tool_name=tool_name, tool_result=tool_result
                             )
+
+                        tool_failed_r = (
+                            not bool(tool_result.get("success", True)) or bool(tool_result.get("error"))
+                        )
+                        if tool_failed_r:
+                            _tb.record_failure()
+                        else:
+                            _tb.record_success()
+                    elif cache_hit and not circuit_skipped:
+                        _tb.record_success()
 
                     tool_call_count += 1
                     step_extra = {}
@@ -2611,9 +2741,9 @@ User context:
         ]
 
         try:
-            response = self.client.chat.completions.create(
+            response = self._agent_chat_completion(
                 model=self.model,
-                messages=messages
+                messages=messages,
             )
 
             return {
@@ -2690,7 +2820,7 @@ User context:
 
         # Add conversation history if provided
         if conversation_history:
-            for msg in conversation_history[-CONVERSATION_HISTORY_MESSAGES:]:
+            for msg in conversation_history[-self.conversation_history_messages:]:
                 if msg.get('isUser'):
                     messages.append({"role": "user", "content": msg['message']})
                 else:

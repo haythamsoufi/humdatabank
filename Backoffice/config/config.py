@@ -744,8 +744,23 @@ class Config:
     AI_AGENT_SEARCH_DOCS_MAX_CALLS = int(os.environ.get('AI_AGENT_SEARCH_DOCS_MAX_CALLS', '5'))
     # Max completion tokens per agent LLM turn (ReAct and native). 32768 allows full 192-row all-countries tables with extra columns.
     AI_AGENT_MAX_COMPLETION_TOKENS = int(os.environ.get('AI_AGENT_MAX_COMPLETION_TOKENS', '32768'))
-    # Set to 0 to disable per-query cost ceiling (unlimited).
-    AI_AGENT_COST_LIMIT_USD = 0.0
+    # Per-query LLM/tool cost ceiling (USD). Default 2.00; set to 0 to disable (not recommended prod).
+    _cost_cap = os.environ.get("AI_AGENT_COST_LIMIT_USD", "").strip()
+    AI_AGENT_COST_LIMIT_USD = float(_cost_cap) if _cost_cap else 2.0
+    try:
+        AI_AGENT_TOOL_CB_FAILURE_THRESHOLD = int(os.environ.get("AI_AGENT_TOOL_CB_FAILURE_THRESHOLD", "3"))
+    except ValueError:
+        AI_AGENT_TOOL_CB_FAILURE_THRESHOLD = 3
+    if AI_AGENT_TOOL_CB_FAILURE_THRESHOLD < 1:
+        AI_AGENT_TOOL_CB_FAILURE_THRESHOLD = 1
+    try:
+        AI_AGENT_TOOL_CB_RESET_SECONDS = float(os.environ.get("AI_AGENT_TOOL_CB_RESET_SECONDS", "30"))
+    except ValueError:
+        AI_AGENT_TOOL_CB_RESET_SECONDS = 30.0
+    try:
+        AI_AGENT_SYSTEM_PROMPT_CACHE_TTL_SECONDS = float(os.environ.get("AI_AGENT_SYSTEM_PROMPT_CACHE_TTL_SECONDS", "60"))
+    except ValueError:
+        AI_AGENT_SYSTEM_PROMPT_CACHE_TTL_SECONDS = 60.0
     # Query rewrite: LLM rewrites the user message before passing to the agent (and direct LLM). Improves tool use.
     AI_QUERY_REWRITE_ENABLED = _parse_bool(os.environ.get('AI_QUERY_REWRITE_ENABLED'), default=True)
     # Reject generic/off-topic chat (coding, recipes, unrelated trivia) before the agent; see ai_query_rewriter.is_message_in_platform_scope.
@@ -824,6 +839,13 @@ class Config:
 
     # HTTP timeouts for outbound AI calls (embedding, LLM). Prevents hung requests.
     AI_HTTP_TIMEOUT_SECONDS = 120
+    # Dedicated timeout (seconds) for the small AIQueryPlanner routing LLM call (default: min(HTTP, 45)).
+    AI_AGENT_PLANNER_TIMEOUT_SECONDS = int(os.environ.get("AI_AGENT_PLANNER_TIMEOUT_SECONDS", "45") or "45")
+    # Max pagination batches when document_list fast-path fetches search_documents batches.
+    AI_AGENT_DOCUMENT_LIST_MAX_PAGES = int(os.environ.get("AI_AGENT_DOCUMENT_LIST_MAX_PAGES", "10") or "10")
+    # Prior user messages injected into native vs ReAct agent prompts (defaults preserve prior behavior).
+    AI_AGENT_HISTORY_MESSAGES = int(os.environ.get("AI_AGENT_HISTORY_MESSAGES", "6") or "6")
+    AI_AGENT_HISTORY_MESSAGES_REACT = int(os.environ.get("AI_AGENT_HISTORY_MESSAGES_REACT", "4") or "4")
 
     # Agent tool observations: max chars passed to the LLM per tool result (avoids context overflow).
     # Lower AI_TOOL_OBSERVATION_MAX_CHARS_DOCUMENT_SEARCH (e.g. 80000) if "could not generate narrative" after large searches.

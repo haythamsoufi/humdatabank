@@ -54,7 +54,11 @@ _UNIFIED_PLAN_THEME_PATTERNS = (
     "unified plans cover",
     "which unified plans",
     "ns include",
-    "national societ",        # "national societies that include/mention"
+    "national societies that include",
+    "national societies that mention",
+    "national societies that priorit",
+    "national societies with ",
+    "how many national societies",
     # Substring of "unified plans" / matches "(UPL)"-style rewrites, e.g.
     # "List countries whose Unified Plans (UPL) prioritize…" (must not fall through
     # to document_list + search_documents + an extra synthesis LLM).
@@ -89,6 +93,22 @@ _UNIFIED_PLAN_FORCE_LLM_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Phrases signalling free-text Indicator Bank similarity search — must not trigger
+# the Unified Plans thematic fast path; prefer search_indicator_bank when available.
+_INDICATOR_SEARCH_SIGNALS = (
+    "closest indicator",
+    "similar indicator",
+    "indicator similar to",
+    "find indicator",
+    "indicator for ",
+    "indicator that ",
+    "indicator to ",
+    "indicator bank search",
+    "most relevant indicator",
+    "nearest indicator",
+    "match this indicator",
+)
+
 
 @dataclass
 class SimplePlan:
@@ -111,19 +131,40 @@ class AIQueryPlanner:
         raw = str(text or "").strip()
         if not raw:
             return None
+
+        # Fast path — whole payload is JSON
         try:
             obj = json.loads(raw)
             return obj if isinstance(obj, dict) else None
         except (ValueError, TypeError):
             pass
-        m = re.search(r"\{[\s\S]*\}", raw)
-        if not m:
-            return None
-        try:
-            obj = json.loads(m.group(0))
-            return obj if isinstance(obj, dict) else None
-        except (ValueError, TypeError):
-            return None
+
+        # Balanced braces: first `{` … matching `}` (avoids greedy `.*` spanning junk / multiple objects).
+        start = raw.find("{")
+        if start >= 0:
+            depth = 0
+            for i in range(start, len(raw)):
+                ch = raw[i]
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        candidate = raw[start : i + 1]
+                        try:
+                            obj = json.loads(candidate)
+                            return obj if isinstance(obj, dict) else None
+                        except (ValueError, TypeError):
+                            break
+
+        # Last resort — smallest outer object (handles models that emit `{..}{..}`)
+        for m in re.finditer(r"\{[\s\S]*?\}(?=\s*\{|$)", raw):
+            try:
+                obj = json.loads(m.group(0))
+                return obj if isinstance(obj, dict) else None
+            except (ValueError, TypeError):
+                continue
+        return None
 
     @staticmethod
     def _validate_simple_plan_dict(plan: Dict[str, Any], tool_names: Set[str]) -> Optional[SimplePlan]:
@@ -135,7 +176,7 @@ class AIQueryPlanner:
             confidence = float(plan.get("confidence", 0.0))
         except (ValueError, TypeError):
             confidence = 0.0
-        if confidence < 0.45:
+        if confidence < 0.65:
             return None
 
         kind = str(plan.get("kind") or "").strip()
@@ -157,6 +198,7 @@ class AIQueryPlanner:
             "compare_countries": {"country_identifiers", "indicator_name"},
             "get_assignment_indicator_values": {"country_identifier", "template_identifier"},
             "get_form_field_value": {"country_identifier", "field_label_or_name"},
+            "search_indicator_bank": {"query"},
         }
         required_by_tool.update(UPR_PLANNER_ENTRIES["required_by_tool"])
         required = required_by_tool.get(tool_name, set())
@@ -190,6 +232,12 @@ class AIQueryPlanner:
                 tool_args["limit"] = max(1, min(int(tool_args.get("limit", 500)), 1000))
             except (ValueError, TypeError):
                 tool_args["limit"] = 500
+        if tool_name == "search_indicator_bank":
+            try:
+                tk = int(tool_args.get("top_k", 5))
+            except (ValueError, TypeError):
+                tk = 5
+            tool_args["top_k"] = max(1, min(tk, 10))
 
         if not kind:
             kind_map = {
@@ -197,6 +245,7 @@ class AIQueryPlanner:
                 "get_indicator_timeseries": "timeseries",
                 "list_documents": "document_inventory",
                 "search_documents": "per_country_docs" if bool(tool_args.get("return_all_countries")) else "document_search",
+                "search_indicator_bank": "indicator_search",
             }
             kind_map.update(UPR_PLANNER_ENTRIES["kind_map"])
             kind = kind_map.get(tool_name, "simple")
@@ -210,7 +259,6 @@ class AIQueryPlanner:
         Returns a list of snake_case area keys for analyze_unified_plans_focus_areas.
         """
         q = (query or "").lower()
-        detected: List[str] = []
         _THEME_MAP = [
             (["migration", "displacement", "migrant", "refugee", "idp", "asylum", "forced migration", "mixed migration"], "migration_displacement"),
             (["climate change", "climate adaptation", "climate risk", "climate resilience", "climate"], "climate"),
@@ -223,16 +271,15 @@ class AIQueryPlanner:
             (["health", "primary health care", "community health", "epidemic", "pandemic"], "health"),
             (["disaster risk reduction", "drr", "disaster preparedness", "early warning"], "disaster_risk_reduction"),
         ]
-        seen: set = set()
+        scores: Dict[str, int] = {}
         for keywords, area_key in _THEME_MAP:
-            if area_key in seen:
-                continue
-            for kw in keywords:
-                if kw in q:
-                    detected.append(area_key)
-                    seen.add(area_key)
-                    break
-        return detected or ["migration_displacement"]  # safe default for unrecognised themes
+            hit_count = sum(1 for kw in keywords if kw in q)
+            if hit_count:
+                scores[area_key] = scores.get(area_key, 0) + hit_count
+        if not scores:
+            return []
+        ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+        return [area for area, _ in ranked]
 
     @staticmethod
     def try_rule_based_document_list(query: str, tool_names: Set[str]) -> Optional[SimplePlan]:
@@ -244,12 +291,27 @@ class AIQueryPlanner:
         if not q or len(q) < 10:
             return None
 
+        if "search_indicator_bank" in tool_names and any(s in q for s in _INDICATOR_SEARCH_SIGNALS):
+            plan = SimplePlan(
+                kind="indicator_search",
+                tool_name="search_indicator_bank",
+                tool_args={"query": (query or "").strip(), "top_k": 5},
+                output_hint="text",
+            )
+            logger.info("Query planner: rule-based indicator_search fast path (skip LLM)")
+            return plan
+
         # Thematic Unified Plans queries (e.g. "migration in Unified Plans") must go to
         # analyze_unified_plans_focus_areas, not to a structured indicator tool.
         # However, queries that ask for activity details, custom table columns,
         # budgets, partners etc. need the full LLM path because the deterministic
         # fast path cannot assess substantive activity coverage.
         if "analyze_unified_plans_focus_areas" in tool_names and any(p in q for p in _UNIFIED_PLAN_THEME_PATTERNS):
+            if any(s in q for s in _INDICATOR_SEARCH_SIGNALS):
+                logger.info(
+                    "Query planner: unified_plans_focus theme skipped — indicator similarity intent detected."
+                )
+                return None
             if _UNIFIED_PLAN_FORCE_LLM_RE.search(q):
                 logger.info(
                     "Query planner: unified_plans_focus theme matched but query "
@@ -257,6 +319,11 @@ class AIQueryPlanner:
                 )
                 return None
             areas = AIQueryPlanner._extract_theme_areas_from_query(query)
+            if not areas:
+                logger.info(
+                    "Query planner: unified_plans_focus theme matched but no focus areas inferred — deferring to LLM planner.",
+                )
+                return None
             plan = SimplePlan(
                 kind="unified_plans_focus",
                 tool_name="analyze_unified_plans_focus_areas",
@@ -302,6 +369,7 @@ class AIQueryPlanner:
             "get_indicator_value",
             "get_indicator_timeseries",
             "get_indicator_values_for_all_countries",
+            "search_indicator_bank",
             "list_documents",
             "search_documents",
             "compare_countries",
@@ -320,7 +388,7 @@ class AIQueryPlanner:
             "Return ONLY valid JSON with shape:\n"
             "{"
             "\"is_simple\": true|false, "
-            "\"kind\": \"single_value|timeseries|document_inventory|per_country_docs|unified_plans_focus|complex\", "
+            "\"kind\": \"single_value|timeseries|document_inventory|per_country_docs|unified_plans_focus|indicator_search|complex\", "
             "\"tool_name\": \"<tool>\", "
             "\"tool_args\": { ... }, "
             "\"output_hint\": \"map|chart|table|text\", "
@@ -340,9 +408,23 @@ class AIQueryPlanner:
             "Pass the theme(s) as snake_case strings in tool_args.areas "
             "(e.g. areas=['migration_displacement'] or areas=['climate'] or areas=['pgi']). "
             "NEVER route these to get_indicator_value — thematic Unified Plan content is stored in documents, not structured indicators.\n"
+            "- For queries asking which Indicator Bank indicator is closest/most similar to a free-text outcome, statement, or concept "
+            "(e.g. 'closest indicator to ...', 'find an indicator for ...'): use search_indicator_bank with "
+            "kind='indicator_search' and tool_args {query: the user's wording or distilled phrase}. "
+            "Do NOT use analyze_unified_plans_focus_areas or search_documents for that intent.\n"
             "- Output only JSON."
         )
         user = json.dumps({"query": q, "allowed_tools": allowed}, ensure_ascii=False)
+
+        try:
+            http_to = float(current_app.config.get("AI_HTTP_TIMEOUT_SECONDS", 120) or 120)
+        except (TypeError, ValueError):
+            http_to = 120.0
+        try:
+            planner_to = float(current_app.config.get("AI_AGENT_PLANNER_TIMEOUT_SECONDS", 45) or 45)
+        except (TypeError, ValueError):
+            planner_to = 45.0
+        planner_timeout = max(5.0, min(planner_to, http_to))
 
         try:
             kwargs: Dict[str, Any] = {
@@ -352,6 +434,7 @@ class AIQueryPlanner:
                     {"role": "user", "content": user},
                 ],
                 "max_completion_tokens": 350,
+                "timeout": planner_timeout,
             }
             if openai_model_supports_sampling_params(str(self.model)):
                 kwargs["temperature"] = 0.0

@@ -59,8 +59,8 @@ logger = logging.getLogger(__name__)
 
 # PII and response formatting live in ai_providers to avoid duplication
 from app.services.ai_providers import (
-    _scrub_pii_text,
-    _scrub_pii_context,
+    scrub_pii_text,
+    scrub_pii_context,
     format_ai_response_for_html,
     format_provenance_block,
 )
@@ -1583,8 +1583,8 @@ def integrate_openai_with_telemetry(message, platform_context=None, conversation
         from openai import OpenAI
 
         # Minimize PII before sending anything to third-party providers
-        safe_message = _scrub_pii_text(message or "")
-        safe_page_context = _scrub_pii_context(page_context or {})
+        safe_message = scrub_pii_text(message or "")
+        safe_page_context = scrub_pii_context(page_context or {})
 
         # Configure OpenAI - get key from Flask config
         openai_key = current_app.config.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
@@ -1607,7 +1607,7 @@ def integrate_openai_with_telemetry(message, platform_context=None, conversation
         if conversation_history:
             for entry in conversation_history[-5:]:  # Last 5 exchanges
                 if entry.get('isUser'):
-                    messages.append({"role": "user", "content": _scrub_pii_text(entry.get('message', ''))})
+                    messages.append({"role": "user", "content": scrub_pii_text(entry.get('message', ''))})
                 else:
                     messages.append({"role": "assistant", "content": entry.get('message', '')})
 

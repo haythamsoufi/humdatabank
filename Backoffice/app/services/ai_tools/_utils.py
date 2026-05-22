@@ -15,11 +15,45 @@ import json
 import logging
 import time
 from functools import wraps
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from flask import current_app, g, has_request_context
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
+
+
+def split_tool_kw_for_call(func: Callable, kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Return (call_kwargs, log_kwargs): strip `_progress_callback` when the callable
+    does not accept ``**kwargs`` or that parameter explicitly.
+
+    Used by ai_tools decorators so `_progress_callback` is only passed through
+    when the wrapped tool accepts it.
+    """
+
+    tool_name = getattr(func, "__name__", "tool")
+    call_kwargs = kwargs
+    try:
+        sig = inspect.signature(func)
+        params = sig.parameters
+        accepts_var_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
+        if (
+            "_progress_callback" in kwargs
+            and "_progress_callback" not in params
+            and not accepts_var_kwargs
+        ):
+            call_kwargs = dict(kwargs)
+            call_kwargs.pop("_progress_callback", None)
+    except Exception as exc:
+        logger.debug("split_tool_kw_for_call(%s): inspect.signature failed: %s", tool_name, exc)
+        if "_progress_callback" in kwargs:
+            call_kwargs = dict(kwargs)
+            call_kwargs.pop("_progress_callback", None)
+
+    log_kwargs = dict(call_kwargs if call_kwargs is not kwargs else dict(kwargs))
+    log_kwargs.pop("_progress_callback", None)
+    return call_kwargs, log_kwargs
 
 
 class ToolExecutionError(Exception):
@@ -98,15 +132,13 @@ def log_tool_usage(
             execution_time_ms=int(execution_time_ms) if execution_time_ms is not None else None,
             user_id=int(user_id) if user_id else None,
         )
-        db.session.add(usage)
-        db.session.commit()
+        with db.session.begin_nested():
+            db.session.add(usage)
+            db.session.flush()
+    except SQLAlchemyError as exc:
+        logger.debug("log_tool_usage failed (savepoint rolled back): %s", exc)
     except Exception as exc:
         logger.debug("log_tool_usage failed: %s", exc)
-        try:
-            from app.extensions import db as _db
-            _db.session.rollback()
-        except Exception:
-            pass
 
 
 def tool_wrapper(func: Callable) -> Callable:
@@ -125,28 +157,7 @@ def tool_wrapper(func: Callable) -> Callable:
     @wraps(func)
     def wrapper(*args, **kwargs):
         tool_name = func.__name__
-        call_kwargs = kwargs
-        try:
-            sig = inspect.signature(func)
-            params = sig.parameters
-            accepts_var_kwargs = any(
-                p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
-            )
-            if (
-                "_progress_callback" in kwargs
-                and "_progress_callback" not in params
-                and not accepts_var_kwargs
-            ):
-                call_kwargs = dict(kwargs)
-                call_kwargs.pop("_progress_callback", None)
-        except Exception as exc:
-            logger.debug("tool_wrapper: inspect.signature failed: %s", exc)
-            if "_progress_callback" in kwargs:
-                call_kwargs = dict(kwargs)
-                call_kwargs.pop("_progress_callback", None)
-
-        log_kwargs = dict(call_kwargs) if call_kwargs is not kwargs else dict(kwargs)
-        log_kwargs.pop("_progress_callback", None)
+        call_kwargs, log_kwargs = split_tool_kw_for_call(func, kwargs)
         logger.info("Executing tool: %s  args=%s  kwargs=%s", tool_name, args, log_kwargs)
 
         start = time.time()

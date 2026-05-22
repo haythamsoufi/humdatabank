@@ -4,7 +4,11 @@ AI Prompt Policy
 Centralized builder for agent system prompts.
 """
 
-from typing import Any, Dict, Optional
+import threading
+import time
+from typing import Any, Dict, Optional, Tuple
+
+from flask import current_app
 
 from app.utils.organization_helpers import get_org_name
 
@@ -29,10 +33,45 @@ _MAP_PAYLOAD_INSTRUCTION = (
     "Output a **markdown table** whose columns match the user's question: if they asked about regions or regional breakdown, use Country | Operational region; if they asked about countries (participation, categories, values, 'which countries have X'), use columns that fit (e.g. Country only; Country | Value; Country | Category). Do NOT always use Country | Operational region - only when the question is region-focused. Then add ## Sources only (no raw JSON)."
 )
 
+_PROMPT_CACHE_LOCK = threading.Lock()
+# Key -> (expiry_monotonic, prompt str)
+_AGENT_SYSTEM_PROMPT_CACHE: Dict[Tuple[Any, ...], Tuple[float, str]] = {}
+
+_MAX_CACHE_ENTRIES = 64
+
+
+def _agent_system_prompt_cache_ttl_seconds() -> float:
+    try:
+        ttl = float(current_app.config.get("AI_AGENT_SYSTEM_PROMPT_CACHE_TTL_SECONDS", 60))
+    except Exception:
+        ttl = 60.0
+    return max(0.0, ttl)
+
 
 def build_agent_system_prompt(user_context: Optional[Dict[str, Any]], language: str) -> str:
-    """Build the agent system prompt."""
+    """Build the agent system prompt (short TTL in-process cache keyed on context)."""
+    from app.services.upr import is_upr_active
+
     org_name = get_org_name()
+    upr_active = bool(is_upr_active())
+    ctx = user_context or {}
+    lang_for_prompt = str(language or "en")
+    cache_key = (
+        org_name,
+        lang_for_prompt,
+        str(ctx.get("role") or "user").strip().lower(),
+        str(ctx.get("access_level") or "public").strip().lower(),
+        bool(ctx.get("map_requested")),
+        upr_active,
+    )
+
+    ttl = _agent_system_prompt_cache_ttl_seconds()
+    now = time.monotonic()
+    if ttl > 0:
+        with _PROMPT_CACHE_LOCK:
+            hit = _AGENT_SYSTEM_PROMPT_CACHE.get(cache_key)
+            if hit and now < hit[0]:
+                return hit[1]
 
     prompt = f"""You are an intelligent AI assistant for the {org_name} platform.
 
@@ -111,7 +150,7 @@ Source selection (controlled by the UI):
 - If only document tools are available, call search_documents early and answer from excerpts (best-effort), except when the request is disallowed under "Protected characteristics — document mining" in Section 2 — then do not call document search. If evidence is insufficient, suggest enabling other document sources.
 
 Source priority (when user specifies):
-- **Databank only** ("only from the databank", "database only", "indicator bank only", "not documents"): use ONLY get_indicator_value, get_indicator_values_for_all_countries, get_assignment_indicator_values, get_form_field_value.
+- **Databank only** ("only from the databank", "database only", "indicator bank only", "not documents"): use ONLY get_indicator_value, get_indicator_values_for_all_countries, get_assignment_indicator_values, get_form_field_value, search_indicator_bank.
 - **Documents only** ("only from documents", "from reports", "from plans", "in the PDFs"): use ONLY search_documents (or search_documents_hybrid). Do NOT call databank tools. Exception: requests disallowed under "Protected characteristics — document mining" in Section 2 — refuse without running document search.
 - **Both (default)**: when the user does not specify, use BOTH databank and document tools, then combine or cite the best source(s). Combine information from both sources when they complement each other.
 
@@ -170,7 +209,8 @@ Bulk all-countries tools (get_indicator_values_for_all_countries):
 - If the user explicitly asked to include external data, acknowledge it in your summary — the platform table will include those enriched columns automatically.
 
 Single-value tools:
-- get_indicator_value: for a specific indicator from the Indicator Bank (e.g. "Number of branches", "Volunteers"). With period=None returns most recent available data.
+- search_indicator_bank: **only** when the user asks which Indicator Bank row is closest / most semantically similar to a free-text description or outcome phrase (e.g. "closest indicator to [text]"). Returns ranked indicator names with similarity scores — not country values.
+- get_indicator_value: for a specific indicator's **reported value** from the Indicator Bank (e.g. "Number of branches", "Volunteers"). With period=None returns most recent available data.
 - get_form_field_value: for form matrix/table data (e.g. "people to be reached"). Pass field_label_or_name as section name or matrix item label. period = matrix row/key, assignment_period = which assignment.
 
 Time series (get_indicator_timeseries):
@@ -223,12 +263,19 @@ When giving platform guidance, address the user naturally using their role (e.g.
 
 Use tools when needed to provide accurate answers. Keep your reasoning internal and only provide the final answer."""
 
-    from app.services.upr import is_upr_active
-    from app.services.upr.prompts import get_upr_prompt_section
+    if upr_active:
+        from app.services.upr.prompts import get_upr_prompt_section
 
-    if is_upr_active():
         prompt += "\n\n" + get_upr_prompt_section()
 
     if user_context and user_context.get("map_requested"):
         prompt = prompt + "\n\n" + _MAP_PAYLOAD_INSTRUCTION
+
+    if ttl > 0:
+        with _PROMPT_CACHE_LOCK:
+            if len(_AGENT_SYSTEM_PROMPT_CACHE) >= _MAX_CACHE_ENTRIES:
+                expired = [k for k, (exp, _) in _AGENT_SYSTEM_PROMPT_CACHE.items() if now >= exp]
+                for k in expired or list(_AGENT_SYSTEM_PROMPT_CACHE.keys())[: _MAX_CACHE_ENTRIES // 2]:
+                    _AGENT_SYSTEM_PROMPT_CACHE.pop(k, None)
+            _AGENT_SYSTEM_PROMPT_CACHE[cache_key] = (now + ttl, prompt)
     return prompt

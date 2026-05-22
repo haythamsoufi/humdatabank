@@ -6,11 +6,10 @@ Includes function signatures, parameter validation, and execution wrappers.
 """
 
 import logging
-import inspect
 import re
 import time
 import json
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, Set
 from functools import wraps
 from collections import defaultdict
 from flask import current_app, g, has_request_context
@@ -51,6 +50,7 @@ from app.services.ai_tools._utils import (
     resolve_ai_user_context,
     resolve_source_config,
     apply_document_source_filters,
+    split_tool_kw_for_call,
 )
 from app.services.ai_tools._query_utils import (
     infer_country_identifier_from_query,
@@ -59,29 +59,23 @@ from app.services.ai_tools._query_utils import (
 )
 from app.services.upr.query_detection import query_prefers_upr_documents
 
+def openapi_function_name(tool_def: Dict[str, Any]) -> Optional[str]:
+    """Return the ``function.name`` field from an OpenAI-style tool specification dict."""
+    try:
+        fn = tool_def.get("function") if isinstance(tool_def, dict) else None
+        if isinstance(fn, dict):
+            return str(fn.get("name") or "").strip() or None
+    except Exception:
+        pass
+    return None
+
+
 def tool_wrapper(func: Callable) -> Callable:
     """Decorator to wrap tool execution with caching, source gating, error handling, and logging."""
     @wraps(func)
     def wrapper(*args, **kwargs):
         tool_name = func.__name__
-        call_kwargs = kwargs
-        try:
-            sig = inspect.signature(func)
-            params = sig.parameters
-            accepts_var_kwargs = any(
-                p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
-            )
-            if "_progress_callback" in kwargs and "_progress_callback" not in params and not accepts_var_kwargs:
-                call_kwargs = dict(kwargs)
-                call_kwargs.pop("_progress_callback", None)
-        except Exception as exc:
-            logger.debug("tool_wrapper: inspect.signature failed: %s", exc)
-            if "_progress_callback" in kwargs:
-                call_kwargs = dict(kwargs)
-                call_kwargs.pop("_progress_callback", None)
-
-        log_kwargs = dict(call_kwargs) if call_kwargs is not kwargs else dict(kwargs)
-        log_kwargs.pop("_progress_callback", None)
+        call_kwargs, log_kwargs = split_tool_kw_for_call(func, kwargs)
 
         logger.info("Executing tool: %s with args=%s, kwargs=%s", tool_name, args, log_kwargs)
 
@@ -102,6 +96,7 @@ def tool_wrapper(func: Callable) -> Callable:
                 databank_tools = {
                     "get_indicator_value", "get_indicator_values_for_all_countries",
                     "get_indicator_timeseries", "get_indicator_metadata",
+                    "search_indicator_bank",
                     "get_country_information", "get_template_details",
                     "get_user_assignments", "get_assignment_indicator_values",
                     "get_form_field_value",
@@ -118,6 +113,7 @@ def tool_wrapper(func: Callable) -> Callable:
                 "get_template_details", "get_user_assignments",
                 "get_assignment_indicator_values", "get_system_statistics",
                 "get_current_user_info", "get_indicator_metadata",
+                "search_indicator_bank",
                 "get_form_field_value",
                 "search_documents", "search_documents_hybrid",
                 "list_documents",
@@ -421,6 +417,62 @@ class AIToolsRegistry:
         if not details:
             raise ToolExecutionError(f"Indicator not found: {indicator_name}")
         return details
+
+    @tool_wrapper
+    def search_indicator_bank(self, query: str, top_k: int = 5) -> Dict[str, Any]:
+        """
+        Find Indicator Bank definitions most similar to a free-text description (vector search).
+
+        Use when the user asks for the closest/nearest indicator to an outcome phrase or concept,
+        not for a country's reported value (use get_indicator_value for values).
+        """
+        from app.services.indicator_resolution_service import IndicatorResolutionService
+
+        qtext = (query or "").strip()
+        if not qtext:
+            raise ToolExecutionError("query is required")
+        try:
+            tk = int(top_k)
+        except (ValueError, TypeError):
+            tk = 5
+        tk = max(1, min(int(tk), 10))
+
+        svc = IndicatorResolutionService()
+        if not svc.has_embeddings():
+            return {
+                "matches": [],
+                "query": qtext,
+                "count": 0,
+                "message": (
+                    "Indicator Bank semantic search is unavailable: no embeddings found. "
+                    "Run indicator embedding sync in admin or set AI_INDICATOR_RESOLUTION_METHOD to build embeddings."
+                ),
+            }
+
+        results = svc.resolve(qtext, top_k=tk)
+        matches: List[Dict[str, Any]] = []
+        for ind, sim in results or []:
+            defn = (getattr(ind, "definition", None) or "") or ""
+            matches.append(
+                {
+                    "id": int(ind.id),
+                    "name": ind.name or "",
+                    "definition": (defn[:300] + ("…" if len(defn) > 300 else "")),
+                    "unit": (ind.unit or "") if getattr(ind, "unit", None) else "",
+                    "similarity_score": round(float(sim), 4),
+                }
+            )
+
+        out: Dict[str, Any] = {
+            "matches": matches,
+            "query": qtext,
+            "count": len(matches),
+        }
+        if not matches:
+            out["message"] = (
+                "No Indicator Bank rows returned for this query. Try rephrasing or check that indicators are embedded."
+            )
+        return out
 
     @tool_wrapper
     def get_form_field_value(
@@ -1746,6 +1798,35 @@ class AIToolsRegistry:
             {
                 "type": "function",
                 "function": {
+                    "name": "search_indicator_bank",
+                    "description": (
+                        "Search the Indicator Bank by semantic similarity to find the closest matching indicator(s) "
+                        "for a free-text description or concept. Use when the user asks what is the closest/nearest/most "
+                        "similar indicator to a statement or outcome phrase, "
+                        "\"find an indicator for [concept]\", or \"which indicator best matches [text]\". "
+                        "Returns ranked indicators with similarity scores. "
+                        "Do NOT use for a country's reported numeric value — use get_indicator_value for that."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Free-text description or concept to match against the Indicator Bank",
+                            },
+                            "top_k": {
+                                "type": "integer",
+                                "description": "Number of top matches to return (default 5, max 10)",
+                                "default": 5,
+                            },
+                        },
+                        "required": ["query"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "get_indicator_metadata",
                     "description": "Get detailed metadata about an indicator including definition, unit of measurement, and related sectors.",
                     "parameters": {
@@ -1783,6 +1864,7 @@ class AIToolsRegistry:
                     "get_user_assignments",
                     "get_assignment_indicator_values",
                     "get_indicator_metadata",
+                    "search_indicator_bank",
                 }
             )
 
@@ -1796,17 +1878,7 @@ class AIToolsRegistry:
         if sources_norm.get("historical") and docs_enabled:
             allowed.add("validate_against_guidelines")
 
-        def _tool_name(td: Dict[str, Any]) -> Optional[str]:
-            try:
-                fn = td.get("function") if isinstance(td, dict) else None
-                if isinstance(fn, dict):
-                    return str(fn.get("name") or "").strip() or None
-            except Exception as e:
-                logger.debug("_fn_name fallback failed: %s", e)
-                return None
-            return None
-
-        filtered = [td for td in tool_defs if (_tool_name(td) in allowed)]
+        filtered = [td for td in tool_defs if (openapi_function_name(td) in allowed)]
         if not filtered:
             logger.warning(
                 "SECURITY: Source filtering produced empty tool list (allowed=%s). "
@@ -1826,11 +1898,25 @@ class AIToolsRegistry:
         Returns:
             Tool execution result
         """
-        # Get the tool method
-        if not hasattr(self, tool_name):
-            raise ToolExecutionError(f"Unknown tool: {tool_name}")
+        # Restrict to tools the active request is allowed to expose (same set as OpenAI tool list).
+        tn = str(tool_name or "").strip()
+        if not tn or tn.startswith("_"):
+            raise ToolExecutionError(f"Unknown tool: {tool_name!r}")
+        try:
+            defs = self.get_tool_definitions_openai() or []
+            exposed: Set[str] = {n for n in (openapi_function_name(td) for td in defs) if n}
+        except Exception as e:
+            logger.debug("execute_tool: could not resolve OpenAI tool list: %s", e)
+            exposed = set()
 
-        tool_method = getattr(self, tool_name)
+        if exposed and tn not in exposed:
+            raise ToolExecutionError(f"Unknown or disallowed tool for this request: {tool_name!r}")
+
+        # Get the tool method
+        if not hasattr(self, tn):
+            raise ToolExecutionError(f"Unknown tool: {tool_name!r}")
+
+        tool_method = getattr(self, tn)
 
         # Execute the tool
         return tool_method(**kwargs)

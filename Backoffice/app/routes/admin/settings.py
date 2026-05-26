@@ -1507,7 +1507,10 @@ def api_settings_email_template_preview():
     """
     from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
     from app.services.email.preview_context import get_email_template_preview_context
-    from app.services.email.rendering import render_admin_email_template_for_preview
+    from app.services.email.rendering import (
+        render_admin_email_template_for_preview,
+        sanitize_admin_email_html_for_api,
+    )
 
     data, parse_err = _parse_email_template_api_request_body()
     if parse_err:
@@ -1532,7 +1535,7 @@ def api_settings_email_template_preview():
     rendered, err = render_admin_email_template_for_preview(source, **context)
     if err:
         return json_bad_request(err)
-    return json_ok(html=rendered)
+    return json_ok(html=sanitize_admin_email_html_for_api(rendered))
 
 
 # Short labels for test email subject line (match Emails settings UI).
@@ -1652,7 +1655,10 @@ def api_settings_email_template_test_send():
         get_email_template_preview_context,
         normalize_template_language,
     )
-    from app.services.email.rendering import render_admin_email_template_for_preview
+    from app.services.email.rendering import (
+        render_admin_email_template_for_preview,
+        sanitize_admin_email_html_for_api,
+    )
 
     if not current_user.is_authenticated:
         return json_bad_request("You must be signed in to send a test message.")
@@ -1694,7 +1700,7 @@ def api_settings_email_template_test_send():
         ok = send_email(
             subject=subject,
             recipients=[current_user.email],
-            html=rendered,
+            html=sanitize_admin_email_html_for_api(rendered),
             sender=current_app.config.get("MAIL_DEFAULT_SENDER"),
             _failure_info=failure,
         )

@@ -744,9 +744,13 @@ document.addEventListener('click', function(e) {
     // Legend
     const legend = document.getElementById('statusLegend');
     if (legend) {
-        const _esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const _esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const _escColor = c => {
+            const s = String(c == null ? '' : c).trim();
+            return /^#[0-9a-fA-F]{3,8}$/.test(s) ? s : '#cccccc';
+        };
         legend.innerHTML = labels.map((l, i) =>
-            `<div class="flex items-center gap-1.5"><span style="width:10px;height:10px;background:${_esc(colors[i])};display:inline-block;border-radius:2px"></span>${_esc(l)}: <strong>${parseInt(data[i], 10) || 0}</strong></div>`
+            `<div class="flex items-center gap-1.5"><span style="width:10px;height:10px;background:${_escColor(colors[i])};display:inline-block;border-radius:2px"></span>${_esc(l)}: <strong>${parseInt(data[i], 10) || 0}</strong></div>`
         ).join('');
     }
 })();

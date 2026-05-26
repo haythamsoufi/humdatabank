@@ -21,7 +21,7 @@ email_validator==2.2.0
 alembic==1.15.2
 psycopg2-binary==2.9.10
 PyMuPDF==1.25.5
-Pillow==12.1.1                  # was 10.4.0 — CVE-2026-25990
+Pillow==12.2.0                  # was 12.1.1 — CVE-2026-40192, CVE-2026-42308–42311
 openpyxl==3.1.2
 pandas==2.2.3
 XlsxWriter==3.2.3
@@ -73,18 +73,22 @@ tiktoken==0.11.0
 langchain==0.3.28               # was 0.2.17 — ecosystem-wide security fixes (0.3.28 is latest 0.3.x)
 langchain-community==0.3.27     # was 0.2.19 — CVE-2025-6984 (min fix: 0.3.27)
 langchain-openai==0.3.35        # was 0.1.25 — aligns with langchain 0.3.x
+                                # NOTE: PYSEC-2026-76 fix requires >=1.1.14 (1.x line).
 # Explicit transitive pins: langchain-core and langchain-text-splitters had their
 # own CVEs and were previously resolved implicitly. Pin them for reproducibility.
-langchain-core==0.3.84          # was ~0.2.43 (transitive) — CVE-2025-65106, CVE-2025-68664, CVE-2026-40087
+langchain-core==0.3.85          # was 0.3.84 — CVE-2026-44843 (min fix: 0.3.85)
                                 # NOTE: CVE-2026-26013 fix requires langchain-core>=1.2.11 (1.x line).
                                 # Migrating to langchain 1.x is a separate, larger upgrade.
 langchain-text-splitters==0.3.11  # was ~0.2.4 (transitive) — CVE-2025-6985 (min fix: 0.3.9)
+                                # NOTE: PYSEC-2026-77 fix requires >=1.1.2 (1.x line).
 
 # ==================== LangGraph Ecosystem ====================
 # ⚠ KNOWN UNRESOLVABLE CVEs — requires LangChain 1.x migration (future task):
-#   CVE-2026-28277 (langgraph)           — fix: langgraph>=1.0.10
-#   CVE-2025-64439 (langgraph-checkpoint) — fix: langgraph-checkpoint>=3.0.0
-#   CVE-2026-27794 (langgraph-checkpoint) — fix: langgraph-checkpoint>=4.0.0
+#   CVE-2026-28277 (langgraph)              — fix: langgraph>=1.0.10
+#   CVE-2025-64439 (langgraph-checkpoint)   — fix: langgraph-checkpoint>=3.0.0
+#   CVE-2026-27794 (langgraph-checkpoint)   — fix: langgraph-checkpoint>=4.0.0
+#   PYSEC-2026-77 (langchain-text-splitters) — fix: langchain-text-splitters>=1.1.2
+#   PYSEC-2026-76 (langchain-openai)        — fix: langchain-openai>=1.1.14
 #
 # langgraph 1.0.x pulls langgraph-prebuilt 1.0.x which requires langchain-core>=1.0.0,
 # but all langchain 0.3.x packages cap at langchain-core<1.0.0 — mutually exclusive.

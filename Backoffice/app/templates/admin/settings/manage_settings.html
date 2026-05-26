@@ -1416,7 +1416,19 @@
   }
 
   function escAttr(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    if (window.escapeHtmlAttr) return window.escapeHtmlAttr(s);
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function escCssSelector(s) {
+    if (window.escapeCssSelector) return window.escapeCssSelector(s);
+    return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 
   function waitForAg(cb, tries) {
@@ -1762,7 +1774,7 @@
     var pwName = name.replace(/_clear$/, '');
     if (!pwName) return;
     var pwInput = document.querySelector(
-      'input[name="' + pwName.replace(/"/g, '\\"') + '"]'
+      'input[name="' + escCssSelector(pwName) + '"]'
     );
     if (!pwInput) return;
     function reflect() {
@@ -1955,7 +1967,7 @@
             return d.innerHTML;
           };
           var raw = String(data.release_url || '').trim();
-          var safeUrl = (raw.indexOf('https://') === 0 || raw.indexOf('http://') === 0) ? raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '#';
+          var safeUrl = (raw.indexOf('https://') === 0 || raw.indexOf('http://') === 0) ? escAttr(raw) : '#';
           badge.innerHTML =
             '<span class="text-xs text-gray-500">v{{ config.APP_VERSION }}</span>' +
             '<a href="' + safeUrl + '" target="_blank" rel="noopener" ' +
@@ -2135,9 +2147,10 @@
   if (!modal) return;
 
   function decodeEntities(s) {
+    if (window.decodeHtmlEntities) return window.decodeHtmlEntities(s);
     if (!s) return '';
     var txt = document.createElement('textarea');
-    txt.innerHTML = s;
+    txt.textContent = s;
     return txt.value;
   }
 
@@ -2779,16 +2792,22 @@
     if (!raw) return '';
     var oB = String.fromCharCode(123);
     var cB = String.fromCharCode(125);
-    var re = new RegExp(oB + oB + '[\\s\\S]*?' + cB + cB, 'g');
+    var open = oB + oB;
+    var close = cB + cB;
     var out = [];
     var last = 0;
-    var m;
-    while ((m = re.exec(raw)) !== null) {
-      out.push(escapeHtmlText(raw.slice(last, m.index)));
+    var i = 0;
+    while (i < raw.length) {
+      var start = raw.indexOf(open, i);
+      if (start === -1) break;
+      if (start > last) out.push(escapeHtmlText(raw.slice(last, start)));
+      var end = raw.indexOf(close, start + 2);
+      if (end === -1) break;
       out.push('<span class="email-template-jinja-var">');
-      out.push(escapeHtmlText(m[0]));
+      out.push(escapeHtmlText(raw.slice(start, end + 2)));
       out.push('</span>');
-      last = m.index + m[0].length;
+      last = end + 2;
+      i = end + 2;
     }
     out.push(escapeHtmlText(raw.slice(last)));
     return out.join('');
@@ -3334,7 +3353,7 @@
     var lang = (ta && ta.dataset && ta.dataset.currentLang) ? String(ta.dataset.currentLang) : 'en';
     var rtl = isEmailTemplateRtlLang(lang);
     return {
-      selector: '#' + templateKey.replace(/"/g, '\\"') + '-visual',
+      selector: '#' + escCssSelector(templateKey) + '-visual',
       /* Fixed viewport; do not use autoresize (it grows the frame to full document height). */
       height: 480,
       resize: false,
@@ -4299,7 +4318,7 @@
        inputs use ``ai_<KEY>_clear`` (also value="1"). Both vanish when unchecked. */
     if (key.indexOf('ai_') === 0) {
       try {
-        var el = form.querySelector('input[type="checkbox"][name="' + key.replace(/"/g, '\\"') + '"]');
+        var el = form.querySelector('input[type="checkbox"][name="' + escCssSelector(key) + '"]');
         if (el) return true;
       } catch (_) { /* invalid selector; ignore */ }
     }
@@ -4364,9 +4383,10 @@
   }
 
   function decodeEntities(s) {
+    if (window.decodeHtmlEntities) return window.decodeHtmlEntities(s);
     if (!s) return '';
     var t = document.createElement('textarea');
-    t.innerHTML = s;
+    t.textContent = s;
     return t.value;
   }
 

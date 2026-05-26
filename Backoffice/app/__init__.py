@@ -706,7 +706,11 @@ def create_app(config_name=None):
             if not os.path.exists(static_folder_path):
                 return {'error': 'Static folder not found'}, 404
 
-            file_path = os.path.join(static_folder_path, filename)
+            safe_filename = os.path.basename(filename)
+            if not safe_filename or safe_filename != filename or safe_filename in ('.', '..'):
+                return {'error': 'Invalid path'}, 400
+
+            file_path = os.path.join(static_folder_path, safe_filename)
             # Prevent path traversal: resolved path must stay within static folder
             static_abs = os.path.abspath(static_folder_path)
             file_abs = os.path.abspath(file_path)
@@ -715,10 +719,10 @@ def create_app(config_name=None):
             if not os.path.exists(file_abs):
                 return {'error': 'File not found'}, 404
 
-            return send_from_directory(static_folder_path, filename)
+            return send_from_directory(static_folder_path, safe_filename)
 
-    from app.middleware import register_coming_soon_lock_middleware
-    register_coming_soon_lock_middleware(app)
+    from app.middleware import register_site_lock_middleware
+    register_site_lock_middleware(app)
 
     # Memory monitoring for requests
     @app.before_request

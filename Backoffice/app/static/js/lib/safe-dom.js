@@ -88,10 +88,35 @@
   function escapeHtmlAttr(value) {
     return toString(value)
       .replace(/&/g, '&amp;')
+      .replace(/\\/g, '\\\\')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  /** Escape a value for use inside a CSS attribute selector ([name="…"]). */
+  function escapeCssSelector(value) {
+    try {
+      if (window.CSS && typeof window.CSS.escape === 'function') {
+        return window.CSS.escape(toString(value));
+      }
+    } catch (_) { /* ignore */ }
+    return toString(value)
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"');
+  }
+
+  /** Decode HTML entities without assigning untrusted HTML via innerHTML. */
+  function decodeHtmlEntities(value) {
+    const raw = toString(value);
+    if (!raw) return '';
+    try {
+      const doc = new DOMParser().parseFromString(raw, 'text/html');
+      return doc.documentElement.textContent || '';
+    } catch (_) {
+      return raw;
+    }
   }
 
   const DANGEROUS_TAGS = new Set([
@@ -163,6 +188,8 @@
   window.SafeDom = {
     escapeHtml,
     escapeHtmlAttr,
+    escapeCssSelector,
+    decodeHtmlEntities,
     sanitizeHtml,
     safeUrl,
     navigate,
@@ -173,5 +200,7 @@
   // Global aliases so templates don't need to repeat local definitions
   if (!window.escapeHtml) window.escapeHtml = escapeHtml;
   if (!window.escapeHtmlAttr) window.escapeHtmlAttr = escapeHtmlAttr;
+  if (!window.escapeCssSelector) window.escapeCssSelector = escapeCssSelector;
+  if (!window.decodeHtmlEntities) window.decodeHtmlEntities = decodeHtmlEntities;
   if (!window.sanitizeHtml) window.sanitizeHtml = sanitizeHtml;
 })();

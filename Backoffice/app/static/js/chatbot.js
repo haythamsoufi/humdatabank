@@ -5912,9 +5912,10 @@ class HumDatabankChatbot {
                 if (fromList.length > segments.length) segments = fromList;
             }
             if (!segments.length) return;
+            const sanitizeSegmentHtml = (html) => (window.sanitizeHtml || ((h) => h))(html);
             let sourceCountForLabel = 0;
             for (const segment of segments) {
-                countProbe.innerHTML = segment;
+                countProbe.innerHTML = sanitizeSegmentHtml(segment);
                 const p = (countProbe.textContent || '').replace(/\s+/g, ' ').trim();
                 if (p && !isAnswerVerificationCaveatText(p)) {
                     sourceCountForLabel += 1;
@@ -5928,7 +5929,7 @@ class HumDatabankChatbot {
             summaryEl.textContent = 'Sources (' + sourceCountForLabel + ')';
             const resolveSourceIcon = (segmentHtml, plainText) => {
                 const probe = document.createElement('div');
-                probe.innerHTML = segmentHtml;
+                probe.innerHTML = sanitizeSegmentHtml(segmentHtml);
                 const anchor = probe.querySelector('a[href]');
                 const href = (anchor?.getAttribute('href') || '').trim();
                 const label = ((anchor?.textContent || '') + ' ' + plainText).toLowerCase();
@@ -5990,7 +5991,7 @@ class HumDatabankChatbot {
             const tempDiv = document.createElement('div');
             segments.forEach((segment) => {
                 segment = linkifySegment(segment);
-                tempDiv.innerHTML = segment;
+                tempDiv.innerHTML = sanitizeSegmentHtml(segment);
                 const plainText = (tempDiv.textContent || '').trim();
                 const lineEl = document.createElement('div');
                 lineEl.className = 'chat-source-line';
@@ -6010,7 +6011,7 @@ class HumDatabankChatbot {
                 toggleSpan.textContent = '\u203a';
                 const fullSpan = document.createElement('span');
                 fullSpan.className = 'chat-source-line-full';
-                fullSpan.innerHTML = segment;
+                fullSpan.innerHTML = sanitizeSegmentHtml(segment);
                 lineEl.appendChild(iconSpan);
                 lineEl.appendChild(previewSpan);
                 lineEl.appendChild(toggleSpan);

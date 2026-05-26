@@ -68,7 +68,7 @@ def language_flag_svg(language):
 @bp.route('/language/<language>')
 def set_language(language):
     """Set the language for the current session"""
-    from app.utils.redirect_utils import is_safe_redirect_url
+    from app.utils.redirect_utils import get_safe_redirect_url, is_safe_redirect_url
     from config import Config
     supported = list(current_app.config.get("SUPPORTED_LANGUAGES", Config.LANGUAGES) or [])
     lang_norm = str(language).lower().replace("-", "_")
@@ -101,15 +101,15 @@ def set_language(language):
     if referrer and is_safe_redirect_url(referrer):
         from urllib.parse import urlparse as _urlparse
         _p = _urlparse(referrer)
-        _safe = _p.path + ('?' + _p.query if _p.query else '')
-        return redirect(_safe or url_for('main.dashboard'))
+        _rel = _p.path + ('?' + _p.query if _p.query else '')
+        return redirect(get_safe_redirect_url(_rel))
     return redirect(url_for('main.dashboard'))
 
 # Translation reload route (for development)
 @bp.route('/reload-translations')
 def reload_translations():
     """Manually reload translations (development only)"""
-    from app.utils.redirect_utils import is_safe_redirect_url
+    from app.utils.redirect_utils import get_safe_redirect_url, is_safe_redirect_url
     if current_app.config.get('DEBUG', False):
         from flask_babel import refresh
         try:
@@ -129,8 +129,8 @@ def reload_translations():
     if referrer and is_safe_redirect_url(referrer):
         from urllib.parse import urlparse as _urlparse
         _p = _urlparse(referrer)
-        _safe = _p.path + ('?' + _p.query if _p.query else '')
-        return redirect(_safe or url_for('main.dashboard'))
+        _rel = _p.path + ('?' + _p.query if _p.query else '')
+        return redirect(get_safe_redirect_url(_rel))
     return redirect(url_for('main.dashboard'))
 
 

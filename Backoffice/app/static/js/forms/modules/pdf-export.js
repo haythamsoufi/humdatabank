@@ -341,9 +341,10 @@ class ProfessionalPDFDocument {
                 return char; // Keep character if it seems safe
             })
 
-            // Clean up multiple spaces and trim
-            .replace(/\s+/g, ' ')
-            .trim();
+            // Clean up multiple spaces and trim (linear scan; avoid ReDoS-prone \s+ on user text)
+            .split(/\s/)
+            .filter(Boolean)
+            .join(' ');
 
         // Log if we cleaned up corruption
         if (cleanedText !== text.toString().trim()) {

@@ -339,7 +339,10 @@ def _download_ifrc_document(url: str):
     ext = os.path.splitext(filename)[1].lower()
     # Sanitize extension to prevent path injection via tempfile suffix
     ext = '.' + re.sub(r'[^a-z0-9]', '', ext.lstrip('.')) if ext else ''
-    if not ext or ext == '.':
+    allowed_suffixes = {
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.md', '.html',
+    }
+    if ext not in allowed_suffixes:
         ext = '.pdf'
     fd, temp_path = tempfile.mkstemp(suffix=ext)
     try:

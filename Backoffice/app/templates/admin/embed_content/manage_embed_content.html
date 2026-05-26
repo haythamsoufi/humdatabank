@@ -400,9 +400,25 @@
         });
     }
 
+    function isAllowedEmbedPreviewUrl(url) {
+        var raw = (url || '').trim();
+        if (!raw) return false;
+        try {
+            var u = new URL(raw);
+            if (u.protocol !== 'https:') return false;
+            var host = (u.hostname || '').toLowerCase();
+            if (host === 'public.tableau.com' || host.endsWith('.public.tableau.com')) return true;
+            var powerBiHosts = ['app.powerbi.com', 'app.powerbigov.us', 'msit.powerbi.com'];
+            return powerBiHosts.indexOf(host) !== -1;
+        } catch (_) {
+            return false;
+        }
+    }
+
     function previewEmbed(url, title, embedType) {
         document.getElementById('preview-title').textContent = title || '{{ _("Preview") }}';
-        document.getElementById('preview-iframe').src = embedPreviewSrc(url, embedType);
+        var src = embedPreviewSrc(url, embedType);
+        document.getElementById('preview-iframe').src = isAllowedEmbedPreviewUrl(src) ? src : 'about:blank';
         showModal('preview-modal');
     }
 

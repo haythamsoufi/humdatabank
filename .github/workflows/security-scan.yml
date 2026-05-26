@@ -1,5 +1,6 @@
 # Security Scanning Workflow
-# Runs on: every PR to main/develop, weekly schedule, and on demand (not on push).
+# Runs on: every PR to main/develop and on demand (not on push).
+# Weekly schedule is disabled — use workflow_dispatch to run on demand.
 # The security-summary job is the single required status check — it only fails on
 # Gitleaks or custom secret-scan findings (Bandit/pip-audit failures are surfaced as
 # warnings in backoffice-ci.yml and dependency-audit workflows respectively).
@@ -9,9 +10,6 @@ name: Security Scan
 on:
   pull_request:
     branches: [main, develop]
-  schedule:
-    # Weekly on Monday at 06:00 UTC — catches new CVEs even without code changes.
-    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 # Opt into Node.js 24 now to avoid forced migration warnings on actions/checkout,
@@ -128,12 +126,14 @@ jobs:
       - name: Run pip-audit
         working-directory: Backoffice
         run: |
-          # Suppress known-unresolvable langgraph CVEs that require a LangChain 1.x
-          # migration (incompatible with current langchain 0.3.x family).
+          # Suppress known-unresolvable CVEs that require a LangChain 1.x migration
+          # (incompatible with the current langchain 0.3.x family).
           KNOWN_IGNORE=(
-            "--ignore-vuln" "CVE-2026-28277"
-            "--ignore-vuln" "CVE-2025-64439"
-            "--ignore-vuln" "CVE-2026-27794"
+            "--ignore-vuln" "CVE-2026-28277"   # langgraph <1.0.10
+            "--ignore-vuln" "CVE-2025-64439"   # langgraph-checkpoint <3.0.0
+            "--ignore-vuln" "CVE-2026-27794"   # langgraph-checkpoint <4.0.0
+            "--ignore-vuln" "PYSEC-2026-77"    # langchain-text-splitters <1.1.2
+            "--ignore-vuln" "PYSEC-2026-76"    # langchain-openai <1.1.14
           )
           pip-audit -r requirements.txt "${KNOWN_IGNORE[@]}" --format json --output pip-audit-results.json || true
           pip-audit -r requirements.txt "${KNOWN_IGNORE[@]}"

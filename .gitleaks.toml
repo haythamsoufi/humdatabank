@@ -5,7 +5,13 @@ title = "Humanitarian Databank"
 useDefault = true
 
 [allowlist]
-description = "Env templates and docs — placeholders only, no live credentials"
+description = "Env templates, public embed data, and known false positives"
 paths = [
     '''Backoffice/env.example''',
+    # Synced Website data: public Tableau/Power BI embed URLs (not credentials).
+    '''Website/data/embed_content\.json''',
+]
+regexes = [
+    # Power BI publish-to-web / view links use base64 ?r= tokens that match grafana-api-key.
+    '''app\.powerbi\.com/view\?r=''',
 ]

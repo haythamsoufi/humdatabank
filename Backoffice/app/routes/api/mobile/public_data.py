@@ -929,6 +929,7 @@ def unified_planning_thumbnail():
 
     from app.routes.ai_documents.helpers import (
         _get_ifrc_basic_auth,
+        _ifrc_get_with_validated_redirects,
         _validate_ifrc_fetch_url,
     )
 
@@ -979,13 +980,12 @@ def unified_planning_thumbnail():
 
     r = None
     try:
-        r = requests.get(
+        r = _ifrc_get_with_validated_redirects(
             url,
-            auth=auth,
-            timeout=(15, 90),
-            stream=True,
             headers={'User-Agent': 'hum-databank-backoffice/1.0'},
-            allow_redirects=True,
+            auth=auth,
+            timeout=90,
+            stream=True,
         )
         if r.status_code != 200:
             return mobile_bad_request(f'Upstream HTTP {r.status_code}')

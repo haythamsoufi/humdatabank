@@ -653,14 +653,31 @@ class AutoTranslator:
             return token
 
         out: list[str] = []
-        last = 0
-        for m in re.finditer(r"(\{\{[\s\S]*?\}\}|\{\%[\s\S]*?\%\})", text):
-            out.append(text[last:m.start()])
+        i = 0
+        n = len(text)
+        while i < n:
+            if text.startswith("{{", i):
+                end = text.find("}}", i + 2)
+                if end == -1:
+                    out.append(text[i])
+                    i += 1
+                    continue
+                original = text[i : end + 2]
+            elif text.startswith("{%", i):
+                end = text.find("%}", i + 2)
+                if end == -1:
+                    out.append(text[i])
+                    i += 1
+                    continue
+                original = text[i : end + 2]
+            else:
+                out.append(text[i])
+                i += 1
+                continue
             tok = make_token()
-            token_map[tok] = m.group(1)
+            token_map[tok] = original
             out.append(tok)
-            last = m.end()
-        out.append(text[last:])
+            i = end + 2
         return "".join(out), token_map
 
     @staticmethod

@@ -167,6 +167,32 @@ def render_admin_email_template_for_preview(
     return cleaned, None
 
 
+def sanitize_admin_email_html_for_api(html: str) -> str:
+    """
+    Re-sanitize admin email HTML immediately before JSON API responses.
+
+    CodeQL tracks this call site for reflective-XSS on preview/test endpoints;
+    the body is already sanitized by :func:`render_admin_email_template_for_preview`.
+    """
+    if not html or not str(html).strip():
+        return ""
+    try:
+        return bleach.clean(
+            str(html),
+            tags=_ALLOWED_TAGS,
+            attributes=_allow_attr,
+            protocols=_SAFE_PROTOCOLS,
+            strip=True,
+            strip_comments=False,
+        )
+    except Exception:
+        logger.warning(
+            "API email HTML re-sanitization failed; returning empty body.",
+            exc_info=True,
+        )
+        return ""
+
+
 def render_admin_email_template(template_str: str, **context: Any) -> str:
     """Render an admin-provided Jinja2 email template safely.
 

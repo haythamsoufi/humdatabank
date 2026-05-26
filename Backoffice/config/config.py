@@ -928,6 +928,10 @@ class Config:
     COMING_SOON_LOCK = _parse_bool(os.environ.get('COMING_SOON_LOCK'), default=False)
     COMING_SOON_BYPASS_SECRET = (os.environ.get('COMING_SOON_BYPASS_SECRET') or '').strip()
 
+    # Maintenance site lock (takes precedence over COMING_SOON_LOCK when both are set).
+    MAINTENANCE_LOCK = _parse_bool(os.environ.get('MAINTENANCE_LOCK'), default=False)
+    MAINTENANCE_BYPASS_SECRET = (os.environ.get('MAINTENANCE_BYPASS_SECRET') or '').strip()
+
     # Verbose app/form debug: DEBUG log level, debug_utils helpers, guarded admin debug logs.
     # Env: true/false only (see _parse_bool). Default false; avoid true in production unless troubleshooting.
     VERBOSE_FORM_DEBUG = _parse_bool(os.environ.get("VERBOSE_FORM_DEBUG"), default=False)

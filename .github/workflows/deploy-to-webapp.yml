@@ -14,11 +14,7 @@ run-name: >-
     || format('Deploy to Webapp — {0} ({1})', inputs.environment, inputs.version) }}
 
 on:
-  # Automatically deploy to Staging whenever a new release is published.
-  # Does NOT deploy to Production — that always requires a manual workflow_dispatch.
-  release:
-    types: [published]
-
+  # Release auto-deploy to Staging is disabled — use workflow_dispatch to deploy.
   workflow_dispatch:
     inputs:
       environment:

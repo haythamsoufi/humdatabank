@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ ORG_NAME }} — Coming Soon</title>
+    <title>{{ ORG_NAME }} — Maintenance</title>
     <link rel="icon" href="{{ org_visual_asset_url((ORGANIZATION_BRANDING or {}).get('organization_favicon_path'), 'favicon.svg') }}" type="image/svg+xml">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
@@ -32,7 +32,7 @@
         }
 
         .top-banner {
-            background: #C8102E;
+            background: #ea580c;
             color: #fff;
             text-align: center;
             padding: 14px 20px;
@@ -84,7 +84,7 @@
             width: 420px;
             height: 420px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(200, 16, 46, 0.18) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(234, 88, 12, 0.18) 0%, transparent 70%);
             top: -120px;
             right: -100px;
             animation: drift 12s ease-in-out infinite alternate;
@@ -126,7 +126,7 @@
             position: absolute;
             inset: -6px;
             border-radius: 50%;
-            border: 1px solid rgba(200, 16, 46, 0.35);
+            border: 1px solid rgba(234, 88, 12, 0.35);
             animation: ring-pulse 3s ease-in-out infinite;
         }
 
@@ -134,7 +134,7 @@
             position: absolute;
             inset: 10%;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(200, 16, 46, 0.35) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(234, 88, 12, 0.35) 0%, transparent 70%);
             animation: glow-breathe 4s ease-in-out infinite;
             pointer-events: none;
         }
@@ -187,7 +187,7 @@
             justify-content: center;
             padding: clamp(48px, 10vh, 96px) clamp(32px, 6vw, 88px);
             background:
-                radial-gradient(circle at 100% 0%, rgba(200, 16, 46, 0.07) 0%, transparent 42%),
+                radial-gradient(circle at 100% 0%, rgba(234, 88, 12, 0.07) 0%, transparent 42%),
                 linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
             position: relative;
             overflow: hidden;
@@ -200,7 +200,7 @@
             left: 0;
             width: 5px;
             height: 100%;
-            background: linear-gradient(180deg, #C8102E, #ef4444, #C8102E);
+            background: linear-gradient(180deg, #ea580c, #f59e0b, #ea580c);
             background-size: 100% 200%;
             animation: stripe-flow 4s linear infinite;
         }
@@ -216,7 +216,7 @@
         .orb-a {
             width: 280px;
             height: 280px;
-            background: rgba(200, 16, 46, 0.12);
+            background: rgba(234, 88, 12, 0.12);
             top: 10%;
             right: -60px;
             animation: drift 9s ease-in-out infinite alternate;
@@ -234,7 +234,7 @@
         .orb-c {
             width: 140px;
             height: 140px;
-            background: rgba(200, 16, 46, 0.1);
+            background: rgba(234, 88, 12, 0.1);
             top: 55%;
             right: 20%;
             animation: drift 7s ease-in-out infinite alternate;
@@ -256,7 +256,7 @@
         .float-shape.cross::after {
             content: "";
             position: absolute;
-            background: #C8102E;
+            background: #ea580c;
             border-radius: 1px;
         }
 
@@ -305,7 +305,7 @@
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: rgba(200, 16, 46, 0.25);
+            background: rgba(234, 88, 12, 0.25);
             animation: particle-rise 8s linear infinite;
         }
 
@@ -332,7 +332,7 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #C8102E;
+            background: #ea580c;
             animation: dot-bounce 1.4s ease-in-out infinite;
         }
 
@@ -359,7 +359,7 @@
         .progress-bar {
             height: 100%;
             width: 40%;
-            background: linear-gradient(90deg, #C8102E, #ef4444);
+            background: linear-gradient(90deg, #ea580c, #f59e0b);
             border-radius: 99px;
             animation: progress-slide 2.2s ease-in-out infinite;
         }
@@ -390,7 +390,7 @@
             font-weight: 800;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: #C8102E;
+            color: #ea580c;
             margin-bottom: 20px;
         }
 
@@ -398,19 +398,23 @@
             display: inline-block;
             width: 28px;
             height: 2px;
-            background: #C8102E;
+            background: #ea580c;
             transform-origin: left center;
             animation: line-grow 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
         }
 
         .headline {
-            font-size: clamp(3rem, 9vw, 5.5rem);
-            line-height: 0.92;
+            font-size: clamp(2.25rem, 5.5vw, 4.25rem);
+            line-height: 1.05;
             font-weight: 900;
-            letter-spacing: -0.04em;
+            letter-spacing: -0.03em;
             color: #0f172a;
             margin-bottom: 18px;
             text-transform: uppercase;
+        }
+
+        .headline-line {
+            display: block;
             overflow: hidden;
         }
 
@@ -422,9 +426,9 @@
         }
 
         .headline-word.coming {
-            color: #C8102E;
+            color: #ea580c;
             animation-delay: 0.35s;
-            background: linear-gradient(90deg, #C8102E 0%, #ef4444 50%, #C8102E 100%);
+            background: linear-gradient(90deg, #ea580c 0%, #f59e0b 50%, #ea580c 100%);
             background-size: 200% auto;
             -webkit-background-clip: text;
             background-clip: text;
@@ -451,7 +455,7 @@
         .divider {
             width: 0;
             height: 4px;
-            background: #C8102E;
+            background: #ea580c;
             margin: 32px 0 0;
             border-radius: 2px;
             animation: divider-grow 1s cubic-bezier(0.22, 1, 0.36, 1) 0.9s forwards;
@@ -481,7 +485,7 @@
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: #C8102E;
+            background: #ea580c;
             animation: pulse-dot 2s ease-in-out infinite;
         }
 
@@ -606,8 +610,8 @@
 
             .divider { width: 72px; }
             .headline-word.coming {
-                -webkit-text-fill-color: #C8102E;
-                color: #C8102E;
+                -webkit-text-fill-color: #ea580c;
+                color: #ea580c;
             }
         }
 
@@ -733,7 +737,7 @@
     <div class="top-banner" role="status" aria-live="polite">
         <span class="top-banner-inner">
             <span class="pulse-dot" aria-hidden="true"></span>
-            Launching soon — please check back shortly
+            Scheduled maintenance in progress — we'll be back shortly
         </span>
     </div>
 
@@ -758,7 +762,7 @@
             </div>
         </section>
 
-        <section class="launch-panel" aria-labelledby="coming-soon-heading">
+        <section class="launch-panel" aria-labelledby="maintenance-heading">
             <div class="launch-particles" aria-hidden="true">
                 <span></span><span></span><span></span><span></span><span></span><span></span>
             </div>
@@ -774,19 +778,19 @@
             <div class="launch-content">
                 <p class="eyebrow anim-item delay-1">
                     <span class="eyebrow-line" aria-hidden="true"></span>
-                    We are almost ready
+                    We'll be back soon
                 </p>
-                <h1 id="coming-soon-heading" class="headline" aria-label="Coming Soon">
-                    <span class="headline-word coming">Coming</span>
-                    <span class="headline-word soon"> Soon</span>
+                <h1 id="maintenance-heading" class="headline" aria-label="Under Maintenance">
+                    <span class="headline-line"><span class="headline-word coming">Under</span></span>
+                    <span class="headline-line"><span class="headline-word soon">Maintenance</span></span>
                 </h1>
                 <p class="lead anim-item delay-4">
-                    We are putting the finishing touches on the platform. Access will open once launch preparations are complete — thank you for your patience.
+                    The platform is temporarily offline while we perform scheduled maintenance. Access will be restored as soon as work is complete — thank you for your patience.
                 </p>
                 <div class="status-row anim-item delay-5" aria-hidden="true">
                     <div class="status-dots"><span></span><span></span><span></span></div>
                     <div class="progress-track"><div class="progress-bar"></div></div>
-                    <span class="status-label">Preparing launch</span>
+                    <span class="status-label">Maintenance in progress</span>
                 </div>
                 <div class="divider anim-item delay-6" aria-hidden="true"></div>
             </div>
@@ -797,7 +801,7 @@
         <span>&copy; {% if _copyright_year %}{{ _copyright_year }} {% endif %}{{ ORG_NAME }}</span>
         <span class="footer-badge">
             <span class="footer-badge-dot" aria-hidden="true"></span>
-            Coming soon
+            Under maintenance
         </span>
     </footer>
 

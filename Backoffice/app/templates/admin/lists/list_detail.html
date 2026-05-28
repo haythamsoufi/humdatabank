@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/modal_shell.html" import modal_shell %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block content %}
 <style nonce="{{ csp_style_nonce() }}">
     .drag-handle {
@@ -29,7 +30,6 @@
     }
 </style>
 
-{% from "components/_page_header.html" import page_header %}
 
 {% set page_actions = [
     {

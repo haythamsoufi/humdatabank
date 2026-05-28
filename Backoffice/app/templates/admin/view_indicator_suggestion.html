@@ -1,9 +1,9 @@
 {% extends "core/layout.html" %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}View Suggestion - Admin{% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {{ page_header(
     title=_('Indicator Suggestion Details'),

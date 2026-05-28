@@ -7,8 +7,13 @@
 {% from "macros/translation_modal.html" import translation_modal, translation_matrix_modal %}
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
 
-{% block content %}
 {% from "components/_page_header.html" import page_header %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static_url('css/form-builder-page.css') }}">
+{% endblock %}
+
+{% block content %}
 
 {% set actions = [
     {
@@ -65,10 +70,6 @@
     ],
     actions=actions
 ) }}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{{ static_url('css/form-builder-page.css') }}">
-{% endblock %}
 
 <script nonce="{{ csp_nonce() }}">
     (function(){ try { document.documentElement.classList.add('form-builder-loading'); } catch(e) {} })();

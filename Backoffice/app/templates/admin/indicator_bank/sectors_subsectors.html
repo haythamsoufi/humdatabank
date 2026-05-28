@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block head %}
     {{ super() }}
     <style nonce="{{ csp_style_nonce() }}">
@@ -105,7 +106,6 @@
 
 {% block content %}
 <div>
-    {% from "components/_page_header.html" import page_header %}
 
     {{ page_header(
         title=title,

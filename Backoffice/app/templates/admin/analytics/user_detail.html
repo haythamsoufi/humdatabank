@@ -1,11 +1,11 @@
 {% extends "core/layout.html" %}
 
-{% block title %}User Analytics - {{ user.name or user.email }} - Admin Panel{% endblock %}
+{% from "components/_page_header.html" import page_header %}
+{% block title %}{{ _('User Analytics') }} - {{ user.name or user.email }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-6">
 
-    {% from "components/_page_header.html" import page_header %}
 
     {{ page_header(
         title=_('User Analytics'),

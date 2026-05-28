@@ -7,3 +7,21 @@
 .sharp-ui .avatar-circle * {
     border-radius: 9999px !important;
 }
+
+/* Analytics dashboard chart layout */
+.chart-container {
+    height: 300px;
+    position: relative;
+}
+
+.device-dist-chart-wrap {
+    position: relative;
+    height: 240px;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .device-dist-chart-wrap {
+        height: 260px;
+    }
+}

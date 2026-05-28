@@ -1,9 +1,10 @@
 {% extends "core/layout.html" %}
+{% from "macros/filter_card.html" import filter_card %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Notification type registry') }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 <div class="container mx-auto px-4 py-6 max-w-7xl">
     {{ page_header(
@@ -17,16 +18,15 @@
         info_tooltip=_('Maps each canonical notification type key to descriptions, configured default priority, TTL (from System Configuration overrides), and the icon shown in grids. Matches the NotificationType enum used for stored rows.')
     ) }}
 
-    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
-        <form method="get" action="{{ url_for('admin_notifications.notifications_registry') }}" class="flex flex-col sm:flex-row flex-wrap gap-4 items-end">
-            <div class="flex-1 min-w-[12rem]">
+    {% call filter_card(_('Search'), method='GET', grid_cols='grid-cols-1 sm:grid-cols-2', action=url_for('admin_notifications.notifications_registry')) %}
+            <div class="flex-1 min-w-[12rem] sm:col-span-1">
                 <label for="ntr_q" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Search') }}</label>
                 <input type="search" name="q" id="ntr_q" value="{{ q }}"
                        class="form-input w-full border-gray-300 rounded-md text-sm font-mono"
                        placeholder="{{ _('group, type key, label, description, priority…') }}"
                        autocomplete="off">
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 sm:col-span-1">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-search mr-2"></i>{{ _('Apply') }}
                 </button>
@@ -35,8 +35,7 @@
                     <i class="fas fa-file-csv mr-2"></i>{{ _('Export CSV') }}
                 </a>
             </div>
-        </form>
-    </div>
+    {% endcall %}
 
     <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
         <p class="text-sm text-gray-600 mb-4">

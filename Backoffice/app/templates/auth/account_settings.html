@@ -1,6 +1,8 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_form_helpers.html" import render_field %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block head %}
 {{ super() }}
 <link rel="stylesheet" href="{{ static_url('css/profile-color-dropdown.css') }}">
@@ -9,7 +11,6 @@
 {% block title %}Account Settings{% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {{ page_header(
@@ -67,20 +68,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <!-- Name -->
                     <div>
-                        {{ form.name.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-                        {{ form.name(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Enter your full name") }}
-                        {% for error in form.name.errors %}
-                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                        {% endfor %}
+                        {{ render_field(form.name, placeholder=_('Enter your full name')) }}
                     </div>
 
                     <!-- Title -->
                     <div>
-                        {{ form.title.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-                        {{ form.title(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Enter your job title or role") }}
-                        {% for error in form.title.errors %}
-                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                        {% endfor %}
+                        {{ render_field(form.title, placeholder=_('Enter your job title or role')) }}
                     </div>
                 </div>
 

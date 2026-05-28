@@ -12,6 +12,7 @@
 {# Actions dropdown is only relevant when the user can do something beyond read-only viewing. #}
 {% set can_see_actions_dropdown = can_create_indicators or can_edit_indicators or can_archive_indicators or can_review_suggestions or can_view_audit or can_manage_org %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Indicator Bank') }}{% endblock %}
 
 {% block head %}
@@ -386,7 +387,6 @@
      data-try-again="{{ _('Try Again') }}">
 </div>
 
-{% from "components/_page_header.html" import page_header %}
 {% set pending_suggestions_count = pending_suggestions_count | default(0) %}
 {% set has_pending_suggestions = pending_suggestions_count > 0 %}
 {% set indicator_suggestions_classes = (

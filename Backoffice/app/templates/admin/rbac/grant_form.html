@@ -71,12 +71,8 @@
             <input type="number" name="assigned_form_id" placeholder="Assignment ID" class="form-control">
         </div>
 
-        <div class="flex gap-3">
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save mr-2"></i>Create Grant
-            </button>
-            <a href="{{ url_for('rbac_management.manage_grants') }}" class="btn btn-secondary">Cancel</a>
-        </div>
+        {% from "macros/form_actions.html" import form_actions %}
+        {{ form_actions(_('Create Grant'), cancel_url=url_for('rbac_management.manage_grants')) }}
     </form>
 </div>
 

@@ -3,6 +3,13 @@
 
 {% block title %}{{ _('Trace') }} #{{ trace.id }}{% endblock %}
 
+{% block head %}
+{{ super() }}
+<style nonce="{{ csp_style_nonce() }}">
+{% include "admin/ai/_trace_detail_styles.html" %}
+</style>
+{% endblock %}
+
 {% block content %}
 {{ page_header(
     title=_('Reasoning Trace') ~ ' #' ~ trace.id,
@@ -18,11 +25,6 @@
         {'type': 'link', 'url': url_for('ai_management.ai_review_queue'), 'text': _('Review Queue'), 'icon': 'fas fa-clipboard-check'}
     ] + ([{'type': 'link', 'url': url_for('ai_management.conversation_traces', conversation_id=trace.conversation_id), 'text': _('View conversation'), 'icon': 'fas fa-comments'}] if trace.conversation_id else [])
 ) }}
-
-{# NOTE: core/layout.html does not define a "head" block, so page-specific styles must live in-body. #}
-<style nonce="{{ csp_style_nonce() }}">
-{% include "admin/ai/_trace_detail_styles.html" %}
-</style>
 
 <div class="trace-detail-page min-w-0 w-full max-w-full">
 {% set id_prefix = 'trace' %}

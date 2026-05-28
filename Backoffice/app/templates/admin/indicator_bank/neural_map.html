@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
@@ -83,7 +84,7 @@
     .emb-hud { position: absolute; bottom: 12px; left: 12px; z-index: 20; color: var(--emb-hud-color); font-size: 0.7rem; pointer-events: none; }
 
     .emb-tooltip {
-        position: absolute; z-index: 50; pointer-events: none;
+        position: absolute; z-index: 100; pointer-events: none;
         background: var(--emb-tt-bg); color: var(--emb-tt-text); padding: 10px 14px;
         border-radius: 10px; font-size: 0.78rem; line-height: 1.45;
         max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
@@ -105,15 +106,16 @@
     }
     .emb-detail.open { display: block; }
     .emb-detail-header { padding: 10px 14px; border-bottom: 1px solid var(--emb-panel-border); display: flex; justify-content: space-between; align-items: start; }
-    .emb-detail-header h3 { font-weight: 700; font-size: 0.85rem; margin: 0; color: var(--emb-panel-heading); }
+    .emb-detail-header h3 { font-weight: 700; font-size: 0.85rem; margin: 0; color: var(--emb-panel-heading); flex: 1; min-width: 0; padding-right: 8px; line-height: 1.35; overflow-wrap: anywhere; word-break: break-word; }
     .emb-detail-close { background: none; border: none; cursor: pointer; color: var(--emb-panel-meta); font-size: 1.1rem; padding: 0; line-height: 1; }
     .emb-detail-close:hover { color: var(--emb-panel-text); }
     .emb-detail-body { padding: 10px 14px; }
     .emb-detail-body .meta-row { margin-bottom: 2px; color: var(--emb-panel-meta); }
     .emb-detail-body .meta-label { font-weight: 600; color: var(--emb-panel-heading); }
     .emb-nbr-list { list-style: none; padding: 0; margin: 6px 0 0 0; }
-    .emb-nbr-list li { padding: 4px 6px; margin-bottom: 1px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; }
+    .emb-nbr-list li { padding: 6px 8px; margin-bottom: 2px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; transition: background 0.1s; min-height: 28px; }
     .emb-nbr-list li:hover { background: rgba(99,102,241,0.12); }
+    .emb-nbr-list li > span:first-child { flex: 1; min-width: 0; }
     .emb-nbr-sim { font-size: 0.65rem; font-weight: 600; padding: 1px 5px; border-radius: 4px; background: rgba(99,102,241,0.15); color: var(--emb-panel-link); }
 
     .emb-status { font-size: 0.75rem; color: var(--emb-text2); margin-top: 0.35rem; }
@@ -142,7 +144,6 @@
 
 <div class="container mx-auto px-4 py-3 emb-page" id="emb-page">
     <div class="emb-header-area">
-    {% from "components/_page_header.html" import page_header %}
     {{ page_header(
         title=title,
         icon='fas fa-project-diagram',
@@ -676,11 +677,30 @@
     }
     function hit2D(sx, sy) {
         var best = null, bd = Infinity, search = (searchInput.value || '').toLowerCase();
+        var probeNbrSet = {};
+        if (probeActive) probeNeighbors.forEach(function(nb) { probeNbrSet[nb.id] = true; });
         for (var i = 0; i < nodes.length; i++) {
             var nd = nodes[i]; if (hiddenGroups[nd[colorBy]]) continue;
             if (search && nd.label.toLowerCase().indexOf(search) < 0) continue;
-            var p = w2s(nd.x, nd.y), d = Math.hypot(p.x - sx, p.y - sy);
-            if (d < 20 && d < bd) { best = nd; bd = d; }
+            var p = w2s(nd.x, nd.y);
+            var isSel = nd.id === selectedId, isNbr = selectedId !== null && nodeById[selectedId] && nodeById[selectedId]._nbrSet && nodeById[selectedId]._nbrSet[nd.id];
+            var isHighNbr = highlightedNbrId !== null && nd.id === highlightedNbrId;
+            var isProbeNbr = probeActive && probeNbrSet[nd.id];
+            var rad = isHighNbr ? 10 : isSel ? 8 : isNbr ? 7 : isProbeNbr ? 7 : 5;
+            var d = Math.hypot(p.x - sx, p.y - sy);
+            if (d < Math.max(20, rad + 4) && d < bd) { best = nd; bd = d; continue; }
+            var showLabel = isSel || isNbr || isHighNbr || isProbeNbr || cam2d.zoom > 12;
+            if (showLabel && ctx2d) {
+                var font = (isSel ? 'bold 12px' : '11px') + ' Inter,sans-serif';
+                ctx2d.font = font;
+                var tw = ctx2d.measureText(nd.label).width;
+                var lh = isSel ? 12 : 11;
+                var lx = p.x + rad + 4, ly = p.y + 4;
+                if (sx >= lx - 2 && sx <= lx + tw + 2 && sy >= ly - lh - 2 && sy <= ly + 4) {
+                    var labelD = Math.hypot(lx + tw / 2 - sx, ly - lh / 2 - sy);
+                    if (labelD < bd) { best = nd; bd = labelD; }
+                }
+            }
         }
         return best;
     }
@@ -707,7 +727,7 @@
 
     /* ═══════════ SHARED UI ═══════════ */
     /* tooltip */
-    function showTooltip(n, x, y) {
+    function buildTooltipHtml(n) {
         var ttH = '<div class="tt-name">' + esc(n.label) + '</div>';
         ttH += '<div class="tt-meta">Type: ' + esc(n.group) + (n.unit ? ' · ' + esc(n.unit) : '') + '</div>';
         if (n.sector) ttH += '<div class="tt-meta">Sector: ' + esc(n.sector) + '</div>';
@@ -716,12 +736,60 @@
         if (n.emergency) ttH += '<div class="tt-meta" style="color:#ef4444">Emergency</div>';
         if (n.kpi_code) ttH += '<div class="tt-meta">KPI: ' + esc(n.kpi_code) + '</div>';
         if (n.definition) ttH += '<div class="tt-def">' + esc(n.definition) + '</div>';
-        tooltip.innerHTML = ttH;
+        return ttH;
+    }
+    function placeTooltip(tx, ty) {
+        tooltip.style.left = tx + 'px';
+        tooltip.style.top = ty + 'px';
+    }
+    function showTooltip(n, x, y) {
+        tooltip.innerHTML = buildTooltipHtml(n);
         tooltip.classList.add('visible');
-        var tx = x + 16, ty = y - 10; if (tx + 320 > viewport.clientWidth) tx = x - 330; if (ty < 0) ty = 10;
-        tooltip.style.left = tx + 'px'; tooltip.style.top = ty + 'px';
+        var tx = x + 16, ty = y - 10;
+        if (tx + 320 > viewport.clientWidth) tx = x - 330;
+        if (ty < 8) ty = 8;
+        if (ty + tooltip.offsetHeight > viewport.clientHeight - 8) ty = Math.max(8, viewport.clientHeight - tooltip.offsetHeight - 8);
+        placeTooltip(tx, ty);
+    }
+    function showListItemTooltip(n, li) {
+        tooltip.innerHTML = buildTooltipHtml(n);
+        tooltip.classList.add('visible');
+        var vpRect = viewport.getBoundingClientRect();
+        var liRect = li.getBoundingClientRect();
+        var detailRect = detail.getBoundingClientRect();
+        tooltip.style.visibility = 'hidden';
+        placeTooltip(0, 0);
+        var ttW = tooltip.offsetWidth, ttH = tooltip.offsetHeight;
+        tooltip.style.visibility = '';
+        var tx = detailRect.left - vpRect.left - ttW - 12;
+        if (tx < 8) tx = liRect.left - vpRect.left - ttW - 8;
+        if (tx < 8) tx = 8;
+        var ty = liRect.top - vpRect.top + (liRect.height - ttH) / 2;
+        ty = Math.max(8, Math.min(viewport.clientHeight - ttH - 8, ty));
+        placeTooltip(tx, ty);
     }
     function hideTooltip() { tooltip.classList.remove('visible'); }
+
+    function bindNeighborListItems() {
+        detailBody.querySelectorAll('.emb-nbr-list li').forEach(function(li) {
+            li.addEventListener('click', function() {
+                var id = parseInt(this.dataset.id, 10);
+                if (nodeById[id]) showDetail(nodeById[id]);
+            });
+            li.addEventListener('mouseenter', function() {
+                var id = parseInt(this.dataset.id, 10);
+                highlightedNbrId = id;
+                var n = nodeById[id];
+                if (n) showListItemTooltip(n, this);
+                if (mode === '3d') updatePoints3D(); else draw2D();
+            });
+            li.addEventListener('mouseleave', function() {
+                highlightedNbrId = null;
+                hideTooltip();
+                if (mode === '3d') updatePoints3D(); else draw2D();
+            });
+        });
+    }
 
     /* detail panel */
     function showDetail(n) {
@@ -740,11 +808,7 @@
         (n.neighbors || []).forEach(function(nb) { var t = nodeById[nb.id]; var safeId = parseInt(nb.id, 10) || 0; h += '<li data-id="' + safeId + '"><span>' + esc(t ? t.label : 'ID ' + safeId) + '</span><span class="emb-nbr-sim">' + (nb.similarity * 100).toFixed(1) + '%</span></li>'; });
         h += '</ul><div style="margin-top:8px"><a href="' + VIEW_URL.replace(/\/0$/, '/' + n.id) + '" style="color:var(--emb-panel-link);text-decoration:none;font-weight:600;font-size:0.78rem">View details →</a></div>';
         detailBody.innerHTML = h; detail.classList.add('open');
-        detailBody.querySelectorAll('.emb-nbr-list li').forEach(function(li) {
-            li.addEventListener('click', function() { var id = parseInt(this.dataset.id); if (nodeById[id]) showDetail(nodeById[id]); });
-            li.addEventListener('mouseenter', function() { highlightedNbrId = parseInt(this.dataset.id); if (mode === '3d') updatePoints3D(); else draw2D(); });
-            li.addEventListener('mouseleave', function() { highlightedNbrId = null; if (mode === '3d') updatePoints3D(); else draw2D(); });
-        });
+        bindNeighborListItems();
         if (mode === '3d') { updatePoints3D(); drawEdges3D(); } else draw2D();
     }
     function hideDetail() { detail.classList.remove('open'); selectedId = null; highlightedNbrId = null; if (mode === '3d') { updatePoints3D(); drawEdges3D(); } else draw2D(); }
@@ -752,10 +816,12 @@
 
     /* prevent viewport zoom when scrolling the detail panel */
     detail.addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
+    detail.addEventListener('mousemove', function(e) { e.stopPropagation(); });
 
     /* 3D hover/click via viewport mousemove */
     viewport.addEventListener('mousemove', function(e) {
         if (mode !== '3d' || orbitDrag.active) { if (mode === '3d') hideTooltip(); return; }
+        if (e.target.closest('.emb-detail')) return;
         var rect = viewport.getBoundingClientRect();
         mouse3D.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         mouse3D.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -961,10 +1027,11 @@
         ctx2d.lineWidth = 2.5;
         ctx2d.strokeRect(-7, -7, 14, 14);
         ctx2d.restore();
-        /* label */
+        /* label (truncate on map only; full text stays in the detail panel) */
         ctx2d.font = 'bold 12px Inter,sans-serif';
         ctx2d.fillStyle = isLight ? '#064e3b' : '#bbf7d0';
-        ctx2d.fillText(probeLabel, sp.x + 14, sp.y + 4);
+        var mapLabel = probeLabel.length > 60 ? probeLabel.substring(0, 57) + '…' : probeLabel;
+        ctx2d.fillText(mapLabel, sp.x + 14, sp.y + 4);
     }
 
     function runProbe() {
@@ -984,13 +1051,13 @@
                 probeBtn.querySelector('i').className = 'fas fa-crosshairs';
                 if (data.error) { setStatus('Probe: ' + data.error, true); return; }
                 probeNeighbors = data.neighbors || [];
-                probeLabel = q.length > 50 ? q.substring(0, 47) + '…' : q;
+                probeLabel = q;
                 probeActive = true;
                 probeClear.style.display = '';
                 computeProbePos();
                 hideDetail(); selectedId = null;
                 /* show probe detail panel */
-                detailTitle.textContent = '🔍 ' + probeLabel;
+                detailTitle.textContent = '🔍 ' + q;
                 var h = '<div style="margin-bottom:6px;font-weight:600;color:var(--emb-panel-link)">Nearest indicators</div>';
                 h += '<ul class="emb-nbr-list">';
                 probeNeighbors.forEach(function(nb) {
@@ -1000,9 +1067,7 @@
                 h += '</ul>';
                 detailBody.innerHTML = h;
                 detail.classList.add('open');
-                detailBody.querySelectorAll('.emb-nbr-list li').forEach(function(li) {
-                    li.addEventListener('click', function() { var id = parseInt(this.dataset.id); if (nodeById[id]) showDetail(nodeById[id]); });
-                });
+                bindNeighborListItems();
                 if (mode === '3d') { updatePoints3D(); drawProbe3D(); }
                 else draw2D();
                 setStatus('Probe placed — ' + probeNeighbors.length + ' nearest indicators');

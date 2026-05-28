@@ -1,5 +1,5 @@
 {% extends "core/layout.html" %}
-{% from "macros/breadcrumbs.html" import breadcrumbs as build_breadcrumbs %}
+{% from "components/_page_header.html" import page_header %}
 {% from "macros/empty_state.html" import empty_state %}
 {# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
@@ -33,24 +33,7 @@
     </style>
 {% endblock %}
 
-{#
-This block defines the breadcrumb navigation for the page.
-It helps users understand their location within the site structure.
-#}
-{% block breadcrumbs %}
-{{ build_breadcrumbs([
-    {'text': 'Home', 'url': url_for('main.index')},
-    {'text': (page_title if page_title is defined and page_title else 'Document Management'), 'active': True}
-]) }}
-{% endblock %}
-
-{#
-Main content block for the document management page.
-It features a full-bleed card layout with a clean header and a responsive table.
-#}
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
-
 {# Precompute assigned country IDs for per-document UI gating #}
 {% set _user_countries = (current_user.countries.all() if current_user.is_authenticated and hasattr(current_user, 'countries') and hasattr(current_user.countries, 'all') else (current_user.countries if current_user.is_authenticated and hasattr(current_user, 'countries') else [])) %}
 {% set current_user_country_ids = _user_countries | map(attribute='id') | list %}

@@ -255,7 +255,7 @@ def download_submission_pdf(submission_id):
 
     # Generate HTML using the exact template
     html_content = render_template(
-        'public_form.html',
+        'public_submission_export_pdf.html',
         title=f"Submission Details - {submission.country.name}",
         form=form,
         country_form=country_form,

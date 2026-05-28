@@ -4,10 +4,10 @@
 {% from "macros/translation_modal.html" import translation_modal %}
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}Create New Template{% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {{ page_header(
     title='Create New Template',

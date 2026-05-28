@@ -4,7 +4,8 @@
 {% from "macros/empty_state.html" import empty_state %}
 {% from "components/pagination.html" import render_pagination %}
 
-{% block title %}Activity Logs - Admin Panel{% endblock %}
+{% from "components/_page_header.html" import page_header %}
+{% block title %}{{ _('Activity Logs') }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -17,21 +18,20 @@
 {% block content %}
 <div class="container mx-auto px-4 py-6">
 
-    {% from "components/_page_header.html" import page_header %}
 
     {{ page_header(
-        title='Activity Logs',
+        title=_('Activity Logs'),
         icon='fas fa-clipboard-list',
         breadcrumbs=[
-            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-            {'name': 'Analytics', 'url': url_for('analytics.analytics_dashboard')},
-            {'name': 'Activity Logs'}
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Analytics'), 'url': url_for('analytics.analytics_dashboard')},
+            {'name': _('Activity Logs')}
         ]
     ) }}
 
     {% call filter_card() %}
             <div>
-                <label for="user" class="block text-sm font-medium text-gray-700 mb-1">User Email</label>
+                <label for="user" class="block text-sm font-medium text-gray-700 mb-1">{{ _('User Email') }}</label>
                 <input type="text" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="user" name="user"
                        value="{{ filters.user or '' }}" placeholder="Search by email">
             </div>

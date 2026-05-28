@@ -5,6 +5,7 @@
 {% set can_create_indicators = current_is_system_manager or has_permission('admin.indicator_bank.create') %}
 {% set can_archive_indicators = current_is_system_manager or has_permission('admin.indicator_bank.archive') %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block head %}
     {{ super() }}
     <style nonce="{{ csp_style_nonce() }}">
@@ -61,7 +62,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {{ page_header(
     title=title,

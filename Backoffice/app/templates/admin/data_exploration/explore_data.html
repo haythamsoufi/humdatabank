@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Explore Data') }}{% endblock %}
 
 {% block head %}
@@ -107,7 +108,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
 
 {{ page_header(

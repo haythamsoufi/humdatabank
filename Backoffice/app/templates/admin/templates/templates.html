@@ -10,6 +10,7 @@
 {# Lookup Lists are protected only by admin gate today; we keep UI conservative and show only to template editors. #}
 {% set can_manage_lists = can_edit_template %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Manage Templates') }}{% endblock %}
 
 {% block head %}
@@ -20,7 +21,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {% set header_actions = namespace(items=[]) %}
 {% if can_create_template %}

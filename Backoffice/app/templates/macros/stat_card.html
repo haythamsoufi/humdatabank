@@ -1,0 +1,30 @@
+{#
+  Shared KPI / stat card for admin dashboards.
+  Usage:
+    {% from "macros/stat_card.html" import kpi %}
+    {{ kpi(_('Users'), user_count, 'fas fa-users', card_class='kpi-ok') }}
+#}
+{% macro kpi(label, value, icon='fas fa-chart-bar', card_class='kpi-warn', tooltip=None, trend=None) %}
+<div class="bg-white rounded shadow border border-gray-200 p-3 kpi-card {{ card_class }}">
+  <div class="text-2xl font-bold text-gray-800">{{ value }}</div>
+  <div class="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+    <i class="{{ icon }} text-gray-400" aria-hidden="true"></i>{{ label }}
+    {% if trend is not none %}
+    <span class="ml-1 text-gray-400">{{ trend }}</span>
+    {% endif %}
+    {% if tooltip %}
+    <span style="position:relative;cursor:help;margin-left:2px" class="group">
+      <i class="fas fa-info-circle text-gray-300 group-hover:text-gray-500"></i>
+      <span style="pointer-events:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;width:280px;border-radius:6px;background:#1f2937;padding:8px 12px;font-size:12px;line-height:1.5;color:#fff;text-align:center;opacity:0;transition:opacity .15s;box-shadow:0 4px 12px rgba(0,0,0,.25);z-index:50" class="group-hover:opacity-100">{{ tooltip }}</span>
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro threshold_stat(label, value, bad_if_gt=0, suffix='') %}
+<div class="rounded border {{ 'border-red-200 bg-red-50' if value > bad_if_gt else 'border-green-200 bg-green-50' }} p-3 text-center">
+  <div class="text-2xl font-bold {{ 'text-red-700' if value > bad_if_gt else 'text-green-700' }}">{{ value }}{{ suffix }}</div>
+  <div class="text-xs text-gray-500 mt-0.5">{{ label }}</div>
+</div>
+{% endmacro %}

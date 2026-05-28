@@ -34,7 +34,7 @@ google-auth==2.40.3
 google-auth-oauthlib==1.2.3
 google-auth-httplib2==0.2.0
 # AI Chatbot Services
-openai==1.109.1                 # was 1.93.0 — required by langchain-openai 0.3.35 (needs >=1.104.2)
+openai==1.109.1
 google-generativeai==0.8.5
 # Security Dependencies
 bleach==6.2.0
@@ -62,39 +62,6 @@ pgvector==0.2.5
 sentence-transformers==5.4.0    # was 2.7.0 — required to allow transformers 5.x
 transformers==5.0.0             # was 4.57.6 — CVE-2026-1839 (min fix: 5.0.0)
 tiktoken==0.11.0
-
-# ==================== LangChain Ecosystem ====================
-# IMPORTANT: This is a MAJOR version upgrade: 0.2.x → 0.3.x.
-# API changes include:
-#   - Many chain constructors replaced with LCEL (RunnableSequence) patterns
-#   - `BaseCallbackHandler` signature changes
-#   - Tool/agent API rework; verify all custom tools and agents
-# Test all AI agent and RAG flows thoroughly before deploying.
-langchain==0.3.28               # was 0.2.17 — ecosystem-wide security fixes (0.3.28 is latest 0.3.x)
-langchain-community==0.3.27     # was 0.2.19 — CVE-2025-6984 (min fix: 0.3.27)
-langchain-openai==0.3.35        # was 0.1.25 — aligns with langchain 0.3.x
-                                # NOTE: PYSEC-2026-76 fix requires >=1.1.14 (1.x line).
-# Explicit transitive pins: langchain-core and langchain-text-splitters had their
-# own CVEs and were previously resolved implicitly. Pin them for reproducibility.
-langchain-core==0.3.85          # was 0.3.84 — CVE-2026-44843 (min fix: 0.3.85)
-                                # NOTE: CVE-2026-26013 fix requires langchain-core>=1.2.11 (1.x line).
-                                # Migrating to langchain 1.x is a separate, larger upgrade.
-langchain-text-splitters==0.3.11  # was ~0.2.4 (transitive) — CVE-2025-6985 (min fix: 0.3.9)
-                                # NOTE: PYSEC-2026-77 fix requires >=1.1.2 (1.x line).
-
-# ==================== LangGraph Ecosystem ====================
-# ⚠ KNOWN UNRESOLVABLE CVEs — requires LangChain 1.x migration (future task):
-#   CVE-2026-28277 (langgraph)              — fix: langgraph>=1.0.10
-#   CVE-2025-64439 (langgraph-checkpoint)   — fix: langgraph-checkpoint>=3.0.0
-#   CVE-2026-27794 (langgraph-checkpoint)   — fix: langgraph-checkpoint>=4.0.0
-#   PYSEC-2026-77 (langchain-text-splitters) — fix: langchain-text-splitters>=1.1.2
-#   PYSEC-2026-76 (langchain-openai)        — fix: langchain-openai>=1.1.14
-#
-# langgraph 1.0.x pulls langgraph-prebuilt 1.0.x which requires langchain-core>=1.0.0,
-# but all langchain 0.3.x packages cap at langchain-core<1.0.0 — mutually exclusive.
-# Pinned to latest 0.4.x that remains compatible with the langchain 0.3.x family.
-langgraph==0.4.10               # latest 0.4.x compatible with langchain-core 0.3.x
-langgraph-checkpoint==2.1.2     # latest 2.x compatible with langgraph 0.4.x
 
 # Document processing
 unstructured==0.18.27

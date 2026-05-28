@@ -1,8 +1,9 @@
-{# templates/entry_form.html #}
+{# Large page template; extract new sections under entry_form/partials/ when possible. #}
 {% extends "core/layout.html" %}
 {% set entity_repo_document_ids = entity_repo_document_ids if entity_repo_document_ids is defined else [] %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
+{% from "components/_form_helpers.html" import format_number_value %}
 {% block title %}{{ get_localized_template_name(template_structure) if template_structure and get_localized_template_name else (template_structure.name if template_structure else '') }}{% endblock %}
 
 {% block head %}
@@ -16,130 +17,10 @@
 {% endif %}
 <meta name="language" content="{{ _lang_for_meta }}">
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
-<style>
-    /* Document modal language select: see forms.css (.modal-document-language-select) */
-
-    /* Entry form loading gate: keep UI hidden until JS modules finish init */
-    .entry-form-loading #entry-form-ui { display: none !important; }
-    .entry-form-loading #entry-form-loading { display: flex !important; }
-    #entry-form-loading { display: none; }
-
-    /* AI opinion processing: spark moving on border + badge below item */
-    .form-item-block.ai-opinion-processing {
-        position: relative;
-        border-radius: 6px;
-        z-index: 1;
-        border: 2px solid rgba(168, 85, 247, 0.35);
-        box-shadow: 0 0 12px rgba(168, 85, 247, 0.2), inset 0 0 8px rgba(168, 85, 247, 0.08);
-        overflow: visible;
-    }
-    /* Spark + trail: trail dots follow the same path with animation-delay (lag behind) and fade */
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        overflow: visible;
-    }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-spark,
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot {
-        position: absolute;
-        transform: translate(-50%, -50%);
-        animation: ai-spark-travel 4.5s linear infinite;
-    }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-spark {
-        width: 28px;
-        height: 28px;
-        background-image: url("{{ static_url('images/ai-spark-icon.svg') }}");
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-        filter: drop-shadow(0 0 4px rgba(233, 121, 249, 0.8)) drop-shadow(0 0 8px rgba(168, 85, 247, 0.5));
-        animation-delay: 0s;
-    }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: radial-gradient(circle at 30% 30%, rgba(233, 121, 249, 0.9), rgba(168, 85, 247, 0.6));
-        box-shadow: 0 0 6px rgba(192, 132, 252, 0.5);
-    }
-    /* Trail dots lag behind: positive delay = starts later = position behind spark */
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot:nth-child(1) { animation-delay: 0.30s; opacity: 0.55; width: 7px; height: 7px; }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot:nth-child(2) { animation-delay: 0.60s; opacity: 0.38; width: 6px; height: 6px; }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot:nth-child(3) { animation-delay: 0.90s; opacity: 0.24; width: 6px; height: 6px; }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot:nth-child(4) { animation-delay: 1.20s; opacity: 0.14; width: 5px; height: 5px; }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot:nth-child(5) { animation-delay: 1.50s; opacity: 0.07; width: 5px; height: 5px; }
-    .form-item-block.ai-opinion-processing .ai-opinion-spark-track .ai-opinion-trail-dot:nth-child(6) { animation-delay: 1.80s; opacity: 0.03; width: 4px; height: 4px; }
-    @keyframes ai-spark-travel {
-        0%   { left: 0;    top: 0; }
-        25%  { left: 100%; top: 0; }
-        50%  { left: 100%; top: 100%; }
-        75%  { left: 0;    top: 100%; }
-        100% { left: 0;    top: 0; }
-    }
-    .ai-opinion-processing-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        margin-top: 0.35rem;
-        padding: 0.35rem 0.6rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #5b21b6;
-        background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%);
-        border: 1px solid #c084fc;
-        border-radius: 9999px;
-        box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
-    }
-    .ai-opinion-processing-badge i {
-        animation: ai-badge-pulse 0.8s ease-in-out infinite;
-    }
-    @keyframes ai-badge-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-    }
-
-    /* Preview banner "select-like" inputs (datalist-backed) */
-    .preview-selectlike-input {
-        appearance: none;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
-        background-position: right 0.5rem center;
-        background-repeat: no-repeat;
-        background-size: 1.25em 1.25em;
-        padding-right: 2.25rem;
-    }
-
-    /* Hover menu above chatbot FAB */
-    #chatbot-ai-hover-menu .chatbot-ai-hover-row {
-        min-height: var(--chat-fab-size, 56px);
-    }
-    #chatbot-ai-hover-menu .chatbot-ai-tooltip {
-        display: inline-flex;
-        align-items: center;
-        min-height: 2rem;
-        padding: 0.375rem 0.75rem;
-        border-radius: 0.5rem;
-        background-color: rgba(31, 41, 55, 0.92);
-        color: #ffffff;
-        font-size: 0.75rem;
-        font-weight: 600;
-        line-height: 1.2;
-        white-space: nowrap;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
-    }
-</style>
 <script nonce="{{ csp_nonce() }}">
     // Gate the entry-form UI ASAP (prevents "half-rendered" form when modules fail to load)
     (function(){ try { document.documentElement.classList.add('entry-form-loading'); } catch(e) {} })();
 </script>
-{% endblock %}
-
-{% block admin_actions %}
-    {% if admin_actions is defined %}
-        {{ admin_actions|safe }}
-    {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -1311,8 +1192,6 @@
                                                                             {% endfor %}
                                                                         </div>
                                                                     </div>
-                                                                    {% macro format_number_value(value) %}{{ value if (value is not none and value != 'None') else '' }}{% endmacro %}
-
                                                                     <div class="disaggregation-inputs" data-parent-id="{{ field.id }}" data-item-type="indicator" data-mode="total" {% if 'total' != current_reporting_mode %}style="display: none;"{% endif %}>
                                                                         <div class="flex items-center gap-6">
                                                                             <div class="flex items-center gap-3 flex-wrap sm:flex-nowrap">
@@ -1466,8 +1345,6 @@
                                                                             {% endfor %}
                                                                         </div>
                                                                     </div>
-                                                                    {% macro format_number_value(value) %}{{ value if (value is not none and value != 'None') else '' }}{% endmacro %}
-
                                                                     <div class="disaggregation-inputs" data-parent-id="{{ field.id }}" data-item-type="indicator" data-mode="total" {% if 'total' != current_reporting_mode %}style="display: none;"{% endif %}>
                                                                         <div class="flex items-center gap-6">
                                                                             <div class="flex items-center gap-3 flex-wrap sm:flex-nowrap">
@@ -1625,7 +1502,6 @@
                                                                 {% endif %}
                                                                 <textarea name="field_value[{{ field.id }}]" id="field-{{ field.id }}" rows="3" class="{{ textarea_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>{{ existing_q_value | default('', true) }}</textarea>
                                                             {% elif field.field_type_for_js|lower == 'number' %}
-                                                                {% macro format_number_value(value) %}{{ value if (value is not none and value != 'None') else '' }}{% endmacro %}
                                                                 {% set number_classes = "w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-right" %}
                                                                 {% if is_prefilled %}
                                                                     {% set number_classes = number_classes ~ " bg-yellow-100 border-yellow-300" %}
@@ -1639,7 +1515,6 @@
                                                                        class="{{ number_classes }}"
                                                                        {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% elif field.field_type_for_js|lower == 'percentage' %}
-                                                                {% macro format_number_value(value) %}{{ value if (value is not none and value != 'None') else '' }}{% endmacro %}
                                                                 {% set percentage_classes = "w-20 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-right" %}
                                                                 {% if is_prefilled %}
                                                                     {% set percentage_classes = percentage_classes ~ " bg-yellow-100 border-yellow-300" %}
@@ -3034,10 +2909,10 @@
     </div>
     {% endif %}
 
-        {% endblock %}
+{% endblock %}
 
-        {% block extra_js %}
-        <!-- Ensure forms.css is loaded even if layout lacks a head block -->
+{% block extra_js %}
+{# Fallback if forms.css failed to load from the head block #}
         <script nonce="{{ csp_nonce() }}">
         (function ensureFormsCss(){
             try {
@@ -3938,4 +3813,4 @@
         })();
         </script>
         {% endif %}
-        {% endblock %}
+{% endblock %}

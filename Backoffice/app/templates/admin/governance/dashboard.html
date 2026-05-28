@@ -1,6 +1,6 @@
 {% extends "core/layout.html" %}
-{% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_page_header.html" import page_header %}
+{% from "macros/stat_card.html" import kpi %}
 
 {% block title %}{{ _('Governance Dashboard') }}{% endblock %}
 
@@ -147,21 +147,6 @@ section[id] { scroll-margin-top: 80px; }
     {# ═══════════════════════════════════════════════════════════════════ #}
     <section id="kpi-strip">
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-
-        {% macro kpi(label, value, icon, cls='kpi-warn', tooltip=None) %}
-        <div class="bg-white rounded shadow border border-gray-200 p-3 kpi-card {{ cls }}">
-          <div class="text-2xl font-bold text-gray-800">{{ value }}</div>
-          <div class="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-            <i class="{{ icon }} text-gray-400"></i>{{ label }}
-            {% if tooltip %}
-            <span style="position:relative;cursor:help;margin-left:2px" class="group">
-              <i class="fas fa-info-circle gov-tip-icon"></i>
-              <span style="pointer-events:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;width:300px;border-radius:6px;background:#1f2937;padding:8px 12px;font-size:12px;line-height:1.5;color:#fff;text-align:center;opacity:0;transition:opacity .15s;box-shadow:0 4px 12px rgba(0,0,0,.25);z-index:50" class="gov-tooltip">{{ tooltip }}</span>
-            </span>
-            {% endif %}
-          </div>
-        </div>
-        {% endmacro %}
 
         {% set fp_pct = ((o.countries_with_focal_point / o.total_countries * 100) | round(0) | int) if o.total_countries else 0 %}
         {{ kpi('Focal Point %', fp_pct ~ '%', 'fas fa-flag', 'kpi-ok' if fp_pct >= 80 else 'kpi-bad') }}

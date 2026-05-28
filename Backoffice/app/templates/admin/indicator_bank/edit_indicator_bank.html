@@ -5,12 +5,12 @@
 {% set can_edit_indicators = current_is_system_manager or has_permission('admin.indicator_bank.edit') %}
 {% set can_archive_indicators = current_is_system_manager or has_permission('admin.indicator_bank.archive') %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block head %}
     {{ super() }}
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 {% set input_class = "shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %}
 
 {% set save_label = form.submit.label.text if form.submit and form.submit.label else _('Save') %}

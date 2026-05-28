@@ -91,57 +91,37 @@
 {% endif %}
 
 {# Add Category Modal #}
-<div id="add-category-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center" role="dialog" aria-labelledby="add-category-modal-title" aria-modal="true">
-    <div class="relative p-6 border max-w-md w-full mx-4 shadow-xl rounded-lg bg-white">
-        <div class="flex justify-between items-center mb-5">
-            <h3 id="add-category-modal-title" class="text-xl font-semibold text-gray-800 flex items-center">
-                <i class="fas fa-plus-circle w-6 h-6 mr-2 text-blue-600"></i>
-                {{ _('Add Category') }}
-            </h3>
-            <button type="button" id="close-add-category-modal-btn" class="text-gray-400 hover:text-gray-600" aria-label="{{ _('Close') }}">
-                <i class="fas fa-times w-5 h-5"></i>
-            </button>
-        </div>
-
-        <form id="add-category-form">
-            <div class="mb-4">
-                <label for="category-name-input" class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ _('Category Name') }}
-                </label>
-                <input
-                    type="text"
-                    id="category-name-input"
-                    name="category_name"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="{{ _('Enter category name...') }}"
-                    required
-                    autofocus
-                >
-                <p class="mt-2 text-sm text-gray-500">
-                    {{ _('This will create a new column in the table for this category.') }}
-                </p>
-            </div>
-
-            <div class="flex justify-end gap-3">
-                <button
-                    type="button"
-                    id="cancel-add-category-btn"
-                    class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                    {{ _('Cancel') }}
-                </button>
-                <button
-                    type="submit"
-                    id="submit-add-category-btn"
-                    class="btn btn-primary"
-                >
-                    <i class="fas fa-plus mr-2"></i>
-                    {{ _('Add Category') }}
-                </button>
-            </div>
-        </form>
+{% from "macros/modal_shell.html" import modal_shell %}
+{% call modal_shell('add-category-modal', _('Add Category'), max_width='max-w-md', close_id='close-add-category-modal-btn',
+    title_class='flex items-center') %}
+<form id="add-category-form">
+    <div class="mb-4">
+        <label for="category-name-input" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ _('Category Name') }}
+        </label>
+        <input
+            type="text"
+            id="category-name-input"
+            name="category_name"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="{{ _('Enter category name...') }}"
+            required
+            autofocus
+        >
+        <p class="mt-2 text-sm text-gray-500">
+            {{ _('This will create a new column in the table for this category.') }}
+        </p>
     </div>
-</div>
+    <div class="flex justify-end gap-3">
+        <button type="button" id="cancel-add-category-btn" class="btn btn-secondary close-modal">
+            {{ _('Cancel') }}
+        </button>
+        <button type="submit" id="submit-add-category-btn" class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>{{ _('Add Category') }}
+        </button>
+    </div>
+</form>
+{% endcall %}
 
 {% if can_manage_org %}
 <script nonce="{{ csp_nonce() }}">

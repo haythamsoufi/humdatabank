@@ -9,37 +9,11 @@ def register_template_context(app, config_class):
     """Register all Jinja2 filters, globals, and context processors."""
     from config.config import Config
 
+    from app.filters import register_jinja_filters
     from app.utils.filters import register_filters
 
-    # Custom Jinja2 filter: parse JSON strings.
-    # When called as `value | fromjson(default=x)`, returns `x` on parse failure.
-    # When called as `value | fromjson` (no default), returns the raw value on failure.
-    _MISSING = object()
-
-    def fromjson_filter(value, default=_MISSING):
-        import json
-        try:
-            return json.loads(value) if isinstance(value, str) else value
-        except (json.JSONDecodeError, TypeError):
-            return value if default is _MISSING else default
-
-    def js_filter(value):
-        import json
-        from markupsafe import Markup
-        # Harden against script-context breakout: escape characters that could
-        # end a <script> block or introduce HTML tags inside JSON strings.
-        return Markup(
-            json.dumps(value)
-            .replace('<', r'\u003c')
-            .replace('>', r'\u003e')
-            .replace('&', r'\u0026')
-            .replace("'", r'\u0027')
-        )
-
     app.jinja_env.filters['zip'] = zip
-    app.jinja_env.filters['fromjson'] = fromjson_filter
-    app.jinja_env.filters['js'] = js_filter
-
+    register_jinja_filters(app)
     register_filters(app)
 
     try:

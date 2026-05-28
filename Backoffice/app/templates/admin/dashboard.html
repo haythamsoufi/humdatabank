@@ -154,16 +154,11 @@
       <a href="{{ url_for('analytics.security_events') }}" class="ml-auto text-xs text-blue-600 hover:underline font-normal">View all →</a>
     </h3>
     <div class="grid grid-cols-2 gap-3">
-      {% macro sa_stat(label, value, bad_if_gt=0, suffix='') %}
-      <div class="rounded border {{ 'border-red-200 bg-red-50' if value > bad_if_gt else 'border-green-200 bg-green-50' }} p-3 text-center">
-        <div class="text-2xl font-bold {{ 'text-red-700' if value > bad_if_gt else 'text-green-700' }}">{{ value }}{{ suffix }}</div>
-        <div class="text-xs text-gray-500 mt-0.5">{{ label }}</div>
-      </div>
-      {% endmacro %}
-      {{ sa_stat('Unresolved Events',        unresolved_security_events | default(0)) }}
-      {{ sa_stat('High-Risk Actions (30d)',  sa.high_risk_actions_30d   | default(0)) }}
-      {{ sa_stat('Suspicious Logins (30d)', sa.suspicious_logins_30d   | default(0)) }}
-      {{ sa_stat('Failed Login Rate',        sa.failed_login_rate_30d   | default(0), bad_if_gt=5, suffix='%') }}
+      {% from "macros/stat_card.html" import threshold_stat %}
+      {{ threshold_stat(_('Unresolved Events'), unresolved_security_events | default(0)) }}
+      {{ threshold_stat(_('High-Risk Actions (30d)'), sa.high_risk_actions_30d | default(0)) }}
+      {{ threshold_stat(_('Suspicious Logins (30d)'), sa.suspicious_logins_30d | default(0)) }}
+      {{ threshold_stat(_('Failed Login Rate'), sa.failed_login_rate_30d | default(0), bad_if_gt=5, suffix='%') }}
     </div>
   </div>
 

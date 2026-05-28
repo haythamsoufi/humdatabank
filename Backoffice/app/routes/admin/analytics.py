@@ -1162,6 +1162,30 @@ def audit_trail():
         except (ValueError, TypeError):
             pass
 
+    from app.services.audit_trail_page_data import (
+        build_audit_trail_grid_rows,
+        build_audit_trail_multiselect_data,
+    )
+
+    audit_trail_page_data = {
+        'multiselect': build_audit_trail_multiselect_data(
+            users=users,
+            countries=countries,
+            activity_types=activity_types,
+            action_types=action_types,
+            recent_session_logs=recent_session_logs,
+            filters={
+                'user': user_filter,
+                'activity_type': activity_type,
+                'risk_level': risk_level,
+                'country': country_filter,
+                'requires_review': requires_review,
+                'session_id': filters_session_id,
+            },
+        ),
+        'gridRows': build_audit_trail_grid_rows(entries),
+    }
+
     return render_template(
         'admin/analytics/audit_trail.html',
         entries=entries,
@@ -1170,6 +1194,7 @@ def audit_trail():
         countries=countries,
         users=users,
         recent_session_logs=recent_session_logs,
+        audit_trail_page_data=audit_trail_page_data,
         filters={
             'user': user_filter,
             'activity_type': activity_type,

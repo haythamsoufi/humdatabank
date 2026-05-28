@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block head %}
     {{ super() }}
     <!-- CSRF Token -->
@@ -80,7 +81,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {{ page_header(
     title=_('Indicator Change History'),

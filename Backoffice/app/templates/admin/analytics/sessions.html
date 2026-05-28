@@ -2,6 +2,7 @@
 {% from "macros/filter_card.html" import filter_card %}
 {% from "components/ag_grid_includes.html" import ag_grid_loading %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Session Logs') }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block head %}
@@ -17,7 +18,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {{ page_header(
     title=_('Session Logs'),
@@ -103,53 +103,50 @@
 {% endblock %}
 
 {% block extra_js %}
-{% from "components/ag_grid_includes.html" import ag_grid_js %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_page_config %}
 {{ ag_grid_js() }}
 <script src="{{ static_url('js/admin/session-logs-grid.js') }}"></script>
-<script nonce="{{ csp_nonce() }}">
-(function() {
-    window.sessionLogsGridConfig = {
-        apiUrl: {{ url_for('admin_analytics_api.session_logs_list_api')|tojson }},
-        perPage: 50,
-        endSessionUrlTemplate: {{ url_for('analytics.end_session', session_id='SESSION_ID_PLACEHOLDER')|tojson }},
-        confirmForceLogout: {{ _('Are you sure you want to force logout this user? They will be logged out on their next request.')|tojson }},
-        auditTrailUrl: {{ url_for('analytics.audit_trail')|tojson }},
-        initialSessionId: {{ (filters.session_id or '')|tojson }}
-    };
-    window.SESSION_LOGS_TRANSLATIONS = {
-        shortSessionId: {{ _('ID')|tojson }},
-        user: {{ _('User')|tojson }},
-        unknownUser: {{ _('Unknown user')|tojson }},
-        deviceType: {{ _('Device')|tojson }},
-        operatingSystem: {{ _('OS')|tojson }},
-        sessionStart: {{ _('Session start')|tojson }},
-        duration: {{ _('Session length')|tojson }},
-        activeDuration: {{ _('Active time')|tojson }},
-        minutesShort: {{ _('min')|tojson }},
-        pageViews: {{ _('Page views')|tojson }},
-        distinctPaths: {{ _('Distinct paths')|tojson }},
-        activities: {{ _('Activities')|tojson }},
-        status: {{ _('Status')|tojson }},
-        active: {{ _('Active')|tojson }},
-        ended: {{ _('Ended')|tojson }},
-        lastActivity: {{ _('Last activity')|tojson }},
-        noActivity: {{ _('No activity')|tojson }},
-        ipAddress: {{ _('IP address')|tojson }},
-        actions: {{ _('Actions')|tojson }},
-        forceLogout: {{ _('Force logout')|tojson }},
-        sessionEnded: {{ _('Session ended')|tojson }},
-        pageOfTotal: {{ _('Page {page} of {pages} ({total} total)')|tojson }},
-        noRows: {{ _('No sessions')|tojson }},
-        loadError: {{ _('Could not load session logs.')|tojson }},
-        openActivitiesInAudit: {{ _('Open activities in audit trail')|tojson }},
-        viewPathBreakdown: {{ _('View path breakdown')|tojson }},
-        pathBreakdownTitle: {{ _('Page views by path')|tojson }},
-        pathBreakdownEmpty: {{ _('No path breakdown recorded for this session.')|tojson }},
-        pathBucketOther: {{ _('Other paths (aggregated)')|tojson }},
-        pathColumn: {{ _('Path')|tojson }},
-        viewCount: {{ _('Count')|tojson }},
-        close: {{ _('Close')|tojson }}
-    };
-})();
-</script>
+{% set session_logs_grid_bootstrap = {
+    'apiUrl': url_for('admin_analytics_api.session_logs_list_api'),
+    'perPage': 50,
+    'endSessionUrlTemplate': url_for('analytics.end_session', session_id='SESSION_ID_PLACEHOLDER'),
+    'confirmForceLogout': _('Are you sure you want to force logout this user? They will be logged out on their next request.'),
+    'auditTrailUrl': url_for('analytics.audit_trail'),
+    'initialSessionId': filters.session_id or '',
+    'translations': {
+        'shortSessionId': _('ID'),
+        'user': _('User'),
+        'unknownUser': _('Unknown user'),
+        'deviceType': _('Device'),
+        'operatingSystem': _('OS'),
+        'sessionStart': _('Session start'),
+        'duration': _('Session length'),
+        'activeDuration': _('Active time'),
+        'minutesShort': _('min'),
+        'pageViews': _('Page views'),
+        'distinctPaths': _('Distinct paths'),
+        'activities': _('Activities'),
+        'status': _('Status'),
+        'active': _('Active'),
+        'ended': _('Ended'),
+        'lastActivity': _('Last activity'),
+        'noActivity': _('No activity'),
+        'ipAddress': _('IP address'),
+        'actions': _('Actions'),
+        'forceLogout': _('Force logout'),
+        'sessionEnded': _('Session ended'),
+        'pageOfTotal': _('Page {page} of {pages} ({total} total)'),
+        'noRows': _('No sessions'),
+        'loadError': _('Could not load session logs.'),
+        'openActivitiesInAudit': _('Open activities in audit trail'),
+        'viewPathBreakdown': _('View path breakdown'),
+        'pathBreakdownTitle': _('Page views by path'),
+        'pathBreakdownEmpty': _('No path breakdown recorded for this session.'),
+        'pathBucketOther': _('Other paths (aggregated)'),
+        'pathColumn': _('Path'),
+        'viewCount': _('Count'),
+        'close': _('Close')
+    }
+} %}
+{{ ag_grid_page_config('sessionLogsGridConfig', 'SESSION_LOGS_TRANSLATIONS', session_logs_grid_bootstrap) }}
 {% endblock %}

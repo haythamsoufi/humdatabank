@@ -15,12 +15,12 @@
   row so each template retains full control over column spans and layout.
 #}
 
-{% macro filter_card(title="Filters", method="GET", grid_cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5") %}
+{% macro filter_card(title="Filters", method="GET", grid_cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5", action=none, form_id=none) %}
 <div class="bg-gray-50 p-4 sm:p-6 rounded-lg shadow mb-8">
     <h5 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
         <i class="fas fa-filter mr-2"></i> {{ title }}
     </h5>
-    <form method="{{ method }}" class="grid {{ grid_cols }} gap-4 items-end">
+    <form method="{{ method }}" class="grid {{ grid_cols }} gap-4 items-end"{% if action %} action="{{ action }}"{% endif %}{% if form_id %} id="{{ form_id }}"{% endif %}>
         {{ caller() }}
     </form>
 </div>

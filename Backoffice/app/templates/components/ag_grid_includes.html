@@ -136,6 +136,35 @@ Parameters:
   - options: Additional grid options (as JS object literal string)
   - on_ready: JavaScript code to run after grid is ready (optional)
 #}
+{#
+Bootstrap AG Grid page config + translations for external grid JS modules.
+Usage:
+  {% set grid_bootstrap = {
+      'apiUrl': url_for('admin_analytics_api.login_logs_list_api'),
+      'perPage': 50,
+      'translations': { 'timestamp': _('Timestamp'), ... }
+  } %}
+  {{ ag_grid_page_config('loginLogsGridConfig', 'LOGIN_LOGS_TRANSLATIONS', grid_bootstrap) }}
+  <script src="{{ static_url('js/admin/login-logs-grid.js') }}"></script>
+#}
+{% macro ag_grid_page_config(config_var, translations_var, bootstrap) %}
+<script type="application/json" id="{{ config_var }}-bootstrap">{{ bootstrap|tojson }}</script>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+  'use strict';
+  var el = document.getElementById('{{ config_var }}-bootstrap');
+  if (!el) return;
+  try {
+    var data = JSON.parse(el.textContent || '{}');
+    var translations = data.translations || {};
+    delete data.translations;
+    window.{{ config_var }} = data;
+    window.{{ translations_var }} = translations;
+  } catch (e) {}
+})();
+</script>
+{% endmacro %}
+
 {% macro ag_grid_init_script(grid_id, template_id, column_defs_var='columnDefs', row_data_var='rowData', options='{}', on_ready='') %}
 <script nonce="{{ csp_nonce() }}">
 (function() {

@@ -2,6 +2,7 @@
 {% from "components/_form_helpers.html" import render_field %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{% if resource %}Edit Resource{% else %}Upload New Resource{% endif %}{% endblock %}
 
 {% block extra_css %}
@@ -75,7 +76,6 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {{ page_header(
     title="Edit Resource" if resource else "Upload New Resource",

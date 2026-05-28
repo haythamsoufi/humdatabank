@@ -1,37 +1,13 @@
 {% extends "core/layout.html" %}
-{% from "macros/breadcrumbs.html" import breadcrumb %}
-
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('User Analytics Dashboard') }}{% endblock %}
 
 {% block head %}
-{{ super() }} {# Includes styles from layout.html, including Tailwind #}
-<style nonce="{{ csp_style_nonce() }}">
-    /* Custom styles specific to this dashboard, if any, can go here.
-       However, the goal is to use Tailwind utilities as much as possible. */
-
-    .chart-container {
-        height: 300px; /* Or use Tailwind's h-72, h-80, h-96 etc. */
-        position: relative;
-    }
-
-    /* You might still need some specific styles for Chart.js if Tailwind doesn't cover all needs,
-       but try to minimize this. */
-
-    .device-dist-chart-wrap {
-        position: relative;
-        height: 240px;
-        width: 100%;
-    }
-    @media (min-width: 1024px) {
-        .device-dist-chart-wrap {
-            height: 260px;
-        }
-    }
-</style>
+{{ super() }}
+<link rel="stylesheet" href="{{ static_url('css/admin-dashboard.css') }}">
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {# Device category: icon + bar colour index (matches Chart.js palette order) #}
 {% macro device_dist_icon(device) -%}

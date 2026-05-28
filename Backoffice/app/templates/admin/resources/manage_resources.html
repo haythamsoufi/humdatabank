@@ -2,6 +2,7 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/pagination.html" import render_pagination %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}Manage Resources{% endblock %}
 
 {% block extra_js %}
@@ -25,7 +26,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set can_manage_resources = current_is_system_manager or has_permission('admin.resources.manage') %}

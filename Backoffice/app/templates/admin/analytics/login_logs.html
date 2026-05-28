@@ -2,6 +2,7 @@
 {% from "macros/filter_card.html" import filter_card %}
 {% from "components/ag_grid_includes.html" import ag_grid_loading %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Login Logs') }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block head %}
@@ -17,7 +18,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {{ page_header(
     title=_('Login Logs'),
@@ -111,42 +111,39 @@
 {% endblock %}
 
 {% block extra_js %}
-{% from "components/ag_grid_includes.html" import ag_grid_js %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_page_config %}
 {{ ag_grid_js() }}
 <script src="{{ static_url('js/admin/login-logs-grid.js') }}"></script>
-<script nonce="{{ csp_nonce() }}">
-(function() {
-    window.loginLogsGridConfig = {
-        apiUrl: {{ url_for('admin_analytics_api.login_logs_list_api')|tojson }},
-        perPage: 50
-    };
-    window.LOGIN_LOGS_TRANSLATIONS = {
-        timestamp: {{ _('Timestamp')|tojson }},
-        user: {{ _('User')|tojson }},
-        unknownUser: {{ _('Unknown user')|tojson }},
-        userNotFound: {{ _('User not found')|tojson }},
-        event: {{ _('Event')|tojson }},
-        eventLogin: {{ _('Login')|tojson }},
-        eventLogout: {{ _('Logout')|tojson }},
-        eventFailed: {{ _('Failed login')|tojson }},
-        ipAddress: {{ _('IP address')|tojson }},
-        recentFailures: {{ _('recent failures')|tojson }},
-        device: {{ _('Device')|tojson }},
-        browser: {{ _('Browser')|tojson }},
-        operatingSystem: {{ _('OS')|tojson }},
-        emailAttempted: {{ _('Email attempted')|tojson }},
-        status: {{ _('Status')|tojson }},
-        suspicious: {{ _('Suspicious')|tojson }},
-        success: {{ _('Success')|tojson }},
-        completed: {{ _('Completed')|tojson }},
-        failed: {{ _('Failed')|tojson }},
-        unknown: {{ _('Unknown')|tojson }},
-        botDetected: {{ _('Bot detected')|tojson }},
-        botDetectedHoverFallback: {{ _('Flagged when the User-Agent matches automation keywords (e.g. bot, curl), is under 10 characters, or lacks typical browser tokens.')|tojson }},
-        pageOfTotal: {{ _('Page {page} of {pages} ({total} total)')|tojson }},
-        noRows: {{ _('No events')|tojson }},
-        loadError: {{ _('Could not load login logs.')|tojson }}
-    };
-})();
-</script>
+{% set login_logs_grid_bootstrap = {
+    'apiUrl': url_for('admin_analytics_api.login_logs_list_api'),
+    'perPage': 50,
+    'translations': {
+        'timestamp': _('Timestamp'),
+        'user': _('User'),
+        'unknownUser': _('Unknown user'),
+        'userNotFound': _('User not found'),
+        'event': _('Event'),
+        'eventLogin': _('Login'),
+        'eventLogout': _('Logout'),
+        'eventFailed': _('Failed login'),
+        'ipAddress': _('IP address'),
+        'recentFailures': _('recent failures'),
+        'device': _('Device'),
+        'browser': _('Browser'),
+        'operatingSystem': _('OS'),
+        'emailAttempted': _('Email attempted'),
+        'status': _('Status'),
+        'suspicious': _('Suspicious'),
+        'success': _('Success'),
+        'completed': _('Completed'),
+        'failed': _('Failed'),
+        'unknown': _('Unknown'),
+        'botDetected': _('Bot detected'),
+        'botDetectedHoverFallback': _('Flagged when the User-Agent matches automation keywords (e.g. bot, curl), is under 10 characters, or lacks typical browser tokens.'),
+        'pageOfTotal': _('Page {page} of {pages} ({total} total)'),
+        'noRows': _('No events'),
+        'loadError': _('Could not load login logs.')
+    }
+} %}
+{{ ag_grid_page_config('loginLogsGridConfig', 'LOGIN_LOGS_TRANSLATIONS', login_logs_grid_bootstrap) }}
 {% endblock %}

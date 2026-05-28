@@ -1,0 +1,14 @@
+{#
+  Standard form action row (submit + optional cancel).
+  Usage:
+    {% from "macros/form_actions.html" import form_actions %}
+    {{ form_actions(_('Save'), cancel_url=url_for('admin.admin_dashboard')) }}
+#}
+{% macro form_actions(submit_label, cancel_url=none, cancel_label=none, submit_class='btn btn-primary', cancel_class='btn btn-secondary', extra_classes='') %}
+<div class="flex flex-wrap gap-3 justify-end items-center {{ extra_classes }}">
+  {% if cancel_url %}
+  <a href="{{ cancel_url }}" class="{{ cancel_class }}">{{ cancel_label or _('Cancel') }}</a>
+  {% endif %}
+  <button type="submit" class="{{ submit_class }}">{{ submit_label }}</button>
+</div>
+{% endmacro %}

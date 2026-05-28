@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "macros/empty_state.html" import empty_state %}
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Public Submissions') }}{% endblock %}
 
 {% block head %}
@@ -11,7 +12,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_page_header.html" import page_header %}
 
 {% set header_actions = [
     {

@@ -119,124 +119,103 @@
 <script type="application/json" id="embed-items-payload" nonce="{{ csp_nonce() }}">[{% for item in items %}{{- {'id': item.id, 'title': item.title, 'description': item.description or '', 'category': item.category, 'embed_url': item.embed_url, 'embed_type': item.embed_type, 'aspect_ratio': item.aspect_ratio or '', 'page_slot': item.page_slot or '', 'is_active': item.is_active}|tojson -}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
 
 {# Create / Edit Modal #}
-<div id="embed-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none;">
-    <div class="bg-white w-full max-w-2xl mx-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
-        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-            <h3 id="modal-title" class="text-lg font-semibold text-gray-900">{{ _('Add Embed Content') }}</h3>
-            <button type="button" id="embed-modal-close" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times"></i>
-            </button>
+{% from "macros/modal_shell.html" import modal_shell %}
+{% call modal_shell('embed-modal', _('Add Embed Content'), max_width='max-w-2xl', close_id='embed-modal-close', content_class='overflow-y-auto max-h-[70vh]') %}
+<div class="space-y-4">
+    <input type="hidden" id="embed-id" value="">
+
+    <div>
+        <label for="embed-title" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Title') }} <span class="text-red-500">*</span></label>
+        <input type="text" id="embed-title" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('e.g. ECHO Programmatic Partnership') }}">
+    </div>
+
+    <div>
+        <label for="embed-description" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+        <textarea id="embed-description" rows="2" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Optional description...') }}"></textarea>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label for="embed-category" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Category') }}</label>
+            <select id="embed-category" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="global_initiative">{{ _('Global initiatives') }}</option>
+                <option value="analysis">{{ _('Analysis') }}</option>
+                <option value="tableau_program">{{ _('Tableau / dashboards') }}</option>
+                <option value="partnerships">{{ _('Partnerships') }}</option>
+                <option value="other">{{ _('Other') }}</option>
+            </select>
         </div>
-        <div class="px-6 py-5 space-y-4">
-            <input type="hidden" id="embed-id" value="">
-
-            <div>
-                <label for="embed-title" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Title') }} <span class="text-red-500">*</span></label>
-                <input type="text" id="embed-title" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('e.g. ECHO Programmatic Partnership') }}">
-            </div>
-
-            <div>
-                <label for="embed-description" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
-                <textarea id="embed-description" rows="2" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Optional description...') }}"></textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label for="embed-category" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Category') }}</label>
-                    <select id="embed-category" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="global_initiative">{{ _('Global initiatives') }}</option>
-                        <option value="analysis">{{ _('Analysis') }}</option>
-                        <option value="tableau_program">{{ _('Tableau / dashboards') }}</option>
-                        <option value="partnerships">{{ _('Partnerships') }}</option>
-                        <option value="other">{{ _('Other') }}</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="embed-type" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Embed type') }}</label>
-                    <select id="embed-type" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="powerbi">{{ _('Power BI') }}</option>
-                        <option value="tableau">{{ _('Tableau Public') }}</option>
-                        <option value="iframe">{{ _('Generic iframe (allowed hosts only)') }}</option>
-                    </select>
-                </div>
-            </div>
-
-            <div>
-                <label for="embed-page-slot" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Page Slot') }}</label>
-                <select id="embed-page-slot" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">{{ _('(None — unassigned)') }}</option>
-                    <option value="echo_partnership">{{ _('ECHO Programmatic Partnership') }}</option>
-                    <option value="grbm">{{ _('Global Route-based Migration') }}</option>
-                    <option value="phsm">{{ _('Professional Health Services Mapping') }}</option>
-                </select>
-                <p class="text-xs text-gray-400 mt-1">{{ _('Assigns this embed to a specific section on the Global Initiatives page.') }}</p>
-            </div>
-
-            <div>
-                <label for="embed-url" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Embed URL') }} <span class="text-red-500">*</span></label>
-                <textarea id="embed-url" rows="3" class="w-full border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Paste the view or embed URL (HTTPS only)') }}"></textarea>
-                <p id="embed-url-hint" class="text-xs text-gray-400 mt-1"></p>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Aspect Ratio') }}</label>
-                <div class="flex items-center gap-2">
-                    <input type="text" id="embed-aspect-ratio" class="w-24 border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="16:9">
-                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="16:9">16:9</button>
-                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="16:10">16:10</button>
-                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="4:3">4:3</button>
-                    <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="">{{ _('Auto') }}</button>
-                </div>
-                <p class="text-xs text-gray-400 mt-1">{{ _('Auto-detected from pasted snippet, or pick a preset. Leave empty for default (75vh).') }}</p>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <input type="checkbox" id="embed-active" checked class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
-                <label for="embed-active" class="text-sm text-gray-700">{{ _('Active (visible on website)') }}</label>
-            </div>
-        </div>
-        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-            <button type="button" class="btn btn-secondary" id="embed-modal-cancel">{{ _('Cancel') }}</button>
-            <button type="button" class="btn btn-success" id="btn-save-embed">
-                <i class="fas fa-save mr-1"></i>{{ _('Save') }}
-            </button>
+        <div>
+            <label for="embed-type" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Embed type') }}</label>
+            <select id="embed-type" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="powerbi">{{ _('Power BI') }}</option>
+                <option value="tableau">{{ _('Tableau Public') }}</option>
+                <option value="iframe">{{ _('Generic iframe (allowed hosts only)') }}</option>
+            </select>
         </div>
     </div>
+
+    <div>
+        <label for="embed-page-slot" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Page Slot') }}</label>
+        <select id="embed-page-slot" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">{{ _('(None — unassigned)') }}</option>
+            <option value="echo_partnership">{{ _('ECHO Programmatic Partnership') }}</option>
+            <option value="grbm">{{ _('Global Route-based Migration') }}</option>
+            <option value="phsm">{{ _('Professional Health Services Mapping') }}</option>
+        </select>
+        <p class="text-xs text-gray-400 mt-1">{{ _('Assigns this embed to a specific section on the Global Initiatives page.') }}</p>
+    </div>
+
+    <div>
+        <label for="embed-url" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Embed URL') }} <span class="text-red-500">*</span></label>
+        <textarea id="embed-url" rows="3" class="w-full border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Paste the view or embed URL (HTTPS only)') }}"></textarea>
+        <p id="embed-url-hint" class="text-xs text-gray-400 mt-1"></p>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Aspect Ratio') }}</label>
+        <div class="flex items-center gap-2">
+            <input type="text" id="embed-aspect-ratio" class="w-24 border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="16:9">
+            <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="16:9">16:9</button>
+            <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="16:10">16:10</button>
+            <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="4:3">4:3</button>
+            <button type="button" class="js-ratio-preset btn btn-secondary btn-sm" data-ratio="">{{ _('Auto') }}</button>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">{{ _('Auto-detected from pasted snippet, or pick a preset. Leave empty for default (75vh).') }}</p>
+    </div>
+
+    <div class="flex items-center gap-2">
+        <input type="checkbox" id="embed-active" checked class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+        <label for="embed-active" class="text-sm text-gray-700">{{ _('Active (visible on website)') }}</label>
+    </div>
+
+    <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <button type="button" class="btn btn-secondary close-modal" id="embed-modal-cancel">{{ _('Cancel') }}</button>
+        <button type="button" class="btn btn-success" id="btn-save-embed">
+            <i class="fas fa-save mr-1"></i>{{ _('Save') }}
+        </button>
+    </div>
 </div>
+{% endcall %}
 
 {# Preview Modal #}
-<div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none;">
-    <div class="bg-white w-full max-w-5xl mx-4 shadow-xl border border-gray-200" style="height:85vh;">
-        <div class="px-6 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-            <h3 id="preview-title" class="text-lg font-semibold text-gray-900">{{ _('Preview') }}</h3>
-            <button type="button" id="preview-modal-close" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="w-full" style="height:calc(85vh - 52px);">
-            <iframe id="preview-iframe" src="about:blank" class="w-full h-full border-0" referrerpolicy="no-referrer" allowfullscreen></iframe>
-        </div>
-    </div>
+{% call modal_shell('preview-modal', _('Preview'), max_width='max-w-5xl', close_id='preview-modal-close', content_class='p-0') %}
+<div class="w-full" style="height:calc(85vh - 100px);">
+    <iframe id="preview-iframe" src="about:blank" class="w-full h-full border-0" referrerpolicy="no-referrer" allowfullscreen></iframe>
 </div>
+{% endcall %}
 
 {# Delete Confirmation Modal #}
-<div id="delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none;">
-    <div class="bg-white w-full max-w-md mx-4 shadow-xl border border-gray-200">
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h3 class="text-lg font-semibold text-gray-900">{{ _('Confirm Delete') }}</h3>
-        </div>
-        <div class="px-6 py-5">
-            <p class="text-sm text-gray-600">{{ _('Are you sure you want to delete') }} <strong id="delete-item-name"></strong>?</p>
-            <input type="hidden" id="delete-item-id" value="">
-        </div>
-        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-            <button type="button" class="btn btn-secondary" id="delete-modal-cancel">{{ _('Cancel') }}</button>
-            <button type="button" class="btn btn-danger" id="delete-modal-confirm">
-                <i class="fas fa-trash mr-1"></i>{{ _('Delete') }}
-            </button>
-        </div>
-    </div>
+{% call modal_shell('delete-modal', _('Confirm Delete'), max_width='max-w-md', close_id='delete-modal-close') %}
+<p class="text-sm text-gray-600">{{ _('Are you sure you want to delete') }} <strong id="delete-item-name"></strong>?</p>
+<input type="hidden" id="delete-item-id" value="">
+<div class="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+    <button type="button" class="btn btn-secondary close-modal" id="delete-modal-cancel">{{ _('Cancel') }}</button>
+    <button type="button" class="btn btn-danger" id="delete-modal-confirm">
+        <i class="fas fa-trash mr-1"></i>{{ _('Delete') }}
+    </button>
 </div>
+{% endcall %}
 
 {% endblock %}
 
@@ -265,13 +244,23 @@
         return embedItems.find(function(x) { return x.id === id; });
     }
 
+    var embedModalCtrl = window.ModalUtils ? window.ModalUtils.makeModal('#embed-modal') : null;
+    var previewModalCtrl = window.ModalUtils ? window.ModalUtils.makeModal('#preview-modal') : null;
+    var deleteModalCtrl = window.ModalUtils ? window.ModalUtils.makeModal('#delete-modal') : null;
+
     function showModal(id) {
+        if (id === 'embed-modal' && embedModalCtrl) { embedModalCtrl.openModal(); return; }
+        if (id === 'preview-modal' && previewModalCtrl) { previewModalCtrl.openModal(); return; }
+        if (id === 'delete-modal' && deleteModalCtrl) { deleteModalCtrl.openModal(); return; }
         const m = document.getElementById(id);
-        if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+        if (m) { m.classList.remove('hidden'); }
     }
     function hideModal(id) {
+        if (id === 'embed-modal' && embedModalCtrl) { embedModalCtrl.closeModal(); return; }
+        if (id === 'preview-modal' && previewModalCtrl) { previewModalCtrl.closeModal(); return; }
+        if (id === 'delete-modal' && deleteModalCtrl) { deleteModalCtrl.closeModal(); return; }
         const m = document.getElementById(id);
-        if (m) { m.style.display = 'none'; m.classList.add('hidden'); }
+        if (m) { m.classList.add('hidden'); }
     }
 
     function updateEmbedUrlHint() {
@@ -326,7 +315,7 @@
     }
 
     function openCreateModal() {
-        document.getElementById('modal-title').textContent = '{{ _("Add Embed Content") }}';
+        document.getElementById('embed-modal-title').textContent = '{{ _("Add Embed Content") }}';
         document.getElementById('embed-id').value = '';
         document.getElementById('embed-title').value = '';
         document.getElementById('embed-description').value = '';
@@ -341,7 +330,7 @@
     }
 
     function openEditModal(id, title, description, category, pageSlot, embedUrl, embedType, aspectRatio, isActive) {
-        document.getElementById('modal-title').textContent = '{{ _("Edit Embed Content") }}';
+        document.getElementById('embed-modal-title').textContent = '{{ _("Edit Embed Content") }}';
         document.getElementById('embed-id').value = id;
         document.getElementById('embed-title').value = title || '';
         document.getElementById('embed-description').value = description || '';
@@ -416,7 +405,7 @@
     }
 
     function previewEmbed(url, title, embedType) {
-        document.getElementById('preview-title').textContent = title || '{{ _("Preview") }}';
+        document.getElementById('preview-modal-title').textContent = title || '{{ _("Preview") }}';
         var src = embedPreviewSrc(url, embedType);
         document.getElementById('preview-iframe').src = isAllowedEmbedPreviewUrl(src) ? src : 'about:blank';
         showModal('preview-modal');
@@ -479,10 +468,6 @@
         });
     }
 
-    var elClose = document.getElementById('embed-modal-close');
-    if (elClose) elClose.addEventListener('click', closeModal);
-    var elCancel = document.getElementById('embed-modal-cancel');
-    if (elCancel) elCancel.addEventListener('click', closeModal);
     var elSave = document.getElementById('btn-save-embed');
     if (elSave) elSave.addEventListener('click', saveEmbed);
 
@@ -490,10 +475,10 @@
     if (embedTypeSel) embedTypeSel.addEventListener('change', updateEmbedUrlHint);
 
     var prevClose = document.getElementById('preview-modal-close');
-    if (prevClose) prevClose.addEventListener('click', closePreview);
+    if (prevClose) prevClose.addEventListener('click', function() {
+        document.getElementById('preview-iframe').src = 'about:blank';
+    });
 
-    var delCancel = document.getElementById('delete-modal-cancel');
-    if (delCancel) delCancel.addEventListener('click', closeDeleteModal);
     var delConfirm = document.getElementById('delete-modal-confirm');
     if (delConfirm) delConfirm.addEventListener('click', executeDelete);
 

@@ -193,3 +193,6 @@
     });
   </script>
 {% endmacro %}
+
+{# Normalizes numeric field values for HTML number inputs (None / string "None" → empty). #}
+{% macro format_number_value(value) %}{{ value if (value is not none and value != 'None') else '' }}{% endmacro %}

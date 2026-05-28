@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 
+{% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('NS Structure') }}{% endblock %}
 
 {% block head %}
@@ -10,7 +11,6 @@
 {% endblock %}
 
 {% block content %}
-    {% from "components/_page_header.html" import page_header %}
 
     <div class="pr-6">
         {{ page_header(
@@ -24,7 +24,7 @@
     </div>
 
     <div id="ns-structure-tab-panel" class="tab-panel">
-        {% include "admin/organization/manage_ns_hierarchy.html" %}
+        {% include "admin/organization/_manage_ns_hierarchy.html" %}
     </div>
 {% endblock %}
 

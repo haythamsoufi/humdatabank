@@ -25,6 +25,10 @@ When you open a PR, reviewers should be able to see **what changed, why it matte
 3. Open a PR into `main` with a clear title and a description that answers **what**, **why**, and **how you verified**.
 4. Link issues with `Fixes #123` when applicable; respond to review feedback before merge.
 
+### Community roadmap (field data & mobile)
+
+Looking for a larger, prioritized slice of work? See **[docs/COMMUNITY-ROADMAP-FIELD-DATA-AND-MOBILE.md](docs/COMMUNITY-ROADMAP-FIELD-DATA-AND-MOBILE.md)** — epics for offline mobile submit, KoBo bridge improvements, data quality, integrations, and related gaps vs dedicated field-survey tools. Open an issue referencing the epic you want to tackle.
+
 ### Where changes usually land
 
 | Area | Typical focus |

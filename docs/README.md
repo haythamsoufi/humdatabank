@@ -7,6 +7,7 @@ Tracked references only — links below resolve inside git.
 | Resource | Purpose |
 |----------|---------|
 | **[Developer handbook](DEVELOPER-HANDBOOK.md)** | Architecture, local setup (Backoffice / Website / Mobile), conventions, migrations single-head policy, AI/RAG/mobile surface, template/CSS patterns |
+| **[Community roadmap: field data & mobile](COMMUNITY-ROADMAP-FIELD-DATA-AND-MOBILE.md)** | SurveyCTO gap analysis, prioritized epics (offline mobile, KoBo bridge, QC, integrations)—for contributors |
 | **[CONTRIBUTING.md](../CONTRIBUTING.md)** | How we collaborate: branches, PRs, CI, security |
 
 ## Application indexes

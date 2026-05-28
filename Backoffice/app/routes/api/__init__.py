@@ -28,6 +28,7 @@ def register_api_blueprints(app):
     from app.routes.api import variables  # noqa: F401
     from app.routes.api import error_log  # noqa: F401
     from app.routes.api import embed_content  # noqa: F401
+    from app.routes.api import indicator_bank_compat  # noqa: F401
 
     # NOW register the blueprint with all routes already added
     # All modules above register their routes directly to api_bp during import

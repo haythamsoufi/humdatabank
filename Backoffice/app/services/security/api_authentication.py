@@ -85,6 +85,14 @@ def _try_finish_auth_with_env_mobile_api_key(*, log_prefix: str, provided_key: s
     return True
 
 
+def _extract_bearer_or_x_api_key() -> str:
+    """Return API key from Authorization Bearer or legacy X-API-Key header."""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        return auth_header[7:].strip()
+    return (request.headers.get('X-API-Key') or request.headers.get('X-API-KEY') or '').strip()
+
+
 def authenticate_db_api_key_only():
     """
     Authenticate request using an API key from Authorization: Bearer.
@@ -100,24 +108,16 @@ def authenticate_db_api_key_only():
 
     auth_header = request.headers.get('Authorization', '')
     endpoint = request.endpoint or request.path or 'unknown'
-    if not auth_header.startswith('Bearer '):
+    provided_key = _extract_bearer_or_x_api_key()
+    if not provided_key:
         current_app.logger.warning(
-            "[API auth] 401 %s: missing or invalid Authorization (expected Bearer <key>). path=%s",
+            "[API auth] 401 %s: missing API key (expected Bearer or X-API-Key). path=%s",
             endpoint, request.path
         )
         return api_error(
             "Authentication required",
             401,
-            extra={"hint": "Use Authorization: Bearer YOUR_API_KEY"},
-        )
-
-    provided_key = auth_header[7:].strip()
-    if not provided_key:
-        current_app.logger.warning("[API auth] 401 %s: Authorization Bearer present but key empty. path=%s", endpoint, request.path)
-        return api_error(
-            "Authentication required",
-            401,
-            extra={"hint": "Use Authorization: Bearer YOUR_API_KEY"},
+            extra={"hint": "Use Authorization: Bearer YOUR_API_KEY or X-API-Key header"},
         )
 
     try:

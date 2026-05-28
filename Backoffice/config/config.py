@@ -259,6 +259,16 @@ class Config:
     except (TypeError, ValueError):
         MOBILE_APP_API_KEY_RATE_LIMIT_PER_MINUTE = 300
 
+    # reCAPTCHA Enterprise (IFRC Indicator Bank public suggestion compat route)
+    RECAPTCHA_PROJECT_ID = (os.environ.get("RECAPTCHA_PROJECT_ID") or "").strip() or None
+    RECAPTCHA_API_KEY = (os.environ.get("RECAPTCHA_API_KEY") or "").strip() or None
+    RECAPTCHA_SITE_KEY = (os.environ.get("RECAPTCHA_SITE_KEY") or "").strip() or None
+    RECAPTCHA_EXPECTED_ACTION = (os.environ.get("RECAPTCHA_EXPECTED_ACTION") or "SendSuggestion").strip()
+    try:
+        RECAPTCHA_MIN_SCORE = float((os.environ.get("RECAPTCHA_MIN_SCORE") or "0.5").strip())
+    except (TypeError, ValueError):
+        RECAPTCHA_MIN_SCORE = 0.5
+
     # Comma-separated IPs that bypass all in-process rate limiting.
     # Useful for CI pipelines and dedicated load-test runner IPs so they never
     # see 429 responses regardless of request volume.

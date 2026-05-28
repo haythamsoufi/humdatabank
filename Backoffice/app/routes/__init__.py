@@ -45,6 +45,10 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     app.register_blueprint(notifications_bp.bp)
     register_api_blueprints(app)
 
+    from app.routes.api.indicator_bank_compat import indicator_bank_compat_bp
+    app.register_blueprint(indicator_bank_compat_bp)
+    csrf.exempt(indicator_bank_compat_bp)
+
     from app.routes.api.mobile import mobile_bp
     app.register_blueprint(mobile_bp)
     csrf.exempt(mobile_bp)

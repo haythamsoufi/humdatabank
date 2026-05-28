@@ -104,6 +104,9 @@ UPR training docs/
 # Local IFRC reference docs / extracts (not part of the app repo)
 IFRC Docs/
 
+# Standalone Indicator Bank app (cloned from Azure DevOps for integration planning)
+IFRC.IndicatorBank/
+
 # Local articles / drafts (not part of the app repo)
 articles/
 

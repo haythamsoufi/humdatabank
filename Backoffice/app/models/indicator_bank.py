@@ -107,6 +107,17 @@ class IndicatorBank(db.Model):
     # Multilingual indicator definition fields - now using JSONB for better performance and flexibility
     definition_translations = db.Column(JSONB, nullable=True)  # Format: {"en": "definition", "fr": "définition", "es": "definición", "ar": "تعريف", "zh": "定义", "ru": "определение", "hi": "परिभाषा"}
 
+    # Rollup label for aggregated reporting (local; not synced from IFRC indicator bank)
+    aggregated_label = db.Column(db.Text, nullable=True)
+    aggregated_label_translations = db.Column(JSONB, nullable=True)
+
+    # IFRC indicator bank metadata (area = remote SPEF code, e.g. EF2 / SP3)
+    area = db.Column(db.String(16), nullable=True)
+    data_source = db.Column(db.Text, nullable=True)
+    disaggregation_guidance = db.Column(db.Text, nullable=True)
+    monitoring_questions = db.Column(JSONB, nullable=True)  # ordered list of question strings
+    tags = db.Column(JSONB, nullable=True)  # list of tag strings from IFRC
+
     # New fields for management
     archived = db.Column(db.Boolean, default=False, nullable=False)
     comments = db.Column(db.Text, nullable=True)
@@ -322,6 +333,35 @@ class IndicatorBank(db.Model):
         elif language in self.definition_translations:
             del self.definition_translations[language]
 
+    def get_aggregated_label_translation(self, language):
+        """Get aggregated label translation for specific language."""
+        if self.aggregated_label_translations and language in self.aggregated_label_translations:
+            return self.aggregated_label_translations[language]
+        return self.aggregated_label
+
+    def set_aggregated_label_translation(self, language, text):
+        """Set aggregated label translation for specific language."""
+        if not self.aggregated_label_translations:
+            self.aggregated_label_translations = {}
+        if text and text.strip():
+            self.aggregated_label_translations[language] = text.strip()
+        elif language in self.aggregated_label_translations:
+            del self.aggregated_label_translations[language]
+
+    @property
+    def tags_list(self):
+        """Return tags as a list."""
+        if not self.tags or not isinstance(self.tags, list):
+            return []
+        return [str(t).strip() for t in self.tags if str(t).strip()]
+
+    @property
+    def monitoring_questions_list(self):
+        """Return monitoring questions as a list."""
+        if not self.monitoring_questions or not isinstance(self.monitoring_questions, list):
+            return []
+        return [str(q).strip() for q in self.monitoring_questions if str(q).strip()]
+
     def __repr__(self):
         return f'<IndicatorBank {self.name} (Type: {self.type})>'
 
@@ -346,6 +386,14 @@ class IndicatorBankHistory(db.Model):
 
     # Multilingual indicator definition fields - now using JSONB for better performance and flexibility
     definition_translations = db.Column(JSONB, nullable=True)  # Format: {"en": "definition", "fr": "définition", "es": "definición", "ar": "تعريف", "zh": "定义", "ru": "определение", "hi": "परिभाषा"}
+
+    aggregated_label = db.Column(db.Text, nullable=True)
+    aggregated_label_translations = db.Column(JSONB, nullable=True)
+    area = db.Column(db.String(16), nullable=True)
+    data_source = db.Column(db.Text, nullable=True)
+    disaggregation_guidance = db.Column(db.Text, nullable=True)
+    monitoring_questions = db.Column(JSONB, nullable=True)
+    tags = db.Column(JSONB, nullable=True)
 
     archived = db.Column(db.Boolean, default=False, nullable=False)
     comments = db.Column(db.Text, nullable=True)

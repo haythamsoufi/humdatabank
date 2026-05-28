@@ -119,10 +119,14 @@ def documents_submit():
         .all()
     )
 
+    # All AES rows share the same (sel_type, sel_id) because of the subquery filter above,
+    # so we resolve the country once instead of calling aes.country (→ EntityService DB
+    # lookup) for every document row.
+    _entity_country = EntityService.get_country_for_entity(sel_type, sel_id)
+
     assignment_tuples = []
     for doc, status, user, uploaded_at, assignment_period, aes in assignment_raw:
-        resolved_country = aes.country
-        assignment_tuples.append((doc, status, resolved_country, user, uploaded_at, assignment_period))
+        assignment_tuples.append((doc, status, _entity_country, user, uploaded_at, assignment_period))
 
     standalone_clauses = [
         and_(

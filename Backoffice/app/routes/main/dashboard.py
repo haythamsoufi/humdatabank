@@ -974,6 +974,23 @@ def dashboard():
 
         # Post-process recent activities so matrix-style field changes only include changed cells
         try:
+            # Batch-load all AES records referenced by activities in a single query
+            # to avoid an N+1 SELECT per activity when enriching period/template_period.
+            _activity_aes_ids = [
+                getattr(a, 'assignment_id', None)
+                for a in recent_activities
+                if getattr(a, 'assignment_id', None)
+            ]
+            _aes_by_id: dict = {}
+            if _activity_aes_ids:
+                _aes_rows = (
+                    AssignmentEntityStatus.query
+                    .filter(AssignmentEntityStatus.id.in_(_activity_aes_ids))
+                    .options(joinedload(AssignmentEntityStatus.assigned_form))
+                    .all()
+                )
+                _aes_by_id = {aes.id: aes for aes in _aes_rows}
+
             for activity in recent_activities:
                 params = getattr(activity, 'summary_params', None)
                 if not isinstance(params, dict):
@@ -984,7 +1001,7 @@ def dashboard():
                 assignment_id = getattr(activity, 'assignment_id', None)
                 if assignment_id and 'period' not in params:
                     try:
-                        aes = AssignmentEntityStatus.query.get(assignment_id)
+                        aes = _aes_by_id.get(assignment_id)
                         if aes and aes.assigned_form:
                             period_name = aes.assigned_form.period_name
                             params['period'] = period_name
@@ -1087,6 +1104,22 @@ def load_more_activities():
         more_activities = all_activities[offset:offset + limit] if offset < len(all_activities) else []
         has_more = len(all_activities) >= fetch_limit
 
+        # Batch-load AES records for period enrichment — avoids N+1 per activity.
+        _more_aes_ids = [
+            getattr(a, 'assignment_id', None)
+            for a in more_activities
+            if getattr(a, 'assignment_id', None)
+        ]
+        _more_aes_by_id: dict = {}
+        if _more_aes_ids:
+            _more_aes_rows = (
+                AssignmentEntityStatus.query
+                .filter(AssignmentEntityStatus.id.in_(_more_aes_ids))
+                .options(joinedload(AssignmentEntityStatus.assigned_form))
+                .all()
+            )
+            _more_aes_by_id = {aes.id: aes for aes in _more_aes_rows}
+
         # Post-process activities (same as dashboard)
         for activity in more_activities:
             params = getattr(activity, 'summary_params', None)
@@ -1098,7 +1131,7 @@ def load_more_activities():
             assignment_id = getattr(activity, 'assignment_id', None)
             if assignment_id and 'period' not in params:
                 try:
-                    aes = AssignmentEntityStatus.query.get(assignment_id)
+                    aes = _more_aes_by_id.get(assignment_id)
                     if aes and aes.assigned_form:
                         period_name = aes.assigned_form.period_name
                         params['period'] = period_name

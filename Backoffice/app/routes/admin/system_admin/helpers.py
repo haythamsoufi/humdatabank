@@ -52,6 +52,32 @@ def _delete_logo_file(base_path, filename):
 
 # === Indicator Change Tracking ===
 
+def indicator_bank_history_snapshot(indicator):
+    """Shared field snapshot for IndicatorBankHistory rows."""
+    return {
+        "name": indicator.name,
+        "type": indicator.type,
+        "unit": indicator.unit,
+        "fdrs_kpi_code": getattr(indicator, "fdrs_kpi_code", None),
+        "definition": indicator.definition,
+        "name_translations": indicator.name_translations,
+        "definition_translations": indicator.definition_translations,
+        "aggregated_label": getattr(indicator, "aggregated_label", None),
+        "aggregated_label_translations": getattr(indicator, "aggregated_label_translations", None),
+        "area": getattr(indicator, "area", None),
+        "data_source": getattr(indicator, "data_source", None),
+        "disaggregation_guidance": getattr(indicator, "disaggregation_guidance", None),
+        "monitoring_questions": getattr(indicator, "monitoring_questions", None),
+        "tags": getattr(indicator, "tags", None),
+        "archived": indicator.archived,
+        "comments": indicator.comments,
+        "emergency": indicator.emergency,
+        "related_programs": indicator.related_programs,
+        "sector": indicator.sector,
+        "sub_sector": indicator.sub_sector,
+    }
+
+
 def track_indicator_changes(old_indicator, new_form_data, user):
     """
     Track specific changes between old indicator data and new form data.
@@ -66,8 +92,15 @@ def track_indicator_changes(old_indicator, new_form_data, user):
         ('unit', 'Unit'),
         ('fdrs_kpi_code', 'FDRS KPI Code'),
         ('definition', 'Definition'),
+        ('aggregated_label', 'Aggregated Label'),
         ('name_translations', 'Name Translations'),
         ('definition_translations', 'Definition Translations'),
+        ('aggregated_label_translations', 'Aggregated Label Translations'),
+        ('area', 'Area'),
+        ('data_source', 'Data Source'),
+        ('disaggregation_guidance', 'Disaggregation Guidance'),
+        ('monitoring_questions', 'Monitoring Questions'),
+        ('tags', 'Tags'),
         ('comments', 'Comments'),
         ('related_programs', 'Related Programs'),
         ('emergency', 'Emergency'),
@@ -84,7 +117,7 @@ def track_indicator_changes(old_indicator, new_form_data, user):
         old_value = getattr(old_indicator, field_name, None)
         new_value = new_form_data.get(field_name)
 
-        if field_name in ("name_translations", "definition_translations"):
+        if field_name in ("name_translations", "definition_translations", "aggregated_label_translations", "monitoring_questions", "tags"):
             try:
                 if isinstance(new_value, str) and new_value.strip():
                     import json as _json

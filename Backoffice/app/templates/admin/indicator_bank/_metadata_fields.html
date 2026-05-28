@@ -1,0 +1,91 @@
+{# Shared metadata fields for add/edit indicator bank forms #}
+{% set input_class = input_class|default("shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") %}
+
+<div class="mb-4">
+    {{ form.aggregated_label.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+    {{ form.aggregated_label(class=input_class) }}
+    {% for error in form.aggregated_label.errors %}
+        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+    {% endfor %}
+</div>
+
+<div class="mb-8">
+    <div class="border-b border-gray-200 mb-4 pb-2">
+        <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-language mr-2"></i>{{ _('Multilingual Aggregated Labels (Optional)') }}
+        </h3>
+    </div>
+    {% if TRANSLATABLE_LANGUAGES and TRANSLATABLE_LANGUAGES|length > 0 %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {% set f = form['aggregated_label_' ~ code] %}
+        <div class="{% if code in ['ar','fa','he','ur'] %}md:col-span-2{% endif %} mb-4">
+            {{ f.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            {{ f(class=input_class, dir=("rtl" if code in ['ar','fa','he','ur'] else None)) }}
+            {% for error in f.errors %}
+                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500">{{ _('No additional languages are enabled.') }}</p>
+    {% endif %}
+</div>
+
+<div class="mb-8">
+    <div class="border-b border-gray-200 mb-4 pb-2">
+        <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-database mr-2"></i>{{ _('IFRC Metadata') }}
+        </h3>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="mb-4">
+            {{ form.area.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            {{ form.area(class=input_class) }}
+            <p class="mt-1 text-xs text-gray-500">{{ _('Strategy 2030 area code from IFRC SPEF (e.g. EF2, SP3).') }}</p>
+            {% for error in form.area.errors %}
+                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+            {% endfor %}
+        </div>
+        <div class="mb-4">
+            {{ form.tags.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            {{ form.tags(class=input_class) }}
+            {% for error in form.tags.errors %}
+                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="mb-4">
+        {{ form.data_source.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+        {{ form.data_source(class=input_class) }}
+        {% for error in form.data_source.errors %}
+            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <div class="mb-4">
+        {{ form.disaggregation_guidance.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+        {{ form.disaggregation_guidance(class=input_class) }}
+        {% for error in form.disaggregation_guidance.errors %}
+            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <div class="grid grid-cols-1 gap-4">
+        <div>
+            {{ form.monitoring_question_1.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            {{ form.monitoring_question_1(class=input_class) }}
+        </div>
+        <div>
+            {{ form.monitoring_question_2.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            {{ form.monitoring_question_2(class=input_class) }}
+        </div>
+        <div>
+            {{ form.monitoring_question_3.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            {{ form.monitoring_question_3(class=input_class) }}
+        </div>
+    </div>
+</div>

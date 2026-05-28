@@ -8,7 +8,7 @@ from flask import request, current_app
 from flask_login import login_required
 import uuid
 
-# Import the API blueprint from parent
+        # Import the API blueprint from parent
 from app.routes.api import api_bp
 from app.utils.sql_utils import safe_ilike_pattern
 
@@ -19,6 +19,7 @@ from app.models import (
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
 from app import db
+from sqlalchemy import func as _sa_func
 
 # Import utility functions
 from app.utils.api_helpers import json_response, api_error
@@ -121,6 +122,32 @@ def get_templates():
         else:
             total_pages = None
 
+        # Batch-count sections, pages, and items to avoid 3 lazy COUNT queries per
+        # template (which becomes 3×N queries for N templates on the page).
+        _page_tpl_ids = [t.id for t in templates]
+        _sections_counts: dict = {}
+        _pages_counts: dict = {}
+        _items_counts: dict = {}
+        if _page_tpl_ids:
+            _sections_counts = dict(
+                db.session.query(FormSection.template_id, _sa_func.count())
+                .filter(FormSection.template_id.in_(_page_tpl_ids))
+                .group_by(FormSection.template_id)
+                .all()
+            )
+            _pages_counts = dict(
+                db.session.query(FormPage.template_id, _sa_func.count())
+                .filter(FormPage.template_id.in_(_page_tpl_ids))
+                .group_by(FormPage.template_id)
+                .all()
+            )
+            _items_counts = dict(
+                db.session.query(FormItem.template_id, _sa_func.count())
+                .filter(FormItem.template_id.in_(_page_tpl_ids))
+                .group_by(FormItem.template_id)
+                .all()
+            )
+
         # Serialize template data
         templates_data = []
         for template in templates:
@@ -134,9 +161,9 @@ def get_templates():
                 'display_order_visible': version.display_order_visible if version else True,
                 'is_paginated': version.is_paginated if version else False,
                 'created_at': template.created_at.isoformat() if template.created_at else None,
-                'sections_count': template.sections.count(),
-                'pages_count': template.pages.count() if hasattr(template, 'pages') else 0,
-                'items_count': template.form_items.count()
+                'sections_count': _sections_counts.get(template.id, 0),
+                'pages_count': _pages_counts.get(template.id, 0),
+                'items_count': _items_counts.get(template.id, 0),
             })
 
         current_app.logger.debug(f"Templates API returning {len(templates_data)} items")

@@ -84,12 +84,71 @@
                             <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{{ indicator.definition or '-' }}</dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Comments</dt>
+                            <dt class="text-sm font-medium text-gray-500">{{ _('Aggregated Label') }}</dt>
+                            <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{{ indicator.aggregated_label or '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">{{ _('Comments') }}</dt>
                             <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{{ indicator.comments or '-' }}</dd>
                         </div>
                     </dl>
                 </div>
             </div>
+
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">{{ _('IFRC Metadata') }}</h3>
+                <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">{{ _('Area') }}</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ indicator.area or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">{{ _('Tags') }}</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ indicator.tags_list|join(', ') if indicator.tags_list else '-' }}</dd>
+                    </div>
+                    <div class="md:col-span-2">
+                        <dt class="text-sm font-medium text-gray-500">{{ _('Data Source') }}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{{ indicator.data_source or '-' }}</dd>
+                    </div>
+                    <div class="md:col-span-2">
+                        <dt class="text-sm font-medium text-gray-500">{{ _('Disaggregation Guidance') }}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{{ indicator.disaggregation_guidance or '-' }}</dd>
+                    </div>
+                    {% if indicator.monitoring_questions_list %}
+                    <div class="md:col-span-2">
+                        <dt class="text-sm font-medium text-gray-500">{{ _('Monitoring Questions') }}</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            <ol class="list-decimal list-inside space-y-1">
+                                {% for question in indicator.monitoring_questions_list %}
+                                <li>{{ question }}</li>
+                                {% endfor %}
+                            </ol>
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            {# Multilingual Aggregated Labels #}
+            {% set agg_translations = indicator.aggregated_label_translations or {} %}
+            {% if indicator.aggregated_label or agg_translations %}
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">{{ _('Multilingual Aggregated Labels') }}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for code in TRANSLATABLE_LANGUAGES %}
+                        {% set translated_value = agg_translations.get(code) %}
+                        {% if translated_value and translated_value|string|trim %}
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <dt class="text-sm font-medium text-gray-500">{{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}</dt>
+                                <dd class="mt-1 text-sm text-gray-900" {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}>
+                                    {{ translated_value }}
+                                </dd>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             {# Multilingual Names #}
             <div class="mb-6">

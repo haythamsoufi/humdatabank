@@ -12,6 +12,20 @@ from app.models import IndicatorBank, Sector, SubSector, IndicatorBankType, Indi
 from ..base import BaseForm, MultilingualFieldsMixin, FileUploadForm, CommonValidators, int_or_none
 
 
+def _split_csv_tags(value):
+    if not value:
+        return []
+    return [part.strip() for part in str(value).split(",") if part.strip()]
+
+
+def _join_csv_tags(tags):
+    if not tags:
+        return ""
+    if isinstance(tags, list):
+        return ", ".join(str(t).strip() for t in tags if str(t).strip())
+    return str(tags).strip()
+
+
 class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
     """Form for adding or editing an IndicatorBank entry."""
 
@@ -23,6 +37,49 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
                                 render_kw={"placeholder": "e.g., FDRS KPI code"})
     definition = TextAreaField("Definition", validators=[Optional()],
                               render_kw={"rows": 4, "placeholder": "Detailed definition of this indicator"})
+    aggregated_label = TextAreaField(
+        "Aggregated Label",
+        validators=[Optional()],
+        render_kw={
+            "rows": 3,
+            "placeholder": "e.g., Number of National Societies that develop and/or implement a strategy…",
+        },
+    )
+    area = StringField(
+        "Area",
+        validators=[Optional(), Length(max=16)],
+        render_kw={"placeholder": "e.g., EF2, SP3 (IFRC SPEF code)"},
+    )
+    data_source = TextAreaField(
+        "Data Source",
+        validators=[Optional()],
+        render_kw={"rows": 3, "placeholder": "Where this indicator's data comes from"},
+    )
+    disaggregation_guidance = TextAreaField(
+        "Disaggregation Guidance",
+        validators=[Optional()],
+        render_kw={"rows": 3, "placeholder": "e.g., SAD, sex/age breakdown guidance from IFRC"},
+    )
+    monitoring_question_1 = TextAreaField(
+        "Monitoring Question 1",
+        validators=[Optional()],
+        render_kw={"rows": 2, "placeholder": "Primary monitoring question"},
+    )
+    monitoring_question_2 = TextAreaField(
+        "Monitoring Question 2",
+        validators=[Optional()],
+        render_kw={"rows": 2, "placeholder": "Optional second monitoring question"},
+    )
+    monitoring_question_3 = TextAreaField(
+        "Monitoring Question 3",
+        validators=[Optional()],
+        render_kw={"rows": 2, "placeholder": "Optional third monitoring question"},
+    )
+    tags = StringField(
+        "Tags",
+        validators=[Optional()],
+        render_kw={"placeholder": "Comma-separated tags"},
+    )
 
     # Management fields
     archived = BooleanField("Archived", default=False)
@@ -46,11 +103,9 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
 
     def __init__(self, *args, **kwargs):
         # Ensure multilingual UnboundFields exist on the class before binding.
-        # This makes the form future-proof: when an org enables a new language,
-        # the corresponding name_<lang> field exists without schema changes.
         self.add_multilingual_name_fields("name", max_length=255)
+        self.add_multilingual_name_fields("aggregated_label", max_length=2000)
         super(IndicatorBankForm, self).__init__(*args, **kwargs)
-        # Populate choices after form is initialized
         self._populate_choices()
 
     def _populate_choices(self):
@@ -71,7 +126,6 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             )
             self.unit.choices = [(None, "-- No unit --")] + [(u.id, u.name) for u in munits]
 
-            # Get active sectors
             sectors = Sector.query.filter_by(is_active=True).order_by(Sector.display_order, Sector.name).all()
             sector_choices = [(None, "-- Select Sector --")] + [
                 (s.id, get_localized_sector_name(s)) for s in sectors
@@ -80,7 +134,6 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             self.sector_secondary.choices = sector_choices
             self.sector_tertiary.choices = sector_choices
 
-            # Get active subsectors
             subsectors = SubSector.query.filter_by(is_active=True).order_by(SubSector.display_order, SubSector.name).all()
             subsector_choices = [(None, "-- Select Sub-Sector --")] + [
                 (s.id, get_localized_subsector_name(s)) for s in subsectors
@@ -90,10 +143,8 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             self.sub_sector_tertiary.choices = subsector_choices
 
         except Exception as e:
-            # Log the error properly
             import logging
             logging.error(f"Error populating sector/subsector choices: {e}")
-            # Fallback to empty choices if there's an error
             empty_choices = [(None, "-- Select Sector --")]
             self.sector_primary.choices = empty_choices
             self.sector_secondary.choices = empty_choices
@@ -104,9 +155,53 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             self.sub_sector_secondary.choices = empty_subsector_choices
             self.sub_sector_tertiary.choices = empty_subsector_choices
 
+    def _translatable_languages(self):
+        try:
+            from flask import current_app
+            return current_app.config.get("TRANSLATABLE_LANGUAGES") or []
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug("TRANSLATABLE_LANGUAGES fallback: %s", e)
+            return []
+
+    def _populate_multilingual_field(self, translations, field_prefix):
+        langs = self._translatable_languages()
+        for lang in langs:
+            field = getattr(self, f"{field_prefix}_{lang}", None)
+            if field is not None:
+                val = (translations or {}).get(lang, "")
+                field.data = val if isinstance(val, str) else ""
+
+    def _apply_multilingual_field(self, indicator, field_prefix, setter_name):
+        langs = self._translatable_languages()
+        setter = getattr(indicator, setter_name)
+        for lang in langs:
+            field = getattr(self, f"{field_prefix}_{lang}", None)
+            if field is not None:
+                setter(lang, field.data or "")
+
+    @staticmethod
+    def _monitoring_questions_from_form(form):
+        questions = []
+        for field_name in ("monitoring_question_1", "monitoring_question_2", "monitoring_question_3"):
+            field = getattr(form, field_name, None)
+            value = (field.data or "").strip() if field is not None else ""
+            if value:
+                questions.append(value)
+        return questions or None
+
+    @staticmethod
+    def _monitoring_questions_to_form(indicator, form):
+        questions = indicator.monitoring_questions_list if indicator else []
+        for idx, field_name in enumerate(
+            ("monitoring_question_1", "monitoring_question_2", "monitoring_question_3"), start=0
+        ):
+            field = getattr(form, field_name, None)
+            if field is not None:
+                field.data = questions[idx] if idx < len(questions) else ""
+
     def populate_from_indicator_bank(self, indicator_bank):
         """Populates the form fields from an IndicatorBank instance."""
-        # Ensure choices are populated before setting data
         self._populate_choices()
 
         from app.services.indicator_measurement_sync import (
@@ -125,34 +220,33 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         self.unit.data = uid
         self.fdrs_kpi_code.data = getattr(indicator_bank, 'fdrs_kpi_code', None) or ''
         self.definition.data = indicator_bank.definition
+        self.aggregated_label.data = indicator_bank.aggregated_label or ''
+        self.area.data = indicator_bank.area or ''
+        self.data_source.data = indicator_bank.data_source or ''
+        self.disaggregation_guidance.data = indicator_bank.disaggregation_guidance or ''
+        self.tags.data = _join_csv_tags(indicator_bank.tags_list)
+        self._monitoring_questions_to_form(indicator_bank, self)
 
-        # Populate multilingual fields from JSONB translations (do not fall back to English)
         translations = indicator_bank.name_translations if isinstance(indicator_bank.name_translations, dict) else {}
-        try:
-            from flask import current_app
-            langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).debug("TRANSLATABLE_LANGUAGES fallback: %s", e)
-            langs = []
-        for lang in langs:
-            field = getattr(self, f"name_{lang}", None)
-            if field is not None:
-                val = translations.get(lang, "")
-                field.data = val if isinstance(val, str) else ""
+        self._populate_multilingual_field(translations, "name")
+
+        agg_translations = (
+            indicator_bank.aggregated_label_translations
+            if isinstance(indicator_bank.aggregated_label_translations, dict)
+            else {}
+        )
+        self._populate_multilingual_field(agg_translations, "aggregated_label")
 
         self.archived.data = indicator_bank.archived
         self.emergency.data = indicator_bank.emergency
         self.comments.data = indicator_bank.comments
         self.related_programs.data = indicator_bank.related_programs
 
-        # Handle sector data - convert from ID to ID (no change needed now)
         if indicator_bank.sector:
             self.sector_primary.data = indicator_bank.sector.get('primary')
             self.sector_secondary.data = indicator_bank.sector.get('secondary')
             self.sector_tertiary.data = indicator_bank.sector.get('tertiary')
 
-        # Handle sub-sector data - convert from ID to ID (no change needed now)
         if indicator_bank.sub_sector:
             self.sub_sector_primary.data = indicator_bank.sub_sector.get('primary')
             self.sub_sector_secondary.data = indicator_bank.sub_sector.get('secondary')
@@ -166,26 +260,22 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         indicator_bank.sync_type_unit_string_columns()
         indicator_bank.fdrs_kpi_code = (self.fdrs_kpi_code.data or '').strip() or None
         indicator_bank.definition = self.definition.data
+        indicator_bank.aggregated_label = (self.aggregated_label.data or '').strip() or None
+        indicator_bank.area = (self.area.data or '').strip() or None
+        indicator_bank.data_source = (self.data_source.data or '').strip() or None
+        indicator_bank.disaggregation_guidance = (self.disaggregation_guidance.data or '').strip() or None
+        indicator_bank.monitoring_questions = self._monitoring_questions_from_form(self)
+        tag_list = _split_csv_tags(self.tags.data)
+        indicator_bank.tags = tag_list or None
 
-        # Populate multilingual fields using the proper setter methods
-        try:
-            from flask import current_app
-            langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).debug("TRANSLATABLE_LANGUAGES fallback: %s", e)
-            langs = []
-        for lang in langs:
-            field = getattr(self, f"name_{lang}", None)
-            if field is not None:
-                indicator_bank.set_name_translation(lang, field.data or "")
+        self._apply_multilingual_field(indicator_bank, "name", "set_name_translation")
+        self._apply_multilingual_field(indicator_bank, "aggregated_label", "set_aggregated_label_translation")
 
         indicator_bank.archived = self.archived.data
         indicator_bank.emergency = self.emergency.data
         indicator_bank.comments = self.comments.data
         indicator_bank.related_programs = self.related_programs.data
 
-        # Handle sector data - store IDs directly
         sector_data = {}
         if self.sector_primary.data:
             sector_data['primary'] = self.sector_primary.data
@@ -195,7 +285,6 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             sector_data['tertiary'] = self.sector_tertiary.data
         indicator_bank.sector = sector_data if sector_data else None
 
-        # Handle sub-sector data - store IDs directly
         sub_sector_data = {}
         if self.sub_sector_primary.data:
             sub_sector_data['primary'] = self.sub_sector_primary.data
@@ -216,20 +305,17 @@ class SectorForm(FileUploadForm, MultilingualFieldsMixin):
                                 render_kw={"placeholder": "Order for sorting (0 = first)"})
     is_active = BooleanField("Active", default=True)
 
-    # Logo upload
     logo_file = FileField(
         "Logo Image (JPG, PNG, GIF, WEBP, SVG)",
         validators=FileUploadForm.image_validators
     )
 
-    # Icon fallback
     icon_class = StringField("FontAwesome Icon Class (fallback)", validators=[Optional(), Length(max=50)],
                             render_kw={"placeholder": "e.g., fas fa-heart"})
 
     submit = SubmitField("Save Sector")
 
     def __init__(self, *args, original_sector_id=None, **kwargs):
-        # Create code-suffixed fields (name_fr, name_es, ...) based on runtime settings.
         self.add_multilingual_name_fields("name", max_length=100)
         super(SectorForm, self).__init__(*args, **kwargs)
         self.original_sector_id = original_sector_id
@@ -250,25 +336,21 @@ class SubSectorForm(FileUploadForm, MultilingualFieldsMixin):
                                 render_kw={"placeholder": "Order for sorting (0 = first)"})
     is_active = BooleanField("Active", default=True)
 
-    # Logo upload
     logo_file = FileField(
         "Logo Image (JPG, PNG, GIF, WEBP, SVG)",
         validators=FileUploadForm.image_validators
     )
 
-    # Icon fallback
     icon_class = StringField("FontAwesome Icon Class (fallback)", validators=[Optional(), Length(max=50)],
                             render_kw={"placeholder": "e.g., fas fa-stethoscope"})
 
     submit = SubmitField("Save Sub-Sector")
 
     def __init__(self, *args, original_subsector_id=None, **kwargs):
-        # Create code-suffixed fields (name_fr, name_es, ...) based on runtime settings.
         self.add_multilingual_name_fields("name", max_length=100)
         super(SubSectorForm, self).__init__(*args, **kwargs)
         self.original_subsector_id = original_subsector_id
 
-        # Populate sector choices
         from app.routes.admin.shared import get_localized_sector_name
         self.sector_id.choices = [(None, "-- No Parent Sector --")] + [
             (s.id, get_localized_sector_name(s)) for s in Sector.query.filter_by(is_active=True).order_by(Sector.display_order, Sector.name).all()
@@ -292,7 +374,6 @@ class CommonWordForm(BaseForm, MultilingualFieldsMixin):
     submit = SubmitField("Save Common Word")
 
     def __init__(self, *args, **kwargs):
-        # Create code-suffixed fields (meaning_fr, meaning_es, ...) based on runtime settings.
         self.add_multilingual_name_fields("meaning", max_length=2000)
         super(CommonWordForm, self).__init__(*args, **kwargs)
 
@@ -302,7 +383,6 @@ class CommonWordForm(BaseForm, MultilingualFieldsMixin):
         common_word.meaning = self.meaning.data
         common_word.is_active = self.is_active.data
 
-        # Set translations dynamically
         try:
             from flask import current_app
             langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
@@ -321,7 +401,6 @@ class CommonWordForm(BaseForm, MultilingualFieldsMixin):
         self.meaning.data = common_word.meaning
         self.is_active.data = common_word.is_active
 
-        # Get translations dynamically (do not fall back to English)
         translations = common_word.meaning_translations if isinstance(common_word.meaning_translations, dict) else {}
         try:
             from flask import current_app

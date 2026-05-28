@@ -13,6 +13,8 @@ Important behavior:
 - We clear translations when the base English source text changes:
   - If `name` changes -> clear `name_translations`
   - If `definition` changes -> clear `definition_translations`
+- Remote IFRC metadata synced on each run: area (SPEF), data_source, disaggregation_guidance,
+  monitoring_questions (q1-q3), tags. aggregated_label is local-only and is not overwritten.
 """
 
 from __future__ import annotations
@@ -120,6 +122,8 @@ def sync_remote_indicator_bank(
                 txt = it.get("text") if isinstance(it, dict) else None
                 if txt and str(txt).strip():
                     out.append(str(txt).strip())
+                elif isinstance(it, str) and it.strip():
+                    out.append(it.strip())
         # de-dupe, keep order
         seen: set[str] = set()
         deduped: list[str] = []
@@ -128,6 +132,46 @@ def sync_remote_indicator_bank(
                 seen.add(x)
                 deduped.append(x)
         return deduped
+
+    def _first_text(item: dict, *keys: str) -> str | None:
+        for key in keys:
+            with suppress(Exception):
+                val = item.get(key)
+                if val is not None and str(val).strip():
+                    return str(val).strip()
+        return None
+
+    def _build_monitoring_questions(item: dict) -> list[str] | None:
+        questions: list[str] = []
+        for key in (
+            "q1", "q2", "q3",
+            "monitoringQuestion1", "monitoringQuestion2", "monitoringQuestion3",
+        ):
+            val = _first_text(item, key)
+            if val:
+                questions.append(val)
+        raw = item.get("monitoringQuestions")
+        if isinstance(raw, list):
+            for entry in raw:
+                if isinstance(entry, dict):
+                    val = _first_text(entry, "text", "question")
+                else:
+                    val = str(entry).strip() if entry is not None else ""
+                if val and val not in questions:
+                    questions.append(val)
+        return questions or None
+
+    def _apply_remote_metadata(existing: IndicatorBank, item: dict) -> None:
+        existing.area = _first_text(item, "spef", "SPEF", "area")
+        existing.data_source = _first_text(
+            item, "indicatorSource", "indicator_source", "dataSource"
+        )
+        existing.disaggregation_guidance = _first_text(
+            item, "disaggregation", "disaggregationGuidance"
+        )
+        existing.monitoring_questions = _build_monitoring_questions(item)
+        tags = _get_text_list(item.get("tags"))
+        existing.tags = tags or None
 
     def _is_emergency(item: dict) -> bool:
         try:
@@ -323,6 +367,7 @@ def sync_remote_indicator_bank(
                         existing.sector = sector_json
                         existing.sub_sector = subsector_json
                         existing.comments = remote_comments
+                        _apply_remote_metadata(existing, item)
                         db.session.add(existing)
                         # Flush inside savepoint to surface uniqueness problems per row.
                         db.session.flush()
@@ -365,6 +410,7 @@ def sync_remote_indicator_bank(
                         existing.sector = sector_json
                         existing.sub_sector = subsector_json
                         existing.comments = remote_comments
+                        _apply_remote_metadata(existing, item)
                         db.session.flush()
                         backfill_fk_from_strings_bank(existing)
                         stats["indicators_updated"] += 1

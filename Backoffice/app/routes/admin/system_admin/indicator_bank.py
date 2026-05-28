@@ -39,7 +39,7 @@ import io
 import pandas as pd
 
 from app.routes.admin.system_admin import bp
-from app.routes.admin.system_admin.helpers import track_indicator_changes
+from app.routes.admin.system_admin.helpers import track_indicator_changes, indicator_bank_history_snapshot
 
 
 # === Indicator Bank Management Routes ===
@@ -315,21 +315,9 @@ def add_indicator_bank():
             history = IndicatorBankHistory(
                 indicator_bank_id=new_indicator.id,
                 user_id=current_user.id,
-                name=new_indicator.name,
-                type=new_indicator.type,
-                unit=new_indicator.unit,
-                fdrs_kpi_code=new_indicator.fdrs_kpi_code,
-                definition=new_indicator.definition,
-                name_translations=new_indicator.name_translations,
-                definition_translations=new_indicator.definition_translations,
-                archived=new_indicator.archived,
-                comments=new_indicator.comments,
-                emergency=new_indicator.emergency,
-                related_programs=new_indicator.related_programs,
-                sector=new_indicator.sector,
-                sub_sector=new_indicator.sub_sector,
                 change_type='CREATED',
-                change_description=f'Indicator "{new_indicator.name}" created by {current_user.name or current_user.email}'
+                change_description=f'Indicator "{new_indicator.name}" created by {current_user.name or current_user.email}',
+                **indicator_bank_history_snapshot(new_indicator),
             )
             db.session.add(history)
 
@@ -389,6 +377,10 @@ def edit_indicator_bank(id):
                             language = field_name.replace('definition_', '')
                             indicator.set_definition_translation(language, value)
                             updated_fields.append(field_name)
+                        elif field_name.startswith('aggregated_label_') and field_name != 'aggregated_label':
+                            language = field_name.replace('aggregated_label_', '')
+                            indicator.set_aggregated_label_translation(language, value)
+                            updated_fields.append(field_name)
                         elif hasattr(indicator, field_name):
                             setattr(indicator, field_name, value)
                             updated_fields.append(field_name)
@@ -402,6 +394,8 @@ def edit_indicator_bank(id):
                         flag_modified(indicator, 'name_translations')
                     if any(field.startswith('definition_') for field in updated_fields):
                         flag_modified(indicator, 'definition_translations')
+                    if any(field.startswith('aggregated_label_') for field in updated_fields):
+                        flag_modified(indicator, 'aggregated_label_translations')
 
                     db.session.add(indicator)
 
@@ -409,21 +403,9 @@ def edit_indicator_bank(id):
                     history = IndicatorBankHistory(
                         indicator_bank_id=indicator.id,
                         user_id=current_user.id,
-                        name=indicator.name,
-                        type=indicator.type,
-                        unit=indicator.unit,
-                        fdrs_kpi_code=indicator.fdrs_kpi_code,
-                        definition=indicator.definition,
-                        name_translations=indicator.name_translations,
-                        definition_translations=indicator.definition_translations,
-                        archived=indicator.archived,
-                        comments=indicator.comments,
-                        emergency=indicator.emergency,
-                        related_programs=indicator.related_programs,
-                        sector=indicator.sector,
-                        sub_sector=indicator.sub_sector,
                         change_type='UPDATED',
-                        change_description=f"Auto-translate update: {', '.join(updated_fields)} updated by {current_user.name or current_user.email}"
+                        change_description=f"Auto-translate update: {', '.join(updated_fields)} updated by {current_user.name or current_user.email}",
+                        **indicator_bank_history_snapshot(indicator),
                     )
                     db.session.add(history)
                     db.session.flush()
@@ -480,9 +462,15 @@ def edit_indicator_bank(id):
                 'unit': form.unit.data,
                 'fdrs_kpi_code': (form.fdrs_kpi_code.data or '').strip() or None,
                 'definition': form.definition.data,
+                'aggregated_label': form.aggregated_label.data,
                 'name_translations': name_translations,
                 'comments': form.comments.data,
                 'related_programs': form.related_programs.data,
+                'area': form.area.data,
+                'data_source': form.data_source.data,
+                'disaggregation_guidance': form.disaggregation_guidance.data,
+                'monitoring_questions': IndicatorBankForm._monitoring_questions_from_form(form),
+                'tags': [t.strip() for t in (form.tags.data or '').split(',') if t.strip()] or None,
                 'emergency': form.emergency.data,
                 'archived': prev_archived if not can_archive else form.archived.data,
                 'sector_primary': form.sector_primary.data,
@@ -500,31 +488,19 @@ def edit_indicator_bank(id):
             else:
                 change_description = f"Indicator updated by {current_user.name or current_user.email} (no specific changes detected)"
 
-            history = IndicatorBankHistory(
-                indicator_bank_id=indicator.id,
-                user_id=current_user.id,
-                name=indicator.name,
-                type=indicator.type,
-                unit=indicator.unit,
-                fdrs_kpi_code=indicator.fdrs_kpi_code,
-                definition=indicator.definition,
-                name_translations=indicator.name_translations,
-                definition_translations=indicator.definition_translations,
-                archived=indicator.archived,
-                comments=indicator.comments,
-                emergency=indicator.emergency,
-                related_programs=indicator.related_programs,
-                sector=indicator.sector,
-                sub_sector=indicator.sub_sector,
-                change_type='UPDATED',
-                change_description=change_description
-            )
-            db.session.add(history)
-
             form.populate_indicator_bank(indicator)
 
             if not can_archive:
                 indicator.archived = prev_archived
+
+            history = IndicatorBankHistory(
+                indicator_bank_id=indicator.id,
+                user_id=current_user.id,
+                change_type='UPDATED',
+                change_description=change_description,
+                **indicator_bank_history_snapshot(indicator),
+            )
+            db.session.add(history)
 
             db.session.flush()
             flash(f"Indicator '{indicator.name}' updated successfully.", "success")
@@ -549,21 +525,9 @@ def delete_indicator_bank(id):
         history = IndicatorBankHistory(
             indicator_bank_id=indicator.id,
             user_id=current_user.id,
-            name=indicator.name,
-            type=indicator.type,
-            unit=indicator.unit,
-            fdrs_kpi_code=indicator.fdrs_kpi_code,
-            definition=indicator.definition,
-            name_translations=indicator.name_translations,
-            definition_translations=indicator.definition_translations,
-            archived=indicator.archived,
-            comments=indicator.comments,
-            emergency=indicator.emergency,
-            related_programs=indicator.related_programs,
-            sector=indicator.sector,
-            sub_sector=indicator.sub_sector,
             change_type='DELETED',
-            change_description=f'Indicator "{indicator.name}" deleted by {current_user.name or current_user.email}'
+            change_description=f'Indicator "{indicator.name}" deleted by {current_user.name or current_user.email}',
+            **indicator_bank_history_snapshot(indicator),
         )
         db.session.add(history)
 
@@ -590,21 +554,9 @@ def archive_indicator_bank(id):
         history = IndicatorBankHistory(
             indicator_bank_id=indicator.id,
             user_id=current_user.id,
-            name=indicator.name,
-            type=indicator.type,
-            unit=indicator.unit,
-            fdrs_kpi_code=indicator.fdrs_kpi_code,
-            definition=indicator.definition,
-            name_translations=indicator.name_translations,
-            definition_translations=indicator.definition_translations,
-            archived=indicator.archived,
-            comments=indicator.comments,
-            emergency=indicator.emergency,
-            related_programs=indicator.related_programs,
-            sector=indicator.sector,
-            sub_sector=indicator.sub_sector,
             change_type='ARCHIVED' if new_archived_status else 'UNARCHIVED',
-            change_description=f'Indicator "{indicator.name}" {"archived" if new_archived_status else "unarchived"} by {current_user.name or current_user.email}'
+            change_description=f'Indicator "{indicator.name}" {"archived" if new_archived_status else "unarchived"} by {current_user.name or current_user.email}',
+            **indicator_bank_history_snapshot(indicator),
         )
         db.session.add(history)
 
@@ -662,21 +614,9 @@ def update_indicator_translations(id):
         history = IndicatorBankHistory(
             indicator_bank_id=indicator.id,
             user_id=current_user.id,
-            name=indicator.name,
-            type=indicator.type,
-            unit=indicator.unit,
-            fdrs_kpi_code=indicator.fdrs_kpi_code,
-            definition=indicator.definition,
-            name_translations=indicator.name_translations,
-            definition_translations=indicator.definition_translations,
-            archived=indicator.archived,
-            comments=indicator.comments,
-            emergency=indicator.emergency,
-            related_programs=indicator.related_programs,
-            sector=indicator.sector,
-            sub_sector=indicator.sub_sector,
             change_type='UPDATED',
-            change_description=change_description
+            change_description=change_description,
+            **indicator_bank_history_snapshot(indicator),
         )
         db.session.add(history)
 
@@ -753,9 +693,12 @@ def export_indicators():
             "SubSector Primary", "SubSector Secondary", "SubSector Tertiary",
         ]
         main_headers = (
-            ['ID', 'Name', 'Definition', 'Type', 'Unit', 'FDRS KPI Code', 'Emergency', 'Related Programs', 'Archived', 'Created At']
+            ['ID', 'Name', 'Definition', 'Aggregated Label', 'Area', 'Type', 'Unit', 'FDRS KPI Code',
+             'Data Source', 'Disaggregation Guidance', 'Monitoring Questions', 'Tags',
+             'Emergency', 'Related Programs', 'Archived', 'Created At']
             + name_lang_headers
             + def_lang_headers
+            + [f"Aggregated Label ({code})" for code in languages if code != "en"]
             + sector_subsector_headers
         )
         for col, header in enumerate(main_headers, 1):
@@ -780,26 +723,47 @@ def export_indicators():
             for ss in SubSector.query.filter(SubSector.id.in_(subsector_ids)).all():
                 subsector_names[ss.id] = ss.name
 
+        def _json_dump(val):
+            try:
+                if val is None:
+                    return ""
+                return json.dumps(val, ensure_ascii=False)
+            except Exception as e:
+                current_app.logger.debug("indicator export _json_dump failed: %s", e)
+                return ""
+
         for row, indicator in enumerate(indicators, 2):
             ws.cell(row=row, column=1, value=indicator.id)
             ws.cell(row=row, column=2, value=indicator.name)
             ws.cell(row=row, column=3, value=indicator.definition)
-            ws.cell(row=row, column=4, value=indicator.type)
-            ws.cell(row=row, column=5, value=indicator.unit)
-            ws.cell(row=row, column=6, value=getattr(indicator, 'fdrs_kpi_code', None) or '')
-            ws.cell(row=row, column=7, value=indicator.emergency)
-            ws.cell(row=row, column=8, value=indicator.related_programs)
-            ws.cell(row=row, column=9, value=indicator.archived)
-            ws.cell(row=row, column=10, value=indicator.created_at.strftime('%Y-%m-%d') if indicator.created_at else '')
+            ws.cell(row=row, column=4, value=getattr(indicator, 'aggregated_label', None) or '')
+            ws.cell(row=row, column=5, value=getattr(indicator, 'area', None) or '')
+            ws.cell(row=row, column=6, value=indicator.type)
+            ws.cell(row=row, column=7, value=indicator.unit)
+            ws.cell(row=row, column=8, value=getattr(indicator, 'fdrs_kpi_code', None) or '')
+            ws.cell(row=row, column=9, value=getattr(indicator, 'data_source', None) or '')
+            ws.cell(row=row, column=10, value=getattr(indicator, 'disaggregation_guidance', None) or '')
+            ws.cell(row=row, column=11, value=_json_dump(indicator.monitoring_questions_list))
+            ws.cell(row=row, column=12, value=", ".join(indicator.tags_list))
+            ws.cell(row=row, column=13, value=indicator.emergency)
+            ws.cell(row=row, column=14, value=indicator.related_programs)
+            ws.cell(row=row, column=15, value=indicator.archived)
+            ws.cell(row=row, column=16, value=indicator.created_at.strftime('%Y-%m-%d') if indicator.created_at else '')
 
             nt = indicator.name_translations or {}
             dt = indicator.definition_translations or {}
-            col = 11
+            alt = indicator.aggregated_label_translations or {}
+            col = 17
             for code in languages:
                 ws.cell(row=row, column=col, value=nt.get(code) if code != "en" else (nt.get("en") or indicator.name))
                 col += 1
             for code in languages:
                 ws.cell(row=row, column=col, value=dt.get(code) if code != "en" else (dt.get("en") or indicator.definition))
+                col += 1
+            for code in languages:
+                if code == "en":
+                    continue
+                ws.cell(row=row, column=col, value=alt.get(code) or '')
                 col += 1
             sec = indicator.sector or {}
             subsec = indicator.sub_sector or {}
@@ -821,24 +785,16 @@ def export_indicators():
                         max_length = len(str(cell.value))
             ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
 
-        def _json_dump(val):
-            try:
-                if val is None:
-                    return ""
-                return json.dumps(val, ensure_ascii=False)
-            except Exception as e:
-                current_app.logger.debug("indicator export _json_dump failed: %s", e)
-                return ""
-
         ws_db_ind = wb.create_sheet(title="DB_Indicators")
         ws_db_ind.sheet_state = "hidden"
 
         db_ind_headers = [
-            "id", "name", "definition", "type", "unit", "fdrs_kpi_code",
+            "id", "name", "definition", "aggregated_label", "area", "type", "unit", "fdrs_kpi_code",
+            "data_source", "disaggregation_guidance", "monitoring_questions_json", "tags_json",
             "emergency", "related_programs", "archived", "comments",
             "sector_primary_id", "sector_secondary_id", "sector_tertiary_id",
             "subsector_primary_id", "subsector_secondary_id", "subsector_tertiary_id",
-            "name_translations_json", "definition_translations_json",
+            "name_translations_json", "definition_translations_json", "aggregated_label_translations_json",
             "created_at", "updated_at",
             "indicator_type_id", "indicator_unit_id",
         ]
@@ -852,25 +808,32 @@ def export_indicators():
             ws_db_ind.cell(row=row, column=1, value=indicator.id)
             ws_db_ind.cell(row=row, column=2, value=indicator.name)
             ws_db_ind.cell(row=row, column=3, value=indicator.definition)
-            ws_db_ind.cell(row=row, column=4, value=indicator.type)
-            ws_db_ind.cell(row=row, column=5, value=indicator.unit)
-            ws_db_ind.cell(row=row, column=6, value=getattr(indicator, 'fdrs_kpi_code', None) or '')
-            ws_db_ind.cell(row=row, column=7, value=indicator.emergency)
-            ws_db_ind.cell(row=row, column=8, value=indicator.related_programs)
-            ws_db_ind.cell(row=row, column=9, value=indicator.archived)
-            ws_db_ind.cell(row=row, column=10, value=indicator.comments)
-            ws_db_ind.cell(row=row, column=11, value=sector.get("primary"))
-            ws_db_ind.cell(row=row, column=12, value=sector.get("secondary"))
-            ws_db_ind.cell(row=row, column=13, value=sector.get("tertiary"))
-            ws_db_ind.cell(row=row, column=14, value=subsector.get("primary"))
-            ws_db_ind.cell(row=row, column=15, value=subsector.get("secondary"))
-            ws_db_ind.cell(row=row, column=16, value=subsector.get("tertiary"))
-            ws_db_ind.cell(row=row, column=17, value=_json_dump(indicator.name_translations or {}))
-            ws_db_ind.cell(row=row, column=18, value=_json_dump(indicator.definition_translations or {}))
-            ws_db_ind.cell(row=row, column=19, value=indicator.created_at.isoformat() if indicator.created_at else "")
-            ws_db_ind.cell(row=row, column=20, value=indicator.updated_at.isoformat() if getattr(indicator, "updated_at", None) else "")
-            ws_db_ind.cell(row=row, column=21, value=indicator.indicator_type_id)
-            ws_db_ind.cell(row=row, column=22, value=indicator.indicator_unit_id)
+            ws_db_ind.cell(row=row, column=4, value=getattr(indicator, 'aggregated_label', None) or '')
+            ws_db_ind.cell(row=row, column=5, value=getattr(indicator, 'area', None) or '')
+            ws_db_ind.cell(row=row, column=6, value=indicator.type)
+            ws_db_ind.cell(row=row, column=7, value=indicator.unit)
+            ws_db_ind.cell(row=row, column=8, value=getattr(indicator, 'fdrs_kpi_code', None) or '')
+            ws_db_ind.cell(row=row, column=9, value=getattr(indicator, 'data_source', None) or '')
+            ws_db_ind.cell(row=row, column=10, value=getattr(indicator, 'disaggregation_guidance', None) or '')
+            ws_db_ind.cell(row=row, column=11, value=_json_dump(indicator.monitoring_questions))
+            ws_db_ind.cell(row=row, column=12, value=_json_dump(indicator.tags))
+            ws_db_ind.cell(row=row, column=13, value=indicator.emergency)
+            ws_db_ind.cell(row=row, column=14, value=indicator.related_programs)
+            ws_db_ind.cell(row=row, column=15, value=indicator.archived)
+            ws_db_ind.cell(row=row, column=16, value=indicator.comments)
+            ws_db_ind.cell(row=row, column=17, value=sector.get("primary"))
+            ws_db_ind.cell(row=row, column=18, value=sector.get("secondary"))
+            ws_db_ind.cell(row=row, column=19, value=sector.get("tertiary"))
+            ws_db_ind.cell(row=row, column=20, value=subsector.get("primary"))
+            ws_db_ind.cell(row=row, column=21, value=subsector.get("secondary"))
+            ws_db_ind.cell(row=row, column=22, value=subsector.get("tertiary"))
+            ws_db_ind.cell(row=row, column=23, value=_json_dump(indicator.name_translations or {}))
+            ws_db_ind.cell(row=row, column=24, value=_json_dump(indicator.definition_translations or {}))
+            ws_db_ind.cell(row=row, column=25, value=_json_dump(indicator.aggregated_label_translations or {}))
+            ws_db_ind.cell(row=row, column=26, value=indicator.created_at.isoformat() if indicator.created_at else "")
+            ws_db_ind.cell(row=row, column=27, value=indicator.updated_at.isoformat() if getattr(indicator, "updated_at", None) else "")
+            ws_db_ind.cell(row=row, column=28, value=indicator.indicator_type_id)
+            ws_db_ind.cell(row=row, column=29, value=indicator.indicator_unit_id)
 
         ws_db_mt = wb.create_sheet(title="DB_MeasurementTypes")
         ws_db_mt.sheet_state = "hidden"

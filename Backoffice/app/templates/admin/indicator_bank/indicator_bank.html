@@ -756,6 +756,16 @@
             unit: {{ (get_indicator_bank_unit_display(indicator) or '')|tojson|safe }},
             fdrs_kpi_code: {{ (indicator.fdrs_kpi_code or '')|tojson|safe }},
             definition: {{ (indicator.definition or '')|tojson|safe }},
+            aggregated_label: {{ (indicator.aggregated_label or '')|tojson|safe }},
+            {% set _alt = indicator.aggregated_label_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            aggregated_label_{{ code }}: {{ ((_alt.get(code) if _alt and _alt.get(code) else '') or '')|tojson|safe }},
+            {% endfor %}
+            area: {{ (indicator.area or '')|tojson|safe }},
+            data_source: {{ (indicator.data_source or '')|tojson|safe }},
+            disaggregation_guidance: {{ (indicator.disaggregation_guidance or '')|tojson|safe }},
+            monitoring_questions: {{ (indicator.monitoring_questions_list or [])|tojson|safe }},
+            tags: {{ (indicator.tags_list or [])|tojson|safe }},
             {% set _dt = indicator.definition_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
             definition_{{ code }}: {{ ((_dt.get(code) if _dt and _dt.get(code) else '') or '')|tojson|safe }},
@@ -868,7 +878,100 @@
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
         },
         {% endfor %}
+        // Aggregated label columns
+        {
+            field: 'aggregated_label',
+            headerName: {{ _("Aggregated Label")|js }},
+            width: 280,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'aggregated_label_{{ code }}',
+            headerName: {{ (_('Aggregated Label') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 280,
+            minWidth: 200,
+            maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
         // Other columns
+        {
+            field: 'area',
+            headerName: {{ _("Area")|js }},
+            width: 90,
+            minWidth: 80,
+            maxWidth: 120,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            }
+        },
+        {
+            field: 'data_source',
+            headerName: {{ _("Data Source")|js }},
+            width: 220,
+            minWidth: 180,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                if (!params.value) return '-';
+                return '<span title="' + String(params.value).replace(/"/g, '&quot;') + '">' + String(params.value).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'disaggregation_guidance',
+            headerName: {{ _("Disaggregation Guidance")|js }},
+            width: 180,
+            minWidth: 140,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '-';
+            }
+        },
+        {
+            field: 'monitoring_questions',
+            headerName: {{ _("Monitoring Questions")|js }},
+            width: 220,
+            minWidth: 180,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: false,
+            cellRenderer: function(params) {
+                if (!params.value || !params.value.length) return '-';
+                return params.value.join('; ');
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'tags',
+            headerName: {{ _("Tags")|js }},
+            width: 180,
+            minWidth: 140,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: false,
+            cellRenderer: function(params) {
+                if (!params.value || !params.value.length) return '-';
+                return params.value.join(', ');
+            }
+        },
         {
             field: 'type',
             headerName: {{ _("Type")|js }},

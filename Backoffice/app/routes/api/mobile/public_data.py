@@ -277,6 +277,13 @@ def public_indicator_bank():
             'localized_unit': localized_unit,
             'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
             'definition': indicator.definition,
+            'aggregated_label': getattr(indicator, 'aggregated_label', None),
+            'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
+            'area': getattr(indicator, 'area', None),
+            'data_source': getattr(indicator, 'data_source', None),
+            'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
+            'monitoring_questions': indicator.monitoring_questions_list,
+            'tags': indicator.tags_list,
             'name_translations': (
                 indicator.name_translations
                 if hasattr(indicator, 'name_translations')
@@ -365,6 +372,13 @@ def public_indicator_detail(indicator_id):
             'unit': indicator.unit,
             'localized_unit': localized_unit,
             'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
+            'aggregated_label': getattr(indicator, 'aggregated_label', None),
+            'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
+            'area': getattr(indicator, 'area', None),
+            'data_source': getattr(indicator, 'data_source', None),
+            'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
+            'monitoring_questions': indicator.monitoring_questions_list,
+            'tags': indicator.tags_list,
             'name_translations': (
                 indicator.name_translations
                 if hasattr(indicator, 'name_translations')

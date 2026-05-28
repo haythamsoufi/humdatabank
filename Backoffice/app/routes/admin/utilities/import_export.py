@@ -21,6 +21,7 @@ from app.models import (
     SubSector,
 )
 from app.routes.admin.shared import permission_required
+from app.routes.admin.system_admin.helpers import indicator_bank_history_snapshot
 from app.routes.admin.utilities import bp
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
@@ -544,6 +545,12 @@ def _process_indicator_import(file_path):
                             continue
 
                         definition = (r.get("definition") or "").strip()
+                        aggregated_label = (r.get("aggregated_label") or "").strip() or None
+                        area = (r.get("area") or "").strip() or None
+                        data_source = (r.get("data_source") or "").strip() or None
+                        disaggregation_guidance = (r.get("disaggregation_guidance") or "").strip() or None
+                        monitoring_questions = _to_json_dict(r.get("monitoring_questions_json")) or _to_json_dict(r.get("monitoring_questions"))
+                        tags = _to_json_dict(r.get("tags_json")) or _to_json_dict(r.get("tags"))
                         indicator_type = (r.get("type") or "").strip() or "numeric"
                         unit = (r.get("unit") or "").strip()
                         fdrs_kpi_code = (r.get("fdrs_kpi_code") or "").strip() or None
@@ -562,6 +569,7 @@ def _process_indicator_import(file_path):
 
                         name_translations = _to_json_dict(r.get("name_translations_json")) or {}
                         definition_translations = _to_json_dict(r.get("definition_translations_json")) or {}
+                        aggregated_label_translations = _to_json_dict(r.get("aggregated_label_translations_json")) or {}
                         itid = _to_int(r.get("indicator_type_id"))
                         iuid = _to_int(r.get("indicator_unit_id"))
 
@@ -577,6 +585,12 @@ def _process_indicator_import(file_path):
                                 fdrs_kpi_code=fdrs_kpi_code,
                                 emergency=bool(emergency) if emergency is not None else False,
                                 related_programs=programs,
+                                aggregated_label=aggregated_label,
+                                area=area,
+                                data_source=data_source,
+                                disaggregation_guidance=disaggregation_guidance,
+                                monitoring_questions=monitoring_questions if isinstance(monitoring_questions, list) else None,
+                                tags=tags if isinstance(tags, list) else None,
                             )
                             if rid:
                                 existing.id = rid
@@ -596,12 +610,19 @@ def _process_indicator_import(file_path):
                                 existing.archived = archived
                             existing.comments = comments
                             existing.related_programs = programs
+                            existing.aggregated_label = aggregated_label
+                            existing.area = area
+                            existing.data_source = data_source
+                            existing.disaggregation_guidance = disaggregation_guidance
+                            existing.monitoring_questions = monitoring_questions if isinstance(monitoring_questions, list) else None
+                            existing.tags = tags if isinstance(tags, list) else None
 
                         # update relational JSON fields + translations
                         existing.sector = _build_levels_json(s_primary, s_secondary, s_tertiary)
                         existing.sub_sector = _build_levels_json(ss_primary, ss_secondary, ss_tertiary)
                         existing.name_translations = name_translations or {}
                         existing.definition_translations = definition_translations or {}
+                        existing.aggregated_label_translations = aggregated_label_translations or {}
 
                         backfill_fk_from_strings_bank(existing)
                         if itid is not None:
@@ -615,25 +636,13 @@ def _process_indicator_import(file_path):
                         history = IndicatorBankHistory(
                             indicator_bank_id=existing.id,
                             user_id=current_user.id,
-                            name=existing.name,
-                            type=existing.type,
-                            unit=existing.unit,
-                            fdrs_kpi_code=existing.fdrs_kpi_code,
-                            definition=existing.definition,
-                            name_translations=existing.name_translations,
-                            definition_translations=existing.definition_translations,
-                            archived=existing.archived,
-                            comments=existing.comments,
-                            emergency=existing.emergency,
-                            related_programs=existing.related_programs,
-                            sector=existing.sector,
-                            sub_sector=existing.sub_sector,
                             change_type='CREATED' if is_new else 'UPDATED',
                             change_description=(
                                 f'Indicator "{existing.name}" created via DB import by {current_user.name or current_user.email}'
                                 if is_new
                                 else f'Indicator "{existing.name}" updated via DB import by {current_user.name or current_user.email}'
                             ),
+                            **indicator_bank_history_snapshot(existing),
                         )
                         db.session.add(history)
 
@@ -768,21 +777,9 @@ def _process_indicator_import(file_path):
                     history = IndicatorBankHistory(
                         indicator_bank_id=existing.id,
                         user_id=current_user.id,
-                        name=existing.name,
-                        type=existing.type,
-                        unit=existing.unit,
-                        fdrs_kpi_code=existing.fdrs_kpi_code,
-                        definition=existing.definition,
-                        name_translations=existing.name_translations,
-                        definition_translations=existing.definition_translations,
-                        archived=existing.archived,
-                        comments=existing.comments,
-                        emergency=existing.emergency,
-                        related_programs=existing.related_programs,
-                        sector=existing.sector,
-                        sub_sector=existing.sub_sector,
                         change_type='UPDATED',
-                        change_description=change_description
+                        change_description=change_description,
+                        **indicator_bank_history_snapshot(existing),
                     )
                     db.session.add(history)
                     result['updated'] += 1
@@ -811,21 +808,9 @@ def _process_indicator_import(file_path):
                     history = IndicatorBankHistory(
                         indicator_bank_id=new_indicator.id,
                         user_id=current_user.id,
-                        name=new_indicator.name,
-                        type=new_indicator.type,
-                        unit=new_indicator.unit,
-                        fdrs_kpi_code=new_indicator.fdrs_kpi_code,
-                        definition=new_indicator.definition,
-                        name_translations=new_indicator.name_translations,
-                        definition_translations=new_indicator.definition_translations,
-                        archived=new_indicator.archived,
-                        comments=new_indicator.comments,
-                        emergency=new_indicator.emergency,
-                        related_programs=new_indicator.related_programs,
-                        sector=new_indicator.sector,
-                        sub_sector=new_indicator.sub_sector,
                         change_type='CREATED',
-                        change_description=f'Indicator "{new_indicator.name}" created via import by {current_user.name or current_user.email}'
+                        change_description=f'Indicator "{new_indicator.name}" created via import by {current_user.name or current_user.email}',
+                        **indicator_bank_history_snapshot(new_indicator),
                     )
                     db.session.add(history)
                     result['imported'] += 1
@@ -866,21 +851,9 @@ def _create_indicator_from_suggestion(suggestion):
         history = IndicatorBankHistory(
             indicator_bank_id=new_indicator.id,
             user_id=current_user.id,
-            name=new_indicator.name,
-            type=new_indicator.type,
-            unit=new_indicator.unit,
-            fdrs_kpi_code=new_indicator.fdrs_kpi_code,
-            definition=new_indicator.definition,
-            name_translations=new_indicator.name_translations,
-            definition_translations=new_indicator.definition_translations,
-            archived=new_indicator.archived,
-            comments=new_indicator.comments,
-            emergency=new_indicator.emergency,
-            related_programs=new_indicator.related_programs,
-            sector=new_indicator.sector,
-            sub_sector=new_indicator.sub_sector,
             change_type='CREATED',
-            change_description=f'Indicator "{new_indicator.name}" created from suggestion by {current_user.name or current_user.email}'
+            change_description=f'Indicator "{new_indicator.name}" created from suggestion by {current_user.name or current_user.email}',
+            **indicator_bank_history_snapshot(new_indicator),
         )
         db.session.add(history)
 

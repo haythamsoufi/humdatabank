@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import requests as http_requests
 from flask import Blueprint, current_app, g, jsonify, make_response, request
 from openpyxl import Workbook
+from sqlalchemy.orm import joinedload
 
 from app import db
 from app.models import (
@@ -151,6 +152,13 @@ def _emergency_to_string(value: Any) -> str:
     return str(value).strip()
 
 
+def _legacy_excel_emergency(indicator: IndicatorBank) -> str:
+    """Legacy IFRC export uses labels like ``Emergency``, not boolean ``Yes``."""
+    if indicator.emergency:
+        return "Emergency"
+    return ""
+
+
 def _load_sector_maps(indicators: List[IndicatorBank]) -> Tuple[dict, dict, dict, dict]:
     sector_ids: Set[int] = set()
     subsector_ids: Set[int] = set()
@@ -194,6 +202,17 @@ def _sector_image_bytes(sector: Sector) -> Optional[List[int]]:
     return None
 
 
+def _localized_sector_subsector_name(
+    entity: Any,
+    locale: str,
+) -> Optional[str]:
+    if entity is None:
+        return None
+    if hasattr(entity, "get_name_translation"):
+        return (entity.get_name_translation(locale) or entity.name or "").strip() or None
+    return (getattr(entity, "name", None) or "").strip() or None
+
+
 def _sector_subsector_names_for_level(
     indicator: IndicatorBank,
     level: str,
@@ -201,31 +220,50 @@ def _sector_subsector_names_for_level(
     sectors_by_id: dict,
     locale: str,
 ) -> Tuple[Optional[str], Optional[str]]:
+    sector_name: Optional[str] = None
+    sub_name: Optional[str] = None
+
     ssid = indicator.sub_sector.get(level) if indicator.sub_sector else None
-    if ssid is None:
-        return None, None
-    subsector = subsectors_by_id.get(int(ssid))
-    if not subsector:
-        return None, None
-    sub_name = (
-        subsector.get_name_translation(locale)
-        if hasattr(subsector, "get_name_translation")
-        else subsector.name
-    ) or subsector.name
-    sector = sectors_by_id.get(subsector.sector_id)
-    sector_name = None
-    if sector:
-        sector_name = (
-            sector.get_name_translation(locale)
-            if hasattr(sector, "get_name_translation")
-            else sector.name
-        ) or sector.name
+    if ssid is not None:
+        subsector = subsectors_by_id.get(int(ssid))
+        if subsector:
+            sub_name = _localized_sector_subsector_name(subsector, locale)
+            parent = sectors_by_id.get(subsector.sector_id)
+            sector_name = _localized_sector_subsector_name(parent, locale)
+
+    if sector_name is None and indicator.sector:
+        sid = indicator.sector.get(level)
+        if sid is not None:
+            sector_name = _localized_sector_subsector_name(sectors_by_id.get(int(sid)), locale)
+
     return sector_name, sub_name
+
+
+def _excel_type_unit_labels(indicator: IndicatorBank, locale: str) -> Tuple[str, str]:
+    """Resolve type/unit for legacy Excel (catalog FK names, then localized strings)."""
+    type_label: Optional[str] = None
+    unit_label: Optional[str] = None
+    if indicator.measurement_type is not None:
+        type_label = _localized_sector_subsector_name(indicator.measurement_type, locale)
+    if indicator.measurement_unit is not None:
+        unit_label = _localized_sector_subsector_name(indicator.measurement_unit, locale)
+    localized_type, localized_unit = _get_localized_type_unit(indicator, locale)
+    return (
+        type_label or localized_type or (indicator.type or ""),
+        unit_label or localized_unit or (indicator.unit or ""),
+    )
 
 
 def _build_legacy_excel_export(locale: str) -> bytes:
     """Build IFRC Indicator Bank public export workbook (legacy ``ExportModel`` layout)."""
-    indicators = IndicatorBank.query.order_by(IndicatorBank.id.asc()).all()
+    indicators = (
+        IndicatorBank.query.options(
+            joinedload(IndicatorBank.measurement_type),
+            joinedload(IndicatorBank.measurement_unit),
+        )
+        .order_by(IndicatorBank.id.asc())
+        .all()
+    )
     sectors_by_id, subsectors_by_id, _, _ = _load_sector_maps(indicators)
 
     wb = Workbook()
@@ -234,7 +272,7 @@ def _build_legacy_excel_export(locale: str) -> bytes:
     ws.append(_EXCEL_HEADERS)
 
     for indicator in indicators:
-        localized_type, localized_unit = _get_localized_type_unit(indicator, locale)
+        localized_type, localized_unit = _excel_type_unit_labels(indicator, locale)
         questions = indicator.monitoring_questions_list
         q1 = questions[0] if len(questions) > 0 else None
         q2 = questions[1] if len(questions) > 1 else None
@@ -260,7 +298,7 @@ def _build_legacy_excel_export(locale: str) -> bytes:
                 q1,
                 q2,
                 q3,
-                _emergency_to_string(indicator.emergency),
+                _legacy_excel_emergency(indicator),
                 modified,
                 "Archived" if indicator.archived else None,
                 indicator.data_source or "",

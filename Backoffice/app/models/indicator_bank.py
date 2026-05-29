@@ -1,6 +1,8 @@
 """
 Indicator Bank models including indicators, sectors, subsectors, and common words.
 """
+import re
+
 from sqlalchemy import Column, Integer, ForeignKey, String, Text, Boolean, JSON, Date, Float
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, backref
@@ -201,7 +203,11 @@ class IndicatorBank(db.Model):
 
         # Cache the parsed list to avoid repeated string splitting
         if not hasattr(self, '_cached_programs_list'):
-            self._cached_programs_list = [program.strip() for program in self.related_programs.split(',') if program.strip()]
+            self._cached_programs_list = [
+                program.strip()
+                for program in re.split(r"[,|]", self.related_programs)
+                if program.strip()
+            ]
 
         return self._cached_programs_list
 
@@ -351,16 +357,16 @@ class IndicatorBank(db.Model):
     @property
     def tags_list(self):
         """Return tags as a list."""
-        if not self.tags or not isinstance(self.tags, list):
-            return []
-        return [str(t).strip() for t in self.tags if str(t).strip()]
+        from app.utils.jsonb_text import text_list_from_jsonb
+
+        return text_list_from_jsonb(self.tags)
 
     @property
     def monitoring_questions_list(self):
         """Return monitoring questions as a list."""
-        if not self.monitoring_questions or not isinstance(self.monitoring_questions, list):
-            return []
-        return [str(q).strip() for q in self.monitoring_questions if str(q).strip()]
+        from app.utils.jsonb_text import text_list_from_jsonb
+
+        return text_list_from_jsonb(self.monitoring_questions)
 
     def __repr__(self):
         return f'<IndicatorBank {self.name} (Type: {self.type})>'

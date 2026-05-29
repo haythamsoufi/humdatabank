@@ -1,9 +1,10 @@
 """
 Site lock middleware.
 
-When COMING_SOON_LOCK or MAINTENANCE_LOCK is true, all routes except health
-checks and static assets return a lock page. Maintenance takes precedence when
-both flags are enabled. Team bypass via *_BYPASS_SECRET query/cookie params.
+When COMING_SOON_LOCK or MAINTENANCE_LOCK is true, browser/HTML routes return a
+lock page. Programmatic access stays available (``/api/*``, API-key/Bearer
+requests, health, static assets). Maintenance takes precedence when both flags are enabled.
+Team bypass via *_BYPASS_SECRET query/cookie params.
 """
 
 from __future__ import annotations
@@ -14,8 +15,7 @@ from typing import Optional
 
 from flask import current_app, g, make_response, render_template, request
 
-from app.utils.api_responses import json_error
-from app.utils.request_utils import is_json_request, is_static_asset_request
+from app.utils.request_utils import is_static_asset_request
 
 _HEALTH_PATHS = frozenset({"/health"})
 
@@ -80,12 +80,25 @@ def _is_anonymous_root_health_probe() -> bool:
     return not user_agent and (not accept or accept == "*/*") and not has_cookies
 
 
+def _is_api_path() -> bool:
+    """True for REST under /api/ or external clients authenticating with API key / Bearer."""
+    path = request.path or ""
+    if path.startswith("/api/"):
+        return True
+    if (request.headers.get("X-API-Key") or "").strip():
+        return True
+    auth = (request.headers.get("Authorization") or "").strip()
+    if auth.startswith("Bearer ") and len(auth) > 7:
+        return True
+    return False
+
+
 def _is_exempt_path() -> bool:
     if is_static_asset_request():
         return True
     if request.path in _HEALTH_PATHS:
         return True
-    if request.path.startswith("/api/v1/uploads/branding/"):
+    if _is_api_path():
         return True
     if _is_anonymous_root_health_probe():
         return True
@@ -109,13 +122,6 @@ def _has_bypass(mode: _LockMode) -> bool:
 
 
 def _lock_response(mode: _LockMode):
-    if is_json_request() or request.path.startswith("/api/"):
-        return json_error(
-            mode.api_message,
-            status=503,
-            code=mode.api_code,
-        )
-
     response = make_response(render_template(mode.template), 200)
     response.headers["Cache-Control"] = "no-store"
     return response

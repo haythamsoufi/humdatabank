@@ -17,8 +17,8 @@ class TestComingSoonLock:
         assert b"Coming Soon" in resp.data
 
         api_resp = client.get("/api/v1/countrymap", headers={"Accept": "application/json"})
-        assert api_resp.status_code == 503
-        assert api_resp.get_json()["code"] == "coming_soon"
+        assert api_resp.status_code != 503
+        assert api_resp.get_json().get("code") != "coming_soon"
 
     def test_health_check_still_works(self, app, client):
         app.config["COMING_SOON_LOCK"] = True
@@ -55,8 +55,8 @@ class TestMaintenanceLock:
         assert b"Maintenance in progress" in resp.data
 
         api_resp = client.get("/api/v1/countrymap", headers={"Accept": "application/json"})
-        assert api_resp.status_code == 503
-        assert api_resp.get_json()["code"] == "maintenance"
+        assert api_resp.status_code != 503
+        assert api_resp.get_json().get("code") != "maintenance"
 
     def test_takes_precedence_over_coming_soon(self, app, client):
         app.config["COMING_SOON_LOCK"] = True

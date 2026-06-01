@@ -527,6 +527,12 @@ def _build_access_context(identity) -> Dict[str, Any]:
         "admin.countries.view": AuthorizationService.has_rbac_permission(user, "admin.countries.view"),
         "admin.organization.manage": AuthorizationService.has_rbac_permission(user, "admin.organization.manage"),
         "admin.indicator_bank.view": AuthorizationService.has_rbac_permission(user, "admin.indicator_bank.view"),
+        "admin.indicator_bank.create": AuthorizationService.has_rbac_permission(user, "admin.indicator_bank.create"),
+        "admin.indicator_bank.edit": AuthorizationService.has_rbac_permission(user, "admin.indicator_bank.edit"),
+        "admin.indicator_bank.archive": AuthorizationService.has_rbac_permission(user, "admin.indicator_bank.archive"),
+        "admin.indicator_bank.suggestions.review": AuthorizationService.has_rbac_permission(
+            user, "admin.indicator_bank.suggestions.review"
+        ),
         "admin.settings.manage": AuthorizationService.has_rbac_permission(user, "admin.settings.manage"),
         "admin.analytics.view": AuthorizationService.has_rbac_permission(user, "admin.analytics.view"),
         "admin.audit.view": AuthorizationService.has_rbac_permission(user, "admin.audit.view"),

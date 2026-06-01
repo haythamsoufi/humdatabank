@@ -54,6 +54,15 @@
                             <span class="text-xs font-semibold text-gray-700">{{ _('User') }}</span>
                             <span class="text-xs text-gray-400">{{ trace.created_at.strftime('%Y-%m-%d %H:%M') }} · {{ _('Trace') }} #{{ trace.id }}</span>
                         </div>
+                        {% if trace.original_query %}
+                        <div class="mb-3">
+                            <p class="text-xs font-semibold text-gray-500 uppercase mb-1">{{ _('Original query') }}</p>
+                            <div class="chat-bubble bg-gray-50 border border-gray-200 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                                <p class="text-gray-600 whitespace-pre-wrap mb-0">{{ trace.original_query }}</p>
+                            </div>
+                        </div>
+                        <p class="text-xs font-semibold text-gray-500 uppercase mb-1">{{ _('Query sent to agent') }}</p>
+                        {% endif %}
                         <div class="chat-bubble bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-sm p-4 shadow-sm">
                             <p class="text-gray-700 whitespace-pre-wrap mb-0">{{ trace.query }}</p>
                         </div>
@@ -138,7 +147,24 @@
 
         {% if trace.steps %}
         <div class="bg-white shadow rounded-lg p-6 mb-6 min-w-0">
-            <h3 class="text-lg font-semibold text-gray-800 mb-6"><i class="fas fa-list-ol text-purple-500 mr-2"></i>{{ _('Reasoning Steps') }} ({{ trace.steps|length }})</h3>
+            <script type="application/json" id="conv-trace-{{ trace.id }}-Meta">{{ {
+                'id': trace.id,
+                'status': trace.status or '',
+                'original_query': trace.original_query or '',
+                'query': trace.query or '',
+                'actual_iterations': trace.actual_iterations or 0,
+                'execution_time_ms': trace.execution_time_ms,
+                'total_cost_usd': (trace.total_cost_usd | float) if trace.total_cost_usd is not none else none,
+                'final_answer': (trace.display_answer or trace.final_answer or '')
+            } | tojson }}</script>
+            <script type="application/json" id="conv-trace-{{ trace.id }}-Steps">{{ (trace.steps if trace.steps else []) | tojson }}</script>
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list-ol text-purple-500 mr-2"></i>{{ _('Reasoning Steps') }} ({{ trace.steps|length }})</h3>
+                <button type="button" class="js-conv-copy-ai-review inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-2 py-1" data-trace-id="{{ trace.id }}" title="{{ _('Copy full trace with metadata for AI review') }}">
+                    <i class="fas fa-robot mr-0.5" aria-hidden="true"></i>
+                    <span class="js-conv-copy-ai-review-label">{{ _('Copy for AI Review') }}</span>
+                </button>
+            </div>
             <div class="space-y-4 pl-4">
                 {% for step in trace.steps %}
                 <div class="step-card trace-step-content {% if step.action == 'finish' %}step-finish{% else %}step-action{% endif %} pl-6 py-3 bg-gray-50 rounded-r-lg">
@@ -236,6 +262,86 @@
 {% block extra_js %}
 <script nonce="{{ csp_nonce() }}">
 document.addEventListener('DOMContentLoaded', function () {
+    // "Copy for AI Review" – per-trace button in the reasoning steps section
+    function stepToTextForAI(step, idx) {
+        var n = (step.step != null ? step.step : idx + 1);
+        var lines = ['--- Step ' + n + ' ---'];
+        if (step.timestamp) lines.push('Timestamp: ' + step.timestamp);
+        if (step.thought) { lines.push('Thought:'); lines.push(step.thought); }
+        if (step.action) {
+            lines.push('Action: ' + step.action);
+            if (step.action_input != null) {
+                lines.push('Action input: ' + (typeof step.action_input === 'string' ? step.action_input : JSON.stringify(step.action_input, null, 2)));
+            }
+        }
+        if (step.observation != null) {
+            var obs = typeof step.observation === 'string' ? step.observation : JSON.stringify(step.observation, null, 2);
+            var obsLines = obs.split('\n');
+            if (obsLines.length > 30) { obs = obsLines.slice(0, 30).join('\n') + '\n... (truncated)'; }
+            lines.push('Observation:'); lines.push(obs);
+        }
+        return lines.join('\n');
+    }
+
+    document.body.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest && e.target.closest('button.js-conv-copy-ai-review');
+        if (!btn) return;
+        var traceId = btn.getAttribute('data-trace-id');
+        var label = btn.querySelector('.js-conv-copy-ai-review-label');
+        var icon = btn.querySelector('i');
+        var metaEl = document.getElementById('conv-trace-' + traceId + '-Meta');
+        var stepsEl = document.getElementById('conv-trace-' + traceId + '-Steps');
+        if (!metaEl) return;
+        try {
+            var meta = JSON.parse(metaEl.textContent || '{}');
+            var steps = stepsEl ? JSON.parse(stepsEl.textContent || '[]') : [];
+            var lines = [];
+            lines.push('=== AI Trace #' + meta.id + ' ===');
+            lines.push('Status: ' + (meta.status || 'Unknown'));
+            if (meta.original_query) {
+                lines.push('Original query: ' + meta.original_query);
+                lines.push('Rewritten query: ' + (meta.query || ''));
+            } else {
+                lines.push('Query: ' + (meta.query || ''));
+            }
+            lines.push('Steps: ' + (meta.actual_iterations || 0));
+            if (meta.execution_time_ms != null) { lines.push('Time: ' + (meta.execution_time_ms / 1000).toFixed(1) + 's'); }
+            if (meta.total_cost_usd != null) { lines.push('Cost: $' + Number(meta.total_cost_usd).toFixed(6)); }
+            lines.push('');
+            if (steps.length) {
+                lines.push('=== Reasoning Steps ===');
+                steps.forEach(function (step, i) {
+                    lines.push(stepToTextForAI(step, i));
+                    lines.push('');
+                });
+            } else {
+                lines.push('(No reasoning steps recorded)');
+                lines.push('');
+            }
+            lines.push('=== Final Answer ===');
+            lines.push(meta.final_answer || '(no answer)');
+            var text = lines.join('\n').trim();
+            navigator.clipboard.writeText(text).then(function () {
+                var orig = label ? label.textContent : '';
+                if (label) label.textContent = '{{ _("Copied!") }}';
+                if (icon) icon.className = 'fas fa-check text-green-600 mr-0.5';
+                setTimeout(function () {
+                    if (label) label.textContent = orig;
+                    if (icon) icon.className = 'fas fa-robot mr-0.5';
+                }, 2000);
+            }).catch(function () {
+                var orig = label ? label.textContent : '';
+                if (label) label.textContent = '{{ _("Copy failed") }}';
+                setTimeout(function () { if (label) label.textContent = orig; }, 2000);
+            });
+        } catch (ex) {
+            var lbl = btn.querySelector('.js-conv-copy-ai-review-label');
+            var origTxt = lbl ? lbl.textContent : '';
+            if (lbl) lbl.textContent = '{{ _("Copy failed") }}';
+            setTimeout(function () { if (lbl) lbl.textContent = origTxt; }, 2000);
+        }
+    });
+
     // Tool usage Show/Hide (same behavior as trace_detail)
     document.body.addEventListener('click', function (e) {
         var btn = e.target && e.target.closest && e.target.closest('button.js-trace-toggle-input');

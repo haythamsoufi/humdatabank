@@ -236,6 +236,15 @@
             // The defaultColDef.cellStyle does NOT apply to the selection column, so we
             // must configure it separately via selectionColumnDef (ag-grid v32+).
             selectionColumnDef: {
+                pinned: 'left',
+                lockPinned: true,
+                suppressMovable: true,
+                width: this.config.checkboxColumnWidth,
+                minWidth: this.config.checkboxColumnWidth,
+                maxWidth: this.config.checkboxColumnWidth,
+                resizable: false,
+                headerClass: 'ag-selection-column-cell',
+                cellClass: 'ag-selection-column-cell',
                 cellStyle: {
                     'display': 'flex',
                     'align-items': 'center',
@@ -2648,6 +2657,10 @@
                     self.scheduleCheckboxWidthEnforcement();
                 }
             });
+
+            this.gridApi.addEventListener('columnPinned', function() {
+                self.scheduleCheckboxWidthEnforcement();
+            });
         }
     };
 
@@ -2664,6 +2677,9 @@
         const self = this;
         this.checkboxWidthTimeout = setTimeout(function() {
             self.enforceCheckboxColumnWidth();
+            if (typeof AgGridHelper.ensureSelectionColumnFirst === 'function') {
+                AgGridHelper.ensureSelectionColumnFirst(self.gridApi, self.gridDiv);
+            }
         }, 80);
     };
 
@@ -2691,17 +2707,32 @@
     };
 
     /**
-     * Identify checkbox selection columns by inspecting the column definitions and DOM
+     * Identify checkbox selection column ids (API + DOM)
+     * @param {Object} gridApi
+     * @param {HTMLElement} [gridDiv]
      * @returns {Array<string>}
      */
-    AgGridHelper.prototype.getCheckboxColumnIds = function() {
+    AgGridHelper.getSelectionColumnIds = function(gridApi, gridDiv) {
         const ids = new Set();
+        const knownIds = ['ag-Grid-SelectionColumn', 'ag-Grid-AutoColumn'];
 
-        if (this.gridApi && typeof this.gridApi.getColumns === 'function') {
-            const columns = this.gridApi.getColumns();
+        knownIds.forEach(function(colId) {
+            if (gridApi && typeof gridApi.getColumn === 'function') {
+                try {
+                    if (gridApi.getColumn(colId)) {
+                        ids.add(colId);
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }
+        });
+
+        if (gridApi && typeof gridApi.getColumns === 'function') {
+            const columns = gridApi.getColumns();
             if (Array.isArray(columns)) {
                 columns.forEach(function(column) {
-                    if (this.isCheckboxColumn(column)) {
+                    if (AgGridHelper.isSelectionCheckboxColumn(column)) {
                         const colId = (typeof column.getColId === 'function')
                             ? column.getColId()
                             : (column.colId || (column.getColDef && column.getColDef().field));
@@ -2709,14 +2740,14 @@
                             ids.add(colId);
                         }
                     }
-                }, this);
+                });
             }
         }
 
-        if (!ids.size && this.gridDiv) {
-            const headerCells = this.gridDiv.querySelectorAll('.ag-header-cell');
+        if (!ids.size && gridDiv) {
+            const headerCells = gridDiv.querySelectorAll('.ag-header-cell');
             headerCells.forEach(function(cell) {
-                if (cell.querySelector('.ag-header-select-all')) {
+                if (cell.querySelector('.ag-header-select-all, .ag-header-checkbox')) {
                     const colId = cell.getAttribute('col-id');
                     if (colId) {
                         ids.add(colId);
@@ -2725,8 +2756,8 @@
             });
         }
 
-        if (!ids.size && this.gridDiv) {
-            const checkboxCells = this.gridDiv.querySelectorAll('.ag-center-cols-container .ag-row:first-child .ag-cell');
+        if (!ids.size && gridDiv) {
+            const checkboxCells = gridDiv.querySelectorAll('.ag-center-cols-container .ag-row:first-child .ag-cell, .ag-pinned-left-cols-container .ag-row:first-child .ag-cell');
             checkboxCells.forEach(function(cell) {
                 if (cell.querySelector('.ag-selection-checkbox')) {
                     const colId = cell.getAttribute('col-id');
@@ -2741,11 +2772,38 @@
     };
 
     /**
+     * Prepend selection column ids to a column order array
+     * @param {Object} gridApi
+     * @param {HTMLElement} [gridDiv]
+     * @param {Array<string>} columnOrder
+     * @returns {Array<string>}
+     */
+    AgGridHelper.prependSelectionColumnOrder = function(gridApi, gridDiv, columnOrder) {
+        const selectionIds = AgGridHelper.getSelectionColumnIds(gridApi, gridDiv);
+        const order = Array.isArray(columnOrder) ? columnOrder.slice() : [];
+        if (!selectionIds.length) {
+            return order;
+        }
+        const rest = order.filter(function(colId) {
+            return selectionIds.indexOf(colId) === -1;
+        });
+        return selectionIds.concat(rest);
+    };
+
+    /**
+     * Identify checkbox selection columns by inspecting the column definitions and DOM
+     * @returns {Array<string>}
+     */
+    AgGridHelper.prototype.getCheckboxColumnIds = function() {
+        return AgGridHelper.getSelectionColumnIds(this.gridApi, this.gridDiv);
+    };
+
+    /**
      * Determine whether a given column instance represents the checkbox selection column
      * @param {Object} column - Column instance
      * @returns {boolean}
      */
-    AgGridHelper.prototype.isCheckboxColumn = function(column) {
+    AgGridHelper.isSelectionCheckboxColumn = function(column) {
         if (!column) {
             return false;
         }
@@ -2760,8 +2818,100 @@
         if (!colId) {
             return false;
         }
-        const normalized = colId.toLowerCase();
+        const normalized = String(colId).toLowerCase();
         return normalized.includes('checkbox') || normalized.includes('selection');
+    };
+
+    AgGridHelper.prototype.isCheckboxColumn = function(column) {
+        return AgGridHelper.isSelectionCheckboxColumn(column);
+    };
+
+    /**
+     * Keep row-selection checkbox column(s) first (pinned left, index 0).
+     * @param {Object} gridApi - AG Grid API instance
+     * @param {HTMLElement} [gridDiv] - Optional grid root for DOM fallback detection
+     */
+    AgGridHelper.ensureSelectionColumnFirst = function(gridApi, gridDiv) {
+        if (!gridApi || typeof gridApi.getColumns !== 'function') {
+            return;
+        }
+
+        const selectionIds = AgGridHelper.getSelectionColumnIds(gridApi, gridDiv);
+        if (!selectionIds.length) {
+            return;
+        }
+
+        const columns = gridApi.getColumns();
+        if (!columns || !columns.length) {
+            return;
+        }
+
+        const selectionSet = new Set(selectionIds);
+        const selectionCols = [];
+        const otherCols = [];
+
+        columns.forEach(function(column) {
+            const colId = column.getColId();
+            if (selectionSet.has(colId) || AgGridHelper.isSelectionCheckboxColumn(column)) {
+                selectionCols.push(column);
+                return;
+            }
+            otherCols.push(column);
+        });
+
+        if (!selectionCols.length) {
+            return;
+        }
+
+        const state = [];
+
+        selectionCols.forEach(function(column) {
+            state.push({
+                colId: column.getColId(),
+                pinned: 'left'
+            });
+        });
+
+        otherCols.forEach(function(column) {
+            const colId = column.getColId();
+            let pinned = column.getPinned ? column.getPinned() : null;
+            if (pinned === true) {
+                pinned = 'left';
+            }
+            if (pinned === false) {
+                pinned = null;
+            }
+            const entry = { colId: colId, pinned: pinned || null };
+            if (column.isVisible && !column.isVisible()) {
+                entry.hide = true;
+            }
+            state.push(entry);
+        });
+
+        try {
+            gridApi.applyColumnState({
+                state: state,
+                applyOrder: true
+            });
+        } catch (e) {
+            console.warn('AgGridHelper: ensureSelectionColumnFirst applyColumnState failed', e);
+        }
+
+        if (typeof gridApi.moveColumns === 'function') {
+            try {
+                gridApi.moveColumns(selectionIds, 0);
+            } catch (e) {
+                console.warn('AgGridHelper: ensureSelectionColumnFirst moveColumns failed', e);
+            }
+        } else if (typeof gridApi.moveColumn === 'function') {
+            selectionIds.forEach(function(colId, index) {
+                try {
+                    gridApi.moveColumn(colId, index);
+                } catch (e) {
+                    // ignore per-column failures
+                }
+            });
+        }
     };
 
     /**
@@ -3078,6 +3228,12 @@
                 if (typeof options.onReady === 'function') {
                     options.onReady(api, helper);
                 }
+
+                // Restore user-saved visibility/pin state after onReady (e.g. pinActionsColumn)
+                if (helper.columnVisibilityManager &&
+                    typeof helper.columnVisibilityManager.finishInitialColumnState === 'function') {
+                    helper.columnVisibilityManager.finishInitialColumnState();
+                }
             }, 100);
         }
 
@@ -3137,19 +3293,46 @@
      *
      * @param {Object} gridApi - AG Grid API instance
      * @param {Array} columnOrder - Optional array of column IDs in desired order
+     * @param {Object} visibilityManager - Optional ColumnVisibilityManager (preserves saved pins)
      */
-    AgGridHelper.pinActionsColumn = function(gridApi, columnOrder) {
+    AgGridHelper.pinActionsColumn = function(gridApi, columnOrder, visibilityManager) {
         if (!gridApi || typeof gridApi.applyColumnState !== 'function') {
             return;
         }
 
+        var mgr = visibilityManager ||
+            (window.gridHelper && window.gridHelper.columnVisibilityManager) ||
+            window.columnVisibilityManager;
+
+        function savedPin(colId) {
+            if (!mgr || typeof mgr.getSavedPin !== 'function') {
+                return null;
+            }
+            return mgr.getSavedPin(colId);
+        }
+
         try {
+            var gridDiv = null;
+            if (gridApi.getGridElement && typeof gridApi.getGridElement === 'function') {
+                gridDiv = gridApi.getGridElement();
+            } else if (gridApi.eGridDiv) {
+                gridDiv = gridApi.eGridDiv;
+            }
+
+            var selectionIds = AgGridHelper.getSelectionColumnIds(gridApi, gridDiv);
+            var mergedOrder = columnOrder && Array.isArray(columnOrder)
+                ? AgGridHelper.prependSelectionColumnOrder(gridApi, gridDiv, columnOrder)
+                : selectionIds.slice();
+
             var state;
-            if (columnOrder && Array.isArray(columnOrder)) {
-                state = columnOrder.map(function(colId) {
+            if (mergedOrder.length) {
+                state = mergedOrder.map(function(colId) {
+                    if (selectionIds.indexOf(colId) !== -1) {
+                        return { colId: colId, pinned: 'left' };
+                    }
                     return {
                         colId: colId,
-                        pinned: colId === 'actions' ? 'right' : null
+                        pinned: colId === 'actions' ? 'right' : savedPin(colId)
                     };
                 });
             } else {
@@ -3158,9 +3341,9 @@
 
             gridApi.applyColumnState({
                 state: state,
-                defaultState: { pinned: null },
-                applyOrder: columnOrder ? true : false
+                applyOrder: mergedOrder.length > 0
             });
+            AgGridHelper.ensureSelectionColumnFirst(gridApi, gridDiv);
         } catch (e) {
             console.warn('AgGridHelper: Could not pin actions column:', e);
         }

@@ -89,42 +89,46 @@
 </div>
 
 <script nonce="{{ csp_nonce() }}">
-function copyApiKey() {
-    const input = document.getElementById('api-key-value');
-    input.select();
-    input.setSelectionRange(0, 99999); // For mobile devices
-    document.execCommand('copy');
+(function () {
+    var input = document.getElementById('api-key-value');
+    var copyBtn = document.getElementById('copy-api-key-btn');
 
-    // Show feedback
-    const button = document.getElementById('copy-api-key-btn');
-    const icon = button.querySelector('i');
-    icon.classList.remove('fa-copy');
-    icon.classList.add('fa-check', 'text-green-600');
+    async function copyApiKey() {
+        if (!input) return;
+        var text = input.value;
+        var icon = copyBtn ? copyBtn.querySelector('i') : null;
 
-    setTimeout(() => {
-        icon.classList.remove('fa-check', 'text-green-600');
-        icon.classList.add('fa-copy', 'text-gray-400');
-    }, 2000);
-}
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                input.select();
+                input.setSelectionRange(0, 99999);
+                document.execCommand('copy');
+            }
+        } catch (e) {
+            console.error('Copy failed', e);
+        }
 
-// Auto-select on page load and setup event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('api-key-value');
-    if (input) {
-        input.select();
-
-        // Add click handler to select and copy
-        input.addEventListener('click', function() {
-            this.select();
-            document.execCommand('copy');
-        });
+        if (icon) {
+            icon.classList.remove('fa-copy', 'text-gray-400');
+            icon.classList.add('fa-check', 'text-green-600');
+            setTimeout(function () {
+                icon.classList.remove('fa-check', 'text-green-600');
+                icon.classList.add('fa-copy', 'text-gray-400');
+            }, 2000);
+        }
     }
 
-    // Add click handler to copy button
-    const copyBtn = document.getElementById('copy-api-key-btn');
-    if (copyBtn) {
-        copyBtn.addEventListener('click', copyApiKey);
-    }
-});
+    document.addEventListener('DOMContentLoaded', function () {
+        if (input) {
+            input.select();
+            input.addEventListener('click', function () { this.select(); });
+        }
+        if (copyBtn) {
+            copyBtn.addEventListener('click', copyApiKey);
+        }
+    });
+})();
 </script>
 {% endblock %}

@@ -45,6 +45,41 @@ class APIKeyForm(FlaskForm):
             raise ValidationError('Expiration date must be in the future')
 
 
+class APIKeyEditForm(FlaskForm):
+    """Form for editing an existing API key's metadata (no key material change)."""
+
+    client_name = StringField(
+        'Client Name',
+        validators=[DataRequired(), Length(max=255)],
+        description='Human-readable name for this API key'
+    )
+
+    client_description = TextAreaField(
+        'Description',
+        validators=[Optional(), Length(max=1000)],
+        description='Optional description of what this API key is used for'
+    )
+
+    rate_limit_per_minute = IntegerField(
+        'Rate Limit (per minute)',
+        validators=[Optional(), NumberRange(min=1, max=10000)],
+        default=60,
+        description='Maximum number of API requests allowed per minute for this key'
+    )
+
+    expires_at = DateTimeField(
+        'Expiration Date',
+        validators=[Optional()],
+        format='%Y-%m-%dT%H:%M',
+        description='Optional expiration date (leave blank for no expiration)'
+    )
+
+    def validate_expires_at(self, field):
+        if field.data and field.data <= utcnow():
+            from wtforms.validators import ValidationError
+            raise ValidationError('Expiration date must be in the future')
+
+
 class APIKeyRevokeForm(FlaskForm):
     """Form for revoking API keys"""
 

@@ -202,6 +202,19 @@ def _is_focus_area(d: dict) -> bool:
     return isinstance(sample.get("plans"), list) or bool(sample.get("country_name"))
 
 
+def _is_indicator_search(d: dict) -> bool:
+    """``matches`` list from search_indicator_bank (≥1 ranked indicator row)."""
+    matches = d.get("matches")
+    if not isinstance(matches, list) or not matches:
+        return False
+    sample = next((m for m in matches if isinstance(m, dict)), None)
+    if not sample:
+        return False
+    return bool(sample.get("name")) and (
+        "similarity_score" in sample or "match_kind" in sample or "id" in sample
+    )
+
+
 # ── Metric / title derivation ────────────────────────────────────────────
 
 
@@ -656,6 +669,92 @@ def _build_focus_area_table(d: dict, query: str = "") -> Optional[Dict[str, Any]
     }
 
 
+_MATCH_KIND_LABELS = {
+    "exact_name": "Exact name",
+    "phrase_in_name": "Phrase in name",
+    "words_in_name": "All words in name",
+    "phrase_in_monitoring": "Monitoring question",
+    "phrase_in_aggregated_label": "Aggregated label",
+}
+
+
+def _format_indicator_match_score(raw: Any) -> Optional[float]:
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        if raw.strip().lower() == "text":
+            return None
+        try:
+            raw = float(raw.replace(",", "").strip())
+        except (ValueError, TypeError):
+            return None
+    try:
+        return round(float(raw), 4)
+    except (ValueError, TypeError):
+        return None
+
+
+def _build_indicator_search_table(d: dict, query: str = "") -> Optional[Dict[str, Any]]:
+    matches = d.get("matches")
+    if not isinstance(matches, list) or not matches:
+        return None
+
+    table_rows: List[Dict[str, Any]] = []
+    has_exact = False
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        ind_id = m.get("id")
+        name = str(m.get("name") or "").strip()
+        if not name:
+            continue
+        score = _format_indicator_match_score(m.get("similarity_score"))
+        match_kind = str(m.get("match_kind") or "").strip().lower()
+        if match_kind == "exact_name" or (score is not None and score >= 0.999):
+            has_exact = True
+        defn_raw = str(m.get("definition") or "").strip().replace("\n", " ")
+        defn = (defn_raw[:220] + "…") if len(defn_raw) > 220 else defn_raw
+        view_url = f"/admin/indicator_bank/view/{int(ind_id)}" if ind_id is not None else ""
+        table_rows.append(
+            {
+                "indicator": name,
+                "indicator_url": view_url,
+                "score": score,
+                "match_type": _MATCH_KIND_LABELS.get(match_kind, match_kind.replace("_", " ").title() if match_kind else "Semantic"),
+                "unit": str(m.get("unit") or "").strip() or "—",
+                "definition": defn or "—",
+            }
+        )
+
+    if not table_rows:
+        return None
+
+    title = (
+        _("Indicator Bank — exact match found")
+        if has_exact
+        else _("Indicator Bank — closest matches")
+    )
+    columns: List[Dict[str, Any]] = [
+        {"key": "indicator", "label": _("Indicator"), "sortable": True, "type": "link", "url_key": "indicator_url"},
+        {"key": "score", "label": _("Score"), "sortable": True, "type": "number"},
+        {"key": "match_type", "label": _("Match"), "sortable": True, "type": "text"},
+        {"key": "unit", "label": _("Unit"), "sortable": True, "type": "text"},
+        {"key": "definition", "label": _("Definition (excerpt)"), "sortable": False, "type": "text"},
+    ]
+
+    return {
+        "type": "data_table",
+        "title": title[:220],
+        "columns": columns,
+        "rows": table_rows,
+        "total_rows": len(table_rows),
+        "sort_by": "score",
+        "sort_order": "desc",
+        "table_kind": "indicator_search",
+        "_score": len(table_rows) + (100 if has_exact else 0),
+    }
+
+
 # ── Builder registry ─────────────────────────────────────────────────────
 # (predicate, builder, payload_slot, priority)
 # Lower priority = evaluated first.  Within the same slot the highest
@@ -665,6 +764,7 @@ _REGISTRY: List[Tuple[Callable, Callable, str, int]] = [
     (_is_timeseries,         _build_line_chart,        "chart_payload", 10),
     (_is_comparison,         _build_bar_chart,          "chart_payload", 15),
     (_is_categorical_counts, _build_pie_chart,          "chart_payload", 25),
+    (_is_indicator_search,   _build_indicator_search_table, "table_payload", 18),
     (_is_country_rows,       _build_country_table,      "table_payload", 20),
     (_is_country_rows,       _build_country_map,        "map_payload",   30),
     (_is_focus_area,         _build_focus_area_table,   "table_payload", 22),
@@ -1104,7 +1204,9 @@ def _apply_enrichment(
 
     enrichment_model = _table_enrichment_model()
 
-    if table_payload.get("table_kind") == "unified_plans_focus":
+    if table_payload.get("table_kind") in {"unified_plans_focus", "indicator_search"}:
+        if table_payload.get("table_kind") == "indicator_search":
+            return table_payload
         combined = f"{query or ''}\n{answer_text or ''}"
         if not _unified_plans_focus_wants_reference_enrichment(combined):
             return table_payload

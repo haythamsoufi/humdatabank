@@ -69,12 +69,11 @@ def _build_sector_subsector_names(indicator, sectors_dict, subsectors_dict):
 
 
 @api_bp.route('/indicator-bank', methods=['GET'])
-@require_api_key
 @api_rate_limit()
 def get_indicator_bank():
     """
     API endpoint to retrieve all indicators from the indicator bank.
-    Authentication: API key in Authorization header (Bearer token).
+    Public read — no API key required.
     Query Parameters:
         - search: Search query for indicator name or definition
         - type: Filter by indicator type
@@ -240,12 +239,11 @@ def get_indicator_bank():
 
 
 @api_bp.route('/indicator-bank/<int:indicator_id>', methods=['GET'])
-@require_api_key
 @api_rate_limit()
 def get_indicator_bank_details(indicator_id):
     """
     API endpoint to retrieve details for a specific indicator from the bank.
-    Authentication: API key in Authorization header (Bearer token).
+    Public read — no API key required.
     """
     try:
         indicator = IndicatorBank.query.get(indicator_id)

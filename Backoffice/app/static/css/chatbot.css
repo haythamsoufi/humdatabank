@@ -1255,6 +1255,36 @@ body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
     transform: scale(0.98);
 }
 
+/* Indicator Bank view/edit CTAs — open in new tab (not chatbot-show-me tour handler) */
+.chat-message a.chatbot-indicator-action {
+    position: static;
+    background: transparent;
+    color: #64748b !important;
+    padding: 6px 10px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    font-size: 12px;
+    text-decoration: none !important;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    transition: all 0.15s ease;
+    margin-right: 8px;
+}
+
+.chat-message a.chatbot-indicator-action:hover {
+    background: #f1f5f9;
+    color: #0f172a !important;
+    border-color: #cbd5e1;
+    text-decoration: none !important;
+}
+
+.chat-message a.chatbot-indicator-action:active {
+    background: #e2e8f0;
+    transform: scale(0.98);
+}
+
 /* Helper layer for spotlight cutout effect (like Intro.js) */
 .chatbot-spotlight-helper-layer {
     pointer-events: none;

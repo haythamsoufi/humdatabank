@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request
-from sqlalchemy import func, case
-from datetime import datetime, timedelta
+from sqlalchemy import func
+from datetime import timedelta
 from app.models.api_usage import APIUsage
 from app.models import IndicatorBank, Sector, SubSector, FormTemplate, Country, User
 from app import db
@@ -10,6 +10,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
 from app.utils.sql_utils import safe_ilike_pattern
+from app.services.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
 
 bp = Blueprint('api_management', __name__, url_prefix='/admin')
 
@@ -102,11 +103,11 @@ EXTERNAL_API_REGISTRY = [
 
     # ── Indicator Bank ─────────────────────────────────────────────────────────
     {'group': 'Indicator Bank', 'path': '/api/v1/indicator-bank', 'methods': ['GET'],
-     'auth': 'api_key', 'rate_limited': True,
+     'auth': 'public', 'rate_limited': True,
      'description': 'Indicator bank listing with filters and pagination',
      'overlaps': ['/api/mobile/v1/data/indicator-bank']},
     {'group': 'Indicator Bank', 'path': '/api/v1/indicator-bank/<indicator_id>', 'methods': ['GET'],
-     'auth': 'api_key', 'rate_limited': True,
+     'auth': 'public', 'rate_limited': True,
      'description': 'Single indicator detail by ID',
      'overlaps': ['/api/mobile/v1/data/indicator-bank/<indicator_id>']},
     {'group': 'Indicator Bank', 'path': '/api/v1/indicator-suggestions', 'methods': ['GET', 'POST'],
@@ -891,21 +892,14 @@ def api_management():
             'undocumented': True,
         })
 
-    # Attach usage stats from APIUsage (covers /api/v1 traffic; mobile/AI show 0)
+    # Attach usage stats from APIUsage (canonical /api traffic log; one grouped query)
+    usage_by_prefix = bulk_endpoint_usage_stats(
+        [endpoint_path_prefix(ep['path']) for ep in all_endpoints]
+    )
     for ep in all_endpoints:
-        filter_prefix = ep['path'].split('<')[0].split('{')[0]
-        endpoint_stats = APIUsage.query.filter(
-            APIUsage.api_endpoint.like(f"{filter_prefix}%")
-        ).with_entities(
-            func.count().label('total_requests'),
-            func.sum(case((APIUsage.status_code < 400, 1), else_=0)).label('successful_requests'),
-        ).first()
-
-        ep['total_requests'] = endpoint_stats.total_requests if endpoint_stats else 0
-        ep['success_rate'] = (
-            endpoint_stats.successful_requests / endpoint_stats.total_requests * 100
-            if endpoint_stats and endpoint_stats.total_requests > 0 else 100
-        )
+        stats = usage_by_prefix.get(endpoint_path_prefix(ep['path']), {})
+        ep['total_requests'] = stats.get('total_requests', 0)
+        ep['success_rate'] = stats.get('success_rate', 100)
 
     # ── Per-surface summary ───────────────────────────────────────────────────
     def _surface_summary(surface_key):
@@ -1023,117 +1017,15 @@ def api_stats():
     try:
         period = request.args.get('period', 'daily')
         endpoint = request.args.get('endpoint', 'all')
-        current_app.logger.debug(f"Fetching stats for period: {period}, endpoint: {endpoint}")
 
-        # Debug: Check total records in APIUsage table
-        total_records = APIUsage.query.count()
-        current_app.logger.debug(f"Total APIUsage records: {total_records}")
-
-        # Debug: Show recent records
-        recent_records = APIUsage.query.order_by(APIUsage.timestamp.desc()).limit(5).all()
-        for record in recent_records:
-            current_app.logger.debug(f"Recent record: {record.api_endpoint} at {record.timestamp}")
-
-        # Get all API requests that start with /api/
         base_query = APIUsage.query.filter(APIUsage.api_endpoint.like('/api/%'))
-
-        # Filter by specific endpoint if requested
         if endpoint != 'all':
             base_query = base_query.filter(APIUsage.api_endpoint.ilike(safe_ilike_pattern(endpoint)))
-            current_app.logger.debug(f"Filtering by endpoint: {endpoint}")
 
-        api_records = base_query.all()
-        current_app.logger.debug(f"API records found: {len(api_records)}")
+        if period not in ('daily', 'weekly', 'monthly', 'quarterly', 'yearly'):
+            period = 'daily'
 
-        if period == 'daily':
-            # Get hourly stats for the last 24 hours
-            last_24h = utcnow() - timedelta(days=1)
-            current_app.logger.debug(f"Looking for records since: {last_24h}")
-
-            stats = base_query.filter(APIUsage.timestamp >= last_24h).all()
-            current_app.logger.debug(f"Records in last 24h: {len(stats)}")
-
-            # Group by hour using Python
-            hour_counts = {}
-            for record in stats:
-                hour = record.timestamp.strftime('%H:00')
-                hour_counts[hour] = hour_counts.get(hour, 0) + 1
-                current_app.logger.debug(f"Record at {record.timestamp} -> hour {hour}")
-
-            current_app.logger.debug(f"Hour counts: {hour_counts}")
-
-            # Fill in missing hours with zeros
-            all_hours = {}
-            current = utcnow()
-            for i in range(24):
-                hour = (current - timedelta(hours=i)).strftime('%H:00')
-                all_hours[hour] = hour_counts.get(hour, 0)
-
-            formatted_stats = [{'label': h, 'count': c} for h, c in reversed(all_hours.items())]
-
-        elif period == 'weekly':
-            # Get daily stats for the last 7 days
-            last_7d = utcnow() - timedelta(days=7)
-            stats = base_query.filter(APIUsage.timestamp >= last_7d).all()
-
-            # Group by day
-            day_counts = {}
-            for record in stats:
-                day = record.timestamp.strftime('%Y-%m-%d')
-                day_counts[day] = day_counts.get(day, 0) + 1
-
-            # Fill in missing days with zeros
-            all_days = {}
-            current = utcnow()
-            for i in range(7):
-                day = (current - timedelta(days=i)).strftime('%Y-%m-%d')
-                all_days[day] = day_counts.get(day, 0)
-
-            formatted_stats = [{'label': d, 'count': c} for d, c in reversed(all_days.items())]
-
-        elif period == 'monthly':
-            # Get daily stats for the last 30 days
-            last_30d = utcnow() - timedelta(days=30)
-            stats = base_query.filter(APIUsage.timestamp >= last_30d).all()
-
-            # Group by day
-            day_counts = {}
-            for record in stats:
-                day = record.timestamp.strftime('%Y-%m-%d')
-                day_counts[day] = day_counts.get(day, 0) + 1
-
-            # Fill in missing days with zeros
-            all_days = {}
-            current = utcnow()
-            for i in range(30):
-                day = (current - timedelta(days=i)).strftime('%Y-%m-%d')
-                all_days[day] = day_counts.get(day, 0)
-
-            formatted_stats = [{'label': d, 'count': c} for d, c in reversed(all_days.items())]
-
-        else:  # yearly
-            # Get monthly stats for the last year
-            last_year = utcnow() - timedelta(days=365)
-            stats = base_query.filter(APIUsage.timestamp >= last_year).all()
-
-            # Group by month
-            month_counts = {}
-            for record in stats:
-                month = record.timestamp.strftime('%Y-%m')
-                month_counts[month] = month_counts.get(month, 0) + 1
-
-            # Fill in missing months with zeros
-            all_months = {}
-            current = utcnow()
-            for i in range(12):
-                month = (current - timedelta(days=i*30)).strftime('%Y-%m')
-                all_months[month] = month_counts.get(month, 0)
-
-            formatted_stats = [{'label': m, 'count': c} for m, c in reversed(all_months.items())]
-
-        current_app.logger.debug(f"Found {len(stats)} records")
-        current_app.logger.debug(f"Formatted stats: {formatted_stats}")
-
+        formatted_stats = chart_stats_for_period(base_query, period)
         return json_ok(stats=formatted_stats)
 
     except Exception as e:

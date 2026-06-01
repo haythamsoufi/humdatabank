@@ -867,6 +867,91 @@ class TestAIPayloadInference:
         assert "chart_payload" in payloads
         assert payloads["chart_payload"]["metric"] == "Branches"
 
+    def test_build_indicator_search_table_from_tool_result(self):
+        from app.services.ai_payload_inference import build_payload_from_tool_result
+
+        tool_result = {
+            "success": True,
+            "result": {
+                "query": "National Society has safe referral pathways",
+                "count": 2,
+                "matches": [
+                    {
+                        "id": 1129,
+                        "name": "National Society has safe and inclusive referral pathways",
+                        "similarity_score": 1.0,
+                        "match_kind": "exact_name",
+                        "unit": "ns",
+                        "definition": "Referral pathway definition text.",
+                    },
+                    {
+                        "id": 162,
+                        "name": "Number of safe referral pathways",
+                        "similarity_score": 0.695,
+                        "unit": "Services",
+                        "definition": "Referral process definition.",
+                    },
+                ],
+            },
+        }
+        payloads = build_payload_from_tool_result(tool_result)
+        assert "table_payload" in payloads
+        table = payloads["table_payload"]
+        assert table["type"] == "data_table"
+        assert table["table_kind"] == "indicator_search"
+        assert len(table["rows"]) == 2
+        assert table["rows"][0]["indicator_url"] == "/admin/indicator_bank/view/1129"
+        assert table["rows"][0]["match_type"] == "Exact name"
+
+    def test_sanitize_strips_indicator_search_bullets(self):
+        from app.services.ai_response_policy import sanitize_agent_answer
+
+        raw = (
+            "An exact match exists.\n\n"
+            "Related indicators (top matches):\n"
+            '- "Number of pathways" — score 0.70.\n'
+            '- "Percentage referred" — score 0.67.\n\n'
+            "Interpretation: choose based on need.\n\n"
+            "[View indicator](/admin/indicator_bank/view/1129)\n\n"
+            "## Sources\n- Indicator Bank"
+        )
+        cleaned = sanitize_agent_answer(raw, has_table_payload=True, table_kind="indicator_search")
+        assert "score 0.70" not in cleaned
+        assert "Related indicators" not in cleaned
+        assert "View indicator" in cleaned
+
+    def test_sanitize_trims_long_indicator_search_interpretation(self):
+        from app.services.ai_response_policy import sanitize_agent_answer
+
+        raw = (
+            'The Indicator Bank already contains this indicator: "Test indicator" (exact match). '
+            "Consider re-using or editing it rather than creating a duplicate.\n\n"
+            "Interpretation: This is a long structural policy indicator with many details about "
+            "SOPs, MOUs, training records, and complementary count indicators.\n\n"
+            "[View indicator](/admin/indicator_bank/view/1)\n\n"
+            "## Sources\n- Indicator Bank"
+        )
+        cleaned = sanitize_agent_answer(raw, has_table_payload=True, table_kind="indicator_search")
+        assert "Interpretation:" not in cleaned
+        assert "creating a duplicate" not in cleaned
+        assert "closest match is" in cleaned.lower()
+        assert "View indicator" in cleaned
+
+    def test_sanitize_dedupes_duplicate_exact_match_sentences(self):
+        from app.services.ai_response_policy import sanitize_agent_answer
+
+        raw = (
+            'An indicator identical to your phrase already exists in the Indicator Bank. '
+            'An indicator very close to this was found: "National Society has safe pathways" '
+            "(similarity 1.00). Consider re-using or editing that existing indicator rather than "
+            "creating a duplicate.\n\n"
+            "## Sources\n- Indicator Bank"
+        )
+        cleaned = sanitize_agent_answer(raw, has_table_payload=True, table_kind="indicator_search")
+        assert cleaned.lower().count("already exists") + cleaned.lower().count("very close") <= 1
+        assert "creating a duplicate" not in cleaned
+        assert "Action links:" not in cleaned
+
 
 class TestAIRuntimeUtils:
     """Tests for extracted runtime utility helpers."""

@@ -107,7 +107,45 @@ _INDICATOR_SEARCH_SIGNALS = (
     "most relevant indicator",
     "nearest indicator",
     "match this indicator",
+    "list indicators",
+    "search indicators",
+    "find me an indicator",
+    "indicator matching",
 )
+
+# Rule-based Indicator Bank management queries (requires mgmt tools in tool_names).
+_INDICATOR_MGMT_RULES: tuple[tuple[tuple[str, ...], str, str, Dict[str, Any], str], ...] = (
+    (
+        ("indicator bank stats", "indicator bank overview", "indicator bank health", "overview of the indicator bank"),
+        "indicator_bank_stats",
+        "get_indicator_bank_stats",
+        {},
+        "table",
+    ),
+    (
+        ("unused indicators", "indicators not used", "indicators with no forms", "indicators with zero usage"),
+        "indicator_browse",
+        "browse_indicators",
+        {"has_no_usage": True, "limit": 20},
+        "table",
+    ),
+    (
+        ("indicators with no definition", "missing definition", "indicators without definition"),
+        "indicator_browse",
+        "browse_indicators",
+        {"has_no_definition": True, "limit": 20},
+        "table",
+    ),
+    (
+        ("pending suggestions", "indicator suggestions", "suggestion queue"),
+        "indicator_suggestions",
+        "list_indicator_suggestions",
+        {"status": "pending", "limit": 20},
+        "table",
+    ),
+)
+
+# Complaint/follow-up patterns where a user points out a missing indicator by its name
 
 
 @dataclass
@@ -199,6 +237,11 @@ class AIQueryPlanner:
             "get_assignment_indicator_values": {"country_identifier", "template_identifier"},
             "get_form_field_value": {"country_identifier", "field_label_or_name"},
             "search_indicator_bank": {"query"},
+            "get_indicator_usage_stats": {"indicator_name"},
+            "browse_indicators": set(),
+            "get_indicator_bank_stats": set(),
+            "get_indicator_change_history": {"indicator_name"},
+            "list_indicator_suggestions": set(),
         }
         required_by_tool.update(UPR_PLANNER_ENTRIES["required_by_tool"])
         required = required_by_tool.get(tool_name, set())
@@ -234,10 +277,36 @@ class AIQueryPlanner:
                 tool_args["limit"] = 500
         if tool_name == "search_indicator_bank":
             try:
-                tk = int(tool_args.get("top_k", 5))
+                tk = int(tool_args.get("top_k", 10))
             except (ValueError, TypeError):
-                tk = 5
+                tk = 10
             tool_args["top_k"] = max(1, min(tk, 10))
+        if tool_name == "browse_indicators":
+            try:
+                tool_args["limit"] = max(1, min(int(tool_args.get("limit", 20)), 100))
+            except (ValueError, TypeError):
+                tool_args["limit"] = 20
+            try:
+                tool_args["offset"] = max(0, int(tool_args.get("offset", 0)))
+            except (ValueError, TypeError):
+                tool_args["offset"] = 0
+            tool_args["has_no_usage"] = bool(tool_args.get("has_no_usage", False))
+            tool_args["has_no_definition"] = bool(tool_args.get("has_no_definition", False))
+        if tool_name == "list_indicator_suggestions":
+            tool_args["status"] = str(tool_args.get("status") or "pending").strip().lower()
+            try:
+                tool_args["limit"] = max(1, min(int(tool_args.get("limit", 20)), 100))
+            except (ValueError, TypeError):
+                tool_args["limit"] = 20
+            try:
+                tool_args["offset"] = max(0, int(tool_args.get("offset", 0)))
+            except (ValueError, TypeError):
+                tool_args["offset"] = 0
+        if tool_name == "get_indicator_change_history":
+            try:
+                tool_args["limit"] = max(1, min(int(tool_args.get("limit", 10)), 50))
+            except (ValueError, TypeError):
+                tool_args["limit"] = 10
 
         if not kind:
             kind_map = {
@@ -246,6 +315,11 @@ class AIQueryPlanner:
                 "list_documents": "document_inventory",
                 "search_documents": "per_country_docs" if bool(tool_args.get("return_all_countries")) else "document_search",
                 "search_indicator_bank": "indicator_search",
+                "get_indicator_usage_stats": "indicator_usage",
+                "browse_indicators": "indicator_browse",
+                "get_indicator_bank_stats": "indicator_bank_stats",
+                "get_indicator_change_history": "indicator_history",
+                "list_indicator_suggestions": "indicator_suggestions",
             }
             kind_map.update(UPR_PLANNER_ENTRIES["kind_map"])
             kind = kind_map.get(tool_name, "simple")
@@ -291,15 +365,22 @@ class AIQueryPlanner:
         if not q or len(q) < 10:
             return None
 
-        if "search_indicator_bank" in tool_names and any(s in q for s in _INDICATOR_SEARCH_SIGNALS):
-            plan = SimplePlan(
-                kind="indicator_search",
-                tool_name="search_indicator_bank",
-                tool_args={"query": (query or "").strip(), "top_k": 5},
-                output_hint="text",
-            )
-            logger.info("Query planner: rule-based indicator_search fast path (skip LLM)")
-            return plan
+        for phrases, kind, tool_name, tool_args, output_hint in _INDICATOR_MGMT_RULES:
+            if tool_name not in tool_names:
+                continue
+            if any(p in q for p in phrases):
+                plan = SimplePlan(
+                    kind=kind,
+                    tool_name=tool_name,
+                    tool_args=dict(tool_args),
+                    output_hint=output_hint,
+                )
+                logger.info(
+                    "Query planner: rule-based %s fast path (tool=%s)",
+                    kind,
+                    tool_name,
+                )
+                return plan
 
         # Thematic Unified Plans queries (e.g. "migration in Unified Plans") must go to
         # analyze_unified_plans_focus_areas, not to a structured indicator tool.
@@ -369,7 +450,11 @@ class AIQueryPlanner:
             "get_indicator_value",
             "get_indicator_timeseries",
             "get_indicator_values_for_all_countries",
-            "search_indicator_bank",
+            "get_indicator_usage_stats",
+            "browse_indicators",
+            "get_indicator_bank_stats",
+            "get_indicator_change_history",
+            "list_indicator_suggestions",
             "list_documents",
             "search_documents",
             "compare_countries",
@@ -388,7 +473,7 @@ class AIQueryPlanner:
             "Return ONLY valid JSON with shape:\n"
             "{"
             "\"is_simple\": true|false, "
-            "\"kind\": \"single_value|timeseries|document_inventory|per_country_docs|unified_plans_focus|indicator_search|complex\", "
+            "\"kind\": \"single_value|timeseries|document_inventory|per_country_docs|unified_plans_focus|indicator_usage|indicator_browse|indicator_bank_stats|indicator_history|indicator_suggestions|complex\", "
             "\"tool_name\": \"<tool>\", "
             "\"tool_args\": { ... }, "
             "\"output_hint\": \"map|chart|table|text\", "
@@ -408,10 +493,15 @@ class AIQueryPlanner:
             "Pass the theme(s) as snake_case strings in tool_args.areas "
             "(e.g. areas=['migration_displacement'] or areas=['climate'] or areas=['pgi']). "
             "NEVER route these to get_indicator_value — thematic Unified Plan content is stored in documents, not structured indicators.\n"
-            "- For queries asking which Indicator Bank indicator is closest/most similar to a free-text outcome, statement, or concept "
-            "(e.g. 'closest indicator to ...', 'find an indicator for ...'): use search_indicator_bank with "
-            "kind='indicator_search' and tool_args {query: the user's wording or distilled phrase}. "
-            "Do NOT use analyze_unified_plans_focus_areas or search_documents for that intent.\n"
+            "- Queries asking for the closest/most similar Indicator Bank indicator to a phrase are complex "
+            "and should be left to the full ReAct agent — set is_simple=false, kind='complex'.\n"
+            "- Indicator Bank management (when allowed tools include them): "
+            "get_indicator_usage_stats for 'how many forms/templates use indicator X'; "
+            "browse_indicators with has_no_usage=true for unused indicators; "
+            "browse_indicators with has_no_definition=true for missing definitions; "
+            "get_indicator_bank_stats for catalog health/overview; "
+            "get_indicator_change_history for audit/who changed; "
+            "list_indicator_suggestions for pending suggestion queue.\n"
             "- Output only JSON."
         )
         user = json.dumps({"query": q, "allowed_tools": allowed}, ensure_ascii=False)

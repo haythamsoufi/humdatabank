@@ -607,23 +607,13 @@ try {
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const desiredOrder = ['id', 'name']
                     .concat(nameColumns)
                     .concat(['iso3', 'status', 'preferred_language', 'currency_code'])
                     .concat(['actions']);
-
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, countriesGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for countries:', e);
@@ -806,16 +796,9 @@ try {
 
         // Ensure Actions column is pinned right
         try {
-            if (window.nssGridApi && typeof window.nssGridApi.applyColumnState === 'function') {
-                const state = allColumns.map((col) => ({
-                    colId: col.field,
-                    pinned: col.field === 'actions' ? 'right' : null
-                }));
-                window.nssGridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+            if (window.nssGridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
+                const desiredOrder = allColumns.map((col) => col.field || col.colId).filter(Boolean);
+                AgGridHelper.pinActionsColumn(window.nssGridApi, desiredOrder, nssGridHelper && nssGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column state:', e);
@@ -1033,7 +1016,7 @@ try {
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const categoryColIds = availableCategories.map(p => `part_of_${p.replace(/[^a-zA-Z0-9]/g, '_')}`);
                 const desiredOrder = ['id', 'name']
@@ -1041,17 +1024,7 @@ try {
                     .concat(['country_name', 'is_active', 'display_order'])
                     .concat(categoryColIds)
                     .concat(['actions']);
-
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, nssGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for NSs:', e);
@@ -1992,23 +1965,13 @@ try {
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const desiredOrder = ['code', 'name']
                     .concat(nameColumns)
                     .concat(['description', 'departments_count', 'is_active', 'display_order'])
                     .concat(['actions']);
-
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, divisionsGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for divisions:', e);
@@ -2050,23 +2013,13 @@ try {
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const desiredOrder = ['division_id', 'code', 'name']
                     .concat(nameColumns)
                     .concat(['division_name', 'description', 'is_active', 'display_order'])
                     .concat(['actions']);
-
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, departmentsGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for departments:', e);
@@ -2108,23 +2061,13 @@ try {
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const desiredOrder = ['code', 'name']
                     .concat(nameColumns)
                     .concat(['description', 'is_active', 'display_order'])
                     .concat(['actions']);
-
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, regionsGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for regions:', e);
@@ -2166,23 +2109,13 @@ try {
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const desiredOrder = ['code', 'name']
                     .concat(nameColumns)
                     .concat(['regional_office_name', 'description', 'is_active', 'display_order'])
                     .concat(['actions']);
-
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, clustersGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for clusters:', e);

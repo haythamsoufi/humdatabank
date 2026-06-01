@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import bleach
 import markdown
@@ -107,6 +107,55 @@ def format_provenance_block(provenance_data: Optional[Dict[str, Any]]) -> str:
     return ''.join(html_parts)
 
 
+def _ensure_markdown_list_spacing(text: str) -> str:
+    """Insert a blank line before list items so Markdown parsers emit <ul>/<li>."""
+    if not text:
+        return text
+    lines = text.split("\n")
+    out: List[str] = []
+    for line in lines:
+        if re.match(r"^\s*[-*]\s+", line) and out and out[-1].strip() and not re.match(r"^\s*[-*]\s+", out[-1]):
+            out.append("")
+        out.append(line)
+    return "\n".join(out)
+
+
+def _linkify_indicator_bank_paths(text: str) -> str:
+    """Turn bare view/edit paths into markdown links (before HTML escape)."""
+    if not text:
+        return text
+    text = re.sub(
+        r'(?<!\]\()(?<![\w"/])/admin/indicator_bank/view/(\d+)\b',
+        r"[View indicator](/admin/indicator_bank/view/\1)",
+        text,
+    )
+    text = re.sub(
+        r'(?<!\]\()(?<![\w"/])/admin/indicator_bank/edit/(\d+)\b',
+        r"[Edit indicator](/admin/indicator_bank/edit/\1)",
+        text,
+    )
+    return text
+
+
+def _finalize_indicator_action_links(html: str) -> str:
+    """Style view/edit links as CTA buttons that open in a new tab."""
+    if not html:
+        return html
+
+    def _patch_tag(match: re.Match) -> str:
+        href = match.group(1)
+        return (
+            f'<a href="{href}" class="chatbot-show-me" target="_blank" rel="noopener">'
+        )
+
+    return re.sub(
+        r'<a href="(/admin/indicator_bank/(?:view|edit)/\d+)"[^>]*>',
+        _patch_tag,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def format_ai_response_for_html(text: Optional[str], provenance_data: Optional[Dict[str, Any]] = None) -> str:
     """
     Convert AI response text to HTML for display. XSS-hardened; allows only
@@ -164,6 +213,9 @@ def format_ai_response_for_html(text: Optional[str], provenance_data: Optional[D
     if sources_match:
         sources_block_raw = sources_match.group(2).strip()
         text = text[: sources_match.start()].rstrip() + "\n\n" + sources_placeholder + "\n"
+
+    text = _linkify_indicator_bank_paths(text or "")
+    text = _ensure_markdown_list_spacing(text or "")
 
     # Lightweight readability: promote standalone "section heading" lines to bold (markdown),
     # while avoiding list items ("- x", "* x", "1. x") which markdown will format as lists.
@@ -336,7 +388,25 @@ def format_ai_response_for_html(text: Optional[str], provenance_data: Optional[D
         placeholder = f"IFRC-TABLE-LINK-{idx}-END"
         safe_url = escape(url)
         safe_inner = inner  # inner was captured from HTML; we re-inject as-is (originated from markdown)
-        link_html = f'<a href="{safe_url}" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener">{safe_inner}</a>'
+        path_part = url.split("#")[0].split("?")[0]
+        if re.match(r"/admin/indicator_bank/(?:view|edit)/\d+", path_part, re.IGNORECASE):
+            link_html = (
+                f'<a href="{safe_url}" class="chatbot-show-me" target="_blank" rel="noopener">'
+                f"{safe_inner}</a>"
+            )
+        else:
+            link_html = (
+                f'<a href="{safe_url}" class="text-blue-600 hover:text-blue-800 underline" '
+                f'target="_blank" rel="noopener">{safe_inner}</a>'
+            )
         cleaned = cleaned.replace(placeholder, link_html)
+
+    cleaned = _finalize_indicator_action_links(cleaned)
+    cleaned = re.sub(
+        r'<a href="/admin/indicator_bank(?:[?#][^"]*)?"[^>]*>.*?</a>\s*',
+        "",
+        cleaned,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
 
     return (cleaned or "").strip()

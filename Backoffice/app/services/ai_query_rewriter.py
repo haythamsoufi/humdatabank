@@ -1,9 +1,11 @@
 """
 AI Query Rewriter Service
 
-Rewrites the user's message with an LLM before passing it to the agent or direct LLM.
-Improves tool selection and answer quality by clarifying intent, fixing typos,
-and making the question self-contained and tool-friendly.
+Classifies user messages (greeting, platform scope) and expands short follow-ups
+into self-contained requests before passing them to the agent.
+
+Substantive queries are passed through in the user's own words — the agent LLM
+interprets them with conversation history, same as ChatGPT/Claude.
 """
 
 import logging
@@ -661,18 +663,11 @@ def _unified_preflight_llm(
 
     strict_substantive = _heuristic_cannot_be_greeting_only(raw) or _is_clearly_substantive_data_query(raw)
 
-    rewrite_rules = ""
-    if rewrite_enabled:
-        rewrite_rules = (
-            "When intent is \"data_query\", rewritten_query MUST be one clear tool-friendly question following the rewriter rules: "
-            "preserve numbers, expand FDRS/UPR jargon as in databank docs, preserve language, "
-            "self-contained unless context above helps resolve references.\n"
-        )
-    else:
-        rewrite_rules = (
-            'When intent is "data_query", set rewritten_query to the user message verbatim (trim outer whitespace only) '
-            "- do NOT expand or reinterpret.\n"
-        )
+    rewrite_rules = (
+        'When intent is "data_query", set rewritten_query to the user message verbatim (trim outer whitespace only) '
+        "- do NOT expand, rephrase, or reinterpret substantive questions.\n"
+        "Follow-up expansion is handled separately before this call.\n"
+    )
 
     scope_rules = ""
     if enforce_scope:
@@ -744,7 +739,6 @@ def _unified_preflight_llm(
             return raw, False, True
 
         intent = str(parsed.get("intent") or "data_query").strip().lower()
-        rew = parsed.get("rewritten_query")
 
         enforce = bool(enforce_scope)
         if not enforce:
@@ -756,23 +750,7 @@ def _unified_preflight_llm(
         if enforce and intent == "out_of_platform_scope":
             return (raw.strip(), False, False)
 
-        out_q = rew if isinstance(rew, str) and rew.strip() else raw
-        out_q = out_q.strip()
-
-        if not rewrite_enabled:
-            out_q = raw.strip()
-
-        if rewrite_enabled:
-            if _looks_truncated(out_q, raw):
-                logger.warning(
-                    "Unified preflight rewritten_query looked truncated; using original (%r)",
-                    out_q[-40:] if len(out_q) >= 40 else out_q,
-                )
-                out_q = raw.strip()
-            elif not out_q:
-                out_q = raw.strip()
-
-        return (out_q, False, True)
+        return (raw.strip(), False, True)
     except Exception as e:
         logger.warning("Unified preflight LLM failed: %s", e)
 
@@ -786,16 +764,14 @@ def classify_and_rewrite_user_message(
     page_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, bool, bool]:
     """
-    Classify greeting / platform scope and rewrite query in minimal LLM round-trips.
+    Classify greeting / platform scope and expand short follow-ups in minimal LLM round-trips.
 
     Returns:
         (query_for_models, is_pure_greeting, in_platform_scope)
 
-    Implements the fast substantive + in-scope heuristic path using a rewrite-only LLM call
-    when eligible; otherwise a single unified JSON preflight replaces separate greeting classify,
-    query rewrite, and scope classify calls.
-
-    Same early-return behaviours as rewrite_user_message (draft follow-ups, short follow-up chains).
+    Substantive queries are returned verbatim (user's own words). Only short analytic
+    follow-ups and draft confirmations are expanded heuristically. Unified preflight
+    handles greeting/scope classification without rewriting question content.
     """
     raw = (message or "").strip()
     if not raw:
@@ -878,30 +854,6 @@ def classify_and_rewrite_user_message(
         if not maybe_greeting and not needs_scope_llm:
             return raw, False, True
 
-    _fast_substantive = (
-        _heuristic_cannot_be_greeting_only(raw) or _is_clearly_substantive_data_query(raw)
-    )
-    _heuristic_in_scope = heuristic_likely_in_platform_scope(raw)
-    fast_rewrite_only = (
-        rewrite_enabled
-        and _fast_substantive
-        and (not enforce or _heuristic_in_scope)
-    )
-
-    model = _effective_query_rewrite_model()
-    rewrite_timeout = int(current_app.config.get("AI_QUERY_REWRITE_TIMEOUT_SECONDS", 30))
-
-    if fast_rewrite_only:
-        text, ok = _run_query_rewrite_completion(
-            raw,
-            conversation_history=conversation_history,
-            preferred_language=preferred_language,
-            page_context=page_context,
-            model=model,
-            rewrite_timeout=rewrite_timeout,
-        )
-        return (text if ok else raw), False, True
-
     return _unified_preflight_llm(
         raw,
         conversation_history=conversation_history,
@@ -919,24 +871,10 @@ def rewrite_user_message(
     page_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, bool]:
     """
-    Rewrite the user's message into a clear, tool-friendly query using an LLM.
+    Backward-compatible wrapper around :func:`classify_and_rewrite_user_message`.
 
-    The rewritten query is used as input to the agent (and direct LLM fallback).
-    The original message is still stored in conversation history for display.
-
-    Args:
-        message: The user's raw message.
-        conversation_history: Optional previous messages (last exchange may be used for context).
-        preferred_language: Preferred language for the rewritten question (hint only).
-        page_context: Optional current page context (currentPage, pageData.pageType) so the
-            rewriter can avoid expanding dashboard UI questions into document-filter queries.
-
-    Returns:
-        (rewritten_or_original_message, is_pure_greeting).
-        When ``is_pure_greeting`` is True, the first value is the user's text unchanged (no rewrite)
-        so traces stay faithful; the caller may answer with a short greeting reply instead of the agent.
-
-    Implemented via :func:`classify_and_rewrite_user_message` (backward-compatible wrapper).
+    Returns (message_for_agent, is_pure_greeting). The message is the user's text
+    unchanged for substantive queries; short follow-ups may be expanded.
     """
     rew, greeting, _ = classify_and_rewrite_user_message(
         message,

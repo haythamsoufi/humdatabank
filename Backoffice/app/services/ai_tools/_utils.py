@@ -277,6 +277,61 @@ def resolve_source_config():
         return None
 
 
+def resolve_indicator_bank_permissions() -> Dict[str, bool]:
+    """
+    Resolve Indicator Bank RBAC permissions for the current AI request user.
+
+    Uses Flask-Login ``current_user`` (including Bearer-authenticated chat sessions).
+    """
+    from flask_login import current_user as _cu
+    from app.services.authorization_service import AuthorizationService
+
+    if not getattr(_cu, "is_authenticated", False):
+        return {"view": False, "create": False, "edit": False, "archive": False, "suggest": False}
+
+    def _has(code: str) -> bool:
+        try:
+            return bool(AuthorizationService.has_rbac_permission(_cu, code))
+        except Exception as exc:
+            logger.debug("resolve_indicator_bank_permissions %s failed: %s", code, exc)
+            return False
+
+    return {
+        "view": _has("admin.indicator_bank.view"),
+        "create": _has("admin.indicator_bank.create"),
+        "edit": _has("admin.indicator_bank.edit"),
+        "archive": _has("admin.indicator_bank.archive"),
+        "suggest": _has("admin.indicator_bank.suggestions.review"),
+    }
+
+
+def require_indicator_bank_permission(permission_code: str) -> None:
+    """Raise ToolExecutionError when the current user lacks an Indicator Bank permission."""
+    from flask_login import current_user as _cu
+    from app.services.authorization_service import AuthorizationService
+
+    if not getattr(_cu, "is_authenticated", False):
+        raise ToolExecutionError("Authentication required for Indicator Bank management tools.")
+    try:
+        allowed = AuthorizationService.has_rbac_permission(_cu, permission_code)
+    except Exception as exc:
+        logger.debug("require_indicator_bank_permission check failed: %s", exc)
+        allowed = False
+    if not allowed:
+        raise ToolExecutionError("You do not have permission to use this Indicator Bank tool.")
+
+
+INDICATOR_BANK_MGMT_TOOL_NAMES = frozenset(
+    {
+        "get_indicator_usage_stats",
+        "browse_indicators",
+        "get_indicator_bank_stats",
+        "get_indicator_change_history",
+        "list_indicator_suggestions",
+    }
+)
+
+
 def apply_document_source_filters(filters, sources_cfg, query=None):
     """
     Apply document-source selection to a search *filters* dict.

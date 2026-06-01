@@ -7,10 +7,10 @@ Used by: data_retrieval_country, data_retrieval_form, data_retrieval_service.
 
 import logging
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from flask_login import current_user
-from sqlalchemy import or_, text
+from sqlalchemy import cast, func, or_, text, Text
 
 from app.models import User, Country, FormItem, IndicatorBank
 from app.extensions import db
@@ -277,6 +277,94 @@ def resolve_country_from_identifier(country_identifier: str):
             break
 
     return None
+
+
+def _normalize_indicator_query(text: str) -> str:
+    """Normalize free-text for case/whitespace-insensitive indicator name comparison."""
+    s = re.sub(r"\s+", " ", (text or "").strip())
+    return s.rstrip(".,;:").lower()
+
+
+def find_indicator_bank_text_aligned(
+    query: str,
+    *,
+    limit: int = 5,
+    include_archived: bool = False,
+) -> List[Tuple[IndicatorBank, str, float]]:
+    """
+    Find indicators whose **name** or **monitoring_questions** text aligns with a query.
+
+    Used before vector search so an exact or near-exact bank name is never drowned out by
+    semantically similar indicators. Returns (indicator, match_kind, score) sorted by score.
+    """
+    raw = (query or "").strip()
+    norm_q = _normalize_indicator_query(raw)
+    if not norm_q:
+        return []
+
+    limit = max(1, min(int(limit or 5), 20))
+    base = IndicatorBank.query
+    if not include_archived:
+        base = base.filter(IndicatorBank.archived == False)  # noqa: E712
+
+    ranked: List[Tuple[IndicatorBank, str, float]] = []
+    seen: set[int] = set()
+
+    def _add(ind: IndicatorBank, kind: str, score: float) -> None:
+        if ind.id in seen:
+            return
+        seen.add(int(ind.id))
+        ranked.append((ind, kind, score))
+
+    # 1) Exact name (case/whitespace insensitive)
+    for ind in base.filter(func.lower(func.trim(IndicatorBank.name)) == norm_q).limit(limit).all():
+        _add(ind, "exact_name", 1.0)
+
+    # Python pass catches names that differ only by internal whitespace
+    if len(ranked) < limit and len(norm_q) >= 8:
+        phrase_pattern = safe_ilike_pattern(raw)
+        for ind in base.filter(IndicatorBank.name.ilike(phrase_pattern)).limit(max(limit * 4, 20)).all():
+            if _normalize_indicator_query(ind.name or "") == norm_q:
+                _add(ind, "exact_name", 1.0)
+
+    # 2) Full query contained in name (substring)
+    if len(raw) >= 10:
+        phrase_pattern = safe_ilike_pattern(raw)
+        for ind in base.filter(IndicatorBank.name.ilike(phrase_pattern)).limit(limit).all():
+            _add(ind, "phrase_name", 0.98)
+        for ind in (
+            base.filter(IndicatorBank.aggregated_label.isnot(None))
+            .filter(IndicatorBank.aggregated_label.ilike(phrase_pattern))
+            .limit(limit)
+            .all()
+        ):
+            _add(ind, "aggregated_label", 0.96)
+
+    # 3) All significant query words appear in the name (AND, not OR)
+    words = [w for w in re.findall(r"[a-z0-9]+", norm_q) if len(w) > 2]
+    if len(words) >= 4:
+        q_and = base
+        for word in words:
+            q_and = q_and.filter(IndicatorBank.name.ilike(safe_ilike_pattern(word)))
+        for ind in q_and.limit(limit).all():
+            _add(ind, "words_name", 0.95)
+
+    # 4) Query appears in monitoring_questions JSON (outcome/monitoring text stored there)
+    if len(raw) >= 10:
+        mq_pattern = safe_ilike_pattern(raw)
+        try:
+            for ind in (
+                base.filter(IndicatorBank.monitoring_questions.isnot(None))
+                .filter(cast(IndicatorBank.monitoring_questions, Text).ilike(mq_pattern))
+                .limit(limit)
+                .all()
+            ):
+                _add(ind, "monitoring_question", 0.97)
+        except Exception as exc:
+            logger.debug("find_indicator_bank_text_aligned monitoring_questions search failed: %s", exc)
+
+    ranked.sort(key=lambda row: (-row[2], (row[0].name or "").lower()))
+    return ranked[:limit]
 
 
 def get_indicator_candidates_by_keyword(

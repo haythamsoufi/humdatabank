@@ -297,8 +297,8 @@
         if (!templatesData || templatesData.length === 0) return;
 
         var result = AgGridHelper.create('templatesGrid', 'templates', columnDefs, templatesData, {
-            onReady: function(api) {
-                AgGridHelper.pinActionsColumn(api, ['name', 'type', 'add_to_self_report', 'version_count', 'status', 'template_access', 'created_at', 'actions']);
+            onReady: function(api, helper) {
+                AgGridHelper.pinActionsColumn(api, ['name', 'type', 'add_to_self_report', 'version_count', 'status', 'template_access', 'created_at', 'actions'], helper && helper.columnVisibilityManager);
             }
         });
         gridHelper = result.helper;

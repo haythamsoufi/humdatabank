@@ -18,24 +18,23 @@ class APIKey(db.Model):
     """
     Per-client API key management.
 
-    Supports:
-    - Multiple keys per client/user
-    - Key rotation
-    - Usage tracking
-    - Revocation
-    - Expiration
+    Status lifecycle (derived via ``status`` property):
+      active   — is_active and not revoked/expired
+      disabled — is_active=False, is_revoked=False (admin pause; re-enable possible)
+      revoked  — is_revoked=True (permanent; is_active also False)
+      expired  — expires_at in the past
     """
     __tablename__ = 'api_keys'
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # Key identifier (public, shown to user)
+    # Public identifier (shown to admins; independent of the secret key material)
     key_id = db.Column(db.String(32), unique=True, nullable=False, index=True)
 
     # Key hash (stored securely, never returned)
     key_hash = db.Column(db.String(128), nullable=False, unique=True, index=True)
 
-    # Key prefix (first 8 chars for identification)
+    # Key prefix (first 8 chars of secret — for human identification in lists)
     key_prefix = db.Column(db.String(8), nullable=False, index=True)
 
     # Owner information
@@ -47,7 +46,7 @@ class APIKey(db.Model):
     permissions = db.Column(db.JSON, nullable=True)  # Optional: fine-grained permissions
     rate_limit_per_minute = db.Column(db.Integer, default=60, nullable=False)
 
-    # Status
+    # Status flags (see ``status`` property for the canonical label)
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     is_revoked = db.Column(db.Boolean, default=False, nullable=False, index=True)
 
@@ -59,11 +58,13 @@ class APIKey(db.Model):
 
     # Metadata
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    revoked_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     revocation_reason = db.Column(db.Text, nullable=True)
 
     # Relationships
     user = db.relationship('User', foreign_keys=[user_id], backref='api_keys')
     created_by = db.relationship('User', foreign_keys=[created_by_user_id])
+    revoked_by = db.relationship('User', foreign_keys=[revoked_by_user_id])
     usage_logs = db.relationship('APIKeyUsage', backref='api_key', lazy='dynamic', cascade='all, delete-orphan')
 
     __table_args__ = (
@@ -73,26 +74,18 @@ class APIKey(db.Model):
     )
 
     @staticmethod
-    def generate_key() -> tuple[str, str, str]:
+    def generate_key() -> tuple[str, str, str, str]:
         """
         Generate a new API key.
 
         Returns:
-            tuple: (full_key, key_hash, key_prefix)
+            tuple: (full_key, key_id, key_hash, key_prefix)
         """
-        # Generate cryptographically secure key
-        full_key = secrets.token_urlsafe(48)  # 64 chars base64-encoded
-
-        # Create key ID (first 32 chars)
-        key_id = full_key[:32]
-
-        # Create prefix for identification (first 8 chars)
+        full_key = secrets.token_urlsafe(48)
+        key_id = secrets.token_hex(16)
         key_prefix = full_key[:8]
-
-        # Hash the full key for storage
         key_hash = hashlib.sha256(full_key.encode()).hexdigest()
-
-        return full_key, key_hash, key_prefix
+        return full_key, key_id, key_hash, key_prefix
 
     @staticmethod
     def hash_key(key: str) -> str:
@@ -109,16 +102,34 @@ class APIKey(db.Model):
         provided_hash = self.hash_key(provided_key)
         return hmac.compare_digest(self.key_hash, provided_hash)
 
-    def is_valid(self) -> bool:
-        """Check if key is valid (active, not revoked, not expired)."""
-        if not self.is_active or self.is_revoked:
-            return False
-        # Some DB drivers return naive datetimes for DateTime columns (no tz).
-        # Treat naive values as UTC to avoid TypeError in comparisons.
+    @property
+    def status(self) -> str:
+        """Canonical lifecycle label: active, disabled, revoked, or expired."""
+        if self.is_revoked:
+            return 'revoked'
         expires_at = ensure_utc(self.expires_at) if self.expires_at else None
         if expires_at and expires_at < utcnow():
-            return False
-        return True
+            return 'expired'
+        if not self.is_active:
+            return 'disabled'
+        return 'active'
+
+    def is_valid(self) -> bool:
+        """Check if key is valid (active, not revoked, not expired)."""
+        return self.status == 'active'
+
+    def disable(self, reason: Optional[str] = None):
+        """Pause the key without revoking it (can be re-enabled)."""
+        self.is_active = False
+        self.is_revoked = False
+        if reason:
+            self.revocation_reason = reason
+
+    def enable(self):
+        """Re-enable a disabled (non-revoked) key."""
+        if self.is_revoked:
+            raise ValueError('Cannot enable a revoked API key')
+        self.is_active = True
 
     def revoke(self, reason: Optional[str] = None, revoked_by_user_id: Optional[int] = None):
         """Revoke this API key."""
@@ -126,11 +137,13 @@ class APIKey(db.Model):
         self.is_active = False
         self.revoked_at = utcnow()
         self.revocation_reason = reason
+        if revoked_by_user_id is not None:
+            self.revoked_by_user_id = revoked_by_user_id
 
     def update_last_used(self):
-        """Update last used timestamp."""
+        """Update last used timestamp (flush only; caller owns the transaction)."""
         self.last_used_at = utcnow()
-        db.session.commit()
+        db.session.flush()
 
     def __repr__(self):
         return f'<APIKey {self.key_id[:8]}... ({self.client_name})>'
@@ -138,7 +151,11 @@ class APIKey(db.Model):
 
 class APIKeyUsage(db.Model):
     """
-    Track API key usage for monitoring and analytics.
+    Per-key audit trail for DB-managed API keys.
+
+    Written alongside rows in ``api_usage`` when a request authenticates with
+    a database key. Use ``APIUsage`` for aggregate endpoint analytics;
+    use ``APIKeyUsage`` for per-client drill-down in API Key Management.
     """
     __tablename__ = 'api_key_usage'
 

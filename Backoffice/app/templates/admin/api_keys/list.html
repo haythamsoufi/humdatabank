@@ -161,13 +161,23 @@
                         {{ key.expires_at|datetime_local('date') if key.expires_at else _('Never') }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-3">
                             <a href="{{ url_for('api_key_management.view_api_key', key_id=key.id) }}"
                                class="text-blue-600 hover:text-blue-900"
                                title="{{ _('View Details') }}">
                                 <i class="fas fa-eye"></i>
                             </a>
                             {% if can_manage_api and not key.is_revoked %}
+                            <a href="{{ url_for('api_key_management.edit_api_key', key_id=key.id) }}"
+                               class="text-indigo-600 hover:text-indigo-900"
+                               title="{{ _('Edit') }}">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{{ url_for('api_key_management.view_api_key', key_id=key.id) }}"
+                               class="text-amber-600 hover:text-amber-900"
+                               title="{{ _('Rotate Key — opens key details') }}">
+                                <i class="fas fa-sync-alt"></i>
+                            </a>
                             <a href="{{ url_for('api_key_management.revoke_api_key', key_id=key.id) }}"
                                class="text-red-600 hover:text-red-900"
                                title="{{ _('Revoke Key') }}">

@@ -816,20 +816,14 @@
             columnVisibility: { buttonPlaceholderId: '{{ DOCUMENTS_GRID_COLVIS_PH }}' },
             {% endif %}
             onReady: function(api, helper) {
-                // Ensure column order is correct (period after language, actions last)
                 try {
-                    if (api && typeof api.applyColumnState === 'function') {
+                    if (api && typeof AgGridHelper.pinActionsColumn === 'function') {
                         var desiredOrder = []
                             {% if show_country_column %}
                             .concat(['country_name'])
                             {% endif %}
                             .concat(['document_type', 'filename', 'language_display', 'period', 'is_public', 'uploaded_by', 'uploaded_at', 'status', 'actions']);
-
-                        var state = desiredOrder.map(function(colId) {
-                            return { colId: colId, pinned: colId === 'actions' ? 'right' : null };
-                        });
-
-                        api.applyColumnState({ state: state, defaultState: { pinned: null }, applyOrder: true });
+                        AgGridHelper.pinActionsColumn(api, desiredOrder, helper && helper.columnVisibilityManager);
                     }
                 } catch (e) {
                     window.__clientWarn && window.__clientWarn('Could not apply column order:', e);

@@ -703,8 +703,8 @@
             if (typesResult) return;
             try {
                 typesResult = AgGridHelper.create('measurementTypesGrid', 'measurement-lookups-types', typeColumnDefs, measurementTypesData, {
-                    onReady: function (api) {
-                        AgGridHelper.pinActionsColumn(api, typeColOrder);
+                    onReady: function (api, helper) {
+                        AgGridHelper.pinActionsColumn(api, typeColOrder, helper && helper.columnVisibilityManager);
                         window.measurementTypesGridApi = api;
                     },
                     gridOptions: {
@@ -729,8 +729,8 @@
             }
             try {
                 unitsResult = AgGridHelper.create('measurementUnitsGrid', 'measurement-lookups-units', unitColumnDefs, measurementUnitsData, {
-                    onReady: function (api) {
-                        AgGridHelper.pinActionsColumn(api, unitColOrder);
+                    onReady: function (api, helper) {
+                        AgGridHelper.pinActionsColumn(api, unitColOrder, helper && helper.columnVisibilityManager);
                         window.measurementUnitsGridApi = api;
                     },
                     gridOptions: {

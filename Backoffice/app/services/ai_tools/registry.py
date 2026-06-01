@@ -51,6 +51,9 @@ from app.services.ai_tools._utils import (
     resolve_source_config,
     apply_document_source_filters,
     split_tool_kw_for_call,
+    resolve_indicator_bank_permissions,
+    require_indicator_bank_permission,
+    INDICATOR_BANK_MGMT_TOOL_NAMES,
 )
 from app.services.ai_tools._query_utils import (
     infer_country_identifier_from_query,
@@ -58,6 +61,44 @@ from app.services.ai_tools._query_utils import (
     resolve_country_search_filters,
 )
 from app.services.upr.query_detection import query_prefers_upr_documents
+
+_INDICATOR_QUERY_PREAMBLE_RE = re.compile(
+    r"^.*?(?:"
+    r"closest\s+indicator\s+(?:to|for)"
+    r"|indicator\s+(?:closest|most\s+similar|similar)\s+(?:to|for)"
+    r"|find\s+(?:me\s+)?(?:an?\s+)?indicator\s+(?:for|to|that\s+matches?)"
+    r"|indicator\s+matching"
+    r"|most\s+relevant\s+indicator\s+(?:for|to)"
+    r"|nearest\s+indicator\s+(?:to|for)"
+    r"|which\s+indicator\s+(?:best\s+)?(?:matches?|fits?)"
+    r"|search\s+(?:the\s+)?indicator\s+bank\s+for"
+    r"|indicator\s+for\s+this\s+concept\s*:"
+    r"|indicator\s+to\s+this"
+    r")\s*:?\s*",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _extract_indicator_search_phrase(query: str) -> str:
+    """
+    Strip preambles like "what's the closest indicator to:" from a user query
+    so that text-aligned and vector search receive just the outcome phrase.
+
+    Only strips when the remainder is long enough to be a meaningful phrase (>= 10 chars).
+    If no preamble is found, returns the original query unchanged.
+    """
+    q = (query or "").strip()
+    m = _INDICATOR_QUERY_PREAMBLE_RE.match(q)
+    if m:
+        remainder = q[m.end():].strip().split("\n", 1)[-1].strip() or q[m.end():].strip()
+        if len(remainder) >= 10:
+            return remainder
+    if "\n" in q:
+        last_line = q.rsplit("\n", 1)[-1].strip()
+        if len(last_line) >= 10 and len(last_line) < len(q) * 0.8:
+            return last_line
+    return q
+
 
 def openapi_function_name(tool_def: Dict[str, Any]) -> Optional[str]:
     """Return the ``function.name`` field from an OpenAI-style tool specification dict."""
@@ -68,6 +109,48 @@ def openapi_function_name(tool_def: Dict[str, Any]) -> Optional[str]:
     except Exception:
         pass
     return None
+
+
+def _filter_indicator_bank_mgmt_tools(tool_defs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove Indicator Bank management tools the current user cannot access."""
+    ib_perms = resolve_indicator_bank_permissions()
+    view_tools = {
+        "get_indicator_usage_stats",
+        "browse_indicators",
+        "get_indicator_bank_stats",
+        "get_indicator_change_history",
+    }
+    suggest_tools = {"list_indicator_suggestions"}
+    allowed_mgmt: Set[str] = set()
+    if ib_perms.get("view"):
+        allowed_mgmt.update(view_tools)
+    if ib_perms.get("suggest"):
+        allowed_mgmt.update(suggest_tools)
+
+    filtered: List[Dict[str, Any]] = []
+    for td in tool_defs or []:
+        name = openapi_function_name(td)
+        if name in INDICATOR_BANK_MGMT_TOOL_NAMES and name not in allowed_mgmt:
+            continue
+        filtered.append(td)
+    return filtered
+
+
+def _indicator_bank_mgmt_allowed_tools() -> Set[str]:
+    ib_perms = resolve_indicator_bank_permissions()
+    allowed: Set[str] = set()
+    if ib_perms.get("view"):
+        allowed.update(
+            {
+                "get_indicator_usage_stats",
+                "browse_indicators",
+                "get_indicator_bank_stats",
+                "get_indicator_change_history",
+            }
+        )
+    if ib_perms.get("suggest"):
+        allowed.add("list_indicator_suggestions")
+    return allowed
 
 
 def tool_wrapper(func: Callable) -> Callable:
@@ -114,6 +197,9 @@ def tool_wrapper(func: Callable) -> Callable:
                 "get_assignment_indicator_values", "get_system_statistics",
                 "get_current_user_info", "get_indicator_metadata",
                 "search_indicator_bank",
+                "get_indicator_usage_stats", "browse_indicators",
+                "get_indicator_bank_stats", "get_indicator_change_history",
+                "list_indicator_suggestions",
                 "get_form_field_value",
                 "search_documents", "search_documents_hybrid",
                 "list_documents",
@@ -437,8 +523,38 @@ class AIToolsRegistry:
             tk = 5
         tk = max(1, min(int(tk), 10))
 
+        # Strip preambles so text-aligned and vector search receive just the outcome phrase.
+        search_phrase = _extract_indicator_search_phrase(qtext)
+
         svc = IndicatorResolutionService()
+        matches: List[Dict[str, Any]] = []
+        seen_ids: set = set()
+
+        # Text-aligned lookup first: exact bank names must win over semantic neighbours.
+        try:
+            from app.services.data_retrieval_shared import find_indicator_bank_text_aligned
+
+            for ind, match_kind, score in find_indicator_bank_text_aligned(search_phrase, limit=tk):
+                if int(ind.id) in seen_ids:
+                    continue
+                defn = (getattr(ind, "definition", None) or "") or ""
+                matches.append(
+                    {
+                        "id": int(ind.id),
+                        "name": ind.name or "",
+                        "definition": (defn[:300] + ("…" if len(defn) > 300 else "")),
+                        "unit": (ind.unit or "") if getattr(ind, "unit", None) else "",
+                        "similarity_score": round(float(score), 4),
+                        "match_kind": match_kind,
+                    }
+                )
+                seen_ids.add(int(ind.id))
+        except Exception as _align_err:
+            logger.debug("search_indicator_bank text-aligned lookup failed: %s", _align_err)
+
         if not svc.has_embeddings():
+            if matches:
+                return {"matches": matches, "query": qtext, "count": len(matches)}
             return {
                 "matches": [],
                 "query": qtext,
@@ -449,9 +565,10 @@ class AIToolsRegistry:
                 ),
             }
 
-        results = svc.resolve(qtext, top_k=tk)
-        matches: List[Dict[str, Any]] = []
+        results = svc.resolve(search_phrase, top_k=tk)
         for ind, sim in results or []:
+            if int(ind.id) in seen_ids:
+                continue
             defn = (getattr(ind, "definition", None) or "") or ""
             matches.append(
                 {
@@ -462,10 +579,33 @@ class AIToolsRegistry:
                     "similarity_score": round(float(sim), 4),
                 }
             )
+            seen_ids.add(int(ind.id))
+
+        # Short-query keyword fallback only (long queries are covered by text-aligned search).
+        if len(search_phrase) < 40:
+            try:
+                from app.services.data_retrieval_shared import get_indicator_candidates_by_keyword
+                keyword_hits = get_indicator_candidates_by_keyword(qtext, limit=tk)
+                for ind in keyword_hits:
+                    if int(ind.id) not in seen_ids and not getattr(ind, "archived", False):
+                        defn = (getattr(ind, "definition", None) or "") or ""
+                        matches.append(
+                            {
+                                "id": int(ind.id),
+                                "name": ind.name or "",
+                                "definition": (defn[:300] + ("…" if len(defn) > 300 else "")),
+                                "unit": (ind.unit or "") if getattr(ind, "unit", None) else "",
+                                "similarity_score": "text",
+                            }
+                        )
+                        seen_ids.add(int(ind.id))
+            except Exception as _kw_err:
+                logger.debug("search_indicator_bank keyword complement failed: %s", _kw_err)
 
         out: Dict[str, Any] = {
             "matches": matches,
             "query": qtext,
+            "search_phrase": search_phrase if search_phrase != qtext else None,
             "count": len(matches),
         }
         if not matches:
@@ -473,6 +613,128 @@ class AIToolsRegistry:
                 "No Indicator Bank rows returned for this query. Try rephrasing or check that indicators are embedded."
             )
         return out
+
+    @tool_wrapper
+    def get_indicator_usage_stats(self, indicator_name: str) -> Dict[str, Any]:
+        """
+        Get form/template usage and reporting reach for a specific Indicator Bank row.
+
+        Requires admin.indicator_bank.view. Use when asked how many forms or templates
+        use an indicator, or how widely it has been reported.
+        """
+        from app.services.ai_tools._indicator_bank_mgmt import (
+            get_indicator_usage_details,
+            resolve_indicator_by_name,
+        )
+
+        require_indicator_bank_permission("admin.indicator_bank.view")
+        ident = (indicator_name or "").strip()
+        if not ident:
+            raise ToolExecutionError("indicator_name is required")
+        ind = resolve_indicator_by_name(ident)
+        if not ind:
+            raise ToolExecutionError(f"Indicator not found: {indicator_name}")
+        details = get_indicator_usage_details(int(ind.id))
+        if not details:
+            raise ToolExecutionError(f"Could not load usage stats for: {indicator_name}")
+        return details
+
+    @tool_wrapper
+    def browse_indicators(
+        self,
+        sector: Optional[str] = None,
+        type: Optional[str] = None,
+        archived: Optional[bool] = False,
+        has_no_usage: bool = False,
+        has_no_definition: bool = False,
+        search: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        Browse/filter the Indicator Bank catalog (metadata only).
+
+        Requires admin.indicator_bank.view. Use for unused indicators, missing definitions,
+        or sector/type filtered lists.
+        """
+        from app.services.ai_tools._indicator_bank_mgmt import query_indicators_filtered
+
+        require_indicator_bank_permission("admin.indicator_bank.view")
+        return query_indicators_filtered(
+            sector=sector,
+            type_=type,
+            archived=archived,
+            has_no_usage=bool(has_no_usage),
+            has_no_definition=bool(has_no_definition),
+            search=search,
+            limit=limit,
+            offset=offset,
+        )
+
+    @tool_wrapper
+    def get_indicator_bank_stats(self) -> Dict[str, Any]:
+        """
+        High-level Indicator Bank health statistics (counts by type, sector, orphans).
+
+        Requires admin.indicator_bank.view.
+        """
+        from app.services.ai_tools._indicator_bank_mgmt import get_indicator_bank_aggregate_stats
+
+        require_indicator_bank_permission("admin.indicator_bank.view")
+        return get_indicator_bank_aggregate_stats()
+
+    @tool_wrapper
+    def get_indicator_change_history(
+        self,
+        indicator_name: str,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        Audit trail for changes to one indicator (who changed what and when).
+
+        Requires admin.indicator_bank.view.
+        """
+        from app.services.ai_tools._indicator_bank_mgmt import (
+            get_indicator_change_history_rows,
+            resolve_indicator_by_name,
+        )
+
+        require_indicator_bank_permission("admin.indicator_bank.view")
+        ident = (indicator_name or "").strip()
+        if not ident:
+            raise ToolExecutionError("indicator_name is required")
+        ind = resolve_indicator_by_name(ident)
+        if not ind:
+            raise ToolExecutionError(f"Indicator not found: {indicator_name}")
+        try:
+            lim = int(limit)
+        except (ValueError, TypeError):
+            lim = 10
+        lim = max(1, min(lim, 50))
+        history = get_indicator_change_history_rows(int(ind.id), limit=lim)
+        return {
+            "indicator_id": int(ind.id),
+            "indicator": ind.name or "",
+            "history": history,
+            "count": len(history),
+        }
+
+    @tool_wrapper
+    def list_indicator_suggestions(
+        self,
+        status: str = "pending",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        List indicator suggestions submitted for review (corrections, new indicators, etc.).
+
+        Requires admin.indicator_bank.suggestions.review.
+        """
+        from app.services.ai_tools._indicator_bank_mgmt import list_indicator_suggestion_rows
+
+        require_indicator_bank_permission("admin.indicator_bank.suggestions.review")
+        return list_indicator_suggestion_rows(status=status, limit=limit, offset=offset)
 
     @tool_wrapper
     def get_form_field_value(
@@ -1840,11 +2102,112 @@ class AIToolsRegistry:
                         "required": ["indicator_name"]
                     }
                 }
-            }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_indicator_usage_stats",
+                    "description": (
+                        "Get how an Indicator Bank row is used: form item count, distinct templates, "
+                        "and countries with submitted data. Requires Indicator Bank manager access. "
+                        "Use when the user asks how many forms/templates use an indicator or how widely it is reported."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "indicator_name": {
+                                "type": "string",
+                                "description": "Indicator name or id",
+                            }
+                        },
+                        "required": ["indicator_name"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "browse_indicators",
+                    "description": (
+                        "Browse/filter the Indicator Bank catalog (metadata). Requires Indicator Bank manager access. "
+                        "Use for unused indicators (has_no_usage=true), missing definitions (has_no_definition=true), "
+                        "or lists filtered by sector/type."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "sector": {"type": "string", "description": "Optional sector name filter"},
+                            "type": {"type": "string", "description": "Optional measurement type (e.g. number, percentage)"},
+                            "archived": {"type": "boolean", "description": "Include archived rows when true", "default": False},
+                            "has_no_usage": {"type": "boolean", "description": "Only indicators not used in any form", "default": False},
+                            "has_no_definition": {"type": "boolean", "description": "Only indicators with empty definition", "default": False},
+                            "search": {"type": "string", "description": "Optional name/definition substring search"},
+                            "limit": {"type": "integer", "description": "Max rows (default 20, max 100)", "default": 20},
+                            "offset": {"type": "integer", "description": "Pagination offset", "default": 0},
+                        },
+                        "required": [],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_indicator_bank_stats",
+                    "description": (
+                        "High-level Indicator Bank health overview: totals, by type, top sectors, "
+                        "zero-usage count, missing definitions, pending suggestions. "
+                        "Requires Indicator Bank manager access."
+                    ),
+                    "parameters": {"type": "object", "properties": {}, "required": []},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_indicator_change_history",
+                    "description": (
+                        "Audit trail for one indicator (who changed it and when). "
+                        "Requires Indicator Bank manager access."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "indicator_name": {"type": "string", "description": "Indicator name or id"},
+                            "limit": {"type": "integer", "description": "Max history rows (default 10, max 50)", "default": 10},
+                        },
+                        "required": ["indicator_name"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_indicator_suggestions",
+                    "description": (
+                        "List indicator suggestions awaiting or after review (corrections, new indicators). "
+                        "Requires indicator suggestion review access."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "description": "pending | reviewed | approved | rejected | all",
+                                "default": "pending",
+                            },
+                            "limit": {"type": "integer", "description": "Max rows (default 20, max 100)", "default": 20},
+                            "offset": {"type": "integer", "description": "Pagination offset", "default": 0},
+                        },
+                        "required": [],
+                    },
+                },
+            },
         ]
         tool_defs.extend(UPR_TOOL_SPECS)
+        tool_defs = _filter_indicator_bank_mgmt_tools(tool_defs)
 
         sources_norm = resolve_source_config()
+        ib_mgmt_allowed = _indicator_bank_mgmt_allowed_tools()
 
         if sources_norm is None:
             return tool_defs
@@ -1867,6 +2230,8 @@ class AIToolsRegistry:
                     "search_indicator_bank",
                 }
             )
+
+        allowed.update(ib_mgmt_allowed)
 
         if docs_enabled:
             allowed.update({"list_documents", "search_documents", "analyze_unified_plans_focus_areas"})

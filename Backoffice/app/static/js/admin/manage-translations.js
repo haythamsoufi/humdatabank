@@ -316,8 +316,8 @@
             .concat(['actions']);
 
         var result = AgGridHelper.create('translationsGrid', 'translations', columnDefs, translationsData, {
-            onReady: function(api) {
-                AgGridHelper.pinActionsColumn(api, desiredOrder);
+            onReady: function(api, helper) {
+                AgGridHelper.pinActionsColumn(api, desiredOrder, helper && helper.columnVisibilityManager);
             }
         });
         gridHelper = result.helper;

@@ -27,15 +27,29 @@
             font-family: 'Inter', sans-serif;
         }
 
-        /* Sector/Sub-Sector display styling */
-        .sector-items div {
-            display: block;
-            margin-bottom: 2px;
-            font-size: 0.875em;
+        /* Indicator bank grid: one body font size for all columns (plain text, badges, sector lists) */
+        #indicatorBankGrid.ag-theme-alpine .ag-cell,
+        #indicatorBankGrid.ag-theme-alpine .ag-cell .ag-cell-value {
+            font-size: var(--ag-font-size, 13px);
             line-height: 1.4;
         }
-        .sector-items div:last-child {
+        #indicatorBankGrid.ag-theme-alpine .ag-cell .text-xs,
+        #indicatorBankGrid.ag-theme-alpine .ag-cell .text-sm {
+            font-size: inherit !important;
+            line-height: inherit;
+        }
+        #indicatorBankGrid.ag-theme-alpine .sector-items div {
+            display: block;
+            margin-bottom: 2px;
+            font-size: inherit;
+            line-height: inherit;
+        }
+        #indicatorBankGrid.ag-theme-alpine .sector-items div:last-child {
             margin-bottom: 0;
+        }
+        #indicatorBankGrid.ag-theme-alpine .ag-cell[col-id="archived"] span,
+        #indicatorBankGrid.ag-theme-alpine .ag-cell[col-id="emergency"] span {
+            font-weight: 400 !important;
         }
 
         /* Filter Modal Styles */
@@ -1028,10 +1042,10 @@
                 let html = '<div class="flex flex-wrap gap-1">';
                 const programs = params.value.slice(0, 3);
                 programs.forEach(function(program) {
-                    html += '<span class="bg-gray-200 text-gray-700 text-xs font-medium px-2 py-0.5 rounded">' + (program || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+                    html += '<span class="bg-gray-200 text-gray-700 font-medium px-2 py-0.5 rounded">' + (program || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
                 });
                 if (params.value.length > 3) {
-                    html += '<span class="text-gray-400 text-xs">+' + (params.value.length - 3) + ' ' + {{ _("more")|js }} + '</span>';
+                    html += '<span class="text-gray-400">+' + (params.value.length - 3) + ' ' + {{ _("more")|js }} + '</span>';
                 }
                 html += '</div>';
                 return html;
@@ -1213,8 +1227,8 @@
             .concat(['type', 'unit', 'fdrs_kpi_code', 'related_programs_list', 'sector', 'subsector', 'archived', 'emergency', 'comments', 'usage_count', 'actions']);
 
         var result = AgGridHelper.create('indicatorBankGrid', 'indicator-bank', columnDefs, indicatorsData, {
-            onReady: function(api) {
-                AgGridHelper.pinActionsColumn(api, desiredOrder);
+            onReady: function(api, helper) {
+                AgGridHelper.pinActionsColumn(api, desiredOrder, helper && helper.columnVisibilityManager);
             }
         });
         gridHelper = result.helper;

@@ -46,8 +46,10 @@ from app.services.ai_payload_inference import (
     build_payload_from_tool_result as _build_payload_from_tool_result,
 )
 from app.services.ai_step_ux import (
+    emit_tool_result_step_detail as _emit_tool_result_step_detail,
     format_plan_for_step as _format_plan_for_step,
     format_tool_args_detail as _format_tool_args_detail,
+    plan_step_message as _plan_step_message,
     step_display_message as _step_display_message,
 )
 from app.utils.api_helpers import service_error
@@ -174,6 +176,18 @@ def _is_dashboard_page(user_context: Optional[Dict[str, Any]]) -> bool:
 def _next_step_index(steps: List[Dict[str, Any]]) -> int:
     """Return monotonic step index (1, 2, 3, ...) for trace clarity."""
     return len(steps) + 1
+
+
+def _format_user_query_for_agent(query: str, original_message: Optional[str] = None) -> str:
+    """When follow-up expansion changed the message, show both to the agent LLM."""
+    orig = (original_message or "").strip()
+    q = (query or "").strip()
+    if orig and q and orig != q:
+        return (
+            f"User's original question:\n{orig}\n\n"
+            f"Interpreted request (use both; prefer the original if details conflict):\n{q}"
+        )
+    return q or orig
 
 
 def _observation_summary_from_tool_result(
@@ -348,6 +362,7 @@ class AIAgentExecutor:
                 return result
 
             tool_result = self.tools_registry.execute_tool(plan.tool_name, **(plan.tool_args or {}))
+            _emit_tool_result_step_detail(on_step_callback, plan.tool_name, tool_result)
             if not isinstance(tool_result, dict) or not tool_result.get("success"):
                 return None
             payload = tool_result.get("result")
@@ -1003,9 +1018,9 @@ class AIAgentExecutor:
                 if callable(on_step_callback):
                     try:
                         plan_detail = _format_plan_for_step(plan, query=query)
-                        on_step_callback(_("Planning approach…"), plan_detail)
+                        on_step_callback(_plan_step_message(plan, query=query), plan_detail or None)
                     except TypeError:
-                        on_step_callback(_("Planning approach…"))
+                        on_step_callback(_plan_step_message(plan, query=query))
                     except Exception as e:
                         logger.debug("Planning step callback failed: %s", e)
                 fast = None
@@ -1030,15 +1045,29 @@ class AIAgentExecutor:
                     # full reasoning is about to start (which begins with a blocking LLM call).
                     if fast is not None and callable(on_step_callback):
                         try:
-                            on_step_callback(_("Reviewing results…"), detail=_("Thinking what to do next."))
+                            on_step_callback(_("Reviewing what I found…"))
                         except Exception as e:
                             logger.debug("ReAct fallback step callback failed: %s", e)
                     # Execute based on provider
                     if self.use_native and self.provider == 'openai':
-                        result = self._execute_openai_native(query, conversation_history, user_context, language, on_step_callback)
+                        result = self._execute_openai_native(
+                            query,
+                            conversation_history,
+                            user_context,
+                            language,
+                            on_step_callback,
+                            original_message=original_message,
+                        )
                         result["execution_path"] = "openai_native"
                     else:
-                        result = self._execute_custom_react(query, conversation_history, user_context, language, on_step_callback)
+                        result = self._execute_custom_react(
+                            query,
+                            conversation_history,
+                            user_context,
+                            language,
+                            on_step_callback,
+                            original_message=original_message,
+                        )
                         result["execution_path"] = "react"
 
                     # When the full LLM path fails (timeout, API error), try the
@@ -1080,8 +1109,11 @@ class AIAgentExecutor:
                         result["output_hint"] = inferred["output_hint"]
 
             if result.get("table_payload") and result.get("answer"):
+                _tp = result.get("table_payload") if isinstance(result.get("table_payload"), dict) else {}
                 result["answer"] = _sanitize_agent_answer(
-                    result["answer"], has_table_payload=True,
+                    result["answer"],
+                    has_table_payload=True,
+                    table_kind=str(_tp.get("table_kind") or ""),
                 )
 
             # Calculate execution time
@@ -1316,10 +1348,17 @@ class AIAgentExecutor:
         conversation_history: Optional[List[Dict[str, str]]],
         user_context: Optional[Dict[str, Any]],
         language: str,
-        on_step_callback: Optional[Callable[[str], None]] = None
+        on_step_callback: Optional[Callable[[str], None]] = None,
+        original_message: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute using OpenAI's native function calling."""
-        messages = self._build_messages(query, conversation_history, user_context, language)
+        messages = self._build_messages(
+            query,
+            conversation_history,
+            user_context,
+            language,
+            original_message=original_message,
+        )
         tools = self.tools_registry.get_tool_definitions_openai()
 
         # Hard-filter: for platform usage/navigation help questions, restrict
@@ -1419,9 +1458,7 @@ class AIAgentExecutor:
             # UX: after at least one tool run, show we're considering next step (not the final answer yet).
             if on_step_callback and tool_call_count > 0:
                 try:
-                    on_step_callback(_("Reviewing results…"), detail=_("Thinking what to do next."))
-                except TypeError:
-                    on_step_callback(_("Reviewing results…"))
+                    on_step_callback(_("Reviewing what I found…"))
                 except Exception as e:
                     logger.debug("Review step callback failed: %s", e)
             try:
@@ -1588,9 +1625,9 @@ class AIAgentExecutor:
                     # We are about to return the final answer (no further tool calls).
                     if on_step_callback:
                         try:
-                            on_step_callback(_("Drafting answer…"))
+                            on_step_callback(_("Putting together your answer…"))
                         except TypeError:
-                            on_step_callback(_("Drafting answer…"))
+                            on_step_callback(_("Putting together your answer…"))
                         except Exception as e:
                             logger.debug("Draft step callback failed: %s", e)
                     result = {
@@ -1903,6 +1940,7 @@ class AIAgentExecutor:
                                         on_step_callback(submsg)
                                 exec_kwargs["_progress_callback"] = _progress_detail_only
                             tool_result = self.tools_registry.execute_tool(tool_name, **exec_kwargs)
+                            _emit_tool_result_step_detail(on_step_callback, tool_name, tool_result)
                             observation = _compact_tool_observation_for_llm(
                                 tool_name=tool_name, tool_result=tool_result
                             )
@@ -2049,6 +2087,7 @@ class AIAgentExecutor:
         user_context: Optional[Dict[str, Any]],
         language: str,
         on_step_callback: Optional[Callable[[str], None]] = None,
+        original_message: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute using custom ReAct implementation (no function calling).
@@ -2103,7 +2142,10 @@ class AIAgentExecutor:
                     messages.append({"role": "assistant", "content": msg['message']})
 
         # Add the current query
-        messages.append({"role": "user", "content": query})
+        messages.append({
+            "role": "user",
+            "content": _format_user_query_for_agent(query, original_message),
+        })
 
         scratchpad = ""
 
@@ -2461,6 +2503,7 @@ class AIAgentExecutor:
                             exec_kwargs["_progress_callback"] = _progress_detail_only
                         try:
                             tool_result = self.tools_registry.execute_tool(tool_name, **exec_kwargs)
+                            _emit_tool_result_step_detail(on_step_callback, tool_name, tool_result)
                             observation = _compact_tool_observation_for_llm(
                                 tool_name=tool_name, tool_result=tool_result
                             )
@@ -2766,7 +2809,8 @@ User context:
         query: str,
         conversation_history: Optional[List[Dict[str, str]]],
         user_context: Optional[Dict[str, Any]],
-        language: str
+        language: str,
+        original_message: Optional[str] = None,
     ) -> List[Dict[str, str]]:
         """Build message list for LLM."""
         system_content = self._get_system_prompt(user_context, language)
@@ -2827,7 +2871,10 @@ User context:
                     messages.append({"role": "assistant", "content": msg['message']})
 
         # Add current query
-        messages.append({"role": "user", "content": query})
+        messages.append({
+            "role": "user",
+            "content": _format_user_query_for_agent(query, original_message),
+        })
 
         return messages
 

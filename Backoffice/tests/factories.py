@@ -317,8 +317,7 @@ def create_test_api_key(db_session, **kwargs):
     counter = _get_unique_suffix()
 
     # Generate new API key
-    full_key, key_hash, key_prefix = APIKey.generate_key()
-    key_id = full_key[:32]
+    full_key, key_id, key_hash, key_prefix = APIKey.generate_key()
 
     defaults = {
         'key_id': key_id,

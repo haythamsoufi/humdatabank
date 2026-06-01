@@ -775,15 +775,14 @@ class AIChatEngine:
                 if chunk_delay_seconds:
                     time.sleep(float(chunk_delay_seconds))
 
-        # User-visible step immediately: query rewrite is a network round-trip and must not block
+        # User-visible step immediately: classification may be a network round-trip and must not block
         # the first progress signal (the UI should not look frozen for ~1–2 minutes).
         if safe_message and on_step and not _is_cancelled():
-            _d0 = safe_message if len(safe_message) <= 500 else (safe_message[:500] + "…")
             try:
                 with force_locale(locale_code):
-                    _emit_step(_("Preparing query…"), _d0)
+                    _emit_step(_("Understanding your question…"))
             except Exception as e:
-                logger.debug("AIChatEngine early Preparing step failed: %s", e)
+                logger.debug("AIChatEngine early Understanding step failed: %s", e)
 
         # Rewrite user message with LLM before passing to agent or any fallback (when enabled)
         import time as _time
@@ -828,8 +827,6 @@ class AIChatEngine:
         # Greeting-only: short LLM reply, no agent (rewritten query equals user's exact words for traces)
         if is_greeting and not _is_cancelled():
             try:
-                with force_locale(locale_code):
-                    _emit_step(_("Replying…"))
                 reply_text, greeting_model = _generate_greeting_reply_llm(
                     user_message=(message or "").strip(),
                     preferred_language=preferred_language,
@@ -863,8 +860,6 @@ class AIChatEngine:
         if current_app.config.get("AI_PLATFORM_SCOPE_ENFORCE_ENABLED", True) and not _is_cancelled():
             try:
                 if not in_platform_scope:
-                    with force_locale(locale_code):
-                        _emit_step(_("Replying…"))
                     reply_text, oos_model = _generate_out_of_scope_reply_llm(
                         user_message=(message or "").strip(),
                         preferred_language=preferred_language,
@@ -901,12 +896,7 @@ class AIChatEngine:
                 from app.services.ai_chat_integration import get_ai_chat_integration
 
                 with force_locale(locale_code):
-                    if safe_query_used and safe_query_used != safe_message:
-                        _emit_step(
-                            _("Preparing query…"),
-                            detail=safe_query_used[:500] + ("…" if len(safe_query_used) > 500 else ""),
-                        )
-                    # "Planning approach…" step (with plan detail) is emitted by the executor after plan_simple()
+                    # Planning step (with plan detail) is emitted by the executor after plan_simple()
                     ai = get_ai_chat_integration()
                     if ai is None:
                         raise RuntimeError("AIChatIntegration not initialized")
@@ -1004,7 +994,7 @@ class AIChatEngine:
                 model_name = current_app.config.get("OPENAI_MODEL", "gpt-5-mini")
                 if on_delta:
                     with force_locale(locale_code):
-                        _emit_step(_("Drafting answer…"))
+                        _emit_step(_("Putting together your answer…"))
                     from openai import OpenAI
                     import os
 

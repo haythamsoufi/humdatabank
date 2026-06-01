@@ -52,18 +52,19 @@ def step_display_message_get_upr_kpi_value(tool_args: Dict[str, Any]) -> str:
     metric = (tool_args or {}).get("metric") or ""
     metric_short = (metric[:30] + ("…" if len(metric) > 30 else "")) if metric else ""
     if country and metric:
-        return _("Looking in Unified Plans and Reports (%(metric)s — %(country)s)", metric=metric_short, country=country)
+        return _("Reading %(metric)s from Unified Plans and Reports for %(country)s…", metric=metric_short, country=country)
     if country:
-        return _("Looking in Unified Plans and Reports (%(country)s)", country=country)
-    return _("Looking in Unified Plans and Reports")
+        return _("Reading Unified Plans and Reports for %(country)s…", country=country)
+    return _("Reading Unified Plans and Reports…")
 
 
 def step_display_message_get_upr_kpi_values_for_all_countries(tool_args: Dict[str, Any]) -> str:
     """User-facing step line for ``get_upr_kpi_values_for_all_countries``."""
     metric = (tool_args or {}).get("metric") or ""
-    if metric:
-        return _("Getting %(metric)s for all countries from Unified Plans and Reports", metric=metric)
-    return _("Getting data for all countries from Unified Plans and Reports")
+    metric_short = (metric[:30] + ("…" if len(metric) > 30 else "")) if metric else ""
+    if metric_short:
+        return _("Reading %(metric)s across all countries from Unified Plans and Reports…", metric=metric_short)
+    return _("Reading Unified Plans and Reports across all countries…")
 
 
 def suppress_format_tool_args_detail_for_tool(tool_name: str) -> bool:

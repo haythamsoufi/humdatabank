@@ -6,6 +6,75 @@
 
 /* Column visibility toolbar (Columns + Clear filters): ag-column-visibility-manager.css */
 
+/* Row selection column — no vertical rule between checkboxes and the next column */
+.ag-theme-alpine .ag-selection-column-cell,
+.ag-theme-balham .ag-selection-column-cell,
+.ag-theme-quartz .ag-selection-column-cell,
+.ag-theme-material .ag-selection-column-cell,
+.ag-theme-alpine .ag-header-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-alpine .ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-balham .ag-header-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-balham .ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-quartz .ag-header-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-quartz .ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-material .ag-header-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-material .ag-cell[col-id="ag-Grid-SelectionColumn"] {
+    border-right: none !important;
+}
+
+/* AG Grid draws the header/body seam on the pinned-left container, not only on the cell */
+.ag-theme-alpine .ag-pinned-left-header,
+.ag-theme-balham .ag-pinned-left-header,
+.ag-theme-quartz .ag-pinned-left-header,
+.ag-theme-material .ag-pinned-left-header,
+.ag-theme-alpine .ag-pinned-left-cols-container,
+.ag-theme-balham .ag-pinned-left-cols-container,
+.ag-theme-quartz .ag-pinned-left-cols-container,
+.ag-theme-material .ag-pinned-left-cols-container {
+    border-right: none !important;
+}
+
+.ag-theme-alpine .ag-cell.ag-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-balham .ag-cell.ag-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-quartz .ag-cell.ag-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-material .ag-cell.ag-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-alpine .ag-header-cell.ag-header-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-balham .ag-header-cell.ag-header-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-quartz .ag-header-cell.ag-header-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-material .ag-header-cell.ag-header-cell-last-left-pinned[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-alpine .ag-selection-column-cell.ag-cell-last-left-pinned,
+.ag-theme-balham .ag-selection-column-cell.ag-cell-last-left-pinned,
+.ag-theme-quartz .ag-selection-column-cell.ag-cell-last-left-pinned,
+.ag-theme-material .ag-selection-column-cell.ag-cell-last-left-pinned,
+.ag-theme-alpine .ag-selection-column-cell.ag-header-cell-last-left-pinned,
+.ag-theme-balham .ag-selection-column-cell.ag-header-cell-last-left-pinned,
+.ag-theme-quartz .ag-selection-column-cell.ag-header-cell-last-left-pinned,
+.ag-theme-material .ag-selection-column-cell.ag-header-cell-last-left-pinned {
+    border-right: none !important;
+}
+
+.ag-theme-alpine .ag-header-cell[col-id="ag-Grid-SelectionColumn"] .ag-header-cell-resize::after,
+.ag-theme-balham .ag-header-cell[col-id="ag-Grid-SelectionColumn"] .ag-header-cell-resize::after,
+.ag-theme-quartz .ag-header-cell[col-id="ag-Grid-SelectionColumn"] .ag-header-cell-resize::after,
+.ag-theme-material .ag-header-cell[col-id="ag-Grid-SelectionColumn"] .ag-header-cell-resize::after,
+.ag-theme-alpine .ag-selection-column-cell .ag-header-cell-resize::after,
+.ag-theme-balham .ag-selection-column-cell .ag-header-cell-resize::after,
+.ag-theme-quartz .ag-selection-column-cell .ag-header-cell-resize::after,
+.ag-theme-material .ag-selection-column-cell .ag-header-cell-resize::after {
+    display: none !important;
+}
+
+.ag-theme-alpine .ag-cell.ag-cell-first-right-pinned,
+.ag-theme-balham .ag-cell.ag-cell-first-right-pinned,
+.ag-theme-quartz .ag-cell.ag-cell-first-right-pinned,
+.ag-theme-material .ag-cell.ag-cell-first-right-pinned,
+.ag-theme-alpine .ag-header-cell.ag-header-cell-first-right-pinned,
+.ag-theme-balham .ag-header-cell.ag-header-cell-first-right-pinned,
+.ag-theme-quartz .ag-header-cell.ag-header-cell-first-right-pinned,
+.ag-theme-material .ag-header-cell.ag-header-cell-first-right-pinned {
+    border-left: none !important;
+}
+
 /* Grid Container Styling
    Do not use overflow-x: auto on the root: AG Grid manages horizontal sync between
    .ag-header-viewport and .ag-body-viewport. A second scrollable layer here causes

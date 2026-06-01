@@ -146,8 +146,8 @@
 
     function initializeGrid() {
         var result = AgGridHelper.create('assignmentsGrid', 'assignments', columnDefs, assignmentsData, {
-            onReady: function (api) {
-                AgGridHelper.pinActionsColumn(api);
+            onReady: function (api, helper) {
+                AgGridHelper.pinActionsColumn(api, null, helper && helper.columnVisibilityManager);
                 var urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('no_data_owner') === '1' && api) {
                     var ownerCol = api.getColumn('data_owner_name');

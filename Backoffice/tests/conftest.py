@@ -284,8 +284,7 @@ def api_key(db_session, app):
             db.create_all()
 
         # Generate new API key
-        full_key, key_hash, key_prefix = APIKey.generate_key()
-        key_id = full_key[:32]
+        full_key, key_id, key_hash, key_prefix = APIKey.generate_key()
 
         # Create API key record
         api_key_obj = APIKey(

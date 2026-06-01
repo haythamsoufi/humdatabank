@@ -4,9 +4,13 @@ import pytest
 @pytest.mark.api
 @pytest.mark.integration
 class TestApiIndicators:
-    def test_indicator_bank_requires_api_key(self, client):
+    def test_indicator_bank_public_without_api_key(self, client):
         resp = client.get("/api/v1/indicator-bank")
-        assert resp.status_code in (401, 500)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert isinstance(data, dict)
+        assert "indicators" in data
+        assert isinstance(data["indicators"], list)
 
     def test_indicator_bank_contract_with_api_key(self, client, auth_headers):
         resp = client.get("/api/v1/indicator-bank", headers=auth_headers)

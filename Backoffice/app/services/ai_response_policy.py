@@ -234,7 +234,95 @@ def _strip_large_markdown_tables(text: str, *, strip_all: bool = False) -> str:
     return "\n".join(out)
 
 
-def sanitize_agent_answer(text: str, *, has_table_payload: bool = False) -> str:
+_DUPLICATE_MATCH_SENTENCE_RE = re.compile(
+    r"(?is)\b(?:an\s+)?indicator\b[^.!?]*\b(?:"
+    r"identical|exact match|already exists|very close|was found|duplicate"
+    r")\b[^.!?]*[.!?]",
+)
+
+
+def _dedupe_indicator_exact_match_intro(text: str) -> str:
+    """Keep one exact-match / duplicate-warning sentence when the model repeats itself."""
+    if not text:
+        return text
+    m = re.search(r"\n\n", text)
+    if m:
+        intro, rest = text[: m.start()], text[m.start() :]
+    else:
+        intro, rest = text, ""
+
+    sentences = re.split(r"(?<=[.!?])\s+", intro.strip())
+    if len(sentences) < 2:
+        return text
+
+    warn_idx = [i for i, s in enumerate(sentences) if _DUPLICATE_MATCH_SENTENCE_RE.search(s)]
+    if len(warn_idx) <= 1:
+        return text
+
+    kept = [sentences[i] for i in range(len(sentences)) if i not in warn_idx[1:]]
+    new_intro = " ".join(s.strip() for s in kept if s.strip())
+    return (new_intro + rest).strip() if new_intro else text
+
+
+def _strip_indicator_search_bullets(text: str) -> str:
+    """Remove redundant indicator match bullet lists when the UI table shows matches."""
+    if not text:
+        return text
+    text = _dedupe_indicator_exact_match_intro(text)
+    # Drop "Related indicators..." heading plus following bullet lines.
+    text = re.sub(
+        r"(?im)^Related indicators[^\n]*\n(?:\s*[-*]\s+[^\n]+\n?)+",
+        "",
+        text,
+    )
+    # Drop bullet lines that look like ranked indicator matches (quoted name + score).
+    text = re.sub(
+        r'(?m)^\s*[-*]\s+["\'].*?(?:score|similarity)\s*[\d.]+.*$',
+        "",
+        text,
+    )
+    # Drop empty "Action links:" headings when links are inline or in the table.
+    text = re.sub(r"(?im)^Action links:\s*(?:\n|$)", "", text)
+    # Drop generic "Open Indicator Bank" / bank index links (view/edit CTAs only).
+    text = re.sub(
+        r'(?im)^\s*\[Open Indicator Bank\]\(/admin/indicator_bank\)\s*\n?',
+        "",
+        text,
+    )
+    text = re.sub(
+        r'(?im)^\s*\[Indicator Bank\]\(/admin/indicator_bank\)\s*\n?',
+        "",
+        text,
+    )
+    text = _trim_indicator_search_prose(text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+_CREATION_ADVICE_RE = re.compile(
+    r"(?im)[^.!?]*(?:consider re-using|creating a duplicate|editing it rather than creating|"
+    r"instead of creating a new one|before you create)[^.!?]*[.!?]\s*"
+)
+
+
+def _trim_indicator_search_prose(text: str) -> str:
+    """Keep similarity-search answers short; drop add/create advisory unless user asked."""
+    if not text:
+        return text
+    text = _CREATION_ADVICE_RE.sub("", text)
+    text = re.sub(
+        r"(?is)\n*Interpretation:\s*.+?(?=\n\n(?:\[View|\[Edit|## Sources)|\Z)",
+        "\n",
+        text,
+    )
+    text = re.sub(
+        r'(?i)The Indicator Bank already contains this indicator:\s*(".*?")\s*\(exact match\)\.',
+        r"The closest match is \1 (exact match).",
+        text,
+    )
+    return text
+
+
+def sanitize_agent_answer(text: str, *, has_table_payload: bool = False, table_kind: Optional[str] = None) -> str:
     """Strip leaked agent internals from a response before returning it.
 
     When *has_table_payload* is True the platform is already rendering a
@@ -260,6 +348,8 @@ def sanitize_agent_answer(text: str, *, has_table_payload: bool = False) -> str:
 
     if has_table_payload:
         text = _strip_large_markdown_tables(text, strip_all=True)
+        if str(table_kind or "").strip().lower() == "indicator_search":
+            text = _strip_indicator_search_bullets(text)
 
     text = re.sub(
         r"---\s*Step\s*\d+\s*---.*?(?=---\s*Step\s*\d+\s*---|$)",

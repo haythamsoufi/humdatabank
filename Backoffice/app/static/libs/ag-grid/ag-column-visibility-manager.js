@@ -50,7 +50,10 @@
                 'showAll': 'Show All',
                 'columnCannotBeHidden': 'This column cannot be hidden',
                 'noColumnsFound': 'No columns found',
-                'clearAllFilters': 'Clear All Filters'
+                'clearAllFilters': 'Clear All Filters',
+                'pinColumn': 'Pin column',
+                'unpinColumn': 'Unpin column',
+                'columnCannotBeUnpinned': 'This column cannot be unpinned'
             };
 
             let updated = false;
@@ -166,6 +169,21 @@
     getTranslation._initialized = false;
 
     /**
+     * Normalize AG Grid pinned values for localStorage (false/true -> null/'left')
+     * @param {string|boolean|null|undefined} pinned
+     * @returns {string|null}
+     */
+    function normalizePinnedValue(pinned) {
+        if (pinned === 'left' || pinned === 'right') {
+            return pinned;
+        }
+        if (pinned === true) {
+            return 'left';
+        }
+        return null;
+    }
+
+    /**
      * Column Visibility Manager
      * @param {Object} gridApi - AG Grid API instance
      * @param {string} templateId - Unique identifier for the template/page
@@ -180,34 +198,146 @@
             showPanelButton: true,
             panelPosition: 'top-right',
             enableExport: true,
-            enableReset: true
+            enableReset: true,
+            enablePin: true,
+            defaultPinSide: 'left'
         }, options || {});
 
         this.columnState = {};
         this.panelElement = null;
         this.panelButton = null;
         this.isPanelVisible = false;
+        this._suppressPersist = false;
+        this._initialStateFinalized = false;
+        this._pinChangeInProgress = false;
+        this._columnPinnedHandler = null;
 
         this.init();
     }
 
     ColumnVisibilityManager.prototype.init = function() {
-        // Load saved column visibility state
+        // Suppress writes while the grid (and page onReady hooks) apply default column state
+        this._suppressPersist = true;
+
+        // Load saved column visibility + pin state from localStorage
         this.loadSavedState();
 
         // Apply saved state to grid
         this.applyColumnState();
 
-        // Listen for column visibility changes
+        // Listen for column visibility / pin changes
         if (this.options.persistOnChange) {
-            this.gridApi.addEventListener('columnVisible', this.onColumnVisibilityChanged.bind(this));
-            this.gridApi.addEventListener('columnPinned', this.onColumnVisibilityChanged.bind(this));
+            this._onColumnStateChanged = this.onColumnVisibilityChanged.bind(this);
+            this.gridApi.addEventListener('columnVisible', this._onColumnStateChanged);
+            this.gridApi.addEventListener('columnPinned', this._onColumnStateChanged);
         }
 
         // Create panel button if enabled
         if (this.options.showPanelButton) {
             this.createPanelButton();
         }
+
+        // Fallback when grids are not created via AgGridHelper.create (no finishInitialColumnState call)
+        const self = this;
+        setTimeout(function() {
+            self.finishInitialColumnState();
+        }, 300);
+    };
+
+    /**
+     * Normalize pinned value (instance wrapper)
+     */
+    ColumnVisibilityManager.prototype.normalizePinnedValue = function(pinned) {
+        return normalizePinnedValue(pinned);
+    };
+
+    /**
+     * Pinned state to apply for a column (saved preference + lockPinned defaults)
+     */
+    ColumnVisibilityManager.prototype.resolvePinnedForApply = function(colDef, saved) {
+        if (colDef.lockPinned && colDef.pinned) {
+            return this.normalizePinnedValue(colDef.pinned);
+        }
+        if (saved && Object.prototype.hasOwnProperty.call(saved, 'pinned')) {
+            return this.normalizePinnedValue(saved.pinned);
+        }
+        return null;
+    };
+
+    /**
+     * Write columnState to localStorage (when persistence is enabled)
+     */
+    ColumnVisibilityManager.prototype.writeColumnStateToStorage = function() {
+        if (this._suppressPersist || !this.options.persistOnChange) {
+            return;
+        }
+        try {
+            localStorage.setItem(this.getStorageKey(), JSON.stringify(this.columnState));
+        } catch (e) {
+            console.warn('Failed to write column state to storage:', e);
+        }
+    };
+
+    /**
+     * Update one column's saved pin and persist immediately
+     */
+    ColumnVisibilityManager.prototype.updateStoredColumnPin = function(field, pinned) {
+        const apiToUse = this.getApiToUse();
+        const column = apiToUse.getColumn ? apiToUse.getColumn(field) : null;
+        const normalizedPin = this.normalizePinnedValue(pinned);
+
+        if (!this.columnState[field]) {
+            this.columnState[field] = {
+                visible: column && column.isVisible ? column.isVisible() : true
+            };
+        }
+        this.columnState[field].pinned = normalizedPin;
+        this.writeColumnStateToStorage();
+        return normalizedPin;
+    };
+
+    /**
+     * After a pin change, re-order selection column then sync full state from the grid
+     */
+    ColumnVisibilityManager.prototype.finalizeColumnPinChange = function() {
+        const self = this;
+        this.ensureSelectionColumnFirst();
+        window.setTimeout(function() {
+            if (self.options.persistOnChange) {
+                self.saveCurrentState();
+            }
+            self._pinChangeInProgress = false;
+            if (self.panelElement && self.isPanelVisible) {
+                self.updatePanel();
+            }
+        }, 50);
+    };
+
+    /**
+     * Saved pin for a column id (used when merging with pinActionsColumn)
+     */
+    ColumnVisibilityManager.prototype.getSavedPin = function(colId) {
+        const saved = this.columnState && this.columnState[colId];
+        if (!saved || !Object.prototype.hasOwnProperty.call(saved, 'pinned')) {
+            return null;
+        }
+        return this.normalizePinnedValue(saved.pinned);
+    };
+
+    /**
+     * Re-apply persisted column state after grid/page onReady hooks (e.g. pinActionsColumn).
+     * Enables localStorage persistence for pins as well as visibility.
+     */
+    ColumnVisibilityManager.prototype.finishInitialColumnState = function() {
+        if (this._initialStateFinalized) {
+            return;
+        }
+        this._initialStateFinalized = true;
+        this.loadSavedState();
+        this.applyColumnState();
+        this._suppressPersist = false;
+        this.ensureSelectionColumnFirst();
+        this.saveCurrentState();
     };
 
     /**
@@ -239,16 +369,28 @@
      * Save current column visibility state to localStorage
      */
     ColumnVisibilityManager.prototype.saveCurrentState = function() {
+        if (this._suppressPersist) {
+            return;
+        }
+
         try {
-            const allColumns = this.gridApi.getColumns();
+            const apiToUse = this.getApiToUse();
+            const allColumns = apiToUse.getColumns ? apiToUse.getColumns() : null;
             if (!allColumns) return;
 
             const state = {};
             allColumns.forEach(function(column) {
                 const colDef = column.getColDef();
-                state[colDef.field || colDef.colId] = {
+                const field = colDef.field || colDef.colId;
+                let pinned = column.getPinned ? column.getPinned() : null;
+                if (this.isSelectionCheckboxColumn(column)) {
+                    pinned = null;
+                } else if (colDef.lockPinned && colDef.pinned) {
+                    pinned = colDef.pinned;
+                }
+                state[field] = {
                     visible: column.isVisible(),
-                    pinned: column.getPinned(),
+                    pinned: normalizePinnedValue(pinned),
                     width: column.getActualWidth(),
                     sort: column.getSort(),
                     sortIndex: column.getSortIndex()
@@ -271,8 +413,9 @@
         }
 
         try {
+            const apiToUse = this.getApiToUse();
             const columnState = [];
-            const allColumns = this.gridApi.getColumns();
+            const allColumns = apiToUse.getColumns ? apiToUse.getColumns() : null;
 
             if (!allColumns) return;
 
@@ -282,10 +425,13 @@
                 const saved = this.columnState[field];
 
                 if (saved) {
+                    const pinned = this.isSelectionCheckboxColumn(column)
+                        ? null
+                        : this.resolvePinnedForApply(colDef, saved);
                     columnState.push({
                         colId: field,
                         hide: !saved.visible,
-                        pinned: saved.pinned || null,
+                        pinned: pinned,
                         width: saved.width || colDef.width,
                         sort: saved.sort || null,
                         sortIndex: saved.sortIndex !== undefined ? saved.sortIndex : null
@@ -293,11 +439,12 @@
                 }
             }.bind(this));
 
-            if (columnState.length > 0) {
-                this.gridApi.applyColumnState({
+            if (columnState.length > 0 && apiToUse.applyColumnState) {
+                apiToUse.applyColumnState({
                     state: columnState,
                     applyOrder: true
                 });
+                this.ensureSelectionColumnFirst();
             }
         } catch (e) {
             console.warn('Failed to apply column state:', e);
@@ -305,23 +452,30 @@
     };
 
     /**
-     * Handle column visibility change
+     * Handle column visibility or pin change
      */
     ColumnVisibilityManager.prototype.onColumnVisibilityChanged = function() {
-        this.saveCurrentState();
-        if (this.panelElement && this.isPanelVisible) {
-            this.updatePanel();
+        if (this._suppressPersist || this._pinChangeInProgress) {
+            return;
         }
+        // Defer so AG Grid finishes applying column state before we read it back
+        const self = this;
+        window.setTimeout(function() {
+            if (self._pinChangeInProgress) {
+                return;
+            }
+            self.saveCurrentState();
+            if (self.panelElement && self.isPanelVisible) {
+                self.updatePanel();
+            }
+        }, 0);
     };
 
     /**
      * Show/hide a column
      */
     ColumnVisibilityManager.prototype.setColumnVisible = function(field, visible) {
-        // Handle both Grid API and createGrid API
-        const apiToUse = (this.gridApi.api && typeof this.gridApi.api.setColumnVisible === 'function')
-            ? this.gridApi.api
-            : this.gridApi;
+        const apiToUse = this.getApiToUse();
 
         // Use applyColumnState as the primary method (most reliable)
         let success = false;
@@ -329,13 +483,16 @@
         try {
             const allColumns = apiToUse.getColumns ? apiToUse.getColumns() : [];
             if (allColumns && allColumns.length > 0) {
+                const self = this;
                 const columnState = allColumns.map(function(col) {
                     const colDef = col.getColDef();
                     const colField = colDef.field || colDef.colId;
                     const isCurrentlyVisible = col.isVisible ? col.isVisible() : true;
+                    const currentPinned = col.getPinned ? self.normalizePinnedValue(col.getPinned()) : null;
                     return {
                         colId: colField,
-                        hide: colField === field ? !visible : !isCurrentlyVisible
+                        hide: colField === field ? !visible : !isCurrentlyVisible,
+                        pinned: currentPinned
                     };
                 });
                 if (apiToUse.applyColumnState && typeof apiToUse.applyColumnState === 'function') {
@@ -373,6 +530,130 @@
         if (this.options.persistOnChange) {
             this.saveCurrentState();
         }
+    };
+
+    /**
+     * Resolve the grid API (supports createGrid wrapper)
+     */
+    ColumnVisibilityManager.prototype.getApiToUse = function() {
+        return (this.gridApi.api && typeof this.gridApi.api.applyColumnState === 'function')
+            ? this.gridApi.api
+            : this.gridApi;
+    };
+
+    /**
+     * Whether a column is the row-selection checkbox column
+     */
+    ColumnVisibilityManager.prototype.isSelectionCheckboxColumn = function(column) {
+        if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.isSelectionCheckboxColumn === 'function') {
+            return AgGridHelper.isSelectionCheckboxColumn(column);
+        }
+        return false;
+    };
+
+    /**
+     * Keep selection checkbox column(s) at the beginning when columns are pinned
+     */
+    ColumnVisibilityManager.prototype.ensureSelectionColumnFirst = function() {
+        if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.ensureSelectionColumnFirst === 'function') {
+            const apiToUse = this.getApiToUse();
+            let gridDiv = null;
+            if (apiToUse && apiToUse.getGridElement && typeof apiToUse.getGridElement === 'function') {
+                gridDiv = apiToUse.getGridElement();
+            } else if (apiToUse && apiToUse.eGridDiv) {
+                gridDiv = apiToUse.eGridDiv;
+            }
+            AgGridHelper.ensureSelectionColumnFirst(apiToUse, gridDiv);
+        }
+    };
+
+    /**
+     * Preferred pin side for a column (colDef default or manager option)
+     */
+    ColumnVisibilityManager.prototype.getPreferredPinSide = function(colDef) {
+        if (colDef && colDef.pinned === 'right') {
+            return 'right';
+        }
+        if (this.options.defaultPinSide === 'right') {
+            return 'right';
+        }
+        return 'left';
+    };
+
+    /**
+     * Pin or unpin a column
+     * @param {string} field - Column field / colId
+     * @param {string|null} pinned - 'left', 'right', or null to unpin
+     */
+    ColumnVisibilityManager.prototype.setColumnPinned = function(field, pinned) {
+        const apiToUse = this.getApiToUse();
+        const column = apiToUse.getColumn ? apiToUse.getColumn(field) : null;
+        if (column && this.isSelectionCheckboxColumn(column)) {
+            return;
+        }
+
+        this._pinChangeInProgress = true;
+        const normalizedPin = this.updateStoredColumnPin(field, pinned);
+        const self = this;
+        let finalized = false;
+
+        function finishPinChange() {
+            if (finalized) {
+                return;
+            }
+            finalized = true;
+            if (self.gridApi && self._columnPinnedHandler) {
+                self.gridApi.removeEventListener('columnPinned', self._columnPinnedHandler);
+                self._columnPinnedHandler = null;
+            }
+            self.finalizeColumnPinChange();
+        }
+
+        if (this.gridApi && typeof this.gridApi.addEventListener === 'function') {
+            this._columnPinnedHandler = finishPinChange;
+            this.gridApi.addEventListener('columnPinned', this._columnPinnedHandler);
+        }
+
+        try {
+            if (apiToUse.applyColumnState && typeof apiToUse.applyColumnState === 'function') {
+                apiToUse.applyColumnState({
+                    state: [{ colId: field, pinned: normalizedPin }],
+                    applyOrder: false
+                });
+            }
+        } catch (e) {
+            console.warn('ColumnVisibilityManager: setColumnPinned failed', e);
+            self._pinChangeInProgress = false;
+            finishPinChange();
+            return;
+        }
+
+        window.setTimeout(finishPinChange, 150);
+    };
+
+    /**
+     * Toggle column pinned state
+     */
+    ColumnVisibilityManager.prototype.toggleColumnPinned = function(field) {
+        const apiToUse = this.getApiToUse();
+        const column = apiToUse.getColumn ? apiToUse.getColumn(field) : null;
+        if (!column) {
+            return;
+        }
+
+        if (this.isSelectionCheckboxColumn(column)) {
+            return;
+        }
+
+        const colDef = column.getColDef();
+        if (colDef.lockPinned) {
+            return;
+        }
+
+        const currentPinned = column.getPinned ? column.getPinned() : null;
+        const isPinned = !!(currentPinned && currentPinned !== false);
+        const newPinned = isPinned ? null : this.getPreferredPinSide(colDef);
+        this.setColumnPinned(field, newPinned);
     };
 
     /**
@@ -497,9 +778,11 @@
                 if (!colDef.lockVisible) {
                     // Check if column has hide property in colDef (default visibility)
                     const shouldBeVisible = colDef.hide !== true;
+                    const defaultPinned = this.normalizePinnedValue(colDef.pinned);
                     columnState.push({
                         colId: field,
-                        hide: !shouldBeVisible
+                        hide: !shouldBeVisible,
+                        pinned: defaultPinned
                     });
                 }
             });
@@ -905,10 +1188,7 @@
     ColumnVisibilityManager.prototype.updatePanel = function() {
         if (!this.listElement) return;
 
-        // Handle both Grid API and createGrid API
-        const apiToUse = (this.gridApi.api && typeof this.gridApi.api.getColumns === 'function')
-            ? this.gridApi.api
-            : this.gridApi;
+        const apiToUse = this.getApiToUse();
 
         const allColumns = apiToUse.getColumns ? apiToUse.getColumns() : null;
         if (!allColumns) return;
@@ -923,6 +1203,12 @@
             const headerName = colDef.headerName || field;
             const isVisible = column.isVisible();
             const isLocked = colDef.lockVisible || false;
+            const isSelectionCol = this.isSelectionCheckboxColumn(column);
+            const isPinned = (function() {
+                const pinned = column.getPinned ? column.getPinned() : null;
+                return !!(pinned && pinned !== false);
+            })();
+            const isPinLocked = colDef.lockPinned || isSelectionCol;
 
             // Filter by search term
             if (searchTerm && !headerName.toLowerCase().includes(searchTerm) && !field.toLowerCase().includes(searchTerm)) {
@@ -962,6 +1248,32 @@
 
             item.appendChild(checkbox);
             item.appendChild(label);
+
+            if (this.options.enablePin && !isSelectionCol) {
+                const pinBtn = document.createElement('button');
+                pinBtn.type = 'button';
+                pinBtn.className = 'ag-column-visibility-pin-btn' +
+                    (isPinned ? ' ag-column-visibility-pin-btn--active' : '') +
+                    (isPinLocked ? ' ag-column-visibility-pin-btn--locked' : '');
+                pinBtn.innerHTML = '<i class="fas fa-thumbtack" aria-hidden="true"></i>';
+                pinBtn.title = isPinLocked
+                    ? getTranslation('columnCannotBeUnpinned', 'This column cannot be unpinned')
+                    : (isPinned
+                        ? getTranslation('unpinColumn', 'Unpin column')
+                        : getTranslation('pinColumn', 'Pin column'));
+                pinBtn.disabled = isPinLocked;
+                pinBtn.setAttribute('aria-label', pinBtn.title);
+                pinBtn.setAttribute('aria-pressed', isPinned ? 'true' : 'false');
+                pinBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!isPinLocked) {
+                        this.toggleColumnPinned(field);
+                    }
+                }.bind(this));
+                item.appendChild(pinBtn);
+            }
+
             this.listElement.appendChild(item);
         }.bind(this));
 
@@ -991,6 +1303,10 @@
      * Destroy manager and cleanup
      */
     ColumnVisibilityManager.prototype.destroy = function() {
+        if (this.gridApi && this._columnPinnedHandler) {
+            this.gridApi.removeEventListener('columnPinned', this._columnPinnedHandler);
+            this._columnPinnedHandler = null;
+        }
         if (this.backdrop && this.backdrop.parentElement) {
             this.backdrop.parentElement.removeChild(this.backdrop);
         }

@@ -663,7 +663,7 @@
                 key = window.getApiManagementApiKey();
             } else {
                 try {
-                    key = String(localStorage.getItem('hum_databank_api_management_api_key') || localStorage.getItem('ifrc_api_management_api_key') || '').trim();
+                    key = String(sessionStorage.getItem('hum_databank_api_management_api_key') || localStorage.getItem('ifrc_api_management_api_key') || '').trim();
                 } catch (e) {}
             }
             if (key) {

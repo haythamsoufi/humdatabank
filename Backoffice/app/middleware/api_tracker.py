@@ -101,18 +101,6 @@ def track_api_response(response):
                         for k, v in raw_data.items()
                     }
 
-                usage = APIUsage(
-                    api_endpoint=request.path,
-                    ip_address=request.remote_addr,
-                    method=request.method,
-                    status_code=response.status_code,
-                    response_time=response_time,
-                    user_agent=request.user_agent.string if request.user_agent else None,
-                    request_data=raw_data
-                )
-
-                temp_db.add(usage)
-
                 # Also track API key usage if a database-managed key was used
                 api_key_id = getattr(g, 'api_key_usage_id', None)
                 client_name = getattr(g, 'api_key_usage_client_name', None)
@@ -124,6 +112,20 @@ def track_api_response(response):
                         insp = sa_inspect(api_key_record)
                         if insp.identity:
                             api_key_id = insp.identity[0]
+
+                usage = APIUsage(
+                    api_endpoint=request.path,
+                    ip_address=request.remote_addr,
+                    method=request.method,
+                    status_code=response.status_code,
+                    response_time=response_time,
+                    user_agent=request.user_agent.string if request.user_agent else None,
+                    request_data=raw_data,
+                    api_key_id=api_key_id,
+                )
+
+                temp_db.add(usage)
+
                 if api_key_id is not None:
                     from app.models.api_key_management import APIKeyUsage
 

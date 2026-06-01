@@ -173,12 +173,12 @@
         'actions'
     ];
 
-    function applySessionLogsColumnOrder(api) {
+    function applySessionLogsColumnOrder(api, visibilityManager) {
         if (!api || typeof AgGridHelper === 'undefined' || typeof AgGridHelper.pinActionsColumn !== 'function') {
             return;
         }
         try {
-            AgGridHelper.pinActionsColumn(api, SESSION_LOGS_COLUMN_ORDER);
+            AgGridHelper.pinActionsColumn(api, SESSION_LOGS_COLUMN_ORDER, visibilityManager);
         } catch (e) {
             if (window.__clientWarn) window.__clientWarn('session logs column order', e);
         }
@@ -639,7 +639,7 @@
                             console.error('Session logs grid async init failed', e2);
                         }
                     }
-                    applySessionLogsColumnOrder(state.gridApi);
+                    applySessionLogsColumnOrder(state.gridApi, state.gridHelper && state.gridHelper.columnVisibilityManager);
                 }
 
                 updatePaginationUi(state);

@@ -25,12 +25,19 @@ logger = logging.getLogger(__name__)
 
 
 def _text_for_indicator(ind: IndicatorBank) -> str:
-    """Build searchable text for one indicator (name + definition + unit)."""
+    """Build searchable text for one indicator (name + definition + unit + monitoring questions)."""
     parts = [ind.name or ""]
     if getattr(ind, "definition", None) and str(ind.definition).strip():
         parts.append(str(ind.definition).strip())
     if getattr(ind, "unit", None) and str(ind.unit).strip():
         parts.append(f"Unit: {ind.unit}".strip())
+    try:
+        for q in ind.monitoring_questions_list or []:
+            qtext = str(q or "").strip()
+            if qtext:
+                parts.append(qtext)
+    except Exception:
+        pass
     return " ".join(parts).strip() or ind.name or ""
 
 

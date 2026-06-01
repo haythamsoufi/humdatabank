@@ -1526,10 +1526,13 @@ class HumDatabankChatbot {
                 return;
             }
 
-            // "Show me" onboarding links (styled like buttons)
+            // "Show me" onboarding links — indicator view/edit open in a new tab (target=_blank)
             const showMeLink = e.target.closest('a.chatbot-show-me');
             if (showMeLink) {
-                const href = showMeLink.getAttribute('href') || '';
+                const href = (showMeLink.getAttribute('href') || '').split('#')[0];
+                if (/^\/admin\/indicator_bank\/(?:view|edit)\/\d+/.test(href)) {
+                    return;
+                }
                 if (!href) return;
                 e.preventDefault();
                 const tourMatch = href.match(/chatbot-tour=([a-zA-Z0-9-]+)/);
@@ -2498,6 +2501,7 @@ class HumDatabankChatbot {
                         }
                     }
                     this._formatChatResponseSources(ctx.contentElement);
+                    this._enhanceIndicatorActionLinks(ctx.contentElement);
                     this._addTableCopyButtons(ctx.contentElement);
                     this._collapseLongTables(ctx.contentElement);
 
@@ -5085,6 +5089,7 @@ class HumDatabankChatbot {
                 }
             }
             this._formatChatResponseSources(content);
+            this._enhanceIndicatorActionLinks(content);
             this._addTableCopyButtons(content);
             this._collapseLongTables(content);
             this._tableDebugLog('Rendered assistant message tables:', {
@@ -5702,6 +5707,7 @@ class HumDatabankChatbot {
                 }
             }
         }
+        this._enhanceIndicatorActionLinks(tempDiv);
         const finalHtml = tempDiv.innerHTML;
         const tableCount = (finalHtml.match(/<table\b/gi) || []).length;
         this._tableDebugLog('sanitizeHtml result:', {
@@ -6082,6 +6088,25 @@ class HumDatabankChatbot {
                 bodyEl.appendChild(expandRow);
             }
         });
+    }
+
+    _enhanceIndicatorActionLinks(root) {
+        /** Promote indicator view/edit links to styled CTA buttons (new tab). */
+        try {
+            if (!root || typeof root.querySelectorAll !== 'function') return;
+            const re = /^\/admin\/indicator_bank\/(?:view|edit)\/\d+/;
+            root.querySelectorAll('a[href]').forEach((link) => {
+                if (link.closest('.chat-response-sources')) return;
+                const rawHref = link.getAttribute('href') || '';
+                const safe = this._safeSameOriginUrl(rawHref.split('#')[0]);
+                if (!safe || !re.test(safe)) return;
+                link.classList.add('chatbot-show-me');
+                link.classList.remove('underline', 'text-blue-600', 'hover:text-blue-800');
+                link.setAttribute('href', safe);
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener');
+            });
+        } catch (_) { /* never break rendering */ }
     }
 
     _augmentOnboardingActions(root) {

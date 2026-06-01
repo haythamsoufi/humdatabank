@@ -335,9 +335,8 @@ def get_api_paths():
             "get": {
                 "tags": ["Indicators"],
                 "summary": "Get indicator bank",
-                "description": "Retrieve all indicators from the indicator bank with optional filtering.",
+                "description": "Retrieve all indicators from the indicator bank with optional filtering. Public — no API key required.",
                 "operationId": "getIndicatorBank",
-                "security": [{"BearerAuth": []}],
                 "parameters": [
                     {
                         "name": "search",
@@ -400,8 +399,7 @@ def get_api_paths():
                                 }
                             }
                         }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                    }
                 }
             }
         },
@@ -409,9 +407,8 @@ def get_api_paths():
             "get": {
                 "tags": ["Indicators"],
                 "summary": "Get indicator by ID",
-                "description": "Retrieve a specific indicator by its ID.",
+                "description": "Retrieve a specific indicator by its ID. Public — no API key required.",
                 "operationId": "getIndicatorById",
-                "security": [{"BearerAuth": []}],
                 "parameters": [
                     {
                         "name": "indicator_id",
@@ -436,8 +433,7 @@ def get_api_paths():
                             }
                         }
                     },
-                    "404": {"$ref": "#/components/responses/NotFound"},
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                    "404": {"$ref": "#/components/responses/NotFound"}
                 }
             }
         },

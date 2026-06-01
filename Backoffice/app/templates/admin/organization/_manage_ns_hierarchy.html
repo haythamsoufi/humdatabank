@@ -666,18 +666,9 @@
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const desiredOrder = ['country_name', 'code', 'name', 'city', 'is_active', 'established_date', 'display_order', 'actions'];
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, branchesGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for branches:', e);
@@ -723,18 +714,9 @@
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const desiredOrder = ['country_name', 'code', 'name', 'branch_name', 'city', 'is_active', 'established_date', 'display_order', 'actions'];
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, subbranchesGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for subbranches:', e);
@@ -780,18 +762,9 @@
 
         // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
         try {
-            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const desiredOrder = ['country_name', 'code', 'name', 'branch_name', 'subbranch_name', 'city', 'is_active', 'established_date', 'display_order', 'actions'];
-                const state = desiredOrder.map((colId) => ({
-                    colId,
-                    pinned: colId === 'actions' ? 'right' : null
-                }));
-
-                gridApi.applyColumnState({
-                    state,
-                    defaultState: { pinned: null },
-                    applyOrder: true
-                });
+                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, localunitsGridHelper.columnVisibilityManager);
             }
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not apply column order for localunits:', e);

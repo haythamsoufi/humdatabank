@@ -175,16 +175,6 @@
     /* Path/description clipping + stacking: rules live in the page extra_js block, right after ag_grid_js(), so they load after AG Grid CSS. */
 </style>
 
-{# Helper function to generate API URLs (do not embed secrets in HTML) #}
-{% macro api_url(path) %}
-    {% set api_key_placeholder = 'YOUR_API_KEY' %}
-    {% if '?' in path %}
-        {{ path }}&api_key={{ api_key_placeholder }}
-    {% else %}
-        {{ path }}?api_key={{ api_key_placeholder }}
-    {% endif %}
-{% endmacro %}
-
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
@@ -238,7 +228,7 @@
                 <i class="fas fa-chart-line text-blue-500"></i>
             </div>
             <p class="text-2xl font-bold text-blue-600 tabular-nums">{{ "{:,}".format((total_requests|default(0))|int) }}</p>
-            <p class="text-xs text-gray-500 mt-1">{{ _('All /api traffic in usage log') }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Logged /api traffic (APIUsage); per-key rows also in API Key Management') }}</p>
         </div>
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
             <div class="flex items-center justify-between mb-2">
@@ -648,16 +638,21 @@
             </div>
         </div>
 
-        <!-- API key input (client-side only; not stored server-side). Wrapped in <form> so Chromium does not warn about a lone password field. -->
+        <!-- API key input (client-side only; sessionStorage, cleared when the tab closes). -->
         <form class="mt-4 mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4" onsubmit="return false;" autocomplete="off" aria-label="{{ _('API key for URL builder') }}">
-            <label for="apiKeyInput" class="block text-sm font-medium text-blue-900 mb-2">
-                <i class="fas fa-key mr-1"></i>{{ _('API Key') }}
-            </label>
+            <div class="flex flex-wrap items-end justify-between gap-3 mb-2">
+                <label for="apiKeyInput" class="block text-sm font-medium text-blue-900">
+                    <i class="fas fa-key mr-1"></i>{{ _('API Key') }}
+                </label>
+                <button type="button" id="clearApiKeyBtn" class="btn btn-secondary btn-sm whitespace-nowrap">
+                    {{ _('Clear stored key') }}
+                </button>
+            </div>
             <input id="apiKeyInput" name="api_key" type="password" autocomplete="off"
                    placeholder="{{ _('Paste an API key created in API Key Management') }}"
                    class="w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono text-sm bg-white">
             <p class="mt-2 text-xs text-blue-800">
-                {{ _('This key is kept only in your browser (local storage) to help build URLs. It is not rendered by the server.') }}
+                {{ _('This key is kept only in your browser session (session storage) to help build URLs. It is not rendered by the server.') }}
             </p>
         </form>
         <div class="space-y-6">
@@ -1060,13 +1055,13 @@ try {
                 {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
                 {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'}
             ],
-            '/api/v1/submissions/{submission_id}': [
+            '/api/v1/submissions/<submission_id>': [
                 {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
             ],
-            '/api/v1/templates/{template_id}/data': [
+            '/api/v1/templates/<template_id>/data': [
                 {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
             ],
-            '/api/v1/countries/{country_id}/data': [
+            '/api/v1/countries/<country_id>/data': [
                 {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
             ],
             '/api/v1/countrymap': [
@@ -1089,7 +1084,7 @@ try {
                 {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'},
                 {name: 'search', type: 'text', placeholder: '{{ _("Search term") }}', description: '{{ _("Search by name or email") }}'}
             ],
-            '/api/v1/users/{user_id}': [
+            '/api/v1/users/<user_id>': [
                 {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
             ],
             '/api/v1/indicator-bank': [
@@ -1100,9 +1095,7 @@ try {
                 {name: 'emergency', type: 'text', placeholder: '{{ _("Emergency type") }}', description: '{{ _("Filter by emergency type") }}'},
                 {name: 'archived', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Filter by archived status") }}'}
             ],
-            '/api/v1/indicator-bank/{indicator_id}': [
-                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
-            ],
+            '/api/v1/indicator-bank/<indicator_id>': [],
             '/api/v1/assigned-forms': [
                 {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
                 {name: 'period_name', type: 'text', placeholder: '{{ _("Period Name") }}', description: '{{ _("Filter by period name") }}'},
@@ -1128,6 +1121,10 @@ try {
 
         let currentParamDefinitions = [];
 
+        function endpointMapKey(path) {
+            return String(path || '').replace(/<[^>]+>/g, '').replace(/\{[^}]+\}/g, '');
+        }
+
         // Build query parameter inputs dynamically
         function createQueryParamInputs() {
             const queryParamsContainer = document.getElementById('queryParams');
@@ -1136,7 +1133,7 @@ try {
             queryParamsContainer.innerHTML = '';
 
             const selectedEndpoint = document.getElementById('baseEndpoint').value;
-            const endpointKey = selectedEndpoint.replace(/\{[^}]+\}/g, '');
+            const endpointKey = endpointMapKey(selectedEndpoint);
 
             currentParamDefinitions = endpointParamMap[endpointKey] || defaultParams;
 
@@ -1219,23 +1216,53 @@ try {
             updateGeneratedUrl();
         }
 
-        // Load API key from local storage (client-side only)
+        // Load API key from session storage (client-side only; tab-scoped)
         const apiKeyInput = document.getElementById('apiKeyInput');
+        const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
         const API_KEY_STORAGE = 'hum_databank_api_management_api_key';
         const LEGACY_API_KEY_STORAGE = 'ifrc_api_management_api_key';
-        if (apiKeyInput) {
+        const apiKeyStore = window.sessionStorage;
+
+        function readStoredApiKey() {
             try {
-                let stored = localStorage.getItem(API_KEY_STORAGE);
+                let stored = apiKeyStore.getItem(API_KEY_STORAGE);
                 if (!stored) {
                     stored = localStorage.getItem(LEGACY_API_KEY_STORAGE) || '';
-                    if (stored) localStorage.setItem(API_KEY_STORAGE, stored);
+                    if (stored) {
+                        apiKeyStore.setItem(API_KEY_STORAGE, stored);
+                        localStorage.removeItem(LEGACY_API_KEY_STORAGE);
+                    }
                 }
-                apiKeyInput.value = stored || '';
+                return stored || '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function persistApiKey(value) {
+            try {
+                if (value) {
+                    apiKeyStore.setItem(API_KEY_STORAGE, value);
+                } else {
+                    apiKeyStore.removeItem(API_KEY_STORAGE);
+                }
             } catch (e) {}
+        }
+
+        if (apiKeyInput) {
+            apiKeyInput.value = readStoredApiKey();
             apiKeyInput.addEventListener('input', function() {
-                try {
-                    localStorage.setItem(API_KEY_STORAGE, this.value || '');
-                } catch (e) {}
+                persistApiKey(this.value || '');
+                updateGeneratedUrl();
+                updateEndpointLinks();
+            });
+        }
+
+        if (clearApiKeyBtn && apiKeyInput) {
+            clearApiKeyBtn.addEventListener('click', function() {
+                apiKeyInput.value = '';
+                persistApiKey('');
+                try { localStorage.removeItem(LEGACY_API_KEY_STORAGE); } catch (e) {}
                 updateGeneratedUrl();
                 updateEndpointLinks();
             });
@@ -1300,20 +1327,33 @@ try {
         updateEndpointLinks();
 
         // Copy URL functionality
-        document.getElementById('copyUrl').addEventListener('click', function() {
+        document.getElementById('copyUrl').addEventListener('click', async function() {
             const urlInput = document.getElementById('generatedUrl');
+            const url = urlInput.value;
+            const btn = this;
+            const originalText = btn.textContent;
+
+            async function showCopied() {
+                btn.textContent = '{{ _("Copied!") }}';
+                btn.classList.add('bg-green-500');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('bg-green-500');
+                }, 2000);
+            }
+
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(url);
+                    await showCopied();
+                    return;
+                }
+            } catch (e) {}
+
             urlInput.select();
-            document.execCommand('copy');
-
-            // Show feedback
-            const originalText = this.textContent;
-            this.textContent = '{{ _("Copied!") }}';
-            this.classList.add('bg-green-500');
-
-            setTimeout(() => {
-                this.textContent = originalText;
-                this.classList.remove('bg-green-500');
-            }, 2000);
+            if (document.execCommand('copy')) {
+                await showCopied();
+            }
         });
 
         // Documentation modal functionality

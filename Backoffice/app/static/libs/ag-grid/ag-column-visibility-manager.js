@@ -395,7 +395,7 @@
                     sort: column.getSort(),
                     sortIndex: column.getSortIndex()
                 };
-            });
+            }.bind(this));
 
             this.columnState = state;
             localStorage.setItem(this.getStorageKey(), JSON.stringify(state));
@@ -785,7 +785,7 @@
                         pinned: defaultPinned
                     });
                 }
-            });
+            }.bind(this));
 
             // Apply the column state using applyColumnState (most reliable method)
             if (columnState.length > 0 && apiToUse.applyColumnState && typeof apiToUse.applyColumnState === 'function') {

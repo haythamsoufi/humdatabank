@@ -141,12 +141,11 @@ def sectors_subsectors():
 @mobile_rate_limit(requests_per_minute=60)
 def public_indicator_bank():
     """Public indicator bank listing (mirrors /api/v1/indicator-bank)."""
-    from flask_babel import force_locale
-
     from app.models import IndicatorBank, Sector, SubSector
     from app.routes.api.indicators import (
-        _build_sector_subsector_names,
-        _get_localized_type_unit,
+        _get_supported_language_codes,
+        _load_measurement_lookup_maps,
+        _serialize_indicator_bank_record,
     )
 
     # Allow full-catalog loads (hundreds of indicators); cap protects against abuse.
@@ -162,11 +161,7 @@ def public_indicator_bank():
     archived_param = request.args.get('archived', default=None)
     sector_id_param = request.args.get('sector_id', type=int)
 
-    requested_locale = request.args.get('locale', default='', type=str).strip().lower()
-    if requested_locale:
-        with suppress(Exception):
-            with force_locale(requested_locale):
-                pass
+    supported_langs = _get_supported_language_codes()
 
     query = IndicatorBank.query
 
@@ -260,56 +255,21 @@ def public_indicator_bank():
         subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
         subsectors_dict = {s.id: s.name for s in subsectors}
 
-    items = []
-    for indicator in indicators:
-        localized_type, localized_unit = _get_localized_type_unit(
-            indicator, requested_locale
+    types_by_id, types_by_code, units_by_id, units_by_code = _load_measurement_lookup_maps(indicators)
+
+    items = [
+        _serialize_indicator_bank_record(
+            indicator,
+            sectors_dict=sectors_dict,
+            subsectors_dict=subsectors_dict,
+            types_by_id=types_by_id,
+            types_by_code=types_by_code,
+            units_by_id=units_by_id,
+            units_by_code=units_by_code,
+            supported_langs=supported_langs,
         )
-        sector_sub = _build_sector_subsector_names(
-            indicator, sectors_dict, subsectors_dict
-        )
-        items.append({
-            'id': indicator.id,
-            'name': indicator.name,
-            'type': indicator.type,
-            'localized_type': localized_type,
-            'unit': indicator.unit,
-            'localized_unit': localized_unit,
-            'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
-            'definition': indicator.definition,
-            'aggregated_label': getattr(indicator, 'aggregated_label', None),
-            'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
-            'area': getattr(indicator, 'area', None),
-            'data_source': getattr(indicator, 'data_source', None),
-            'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
-            'monitoring_questions': indicator.monitoring_questions_list,
-            'tags': indicator.tags_list,
-            'name_translations': (
-                indicator.name_translations
-                if hasattr(indicator, 'name_translations')
-                else None
-            ),
-            'definition_translations': (
-                indicator.definition_translations
-                if hasattr(indicator, 'definition_translations')
-                else None
-            ),
-            'sector': sector_sub['sector'],
-            'sub_sector': sector_sub['sub_sector'],
-            'emergency': indicator.emergency,
-            'related_programs': indicator.related_programs_list,
-            'archived': indicator.archived,
-            'created_at': (
-                indicator.created_at.isoformat()
-                if hasattr(indicator, 'created_at') and indicator.created_at
-                else None
-            ),
-            'updated_at': (
-                indicator.updated_at.isoformat()
-                if hasattr(indicator, 'updated_at') and indicator.updated_at
-                else None
-            ),
-        })
+        for indicator in indicators
+    ]
 
     return mobile_paginated(
         items=items,
@@ -325,11 +285,10 @@ def public_indicator_detail(indicator_id):
     """Single indicator detail (public) — fully localized."""
     from app.models import IndicatorBank, Sector, SubSector
     from app.routes.api.indicators import (
-        _build_sector_subsector_names,
-        _get_localized_type_unit,
+        _get_supported_language_codes,
+        _load_measurement_lookup_maps,
+        _serialize_indicator_bank_record,
     )
-
-    requested_locale = request.args.get('locale', default='', type=str).strip().lower()
 
     indicator = IndicatorBank.query.get(indicator_id)
     if not indicator:
@@ -359,43 +318,20 @@ def public_indicator_detail(indicator_id):
         subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
         subsectors_dict = {s.id: s.name for s in subsectors}
 
-    localized_type, localized_unit = _get_localized_type_unit(indicator, requested_locale)
-    sector_sub = _build_sector_subsector_names(indicator, sectors_dict, subsectors_dict)
+    supported_langs = _get_supported_language_codes()
+    types_by_id, types_by_code, units_by_id, units_by_code = _load_measurement_lookup_maps([indicator])
+    indicator_data = _serialize_indicator_bank_record(
+        indicator,
+        sectors_dict=sectors_dict,
+        subsectors_dict=subsectors_dict,
+        types_by_id=types_by_id,
+        types_by_code=types_by_code,
+        units_by_id=units_by_id,
+        units_by_code=units_by_code,
+        supported_langs=supported_langs,
+    )
 
-    return mobile_ok(data={
-        'indicator': {
-            'id': indicator.id,
-            'name': indicator.name,
-            'definition': getattr(indicator, 'definition', None),
-            'type': indicator.type,
-            'localized_type': localized_type,
-            'unit': indicator.unit,
-            'localized_unit': localized_unit,
-            'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
-            'aggregated_label': getattr(indicator, 'aggregated_label', None),
-            'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
-            'area': getattr(indicator, 'area', None),
-            'data_source': getattr(indicator, 'data_source', None),
-            'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
-            'monitoring_questions': indicator.monitoring_questions_list,
-            'tags': indicator.tags_list,
-            'name_translations': (
-                indicator.name_translations
-                if hasattr(indicator, 'name_translations')
-                else None
-            ),
-            'definition_translations': (
-                indicator.definition_translations
-                if hasattr(indicator, 'definition_translations')
-                else None
-            ),
-            'sector': sector_sub['sector'],
-            'sub_sector': sector_sub['sub_sector'],
-            'emergency': getattr(indicator, 'emergency', False),
-            'related_programs': indicator.related_programs_list,
-            'archived': indicator.archived,
-        },
-    })
+    return mobile_ok(data={'indicator': indicator_data})
 
 
 @mobile_bp.route('/data/indicator-suggestions', methods=['POST'])

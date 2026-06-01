@@ -19,7 +19,14 @@ from datetime import datetime
 from app.routes.api import api_bp
 
 # Import models
-from app.models import IndicatorBank, IndicatorSuggestion, Sector, SubSector
+from app.models import (
+    IndicatorBank,
+    IndicatorBankType,
+    IndicatorBankUnit,
+    IndicatorSuggestion,
+    Sector,
+    SubSector,
+)
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
 from app import db
@@ -33,8 +40,126 @@ from app.services.authorization_service import AuthorizationService
 _SECTOR_LEVELS = ('primary', 'secondary', 'tertiary')
 
 
+def _normalize_type_code(value):
+    return (value or '').strip().lower()
+
+
+def _normalize_unit_code(value):
+    return ' '.join(str(value or '').strip().lower().split())
+
+
+def _get_supported_language_codes():
+    from config import Config
+
+    langs = current_app.config.get('SUPPORTED_LANGUAGES', Config.LANGUAGES) or ['en']
+    normalized = [
+        (code or '').split('_', 1)[0].split('-', 1)[0].strip().lower()
+        for code in langs
+    ]
+    return [code for code in normalized if code] or ['en']
+
+
+def _load_measurement_lookup_maps(indicators):
+    """Batch-load measurement type/unit lookup rows for indicator-bank serialization."""
+    type_ids = set()
+    type_codes = set()
+    unit_ids = set()
+    unit_codes = set()
+
+    for indicator in indicators:
+        if getattr(indicator, 'indicator_type_id', None):
+            type_ids.add(indicator.indicator_type_id)
+        if indicator.type:
+            type_codes.add(_normalize_type_code(indicator.type))
+        if getattr(indicator, 'indicator_unit_id', None):
+            unit_ids.add(indicator.indicator_unit_id)
+        if indicator.unit:
+            unit_codes.add(_normalize_unit_code(indicator.unit))
+
+    types_by_id = {}
+    types_by_code = {}
+    if type_ids:
+        for row in IndicatorBankType.query.filter(IndicatorBankType.id.in_(type_ids)).all():
+            types_by_id[row.id] = row
+            types_by_code[_normalize_type_code(row.code)] = row
+    remaining_type_codes = type_codes - set(types_by_code.keys())
+    if remaining_type_codes:
+        for row in IndicatorBankType.query.filter(
+            db.func.lower(IndicatorBankType.code).in_(remaining_type_codes)
+        ).all():
+            types_by_code[_normalize_type_code(row.code)] = row
+
+    units_by_id = {}
+    units_by_code = {}
+    if unit_ids:
+        for row in IndicatorBankUnit.query.filter(IndicatorBankUnit.id.in_(unit_ids)).all():
+            units_by_id[row.id] = row
+            units_by_code[_normalize_unit_code(row.code)] = row
+    remaining_unit_codes = unit_codes - set(units_by_code.keys())
+    if remaining_unit_codes:
+        for row in IndicatorBankUnit.query.filter(
+            db.func.lower(IndicatorBankUnit.code).in_(remaining_unit_codes)
+        ).all():
+            units_by_code[_normalize_unit_code(row.code)] = row
+        still_missing = remaining_unit_codes - set(units_by_code.keys())
+        if still_missing:
+            for row in IndicatorBankUnit.query.filter(
+                db.func.lower(IndicatorBankUnit.name).in_(still_missing)
+            ).all():
+                units_by_code[_normalize_unit_code(row.name)] = row
+
+    return types_by_id, types_by_code, units_by_id, units_by_code
+
+
+def _resolve_measurement_type_row(indicator, types_by_id, types_by_code):
+    type_id = getattr(indicator, 'indicator_type_id', None)
+    if type_id and type_id in types_by_id:
+        return types_by_id[type_id]
+    if indicator.type:
+        return types_by_code.get(_normalize_type_code(indicator.type))
+    return None
+
+
+def _resolve_measurement_unit_row(indicator, units_by_id, units_by_code):
+    unit_id = getattr(indicator, 'indicator_unit_id', None)
+    if unit_id and unit_id in units_by_id:
+        return units_by_id[unit_id]
+    if indicator.unit:
+        return units_by_code.get(_normalize_unit_code(indicator.unit))
+    return None
+
+
+def _build_measurement_label_translations(row, code_value, localize_fn, supported_langs):
+    """Build {lang: label} for a measurement type/unit, mirroring *_translations fields."""
+    if row and row.is_active:
+        return {
+            lang: row.get_name_translation(lang) or None
+            for lang in supported_langs
+        }
+
+    if not code_value:
+        return {lang: None for lang in supported_langs}
+
+    translations = {}
+    from flask_babel import force_locale
+
+    for lang in supported_langs:
+        try:
+            with force_locale(lang):
+                translations[lang] = localize_fn(code_value) or code_value
+        except Exception as exc:
+            current_app.logger.debug(
+                "force_locale for measurement label %s (%s) failed: %s",
+                code_value,
+                lang,
+                exc,
+            )
+            translations[lang] = code_value
+    return translations
+
+
 def _get_localized_type_unit(indicator, requested_locale):
-    """Return (localized_type, localized_unit) for an indicator, optionally under requested_locale."""
+    """Return (localized_type, localized_unit) for legacy locale-scoped consumers."""
     localized_type = None
     localized_unit = None
     if indicator.type:
@@ -68,6 +193,52 @@ def _build_sector_subsector_names(indicator, sectors_dict, subsectors_dict):
     return {'sector': sector_names, 'sub_sector': subsector_names}
 
 
+def _serialize_indicator_bank_record(
+    indicator,
+    *,
+    sectors_dict,
+    subsectors_dict,
+    types_by_id,
+    types_by_code,
+    units_by_id,
+    units_by_code,
+    supported_langs,
+):
+    type_row = _resolve_measurement_type_row(indicator, types_by_id, types_by_code)
+    unit_row = _resolve_measurement_unit_row(indicator, units_by_id, units_by_code)
+    sector_sub = _build_sector_subsector_names(indicator, sectors_dict, subsectors_dict)
+    return {
+        'id': indicator.id,
+        'name': indicator.name,
+        'type': indicator.type,
+        'type_translations': _build_measurement_label_translations(
+            type_row, indicator.type, get_localized_indicator_type, supported_langs
+        ),
+        'unit': indicator.unit,
+        'unit_translations': _build_measurement_label_translations(
+            unit_row, indicator.unit, get_localized_indicator_unit, supported_langs
+        ),
+        'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
+        'definition': indicator.definition,
+        'aggregated_label': getattr(indicator, 'aggregated_label', None),
+        'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
+        'area': getattr(indicator, 'area', None),
+        'data_source': getattr(indicator, 'data_source', None),
+        'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
+        'monitoring_questions': indicator.monitoring_questions_list,
+        'tags': indicator.tags_list,
+        'name_translations': indicator.name_translations if hasattr(indicator, 'name_translations') else None,
+        'definition_translations': indicator.definition_translations if hasattr(indicator, 'definition_translations') else None,
+        'sector': sector_sub['sector'],
+        'sub_sector': sector_sub['sub_sector'],
+        'emergency': indicator.emergency,
+        'related_programs': indicator.related_programs_list,
+        'archived': indicator.archived,
+        'created_at': indicator.created_at.isoformat() if hasattr(indicator, 'created_at') and indicator.created_at else None,
+        'updated_at': indicator.updated_at.isoformat() if hasattr(indicator, 'updated_at') and indicator.updated_at else None,
+    }
+
+
 @api_bp.route('/indicator-bank', methods=['GET'])
 @api_rate_limit()
 def get_indicator_bank():
@@ -81,22 +252,13 @@ def get_indicator_bank():
         - sub_sector: Filter by sub-sector
         - emergency: Filter by emergency type
         - archived: Filter by archived status (true=only archived, false=only non-archived, omit=all indicators)
-        - locale: Optional locale code for localized type and unit (e.g., 'en', 'fr', 'es', 'ar', 'zh', 'ru', 'hi')
     Returns:
         JSON object containing:
         - indicators: List of all indicator bank objects
     """
     try:
         current_app.logger.debug("Entering indicator bank API endpoint")
-
-        # Get locale for localization (default to 'en')
-        requested_locale = request.args.get('locale', default='', type=str).strip().lower()
-        if requested_locale:
-            from flask_babel import force_locale
-            # Set locale context if requested
-            with suppress(Exception):  # Fallback to default locale
-                with force_locale(requested_locale):
-                    pass  # Locale will be set in context
+        supported_langs = _get_supported_language_codes()
 
         # Get filter parameters
         search_query = request.args.get('search', default='', type=str).strip()
@@ -190,36 +352,21 @@ def get_indicator_bank():
             subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
             subsectors_dict = {subsector.id: subsector.name for subsector in subsectors}
 
-        indicators_data = []
-        for indicator in indicators:
-            localized_type, localized_unit = _get_localized_type_unit(indicator, requested_locale)
-            sector_sub = _build_sector_subsector_names(indicator, sectors_dict, subsectors_dict)
-            indicators_data.append({
-                'id': indicator.id,
-                'name': indicator.name,
-                'type': indicator.type,
-                'localized_type': localized_type,
-                'unit': indicator.unit,
-                'localized_unit': localized_unit,
-                'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
-                'definition': indicator.definition,
-                'aggregated_label': getattr(indicator, 'aggregated_label', None),
-                'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
-                'area': getattr(indicator, 'area', None),
-                'data_source': getattr(indicator, 'data_source', None),
-                'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
-                'monitoring_questions': indicator.monitoring_questions_list,
-                'tags': indicator.tags_list,
-                'name_translations': indicator.name_translations if hasattr(indicator, 'name_translations') else None,
-                'definition_translations': indicator.definition_translations if hasattr(indicator, 'definition_translations') else None,
-                'sector': sector_sub['sector'],
-                'sub_sector': sector_sub['sub_sector'],
-                'emergency': indicator.emergency,
-                'related_programs': indicator.related_programs_list,
-                'archived': indicator.archived,
-                'created_at': indicator.created_at.isoformat() if hasattr(indicator, 'created_at') and indicator.created_at else None,
-                'updated_at': indicator.updated_at.isoformat() if hasattr(indicator, 'updated_at') and indicator.updated_at else None
-            })
+        types_by_id, types_by_code, units_by_id, units_by_code = _load_measurement_lookup_maps(indicators)
+
+        indicators_data = [
+            _serialize_indicator_bank_record(
+                indicator,
+                sectors_dict=sectors_dict,
+                subsectors_dict=subsectors_dict,
+                types_by_id=types_by_id,
+                types_by_code=types_by_code,
+                units_by_id=units_by_id,
+                units_by_code=units_by_code,
+                supported_langs=supported_langs,
+            )
+            for indicator in indicators
+        ]
 
         current_app.logger.debug(f"Indicator bank API returning {len(indicators_data)} items")
 
@@ -251,8 +398,7 @@ def get_indicator_bank_details(indicator_id):
         if not indicator:
             return api_error('Indicator not found', 404)
 
-        # Get locale for localization
-        requested_locale = request.args.get('locale', default='', type=str).strip().lower()
+        supported_langs = _get_supported_language_codes()
 
         # OPTIMIZATION: Pre-fetch sectors and subsectors for this indicator to avoid N+1 queries
         sector_ids = set()
@@ -281,34 +427,17 @@ def get_indicator_bank_details(indicator_id):
             subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
             subsectors_dict = {subsector.id: subsector.name for subsector in subsectors}
 
-        localized_type, localized_unit = _get_localized_type_unit(indicator, requested_locale)
-        sector_sub = _build_sector_subsector_names(indicator, sectors_dict, subsectors_dict)
-        indicator_data = {
-            'id': indicator.id,
-            'name': indicator.name,
-            'type': indicator.type,
-            'localized_type': localized_type,
-            'unit': indicator.unit,
-            'localized_unit': localized_unit,
-            'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
-            'definition': indicator.definition,
-            'aggregated_label': getattr(indicator, 'aggregated_label', None),
-            'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
-            'area': getattr(indicator, 'area', None),
-            'data_source': getattr(indicator, 'data_source', None),
-            'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
-            'monitoring_questions': indicator.monitoring_questions_list,
-            'tags': indicator.tags_list,
-            'name_translations': indicator.name_translations if hasattr(indicator, 'name_translations') else None,
-            'definition_translations': indicator.definition_translations if hasattr(indicator, 'definition_translations') else None,
-            'sector': sector_sub['sector'],
-            'sub_sector': sector_sub['sub_sector'],
-            'emergency': indicator.emergency,
-            'related_programs': indicator.related_programs_list,
-            'archived': indicator.archived,
-            'created_at': indicator.created_at.isoformat() if hasattr(indicator, 'created_at') and indicator.created_at else None,
-            'updated_at': indicator.updated_at.isoformat() if hasattr(indicator, 'updated_at') and indicator.updated_at else None
-        }
+        types_by_id, types_by_code, units_by_id, units_by_code = _load_measurement_lookup_maps([indicator])
+        indicator_data = _serialize_indicator_bank_record(
+            indicator,
+            sectors_dict=sectors_dict,
+            subsectors_dict=subsectors_dict,
+            types_by_id=types_by_id,
+            types_by_code=types_by_code,
+            units_by_id=units_by_id,
+            units_by_code=units_by_code,
+            supported_langs=supported_langs,
+        )
 
         return json_response(indicator_data)
 

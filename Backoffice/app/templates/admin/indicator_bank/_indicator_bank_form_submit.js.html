@@ -1,0 +1,89 @@
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    function initIndicatorBankFormWafSubmit(formId, submitBtnId) {
+        var form = document.getElementById(formId);
+        if (!form || form.dataset.wafSubmitInit === '1') {
+            return;
+        }
+        form.dataset.wafSubmitInit = '1';
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            if (form.dataset.saveInFlight === '1') {
+                return;
+            }
+            form.dataset.saveInFlight = '1';
+
+            var submitBtn = submitBtnId ? document.getElementById(submitBtnId) : form.querySelector('[type="submit"]');
+            var originalBtnHtml = null;
+            if (submitBtn) {
+                originalBtnHtml = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+            }
+
+            var restoreSubmitBtn = function() {
+                delete form.dataset.saveInFlight;
+                if (submitBtn && originalBtnHtml !== null) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHtml;
+                }
+            };
+
+            if (!window.formDataToJson) {
+                restoreSubmitBtn();
+                var helperMsg = {{ _('Unable to save: form helper is not available.')|tojson|safe }};
+                if (window.showAlert) {
+                    window.showAlert(helperMsg, 'error');
+                } else {
+                    console.error(helperMsg);
+                }
+                return;
+            }
+
+            var payloadObj = window.formDataToJson(form);
+            var csrfToken = payloadObj && payloadObj.csrf_token ? String(payloadObj.csrf_token) : '';
+            var payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
+            var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+
+            fetchFn(form.action, {
+                method: 'POST',
+                body: JSON.stringify({ payload: payloadB64 }),
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(function(resp) {
+                return resp.text().then(function(text) {
+                    if (!resp.ok) {
+                        throw new Error({{ _('Save failed')|tojson|safe }} + ' (' + resp.status + ')');
+                    }
+                    if (resp.redirected) {
+                        window.location.href = resp.url;
+                        return;
+                    }
+                    document.open();
+                    document.write(text);
+                    document.close();
+                });
+            })
+            .catch(function(err) {
+                restoreSubmitBtn();
+                var message = (err && err.message) ? err.message : {{ _('Failed to save indicator')|tojson|safe }};
+                if (window.showAlert) {
+                    window.showAlert(message, 'error');
+                } else {
+                    console.error(message);
+                }
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initIndicatorBankFormWafSubmit('edit-indicator-form', 'editIndicatorBankSubmitBtn');
+        initIndicatorBankFormWafSubmit('add-indicator-form', null);
+    });
+})();
+</script>

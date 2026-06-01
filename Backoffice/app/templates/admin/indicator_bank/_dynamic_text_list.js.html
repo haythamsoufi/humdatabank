@@ -1,0 +1,62 @@
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    if (window.__indicatorBankDynamicTextListInit) {
+        return;
+    }
+    window.__indicatorBankDynamicTextListInit = true;
+
+    function createDynamicTextListRow(container) {
+        const fieldName = container.dataset.fieldName;
+        const inputClass = container.dataset.inputClass;
+        const fieldRows = container.dataset.fieldRows || '2';
+        const removeLabel = container.dataset.removeLabel || 'Remove';
+
+        const row = document.createElement('div');
+        row.className = 'dynamic-text-list-row flex gap-2 items-start';
+
+        const textarea = document.createElement('textarea');
+        textarea.name = fieldName;
+        textarea.rows = parseInt(fieldRows, 10) || 2;
+        textarea.className = inputClass + ' resize-y';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'dynamic-text-list-remove flex-shrink-0 mt-2 inline-flex items-center px-2 py-1 text-sm text-red-600 hover:text-red-800';
+        removeBtn.title = removeLabel;
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+
+        row.appendChild(textarea);
+        row.appendChild(removeBtn);
+        return row;
+    }
+
+    document.addEventListener('click', function(event) {
+        const addBtn = event.target.closest('.dynamic-text-list-add');
+        if (addBtn) {
+            const container = addBtn.closest('.dynamic-text-list');
+            if (!container) {
+                return;
+            }
+            const itemsEl = container.querySelector('.dynamic-text-list-items');
+            if (!itemsEl) {
+                return;
+            }
+            const row = createDynamicTextListRow(container);
+            itemsEl.appendChild(row);
+            const textarea = row.querySelector('textarea');
+            if (textarea) {
+                textarea.focus();
+            }
+            return;
+        }
+
+        const removeBtn = event.target.closest('.dynamic-text-list-remove');
+        if (removeBtn) {
+            const row = removeBtn.closest('.dynamic-text-list-row');
+            if (row) {
+                row.remove();
+            }
+        }
+    });
+})();
+</script>

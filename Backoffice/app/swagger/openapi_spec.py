@@ -155,7 +155,15 @@ def get_openapi_spec():
                         "name": {"type": "string"},
                         "definition": {"type": "string"},
                         "type": {"type": "string"},
+                        "type_translations": {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"},
+                        },
                         "unit": {"type": "string"},
+                        "unit_translations": {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"},
+                        },
                         "sector": {"type": "object"},
                         "archived": {"type": "boolean"}
                     }
@@ -379,8 +387,7 @@ def get_api_paths():
                         "description": "Filter by archived status (true/false)",
                         "required": False,
                         "schema": {"type": "string", "enum": ["true", "false"]}
-                    },
-                    {"$ref": "#/components/parameters/LocaleParam"}
+                    }
                 ],
                 "responses": {
                     "200": {
@@ -415,8 +422,7 @@ def get_api_paths():
                         "in": "path",
                         "required": True,
                         "schema": {"type": "integer"}
-                    },
-                    {"$ref": "#/components/parameters/LocaleParam"}
+                    }
                 ],
                 "responses": {
                     "200": {

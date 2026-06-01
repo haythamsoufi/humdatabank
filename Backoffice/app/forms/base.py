@@ -265,7 +265,13 @@ class MultilingualFieldsMixin:
             # Fallback: keep at least an empty list to avoid NoneType iteration
             form_cls._unbound_fields = []
 
-    def add_multilingual_name_fields(self, base_field_name="name", max_length=100):
+    def add_multilingual_name_fields(
+        self,
+        base_field_name="name",
+        max_length=100,
+        use_textarea=False,
+        textarea_rows=3,
+    ):
         """Declare multilingual name fields on the class so WTForms binds them.
 
         Generates code-suffixed fields only (e.g., `_fr`, `_es`, `_ar`).
@@ -276,14 +282,18 @@ class MultilingualFieldsMixin:
             # Variant 1: code suffix (e.g., name_fr)
             field_name_code = f'{base_field_name}_{lang_code}'
             if not hasattr(self.__class__, field_name_code):
-                setattr(
-                    self.__class__,
-                    field_name_code,
-                    StringField(
+                if use_textarea:
+                    field_def = TextAreaField(
                         f"{base_field_name.title()} ({lang_name})",
-                        validators=[Optional(), Length(max=max_length)]
-                    ),
-                )
+                        validators=[Optional(), Length(max=max_length)],
+                        render_kw={"rows": textarea_rows},
+                    )
+                else:
+                    field_def = StringField(
+                        f"{base_field_name.title()} ({lang_name})",
+                        validators=[Optional(), Length(max=max_length)],
+                    )
+                setattr(self.__class__, field_name_code, field_def)
                 added_any = True
 
         # WTForms may set `_unbound_fields` to None when fields are added dynamically.

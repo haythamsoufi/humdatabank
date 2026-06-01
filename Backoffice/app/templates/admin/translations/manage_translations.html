@@ -590,6 +590,8 @@
     }{%- if not loop.last -%},{%- endif -%}
     {%- endfor -%}
 ]</script>
+<script id="languages-json" type="application/json">{{ languages | tojson | safe }}</script>
+<script id="language-names-json" type="application/json">{{ language_names | tojson | safe }}</script>
 <script id="all-language-names-json" type="application/json">{{ ALL_LANGUAGES_DISPLAY_NAMES | tojson | safe }}</script>
 
 <script nonce="{{ csp_nonce() }}">

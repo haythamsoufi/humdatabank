@@ -1,0 +1,31 @@
+{# Dynamic add/remove list of text areas. Only non-empty items are shown initially. #}
+{% set input_class = input_class|default("shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") %}
+{% set field_rows = field_rows|default(2) %}
+{% set visible_items = items | default([]) | map('trim') | reject('equalto', '') | list %}
+
+<div class="mb-4 dynamic-text-list"
+     data-field-name="{{ field_name }}"
+     data-input-class="{{ input_class }}"
+     data-field-rows="{{ field_rows }}"
+     data-add-label="{{ add_label }}"
+     data-remove-label="{{ _('Remove') }}">
+    {% if label %}
+    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ label }}</label>
+    {% endif %}
+    <div class="dynamic-text-list-items space-y-3">
+        {% for item in visible_items %}
+        <div class="dynamic-text-list-row flex gap-2 items-start">
+            <textarea name="{{ field_name }}" rows="{{ field_rows }}" class="{{ input_class }} resize-y">{{ item }}</textarea>
+            <button type="button"
+                    class="dynamic-text-list-remove flex-shrink-0 mt-2 inline-flex items-center px-2 py-1 text-sm text-red-600 hover:text-red-800"
+                    title="{{ _('Remove') }}">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    <button type="button"
+            class="dynamic-text-list-add mt-2 inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">
+        <i class="fas fa-plus mr-1"></i>{{ add_label }}
+    </button>
+</div>

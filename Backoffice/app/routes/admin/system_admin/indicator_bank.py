@@ -28,7 +28,7 @@ from app.models import (
 from sqlalchemy.orm import joinedload
 from app.forms.system import IndicatorBankForm, CommonWordForm
 from app.routes.admin.shared import permission_required
-from app.utils.request_utils import get_json_or_form, is_json_request
+from app.utils.request_utils import get_json_or_form, is_json_request, get_request_data
 from sqlalchemy import func, or_
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -40,6 +40,25 @@ import pandas as pd
 
 from app.routes.admin.system_admin import bp
 from app.routes.admin.system_admin.helpers import track_indicator_changes, indicator_bank_history_snapshot
+
+
+def _indicator_bank_dynamic_list_values():
+    """Read monitoring_questions / related_programs from POST (JSON or form)."""
+    if request.method != "POST":
+        return {"monitoring_questions": [], "related_programs": []}
+    data = get_request_data()
+    return {
+        "monitoring_questions": [
+            str(v).strip()
+            for v in data.getlist("monitoring_questions")
+            if v and str(v).strip()
+        ],
+        "related_programs": [
+            str(v).strip()
+            for v in data.getlist("related_programs")
+            if v and str(v).strip()
+        ],
+    }
 
 
 # === Indicator Bank Management Routes ===
@@ -284,7 +303,7 @@ def add_indicator_bank():
         can_archive = False
 
     if request.method == 'POST':
-        form = IndicatorBankForm(request.form)
+        form = IndicatorBankForm(formdata=get_request_data())
     else:
         form = IndicatorBankForm()
 
@@ -300,7 +319,6 @@ def add_indicator_bank():
                 unit=None,
                 fdrs_kpi_code=(form.fdrs_kpi_code.data or '').strip() or None,
                 emergency=form.emergency.data,
-                related_programs=form.related_programs.data,
                 archived=(form.archived.data if can_archive else False)
             )
 
@@ -333,7 +351,8 @@ def add_indicator_bank():
 
     return render_template("admin/indicator_bank/add_indicator_bank.html",
                          form=form,
-                         title="Add New Indicator")
+                         title="Add New Indicator",
+                         form_lists=_indicator_bank_dynamic_list_values())
 
 @bp.route("/indicator_bank/edit/<int:id>", methods=["GET", "POST"])
 @permission_required('admin.indicator_bank.edit')
@@ -421,7 +440,7 @@ def edit_indicator_bank(id):
                 current_app.logger.error(f"Error updating indicator {id} via AJAX: {e}", exc_info=True)
                 return json_server_error(GENERIC_ERROR_MESSAGE)
 
-        form = IndicatorBankForm(request.form)
+        form = IndicatorBankForm(formdata=get_request_data())
 
     else:
         form = IndicatorBankForm(obj=indicator)
@@ -465,11 +484,11 @@ def edit_indicator_bank(id):
                 'aggregated_label': form.aggregated_label.data,
                 'name_translations': name_translations,
                 'comments': form.comments.data,
-                'related_programs': form.related_programs.data,
+                'related_programs': IndicatorBankForm.related_programs_from_request(),
                 'area': form.area.data,
                 'data_source': form.data_source.data,
                 'disaggregation_guidance': form.disaggregation_guidance.data,
-                'monitoring_questions': IndicatorBankForm._monitoring_questions_from_form(form),
+                'monitoring_questions': IndicatorBankForm.monitoring_questions_from_request(),
                 'tags': [t.strip() for t in (form.tags.data or '').split(',') if t.strip()] or None,
                 'emergency': form.emergency.data,
                 'archived': prev_archived if not can_archive else form.archived.data,
@@ -514,7 +533,8 @@ def edit_indicator_bank(id):
     return render_template("admin/indicator_bank/edit_indicator_bank.html",
                          form=form,
                          indicator=indicator,
-                         title=f"Edit Indicator: {indicator.name}")
+                         title=f"Edit Indicator: {indicator.name}",
+                         form_lists=_indicator_bank_dynamic_list_values())
 
 @bp.route("/indicator_bank/delete/<int:id>", methods=["POST"])
 @permission_required('admin.indicator_bank.edit')

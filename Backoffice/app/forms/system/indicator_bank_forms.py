@@ -6,6 +6,7 @@ These forms are grouped together as they are all related to indicator bank funct
 
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
+from app.utils.request_utils import get_request_data
 from wtforms import StringField, TextAreaField, SubmitField, SelectField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Optional, Length, ValidationError
 from app.models import IndicatorBank, Sector, SubSector, IndicatorBankType, IndicatorBankUnit
@@ -29,7 +30,11 @@ def _join_csv_tags(tags):
 class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
     """Form for adding or editing an IndicatorBank entry."""
 
-    name = StringField("Indicator Name", validators=[DataRequired(), Length(max=255)])
+    name = TextAreaField(
+        "Indicator Name",
+        validators=[DataRequired(), Length(max=255)],
+        render_kw={"rows": 3, "placeholder": "Indicator name"},
+    )
     # Central catalog IDs (see IndicatorBankType / IndicatorBankUnit)
     type = SelectField("Type", coerce=int, validators=[DataRequired()])
     unit = SelectField("Unit", coerce=int_or_none, validators=[Optional()])
@@ -60,21 +65,6 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         validators=[Optional()],
         render_kw={"rows": 3, "placeholder": "e.g., SAD, sex/age breakdown guidance from IFRC"},
     )
-    monitoring_question_1 = TextAreaField(
-        "Monitoring Question 1",
-        validators=[Optional()],
-        render_kw={"rows": 2, "placeholder": "Primary monitoring question"},
-    )
-    monitoring_question_2 = TextAreaField(
-        "Monitoring Question 2",
-        validators=[Optional()],
-        render_kw={"rows": 2, "placeholder": "Optional second monitoring question"},
-    )
-    monitoring_question_3 = TextAreaField(
-        "Monitoring Question 3",
-        validators=[Optional()],
-        render_kw={"rows": 2, "placeholder": "Optional third monitoring question"},
-    )
     tags = StringField(
         "Tags",
         validators=[Optional()],
@@ -86,8 +76,6 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
     emergency = BooleanField("Emergency Indicator", default=False)
     comments = TextAreaField("Comments", validators=[Optional()],
                             render_kw={"rows": 3, "placeholder": "Internal comments about this indicator"})
-    related_programs = StringField("Related Programs", validators=[Optional()],
-                                  render_kw={"placeholder": "Comma-separated list of related programs"})
 
     # Sector fields - Primary/Secondary/Tertiary (dropdowns)
     sector_primary = SelectField("Sector - Primary", coerce=int_or_none, validators=[Optional()])
@@ -103,8 +91,8 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
 
     def __init__(self, *args, **kwargs):
         # Ensure multilingual UnboundFields exist on the class before binding.
-        self.add_multilingual_name_fields("name", max_length=255)
-        self.add_multilingual_name_fields("aggregated_label", max_length=2000)
+        self.add_multilingual_name_fields("name", max_length=255, use_textarea=True, textarea_rows=3)
+        self.add_multilingual_name_fields("aggregated_label", max_length=2000, use_textarea=True, textarea_rows=3)
         super(IndicatorBankForm, self).__init__(*args, **kwargs)
         self._populate_choices()
 
@@ -181,24 +169,19 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
                 setter(lang, field.data or "")
 
     @staticmethod
-    def _monitoring_questions_from_form(form):
-        questions = []
-        for field_name in ("monitoring_question_1", "monitoring_question_2", "monitoring_question_3"):
-            field = getattr(form, field_name, None)
-            value = (field.data or "").strip() if field is not None else ""
-            if value:
-                questions.append(value)
-        return questions or None
+    def _non_empty_values_from_request(field_name):
+        data = get_request_data()
+        return [str(value).strip() for value in data.getlist(field_name) if value and str(value).strip()]
 
-    @staticmethod
-    def _monitoring_questions_to_form(indicator, form):
-        questions = indicator.monitoring_questions_list if indicator else []
-        for idx, field_name in enumerate(
-            ("monitoring_question_1", "monitoring_question_2", "monitoring_question_3"), start=0
-        ):
-            field = getattr(form, field_name, None)
-            if field is not None:
-                field.data = questions[idx] if idx < len(questions) else ""
+    @classmethod
+    def monitoring_questions_from_request(cls):
+        values = cls._non_empty_values_from_request("monitoring_questions")
+        return values or None
+
+    @classmethod
+    def related_programs_from_request(cls):
+        values = cls._non_empty_values_from_request("related_programs")
+        return ", ".join(values) if values else None
 
     def populate_from_indicator_bank(self, indicator_bank):
         """Populates the form fields from an IndicatorBank instance."""
@@ -225,7 +208,6 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         self.data_source.data = indicator_bank.data_source or ''
         self.disaggregation_guidance.data = indicator_bank.disaggregation_guidance or ''
         self.tags.data = _join_csv_tags(indicator_bank.tags_list)
-        self._monitoring_questions_to_form(indicator_bank, self)
 
         translations = indicator_bank.name_translations if isinstance(indicator_bank.name_translations, dict) else {}
         self._populate_multilingual_field(translations, "name")
@@ -240,7 +222,6 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         self.archived.data = indicator_bank.archived
         self.emergency.data = indicator_bank.emergency
         self.comments.data = indicator_bank.comments
-        self.related_programs.data = indicator_bank.related_programs
 
         if indicator_bank.sector:
             self.sector_primary.data = indicator_bank.sector.get('primary')
@@ -264,7 +245,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         indicator_bank.area = (self.area.data or '').strip() or None
         indicator_bank.data_source = (self.data_source.data or '').strip() or None
         indicator_bank.disaggregation_guidance = (self.disaggregation_guidance.data or '').strip() or None
-        indicator_bank.monitoring_questions = self._monitoring_questions_from_form(self)
+        indicator_bank.monitoring_questions = self.monitoring_questions_from_request()
         tag_list = _split_csv_tags(self.tags.data)
         indicator_bank.tags = tag_list or None
 
@@ -274,7 +255,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         indicator_bank.archived = self.archived.data
         indicator_bank.emergency = self.emergency.data
         indicator_bank.comments = self.comments.data
-        indicator_bank.related_programs = self.related_programs.data
+        indicator_bank.related_programs = self.related_programs_from_request()
 
         sector_data = {}
         if self.sector_primary.data:

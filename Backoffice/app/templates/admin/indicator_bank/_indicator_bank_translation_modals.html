@@ -1,0 +1,45 @@
+{# Translation modals + wiring for indicator bank add/edit forms #}
+{% from "macros/translation_modal.html" import translation_modal %}
+{% set _lang_ns = namespace(names={}) %}
+{% for code, label in ALL_LANGUAGES_DISPLAY_NAMES|default({}, true)|items %}
+    {% set _ = _lang_ns.names.update({code: label}) %}
+{% endfor %}
+{% for code, label in LANGUAGE_DISPLAY_NAMES|default({}, true)|items %}
+    {% set _ = _lang_ns.names.update({code: label}) %}
+{% endfor %}
+
+<script type="application/json" id="translation-data">
+{
+    "supportedLanguages": {{ SUPPORTED_LANGUAGES|tojson|safe }},
+    "languageDisplayNames": {{ _lang_ns.names|tojson|safe }}
+}
+</script>
+
+{{ translation_modal(
+    modal_id='indicator-name-translations-modal',
+    modal_title=_('Indicator Name Translations'),
+    description=_('Add translations for this indicator name in different languages.'),
+    context='indicator_name',
+    css_prefix='indicator-name',
+    auto_translate_permission_context='indicator_bank',
+    auto_translate_permission_code=translation_permission_code|default('admin.indicator_bank.edit')
+) }}
+
+{{ translation_modal(
+    modal_id='indicator-aggregated-label-translations-modal',
+    modal_title=_('Aggregated Label Translations'),
+    description=_('Add translations for the aggregated label in different languages.'),
+    context='indicator_aggregated_label',
+    css_prefix='indicator-aggregated-label',
+    auto_translate_permission_context='indicator_bank',
+    auto_translate_permission_code=translation_permission_code|default('admin.indicator_bank.edit')
+) }}
+
+<script type="module" nonce="{{ csp_nonce() }}">
+    import { TranslationModal } from '{{ static_url('js/components/translation-modal.js') }}';
+    import '{{ static_url('js/components/translation-utils.js') }}';
+    import { initIndicatorBankTranslations } from '{{ static_url('js/admin/indicator-bank-translations.js') }}';
+
+    window.TranslationModal = TranslationModal;
+    initIndicatorBankTranslations();
+</script>

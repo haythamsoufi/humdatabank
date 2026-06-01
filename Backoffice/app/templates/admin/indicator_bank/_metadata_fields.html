@@ -1,36 +1,19 @@
 {# Shared metadata fields for add/edit indicator bank forms #}
+{% from "admin/indicator_bank/_indicator_bank_translation_helpers.html" import indicator_bank_translation_btn, indicator_bank_hidden_translations, indicator_bank_translation_field_errors %}
 {% set input_class = input_class|default("shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") %}
+{% set textarea_class = input_class ~ " resize-y" %}
 
 <div class="mb-4">
-    {{ form.aggregated_label.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-    {{ form.aggregated_label(class=input_class) }}
+    <div class="flex items-center gap-2 flex-wrap mb-2">
+        {{ form.aggregated_label.label(class="text-gray-700 text-sm font-semibold mb-0") }}
+        {{ indicator_bank_translation_btn('indicator-aggregated-label-translations-btn') }}
+    </div>
+    {{ form.aggregated_label(class=textarea_class, rows=3) }}
+    {{ indicator_bank_hidden_translations(form, 'aggregated_label') }}
     {% for error in form.aggregated_label.errors %}
         <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
     {% endfor %}
-</div>
-
-<div class="mb-8">
-    <div class="border-b border-gray-200 mb-4 pb-2">
-        <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-            <i class="fas fa-language mr-2"></i>{{ _('Multilingual Aggregated Labels (Optional)') }}
-        </h3>
-    </div>
-    {% if TRANSLATABLE_LANGUAGES and TRANSLATABLE_LANGUAGES|length > 0 %}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {% for code in TRANSLATABLE_LANGUAGES %}
-        {% set f = form['aggregated_label_' ~ code] %}
-        <div class="{% if code in ['ar','fa','he','ur'] %}md:col-span-2{% endif %} mb-4">
-            {{ f.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-            {{ f(class=input_class, dir=("rtl" if code in ['ar','fa','he','ur'] else None)) }}
-            {% for error in f.errors %}
-                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-            {% endfor %}
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-sm text-gray-500">{{ _('No additional languages are enabled.') }}</p>
-    {% endif %}
+    {{ indicator_bank_translation_field_errors(form, 'aggregated_label') }}
 </div>
 
 <div class="mb-8">
@@ -74,18 +57,17 @@
         {% endfor %}
     </div>
 
-    <div class="grid grid-cols-1 gap-4">
-        <div>
-            {{ form.monitoring_question_1.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-            {{ form.monitoring_question_1(class=input_class) }}
-        </div>
-        <div>
-            {{ form.monitoring_question_2.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-            {{ form.monitoring_question_2(class=input_class) }}
-        </div>
-        <div>
-            {{ form.monitoring_question_3.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-            {{ form.monitoring_question_3(class=input_class) }}
-        </div>
-    </div>
+    {% if request.method == 'POST' %}
+        {% set monitoring_question_items = form_lists.monitoring_questions if form_lists is defined else [] %}
+    {% elif indicator is defined %}
+        {% set monitoring_question_items = indicator.monitoring_questions_list %}
+    {% else %}
+        {% set monitoring_question_items = [] %}
+    {% endif %}
+    {% set field_name = 'monitoring_questions' %}
+    {% set label = _('Monitoring Questions') %}
+    {% set add_label = _('Add question') %}
+    {% set items = monitoring_question_items %}
+    {% set field_rows = 2 %}
+    {% include "admin/indicator_bank/_dynamic_text_list.html" with context %}
 </div>

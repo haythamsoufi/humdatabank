@@ -202,7 +202,7 @@
 
                 const hasPlaceholders = /%\([^)]+\)[sd]|%(?:[sd]|\.\d+[fd])/.test(raw);
                 if (hasPlaceholders) {
-                    display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="" + cfg.t.containsPlaceholders + ""><i class="fas fa-code mr-1"></i>' + display + '</span>';
+                    display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="' + cfg.t.containsPlaceholders + '"><i class="fas fa-code mr-1"></i>' + display + '</span>';
                 }
                 return '<div title="' + raw.replace(/"/g, '&quot;') + '">' + display + '</div>';
             },
@@ -234,7 +234,7 @@
                 const hasPlaceholders = /%\([^)]+\)[sd]|%(?:[sd]|\.\d+[fd])/.test(value);
                 let display = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 if (hasPlaceholders) {
-                    display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="" + cfg.t.containsPlaceholders + ""><i class="fas fa-code mr-1"></i>' + display + '</span>';
+                    display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="' + cfg.t.containsPlaceholders + '"><i class="fas fa-code mr-1"></i>' + display + '</span>';
                 }
                 const style = removed ? ' style="text-decoration:line-through;color:#9ca3af;"' : '';
                 return '<div' + style + ' title="' + value.replace(/"/g, '&quot;') + '">' + display + '</div>';
@@ -284,30 +284,28 @@
         };
     }))
     .concat([{
-        {
-            field: 'actions',
-            headerName: cfg.t.actionsCol,
-            width: 130,
-            minWidth: 100,
-            maxWidth: 160,
-            lockVisible: true,
-            pinned: 'right',
-            lockPinned: true,
-            suppressMovable: true,
-            sortable: false,
-            filter: false,
-            cellRenderer: function(params) {
-                const msgid = params.data.msgid || '';
-                const encodedMsgid = encodeURIComponent(msgid);
-                const removed = params.data && params.data.removed;
-                const editBtn = '<button type="button" class="text-blue-600 hover:text-blue-900 edit-translation-btn" data-msgid="' + encodedMsgid + '" title=cfg.t.editAllTranslations><i class="fas fa-pen"></i></button>';
-                const delBtn = removed
-                    ? '<button type="button" class="text-red-600 hover:text-red-900 transition-colors delete-removed-translation-btn" data-msgid="' + encodedMsgid + '" title=cfg.t.permanentlyDelete><i class="fas fa-trash fa-fw"></i></button>'
-                    : '';
-                return '<div class="flex items-center gap-1 flex-nowrap">' + editBtn + delBtn + '</div>';
-            }
+        field: 'actions',
+        headerName: cfg.t.actionsCol,
+        width: 130,
+        minWidth: 100,
+        maxWidth: 160,
+        lockVisible: true,
+        pinned: 'right',
+        lockPinned: true,
+        suppressMovable: true,
+        sortable: false,
+        filter: false,
+        cellRenderer: function(params) {
+            const msgid = params.data.msgid || '';
+            const encodedMsgid = encodeURIComponent(msgid);
+            const removed = params.data && params.data.removed;
+            const editBtn = '<button type="button" class="text-blue-600 hover:text-blue-900 edit-translation-btn" data-msgid="' + encodedMsgid + '" title="' + cfg.t.editAllTranslations + '"><i class="fas fa-pen"></i></button>';
+            const delBtn = removed
+                ? '<button type="button" class="text-red-600 hover:text-red-900 transition-colors delete-removed-translation-btn" data-msgid="' + encodedMsgid + '" title="' + cfg.t.permanentlyDelete + '"><i class="fas fa-trash fa-fw"></i></button>'
+                : '';
+            return '<div class="flex items-center gap-1 flex-nowrap">' + editBtn + delBtn + '</div>';
         }
-    ];
+    }]);
 
     // Initialize grid using helper
     function initializeGrid() {
@@ -823,7 +821,7 @@
                     window.autoTranslateModal.translationState.skippedCount =
                         (window.autoTranslateModal.translationState.skippedCount || 0) + 1;
                     window.autoTranslateModal.logProgress(
-                        `" + cfg.t.skipped + " ${translation.language} " + cfg.t.translationFor + " ${translation.id} — " + cfg.t.properNounOrTech + "`,
+                        `${cfg.t.skipped} ${translation.language} ${cfg.t.translationFor} ${translation.id} — ${cfg.t.properNounOrTech}`,
                         'warning'
                     );
                 } else if (data.success && data.translations && data.updated_count > 0) {
@@ -844,11 +842,11 @@
                     }
 
                     window.autoTranslateModal.translationState.successCount++;
-                    window.autoTranslateModal.logProgress(`" + cfg.t.translated + " ${translation.language} " + cfg.t.translationFor + " ${translation.id}`, 'success');
+                    window.autoTranslateModal.logProgress(`${cfg.t.translated} ${translation.language} ${cfg.t.translationFor} ${translation.id}`, 'success');
                 } else {
                     window.autoTranslateModal.translationState.errorCount++;
                     const unknownError = cfg.t.unknownError;
-                    const errorMsg = `" + cfg.t.failedToTranslate + " ${translation.id} " + cfg.t.toText + " ${translation.language}: ${data.message || unknownError}`;
+                    const errorMsg = `${cfg.t.failedToTranslate} ${translation.id} ${cfg.t.toText} ${translation.language}: ${data.message || unknownError}`;
                     window.autoTranslateModal.translationState.errors.push(errorMsg);
                     window.autoTranslateModal.logProgress(errorMsg, 'error');
                     console.error('Auto-translate: Translation failed:', data);
@@ -868,8 +866,8 @@
                 const em = (error && error.message) ? String(error.message) : '';
                 const looksLikeWaf = em.includes('403') || em.toLowerCase().includes('application-gateway') || em.toLowerCase().includes('waf');
                 const prefix = looksLikeWaf
-                    ? `" + cfg.t.blockedByWaf + "`
-                    : `" + cfg.t.networkError + "`;
+                    ? cfg.t.blockedByWaf
+                    : cfg.t.networkError;
                 const errorMsg = `${prefix} ${translation.id}: ${em || cfg.t.unknownError}`;
                 window.autoTranslateModal.translationState.errors.push(errorMsg);
                 window.autoTranslateModal.logProgress(errorMsg, 'error');
@@ -970,7 +968,7 @@
             if (missing.length > 0) {
                 return {
                     valid: false,
-                    message: '" + cfg.t.missingPlaceholders + ": ' + missing.join(', ') + '. " + cfg.t.allPlaceholdersMustBePreserved + "'
+                    message: cfg.t.missingPlaceholders + ': ' + missing.join(', ') + '. ' + cfg.t.allPlaceholdersMustBePreserved
                 };
             }
             return { valid: true };
@@ -1023,7 +1021,7 @@
                     const label = document.createElement('label');
                     label.setAttribute('for', fieldId);
                     label.className = 'block text-sm font-medium text-gray-700 mb-2';
-                    label.textContent = langDisplay + ' " + cfg.t.translationLabel + "';
+                    label.textContent = langDisplay + ' ' + cfg.t.translationLabel;
 
                     const textarea = document.createElement('textarea');
                     textarea.id = fieldId;
@@ -1142,16 +1140,16 @@
             .then(function(response) { return response.json().then(function(data) { return { ok: response.ok, data: data }; }); })
             .then(function(result) {
                 if (result.ok && result.data && result.data.success) {
-                    if (window.showAlert) window.showAlert(result.data.message || '" + cfg.t.removedObsolete + "', 'success');
+                    if (window.showAlert) window.showAlert(result.data.message || cfg.t.removedObsolete, 'success');
                     window.location.reload();
                     return;
                 }
-                var errMsg = (result.data && result.data.message) ? result.data.message : '" + cfg.t.deleteFailed + "';
+                var errMsg = (result.data && result.data.message) ? result.data.message : cfg.t.deleteFailed;
                 throw new Error(errMsg);
             })
             .catch(function(error) {
                 console.error('delete-removed translation:', error);
-                if (window.showAlert) window.showAlert(error.message || '" + cfg.t.deleteFailed + "', 'error');
+                if (window.showAlert) window.showAlert(error.message || cfg.t.deleteFailed, 'error');
             });
         }
 
@@ -1162,7 +1160,7 @@
             e.stopPropagation();
             var msgid = decodeURIComponent(delBtn.getAttribute('data-msgid') || '');
             if (!msgid) return;
-            var confirmMsg = '" + cfg.t.permanentDeleteConfirm + "';
+            var confirmMsg = cfg.t.permanentDeleteConfirm;
             var confirmTitle = cfg.t.deleteRemovedTitle;
             var doDelete = function() { performDeleteRemovedTranslation(msgid); };
             if (window.showDangerConfirmation) {
@@ -1210,7 +1208,7 @@
                 });
 
                 if (hasErrors) {
-                    var m = '" + cfg.t.validationError + "\n\n' + errors.join('\n\n') + '\n\n" + cfg.t.fixErrorsBeforeSaving + "';
+                    var m = cfg.t.validationError + '\n\n' + errors.join('\n\n') + '\n\n' + cfg.t.fixErrorsBeforeSaving;
                     if (window.showAlert) window.showAlert(m, 'error');
                     else console.error(m);
                     return false;
@@ -1236,7 +1234,7 @@
                 if (response.ok) {
                     return response.json();
                 }
-                throw new Error('" + cfg.t.failedToSave + "');
+                throw new Error(cfg.t.failedToSave);
             })
             .then(data => {
                 if (data.success) {
@@ -1247,15 +1245,15 @@
                     } else {
                         setEditModalSaving(false);
                         closeEditModal();
-                        if (window.showAlert) window.showAlert(data.message || '" + cfg.t.savedSuccessfully + "', 'success');
+                        if (window.showAlert) window.showAlert(data.message || cfg.t.savedSuccessfully, 'success');
                     }
                 } else {
-                    throw new Error(data.message || '" + cfg.t.failedToSave + "');
+                    throw new Error(data.message || cfg.t.failedToSave);
                 }
             })
             .catch(error => {
                 console.error('Error saving translation:', error);
-                var m = '" + cfg.t.failedToSave + ": ' + error.message;
+                var m = cfg.t.failedToSave + ': ' + error.message;
                 if (window.showAlert) window.showAlert(m, 'error');
                 else console.error(m);
             })
@@ -1279,7 +1277,7 @@
                     if (spinner) spinner.classList.remove('hidden');
                     if (textEl) {
                         textEl.dataset.original = textEl.textContent;
-                        textEl.textContent = '" + cfg.t.translatingText + "';
+                        textEl.textContent = cfg.t.translatingText;
                     }
 
                     const msgid = document.getElementById('edit-translation-msgid').value;
@@ -1327,7 +1325,7 @@
                     }
                 } catch (e) {
                     console.error(e);
-                    var m = '" + cfg.t.autoTranslateFailed + " ' + (e && e.message ? e.message : '');
+                    var m = cfg.t.autoTranslateFailed + ' ' + (e && e.message ? e.message : '');
                     if (window.showAlert) window.showAlert(m, 'error');
                     else console.error(m);
                 } finally {
@@ -1347,7 +1345,7 @@
         const clearBtn = document.getElementById('modal-clear-translations-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', function() {
-                const msg = '" + cfg.t.clearConfirm + "';
+                const msg = cfg.t.clearConfirm;
                 function doClear() {
                     const translationFields = document.querySelectorAll('#edit-translation-modal textarea[id^="msgstr_"], #edit-translation-modal input[id^="msgstr_"]');
                     let clearedCount = 0;
@@ -1367,8 +1365,8 @@
 
                     if (clearedCount > 0) {
                         var m = clearedCount === 1
-                            ? '" + cfg.t.cleared1 + "'
-                            : '" + cfg.t.cleared + " ' + clearedCount + ' " + cfg.t.translationFields + "';
+                            ? cfg.t.cleared1
+                            : cfg.t.cleared + ' ' + clearedCount + ' ' + cfg.t.translationFields;
                         if (window.showAlert) window.showAlert(m, 'success');
                     } else {
                         if (window.showAlert) window.showAlert(cfg.t.noFieldsToClear, 'info');

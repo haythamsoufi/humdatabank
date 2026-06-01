@@ -1,0 +1,31 @@
+{# Translation button + hidden per-language fields for indicator bank forms #}
+
+{% macro indicator_bank_translation_btn(btn_id) %}
+<button type="button"
+        id="{{ btn_id }}"
+        class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0"
+        title="{{ _('Add translations') }}"
+        aria-label="{{ _('Translations') }}">
+    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+</button>
+{% endmacro %}
+
+{% macro indicator_bank_hidden_translations(form, field_prefix) %}
+{% for code in TRANSLATABLE_LANGUAGES %}
+    {% if code != 'en' %}
+        {% set f = form[field_prefix ~ '_' ~ code] %}
+        <input type="hidden" name="{{ f.name }}" id="{{ f.id }}" value="{{ f.data or '' }}">
+    {% endif %}
+{% endfor %}
+{% endmacro %}
+
+{% macro indicator_bank_translation_field_errors(form, field_prefix) %}
+{% for code in TRANSLATABLE_LANGUAGES %}
+    {% if code != 'en' %}
+        {% set f = form[field_prefix ~ '_' ~ code] %}
+        {% for error in f.errors %}
+            <p class="mt-1 text-red-500 text-xs italic">{{ (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or code.upper()) }}: {{ error }}</p>
+        {% endfor %}
+    {% endif %}
+{% endfor %}
+{% endmacro %}

@@ -372,6 +372,14 @@ def edit_indicator_bank(id):
     if request.method == 'POST':
         is_ajax = is_json_request()
 
+        # WAF-bypass form submits arrive as JSON with a base64 "payload" key.
+        # They are full form submissions and must go through the normal form
+        # handler (which calls get_request_data() and decodes the payload).
+        if is_ajax:
+            _raw_json = get_json_safe()
+            if _raw_json.get("payload") or _raw_json.get("payload_b64"):
+                is_ajax = False
+
         if is_ajax:
             try:
                 data = get_json_safe()

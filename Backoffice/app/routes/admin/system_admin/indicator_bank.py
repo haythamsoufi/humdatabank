@@ -12,6 +12,7 @@ from flask import (
     render_template, request, flash, redirect, url_for,
     current_app, make_response, send_file,
 )
+from flask_babel import _
 from flask_login import current_user
 from app import db
 from config import Config
@@ -530,13 +531,21 @@ def edit_indicator_bank(id):
             db.session.add(history)
 
             db.session.flush()
-            flash(f"Indicator '{indicator.name}' updated successfully.", "success")
+            success_message = f"Indicator '{indicator.name}' updated successfully."
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return json_ok(message=success_message, indicator_id=indicator.id, name=indicator.name)
+            flash(success_message, "success")
             return redirect(url_for("system_admin.manage_indicator_bank"))
 
         except Exception as e:
             request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
             current_app.logger.error(f"Error updating indicator {id}: {e}", exc_info=True)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return json_server_error(GENERIC_ERROR_MESSAGE)
+            flash("An error occurred. Please try again.", "danger")
+
+    if request.method == "POST" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return json_form_errors(form, _("Please correct the errors in the form."))
 
     return render_template("admin/indicator_bank/edit_indicator_bank.html",
                          form=form,
@@ -686,7 +695,15 @@ def session_status():
 @bp.route("/indicator_bank/export", methods=["GET", "POST"])
 @permission_required('admin.indicator_bank.view')
 def export_indicators():
-    """Export indicators to Excel.
+    """Export indicators to a fully human-readable, importable Excel workbook.
+
+    Sheets:
+      - Indicators   – main data (names, definitions, sectors, etc.)
+      - Types        – measurement type catalog
+      - Units        – measurement unit catalog
+      - Sectors      – sector catalog
+      - Sub-Sectors  – sub-sector catalog (with parent sector name)
+      - Common Words – common words / glossary
 
     Supports:
     - GET: export all indicators
@@ -710,282 +727,254 @@ def export_indicators():
 
         wb = Workbook()
 
+        # ── Styling helpers ──────────────────────────────────────────────────
+        def _hdr_fill(hex_color):
+            return PatternFill("solid", fgColor=hex_color)
+
+        _FILL_BLUE   = _hdr_fill("1F4E79")   # Indicators
+        _FILL_TEAL   = _hdr_fill("1A6B5A")   # Types / Units
+        _FILL_PURPLE = _hdr_fill("5B3A8E")   # Sectors
+        _FILL_GREEN  = _hdr_fill("2D6A4F")   # Sub-Sectors
+        _FILL_BROWN  = _hdr_fill("7B3F00")   # Common Words
+        _FONT_WHITE  = Font(bold=True, color="FFFFFF")
+        _ALIGN_CTR   = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        def _write_headers(ws, headers, fill, row=1):
+            for col, h in enumerate(headers, 1):
+                c = ws.cell(row=row, column=col, value=h)
+                c.font = _FONT_WHITE
+                c.fill = fill
+                c.alignment = _ALIGN_CTR
+            ws.row_dimensions[row].height = 22
+
+        def _autofit(ws, max_width=60):
+            for col in ws.columns:
+                mx = max(
+                    (len(str(cell.value or "")) for cell in col),
+                    default=0
+                )
+                ws.column_dimensions[col[0].column_letter].width = min(mx + 2, max_width)
+
+        def _mq_to_str(val):
+            """Convert monitoring_questions list/json to semicolon-separated string."""
+            if not val:
+                return ""
+            if isinstance(val, list):
+                return "; ".join(str(v) for v in val if v)
+            try:
+                parsed = json.loads(str(val))
+                if isinstance(parsed, list):
+                    return "; ".join(str(v) for v in parsed if v)
+            except Exception:
+                pass
+            return str(val)
+
+        languages = (
+            current_app.config.get("SUPPORTED_LANGUAGES")
+            or getattr(Config, "LANGUAGES", None)
+            or ["en"]
+        )
+
+        # ── Sheet 1: Indicators ──────────────────────────────────────────────
         ws = wb.active
         ws.title = "Indicators"
 
-        languages = current_app.config.get("SUPPORTED_LANGUAGES", getattr(Config, "LANGUAGES", ["en"])) or ["en"]
         name_lang_headers = [f"Name ({code})" for code in languages]
-        def_lang_headers = [f"Definition ({code})" for code in languages]
-        sector_subsector_headers = [
-            "Sector Primary", "Sector Secondary", "Sector Tertiary",
-            "SubSector Primary", "SubSector Secondary", "SubSector Tertiary",
-        ]
-        main_headers = (
-            ['ID', 'Name', 'Definition', 'Aggregated Label', 'Area', 'Type', 'Unit', 'FDRS KPI Code',
-             'Data Source', 'Disaggregation Guidance', 'Monitoring Questions', 'Tags',
-             'Emergency', 'Related Programs', 'Archived', 'Created At']
+        def_lang_headers  = [f"Definition ({code})" for code in languages]
+        agg_lang_headers  = [f"Aggregated Label ({code})" for code in languages if code != "en"]
+        ind_headers = (
+            ['ID', 'Name', 'Definition', 'Aggregated Label', 'Area', 'Type', 'Unit',
+             'FDRS KPI Code', 'Data Source', 'Disaggregation Guidance',
+             'Monitoring Questions', 'Tags', 'Emergency', 'Related Programs',
+             'Archived', 'Comments', 'Created At']
             + name_lang_headers
             + def_lang_headers
-            + [f"Aggregated Label ({code})" for code in languages if code != "en"]
-            + sector_subsector_headers
+            + agg_lang_headers
+            + ['Sector Primary', 'Sector Secondary', 'Sector Tertiary',
+               'SubSector Primary', 'SubSector Secondary', 'SubSector Tertiary']
         )
-        for col, header in enumerate(main_headers, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        _write_headers(ws, ind_headers, _FILL_BLUE)
+        ws.freeze_panes = "B2"
 
-        sector_ids = set()
-        subsector_ids = set()
+        # Resolve sector/subsector id → name
+        sector_ids, subsector_ids = set(), set()
         for ind in indicators:
             for level in ("primary", "secondary", "tertiary"):
                 if ind.sector and ind.sector.get(level):
-                    sector_ids.add(ind.sector.get(level))
+                    sector_ids.add(ind.sector[level])
                 if ind.sub_sector and ind.sub_sector.get(level):
-                    subsector_ids.add(ind.sub_sector.get(level))
-        sector_names = {}
-        if sector_ids:
-            for s in Sector.query.filter(Sector.id.in_(sector_ids)).all():
-                sector_names[s.id] = s.name
-        subsector_names = {}
-        if subsector_ids:
-            for ss in SubSector.query.filter(SubSector.id.in_(subsector_ids)).all():
-                subsector_names[ss.id] = ss.name
+                    subsector_ids.add(ind.sub_sector[level])
 
-        def _json_dump(val):
-            try:
-                if val is None:
-                    return ""
-                return json.dumps(val, ensure_ascii=False)
-            except Exception as e:
-                current_app.logger.debug("indicator export _json_dump failed: %s", e)
-                return ""
+        sector_names = (
+            {s.id: s.name for s in Sector.query.filter(Sector.id.in_(sector_ids)).all()}
+            if sector_ids else {}
+        )
+        subsector_names = (
+            {ss.id: ss.name for ss in SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()}
+            if subsector_ids else {}
+        )
 
-        for row, indicator in enumerate(indicators, 2):
-            ws.cell(row=row, column=1, value=indicator.id)
-            ws.cell(row=row, column=2, value=indicator.name)
-            ws.cell(row=row, column=3, value=indicator.definition)
-            ws.cell(row=row, column=4, value=getattr(indicator, 'aggregated_label', None) or '')
-            ws.cell(row=row, column=5, value=getattr(indicator, 'area', None) or '')
-            ws.cell(row=row, column=6, value=indicator.type)
-            ws.cell(row=row, column=7, value=indicator.unit)
-            ws.cell(row=row, column=8, value=getattr(indicator, 'fdrs_kpi_code', None) or '')
-            ws.cell(row=row, column=9, value=getattr(indicator, 'data_source', None) or '')
-            ws.cell(row=row, column=10, value=getattr(indicator, 'disaggregation_guidance', None) or '')
-            ws.cell(row=row, column=11, value=_json_dump(indicator.monitoring_questions_list))
-            ws.cell(row=row, column=12, value=", ".join(indicator.tags_list))
-            ws.cell(row=row, column=13, value=indicator.emergency)
-            ws.cell(row=row, column=14, value=indicator.related_programs)
-            ws.cell(row=row, column=15, value=indicator.archived)
-            ws.cell(row=row, column=16, value=indicator.created_at.strftime('%Y-%m-%d') if indicator.created_at else '')
-
-            nt = indicator.name_translations or {}
-            dt = indicator.definition_translations or {}
-            alt = indicator.aggregated_label_translations or {}
-            col = 17
+        for row, ind in enumerate(indicators, 2):
+            nt  = ind.name_translations or {}
+            dt  = ind.definition_translations or {}
+            alt = ind.aggregated_label_translations or {}
+            sec = ind.sector or {}
+            sub = ind.sub_sector or {}
+            col = 1
+            ws.cell(row=row, column=col, value=ind.id);                                                     col += 1
+            ws.cell(row=row, column=col, value=ind.name);                                                   col += 1
+            ws.cell(row=row, column=col, value=ind.definition);                                             col += 1
+            ws.cell(row=row, column=col, value=getattr(ind, 'aggregated_label', None) or '');               col += 1
+            ws.cell(row=row, column=col, value=getattr(ind, 'area', None) or '');                           col += 1
+            ws.cell(row=row, column=col, value=ind.type);                                                   col += 1
+            ws.cell(row=row, column=col, value=ind.unit);                                                   col += 1
+            ws.cell(row=row, column=col, value=getattr(ind, 'fdrs_kpi_code', None) or '');                  col += 1
+            ws.cell(row=row, column=col, value=getattr(ind, 'data_source', None) or '');                    col += 1
+            ws.cell(row=row, column=col, value=getattr(ind, 'disaggregation_guidance', None) or '');        col += 1
+            ws.cell(row=row, column=col, value=_mq_to_str(ind.monitoring_questions_list));                  col += 1
+            ws.cell(row=row, column=col, value=", ".join(ind.tags_list));                                   col += 1
+            ws.cell(row=row, column=col, value=ind.emergency);                                              col += 1
+            ws.cell(row=row, column=col, value=ind.related_programs);                                       col += 1
+            ws.cell(row=row, column=col, value=ind.archived);                                               col += 1
+            ws.cell(row=row, column=col, value=getattr(ind, 'comments', None) or '');                       col += 1
+            ws.cell(row=row, column=col,
+                    value=ind.created_at.strftime('%Y-%m-%d') if ind.created_at else '');                   col += 1
             for code in languages:
-                ws.cell(row=row, column=col, value=nt.get(code) if code != "en" else (nt.get("en") or indicator.name))
-                col += 1
+                ws.cell(row=row, column=col,
+                        value=nt.get(code) if code != "en" else (nt.get("en") or ind.name));               col += 1
             for code in languages:
-                ws.cell(row=row, column=col, value=dt.get(code) if code != "en" else (dt.get("en") or indicator.definition))
-                col += 1
+                ws.cell(row=row, column=col,
+                        value=dt.get(code) if code != "en" else (dt.get("en") or ind.definition));         col += 1
             for code in languages:
                 if code == "en":
                     continue
-                ws.cell(row=row, column=col, value=alt.get(code) or '')
-                col += 1
-            sec = indicator.sector or {}
-            subsec = indicator.sub_sector or {}
+                ws.cell(row=row, column=col, value=alt.get(code) or '');                                   col += 1
             for level in ("primary", "secondary", "tertiary"):
                 sid = sec.get(level)
-                ws.cell(row=row, column=col, value=sector_names.get(sid, "") if sid else "")
-                col += 1
+                ws.cell(row=row, column=col, value=sector_names.get(sid, '') if sid else '');               col += 1
             for level in ("primary", "secondary", "tertiary"):
-                ssid = subsec.get(level)
-                ws.cell(row=row, column=col, value=subsector_names.get(ssid, "") if ssid else "")
-                col += 1
+                ssid = sub.get(level)
+                ws.cell(row=row, column=col, value=subsector_names.get(ssid, '') if ssid else '');          col += 1
 
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                with suppress(Exception):
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+        _autofit(ws)
 
-        ws_db_ind = wb.create_sheet(title="DB_Indicators")
-        ws_db_ind.sheet_state = "hidden"
-
-        db_ind_headers = [
-            "id", "name", "definition", "aggregated_label", "area", "type", "unit", "fdrs_kpi_code",
-            "data_source", "disaggregation_guidance", "monitoring_questions_json", "tags_json",
-            "emergency", "related_programs", "archived", "comments",
-            "sector_primary_id", "sector_secondary_id", "sector_tertiary_id",
-            "subsector_primary_id", "subsector_secondary_id", "subsector_tertiary_id",
-            "name_translations_json", "definition_translations_json", "aggregated_label_translations_json",
-            "created_at", "updated_at",
-            "indicator_type_id", "indicator_unit_id",
-        ]
-        for col, header in enumerate(db_ind_headers, 1):
-            cell = ws_db_ind.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
-
-        for row, indicator in enumerate(indicators, 2):
-            sector = indicator.sector or {}
-            subsector = indicator.sub_sector or {}
-            ws_db_ind.cell(row=row, column=1, value=indicator.id)
-            ws_db_ind.cell(row=row, column=2, value=indicator.name)
-            ws_db_ind.cell(row=row, column=3, value=indicator.definition)
-            ws_db_ind.cell(row=row, column=4, value=getattr(indicator, 'aggregated_label', None) or '')
-            ws_db_ind.cell(row=row, column=5, value=getattr(indicator, 'area', None) or '')
-            ws_db_ind.cell(row=row, column=6, value=indicator.type)
-            ws_db_ind.cell(row=row, column=7, value=indicator.unit)
-            ws_db_ind.cell(row=row, column=8, value=getattr(indicator, 'fdrs_kpi_code', None) or '')
-            ws_db_ind.cell(row=row, column=9, value=getattr(indicator, 'data_source', None) or '')
-            ws_db_ind.cell(row=row, column=10, value=getattr(indicator, 'disaggregation_guidance', None) or '')
-            ws_db_ind.cell(row=row, column=11, value=_json_dump(indicator.monitoring_questions))
-            ws_db_ind.cell(row=row, column=12, value=_json_dump(indicator.tags))
-            ws_db_ind.cell(row=row, column=13, value=indicator.emergency)
-            ws_db_ind.cell(row=row, column=14, value=indicator.related_programs)
-            ws_db_ind.cell(row=row, column=15, value=indicator.archived)
-            ws_db_ind.cell(row=row, column=16, value=indicator.comments)
-            ws_db_ind.cell(row=row, column=17, value=sector.get("primary"))
-            ws_db_ind.cell(row=row, column=18, value=sector.get("secondary"))
-            ws_db_ind.cell(row=row, column=19, value=sector.get("tertiary"))
-            ws_db_ind.cell(row=row, column=20, value=subsector.get("primary"))
-            ws_db_ind.cell(row=row, column=21, value=subsector.get("secondary"))
-            ws_db_ind.cell(row=row, column=22, value=subsector.get("tertiary"))
-            ws_db_ind.cell(row=row, column=23, value=_json_dump(indicator.name_translations or {}))
-            ws_db_ind.cell(row=row, column=24, value=_json_dump(indicator.definition_translations or {}))
-            ws_db_ind.cell(row=row, column=25, value=_json_dump(indicator.aggregated_label_translations or {}))
-            ws_db_ind.cell(row=row, column=26, value=indicator.created_at.isoformat() if indicator.created_at else "")
-            ws_db_ind.cell(row=row, column=27, value=indicator.updated_at.isoformat() if getattr(indicator, "updated_at", None) else "")
-            ws_db_ind.cell(row=row, column=28, value=indicator.indicator_type_id)
-            ws_db_ind.cell(row=row, column=29, value=indicator.indicator_unit_id)
-
-        ws_db_mt = wb.create_sheet(title="DB_MeasurementTypes")
-        ws_db_mt.sheet_state = "hidden"
-        db_mt_headers = [
-            "id",
-            "code",
-            "name",
-            "name_translations_json",
-            "sort_order",
-            "is_active",
-            "created_at",
-            "updated_at",
-        ]
-        for col, header in enumerate(db_mt_headers, 1):
-            cell = ws_db_mt.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
+        # ── Sheet 2: Types ───────────────────────────────────────────────────
+        ws_types = wb.create_sheet(title="Types")
+        types_headers = (
+            ['ID', 'Code', 'Name', 'Active', 'Sort Order']
+            + [f"Name ({code})" for code in languages if code != "en"]
+        )
+        _write_headers(ws_types, types_headers, _FILL_TEAL)
         for row, mt in enumerate(
-            IndicatorBankType.query.order_by(IndicatorBankType.sort_order, IndicatorBankType.name).all(),
-            2,
+            IndicatorBankType.query.order_by(IndicatorBankType.sort_order, IndicatorBankType.name).all(), 2
         ):
-            ws_db_mt.cell(row=row, column=1, value=mt.id)
-            ws_db_mt.cell(row=row, column=2, value=mt.code)
-            ws_db_mt.cell(row=row, column=3, value=mt.name)
-            ws_db_mt.cell(row=row, column=4, value=_json_dump(mt.name_translations or {}))
-            ws_db_mt.cell(row=row, column=5, value=mt.sort_order)
-            ws_db_mt.cell(row=row, column=6, value=mt.is_active)
-            ws_db_mt.cell(row=row, column=7, value=mt.created_at.isoformat() if getattr(mt, "created_at", None) else "")
-            ws_db_mt.cell(row=row, column=8, value=mt.updated_at.isoformat() if getattr(mt, "updated_at", None) else "")
+            nt = mt.name_translations or {}
+            col = 1
+            ws_types.cell(row=row, column=col, value=mt.id);          col += 1
+            ws_types.cell(row=row, column=col, value=mt.code);         col += 1
+            ws_types.cell(row=row, column=col, value=mt.name);         col += 1
+            ws_types.cell(row=row, column=col, value=mt.is_active);    col += 1
+            ws_types.cell(row=row, column=col, value=mt.sort_order);   col += 1
+            for code in languages:
+                if code == "en":
+                    continue
+                ws_types.cell(row=row, column=col, value=nt.get(code, '')); col += 1
+        _autofit(ws_types)
 
-        ws_db_mu = wb.create_sheet(title="DB_MeasurementUnits")
-        ws_db_mu.sheet_state = "hidden"
-        db_mu_headers = [
-            "id",
-            "code",
-            "name",
-            "name_translations_json",
-            "sort_order",
-            "is_active",
-            "allows_disaggregation",
-            "created_at",
-            "updated_at",
-        ]
-        for col, header in enumerate(db_mu_headers, 1):
-            cell = ws_db_mu.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
+        # ── Sheet 3: Units ───────────────────────────────────────────────────
+        ws_units = wb.create_sheet(title="Units")
+        units_headers = (
+            ['ID', 'Code', 'Name', 'Active', 'Sort Order', 'Allows Disaggregation']
+            + [f"Name ({code})" for code in languages if code != "en"]
+        )
+        _write_headers(ws_units, units_headers, _FILL_TEAL)
         for row, mu in enumerate(
-            IndicatorBankUnit.query.order_by(IndicatorBankUnit.sort_order, IndicatorBankUnit.name).all(),
-            2,
+            IndicatorBankUnit.query.order_by(IndicatorBankUnit.sort_order, IndicatorBankUnit.name).all(), 2
         ):
-            ws_db_mu.cell(row=row, column=1, value=mu.id)
-            ws_db_mu.cell(row=row, column=2, value=mu.code)
-            ws_db_mu.cell(row=row, column=3, value=mu.name)
-            ws_db_mu.cell(row=row, column=4, value=_json_dump(mu.name_translations or {}))
-            ws_db_mu.cell(row=row, column=5, value=mu.sort_order)
-            ws_db_mu.cell(row=row, column=6, value=mu.is_active)
-            ws_db_mu.cell(row=row, column=7, value=mu.allows_disaggregation)
-            ws_db_mu.cell(row=row, column=8, value=mu.created_at.isoformat() if getattr(mu, "created_at", None) else "")
-            ws_db_mu.cell(row=row, column=9, value=mu.updated_at.isoformat() if getattr(mu, "updated_at", None) else "")
+            nt = mu.name_translations or {}
+            col = 1
+            ws_units.cell(row=row, column=col, value=mu.id);                    col += 1
+            ws_units.cell(row=row, column=col, value=mu.code);                   col += 1
+            ws_units.cell(row=row, column=col, value=mu.name);                   col += 1
+            ws_units.cell(row=row, column=col, value=mu.is_active);              col += 1
+            ws_units.cell(row=row, column=col, value=mu.sort_order);             col += 1
+            ws_units.cell(row=row, column=col, value=mu.allows_disaggregation);  col += 1
+            for code in languages:
+                if code == "en":
+                    continue
+                ws_units.cell(row=row, column=col, value=nt.get(code, '')); col += 1
+        _autofit(ws_units)
 
-        ws_db_ss = wb.create_sheet(title="DB_Sectors_SubSectors")
-        ws_db_ss.sheet_state = "hidden"
+        # ── Sheet 4: Sectors ─────────────────────────────────────────────────
+        ws_sectors = wb.create_sheet(title="Sectors")
+        sectors_headers = (
+            ['ID', 'Name', 'Description', 'Active', 'Display Order', 'Icon Class']
+            + [f"Name ({code})" for code in languages if code != "en"]
+        )
+        _write_headers(ws_sectors, sectors_headers, _FILL_PURPLE)
+        for row, s in enumerate(
+            Sector.query.order_by(Sector.display_order, Sector.name).all(), 2
+        ):
+            nt = s.name_translations or {}
+            col = 1
+            ws_sectors.cell(row=row, column=col, value=s.id);             col += 1
+            ws_sectors.cell(row=row, column=col, value=s.name);           col += 1
+            ws_sectors.cell(row=row, column=col, value=s.description);    col += 1
+            ws_sectors.cell(row=row, column=col, value=s.is_active);      col += 1
+            ws_sectors.cell(row=row, column=col, value=s.display_order);  col += 1
+            ws_sectors.cell(row=row, column=col, value=s.icon_class);     col += 1
+            for code in languages:
+                if code == "en":
+                    continue
+                ws_sectors.cell(row=row, column=col, value=nt.get(code, '')); col += 1
+        _autofit(ws_sectors)
 
-        db_ss_headers = [
-            "record_type", "id", "name", "description", "sector_id",
-            "display_order", "is_active", "icon_class", "logo_filename",
-            "name_translations_json", "created_at", "updated_at",
-        ]
-        for col, header in enumerate(db_ss_headers, 1):
-            cell = ws_db_ss.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
+        # ── Sheet 5: Sub-Sectors ─────────────────────────────────────────────
+        ws_subsectors = wb.create_sheet(title="Sub-Sectors")
+        subsectors_headers = (
+            ['ID', 'Sector', 'Name', 'Description', 'Active', 'Display Order', 'Icon Class']
+            + [f"Name ({code})" for code in languages if code != "en"]
+        )
+        _write_headers(ws_subsectors, subsectors_headers, _FILL_GREEN)
+        all_sectors_map = {s.id: s.name for s in Sector.query.all()}
+        for row, ss in enumerate(
+            SubSector.query.order_by(SubSector.display_order, SubSector.name).all(), 2
+        ):
+            nt = ss.name_translations or {}
+            col = 1
+            ws_subsectors.cell(row=row, column=col, value=ss.id);          col += 1
+            ws_subsectors.cell(row=row, column=col,
+                               value=all_sectors_map.get(ss.sector_id, '') if ss.sector_id else ''); col += 1
+            ws_subsectors.cell(row=row, column=col, value=ss.name);        col += 1
+            ws_subsectors.cell(row=row, column=col, value=ss.description); col += 1
+            ws_subsectors.cell(row=row, column=col, value=ss.is_active);   col += 1
+            ws_subsectors.cell(row=row, column=col, value=ss.display_order); col += 1
+            ws_subsectors.cell(row=row, column=col, value=ss.icon_class);  col += 1
+            for code in languages:
+                if code == "en":
+                    continue
+                ws_subsectors.cell(row=row, column=col, value=nt.get(code, '')); col += 1
+        _autofit(ws_subsectors)
 
-        ss_row = 2
-        all_sectors = Sector.query.order_by(Sector.display_order, Sector.name).all()
-        for s in all_sectors:
-            ws_db_ss.cell(row=ss_row, column=1, value="sector")
-            ws_db_ss.cell(row=ss_row, column=2, value=s.id)
-            ws_db_ss.cell(row=ss_row, column=3, value=s.name)
-            ws_db_ss.cell(row=ss_row, column=4, value=s.description)
-            ws_db_ss.cell(row=ss_row, column=5, value="")
-            ws_db_ss.cell(row=ss_row, column=6, value=s.display_order)
-            ws_db_ss.cell(row=ss_row, column=7, value=s.is_active)
-            ws_db_ss.cell(row=ss_row, column=8, value=s.icon_class)
-            ws_db_ss.cell(row=ss_row, column=9, value=s.logo_filename)
-            ws_db_ss.cell(row=ss_row, column=10, value=_json_dump(s.name_translations or {}))
-            ws_db_ss.cell(row=ss_row, column=11, value=s.created_at.isoformat() if getattr(s, "created_at", None) else "")
-            ws_db_ss.cell(row=ss_row, column=12, value=s.updated_at.isoformat() if getattr(s, "updated_at", None) else "")
-            ss_row += 1
-
-        all_subsectors = SubSector.query.order_by(SubSector.display_order, SubSector.name).all()
-        for ss in all_subsectors:
-            ws_db_ss.cell(row=ss_row, column=1, value="subsector")
-            ws_db_ss.cell(row=ss_row, column=2, value=ss.id)
-            ws_db_ss.cell(row=ss_row, column=3, value=ss.name)
-            ws_db_ss.cell(row=ss_row, column=4, value=ss.description)
-            ws_db_ss.cell(row=ss_row, column=5, value=ss.sector_id)
-            ws_db_ss.cell(row=ss_row, column=6, value=ss.display_order)
-            ws_db_ss.cell(row=ss_row, column=7, value=ss.is_active)
-            ws_db_ss.cell(row=ss_row, column=8, value=ss.icon_class)
-            ws_db_ss.cell(row=ss_row, column=9, value=ss.logo_filename)
-            ws_db_ss.cell(row=ss_row, column=10, value=_json_dump(ss.name_translations or {}))
-            ws_db_ss.cell(row=ss_row, column=11, value=ss.created_at.isoformat() if getattr(ss, "created_at", None) else "")
-            ws_db_ss.cell(row=ss_row, column=12, value=ss.updated_at.isoformat() if getattr(ss, "updated_at", None) else "")
-            ss_row += 1
-
-        ws_db_cw = wb.create_sheet(title="DB_CommonWords")
-        ws_db_cw.sheet_state = "hidden"
-
-        db_cw_headers = [
-            "id", "term", "meaning", "is_active",
-            "meaning_translations_json", "created_at", "updated_at",
-        ]
-        for col, header in enumerate(db_cw_headers, 1):
-            cell = ws_db_cw.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
-
-        common_words = CommonWord.query.order_by(CommonWord.term).all()
-        for row, cw in enumerate(common_words, 2):
-            ws_db_cw.cell(row=row, column=1, value=cw.id)
-            ws_db_cw.cell(row=row, column=2, value=cw.term)
-            ws_db_cw.cell(row=row, column=3, value=cw.meaning)
-            ws_db_cw.cell(row=row, column=4, value=cw.is_active)
-            ws_db_cw.cell(row=row, column=5, value=_json_dump(cw.meaning_translations or {}))
-            ws_db_cw.cell(row=row, column=6, value=cw.created_at.isoformat() if getattr(cw, "created_at", None) else "")
-            ws_db_cw.cell(row=row, column=7, value=cw.updated_at.isoformat() if getattr(cw, "updated_at", None) else "")
+        # ── Sheet 6: Common Words ────────────────────────────────────────────
+        ws_cw = wb.create_sheet(title="Common Words")
+        cw_headers = (
+            ['ID', 'Term', 'Meaning', 'Active']
+            + [f"Meaning ({code})" for code in languages if code != "en"]
+        )
+        _write_headers(ws_cw, cw_headers, _FILL_BROWN)
+        for row, cw in enumerate(CommonWord.query.order_by(CommonWord.term).all(), 2):
+            mt = cw.meaning_translations or {}
+            col = 1
+            ws_cw.cell(row=row, column=col, value=cw.id);       col += 1
+            ws_cw.cell(row=row, column=col, value=cw.term);     col += 1
+            ws_cw.cell(row=row, column=col, value=cw.meaning);  col += 1
+            ws_cw.cell(row=row, column=col, value=cw.is_active); col += 1
+            for code in languages:
+                if code == "en":
+                    continue
+                ws_cw.cell(row=row, column=col, value=mt.get(code, '')); col += 1
+        _autofit(ws_cw)
 
         output = BytesIO()
         wb.save(output)

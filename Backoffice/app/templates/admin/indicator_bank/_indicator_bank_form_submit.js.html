@@ -1,6 +1,28 @@
 <script nonce="{{ csp_nonce() }}">
 (function() {
-    function initIndicatorBankFormWafSubmit(formId, submitBtnId) {
+    function formatFormErrors(errors) {
+        if (!errors || typeof errors !== 'object') {
+            return '';
+        }
+        var lines = [];
+        Object.keys(errors).forEach(function(field) {
+            var fieldErrors = errors[field];
+            if (!Array.isArray(fieldErrors)) {
+                return;
+            }
+            fieldErrors.forEach(function(msg) {
+                if (msg) {
+                    lines.push(String(field) + ': ' + String(msg));
+                }
+            });
+        });
+        return lines.join('\n');
+    }
+
+    function initIndicatorBankFormWafSubmit(formId, submitBtnId, options) {
+        options = options || {};
+        var stayOnPage = options.stayOnPage === true;
+
         var form = document.getElementById(formId);
         if (!form || form.dataset.wafSubmitInit === '1') {
             return;
@@ -51,19 +73,56 @@
                 credentials: 'same-origin',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 }
             })
             .then(function(resp) {
+                var contentType = resp.headers.get('Content-Type') || '';
                 return resp.text().then(function(text) {
-                    if (!resp.ok) {
-                        throw new Error({{ _('Save failed')|tojson|safe }} + ' (' + resp.status + ')');
+                    var data = null;
+                    if (contentType.indexOf('application/json') !== -1 || (text && text.trim().charAt(0) === '{')) {
+                        try {
+                            data = JSON.parse(text);
+                        } catch (parseErr) {
+                            data = null;
+                        }
                     }
+
+                    if (!resp.ok) {
+                        var errMsg = (data && data.message)
+                            ? data.message
+                            : ({{ _('Save failed')|tojson|safe }} + ' (' + resp.status + ')');
+                        var errDetails = formatFormErrors(data && data.errors);
+                        if (errDetails) {
+                            errMsg += '\n\n' + errDetails;
+                        }
+                        throw new Error(errMsg);
+                    }
+
+                    if (stayOnPage) {
+                        if (data && data.success) {
+                            restoreSubmitBtn();
+                            if (data.name && document.title.indexOf('Edit Indicator:') === 0) {
+                                document.title = {{ _('Edit Indicator:')|tojson|safe }} + ' ' + data.name;
+                            }
+                            if (window.showAlert) {
+                                window.showAlert(
+                                    data.message || {{ _('Indicator saved successfully.')|tojson|safe }},
+                                    'success'
+                                );
+                            }
+                            return;
+                        }
+                        throw new Error((data && data.message) || {{ _('Failed to save indicator')|tojson|safe }});
+                    }
+
                     if (resp.redirected) {
                         window.location.href = resp.url;
                         return;
                     }
+
                     document.open();
                     document.write(text);
                     document.close();
@@ -82,8 +141,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        initIndicatorBankFormWafSubmit('edit-indicator-form', 'editIndicatorBankSubmitBtn');
-        initIndicatorBankFormWafSubmit('add-indicator-form', null);
+        initIndicatorBankFormWafSubmit('edit-indicator-form', 'editIndicatorBankSubmitBtn', { stayOnPage: true });
+        initIndicatorBankFormWafSubmit('add-indicator-form', null, { stayOnPage: false });
     });
 })();
 </script>

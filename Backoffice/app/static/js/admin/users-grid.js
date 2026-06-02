@@ -20,7 +20,7 @@
         if (user.country_count > 0) {
             displayedAny = true;
             if (user.country_count === 1) {
-                html += user.countries[0];
+                html += escapeHtml(user.countries[0]);
             } else {
                 var totalCountries = Object.values(user.countries_by_region || {}).reduce(function (sum, countries) { return sum + (countries ? countries.length : 0); }, 0);
                 if (user.country_count === totalCountries) {
@@ -36,12 +36,12 @@
                             regions[region] = { total: regionTotal, user: regionUserCount };
                             if (regionUserCount === regionTotal) {
                                 hasCompleteRegion = true;
-                                html += '<div class="font-medium text-green-600">' + region + '</div>';
+                                html += '<div class="font-medium text-green-600">' + escapeHtml(region) + '</div>';
                             }
                         }
                     }
                     if (!hasCompleteRegion) {
-                        html += '<span class="cursor-help" title="' + user.countries.join(', ') + '">' + user.country_count + ' ' + cfg.t.countries_790d59ef + '</span>';
+                        html += '<span class="cursor-help" title="' + escapeHtmlAttr(user.countries.join(', ')) + '">' + user.country_count + ' ' + cfg.t.countries_790d59ef + '</span>';
                     } else {
                         var completeRegionsTotal = Object.values(regions).reduce(function (sum, r) { return sum + (r.user === r.total ? r.total : 0); }, 0);
                         if (user.country_count > completeRegionsTotal) {

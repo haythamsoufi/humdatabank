@@ -648,7 +648,12 @@
                     {{ _('Clear stored key') }}
                 </button>
             </div>
-            <input id="apiKeyInput" name="api_key" type="password" autocomplete="off"
+            {#
+              autocomplete="new-password": iOS Safari ignores autocomplete="off" on type="password"
+              fields and autofills the site's stored login password instead. The "new-password"
+              value is correctly honoured by Safari and prevents password-manager autofill.
+            #}
+            <input id="apiKeyInput" name="api_key" type="password" autocomplete="new-password"
                    placeholder="{{ _('Paste an API key created in API Key Management') }}"
                    class="w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono text-sm bg-white">
             <p class="mt-2 text-xs text-blue-800">

@@ -656,21 +656,12 @@
     }
 
     function epRegistryV1PathHref(path) {
+        // Never embed API keys in URLs — they leak via browser history, referrer headers,
+        // and server logs.  Return a clean link; callers can copy the path and use their
+        // key via an Authorization header or a dedicated test-request tool instead.
         try {
             var u = new URL(path, window.location.origin);
-            var key = '';
-            if (typeof window.getApiManagementApiKey === 'function') {
-                key = window.getApiManagementApiKey();
-            } else {
-                try {
-                    key = String(sessionStorage.getItem('hum_databank_api_management_api_key') || localStorage.getItem('ifrc_api_management_api_key') || '').trim();
-                } catch (e) {}
-            }
-            if (key) {
-                u.searchParams.set('api_key', key);
-            } else {
-                u.searchParams.delete('api_key');
-            }
+            u.searchParams.delete('api_key');
             return u.href;
         } catch (e) {
             return '#';

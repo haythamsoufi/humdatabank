@@ -93,10 +93,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Add CSRF token to all AJAX requests
+    // Add CSRF token to same-origin XHR requests only; skip if token unavailable
+    // to avoid sending a literal "null" header to third-party services.
     let originalSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function(data) {
-        this.setRequestHeader('X-CSRFToken', getCSRFToken());
+        var token = getCSRFToken();
+        if (token) {
+            try { this.setRequestHeader('X-CSRFToken', token); } catch (_) {}
+        }
         originalSend.apply(this, arguments);
     };
 

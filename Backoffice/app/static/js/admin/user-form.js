@@ -737,11 +737,11 @@
         function loadPreview() {
             if (!previewContainer) return;
             if (!userDeletionPreviewUrl) {
-                previewContainer.innerHTML = '<div class="text-red-600">" + cfg.t.couldNotLoadPreview + "</div>';
+                previewContainer.innerHTML = '<div class="text-red-600">' + cfg.t.couldNotLoadPreview + '</div>';
                 confirmBtn.disabled = false;
                 return;
             }
-            previewContainer.innerHTML = '<div>" + cfg.t.loadingText + "</div>';
+            previewContainer.innerHTML = '<div>' + cfg.t.loadingText + '</div>';
             if (unassignContainer) unassignContainer.innerHTML = '';
             confirmBtn.disabled = true;
 
@@ -755,7 +755,7 @@
                 .then(function(resp) {
                     window.__clientLog && window.__clientLog('[user_form] delete preview payload', resp);
                     if (!resp.success) {
-                        previewContainer.innerHTML = '<div class="text-red-600">' + escapeHtml(resp.error || "" + cfg.t.couldNotLoadPreview + "") + '</div>';
+                        previewContainer.innerHTML = '<div class="text-red-600">' + escapeHtml(resp.error || cfg.t.couldNotLoadPreview) + '</div>';
                         confirmBtn.disabled = false;
                         return;
                     }
@@ -770,7 +770,7 @@
                             listHtml += '<li>' + escapeHtml(String(k).replaceAll('_', ' ')) + ': ' + escapeHtml(String(del[k])) + '</li>';
                         }
                     }
-                    if (!hasItems) listHtml += '<li>" + cfg.t.noRelatedDeletions + "</li>';
+                    if (!hasItems) listHtml += '<li>' + cfg.t.noRelatedDeletions + '</li>';
                     listHtml += '</ul>';
                     previewContainer.innerHTML = listHtml;
 
@@ -780,18 +780,18 @@
                         for (var u in unassign) {
                             if (unassign[u] && unassign[u] > 0) {
                                 hasUnassign = true;
-                                unHtml += '<li>' + escapeHtml(String(u).replaceAll('_', ' ')) + ': ' + escapeHtml(String(unassign[u])) + ' " + cfg.t.willBeUnassigned + "</li>';
+                                unHtml += '<li>' + escapeHtml(String(u).replaceAll('_', ' ')) + ': ' + escapeHtml(String(unassign[u])) + ' ' + cfg.t.willBeUnassigned + '</li>';
                             }
                         }
                         unassignContainer.innerHTML = hasUnassign
-                            ? '<div class="font-medium mb-1">" + cfg.t.followingUnassigned + "</div><ul class="list-disc pl-5 space-y-1">' + unHtml + '</ul>'
+                            ? '<div class="font-medium mb-1">' + cfg.t.followingUnassigned + '</div><ul class="list-disc pl-5 space-y-1">' + unHtml + '</ul>'
                             : '';
                     }
                     confirmBtn.disabled = false;
                 })
                 .catch(function(err) {
                     console.error('[user_form] delete preview failed', err);
-                    previewContainer.innerHTML = '<div class="text-red-600">" + cfg.t.failedToLoadPreview + "</div>';
+                    previewContainer.innerHTML = '<div class="text-red-600">' + cfg.t.failedToLoadPreview + '</div>';
                     confirmBtn.disabled = false;
                 });
         }
@@ -807,7 +807,7 @@
         confirmBtn.addEventListener('click', function() {
             window.__clientLog && window.__clientLog('[user_form] delete confirm clicked, submitting form');
             confirmBtn.disabled = true;
-            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>" + cfg.t.deletingText + "';
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + cfg.t.deletingText;
             closeModal();
             deleteForm.submit();
         });
@@ -1152,7 +1152,7 @@
                         url += (url.indexOf('?') !== -1 ? '&' : '?') + 'days=' + days;
                     }
                 }
-                analyticsPanel.innerHTML = '<div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center py-14 px-4"><i class="fas fa-spinner fa-spin text-blue-600 text-2xl mb-3"></i><span class="text-sm text-gray-600">" + cfg.t.loadingAnalytics + "</span></div>';
+                analyticsPanel.innerHTML = '<div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center py-14 px-4"><i class="fas fa-spinner fa-spin text-blue-600 text-2xl mb-3"></i><span class="text-sm text-gray-600">' + cfg.t.loadingAnalytics + '</span></div>';
                 var fetchFn = (window.getFetch && window.getFetch()) || fetch;
                 fetchFn(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
                     .then(function(r) {
@@ -1170,16 +1170,16 @@
                             analyticsPanel.innerHTML = [
                                 '<div class="rounded-lg border border-yellow-200 bg-yellow-50 text-center py-10 px-4">',
                                   '<i class="fas fa-lock text-yellow-500 text-2xl mb-3"></i>',
-                                  '<p class="text-sm font-semibold text-yellow-800 mb-1">" + cfg.t.sessionExpired + "</p>',
-                                  '<p class="text-xs text-yellow-700 mb-4">" + cfg.t.pleaseLogIn + "</p>',
-                                  '<a href="" + cfg.urls.loginUrl + "" target="_blank" rel="noopener"',
+                                  '<p class="text-sm font-semibold text-yellow-800 mb-1">' + cfg.t.sessionExpired + '</p>',
+                                  '<p class="text-xs text-yellow-700 mb-4">' + cfg.t.pleaseLogIn + '</p>',
+                                  '<a href="' + cfg.urls.loginUrl + '" target="_blank" rel="noopener"',
                                   '   class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors">',
-                                  '  <i class="fas fa-sign-in-alt"></i> " + cfg.t.logIn + "',
+                                  '  <i class="fas fa-sign-in-alt"></i> ' + cfg.t.logIn,
                                   '</a>',
                                 '</div>'
                             ].join('');
                         } else {
-                            analyticsPanel.innerHTML = '<div class="rounded-lg border border-red-200 bg-red-50 text-center py-10 px-4"><i class="fas fa-exclamation-circle text-red-500 text-2xl mb-2"></i><p class="text-sm text-red-800">" + cfg.t.failedToLoadAnalytics + "</p></div>';
+                            analyticsPanel.innerHTML = '<div class="rounded-lg border border-red-200 bg-red-50 text-center py-10 px-4"><i class="fas fa-exclamation-circle text-red-500 text-2xl mb-2"></i><p class="text-sm text-red-800">' + cfg.t.failedToLoadAnalytics + '</p></div>';
                         }
                     });
             }
@@ -1638,12 +1638,11 @@
                 kickBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Kicking Out...';
 
                 try {
-                    // Make AJAX request to kick out device
-                    const response = await fetch(`/admin/users/${userId}/devices/${deviceId}/kickout`, {
+                    const _apiFetch = (window.getFetch && window.getFetch()) || fetch;
+                    const response = await _apiFetch(`/admin/users/${userId}/devices/${deviceId}/kickout`, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                            'Content-Type': 'application/json'
                         },
                         credentials: 'same-origin'
                     });
@@ -1745,12 +1744,11 @@
                 removeBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Removing...';
 
                 try {
-                    // Make AJAX request to remove device
-                    const response = await fetch(`/admin/users/${userId}/devices/${deviceId}/remove`, {
+                    const _apiFetch = (window.getFetch && window.getFetch()) || fetch;
+                    const response = await _apiFetch(`/admin/users/${userId}/devices/${deviceId}/remove`, {
                         method: 'DELETE',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                            'Content-Type': 'application/json'
                         },
                         credentials: 'same-origin'
                     });

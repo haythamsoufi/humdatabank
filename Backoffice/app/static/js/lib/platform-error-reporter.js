@@ -205,6 +205,22 @@
     });
   }
 
+  /* ── Global unhandled-rejection handler ───────────────────────────────── */
+
+  var UNHANDLED_FLAG = '__humdbUnhandledRejectionBound';
+
+  function installUnhandledRejectionHandler() {
+    if (typeof window === 'undefined' || window[UNHANDLED_FLAG]) return;
+    window[UNHANDLED_FLAG] = true;
+    window.addEventListener('unhandledrejection', function (event) {
+      var reason = (event && event.reason) || {};
+      // Suppress noise from aborted fetches and cancelled operations.
+      var msg = String(reason && reason.message ? reason.message : reason);
+      if (msg === 'AbortError' || msg.indexOf('AbortError') !== -1) return;
+      console.warn('[humdb] Unhandled promise rejection:', reason);
+    });
+  }
+
   /* ── Bootstrap ─────────────────────────────────────────────────────────── */
 
   if (typeof window !== 'undefined') {
@@ -212,5 +228,6 @@
     window.looksLikeWafResponse = looksLikeWafResponse;
     installFetchWrapper();
     installJQueryHandler();
+    installUnhandledRejectionHandler();
   }
 })();

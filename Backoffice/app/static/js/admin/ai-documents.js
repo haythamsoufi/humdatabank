@@ -32,22 +32,22 @@ function getStatusBadge(status, error) {
         'completed': {
             class: 'bg-green-100 text-green-800',
             icon: 'fa-check-circle',
-            text: 'cfg.t.completed_07ca5050'
+            text: cfg.t.completed_07ca5050
         },
         'pending': {
             class: 'bg-yellow-100 text-yellow-800',
             icon: 'fa-clock',
-            text: 'cfg.t.pending_2d13df6f'
+            text: cfg.t.pending_2d13df6f
         },
         'processing': {
             class: 'bg-blue-100 text-blue-800',
             icon: 'fa-spinner fa-spin',
-            text: 'cfg.t.processing_643562a9'
+            text: cfg.t.processing_643562a9
         },
         'failed': {
             class: 'bg-red-100 text-red-800',
             icon: 'fa-times-circle',
-            text: 'cfg.t.failed_d7c8c85b'
+            text: cfg.t.failed_d7c8c85b
         }
     };
 
@@ -59,21 +59,21 @@ function getStatusBadge(status, error) {
 
 // Document category taxonomy (must match ai_metadata_extractor.DOCUMENT_CATEGORIES / CATEGORY_LABELS)
 const DOCUMENT_CATEGORY_OPTIONS = [
-    { value: '',               label: '— cfg.t.none_6adf97f8 —' },
-    { value: 'country_plan',   label: 'cfg.t.country_plan_137beb42' },
-    { value: 'country_report', label: 'cfg.t.country_report_6316677c' },
-    { value: 'strategic_plan', label: 'cfg.t.strategic_plan_13a00ea1' },
-    { value: 'work_plan',      label: 'cfg.t.work_plan_2a21b46b' },
-    { value: 'plan',           label: 'cfg.t.plan_0b6cbdf7' },
-    { value: 'sitrep',         label: 'cfg.t.situation_report_eb2802e8' },
-    { value: 'report',         label: 'cfg.t.report_4b1b4dc8' },
-    { value: 'assessment',     label: 'cfg.t.assessment_29a99298' },
-    { value: 'policy',         label: 'cfg.t.policy_51359e8b' },
-    { value: 'guideline',      label: 'cfg.t.guideline_a3928106' },
-    { value: 'resolution',     label: 'cfg.t.resolution_b5a4b64b' },
-    { value: 'data_sheet',     label: 'cfg.t.data_sheet_063b405d' },
-    { value: 'training',       label: 'cfg.t.training_cf270e40' },
-    { value: 'other',          label: 'cfg.t.other_6311ae17' },
+    { value: '',               label: cfg.t.none_49bd59b9 },
+    { value: 'country_plan',   label: cfg.t.country_plan_137beb42 },
+    { value: 'country_report', label: cfg.t.country_report_6316677c },
+    { value: 'strategic_plan', label: cfg.t.strategic_plan_13a00ea1 },
+    { value: 'work_plan',      label: cfg.t.work_plan_2a21b46b },
+    { value: 'plan',           label: cfg.t.plan_0b6cbdf7 },
+    { value: 'sitrep',         label: cfg.t.situation_report_eb2802e8 },
+    { value: 'report',         label: cfg.t.report_4b1b4dc8 },
+    { value: 'assessment',     label: cfg.t.assessment_29a99298 },
+    { value: 'policy',         label: cfg.t.policy_51359e8b },
+    { value: 'guideline',      label: cfg.t.guideline_a3928106 },
+    { value: 'resolution',     label: cfg.t.resolution_b5a4b64b },
+    { value: 'data_sheet',     label: cfg.t.data_sheet_063b405d },
+    { value: 'training',       label: cfg.t.training_cf270e40 },
+    { value: 'other',          label: cfg.t.other_6311ae17 },
 ];
 
 function getCategoryLabel(value) {
@@ -270,7 +270,7 @@ if (processingCancelBtn) {
         if (!ifrcImportJobId && !bulkReprocessJobId && !bulkMetaReprocessJobId) {
             return;
         }
-        if (processingTitle) processingTitle.textContent = 'cfg.t.cancelling_ef5ba1f8';
+        if (processingTitle) processingTitle.textContent = cfg.t.cancelling_ef5ba1f8;
         if (processingCancelWrap) processingCancelWrap.classList.add('hidden');
         (async function () {
             try {
@@ -341,7 +341,7 @@ function trackProcessingDoc(docId) {
     if (!trackedProcessingDocs.has(id)) {
         trackedProcessingDocs.set(id, {
             status: 'pending',
-            stage: 'cfg.t.preparing_0862f67f',
+            stage: cfg.t.preparing_0862f67f,
             progress: 0,
             error: '',
             updatedAt: Date.now(),
@@ -416,14 +416,14 @@ function renderTrackedProcessingBar() {
             const activeDownloads = (sCounts.downloading || 0) + (sCounts.processing || 0);
             let detail;
             if (activeDownloads > 0) {
-                detail = `${doneCount}/${total} \u2013 cfg.t.downloading_ae314963 ${activeDownloads}...`;
+                detail = `${doneCount}/${total} \u2013 ` + cfg.t.downloading_ae314963 + ` ${activeDownloads}...`;
             } else if (doneCount > 0) {
-                detail = `${doneCount}/${total} cfg.t.starting_8c6ce9f8`;
+                detail = `${doneCount}/${total} ` + cfg.t.starting_8c6ce9f8;
             } else {
-                detail = total > 1 ? `0/${total} cfg.t.starting_8c6ce9f8` : 'cfg.t.starting_import_b06c80dc...';
+                detail = total > 1 ? `0/${total} ` + cfg.t.starting_8c6ce9f8 : cfg.t.starting_import_b06c80dc + '...';
             }
             const overallPct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
-            showProcessingBanner('cfg.t.importing_documents_8a49fe5a', detail, overallPct);
+            showProcessingBanner(cfg.t.importing_documents_8a49fe5a, detail, overallPct);
             if (processingBannerUI && processingBannerUI.setCancelVisible) {
                 processingBannerUI.setCancelVisible(true);
             } else if (processingCancelWrap) {
@@ -469,21 +469,21 @@ function renderTrackedProcessingBar() {
     let detail;
 
     if (done >= total) {
-        title = (failed > 0) ? 'cfg.t.processing_finished_1b8f5c57' : 'cfg.t.processing_complete_930a1b79';
+        title = (failed > 0) ? cfg.t.processing_finished_1b8f5c57 : cfg.t.processing_complete_930a1b79;
         detail = (failed > 0)
-            ? ('cfg.t.some_documents_failed_aaa3128a' + ` (${failed}/${total})`)
-            : 'cfg.t.done_f5940523';
+            ? (cfg.t.some_documents_failed_aaa3128a + ` (${failed}/${total})`)
+            : cfg.t.done_f5940523;
     } else {
         // Show "current/total": count completed + 1 if one is in progress, so we don't show "0/1" while a doc is processing
         const displayCurrent = Math.min(done + (inProgress ? 1 : 0), total);
-        title = (window.aiDocsImportProgress ? 'cfg.t.importing_documents_8a49fe5a' : 'cfg.t.processing_documents_4c764ed2') + ` (${displayCurrent}/${total})`;
+        title = (window.aiDocsImportProgress ? cfg.t.importing_documents_8a49fe5a : cfg.t.processing_documents_4c764ed2) + ` (${displayCurrent}/${total})`;
         if (focus && focus.data) {
             const focusId = focus.id;
-            const focusStage = focus.data.stage || 'cfg.t.preparing_0862f67f';
+            const focusStage = focus.data.stage || cfg.t.preparing_0862f67f;
             const focusPct = clampPercent(typeof focus.data.progress === 'number' ? focus.data.progress : 0);
             detail = `#${focusId} • cfg.t.stage_5f483ab8 ${focusStage} • ${focusPct}%`;
         } else {
-            detail = 'cfg.t.working_9c8a77ee';
+            detail = cfg.t.working_9c8a77ee;
         }
     }
 
@@ -613,7 +613,7 @@ function startProcessingPoll(docId) {
                     void refreshAiDocumentGridRowFromApi(docId);
                 }
             } else if (status === 'failed') {
-                const errorMsg = data.document.processing_error || 'cfg.t.processing_failed_ad62fd55';
+                const errorMsg = data.document.processing_error || cfg.t.processing_failed_ad62fd55;
                 updateTrackedProcessingDoc(docId, { status: 'failed', stage: 'Failed', progress: 100, error: errorMsg });
                 updateDocumentInGrid(docId, {
                     processing_status: 'failed',
@@ -862,14 +862,14 @@ CountryScopeTooltip.prototype.init = function(params) {
 
     if (countries.length === 0) {
         const empty = document.createElement('div');
-        empty.textContent = 'cfg.t.no_countries_e1ba5c60';
+        empty.textContent = cfg.t.no_countries_e1ba5c60;
         container.appendChild(empty);
         this.eGui = container;
         return;
     }
 
     const title = document.createElement('div');
-    title.textContent = 'cfg.t.countries_790d59ef' + ' (' + countries.length + ')';
+    title.textContent = cfg.t.countries_790d59ef + ' (' + countries.length + ')';
     title.style.fontWeight = '600';
     title.style.marginBottom = '6px';
     container.appendChild(title);
@@ -897,7 +897,7 @@ CountryScopeTooltip.prototype.getGui = function() {
 const columnDefs = [
     {
         field: 'title',
-        headerName: 'cfg.t.document_09453598',
+        headerName: cfg.t.document_09453598,
         width: 350,
         minWidth: 250,
         maxWidth: 500,
@@ -921,7 +921,7 @@ const columnDefs = [
     },
     {
         field: 'file_type',
-        headerName: 'cfg.t.type_a1fa2777',
+        headerName: cfg.t.type_a1fa2777,
         width: 120,
         minWidth: 100,
         maxWidth: 150,
@@ -936,7 +936,7 @@ const columnDefs = [
     },
     {
         field: 'country_name',
-        headerName: 'cfg.t.country_scope_281f8863',
+        headerName: cfg.t.country_scope_281f8863,
         width: 220,
         minWidth: 160,
         maxWidth: 360,
@@ -994,23 +994,23 @@ const columnDefs = [
 
             // Global scope badge
             if (scope === 'global') {
-                return _scopePill('bg-blue-100 text-blue-800', 'fas fa-globe', 'cfg.t.global_4cc6684d');
+                return _scopePill('bg-blue-100 text-blue-800', 'fas fa-globe', cfg.t.global_4cc6684d);
             }
 
             // Regional scope badge (no country list)
             if (scope === 'regional' && countries.length === 0) {
-                return _scopePill('bg-purple-100 text-purple-800', 'fas fa-map', 'cfg.t.regional_9c1c6794');
+                return _scopePill('bg-purple-100 text-purple-800', 'fas fa-map', cfg.t.regional_9c1c6794);
             }
 
             // Regional with countries: badge only; full list on hover via tooltip
             if (scope === 'regional' && countries.length > 0) {
-                return _scopePill('bg-purple-100 text-purple-800', 'fas fa-map', 'cfg.t.regional_9c1c6794');
+                return _scopePill('bg-purple-100 text-purple-800', 'fas fa-map', cfg.t.regional_9c1c6794);
             }
 
             // Cluster (multi-country / NS set, not a platform region label)
             // Note: theme maps `blue` and `teal` to the same palette — do not use teal here or Cluster matches Global.
             if (scope === 'cluster') {
-                return _scopePill('bg-amber-100 text-amber-800', 'fas fa-layer-group', 'cfg.t.cluster_249694a4');
+                return _scopePill('bg-amber-100 text-amber-800', 'fas fa-layer-group', cfg.t.cluster_249694a4);
             }
 
             // No countries at all
@@ -1035,7 +1035,7 @@ const columnDefs = [
             const scopeBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 mr-1" style="line-height:1">' +
                 '<span class="inline-flex shrink-0 items-center justify-center" style="width:1em;height:1em;line-height:1" aria-hidden="true">' +
                 '<i class="fas fa-globe-americas" style="display:block;line-height:1;font-size:0.95em"></i></span>' +
-                '<span style="line-height:1">' + countries.length + ' cfg.t.countries_71bee43a</span></span>';
+                '<span style="line-height:1">' + countries.length + ' ' + cfg.t.countries_71bee43a + '</span></span>';
             const names = countries.map(function(c) { return c.name + (c.iso3 ? ' (' + c.iso3 + ')' : ''); }).join(', ');
             return scopeBadge + '<span class="text-xs text-gray-600" style="' + _countryNameWrap + '" title="' + escapeAttr(names) + '">' + escapeHtml(names) + '</span>';
         },
@@ -1060,7 +1060,7 @@ const columnDefs = [
     },
     {
         field: 'is_public',
-        headerName: 'cfg.t.public_3d067bed',
+        headerName: cfg.t.public_3d067bed,
         width: 100,
         minWidth: 90,
         maxWidth: 120,
@@ -1070,8 +1070,8 @@ const columnDefs = [
             const data = params.data;
             const isPublic = data && (data.is_public === true || data.is_public === 'true' || data.is_public === 1);
             const docId = data && data.id;
-            const label = isPublic ? 'cfg.t.public_3d067bed' : 'cfg.t.not_public_20257be8';
-            const titleAttr = isPublic ? 'cfg.t.click_to_make_not_public_1466b6c5' : 'cfg.t.click_to_make_public_f00ad0b7';
+            const label = isPublic ? cfg.t.public_3d067bed : cfg.t.not_public_20257be8;
+            const titleAttr = isPublic ? cfg.t.click_to_make_not_public_1466b6c5 : cfg.t.click_to_make_public_f00ad0b7;
             const btnClass = isPublic
                 ? 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer border border-transparent hover:border-green-300 transition-colors'
                 : 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer border border-transparent hover:border-gray-300 transition-colors';
@@ -1085,13 +1085,13 @@ const columnDefs = [
         filterValueGetter: function(params) {
             const v = params.data && params.data.is_public;
             const isPublic = v === true || v === 'true' || v === 1;
-            return isPublic ? 'cfg.t.public_3d067bed' : 'cfg.t.not_public_20257be8';
+            return isPublic ? cfg.t.public_3d067bed : cfg.t.not_public_20257be8;
         },
         cellStyle: { 'text-align': 'center', 'white-space': 'nowrap' }
     },
     {
         field: 'processing_status',
-        headerName: 'cfg.t.status_ec53a8c4',
+        headerName: cfg.t.status_ec53a8c4,
         width: 150,
         minWidth: 120,
         maxWidth: 200,
@@ -1104,7 +1104,7 @@ const columnDefs = [
     },
     {
         field: 'total_chunks',
-        headerName: 'cfg.t.chunks_58fce280',
+        headerName: cfg.t.chunks_58fce280,
         width: 120,
         minWidth: 100,
         maxWidth: 150,
@@ -1117,7 +1117,7 @@ const columnDefs = [
     },
     {
         field: 'created_at',
-        headerName: 'cfg.t.created_0eceeb45',
+        headerName: cfg.t.created_0eceeb45,
         width: 180,
         minWidth: 150,
         maxWidth: 250,
@@ -1128,7 +1128,7 @@ const columnDefs = [
     },
     {
         field: 'document_date',
-        headerName: 'cfg.t.doc_date_8c62d999',
+        headerName: cfg.t.doc_date_8c62d999,
         width: 140,
         minWidth: 110,
         maxWidth: 180,
@@ -1143,7 +1143,7 @@ const columnDefs = [
     },
     {
         field: 'document_language',
-        headerName: 'cfg.t.language_4994a8ff',
+        headerName: cfg.t.language_4994a8ff,
         width: 110,
         minWidth: 90,
         maxWidth: 140,
@@ -1158,7 +1158,7 @@ const columnDefs = [
     },
     {
         field: 'source_organization',
-        headerName: 'cfg.t.source_org_83a6d807',
+        headerName: cfg.t.source_org_83a6d807,
         width: 160,
         minWidth: 120,
         maxWidth: 220,
@@ -1174,7 +1174,7 @@ const columnDefs = [
     },
     {
         field: 'document_category',
-        headerName: 'cfg.t.category_3adbdb3a',
+        headerName: cfg.t.category_3adbdb3a,
         width: 160,
         minWidth: 130,
         maxWidth: 200,
@@ -1183,13 +1183,13 @@ const columnDefs = [
         cellRenderer: function(params) {
             const v = params.value || '';
             const docId = params.data && params.data.id;
-            const label = v ? getCategoryLabel(v) : 'cfg.t.none_49bd59b9';
+            const label = v ? getCategoryLabel(v) : cfg.t.none_49bd59b9;
             const opts = DOCUMENT_CATEGORY_OPTIONS.map(function(o) {
                 return '<option value="' + escapeAttr(o.value) + '"' + (o.value === v ? ' selected' : '') + '>' + escapeHtml(o.label) + '</option>';
             }).join('');
             return '<select class="ai-doc-category-select text-xs border-0 bg-transparent focus:ring-1 focus:ring-blue-400 rounded cursor-pointer w-full py-0.5 text-emerald-700 font-medium" ' +
                    'data-ai-doc-action="change-category" data-doc-id="' + (docId || '') + '" ' +
-                   'title="cfg.t.click_to_change_category_a21f96b3">' + opts + '</select>';
+                   'title="' + cfg.t.click_to_change_category_a21f96b3 + '">' + opts + '</select>';
         },
         filterValueGetter: function(params) {
             return getCategoryLabel(params.data && params.data.document_category);
@@ -1198,7 +1198,7 @@ const columnDefs = [
     },
     {
         field: 'quality_score',
-        headerName: 'cfg.t.quality_571094bb',
+        headerName: cfg.t.quality_571094bb,
         width: 110,
         minWidth: 90,
         maxWidth: 130,
@@ -1333,22 +1333,22 @@ function initializeDocumentsBulkActions() {
         deleteBtn.disabled = selectedCount === 0;
         if (redetectCountryBtn) redetectCountryBtn.disabled = eligibleReprocess.length === 0;
         if (redetectCountryLabel) redetectCountryLabel.textContent = selectedCount > 0
-            ? 'cfg.t.redetect_country_2f20e028' + ' (' + eligibleReprocess.length + ')'
-            : 'cfg.t.redetect_country_2f20e028';
+            ? cfg.t.redetect_country_2f20e028 + ' (' + eligibleReprocess.length + ')'
+            : cfg.t.redetect_country_2f20e028;
         if (reprocessMetaBtn) reprocessMetaBtn.disabled = eligibleReprocess.length === 0;
         if (reprocessMetaLabel) reprocessMetaLabel.textContent = selectedCount > 0
-            ? 'cfg.t.reprocess_metadata_4a7b1eab' + ' (' + eligibleReprocess.length + ')'
-            : 'cfg.t.reprocess_metadata_4a7b1eab';
+            ? cfg.t.reprocess_metadata_4a7b1eab + ' (' + eligibleReprocess.length + ')'
+            : cfg.t.reprocess_metadata_4a7b1eab;
 
         downloadLabel.textContent = selectedCount > 0
-            ? 'cfg.t.download_801ab246' + ' (' + selectedCount + ')'
-            : 'cfg.t.download_801ab246';
+            ? cfg.t.download_801ab246 + ' (' + selectedCount + ')'
+            : cfg.t.download_801ab246;
         reprocessLabel.textContent = selectedCount > 0
-            ? 'cfg.t.reprocess_3f20034f' + ' (' + eligibleReprocess.length + ')'
-            : 'cfg.t.reprocess_3f20034f';
+            ? cfg.t.reprocess_3f20034f + ' (' + eligibleReprocess.length + ')'
+            : cfg.t.reprocess_3f20034f;
         deleteLabel.textContent = selectedCount > 0
-            ? 'cfg.t.delete_f2a6c498' + ' (' + selectedCount + ')'
-            : 'cfg.t.delete_f2a6c498';
+            ? cfg.t.delete_f2a6c498 + ' (' + selectedCount + ')'
+            : cfg.t.delete_f2a6c498;
     };
 
     const bulkDownloadSelected = function() {
@@ -1404,7 +1404,7 @@ function initializeDocumentsBulkActions() {
             ids: targets.map(function(r) { return r.id; })
         });
 
-        const confirmMsg = 'cfg.t.reprocess_selected_documents_95e21554' + ' (' + targets.length + ')';
+        const confirmMsg = cfg.t.reprocess_selected_documents_95e21554 + ' (' + targets.length + ')';
         const proceed = async function() {
             // IMPORTANT: Pre-register ALL docs first so the banner shows 0/N immediately (not 0/1 then 0/2...).
             const requestTs = Date.now();
@@ -1459,9 +1459,9 @@ function initializeDocumentsBulkActions() {
                 confirmMsg,
                 proceed,
                 null,
-                'cfg.t.reprocess_3f20034f',
-                'cfg.t.cancel_ea478870',
-                'cfg.t.reprocess_documents_fa766fbe'
+                cfg.t.reprocess_3f20034f,
+                cfg.t.cancel_ea478870,
+                cfg.t.reprocess_documents_fa766fbe
             );
         } else {
             proceed();
@@ -1476,10 +1476,10 @@ function initializeDocumentsBulkActions() {
         });
         if (!targets.length) return;
 
-        const confirmMsg = 'cfg.t.re_run_metadata_enrichment_date_language_abe06685' + ' (' + targets.length + ')';
+        const confirmMsg = cfg.t.re_run_metadata_enrichment_date_language_abe06685 + ' (' + targets.length + ')';
         const proceed = async function() {
             const ids = targets.map(function(r) { return r.id; });
-            showProcessingBanner('cfg.t.reprocessing_metadata_e6c7cf5c', 'cfg.t.starting_8c6ce9f8', 0);
+            showProcessingBanner(cfg.t.reprocessing_metadata_e6c7cf5c, cfg.t.starting_8c6ce9f8, 0);
             if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
             try {
                 const response = await csrfFetch('/admin/ai/documents/bulk-reprocess-metadata', {
@@ -1496,7 +1496,7 @@ function initializeDocumentsBulkActions() {
             } catch (error) {
                 hideProcessingBanner();
                 if (processingCancelWrap) processingCancelWrap.classList.add('hidden');
-                if (window.showAlert) window.showAlert('cfg.t.error_3d9f514d ' + ((error && error.message) || 'cfg.t.failed_to_start_metadata_reprocess_801da98c'), 'error');
+                if (window.showAlert) window.showAlert(cfg.t.error_3d9f514d + ' ' + ((error && error.message) || cfg.t.failed_to_start_metadata_reprocess_801da98c), 'error');
             }
             deselectAll();
         };
@@ -1506,9 +1506,9 @@ function initializeDocumentsBulkActions() {
                 confirmMsg,
                 proceed,
                 null,
-                'cfg.t.reprocess_metadata_4a7b1eab',
-                'cfg.t.cancel_ea478870',
-                'cfg.t.reprocess_metadata_d2fa3648'
+                cfg.t.reprocess_metadata_4a7b1eab,
+                cfg.t.cancel_ea478870,
+                cfg.t.reprocess_metadata_d2fa3648
             );
         } else {
             proceed();
@@ -1522,7 +1522,7 @@ function initializeDocumentsBulkActions() {
         });
         if (!targets.length) return;
 
-        const confirmMsg = 'cfg.t.delete_selected_documents_54681267' + ' (' + targets.length + ')';
+        const confirmMsg = cfg.t.delete_selected_documents_54681267 + ' (' + targets.length + ')';
         const proceed = async function() {
             for (let i = 0; i < targets.length; i++) {
                 const row = targets[i];
@@ -1541,11 +1541,11 @@ function initializeDocumentsBulkActions() {
                         removeTrackedProcessingDoc(id);
                         removeDocumentFromGrid(id);
                     } else {
-                        const msg = 'cfg.t.error_3d9f514d ' + (result.error || 'cfg.t.failed_to_delete_document_94ab7a09') + ' (' + title + ')';
+                        const msg = cfg.t.error_3d9f514d + ' ' + (result.error || cfg.t.failed_to_delete_document_94ab7a09) + ' (' + title + ')';
                         if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
                     }
                 } catch (error) {
-                    const msg = 'cfg.t.error_3d9f514d ' + (error.message || 'cfg.t.failed_to_delete_document_94ab7a09') + ' (' + title + ')';
+                    const msg = cfg.t.error_3d9f514d + ' ' + (error.message || cfg.t.failed_to_delete_document_94ab7a09) + ' (' + title + ')';
                     if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
                 }
             }
@@ -1558,18 +1558,18 @@ function initializeDocumentsBulkActions() {
                 confirmMsg,
                 proceed,
                 null,
-                'cfg.t.delete_f2a6c498',
-                'cfg.t.cancel_ea478870',
-                'cfg.t.delete_documents_13b47e67'
+                cfg.t.delete_f2a6c498,
+                cfg.t.cancel_ea478870,
+                cfg.t.delete_documents_13b47e67
             );
         } else if (window.showConfirmation) {
             window.showConfirmation(
                 confirmMsg,
                 proceed,
                 null,
-                'cfg.t.delete_f2a6c498',
-                'cfg.t.cancel_ea478870',
-                'cfg.t.delete_documents_13b47e67'
+                cfg.t.delete_f2a6c498,
+                cfg.t.cancel_ea478870,
+                cfg.t.delete_documents_13b47e67
             );
         } else {
             proceed();
@@ -1584,10 +1584,10 @@ function initializeDocumentsBulkActions() {
         });
         if (!targets.length) return;
 
-        const confirmMsg = 'cfg.t.re_run_country_detection_for_selected_do_01bf58fb' + ' (' + targets.length + ')';
+        const confirmMsg = cfg.t.re_run_country_detection_for_selected_do_01bf58fb + ' (' + targets.length + ')';
         const proceed = function() {
             const total = targets.length;
-            showProcessingBanner('cfg.t.detecting_countries_c3ff26ba' + ' (0/' + total + ')', 'cfg.t.starting_8c6ce9f8', 0);
+            showProcessingBanner(cfg.t.detecting_countries_c3ff26ba + ' (0/' + total + ')', cfg.t.starting_8c6ce9f8, 0);
 
             (async function() {
                 let done = 0;
@@ -1598,7 +1598,7 @@ function initializeDocumentsBulkActions() {
                     const title = row.title || row.filename || 'Untitled';
                     const pct = Math.round(((i) / total) * 100);
                     showProcessingBanner(
-                        'cfg.t.detecting_countries_c3ff26ba' + ' (' + (i + 1) + '/' + total + ')',
+                        cfg.t.detecting_countries_c3ff26ba + ' (' + (i + 1) + '/' + total + ')',
                         '#' + id + ' \u2022 ' + title,
                         pct
                     );
@@ -1627,9 +1627,9 @@ function initializeDocumentsBulkActions() {
                     }
                 }
                 const summaryMsg = failed > 0
-                    ? (done + ' cfg.t.document_s_updated_15f428a2 ' + failed + ' cfg.t.failed_53cc4f54')
-                    : (done + ' cfg.t.document_s_updated_15f428a2');
-                showProcessingBanner('cfg.t.detecting_countries_c3ff26ba' + ' (' + total + '/' + total + ')', summaryMsg, 100);
+                    ? (done + ' ' + cfg.t.document_s_updated_15f428a2 + ' ' + failed + ' ' + cfg.t.failed_53cc4f54)
+                    : (done + ' ' + cfg.t.document_s_updated_15f428a2);
+                showProcessingBanner(cfg.t.detecting_countries_c3ff26ba + ' (' + total + '/' + total + ')', summaryMsg, 100);
                 if (window.showAlert) window.showAlert(summaryMsg, failed > 0 ? 'warning' : 'success');
                 setTimeout(hideProcessingBanner, 3000);
                 deselectAll();
@@ -1641,9 +1641,9 @@ function initializeDocumentsBulkActions() {
                 confirmMsg,
                 proceed,
                 null,
-                'cfg.t.redetect_country_2f20e028',
-                'cfg.t.cancel_ea478870',
-                'cfg.t.redetect_country_f2f630d6'
+                cfg.t.redetect_country_2f20e028,
+                cfg.t.cancel_ea478870,
+                cfg.t.redetect_country_f2f630d6
             );
         } else {
             proceed();
@@ -1757,9 +1757,9 @@ function initializeUploadForm() {
 
         if (!fileInput.files || !fileInput.files.length) {
             if (window.showAlert) {
-                window.showAlert('cfg.t.please_select_a_file_b3d4e2bc', 'warning');
+                window.showAlert(cfg.t.please_select_a_file_b3d4e2bc, 'warning');
             } else {
-                if (window.showAlert) window.showAlert('cfg.t.please_select_a_file_b3d4e2bc', 'warning');
+                if (window.showAlert) window.showAlert(cfg.t.please_select_a_file_b3d4e2bc, 'warning');
                 else window.__clientWarn && window.__clientWarn('Please select a file');
             }
             return;
@@ -1773,7 +1773,7 @@ function initializeUploadForm() {
         uploadBtn.disabled = true;
         uploadProgress.classList.remove('hidden');
         progressBar.style.width = '0%';
-        uploadStatus.textContent = 'cfg.t.uploading_f2870421';
+        uploadStatus.textContent = cfg.t.uploading_f2870421;
 
         try {
             window.__clientLog && window.__clientLog('Uploading file:', fileInput.files[0].name);
@@ -1789,8 +1789,8 @@ function initializeUploadForm() {
             if (response.status === 202 && result.success && result.document_id) {
                 uploadProgress.classList.add('hidden');
                 const docId = result.document_id;
-                showProcessingBanner('cfg.t.processing_upload_9cb556a5', 'cfg.t.starting_8c6ce9f8', 0);
-                updateTrackedProcessingDoc(docId, { status: 'pending', stage: 'cfg.t.starting_8c6ce9f8', progress: 0 });
+                showProcessingBanner(cfg.t.processing_upload_9cb556a5, cfg.t.starting_8c6ce9f8, 0);
+                updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
                 startProcessingPoll(docId);
                 await new Promise(function (resolve) {
                     function check() {
@@ -1806,7 +1806,7 @@ function initializeUploadForm() {
                 const t = trackedProcessingDocs.get(Number(docId));
                 stopProcessingPoll(docId);
                 if (t && t.status === 'completed') {
-                    showProcessingBanner('cfg.t.upload_complete_f79598ab', 'cfg.t.done_f92965e2', 100);
+                    showProcessingBanner(cfg.t.upload_complete_f79598ab, cfg.t.done_f92965e2, 100);
                 closeUploadModal();
                 reloadDocumentsGrid();
                 setTimeout(function() { hideProcessingBanner(); uploadBtn.disabled = false; }, 2000);
@@ -1816,7 +1816,7 @@ function initializeUploadForm() {
                     uploadBtn.disabled = false;
                 }
             } else if (result.success) {
-                uploadStatus.textContent = 'cfg.t.upload_complete_635c737d';
+                uploadStatus.textContent = cfg.t.upload_complete_635c737d;
                 progressBar.style.width = '100%';
                 closeUploadModal();
                 reloadDocumentsGrid();
@@ -2098,7 +2098,7 @@ function initializeUploadModal() {
         if (dropZone) {
             const textElements = dropZone.querySelectorAll('p');
             if (textElements.length > 0) {
-                textElements[0].textContent = 'cfg.t.drag_and_drop_files_here_or_click_to_sel_d56c91ec';
+                textElements[0].textContent = cfg.t.drag_and_drop_files_here_or_click_to_sel_d56c91ec;
             }
         }
     }
@@ -2186,7 +2186,7 @@ function getImportSystemDocumentsGridOptions() {
 const importSystemDocumentsColumnDefs = [
     {
         field: 'filename',
-        headerName: 'cfg.t.filename_1351017a',
+        headerName: cfg.t.filename_1351017a,
         flex: 1,
         minWidth: 220,
         filter: 'agTextColumnFilter',
@@ -2196,7 +2196,7 @@ const importSystemDocumentsColumnDefs = [
             const data = params.data || {};
             const icon = getFileTypeIcon(data.filename);
             const name = escapeHtml(data.filename || '');
-            const meta = escapeHtml(data.document_type || 'cfg.t.document_09453598') + ' \u2022 ' + formatFileSize(data.file_size || 0);
+            const meta = escapeHtml(data.document_type || cfg.t.document_09453598) + ' \u2022 ' + formatFileSize(data.file_size || 0);
             const wrap = 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%';
             const aid = data.ai_document_id != null ? parseInt(data.ai_document_id, 10) : 0;
             const nameLine = (data.ai_processed && aid) ?
@@ -2220,7 +2220,7 @@ const importSystemDocumentsColumnDefs = [
     },
     {
         field: 'language',
-        headerName: 'cfg.t.language_4994a8ff',
+        headerName: cfg.t.language_4994a8ff,
         width: 100,
         minWidth: 80,
         maxWidth: 140,
@@ -2233,7 +2233,7 @@ const importSystemDocumentsColumnDefs = [
     },
     {
         field: 'uploaded_at',
-        headerName: 'cfg.t.uploaded_fe8d588f',
+        headerName: cfg.t.uploaded_fe8d588f,
         width: 160,
         minWidth: 140,
         maxWidth: 200,
@@ -2244,14 +2244,14 @@ const importSystemDocumentsColumnDefs = [
     },
     {
         field: 'ai_processed',
-        headerName: 'cfg.t.ai_import_eca697b5',
+        headerName: cfg.t.ai_import_eca697b5,
         width: 200,
         minWidth: 160,
         maxWidth: 260,
         filter: 'customSetFilter',
         sortable: true,
         filterValueGetter: function(params) {
-            return params.data && params.data.ai_processed ? 'cfg.t.processed_e6f641ae' : 'cfg.t.not_processed_0fe381df';
+            return params.data && params.data.ai_processed ? cfg.t.processed_e6f641ae : cfg.t.not_processed_0fe381df;
         },
         cellRenderer: function(params) {
             const data = params.data || {};
@@ -2347,7 +2347,7 @@ function ensureImportDocumentsGrid(rowData) {
             if (emptyEl) emptyEl.style.display = 'block';
             var initErr = document.getElementById('importDocumentsFetchError');
             if (initErr) {
-                initErr.textContent = 'cfg.t.failed_to_load_documents_94b93867';
+                initErr.textContent = cfg.t.failed_to_load_documents_94b93867;
                 initErr.classList.remove('hidden');
             }
             updateImportActionsVisibility(0);
@@ -2416,7 +2416,7 @@ async function loadSystemDocuments() {
             ensureImportDocumentsGrid(rows);
             syncImportSelectionFromGrid();
         } else {
-            var errorMsg = result.error || 'cfg.t.error_loading_documents_a708c41e';
+            var errorMsg = result.error || cfg.t.error_loading_documents_a708c41e;
             if (errEl) {
                 errEl.textContent = String(errorMsg || '');
                 errEl.classList.remove('hidden');
@@ -2433,7 +2433,7 @@ async function loadSystemDocuments() {
     } catch (error) {
         console.error('Error loading system documents:', error);
         if (errEl) {
-            errEl.textContent = 'cfg.t.failed_to_load_documents_94b93867';
+            errEl.textContent = cfg.t.failed_to_load_documents_94b93867;
             errEl.classList.remove('hidden');
         }
         if (importDocumentsGridHelper) {
@@ -2466,7 +2466,7 @@ let ifrcImportCancelled = false;
 function onBeforeUnloadIfrcImport(e) {
     if (!ifrcImportInProgress) return;
     e.preventDefault();
-    e.returnValue = 'cfg.t.import_is_in_progress_are_you_sure_you_w_bf66d0d2';
+    e.returnValue = cfg.t.import_is_in_progress_are_you_sure_you_w_bf66d0d2;
     return e.returnValue;
 }
 let ifrcCountriesLoaded = false;
@@ -2515,13 +2515,13 @@ function updateIfrcTypeFilterSummary() {
     const checked = getIfrcTypeIdsChecked();
     const total = getIfrcTypeCheckboxCount();
     if (total === 0) {
-        summary.textContent = 'cfg.t.no_types_loaded_62ef2d48';
+        summary.textContent = cfg.t.no_types_loaded_62ef2d48;
         return;
     }
     if (checked.length === 0 || checked.length === total) {
-        summary.textContent = 'cfg.t.all_types_134353eb';
+        summary.textContent = cfg.t.all_types_134353eb;
     } else {
-        summary.textContent = 'cfg.t.selected_91b442d3' + ': ' + checked.length + ' / ' + total;
+        summary.textContent = cfg.t.selected_91b442d3 + ': ' + checked.length + ' / ' + total;
     }
 }
 
@@ -2577,7 +2577,7 @@ async function loadIfrcTypes(countryName) {
                 if (hasGroups) {
                     const raw = (t.group || '').trim();
                     const gKey = raw || '__other__';
-                    const gLabel = raw || 'cfg.t.other_6311ae17';
+                    const gLabel = raw || cfg.t.other_6311ae17;
                     if (gKey !== lastGroupKey) {
                         lastGroupKey = gKey;
                         const gh = document.createElement('div');
@@ -2737,7 +2737,7 @@ function getIfrcDocumentsGridOptions() {
 const ifrcDocumentsColumnDefs = [
     {
         field: 'title',
-        headerName: 'cfg.t.document_09453598',
+        headerName: cfg.t.document_09453598,
         flex: 1,
         minWidth: 220,
         filter: 'agTextColumnFilter',
@@ -2772,7 +2772,7 @@ const ifrcDocumentsColumnDefs = [
     },
     {
         field: 'type',
-        headerName: 'cfg.t.type_a1fa2777',
+        headerName: cfg.t.type_a1fa2777,
         width: 200,
         minWidth: 140,
         maxWidth: 320,
@@ -2785,7 +2785,7 @@ const ifrcDocumentsColumnDefs = [
     },
     {
         field: 'year',
-        headerName: 'cfg.t.year_537c66b2',
+        headerName: cfg.t.year_537c66b2,
         width: 100,
         minWidth: 80,
         maxWidth: 120,
@@ -2798,7 +2798,7 @@ const ifrcDocumentsColumnDefs = [
     },
     {
         field: 'country_name',
-        headerName: 'cfg.t.country_59716c97',
+        headerName: cfg.t.country_59716c97,
         width: 160,
         minWidth: 120,
         maxWidth: 220,
@@ -2907,7 +2907,7 @@ function ensureIfrcDocumentsGrid(rowData) {
             if (emptyEl) emptyEl.style.display = 'block';
             var initErr = document.getElementById('ifrcDocumentsFetchError');
             if (initErr) {
-                initErr.textContent = 'cfg.t.failed_to_load_documents_from_external_a_6a7d9a35';
+                initErr.textContent = cfg.t.failed_to_load_documents_from_external_a_6a7d9a35;
                 initErr.classList.remove('hidden');
             }
             updateIfrcActionsVisibility(0);
@@ -3000,7 +3000,7 @@ async function loadIfrcApiDocuments() {
             ensureIfrcDocumentsGrid(rows);
             syncIfrcSelectionFromGrid();
         } else {
-            var errorMsg = result.error || 'cfg.t.error_loading_documents_a708c41e';
+            var errorMsg = result.error || cfg.t.error_loading_documents_a708c41e;
             if (errEl) {
                 errEl.textContent = String(errorMsg || '');
                 errEl.classList.remove('hidden');
@@ -3019,7 +3019,7 @@ async function loadIfrcApiDocuments() {
     } catch (error) {
         console.error('Error loading external API documents:', error);
         if (errEl) {
-            errEl.textContent = 'cfg.t.failed_to_load_documents_from_external_a_6a7d9a35';
+            errEl.textContent = cfg.t.failed_to_load_documents_from_external_a_6a7d9a35;
             errEl.classList.remove('hidden');
         }
         if (ifrcDocumentsGridHelper) {
@@ -3112,7 +3112,7 @@ function startIfrcImportJobPolling(jobId) {
                 // Ensure we track it so banner doesn't flicker when grid isn't updated yet.
                 const existing = trackedProcessingDocs.get(Number(docId));
                 if (!existing) {
-                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: 'cfg.t.starting_8c6ce9f8', progress: 0 });
+                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
                 }
                 startProcessingPoll(docId);
             });
@@ -3130,8 +3130,8 @@ function startIfrcImportJobPolling(jobId) {
                     processingCancelWrap.classList.add('hidden');
                 }
                 showProcessingBanner(
-                    job.status === 'cancelled' ? 'cfg.t.import_cancelled_2a8b4482' : 'cfg.t.import_complete_a218495a',
-                    job.status === 'failed' ? 'cfg.t.some_documents_failed_2221bc0e' : 'cfg.t.done_f92965e2',
+                    job.status === 'cancelled' ? cfg.t.import_cancelled_2a8b4482 : cfg.t.import_complete_a218495a,
+                    job.status === 'failed' ? cfg.t.some_documents_failed_2221bc0e : cfg.t.done_f92965e2,
                     100
                 );
                 setTimeout(function () { hideProcessingBanner(); }, 2500);
@@ -3158,7 +3158,7 @@ function resumeIfrcImportJobIfAny() {
     if (!stored || !stored.jobId) return;
     const total = Number(stored.total) || 0;
     window.aiDocsImportProgress = { total: total, done: 0 };
-    showProcessingBanner('cfg.t.importing_documents_8a49fe5a', 'cfg.t.resuming_09136a9d', 0);
+    showProcessingBanner(cfg.t.importing_documents_8a49fe5a, cfg.t.resuming_09136a9d, 0);
     if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
     startIfrcImportJobPolling(stored.jobId);
 }
@@ -3215,7 +3215,7 @@ function startBulkReprocessJobPolling(jobId) {
                 if (!docId || !Number.isFinite(docId)) return;
                 const existing = trackedProcessingDocs.get(Number(docId));
                 if (!existing) {
-                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: 'cfg.t.starting_8c6ce9f8', progress: 0 });
+                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
                 }
                 startProcessingPoll(docId);
             });
@@ -3232,8 +3232,8 @@ function startBulkReprocessJobPolling(jobId) {
                     processingCancelWrap.classList.add('hidden');
                 }
                 showProcessingBanner(
-                    job.status === 'cancelled' ? 'cfg.t.reprocess_cancelled_97d2acd3' : 'cfg.t.reprocess_complete_f1001d0e',
-                    (Number(counts.failed) || 0) > 0 ? 'cfg.t.some_documents_failed_2221bc0e' : 'cfg.t.done_f92965e2',
+                    job.status === 'cancelled' ? cfg.t.reprocess_cancelled_97d2acd3 : cfg.t.reprocess_complete_f1001d0e,
+                    (Number(counts.failed) || 0) > 0 ? cfg.t.some_documents_failed_2221bc0e : cfg.t.done_f92965e2,
                     100
                 );
                 setTimeout(function () { hideProcessingBanner(); }, 2500);
@@ -3244,7 +3244,7 @@ function startBulkReprocessJobPolling(jobId) {
                 // Let renderTrackedProcessingBar() own the banner when we have per-doc state (avoids overwriting with "0/1")
                 if (trackedProcessingDocs.size === 0) {
                     const pct = total > 0 ? Math.round(Math.min(100, (done / total) * 100)) : 0;
-                    showProcessingBanner('cfg.t.reprocessing_documents_d4993939', `${done}/${total}`, pct);
+                    showProcessingBanner(cfg.t.reprocessing_documents_d4993939, `${done}/${total}`, pct);
                 }
             }
         } catch (e) {
@@ -3259,7 +3259,7 @@ function startBulkReprocessJobPolling(jobId) {
 function resumeBulkReprocessJobIfAny() {
     const stored = normalizeStoredReprocessJob(getStoredReprocessJob());
     if (!stored || !stored.jobId) return;
-    showProcessingBanner('cfg.t.reprocessing_documents_d4993939', 'cfg.t.resuming_09136a9d', 0);
+    showProcessingBanner(cfg.t.reprocessing_documents_d4993939, cfg.t.resuming_09136a9d, 0);
     if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
     startBulkReprocessJobPolling(stored.jobId);
 }
@@ -3313,19 +3313,19 @@ function startBulkMetaReprocessJobPolling(jobId) {
                     processingCancelWrap.classList.add('hidden');
                 }
                 const titleText = job.status === 'cancelled'
-                    ? 'cfg.t.metadata_reprocess_cancelled_3e89b850'
-                    : 'cfg.t.metadata_reprocess_complete_87ff8292';
+                    ? cfg.t.metadata_reprocess_cancelled_3e89b850
+                    : cfg.t.metadata_reprocess_complete_87ff8292;
                 const detailText = (Number(counts.failed) || 0) > 0
                     ? done + '/cfg.t.total_fbb44b44 (' + (Number(counts.failed) || 0) + ' cfg.t.failed_26934eb3)'
                     : done + '/cfg.t.total_fbb44b44';
-                showProcessingBanner(titleText, detailText.replace('cfg.t.total_fbb44b44', String(total)), 100);
+                showProcessingBanner(titleText, detailText.replace(cfg.t.total_fbb44b44, String(total)), 100);
                 setTimeout(function() { hideProcessingBanner(); }, 2500);
                 // Reload grid so updated metadata columns are visible
                 setTimeout(function() {
                     try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
                 }, 800);
             } else {
-                showProcessingBanner('cfg.t.reprocessing_metadata_e6c7cf5c', `${done}/${total}`, pct);
+                showProcessingBanner(cfg.t.reprocessing_metadata_e6c7cf5c, `${done}/${total}`, pct);
             }
         } catch (e) {
             aiDocsLog('bulkMetaReprocessJobPollError', String(e && e.message ? e.message : e));
@@ -3339,7 +3339,7 @@ function startBulkMetaReprocessJobPolling(jobId) {
 function resumeBulkMetaReprocessJobIfAny() {
     const stored = normalizeStoredMetaReprocessJob(getStoredMetaReprocessJob());
     if (!stored || !stored.jobId) return;
-    showProcessingBanner('cfg.t.reprocessing_metadata_e6c7cf5c', 'cfg.t.resuming_09136a9d', 0);
+    showProcessingBanner(cfg.t.reprocessing_metadata_e6c7cf5c, cfg.t.resuming_09136a9d, 0);
     if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
     startBulkMetaReprocessJobPolling(stored.jobId);
 }
@@ -3384,7 +3384,7 @@ async function importIfrcDocuments() {
     const total = items.length;
     window.aiDocsImportProgress = { total: total, done: 0 };
     showProcessingBanner(
-        'cfg.t.importing_documents_8a49fe5a',
+        cfg.t.importing_documents_8a49fe5a,
         total > 1 ? `0/${total} cfg.t.starting_8c6ce9f8` : 'cfg.t.starting_import_b06c80dc...',
         0
     );
@@ -3457,16 +3457,16 @@ if (document.readyState === 'loading') {
 async function processSelectedDocuments() {
     if (selectedDocuments.size === 0) {
         if (window.showAlert) {
-            window.showAlert('cfg.t.please_select_at_least_one_document_db0de074', 'warning');
+            window.showAlert(cfg.t.please_select_at_least_one_document_db0de074, 'warning');
         } else {
-            if (window.showAlert) window.showAlert('cfg.t.please_select_at_least_one_document_db0de074', 'warning');
+            if (window.showAlert) window.showAlert(cfg.t.please_select_at_least_one_document_db0de074, 'warning');
             else window.__clientWarn && window.__clientWarn('Please select at least one document');
         }
         return;
     }
 
     const docIds = Array.from(selectedDocuments);
-    const confirmMsg = 'cfg.t.process_count_document_s_with_ai_this_wi_b44c5b13'.replace('{count}', docIds.length);
+    const confirmMsg = cfg.t.process_count_document_s_with_ai_this_wi_b44c5b13.replace('{count}', docIds.length);
 
     const proceedWithProcessing = () => {
         const processBtn = document.getElementById('processSelectedBtn');
@@ -3526,7 +3526,7 @@ async function processSelectedDocuments() {
 
                         if (response.status === 202 && result.success && result.ai_document_id) {
                             const aiDocId = result.ai_document_id;
-                            updateTrackedProcessingDoc(aiDocId, { status: 'pending', stage: 'cfg.t.starting_8c6ce9f8', progress: 0 });
+                            updateTrackedProcessingDoc(aiDocId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
                             startProcessingPoll(aiDocId);
                             await new Promise(function (resolve) {
                                 function check() {
@@ -3593,11 +3593,11 @@ async function processSelectedDocuments() {
                 let message = '';
                 const alertType = failCount > 0 ? 'error' : 'info';
                 if (successCount > 0) {
-                    message += 'cfg.t.successfully_processed_count_97c0ea56'.replace('{count}', successCount);
+                    message += cfg.t.successfully_processed_count_97c0ea56.replace('{count}', successCount);
                     if (failCount > 0) message += '\n';
                 }
                 if (failCount > 0) {
-                    message += 'cfg.t.failed_count_bc24793b'.replace('{count}', failCount);
+                    message += cfg.t.failed_count_bc24793b.replace('{count}', failCount);
                     if (errors.length > 0) {
                         message += '\n\ncfg.t.errors_c48c42c9\n' + errors.slice(0, 5).join('\n');
                         if (errors.length > 5) {
@@ -3628,9 +3628,9 @@ async function processSelectedDocuments() {
             confirmMsg,
             proceedWithProcessing,
             null,
-            'cfg.t.process_b6ec7abe',
-            'cfg.t.cancel_ea478870',
-            'cfg.t.process_documents_056842a0'
+            cfg.t.process_b6ec7abe,
+            cfg.t.cancel_ea478870,
+            cfg.t.process_documents_056842a0
         );
     } else {
         proceedWithProcessing();
@@ -3679,13 +3679,13 @@ async function toggleDocumentPublic(docId, actionBtn) {
         });
         const result = await response.json();
         if (!response.ok || !result.success) {
-            const msg = (result && result.error) ? result.error : 'cfg.t.failed_to_update_0ff78b34';
+            const msg = (result && result.error) ? result.error : cfg.t.failed_to_update_0ff78b34;
             if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
             return;
         }
         updateDocumentInGrid(docId, { is_public: newVal });
     } catch (err) {
-        const msg = err && err.message ? err.message : 'cfg.t.failed_to_update_0ff78b34';
+        const msg = err && err.message ? err.message : cfg.t.failed_to_update_0ff78b34;
         if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
     } finally {
         actionBtn.disabled = false;
@@ -3718,7 +3718,7 @@ document.addEventListener('change', async function(e) {
         const result = await response.json();
         if (!response.ok || !result.success) {
             sel.value = prevCat; // revert
-            const msg = (result && result.error) ? result.error : 'cfg.t.failed_to_update_category_e480510f';
+            const msg = (result && result.error) ? result.error : cfg.t.failed_to_update_category_e480510f;
             if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
             return;
         }
@@ -3729,7 +3729,7 @@ document.addEventListener('change', async function(e) {
         updateDocumentInGrid(docId, { document_category: newCat });
     } catch (err) {
         sel.value = prevCat; // revert on network error
-        const msg = err && err.message ? err.message : 'cfg.t.failed_to_update_category_e480510f';
+        const msg = err && err.message ? err.message : cfg.t.failed_to_update_category_e480510f;
         if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
     } finally {
         sel.disabled = false;
@@ -4302,7 +4302,7 @@ function renderAnswerSources(sources) {
     }
 
     sourcesContainer.innerHTML = sources.map((s, index) => {
-        const filename = escapeHtml(s.filename || s.title || 'cfg.t.document_09453598');
+        const filename = escapeHtml(s.filename || s.title || cfg.t.document_09453598);
         const pageInfo = s.page_label
             ? escapeHtml(s.page_label)
             : (s.page_number ? `cfg.t.page_193cfc9b ${s.page_number}` : 'cfg.t.page_193cfc9b N/A');
@@ -4333,7 +4333,7 @@ if (aiSearchForm) {
             if (aiSearchStatus) {
                 const statusSpan = aiSearchStatus.querySelector('span');
                 if (statusSpan) {
-                    statusSpan.textContent = 'cfg.t.please_enter_a_query_4ad9a6c1';
+                    statusSpan.textContent = cfg.t.please_enter_a_query_4ad9a6c1;
                 } else {
                     aiSearchStatus.innerHTML = '<i class="fas fa-exclamation-circle text-yellow-600"></i><span>cfg.t.please_enter_a_query_4ad9a6c1</span>';
                 }
@@ -4492,7 +4492,7 @@ if (aiSearchForm) {
                         issues
                     });
                 } else if (aiSearchStatus) {
-                    const errorMsg = result.error || 'cfg.t.failed_to_generate_answer_9c78619e';
+                    const errorMsg = result.error || cfg.t.failed_to_generate_answer_9c78619e;
                     const statusSpan = aiSearchStatus.querySelector('span');
                     // XSS fix: escape error message before inserting
                     const safeErrorMsg = escapeHtml(errorMsg);
@@ -4510,7 +4510,7 @@ if (aiSearchForm) {
             } catch (e2) {
                 console.error('AI query error:', e2);
                 if (aiSearchStatus) {
-                    const errorMsg = e2.message || 'cfg.t.failed_to_process_request_df530c1a';
+                    const errorMsg = e2.message || cfg.t.failed_to_process_request_df530c1a;
                     const statusSpan = aiSearchStatus.querySelector('span');
                     // XSS fix: escape error message before inserting
                     const safeErrorMsg = escapeHtml(errorMsg);
@@ -4578,7 +4578,7 @@ async function deleteDocument(id, title) {
                 // Stop polling if it was running (prevents 404 spam after delete)
                 stopProcessingPoll(id);
                 removeTrackedProcessingDoc(id);
-                showProcessingBanner('cfg.t.document_deleted_369422de', 'cfg.t.refreshing_document_list_fa9f8b74', 100);
+                showProcessingBanner(cfg.t.document_deleted_369422de, cfg.t.refreshing_document_list_fa9f8b74, 100);
                 setTimeout(() => window.location.reload(), 800);
             } else {
                 if (window.showAlert) {
@@ -4603,18 +4603,18 @@ async function deleteDocument(id, title) {
             confirmMsg,
             proceedWithDelete,
             null,
-            'cfg.t.delete_f2a6c498',
-            'cfg.t.cancel_ea478870',
-            'cfg.t.delete_document_616cd122'
+            cfg.t.delete_f2a6c498,
+            cfg.t.cancel_ea478870,
+            cfg.t.delete_document_616cd122
         );
     } else if (window.showConfirmation) {
         window.showConfirmation(
             confirmMsg,
             proceedWithDelete,
             null,
-            'cfg.t.delete_f2a6c498',
-            'cfg.t.cancel_ea478870',
-            'cfg.t.delete_document_616cd122'
+            cfg.t.delete_f2a6c498,
+            cfg.t.cancel_ea478870,
+            cfg.t.delete_document_616cd122
         );
     } else {
         proceedWithDelete();
@@ -4622,13 +4622,13 @@ async function deleteDocument(id, title) {
 }
 
 async function reprocessDocument(id) {
-    const confirmMsg = 'cfg.t.reprocess_this_document_6e5046e8';
+    const confirmMsg = cfg.t.reprocess_this_document_6e5046e8;
     const proceedWithReprocess = async () => {
         // Optimistically update the row UI immediately (spinner in Actions, status badge updates on poll)
         updateDocumentInGrid(id, { processing_status: 'pending', processing_error: '' });
         const requestTs = Date.now();
-        updateTrackedProcessingDoc(id, { status: 'pending', stage: 'cfg.t.starting_8c6ce9f8', progress: 0, reprocessRequestedAt: requestTs, seenNonCompletedSinceRequest: false });
-        showProcessingBanner('cfg.t.reprocessing_started_5259d906', 'cfg.t.preparing_0862f67f', 0);
+        updateTrackedProcessingDoc(id, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0, reprocessRequestedAt: requestTs, seenNonCompletedSinceRequest: false });
+        showProcessingBanner(cfg.t.reprocessing_started_5259d906, cfg.t.preparing_0862f67f, 0);
         startProcessingPoll(id);
 
         try {
@@ -4674,9 +4674,9 @@ async function reprocessDocument(id) {
             confirmMsg,
             proceedWithReprocess,
             null,
-            'cfg.t.reprocess_3f20034f',
-            'cfg.t.cancel_ea478870',
-            'cfg.t.reprocess_document_f2729c9f'
+            cfg.t.reprocess_3f20034f,
+            cfg.t.cancel_ea478870,
+            cfg.t.reprocess_document_f2729c9f
         );
     } else {
         proceedWithReprocess();

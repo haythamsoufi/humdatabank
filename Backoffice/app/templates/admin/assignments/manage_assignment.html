@@ -325,7 +325,7 @@
             <div id="period-name-error" class="hidden w-full sm:w-auto sm:ml-auto">
                 <p class="text-red-600 text-sm font-medium">
                     <i class="fas fa-exclamation-circle mr-2"></i>
-                    Please select a valid period (year or date range) before submitting.
+                    {{ _('Please select a valid period (year or date range) before submitting.') }}
                 </p>
             </div>
         </div>
@@ -338,13 +338,13 @@
     <div class="mb-4">
         <h2 class="text-xl font-semibold text-gray-700">
             <i class="fas fa-sitemap mr-2 text-blue-600"></i>
-            Entity Assignments
+            {{ _('Entity Assignments') }}
         </h2>
         <p class="text-sm text-gray-600 mt-1">
             {% if assignment %}
-            Manage existing entity assignments and assign new entities to this form. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).
+            {{ _('Manage existing entity assignments and assign new entities to this form. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).') }}
             {% else %}
-            Assign this form to specific organizational entities. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).
+            {{ _('Assign this form to specific organizational entities. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).') }}
             {% endif %}
         </p>
     </div>
@@ -364,7 +364,7 @@
                             role="tab"
                             aria-controls="manage-entities-panel"
                             aria-selected="{{ 'true' if is_manage_active else 'false' }}">
-                        <i class="fas fa-cog mr-2"></i>Manage Existing Entities
+                        <i class="fas fa-cog mr-2"></i>{{ _('Manage Existing Entities') }}
                     </button>
                 </li>
                 {% endif %}
@@ -378,7 +378,7 @@
                             role="tab"
                             aria-controls="add-entities-panel"
                             aria-selected="{{ 'true' if is_add_entities_active else 'false' }}">
-                        <i class="fas fa-plus-circle mr-2"></i>Add Entities
+                        <i class="fas fa-plus-circle mr-2"></i>{{ _('Add Entities') }}
                     </button>
                 </li>
                 {% endif %}
@@ -392,7 +392,7 @@
                             role="tab"
                             aria-controls="ns-structure-panel"
                             aria-selected="{{ 'true' if is_entity_ns_active else 'false' }}">
-                        <i class="fas fa-sitemap mr-2"></i>NS Structure
+                        <i class="fas fa-sitemap mr-2"></i>{{ _('NS Structure') }}
                     </button>
                 </li>
                 {% endif %}
@@ -409,17 +409,17 @@
                 </div>
                 {% if has_countries %}
                 <div class="flex items-center gap-3 flex-wrap mb-4">
-                    <span class="text-sm font-bold text-gray-800">Part of:</span>
+                    <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
                     <div id="category-filters-manage" class="flex items-center gap-3 flex-wrap">
                         {# Category checkboxes will be dynamically added here #}
                     </div>
                 </div>
                 {% endif %}
                 {# Bulk actions bar - shown when rows are selected in the grid #}
-                <div id="entity-grid-bulk-actions" class="hidden flex items-center gap-3 flex-wrap mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <span id="entity-grid-selected-count" class="text-sm font-semibold text-gray-800">0 selected</span>
+                <div id="entity-grid-bulk-actions" class="hidden items-center gap-3 flex-wrap mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span id="entity-grid-selected-count" class="text-sm font-semibold text-gray-800">{{ _('0 selected') }}</span>
                     <button type="button" id="entity-grid-bulk-delete-btn" class="btn btn-danger">
-                        <i class="fas fa-trash mr-1"></i>Delete selected
+                        <i class="fas fa-trash mr-1"></i>{{ _('Delete selected') }}
                     </button>
                     <button type="button" id="entity-grid-bulk-status-btn" class="btn btn-primary">
                         <i class="fas fa-exchange-alt mr-1"></i>{{ _('Change status') }}
@@ -487,12 +487,12 @@
                     {% set is_countries_subtab_active = default_add_entities_subtab == 'countries' %}
                     <div class="{% if show_add_entities_subtabs and not is_countries_subtab_active %}hidden{% endif %}" id="add-entities-countries-panel" role="tabpanel" aria-labelledby="add-entities-countries-tab">
                  <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2">Assign Countries</label>
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Assign Countries') }}</label>
                     <p class="text-sm text-gray-600 mb-3">
                         {% if assignment %}
-                        Select countries to add to this assignment. Already assigned countries are pre-checked.
+                        {{ _('Select countries to add to this assignment. Already assigned countries are pre-checked.') }}
                         {% else %}
-                        Select countries to assign to this assignment.
+                        {{ _('Select countries to assign to this assignment.') }}
                         {% endif %}
                     </p>
                 </div>
@@ -508,10 +508,10 @@
                          <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200 flex-wrap gap-4">
                             <div class="flex items-center">
                                 <input type="checkbox" id="select-all-countries-entity" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                <label for="select-all-countries-entity" class="ml-2 block text-sm font-bold text-gray-800">Select All Countries</label>
+                                <label for="select-all-countries-entity" class="ml-2 block text-sm font-bold text-gray-800">{{ _('Select All Countries') }}</label>
                             </div>
                             <div class="flex items-center gap-3 flex-wrap">
-                                <span class="text-sm font-bold text-gray-800">Part of:</span>
+                                <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
                                 <div id="category-filters-entity" class="flex items-center gap-3 flex-wrap">
                                     {# Category checkboxes will be dynamically added here #}
                                 </div>
@@ -561,52 +561,10 @@
                     {% if has_secretariat %}
                     {% set is_secretariat_subtab_active = default_add_entities_subtab == 'secretariat' %}
                     <div class="{% if show_add_entities_subtabs and not is_secretariat_subtab_active %}hidden{% endif %}" id="add-entities-secretariat-panel" role="tabpanel" aria-labelledby="add-entities-secretariat-tab">
-            {% if has_ns_structure %}
-            <div class="p-4 rounded-lg bg-gray-50 {% if default_entity_tab != 'ns_structure' %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
-                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p class="text-xs text-blue-800">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        <strong>Note:</strong> Select entities by checking the boxes, then click "Save Changes" to apply them.
-                    </p>
-                 </div>
-                <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-gray-700 text-sm font-semibold mb-2">Search NS Structure</label>
-                        <input type="text"
-                               id="ns-structure-search"
-                               class="form-input w-full rounded-md border-gray-300"
-                               placeholder="Search branches, sub-branches, or local units...">
-                 </div>
-                    <div>
-                        <label class="block text-gray-700 text-sm font-semibold mb-2">Country</label>
-                        <select id="ns-country-select" class="form-select w-full rounded-md border-gray-300">
-                            <option value="">Select a country</option>
-                            {% for region, countries in countries_by_region.items() %}
-                                <optgroup label="{{ region }}">
-                                {% for country in countries %}
-                                    <option value="{{ country.id }}">{{ country.name }}</option>
-                                {% endfor %}
-                                </optgroup>
-                            {% endfor %}
-                        </select>
-                 </div>
-             </div>
-                <div id="ns-structure-hierarchy-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
-                    <!-- Hierarchical NS structure will be loaded here by JavaScript -->
-                    <div class="text-center py-4">
-                        <i class="fas fa-info-circle text-gray-400"></i>
-                        <p class="text-sm text-gray-500 mt-2">Select a country to view NS structure.</p>
-                    </div>
-                </div>
-
-    </div>
-            </div>
-            {% endif %}
-
                         <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                             <p class="text-xs text-blue-800">
                                 <i class="fas fa-info-circle mr-2"></i>
-                                <strong>Note:</strong> Select entities by checking the boxes, then click "Save Changes" to apply them.
+                                <strong>{{ _('Note:') }}</strong> {{ _('Select entities by checking the boxes, then click "Save Changes" to apply them.') }}
                             </p>
                         </div>
 
@@ -620,7 +578,7 @@
                                             role="tab"
                                             aria-controls="secretariat-divisions-panel"
                                             aria-selected="true">
-                                        <i class="fas fa-building mr-2"></i>Divisions & Departments
+                                        <i class="fas fa-building mr-2"></i>{{ _('Divisions & Departments') }}
                                     </button>
                                 </li>
                                 <li class="me-2" role="presentation">
@@ -631,7 +589,7 @@
                                             role="tab"
                                             aria-controls="secretariat-regions-panel"
                                             aria-selected="false">
-                                        <i class="fas fa-globe-europe mr-2"></i>Regions
+                                        <i class="fas fa-globe-europe mr-2"></i>{{ _('Regions') }}
                                     </button>
                                 </li>
                         {% endcall %}
@@ -641,39 +599,37 @@
                             {# Divisions & Departments panel #}
                             <div class="p-2" id="secretariat-divisions-panel" role="tabpanel" aria-labelledby="secretariat-divisions-tab">
                                 <div class="mb-4">
-                                    <label class="block text-gray-700 text-sm font-semibold mb-2">Search Secretariat</label>
+                                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Search Secretariat') }}</label>
                                     <input type="text"
                                            id="secretariat-search"
                                            class="form-input w-full rounded-md border-gray-300"
-                                           placeholder="Search divisions or departments...">
+                                           placeholder="{{ _('Search divisions or departments...') }}">
                                 </div>
                                 <div id="secretariat-hierarchy-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Secretariat structure will be loaded here by JavaScript -->
                                     <div class="text-center py-4">
                                         <i class="fas fa-spinner fa-spin text-gray-400"></i>
-                                        <p class="text-sm text-gray-500 mt-2">Loading Secretariat structure...</p>
+                                        <p class="text-sm text-gray-500 mt-2">{{ _('Loading Secretariat structure...') }}</p>
                                     </div>
                                 </div>
-
                             </div>
 
                             {# Regions panel #}
                             <div class="hidden p-2" id="secretariat-regions-panel" role="tabpanel" aria-labelledby="secretariat-regions-tab">
                                 <div class="mb-4">
-                                    <label class="block text-gray-700 text-sm font-semibold mb-2">Search Regions</label>
+                                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Search Regions') }}</label>
                                     <input type="text"
                                            id="secretariat-regions-search"
                                            class="form-input w-full rounded-md border-gray-300"
-                                           placeholder="Search regional or cluster offices...">
+                                           placeholder="{{ _('Search regional or cluster offices...') }}">
                                 </div>
                                 <div id="secretariat-regions-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Regions structure will be loaded here by JavaScript -->
                                     <div class="text-center py-4">
                                         <i class="fas fa-spinner fa-spin text-gray-400"></i>
-                                        <p class="text-sm text-gray-500 mt-2">Loading Regions structure...</p>
+                                        <p class="text-sm text-gray-500 mt-2">{{ _('Loading Regions structure...') }}</p>
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     </div>
@@ -683,6 +639,46 @@
             {% endif %}
 
             {# NS Structure Tab - Hierarchical view of Branches > Sub-branches > Local Units #}
+            {% if has_ns_structure %}
+            {% set is_entity_ns_active = default_entity_tab == 'ns_structure' %}
+            <div class="p-4 rounded-lg bg-gray-50 {% if not is_entity_ns_active %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
+                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p class="text-xs text-blue-800">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>{{ _('Note:') }}</strong> {{ _('Select entities by checking the boxes, then click "Save Changes" to apply them.') }}
+                    </p>
+                </div>
+                <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Search NS Structure') }}</label>
+                        <input type="text"
+                               id="ns-structure-search"
+                               class="form-input w-full rounded-md border-gray-300"
+                               placeholder="{{ _('Search branches, sub-branches, or local units...') }}">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Country') }}</label>
+                        <select id="ns-country-select" class="form-select w-full rounded-md border-gray-300">
+                            <option value="">{{ _('Select a country') }}</option>
+                            {% for region, countries in countries_by_region.items() %}
+                                <optgroup label="{{ region }}">
+                                {% for country in countries %}
+                                    <option value="{{ country.id }}">{{ country.name }}</option>
+                                {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div id="ns-structure-hierarchy-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
+                    <!-- Hierarchical NS structure will be loaded here by JavaScript -->
+                    <div class="text-center py-4">
+                        <i class="fas fa-info-circle text-gray-400"></i>
+                        <p class="text-sm text-gray-500 mt-2">{{ _('Select a country to view NS structure.') }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div> {# End of entity-assignments-content #}
 </div> {# End of Entity Assignments section #}
@@ -818,7 +814,22 @@ window.manageAssignmentConfig = {
         apiPartOfPrograms: {{ url_for('organization.api_get_part_of_programs')|tojson }},
         organizationIndex: {{ url_for('organization.index')|tojson }},
         checkDuplicate: {{ url_for('assignment_management.check_assignment_duplicate')|tojson }},
-        adminBase: {{ url_for('system_admin.manage_indicator_bank')|replace('/indicator-bank', '')|tojson }}
+        adminBase: {{ url_for('system_admin.manage_indicator_bank')|replace('/indicator-bank', '')|tojson }},
+        editEntityStatusBase: {{ url_for('assignment_management.edit_assignment_entity_status', aes_id=99999)|replace('99999', '')|tojson }},
+        nsHierarchyBase: {{ url_for('user_management.get_ns_hierarchy')|tojson }},
+        secretariatHierarchy: {{ url_for('user_management.get_secretariat_hierarchy')|tojson }},
+        secretariatRegionsHierarchy: {{ url_for('user_management.get_secretariat_regions_hierarchy')|tojson }},
+        templateOwnedByBase: {{ url_for('form_builder.get_template_owned_by', template_id=99999)|replace('/99999', '')|tojson }},
+        {% if assignment %}
+        assignmentBulkRemove: {{ url_for('assignment_management.bulk_remove_entities_from_assignment', assignment_id=assignment.id)|tojson }},
+        assignmentBulkUpdateStatus: {{ url_for('assignment_management.bulk_update_entity_status', assignment_id=assignment.id)|tojson }},
+        assignmentBulkUpdatePublic: {{ url_for('assignment_management.bulk_update_public_availability', assignment_id=assignment.id)|tojson }},
+        assignmentBulkUpdateDueDate: {{ url_for('assignment_management.bulk_update_due_date_selected', assignment_id=assignment.id)|tojson }},
+        assignmentTogglePublicAccess: {{ url_for('assignment_management.toggle_public_access', assignment_id=assignment.id)|tojson }},
+        assignmentGetEntities: {{ url_for('assignment_management.get_assignment_entities', assignment_id=assignment.id)|tojson }},
+        assignmentAddEntity: {{ url_for('assignment_management.add_entity_to_assignment', assignment_id=assignment.id)|tojson }},
+        assignmentRemoveEntityBase: {{ url_for('assignment_management.remove_entity_from_assignment', assignment_id=assignment.id, status_id=99999)|replace('/99999', '')|tojson }},
+        {% endif %}
     },
     t: {
         remove: {{ _('Remove')|tojson }},

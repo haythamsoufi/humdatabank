@@ -472,7 +472,11 @@
                 if (data.success) {
                     showSuccess(i18n.success_plugin_reloaded.replace('%(plugin)s', displayName));
                     await loadPlugins();
+                } else {
+                    showError(data.message || i18n.error_failed_reload_plugins);
                 }
+            } else {
+                showError(i18n.error_failed_reload_plugins);
             }
         } catch (error) {
             console.error('Error reloading plugin:', error);
@@ -510,7 +514,11 @@
                 if (data.success) {
                     showSuccess(i18n.success_plugin_activated.replace('%(plugin)s', displayName));
                     await loadPlugins();
+                } else {
+                    showError(data.message || i18n.error_failed_install);
                 }
+            } else {
+                showError(i18n.error_failed_install);
             }
         } catch (error) {
             console.error('Error activating plugin:', error);
@@ -548,7 +556,11 @@
                 if (data.success) {
                     showSuccess(i18n.success_plugin_deactivated.replace('%(plugin)s', displayName));
                     await loadPlugins();
+                } else {
+                    showError(data.message || i18n.error_failed_install);
                 }
+            } else {
+                showError(i18n.error_failed_install);
             }
         } catch (error) {
             console.error('Error deactivating plugin:', error);

@@ -393,7 +393,7 @@
                     return renderPublicBadge(params.value);
                 }
             }] : []
-        ];
+        );
 
         function initializeEntityGrid() {
             window.__clientLog && window.__clientLog('[INIT-FUNC] initializeEntityGrid function called');
@@ -1624,7 +1624,6 @@
         }
 
         // Create a custom class that extends HierarchicalEntitySelector functionality for assignments
-        if (cfg.assignmentId) {
         class AssignmentHierarchicalEntitySelector extends HierarchicalEntitySelector {
             constructor(config) {
                 // Call parent constructor FIRST before accessing 'this'
@@ -1887,7 +1886,6 @@
                     errors: results.errors
                 };
             }
-        }
         }
 
         // Initialize NS Structure hierarchical selector

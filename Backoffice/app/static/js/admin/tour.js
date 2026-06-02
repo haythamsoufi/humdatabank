@@ -792,50 +792,57 @@
 		const role = isFocalPoint ? 'focal_point' : 'admin';
 		const tourKey = `humdb_tour_status_${role}`;
 		const status = localStorage.getItem(tourKey);
-		const modal = document.getElementById('tourPreModal');
-		const modalScrim = document.getElementById('tourPreModalScrim');
-		const modalStartBtn = document.getElementById('tourModalStartBtn');
-		const modalSkipBtn = document.getElementById('tourModalSkipBtn');
+	const modal = document.getElementById('tourPreModal');
+	const modalScrim = document.getElementById('tourPreModalScrim');
+	const modalStartBtn = document.getElementById('tourModalStartBtn');
+	const modalSkipBtn = document.getElementById('tourModalSkipBtn');
+	const modalCloseBtn = document.getElementById('tourModalCloseBtn');
 
-		function openPreTourModal() {
-			if (!modal) return;
-			modal.classList.remove('hidden');
-			// Prevent body scroll behind modal
-			document.body.style.overflow = 'hidden';
-		}
+	function openPreTourModal() {
+		if (!modal) return;
+		modal.classList.remove('hidden');
+		// Prevent body scroll behind modal
+		document.body.style.overflow = 'hidden';
+	}
 
-		function closePreTourModal() {
-			if (!modal) return;
-			modal.classList.add('hidden');
-			document.body.style.overflow = '';
-		}
+	function closePreTourModal() {
+		if (!modal) return;
+		modal.classList.add('hidden');
+		document.body.style.overflow = '';
+	}
 
-		if (modalStartBtn) {
-			modalStartBtn.addEventListener('click', function() {
-				closePreTourModal();
-				setTimeout(() => {
-					// Ensure Intro.js is present before starting
-					ensureIntroJsLoaded(() => startSiteTour(true));
-				}, 100);
-			});
-		}
-		if (modalSkipBtn) {
-			modalSkipBtn.addEventListener('click', function() {
-				closePreTourModal();
-				localStorage.setItem(tourKey, 'skipped');
+	if (modalStartBtn) {
+		modalStartBtn.addEventListener('click', function() {
+			closePreTourModal();
+			setTimeout(() => {
+				// Ensure Intro.js is present before starting
+				ensureIntroJsLoaded(() => startSiteTour(true));
+			}, 100);
+		});
+	}
+	if (modalSkipBtn) {
+		modalSkipBtn.addEventListener('click', function() {
+			closePreTourModal();
+			localStorage.setItem(tourKey, 'skipped');
 
-				// Show profile dropdown and tooltip after a short delay
-				setTimeout(() => {
-					showProfileTooltip();
-				}, 500);
-			});
-		}
-		if (modalScrim) {
-			modalScrim.addEventListener('click', function() {
-				closePreTourModal();
-				localStorage.setItem(tourKey, 'skipped');
-			});
-		}
+			// Show profile dropdown and tooltip after a short delay
+			setTimeout(() => {
+				showProfileTooltip();
+			}, 500);
+		});
+	}
+	if (modalCloseBtn) {
+		modalCloseBtn.addEventListener('click', function() {
+			closePreTourModal();
+			localStorage.setItem(tourKey, 'skipped');
+		});
+	}
+	if (modalScrim) {
+		modalScrim.addEventListener('click', function() {
+			closePreTourModal();
+			localStorage.setItem(tourKey, 'skipped');
+		});
+	}
 
 		// Check if we're in the mobile app - disable tour modal if so
 		const isMobileApp = window.isMobileApp === true ||

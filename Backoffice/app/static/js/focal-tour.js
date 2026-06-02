@@ -789,6 +789,7 @@
 		const modalScrim = document.getElementById('tourPreModalScrim');
 		const modalStartBtn = document.getElementById('tourModalStartBtn');
 		const modalSkipBtn = document.getElementById('tourModalSkipBtn');
+		const modalCloseBtn = document.getElementById('tourModalCloseBtn');
 
 		function openPreTourModal() {
 			if (!modal) return;
@@ -821,6 +822,12 @@
 				setTimeout(() => {
 					showProfileTooltip();
 				}, 500);
+			});
+		}
+		if (modalCloseBtn) {
+			modalCloseBtn.addEventListener('click', function() {
+				closePreTourModal();
+				localStorage.setItem(tourKey, 'skipped');
 			});
 		}
 		if (modalScrim) {

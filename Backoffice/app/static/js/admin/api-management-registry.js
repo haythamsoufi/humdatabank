@@ -306,7 +306,7 @@
             epFilterUrlTimer = null;
             if (!epRegistryGridApi || typeof epRegistryGridApi.getFilterModel !== 'function') return;
             var m = epRegistryGridApi.getFilterModel();
-            var json = m && Object.keys(m).length ? encodeURIComponent(JSON.stringify(m)) : '';
+            var json = m && Object.keys(m).length ? JSON.stringify(m) : '';
             window.__apiMgmtUrlExtra.ep_f = json;
             if (typeof window.apiMgmtSyncUrl === 'function') window.apiMgmtSyncUrl();
         }, 300);

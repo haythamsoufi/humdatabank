@@ -1412,8 +1412,7 @@ window.settingsPageConfig = {
         emailSeed: {{ url_for('settings.api_settings_email_templates_seed')|tojson }},
         emailTemplates: {{ url_for('settings.api_settings_email_templates')|tojson }},
         tinymceBase: {{ url_for('static', filename='libs/tinymce')|tojson }},
-        brandingUpload: {{ url_for('settings.branding_assets_upload')|tojson }},
-        apiSettingsSave: {{ url_for('settings.api_settings_save')|tojson }}
+        brandingUpload: {{ url_for('settings.branding_assets_upload')|tojson }}
     },
     t: {
         willBeClearedOnSave: {{ _('Will be cleared on save')|tojson }},

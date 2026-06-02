@@ -893,9 +893,7 @@
         if (cfg.userId) {
         // --- Initial state setup for edit mode ---
         // For edit mode, we need to set up the initial state based on existing user assignments
-        const userAssignedCountryIds = new Set([
-        const userCountryIds = new Set(cfg.userCountryIds || []);
-        ]);
+        const userAssignedCountryIds = new Set(cfg.userCountryIds || []);
 
         countryCheckboxes.forEach(countryCheckbox => {
             const countryId = parseInt(countryCheckbox.value);

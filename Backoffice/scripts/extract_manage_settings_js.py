@@ -131,8 +131,6 @@ TRANS_REPLACEMENTS = [
      "var BRANDING_UPLOAD_URL = cfg.urls.brandingUpload;"),
     ("var BRANDING_UPLOAD_ENABLED = {{ (visual_branding_upload_available | default(false)) | tojson }};",
      "var BRANDING_UPLOAD_ENABLED = cfg.brandingUploadEnabled || false;"),
-    ("var resp = await ((window.getFetch && window.getFetch()) || fetch)('{{ url_for(\"settings.api_settings_save\") }}'",
-     "var resp = await ((window.getFetch && window.getFetch()) || fetch)(cfg.urls.apiSettingsSave"),
 ]
 
 def transform_js(js_lines):

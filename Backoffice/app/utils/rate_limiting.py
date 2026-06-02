@@ -133,7 +133,7 @@ def rate_limit(requests_per_minute=10, key_func=None, flash_message=None, redire
                         else:
                             # Fallback: redirect to main page
                             try:
-                                return redirect(url_for('main.index'))
+                                return redirect(url_for('main.dashboard'))
                             except Exception as e:
                                 current_app.logger.debug("Rate limit redirect fallback failed; redirecting to '/': %s", e, exc_info=True)
                                 return redirect('/')

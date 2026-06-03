@@ -115,7 +115,7 @@ def dashboard_stats():
                     AssignmentEntityStatus.entity_type == 'country',
                     AssignmentEntityStatus.due_date.isnot(None),
                     AssignmentEntityStatus.due_date < utcnow(),
-                    AssignmentEntityStatus.status.in_(['Assigned', 'In Progress']),
+                    AssignmentEntityStatus.status.in_(['pending', 'in_progress']),
                 )
             ).count()
 

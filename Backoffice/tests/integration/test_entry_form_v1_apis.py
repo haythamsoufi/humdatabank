@@ -86,7 +86,7 @@ class TestEntryFormVariablesResolveApi:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -123,7 +123,7 @@ class TestEntryFormVariablesResolveApi:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -164,7 +164,7 @@ class TestEntryFormVariablesResolveApi:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -200,7 +200,7 @@ class TestEntryFormVariablesResolveApi:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -241,7 +241,7 @@ class TestEntryFormVariablesResolveApi:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -306,7 +306,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
             assigned_form_id=assigned_form.id,
             entity_type=EntityType.country.value,
             entity_id=entity_id,
-            status="In Progress",
+            status="in_progress",
         )
         db_session.add(aes)
         db_session.flush()
@@ -406,7 +406,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -455,7 +455,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                     assigned_form_id=_source_assigned_form.id,
                     entity_type=EntityType.country.value,
                     entity_id=other_country.id,
-                    status="In Progress",
+                    status="in_progress",
                 )
             )
             db_session.commit()
@@ -499,7 +499,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                 assigned_form_id=source_assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(source_aes)
             db_session.flush()
@@ -545,7 +545,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                 assigned_form_id=source_assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(source_aes)
             db_session.flush()
@@ -597,7 +597,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                 assigned_form_id=source_assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(source_aes)
             db_session.flush()
@@ -656,7 +656,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                 assigned_form_id=source_assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(source_aes)
             db_session.flush()
@@ -717,7 +717,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                 assigned_form_id=source_assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(source_aes)
             db_session.flush()

@@ -27,6 +27,7 @@ _DOCUMENT_LOOKUP_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -207,7 +208,10 @@ def is_platform_usage_help_question(query: str) -> bool:
     has_document_signal = bool(_DOCUMENT_LOOKUP_RE.search(q))
     has_question_form = "?" in q or q.lower().startswith(("how", "where", "what", "can i"))
 
-    return bool((has_usage_signal and not has_document_signal) or (has_usage_signal and has_question_form))
+    return bool(
+        (has_usage_signal and not has_document_signal)
+        or (has_usage_signal and has_question_form)
+    )
 
 
 def is_template_assignment_ambiguous(query: str) -> bool:

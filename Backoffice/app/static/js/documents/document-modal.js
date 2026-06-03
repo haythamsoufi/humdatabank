@@ -432,9 +432,9 @@ class DocumentModalManager {
             const statusSelect = document.getElementById('status');
             if (statusSelect) {
                 const s = (docData.status != null ? String(docData.status) : '').trim().toLowerCase();
-                if (s === 'approved') statusSelect.value = 'Approved';
-                else if (s === 'rejected') statusSelect.value = 'Rejected';
-                else statusSelect.value = 'Pending';
+                if (s === 'approved') statusSelect.value = 'approved';
+                else if (s === 'rejected') statusSelect.value = 'rejected';
+                else statusSelect.value = 'pending';
             }
         } else {
             statusSection?.classList.add('hidden');

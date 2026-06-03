@@ -119,7 +119,7 @@ def import_assignment_excel(aes_id):
 
     from app.services.authorization_service import AuthorizationService
 
-    if aes.status in ["Submitted", "Approved"] and not AuthorizationService.is_admin(current_user):
+    if aes.status in ["submitted", "approved"] and not AuthorizationService.is_admin(current_user):
         error_msg = "This assignment is no longer in an editable state."
         flash(error_msg, "warning")
         if is_ajax:

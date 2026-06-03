@@ -1024,15 +1024,19 @@ def localize_status(status):
     if not status:
         return status
 
-    status_lower = status.lower().strip()
+    if hasattr(status, 'value'):
+        status = status.value
 
-    # Map status values to translation keys
+    status_lower = str(status).strip().casefold().replace(' ', '_')
+
+    # Map canonical snake_case values to translation keys
     status_map = {
         'pending': _('Pending'),
-        'in progress': _('In Progress'),
+        'in_progress': _('In Progress'),
         'submitted': _('Submitted'),
         'approved': _('Approved'),
-        'requires revision': _('Requires Revision'),
+        'requires_revision': _('Requires Revision'),
+        'rejected': _('Rejected'),
         'closed': _('Closed'),
     }
 

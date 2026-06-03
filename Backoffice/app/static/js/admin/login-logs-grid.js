@@ -65,9 +65,9 @@
                         '<div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;">' +
                         '<div style="display:flex;flex-direction:row;align-items:center;gap:0.5rem;min-width:0;">' +
                         icon +
-                        '<span class="text-sm font-medium text-gray-900" style="line-height:1.3;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+                        '<span class="text-sm font-medium text-gray-900" style="line-height:1.4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
                         email + '</span></div>' +
-                        '<div style="padding-left:1.75rem;font-size:0.75rem;line-height:1.3;color:#9ca3af;">' + sub + '</div>' +
+                        '<div style="padding-left:1.75rem;font-size:0.75rem;line-height:1.4;color:#9ca3af;">' + sub + '</div>' +
                         '</div></div>';
                 }
             },

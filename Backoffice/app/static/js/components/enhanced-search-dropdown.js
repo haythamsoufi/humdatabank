@@ -129,8 +129,10 @@ class EnhancedSearchDropdown {
         let visibleCount = 0;
 
         dropdownOptions.forEach(option => {
-            const itemName = option.getAttribute('data-item-name').toLowerCase();
-            const matches = itemName.includes(searchTerm);
+            const itemName = (option.getAttribute('data-item-name') || '').toLowerCase();
+            const extraSearchText = (option.getAttribute('data-search-text') || '').toLowerCase();
+            const searchText = `${itemName} ${extraSearchText}`;
+            const matches = searchText.includes(searchTerm);
 
             if (matches) {
                 option.classList.remove('hidden');

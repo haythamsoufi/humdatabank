@@ -218,8 +218,8 @@
                 var st = (raw != null && String(raw).trim() !== '') ? String(raw).trim() : '';
                 if (!st) return '';
                 if (st.toLowerCase() === 'saved') return 'Saved';
-                if (st.toLowerCase() === 'submitted') return 'Submitted';
-                if (st.toLowerCase() === 'approved') return 'Approved';
+                if (st.toLowerCase() === 'submitted') return 'submitted';
+                if (st.toLowerCase() === 'approved') return 'approved';
                 return st.charAt(0).toUpperCase() + st.slice(1);
             }
 
@@ -2049,8 +2049,8 @@
 
         function statusLabel(key) {
             if (key === 'saved') return 'Saved';
-            if (key === 'submitted') return 'Submitted';
-            if (key === 'approved') return 'Approved';
+            if (key === 'submitted') return 'submitted';
+            if (key === 'approved') return 'approved';
             return key ? (key.charAt(0).toUpperCase() + key.slice(1)) : '';
         }
 

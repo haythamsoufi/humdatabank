@@ -47,9 +47,18 @@
         #indicatorBankGrid.ag-theme-alpine .sector-items div:last-child {
             margin-bottom: 0;
         }
-        #indicatorBankGrid.ag-theme-alpine .ag-cell[col-id="archived"] span,
-        #indicatorBankGrid.ag-theme-alpine .ag-cell[col-id="emergency"] span {
-            font-weight: 400 !important;
+        #indicatorBankGrid.ag-theme-alpine .indicator-state-badge {
+            font-weight: 600 !important;
+            letter-spacing: 0.01em;
+        }
+
+        /* Archived indicators: highlight full row (matches Status badge yellow) */
+        #indicatorBankGrid.ag-theme-alpine .ag-row.indicator-archived-row .ag-cell {
+            background-color: #fef9c3 !important;
+        }
+        #indicatorBankGrid.ag-theme-alpine .ag-row.indicator-archived-row.ag-row-hover .ag-cell,
+        #indicatorBankGrid.ag-theme-alpine .ag-row.indicator-archived-row.ag-row-selected .ag-cell {
+            background-color: #fef08a !important;
         }
 
         /* Filter Modal Styles */
@@ -193,6 +202,12 @@
         .file-upload-wrapper:hover .file-upload-box {
             border-color: #dc2626;
             background-color: #fef2f2;
+        }
+
+        #export-selected-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            filter: grayscale(0.35);
         }
 
         /* Column Visibility Modal Styles */
@@ -552,21 +567,10 @@
                     <button id="export-all-btn" class="btn btn-success flex-1">
                         <i class="fas fa-download mr-2"></i>{{ _('All Indicators') }}
                     </button>
-                    <button id="export-selected-btn" class="btn btn-success flex-1">
+                    <button id="export-selected-btn" type="button" class="btn btn-success flex-1" disabled
+                            title="{{ _('Select one or more indicators in the table first') }}">
                         <i class="fas fa-check-square mr-2"></i>{{ _('Selected Indicators') }}
                     </button>
-                </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
-                    <p class="text-xs text-blue-800 font-medium mb-1">
-                        <i class="fas fa-table mr-1"></i>{{ _('Export includes 6 human-readable sheets:') }}
-                    </p>
-                    <ul class="text-xs text-blue-700 space-y-0.5 ml-4 list-disc">
-                        <li>{{ _('Indicators') }}</li>
-                        <li>{{ _('Types &amp; Units') }}</li>
-                        <li>{{ _('Sectors &amp; Sub-Sectors') }}</li>
-                        <li>{{ _('Common Words') }}</li>
-                    </ul>
-                    <p class="text-xs text-blue-600 mt-1">{{ _('All sheets can be re-imported.') }}</p>
                 </div>
             </div>
 
@@ -575,7 +579,7 @@
                 <div class="p-6 space-y-4">
                     <h4 class="text-lg font-medium text-gray-700 mb-4">{{ _('Import Indicators') }}</h4>
                     <div class="space-y-4">
-                        <div class="file-upload-wrapper relative border-2 border-dashed border-gray-300 rounded-lg">
+                        <div class="file-upload-wrapper relative">
                             <input type="file"
                                    id="import-file"
                                    name="file"
@@ -838,6 +842,27 @@
         {% endfor %}
     ];
 
+    function formatListValue(params, separator) {
+        const value = params && params.value;
+        if (!Array.isArray(value) || value.length === 0) {
+            return '';
+        }
+        return value.join(separator);
+    }
+
+    const DEFINITION_DISPLAY_MAX = 220;
+
+    function renderTruncatedDefinition(params) {
+        if (!params.value) return '-';
+        const full = String(params.value);
+        const display = full.length > DEFINITION_DISPLAY_MAX
+            ? full.substring(0, DEFINITION_DISPLAY_MAX) + '...'
+            : full;
+        const title = full.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const text = display.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return '<span title="' + title + '">' + text + '</span>';
+    }
+
     // Column definitions for ag-grid
     // Order: ID, all name columns (name + name_*), all definition columns (definition + definition_*), other columns, actions (pinned last)
     const columnDefs = [
@@ -899,10 +924,7 @@
             maxWidth: 400,
             filter: 'agTextColumnFilter',
             sortable: true,
-            cellRenderer: function(params) {
-                if (!params.value) return '-';
-                return '<span>' + (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
-            },
+            cellRenderer: renderTruncatedDefinition,
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
         },
         {% for code in TRANSLATABLE_LANGUAGES %}
@@ -915,15 +937,7 @@
             hide: true,
             filter: 'agTextColumnFilter',
             sortable: true,
-            cellRenderer: function(params) {
-                if (!params.value) return '-';
-                {% if code in ['ar','fa','he','ur'] %}
-                const truncated = params.value.length > 100 ? params.value.substring(0, 100) + '...' : params.value;
-                return '<span title="' + (params.value || '').replace(/"/g, '&quot;') + '">' + truncated + '</span>';
-                {% else %}
-                return '<span>' + (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
-                {% endif %}
-            },
+            cellRenderer: renderTruncatedDefinition,
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
         },
         {% endfor %}
@@ -976,10 +990,7 @@
             hide: true,
             filter: 'agTextColumnFilter',
             sortable: true,
-            cellRenderer: function(params) {
-                if (!params.value) return '-';
-                return '<span title="' + String(params.value).replace(/"/g, '&quot;') + '">' + String(params.value).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
-            },
+            cellRenderer: renderTruncatedDefinition,
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
         },
         {
@@ -990,9 +1001,7 @@
             hide: true,
             filter: 'agTextColumnFilter',
             sortable: true,
-            cellRenderer: function(params) {
-                return params.value || '-';
-            }
+            cellRenderer: renderTruncatedDefinition
         },
         {
             field: 'monitoring_questions',
@@ -1002,6 +1011,9 @@
             hide: true,
             filter: 'agTextColumnFilter',
             sortable: false,
+            valueFormatter: function(params) {
+                return formatListValue(params, '; ');
+            },
             cellRenderer: function(params) {
                 if (!params.value || !params.value.length) return '-';
                 return params.value.join('; ');
@@ -1016,6 +1028,9 @@
             hide: true,
             filter: 'agTextColumnFilter',
             sortable: false,
+            valueFormatter: function(params) {
+                return formatListValue(params, ', ');
+            },
             cellRenderer: function(params) {
                 if (!params.value || !params.value.length) return '-';
                 return params.value.join(', ');
@@ -1067,8 +1082,7 @@
             filter: 'customSetFilter',
             sortable: false,
             valueFormatter: function(params) {
-                // Return empty string for valueFormatter to suppress warning
-                return '';
+                return formatListValue(params, ', ');
             },
             cellRenderer: function(params) {
                 if (!params.value || !Array.isArray(params.value) || params.value.length === 0) {
@@ -1173,6 +1187,7 @@
             filter: 'customSetFilter',
             sortable: true,
             cellRenderer: AgGridRenderers.archivedStatus,
+            filterValueGetter: AgGridRenderers.archivedFilterValue,
             cellStyle: { 'white-space': 'nowrap' }
         },
         {
@@ -1184,6 +1199,7 @@
             filter: 'customSetFilter',
             sortable: true,
             cellRenderer: AgGridRenderers.emergencyBadge,
+            filterValueGetter: AgGridRenderers.emergencyFilterValue,
             cellStyle: { 'white-space': 'nowrap' }
         },
         {
@@ -1262,8 +1278,23 @@
             .concat(['type', 'unit', 'fdrs_kpi_code', 'related_programs_list', 'sector', 'subsector', 'archived', 'emergency', 'comments', 'usage_count', 'actions']);
 
         var result = AgGridHelper.create('indicatorBankGrid', 'indicator-bank', columnDefs, indicatorsData, {
+            gridOptions: {
+                getRowClass: function(params) {
+                    if (!params.data) {
+                        return null;
+                    }
+                    var archived = params.data.archived;
+                    if (archived === true || archived === 'true' || archived === 1) {
+                        return 'indicator-archived-row';
+                    }
+                    return null;
+                }
+            },
             onReady: function(api, helper) {
                 AgGridHelper.pinActionsColumn(api, desiredOrder, helper && helper.columnVisibilityManager);
+                if (typeof window.updateExportSelectedBtnState === 'function') {
+                    window.updateExportSelectedBtnState();
+                }
             }
         });
         gridHelper = result.helper;
@@ -1272,6 +1303,29 @@
         window.gridHelper = gridHelper;
         window.columnVisibilityManager = gridHelper.columnVisibilityManager;
     }
+
+    window.updateExportSelectedBtnState = function() {
+        var btn = document.getElementById('export-selected-btn');
+        if (!btn) {
+            return;
+        }
+        var count = 0;
+        if (window.gridHelper && typeof window.gridHelper.getSelectedRowIds === 'function') {
+            count = window.gridHelper.getSelectedRowIds('id').length;
+        }
+        var hasSelection = count > 0;
+        btn.disabled = !hasSelection;
+        btn.title = hasSelection
+            ? ''
+            : {{ _('Select one or more indicators in the table first')|tojson|safe }};
+    };
+
+    document.addEventListener('ag-grid-selection-changed', function(e) {
+        if (!e || !e.detail || e.detail.gridId !== 'indicatorBankGrid') {
+            return;
+        }
+        window.updateExportSelectedBtnState();
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeGrid);
@@ -1563,8 +1617,10 @@
                 Object.keys(indicatorToUpdate.translations).forEach(fieldName => {
                     updatePayload[fieldName] = indicatorToUpdate.translations[fieldName];
                 });
+                updatePayload._indicator_bank_partial_update = true;
 
                 const saveUrl = '{{ url_for("system_admin.edit_indicator_bank", id=0) }}'.replace('/0', `/${indicator.id}`);
+                const updatePayloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatePayload))));
 
                 ((window.getFetch && window.getFetch()) || fetch)(saveUrl, {
                     method: 'POST',
@@ -1573,7 +1629,7 @@
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRFToken': jQuery('meta[name=csrf-token]').attr('content')
                     },
-                    body: JSON.stringify(updatePayload)
+                    body: JSON.stringify({ payload: updatePayloadB64 })
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -2178,7 +2234,12 @@
             });
 
             // Show modal
-            jQuery('#export-import-btn').on('click', () => exportImportModal.removeClass('hidden'));
+            jQuery('#export-import-btn').on('click', () => {
+                exportImportModal.removeClass('hidden');
+                if (typeof window.updateExportSelectedBtnState === 'function') {
+                    window.updateExportSelectedBtnState();
+                }
+            });
 
             // Close modal
             jQuery('#close-export-import-modal-btn, #export-import-modal').on('click', (e) => {
@@ -2193,15 +2254,17 @@
                 submitExportForm();
             });
 
-            // Export selected indicators
+            // Export selected indicators (enabled only when rows are selected in the grid)
             jQuery('#export-selected-btn').on('click', function() {
+                if (this.disabled) {
+                    return;
+                }
                 if (!window.gridHelper) {
                     showToast({{ _("Grid not initialized. Please use Export All instead.")|tojson|safe }}, 'warning', 6000);
                     return;
                 }
                 const selectedIds = window.gridHelper.getSelectedRowIds('id');
                 if (selectedIds.length === 0) {
-                    showToast({{ _("Please select at least one indicator to export.")|tojson|safe }}, 'warning', 6000);
                     return;
                 }
                 submitExportForm(selectedIds);
@@ -2464,15 +2527,17 @@
                 }, false);
             });
 
+            const dropZoneBox = dropZone ? jQuery(dropZone).find('.file-upload-box') : jQuery();
+
             ['dragenter', 'dragover'].forEach(eventName => {
                 dropZone.addEventListener(eventName, function() {
-                    jQuery('.file-upload-wrapper').addClass('border-blue-500 bg-blue-50');
+                    dropZoneBox.addClass('border-blue-500 bg-blue-50');
                 }, false);
             });
 
             ['dragleave', 'drop'].forEach(eventName => {
                 dropZone.addEventListener(eventName, function() {
-                    jQuery('.file-upload-wrapper').removeClass('border-blue-500 bg-blue-50');
+                    dropZoneBox.removeClass('border-blue-500 bg-blue-50');
                 }, false);
             });
 

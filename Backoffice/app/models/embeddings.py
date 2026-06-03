@@ -17,6 +17,13 @@ from pgvector.sqlalchemy import Vector
 import uuid
 
 from app.extensions import db
+from app.models.enums import (
+    AIDocumentProcessingStatusValue,
+    AIReasoningTraceStatusValue,
+    AITraceReviewStatusValue,
+    AITraceReviewVerdictValue,
+)
+from app.models.enum_columns import pg_str_enum_column
 from app.utils.datetime_helpers import utcnow
 
 # Many-to-many association table: AI documents ↔ countries
@@ -63,7 +70,13 @@ class AIDocument(db.Model):
     content_hash = Column(String(64), nullable=True, index=True)  # SHA256 hash
 
     # Processing status
-    processing_status = Column(String(50), default='pending', nullable=False, index=True)
+    processing_status = pg_str_enum_column(
+        AIDocumentProcessingStatusValue,
+        'aidocumentprocessingstatus',
+        default=AIDocumentProcessingStatusValue.pending,
+        nullable=False,
+        index=True,
+    )
     # Status values: pending, processing, completed, failed
 
     processing_error = Column(Text, nullable=True)  # Error message if failed
@@ -341,7 +354,13 @@ class AIReasoningTrace(db.Model):
     actual_iterations = Column(Integer, default=0)
 
     # Execution status
-    status = Column(String(50), default='completed', nullable=False, index=True)
+    status = pg_str_enum_column(
+        AIReasoningTraceStatusValue,
+        'aireasoningtracestatus',
+        default=AIReasoningTraceStatusValue.completed,
+        nullable=False,
+        index=True,
+    )
     # Status values: completed, timeout, error, cost_limit_exceeded, max_iterations_exceeded
 
     error_message = Column(Text, nullable=True)
@@ -551,11 +570,21 @@ class AITraceReview(db.Model):
     reviewer = relationship('User', backref='ai_trace_reviews', foreign_keys=[reviewer_id])
 
     # Review workflow
-    status = Column(String(30), default='pending', nullable=False, index=True)
-    # Values: pending | in_review | completed | dismissed
+    status = pg_str_enum_column(
+        AITraceReviewStatusValue,
+        'aitracereviewstatus',
+        default=AITraceReviewStatusValue.pending,
+        nullable=False,
+        index=True,
+    )
 
     # Verdict recorded by reviewer
-    verdict = Column(String(30), nullable=True)
+    verdict = pg_str_enum_column(
+        AITraceReviewVerdictValue,
+        'aitracereviewverdict',
+        default=None,
+        nullable=True,
+    )
     # Values: correct | partially_correct | incorrect | needs_improvement
 
     reviewer_notes = Column(Text, nullable=True)

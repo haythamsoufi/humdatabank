@@ -974,6 +974,10 @@ class Config:
     # Default False so agent/chat runs stay readable in the terminal.
     AI_VERBOSE_OPENAI_HTTP = _parse_bool(os.environ.get("AI_VERBOSE_OPENAI_HTTP"), default=False)
 
+    # Background scheduler jobs are maintenance tasks; tolerate short event-loop/process stalls
+    # without logging noisy APScheduler misfire warnings.
+    SCHEDULER_MISFIRE_GRACE_SECONDS = int(os.environ.get('SCHEDULER_MISFIRE_GRACE_SECONDS', '30'))
+
     # Verbose AI SSE logs (delta sampling, persist/engine summary lines). Default false.
     AI_STREAM_DEBUG = _parse_bool(os.environ.get("AI_STREAM_DEBUG"), default=False)
 

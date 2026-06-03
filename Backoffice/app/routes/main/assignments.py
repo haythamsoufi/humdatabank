@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app.models import db, User, Country, CountryAccessRequest
 from app.models.assignments import AssignmentEntityStatus
 from app.models.core import UserEntityPermission
-from app.models.enums import EntityType
+from app.models.enums import AssignmentEntityStatusValue, EntityType
 from app.models.system import CountryAccessRequestStatus
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.forms.assignments import ReopenAssignmentForm, ApproveAssignmentForm
@@ -27,7 +27,7 @@ def select_country(country_id):
 @login_required
 def reopen_assignment(aes_id):
     """
-    Reopens an assignment by changing its status to 'In Progress'.
+    Reopens an assignment by changing its status to 'in_progress'.
     Uses AuthorizationService for granular RBAC checks.
     """
     from app.services.authorization_service import AuthorizationService
@@ -49,7 +49,7 @@ def reopen_assignment(aes_id):
 
     if assignment_entity_status:
         try:
-            assignment_entity_status.status = 'In Progress'
+            assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
             assignment_entity_status.status_timestamp = utcnow()  # Set timestamp when status changes
             db.session.flush()
 
@@ -81,7 +81,7 @@ def reopen_assignment(aes_id):
 @login_required
 def approve_assignment(aes_id):
     """
-    Approves an assignment by changing its status to 'Approved'.
+    Approves an assignment by changing its status to 'approved'.
     Uses AuthorizationService for granular RBAC checks.
     """
     from app.services.authorization_service import AuthorizationService
@@ -103,7 +103,7 @@ def approve_assignment(aes_id):
 
     if assignment_entity_status:
         try:
-            assignment_entity_status.status = 'Approved'
+            assignment_entity_status.status = AssignmentEntityStatusValue.approved
             assignment_entity_status.status_timestamp = utcnow()  # Set timestamp when status changes
             assignment_entity_status.approved_by_user_id = current_user.id
             db.session.flush()
@@ -116,7 +116,7 @@ def approve_assignment(aes_id):
                 current_app.logger.error(f"Error sending assignment approved notification: {e}", exc_info=True)
 
             flash(f"Assignment '{assignment_entity_status.assigned_form.template.name if assignment_entity_status.assigned_form.template else 'Template Missing'}' for {assignment_entity_status.country.name if assignment_entity_status.country else 'N/A'} has been approved.", "success")
-            current_app.logger.info(f"AssignmentEntityStatus ID {aes_id} status changed to 'Approved' by admin {current_user.email}.")
+            current_app.logger.info(f"AssignmentEntityStatus ID {aes_id} status changed to 'approved' by admin {current_user.email}.")
         except Exception as e:
             request_transaction_rollback()
             flash("An error occurred. Please try again.", "danger")

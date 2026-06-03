@@ -2711,7 +2711,7 @@ def notify_template_updated(template):
             AssignmentEntityStatus.assigned_form
         ).filter(
             AssignmentEntityStatus.assigned_form.has(template_id=template.id),
-            AssignmentEntityStatus.status.in_(['Pending', 'In Progress', 'Submitted'])
+            AssignmentEntityStatus.status.in_(['pending', 'in_progress', 'submitted'])
         ).all()
 
         # Get unique user IDs from focal points of countries with active assignments
@@ -2934,14 +2934,14 @@ def notify_standalone_document_uploaded(document, country_id):
         # Determine who should receive notifications based on document status
         #
         # Logic:
-        # 1. If status is "Pending": Only notify admins/system managers (for approval)
-        # 2. If status is "Approved": Notify focal points (they should know about approved documents)
+        # 1. If status is "pending": Only notify admins/system managers (for approval)
+        # 2. If status is "approved": Notify focal points (they should know about approved documents)
         # 3. Never notify the uploader
         # 4. Users who are both admins and focal points only get one notification (admin takes priority)
 
-        if document.status == 'Pending':
+        if document.status == 'pending':
             current_app.logger.info(
-                f"[DOCUMENT_NOTIFICATION] Document status is 'Pending' - will notify admins/system managers only"
+                f"[DOCUMENT_NOTIFICATION] Document status is 'pending' - will notify admins/system managers only"
             )
 
             xs_uploader = [uploader_id] if uploader_id else []

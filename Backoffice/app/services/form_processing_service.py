@@ -570,10 +570,10 @@ class FormItemProcessor:
                             'mode': 'total',
                             'values': {
                                 'total': final_value,
-                                'indirect_reach': indirect_reach_value
+                                'indirect': indirect_reach_value
                             }
                         }
-                        final_value = json.dumps(disaggregation_data)
+                        final_value = disaggregation_data
                 except ValueError:
                     current_app.logger.warning(f"Invalid indirect reach for question {form_item.label}: {indirect_reach_str}")
 

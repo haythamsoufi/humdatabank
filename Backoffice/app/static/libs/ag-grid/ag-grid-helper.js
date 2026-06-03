@@ -23,6 +23,9 @@
 (function() {
     'use strict';
 
+    /** Standard line spacing for AG Grid body cells (matches ag-grid-common-styles.css). */
+    var AG_GRID_CELL_LINE_HEIGHT = '1.4';
+
     /**
      * Bump when global column-visibility / clear-filters toolbar styles change.
      * Used so existing DOM (data-styled from a prior script version) re-applies inline styles.
@@ -123,6 +126,7 @@
      * @param {Array} config.rowData - Initial row data (optional)
      * @param {Object} config.options - Additional grid options
      * @param {Object} config.columnVisibilityOptions - Column Visibility Manager options
+     * @param {boolean} [config.filterPersistence=true] - Persist filters in localStorage per templateId
      * @param {boolean} [config.autoDetectFilters=true] - Run autoDetectColumnFilters on init; re-evaluate on filterChanged
      * @param {Object} [config.autoDetectFilterOptions] - Options for autoDetectColumnFilters (maxUniqueValues, sampleSize, …)
      */
@@ -141,6 +145,7 @@
             rowData: config.rowData || [],
             options: config.options || {},
             columnVisibilityOptions: config.columnVisibilityOptions || {},
+            filterPersistence: config.filterPersistence !== false,
             heightOptions: Object.assign({
                 // Minimum height mode:
                 // - 'viewport': Fill available viewport height (screen height minus top bar)
@@ -181,11 +186,27 @@
         this.columnVisibilityManager = null;
         this.gridDiv = null;
         this.checkboxWidthTimeout = null;
+        this.columnFitTimeout = null;
+        this.resultCountElement = null;
+        this._suppressFilterPersistence = false;
         // Track whether we've already called sizeColumnsToFit().
         // Repeated calls (e.g., after height recalculation) can effectively "fight" user-driven column resizing
         // by continuously re-fitting widths to the container.
         this._hasSizedColumnsToFit = false;
     }
+
+    /**
+     * Grid options that allow selecting/copying cell text (AG Grid defaults block this).
+     * Merged into AgGridHelper defaults; use when calling agGrid.createGrid() directly.
+     * @returns {Object}
+     */
+    AgGridHelper.getTextSelectionGridOptions = function() {
+        return {
+            enableCellTextSelection: true,
+            ensureDomOrder: true,
+            suppressCellFocus: false
+        };
+    };
 
     /**
      * Get default grid options
@@ -198,9 +219,16 @@
         const docDir = document.documentElement.getAttribute('dir');
         const dataLang = (document.documentElement.getAttribute('data-language') || document.body.getAttribute('data-language') || '').toLowerCase();
         const isRtl = docDir === 'rtl' || dataLang === 'ar';
+        const textSelection = AgGridHelper.getTextSelectionGridOptions();
         const options = {
             columnDefs: this.config.columnDefs,
             rowData: this.config.rowData,
+            enableCellTextSelection: textSelection.enableCellTextSelection,
+            ensureDomOrder: textSelection.ensureDomOrder,
+            suppressCellFocus: textSelection.suppressCellFocus,
+            context: {
+                agGridHelperRowData: this.config.rowData || []
+            },
             components: typeof CustomSetFilter !== 'undefined' ? {
                 customSetFilter: CustomSetFilter
             } : {},
@@ -213,7 +241,10 @@
                 cellStyle: {
                     'display': 'flex',
                     'align-items': 'center',
-                    'justify-content': 'flex-start'
+                    'justify-content': 'flex-start',
+                    'line-height': AG_GRID_CELL_LINE_HEIGHT,
+                    'userSelect': 'text',
+                    '-webkit-user-select': 'text'
                 }
             },
             // Enable AG Grid built-in RTL layout when the app is in RTL mode.
@@ -248,7 +279,9 @@
                 cellStyle: {
                     'display': 'flex',
                     'align-items': 'center',
-                    'justify-content': 'center'
+                    'justify-content': 'center',
+                    'userSelect': 'none',
+                    '-webkit-user-select': 'none'
                 }
             }
         };
@@ -343,6 +376,10 @@
         if (custom.components) {
             merged.components = Object.assign({}, defaults.components, custom.components);
         }
+
+        // Merge context so custom filters can always access the full helper rowData,
+        // even if a page supplies its own AG Grid context object.
+        merged.context = Object.assign({}, defaults.context || {}, custom.context || {});
 
         // Deep merge getLocaleText callback (important: preserve both if they exist)
         if (defaults.getLocaleText && custom.getLocaleText) {
@@ -548,8 +585,17 @@
             // Initialize Column Visibility Manager
             this.initializeColumnVisibilityManager();
 
+            // Restore saved column filters before toolbar state is calculated.
+            this.restoreSavedFilterModel();
+
+            // Persist column filters for this template/grid after user changes.
+            this.setupFilterPersistenceListener();
+
             // Initialize Clear All Filters Button
             this.initializeClearFiltersButton();
+
+            // Show live result count above the grid.
+            this.initializeResultCount();
 
             // Ensure cell alignment is applied after grid initialization
             this.ensureCellAlignment();
@@ -562,6 +608,9 @@
 
             // Setup checkbox column width handling
             this.setupCheckboxColumnWidthHandling();
+
+            // Re-fit columns when the visible column set changes after initialization.
+            this.setupColumnFitOnStructureChange();
 
             // Ensure filter menu input spacing is applied reliably
             this.setupFilterMenuInputSpacing();
@@ -1037,6 +1086,286 @@
 
         // Show/hide button based on filter state
         this.clearFiltersButton.style.display = hasActiveFilters ? 'inline-flex' : 'none';
+    };
+
+    /**
+     * Get storage key for persisted filter state.
+     * @returns {string}
+     */
+    AgGridHelper.prototype.getFilterStorageKey = function() {
+        return 'ag-grid-filter-model-' + (this.config.templateId || this.config.containerId || 'default');
+    };
+
+    /**
+     * Persist the current filter model for this grid.
+     */
+    AgGridHelper.prototype.saveCurrentFilterModel = function() {
+        if (!this.config.filterPersistence || this._suppressFilterPersistence || !this.gridApi) {
+            return;
+        }
+        if (typeof this.gridApi.getFilterModel !== 'function') {
+            return;
+        }
+
+        try {
+            const filterModel = this.gridApi.getFilterModel() || {};
+            const hasFilters = Object.keys(filterModel).length > 0;
+            if (hasFilters) {
+                localStorage.setItem(this.getFilterStorageKey(), JSON.stringify(filterModel));
+            } else {
+                localStorage.removeItem(this.getFilterStorageKey());
+            }
+        } catch (e) {
+            console.warn('AgGridHelper: Failed to persist filter model:', e);
+        }
+    };
+
+    /**
+     * Restore the saved filter model for this grid.
+     */
+    AgGridHelper.prototype.restoreSavedFilterModel = function() {
+        if (!this.config.filterPersistence || !this.gridApi || typeof this.gridApi.setFilterModel !== 'function') {
+            return false;
+        }
+
+        let saved = null;
+        try {
+            saved = localStorage.getItem(this.getFilterStorageKey());
+        } catch (e) {
+            return false;
+        }
+        if (!saved) {
+            return false;
+        }
+
+        let filterModel = null;
+        try {
+            filterModel = JSON.parse(saved);
+        } catch (e) {
+            try {
+                localStorage.removeItem(this.getFilterStorageKey());
+            } catch (removeError) {
+                // Ignore storage cleanup failures
+            }
+            return false;
+        }
+
+        if (!filterModel || typeof filterModel !== 'object' || Object.keys(filterModel).length === 0) {
+            return false;
+        }
+
+        const self = this;
+        this._suppressFilterPersistence = true;
+        try {
+            const maybePromise = this.gridApi.setFilterModel(filterModel);
+            const finish = function() {
+                self._suppressFilterPersistence = false;
+                self.updateClearFiltersButtonVisibility();
+                self.updateResultCount();
+            };
+            if (maybePromise && typeof maybePromise.then === 'function') {
+                maybePromise.then(finish).catch(function() {
+                    self._suppressFilterPersistence = false;
+                });
+            } else {
+                setTimeout(finish, 0);
+            }
+            return true;
+        } catch (e) {
+            this._suppressFilterPersistence = false;
+            console.warn('AgGridHelper: Failed to restore filter model:', e);
+            return false;
+        }
+    };
+
+    /**
+     * Save filters whenever the grid filter model changes.
+     */
+    AgGridHelper.prototype.setupFilterPersistenceListener = function() {
+        if (this._filterPersistenceListenerAttached || !this.gridApi || typeof this.gridApi.addEventListener !== 'function') {
+            return;
+        }
+        if (!this.config.filterPersistence) {
+            return;
+        }
+
+        const self = this;
+        this.gridApi.addEventListener('filterChanged', function() {
+            self.saveCurrentFilterModel();
+        });
+        this._filterPersistenceListenerAttached = true;
+    };
+
+    /**
+     * Initialize a live result-count label above the grid.
+     */
+    AgGridHelper.prototype.initializeResultCount = function() {
+        if (!this.gridApi) {
+            return;
+        }
+
+        const self = this;
+        const countEl = document.createElement('div');
+        countEl.className = 'ag-grid-result-count';
+        countEl.setAttribute('data-grid-id', this.config.containerId);
+        countEl.style.cssText = [
+            'box-sizing: border-box',
+            'display: inline-flex',
+            'align-items: center',
+            'min-height: 30px',
+            'padding: 6px 0',
+            'font-size: 13px',
+            'line-height: 1.25',
+            'font-weight: 600',
+            'color: #374151',
+            'white-space: nowrap',
+            'font-family: inherit'
+        ].join('; ');
+        this.resultCountElement = countEl;
+
+        const insertResultCount = function() {
+            let placeholder = null;
+            const columnVisibilityOptions = self.config.columnVisibilityOptions || {};
+            const configuredPlaceholderId = columnVisibilityOptions.buttonPlaceholderId;
+            const gridPlaceholderId = self.gridDiv && self.gridDiv.getAttribute('data-placeholder-id');
+            const placeholderId = configuredPlaceholderId || gridPlaceholderId || 'column-visibility-button-placeholder';
+
+            if (placeholderId) {
+                placeholder = document.getElementById(placeholderId);
+            }
+
+            if (!placeholder && self.gridDiv) {
+                let searchContainer = self.gridDiv.parentElement;
+                while (searchContainer && searchContainer !== document.body) {
+                    placeholder = searchContainer.querySelector('[id*="column-visibility-button-placeholder"]');
+                    if (placeholder) break;
+                    searchContainer = searchContainer.parentElement;
+                }
+            }
+
+            if (placeholder && placeholder.parentElement) {
+                const placeholderParent = placeholder.parentElement;
+                const headerRow = placeholderParent.parentElement;
+                let titleGroup = null;
+
+                if (headerRow && headerRow !== document.body) {
+                    Array.prototype.some.call(headerRow.children || [], function(child) {
+                        if (child === placeholderParent || !child.querySelector) {
+                            return false;
+                        }
+                        if (child.querySelector('h1, h2, h3, h4, [data-ag-grid-title-group]')) {
+                            titleGroup = child;
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+
+                if (titleGroup) {
+                    const existing = titleGroup.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
+                    if (existing) {
+                        self.resultCountElement = existing;
+                        return true;
+                    }
+                    countEl.style.marginLeft = '4px';
+                    countEl.style.padding = '0';
+                    titleGroup.appendChild(countEl);
+                    return true;
+                }
+
+                // Generic macro-generated grid toolbar: the placeholder itself is the toolbar content.
+                // Avoid rewriting custom right-side action groups that contain buttons next to the placeholder.
+                if (placeholderParent.children && placeholderParent.children.length > 1) {
+                    return false;
+                }
+
+                const toolbarRow = placeholderParent;
+                const existing = toolbarRow.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
+                if (existing) {
+                    self.resultCountElement = existing;
+                    return true;
+                }
+
+                toolbarRow.style.display = 'flex';
+                toolbarRow.style.alignItems = 'center';
+                toolbarRow.style.justifyContent = 'space-between';
+                toolbarRow.style.gap = '12px';
+                toolbarRow.style.width = '100%';
+                placeholder.style.marginLeft = 'auto';
+                toolbarRow.insertBefore(countEl, placeholder);
+                return true;
+            }
+
+            if (self.gridDiv && self.gridDiv.parentElement) {
+                const parent = self.gridDiv.parentElement;
+                const existing = parent.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
+                if (existing) {
+                    self.resultCountElement = existing;
+                    return true;
+                }
+                const countRow = document.createElement('div');
+                countRow.className = 'ag-grid-result-count-row';
+                countRow.style.cssText = 'display:flex;align-items:center;justify-content:flex-start;margin-bottom:8px;';
+                countRow.appendChild(countEl);
+                parent.insertBefore(countRow, self.gridDiv);
+                return true;
+            }
+
+            return false;
+        };
+
+        if (!insertResultCount()) {
+            setTimeout(function() {
+                if (!insertResultCount()) {
+                    setTimeout(insertResultCount, 200);
+                }
+            }, 50);
+        }
+
+        if (typeof this.gridApi.addEventListener === 'function') {
+            this.gridApi.addEventListener('filterChanged', function() {
+                self.updateResultCount();
+            });
+            this.gridApi.addEventListener('modelUpdated', function() {
+                self.updateResultCount();
+            });
+        }
+
+        setTimeout(function() {
+            self.updateResultCount();
+        }, 0);
+    };
+
+    /**
+     * Update the live result-count label.
+     */
+    AgGridHelper.prototype.updateResultCount = function() {
+        if (!this.resultCountElement || !this.gridApi) {
+            return;
+        }
+
+        let displayedCount = 0;
+        if (typeof this.gridApi.getDisplayedRowCount === 'function') {
+            displayedCount = this.gridApi.getDisplayedRowCount();
+        } else if (Array.isArray(this.config.rowData)) {
+            displayedCount = this.config.rowData.length;
+        }
+
+        const totalCount = Array.isArray(this.config.rowData)
+            ? this.config.rowData.length
+            : displayedCount;
+
+        const showingText = this.getTranslation('showing', 'Showing');
+        const ofText = this.getTranslation('of', 'of');
+        const recordText = this.getTranslation('record', 'record');
+        const recordsText = this.getTranslation('records', 'records');
+        const noun = totalCount === 1 ? recordText : recordsText;
+
+        if (displayedCount === totalCount) {
+            this.resultCountElement.textContent = totalCount + ' ' + noun;
+        } else {
+            this.resultCountElement.textContent = showingText + ' ' + displayedCount + ' ' + ofText + ' ' + totalCount + ' ' + noun;
+        }
     };
 
     /**
@@ -2033,6 +2362,9 @@
 
         // Update config rowData
         this.config.rowData = rowData || [];
+        if (this._gridOptions && this._gridOptions.context) {
+            this._gridOptions.context.agGridHelperRowData = this.config.rowData;
+        }
 
         // Handle both createGrid API (v31+) and old Grid API
         // Try setGridOption first (createGrid API)
@@ -2055,6 +2387,7 @@
         const self = this;
         setTimeout(function() {
             self.setDynamicHeight();
+            self.updateResultCount();
         }, 100);
     };
 
@@ -2428,6 +2761,109 @@
         } else {
             this.scheduleCheckboxWidthEnforcement();
         }
+    };
+
+    /**
+     * Size visible columns to the available grid width.
+     * Used for structural column changes (show/hide/add/remove), not for regular
+     * row/model refreshes, so normal manual resizing is not constantly overwritten.
+     * @param {string} reason - Optional debug reason for the fit request
+     */
+    AgGridHelper.prototype.fitColumnsToAvailableWidth = function(reason) {
+        if (!this.gridApi) {
+            return;
+        }
+        if (this.config && this.config.options && this.config.options.sizeColumnsToFitOnColumnChange === false) {
+            return;
+        }
+        if (this.isFilterMenuOpen && this.isFilterMenuOpen()) {
+            return;
+        }
+        if (this.isGridVisible && typeof this.isGridVisible === 'function' && !this.isGridVisible()) {
+            return;
+        }
+
+        const apiToUse = (this.gridApi && this.gridApi.api && typeof this.gridApi.api.sizeColumnsToFit === 'function')
+            ? this.gridApi.api
+            : this.gridApi;
+
+        if (!apiToUse || typeof apiToUse.sizeColumnsToFit !== 'function') {
+            return;
+        }
+
+        try {
+            if (typeof apiToUse.doLayout === 'function') {
+                apiToUse.doLayout();
+            }
+        } catch (e) {
+            // Non-fatal
+        }
+
+        try {
+            apiToUse.sizeColumnsToFit();
+            this._hasSizedColumnsToFit = true;
+        } catch (e) {
+            // Non-fatal
+        }
+
+        this.scheduleCheckboxWidthEnforcement();
+    };
+
+    /**
+     * Debounce column fitting after visible-column structure changes.
+     * @param {string} reason - Event/reason that requested fitting
+     * @param {number} delayMs - Optional debounce delay
+     */
+    AgGridHelper.prototype.scheduleColumnsToFit = function(reason, delayMs) {
+        if (!this.gridApi) {
+            return;
+        }
+        if (this.config && this.config.options && this.config.options.sizeColumnsToFitOnColumnChange === false) {
+            return;
+        }
+
+        if (this.columnFitTimeout) {
+            clearTimeout(this.columnFitTimeout);
+        }
+
+        const self = this;
+        this.columnFitTimeout = setTimeout(function() {
+            self.fitColumnsToAvailableWidth(reason || 'column-structure-change');
+        }, typeof delayMs === 'number' ? delayMs : 120);
+    };
+
+    /**
+     * Listen for AG Grid column structure changes and re-fit visible columns.
+     */
+    AgGridHelper.prototype.setupColumnFitOnStructureChange = function() {
+        if (this._columnFitOnStructureChangeAttached || !this.gridApi || typeof this.gridApi.addEventListener !== 'function') {
+            return;
+        }
+        if (this.config && this.config.options && this.config.options.sizeColumnsToFitOnColumnChange === false) {
+            return;
+        }
+
+        const self = this;
+        const schedule = function(event) {
+            const type = event && event.type ? event.type : 'column-structure-change';
+            self.scheduleColumnsToFit(type);
+        };
+
+        [
+            'columnVisible',
+            'columnPinned',
+            'displayedColumnsChanged',
+            'gridColumnsChanged',
+            'newColumnsLoaded'
+        ].forEach(function(eventName) {
+            try {
+                self.gridApi.addEventListener(eventName, schedule);
+            } catch (e) {
+                // Some AG Grid versions may not expose every event.
+            }
+        });
+
+        this._columnFitOnStructureChangeAttached = true;
     };
 
     /**
@@ -3152,6 +3588,7 @@
      * @param {Object} options.gridOptions - AG Grid options
      * @param {Object} options.columnVisibility - Column visibility manager options
      * @param {Object} options.height - Height options
+     * @param {boolean} options.persistFilters - Persist filters in browser localStorage (default: true)
      * @param {boolean} options.autoShow - Auto show grid after init (default: true)
      * @param {string} options.loadingId - Custom loading element ID (default: gridId + '-loading')
      * @param {string} options.containerId - Custom container element ID (default: gridId + '-container')
@@ -3194,6 +3631,7 @@
             options: mergedGridOptions,
             columnVisibilityOptions: mergedColumnVisibility,
             heightOptions: heightOptions,
+            filterPersistence: options.filterPersistence !== false && options.persistFilters !== false,
             autoDetectFilters: options.autoDetectFilters,
             autoDetectFilterOptions: options.autoDetectFilterOptions
         });
@@ -3348,6 +3786,8 @@
             console.warn('AgGridHelper: Could not pin actions column:', e);
         }
     };
+
+    AgGridHelper.CELL_LINE_HEIGHT = AG_GRID_CELL_LINE_HEIGHT;
 
     // Export to global scope
     window.AgGridHelper = AgGridHelper;

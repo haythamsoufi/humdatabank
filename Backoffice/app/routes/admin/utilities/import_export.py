@@ -22,6 +22,7 @@ from app.models import (
     Sector,
     SubSector,
 )
+from app.models.enums import IndicatorSuggestionStatusValue
 from app.routes.admin.shared import permission_required
 from app.routes.admin.system_admin.helpers import indicator_bank_history_snapshot
 from app.routes.admin.utilities import bp
@@ -218,8 +219,8 @@ def update_indicator_suggestion_status(suggestion_id):
     admin_notes = request.form.get('admin_notes', '').strip()
 
     try:
-        if new_status in ['Pending', 'approved', 'rejected', 'implemented']:
-            suggestion.status = new_status
+        if new_status in ['pending', 'approved', 'rejected', 'implemented', 'pending', 'reviewed']:
+            suggestion.status = IndicatorSuggestionStatusValue.normalize(new_status)
             suggestion.admin_notes = admin_notes
             suggestion.reviewed_by = current_user
             suggestion.reviewed_at = utcnow()
@@ -1352,7 +1353,7 @@ def _create_indicator_from_suggestion(suggestion):
         db.session.add(history)
 
         # Update suggestion status
-        suggestion.status = 'implemented'
+        suggestion.status = IndicatorSuggestionStatusValue.implemented
         suggestion.indicator_id = new_indicator.id
 
         return new_indicator

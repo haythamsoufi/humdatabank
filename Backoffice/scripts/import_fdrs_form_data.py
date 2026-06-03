@@ -2180,13 +2180,20 @@ def run_import(
                     imputed_for_db = payload["imputed_value"]
                     if imputed_for_db is None or imputed_for_db == {} or imputed_for_db == []:
                         imputed_for_db = db.null()
+                    disagg_type = None
+                    if isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"].get("mode"):
+                        disagg_type = "standard_disagg"
+                    elif payload.get("value") not in (None, ""):
+                        disagg_type = "simple"
                     if existing:
                         existing.value = payload["value"]
+                        existing._sync_numeric_value_from_string()
                         existing.disagg_data = disagg_for_db
+                        existing.disagg_type = disagg_type
                         existing.data_not_available = payload["data_not_available"]
                         existing.not_applicable = payload["not_applicable"]
                         existing.prefilled_value = prefilled_for_db
-                        existing.imputed_value = imputed_for_db
+                        FormData.sync_imputed_numeric_value(existing, imputed_for_db if imputed_for_db is not db.null() else None)
                         if payload["submitted_at"] is not None:
                             existing.submitted_at = payload["submitted_at"]
                         db.session.add(existing)
@@ -2198,11 +2205,16 @@ def run_import(
                             form_item_id=form_item_id,
                             value=payload["value"],
                             disagg_data=disagg_for_db,
+                            disagg_type=disagg_type,
                             data_not_available=payload["data_not_available"],
                             not_applicable=payload["not_applicable"],
                             prefilled_value=prefilled_for_db,
-                            imputed_value=imputed_for_db,
                             submitted_at=payload["submitted_at"],
+                        )
+                        entry._sync_numeric_value_from_string()
+                        FormData.sync_imputed_numeric_value(
+                            entry,
+                            imputed_for_db if imputed_for_db is not db.null() else None,
                         )
                         db.session.add(entry)
                         stats["inserted"] += 1

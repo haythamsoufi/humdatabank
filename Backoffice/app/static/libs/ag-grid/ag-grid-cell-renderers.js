@@ -224,11 +224,33 @@
             var activeText = getTranslation('active', 'Active');
 
             if (params.value) {
-                return '<span class="inline-flex items-center gap-x-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">' +
-                    '<i class="fas fa-archive"></i>' + archivedText + '</span>';
+                return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 shadow-sm">' +
+                    '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-200"><i class="fas fa-archive" style="font-size: 10px;"></i></span>' +
+                    '<span>' + archivedText + '</span></span>';
             }
-            return '<span class="inline-flex items-center gap-x-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-green-100 text-green-800">' +
-                '<i class="fas fa-check-circle"></i>' + activeText + '</span>';
+            return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 shadow-sm">' +
+                '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"><i class="fas fa-check" style="font-size: 10px;"></i></span>' +
+                '<span>' + activeText + '</span></span>';
+        },
+
+        /** Filter labels for archived column (matches archivedStatus display). */
+        archivedFilterValue: function(params) {
+            var archivedText = getTranslation('archived', 'Archived');
+            var activeText = getTranslation('active', 'Active');
+            if (!params.data) {
+                return '';
+            }
+            return params.data.archived ? archivedText : activeText;
+        },
+
+        /** Filter labels for emergency column (matches emergencyBadge display). */
+        emergencyFilterValue: function(params) {
+            var emergencyText = getTranslation('emergency', 'Emergency');
+            var notEmergencyText = getTranslation('not_emergency', 'Not emergency');
+            if (!params.data) {
+                return '';
+            }
+            return params.data.emergency ? emergencyText : notEmergencyText;
         },
 
         /**
@@ -237,12 +259,16 @@
          */
         emergencyBadge: function(params) {
             var emergencyText = getTranslation('emergency', 'Emergency');
+            var notEmergencyText = getTranslation('not_emergency', 'Not emergency');
 
             if (params.value) {
-                return '<span class="inline-flex items-center gap-x-1.5 py-1 px-2.5 rounded-full text-xs font-bold bg-red-100 text-red-800">' +
-                    '<i class="fas fa-exclamation-triangle"></i>' + emergencyText + '</span>';
+                return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm">' +
+                    '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-700 ring-1 ring-rose-200"><i class="fas fa-bolt" style="font-size: 10px;"></i></span>' +
+                    '<span>' + emergencyText + '</span></span>';
             }
-            return '<span class="text-gray-400">-</span>';
+            return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">' +
+                '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200"><i class="fas fa-minus" style="font-size: 10px;"></i></span>' +
+                '<span>' + notEmergencyText + '</span></span>';
         },
 
         /**
@@ -507,10 +533,10 @@
             html += '>';
             html += '<span style="display:flex;flex-direction:row;align-items:center;gap:0.5rem;min-width:0;width:100%;">';
             html += deviceIconHtml;
-            html += '<span class="ag-user-hover-name" style="flex:1;min-width:0;font-size:0.875rem;line-height:1.3;font-weight:500;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(displayName) + '</span>';
+            html += '<span class="ag-user-hover-name" style="flex:1;min-width:0;font-size:0.875rem;line-height:1.4;font-weight:500;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(displayName) + '</span>';
             html += '</span>';
             if (showEmail && userName && userEmail) {
-                html += '<span class="ag-user-hover-subline" style="display:block;padding-left:' + emailPad + ';font-size:0.75rem;line-height:1.3;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">' + escapeHtml(userEmail) + '</span>';
+                html += '<span class="ag-user-hover-subline" style="display:block;padding-left:' + emailPad + ';font-size:0.75rem;line-height:1.4;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">' + escapeHtml(userEmail) + '</span>';
             }
             html += '</span>';
             html += '</div>';

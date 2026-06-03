@@ -1087,6 +1087,31 @@
             document.getElementById('edit-translation-fields-container').innerHTML = '';
         }
 
+        function updateGridRowTranslations(msgid, payloadObj) {
+            if (!window.gridApi || !msgid || !payloadObj) return;
+
+            let updatedNode = null;
+            window.gridApi.forEachNode(function(node) {
+                if (updatedNode || !node.data || node.data.msgid !== msgid) return;
+
+                (cfg.languages || languages || []).forEach(function(langCode) {
+                    const langBase = String(langCode).toLowerCase().split('_')[0];
+                    const fieldValue = payloadObj['msgstr_' + langCode] !== undefined
+                        ? payloadObj['msgstr_' + langCode]
+                        : payloadObj['msgstr_' + langBase];
+
+                    if (fieldValue !== undefined) {
+                        node.setDataValue(langCode, fieldValue || '');
+                    }
+                });
+                updatedNode = node;
+            });
+
+            if (updatedNode && typeof window.gridApi.refreshCells === 'function') {
+                window.gridApi.refreshCells({ rowNodes: [updatedNode], force: true });
+            }
+        }
+
         // Event listeners
         closeBtns.forEach(btn => {
             btn.addEventListener('click', closeEditModal);
@@ -1221,7 +1246,6 @@
             var csrfToken = (payloadObj && payloadObj.csrf_token) ? String(payloadObj.csrf_token) : '';
             var payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
             var fetchFn = (window.getFetch && window.getFetch()) || fetch;
-            var willReloadPage = false;
 
             setEditModalSaving(true);
             fetchFn(cfg.urls.editTranslation, {
@@ -1238,14 +1262,14 @@
             })
             .then(data => {
                 if (data.success) {
-                    // Refresh grid data
-                    if (window.gridApi) {
-                        willReloadPage = true;
-                        window.location.reload();
-                    } else {
-                        setEditModalSaving(false);
-                        closeEditModal();
-                        if (window.showAlert) window.showAlert(data.message || cfg.t.savedSuccessfully, 'success');
+                    updateGridRowTranslations(msgid, payloadObj);
+                    setEditModalSaving(false);
+                    closeEditModal();
+                    var flashCategory = data.updated_count > 0 ? 'success' : 'warning';
+                    if (window.FlashMessages && typeof window.FlashMessages.add === 'function') {
+                        window.FlashMessages.add(data.message || cfg.t.savedSuccessfully, flashCategory);
+                    } else if (typeof window.showFlashMessage === 'function') {
+                        window.showFlashMessage(data.message || cfg.t.savedSuccessfully, flashCategory);
                     }
                 } else {
                     throw new Error(data.message || cfg.t.failedToSave);
@@ -1258,7 +1282,7 @@
                 else console.error(m);
             })
             .finally(function() {
-                if (!willReloadPage) setEditModalSaving(false);
+                setEditModalSaving(false);
             });
         });
 

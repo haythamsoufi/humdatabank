@@ -683,6 +683,8 @@ def apply_imputed_value():
                 fd = FormData(
                     assignment_entity_status_id=int(submission_id),
                     form_item_id=int(form_item_id),
+                    created_at=utcnow(),
+                    created_by_user_id=current_user.id if current_user.is_authenticated else None,
                 )
                 # Ensure a clean "empty reported value" baseline.
                 fd.value = None
@@ -746,7 +748,7 @@ def apply_imputed_value():
 
         # Only set fields that were actually provided (allows scalar-only or disagg-only applies).
         if "imputed_value" in payload:
-            fd.imputed_value = imputed_value
+            FormData.sync_imputed_numeric_value(fd, imputed_value)
         if "imputed_disagg_data" in payload:
             fd.imputed_disagg_data = imputed_disagg_data
 

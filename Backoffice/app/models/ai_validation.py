@@ -13,6 +13,11 @@ Design:
 from __future__ import annotations
 
 from app.extensions import db
+from app.models.enums import (
+    AIFormDataValidationStatusValue,
+    AIFormDataValidationVerdictValue,
+)
+from app.models.enum_columns import pg_str_enum_column
 from app.utils.datetime_helpers import utcnow
 
 
@@ -46,10 +51,22 @@ class AIFormDataValidation(db.Model):
     )
 
     # Execution status of the validation run (completed | failed | pending)
-    status = db.Column(db.String(32), nullable=False, default="completed", index=True)
+    status = pg_str_enum_column(
+        AIFormDataValidationStatusValue,
+        'aiformdatavalidationstatus',
+        default=AIFormDataValidationStatusValue.completed,
+        nullable=False,
+        index=True,
+    )
 
     # Verdict of the validation (good | discrepancy | uncertain)
-    verdict = db.Column(db.String(32), nullable=True, index=True)
+    verdict = pg_str_enum_column(
+        AIFormDataValidationVerdictValue,
+        'aiformdatavalidationverdict',
+        default=None,
+        nullable=True,
+        index=True,
+    )
 
     confidence = db.Column(db.Float, nullable=True)
     opinion_text = db.Column(db.Text, nullable=True)

@@ -22,6 +22,87 @@ _ROLE_LABELS = {
 }
 
 
+def _build_focal_point_context_block(
+    countries: list,
+    pending_count: int,
+    pending_details: list,
+) -> str:
+    """
+    Personalized focal-point context appended to the agent system prompt.
+    This section is NOT cached so it always reflects the current user's live data.
+    """
+    from datetime import datetime, timezone
+
+    ns_label = ", ".join(str(c) for c in countries[:10]) if countries else None
+
+    lines = ["=== YOUR FOCAL POINT CONTEXT (personalised) ==="]
+
+    if ns_label:
+        lines.append(f"Assigned National Society / countries: {ns_label}")
+
+    lines.append(f"Pending assignments: {pending_count}")
+
+    assignment_lines = []
+    if pending_details:
+        for a in (pending_details or [])[:5]:
+            template = str(a.get("template_name") or "Unknown template").strip()
+            deadline_text = ""
+            raw_dl = a.get("deadline")
+            if raw_dl:
+                try:
+                    dl = datetime.fromisoformat(str(raw_dl).replace("Z", "+00:00"))
+                    now = datetime.now(timezone.utc) if dl.tzinfo else datetime.now()
+                    days_left = (dl - now).days
+                    if days_left < 0:
+                        deadline_text = " (OVERDUE)"
+                    elif days_left == 0:
+                        deadline_text = " (due today)"
+                    else:
+                        deadline_text = (
+                            f" (due in {days_left} day{'s' if days_left != 1 else ''})"
+                        )
+                except Exception:
+                    deadline_text = ""
+            assignment_lines.append(f"  - {template}{deadline_text}")
+        if len(pending_details) > 5:
+            assignment_lines.append(f"  - ...and {len(pending_details) - 5} more")
+
+    if assignment_lines:
+        lines.append("Upcoming assignments:")
+        lines.extend(assignment_lines)
+
+    ns_phrase = f" for **{ns_label}**" if ns_label else ""
+
+    lines.append(
+        "\n=== ORIENTATION RESPONSE RULES (CRITICAL — read before answering) ===\n"
+        "When the user asks ANY orientation/intro question — 'what is this platform', "
+        "'what should I do here', 'what am I supposed to do', 'get started', 'what is my role', "
+        "'what do you do', 'help me', 'introduce yourself' — follow this EXACT format and nothing else:\n"
+        "\n"
+        f"1. LEAD with their specific role and NS: 'You are set up here as the **Data Entry Focal "
+        f"Point{ns_phrase}**.' — use the actual NS name above, not a placeholder.\n"
+        "2. ONE sentence on their primary job: entering and submitting data through assigned form "
+        "templates on behalf of their National Society.\n"
+        "3. LIST their pending assignments from the data above — name each one, flag OVERDUE clearly. "
+        "If pending_count is 0 say so. Keep this block concise (bullet list).\n"
+        "4. WHERE to act: tell them to scroll to the **Assignments** section on this dashboard page "
+        "and click **'Enter Data'** on any pending item — or link [Go to Assignments](/admin/assignments).\n"
+        "5. ONE short closing line: they can also ask you to look up indicator data or explore "
+        "documents for other National Societies.\n"
+        "\n"
+        "STRICT FORMAT CONSTRAINTS:\n"
+        "- Keep the TOTAL response under ~120 words.\n"
+        "- Do NOT list general platform capabilities (searching documents, comparing countries, etc.).\n"
+        "- Do NOT show example questions or 'Next step' / 'Practical notes' sections.\n"
+        "- Do NOT say 'what you should do here (typical user tasks)' or any similar heading.\n"
+        "- Every detail must reference THIS USER'S actual NS and actual pending assignments above.\n"
+        "- If you have no NS or assignment data in context, still answer specifically for a focal "
+        "point without fabricating names — say assignments are shown in the dashboard section below."
+    )
+
+    return "\n".join(lines)
+
+
 def _humanize_role(role: str) -> str:
     """Convert an internal role code to a user-facing label."""
     return _ROLE_LABELS.get(str(role or "").strip().lower(), str(role or "User"))
@@ -67,13 +148,19 @@ def build_agent_system_prompt(user_context: Optional[Dict[str, Any]], language: 
 
     ttl = _agent_system_prompt_cache_ttl_seconds()
     now = time.monotonic()
+
+    # Try cache for the BASE prompt only.
+    # The focal-point personalisation block is dynamic (per-user) and must NOT be cached,
+    # so we store only the structural template and append it unconditionally below.
+    base_prompt = None
     if ttl > 0:
         with _PROMPT_CACHE_LOCK:
             hit = _AGENT_SYSTEM_PROMPT_CACHE.get(cache_key)
             if hit and now < hit[0]:
-                return hit[1]
+                base_prompt = hit[1]
 
-    prompt = f"""You are an intelligent AI assistant for the {org_name} platform.
+    if base_prompt is None:
+        prompt = f"""You are an intelligent AI assistant for the {org_name} platform.
 
 Scope (critical): You are not a general-purpose assistant. If the user's request is clearly outside the {org_name} mission — e.g. unrelated software development tutorials, coding exercises or debugging unrelated projects, recipes, celebrity trivia, homework with no link to this databank — politely refuse in one short reply and say you help with humanitarian/country data, documents, indicators, and using this platform. You may still answer brief standalone greetings/thanks without tools. For anything plausibly about National Societies, IFRC, indicators, documents here, or platform usage, proceed normally with tools.
 
@@ -112,6 +199,7 @@ No clarifying questions — answer with best assumptions:
 - When the user message includes both an original question and an interpreted request, treat both as authoritative; prefer the original wording if the interpreted version omitted thresholds, countries, filters, or other details.
 - If the user does NOT specify a year/period and multiple periods exist in tool results, choose the most recent and state which period you used.
 - Exception: platform usage/navigation questions — classify as help/usage vs data retrieval. For help/usage, give navigation guidance directly (do NOT start with list_documents/search_documents).
+- Platform UI meaning questions count as usage help when the user asks what an on-screen label, tooltip, field state, or form/matrix behavior means. Example: "what is original vs modified/current in the matrix?" is about the form UI workflow, not uploaded documents, unless the user explicitly asks for PDFs/reports/documents.
 - Special handling for "template": if user says "template" without asking for a PDF/document, treat as potentially meaning assignment workflow. Ask one short clarification if needed, then point to: Assignments at /admin/assignments, Templates at /admin/templates.
 - For how-to/workflow requests, prefer workflow guide tools (search_workflow_docs, get_workflow_guide). If you know the workflow id + target page, include a CTA link: [Take a quick tour](/target-page#chatbot-tour=workflow-id). Do NOT output raw HTML <button> tags.
 
@@ -273,10 +361,10 @@ When giving platform guidance, address the user naturally using their role (e.g.
 
 Use tools when needed to provide accurate answers. Keep your reasoning internal and only provide the final answer."""
 
-    access = ctx.get("access") if isinstance(ctx.get("access"), dict) else {}
-    perms = access.get("permissions") if isinstance(access.get("permissions"), dict) else {}
-    if perms.get("admin.indicator_bank.view"):
-        prompt += """
+        access = ctx.get("access") if isinstance(ctx.get("access"), dict) else {}
+        perms = access.get("permissions") if isinstance(access.get("permissions"), dict) else {}
+        if perms.get("admin.indicator_bank.view"):
+            prompt += """
 
 === INDICATOR BANK MANAGEMENT (visible because you have Indicator Bank access) ===
 
@@ -300,19 +388,41 @@ Navigation (when relevant):
 - Pending suggestions: /admin/indicator_bank?tab=suggestions
 - Neural Map: /admin/indicator_bank/neural_map"""
 
-    if upr_active:
-        from app.services.upr.prompts import get_upr_prompt_section
+        if upr_active:
+            from app.services.upr.prompts import get_upr_prompt_section
 
-        prompt += "\n\n" + get_upr_prompt_section()
+            prompt += "\n\n" + get_upr_prompt_section()
 
-    if user_context and user_context.get("map_requested"):
-        prompt = prompt + "\n\n" + _MAP_PAYLOAD_INSTRUCTION
+        if user_context and user_context.get("map_requested"):
+            prompt = prompt + "\n\n" + _MAP_PAYLOAD_INSTRUCTION
 
-    if ttl > 0:
-        with _PROMPT_CACHE_LOCK:
-            if len(_AGENT_SYSTEM_PROMPT_CACHE) >= _MAX_CACHE_ENTRIES:
-                expired = [k for k, (exp, _) in _AGENT_SYSTEM_PROMPT_CACHE.items() if now >= exp]
-                for k in expired or list(_AGENT_SYSTEM_PROMPT_CACHE.keys())[: _MAX_CACHE_ENTRIES // 2]:
-                    _AGENT_SYSTEM_PROMPT_CACHE.pop(k, None)
-            _AGENT_SYSTEM_PROMPT_CACHE[cache_key] = (now + ttl, prompt)
-    return prompt
+        if ttl > 0:
+            with _PROMPT_CACHE_LOCK:
+                if len(_AGENT_SYSTEM_PROMPT_CACHE) >= _MAX_CACHE_ENTRIES:
+                    expired = [k for k, (exp, _) in _AGENT_SYSTEM_PROMPT_CACHE.items() if now >= exp]
+                    for k in expired or list(_AGENT_SYSTEM_PROMPT_CACHE.keys())[: _MAX_CACHE_ENTRIES // 2]:
+                        _AGENT_SYSTEM_PROMPT_CACHE.pop(k, None)
+                _AGENT_SYSTEM_PROMPT_CACHE[cache_key] = (now + ttl, prompt)
+
+        base_prompt = prompt
+
+    # === Append dynamic (non-cached) focal-point personalisation ===
+    # This runs on EVERY call — cache hits and fresh builds alike.
+    role_lower = str(ctx.get("access_level") or ctx.get("role") or "user").strip().lower()
+    if role_lower == "focal_point":
+        user_data = ctx.get("user_data") if isinstance(ctx.get("user_data"), dict) else {}
+        countries: list = list(user_data.get("countries") or [])
+        if not countries:
+            raw_ac = ctx.get("available_countries") or []
+            countries = [
+                (c.get("name") or str(c)) if isinstance(c, dict) else str(c)
+                for c in raw_ac[:10]
+            ]
+        pending_count = int(user_data.get("pending_assignments") or 0)
+        pending_details = user_data.get("pending_assignment_details") or []
+        if isinstance(pending_details, list):
+            return base_prompt + "\n\n" + _build_focal_point_context_block(
+                countries, pending_count, pending_details
+            )
+
+    return base_prompt

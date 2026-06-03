@@ -360,7 +360,7 @@ class TestCalculateSectionCompletionStatus:
                 [section], existing_data, existing_documents
             )
 
-            assert statuses['Section 1'] == 'In Progress'
+            assert statuses['Section 1'] == 'in_progress'
 
     def test_calculate_section_completion_status_not_started(self, db_session, app):
         """Test calculating status when no fields are filled."""
@@ -423,7 +423,7 @@ class TestEntryFormRoutes:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.flush()
@@ -464,7 +464,7 @@ class TestEntryFormRoutes:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.flush()
@@ -528,7 +528,7 @@ class TestFormDataService:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -595,7 +595,7 @@ class TestFormDataService:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -642,7 +642,7 @@ class TestFormDataService:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -748,7 +748,7 @@ class TestVariableResolutionService:
                 assigned_form_id=1,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
 
             resolved = VariableResolutionService.resolve_variables(
@@ -813,7 +813,7 @@ class TestDocumentService:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -888,7 +888,7 @@ class TestDocumentService:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country2.id,  # Different country from test_user
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -950,7 +950,7 @@ class TestDocumentService:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1031,7 +1031,7 @@ class TestDocumentService:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="Submitted"  # Submitted status
+                status="submitted"  # Submitted status
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1208,7 +1208,7 @@ class TestFormAuthorization:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1239,7 +1239,7 @@ class TestFormAuthorization:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1293,7 +1293,7 @@ class TestFormAuthorization:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country2.id,  # User only has country1
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1322,7 +1322,7 @@ class TestFormAuthorization:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="Submitted"  # Submitted status
+                status="submitted"  # Submitted status
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1350,7 +1350,7 @@ class TestFormAuthorization:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="Submitted"  # Submitted status
+                status="submitted"  # Submitted status
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1411,7 +1411,7 @@ class TestFormProcessingUtilities:
                 assigned_form_id=1,
                 entity_type=EntityType.country.value,
                 entity_id=1,
-                status="In Progress"
+                status="in_progress"
             )
 
             result = FormItemProcessor.setup_form_item_for_template(
@@ -1453,7 +1453,7 @@ class TestFormProcessingUtilities:
                 assigned_form_id=1,
                 entity_type=EntityType.country.value,
                 entity_id=1,
-                status="In Progress"
+                status="in_progress"
             )
 
             result = FormItemProcessor.setup_form_item_for_template(
@@ -1504,7 +1504,7 @@ class TestFormProcessingUtilities:
                 assigned_form_id=1,
                 entity_type=EntityType.country.value,
                 entity_id=1,
-                status="In Progress"
+                status="in_progress"
             )
 
             items = get_form_items_for_section(section, assignment_status)
@@ -1785,7 +1785,7 @@ class TestEntryFormPDFExport:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -1818,6 +1818,10 @@ class TestEntryFormMatrixOperations:
             with client.session_transaction() as sess:
                 sess["_user_id"] = str(user.id)
                 sess["_fresh"] = True
+            csrf_resp = client.get("/api/v1/csrf-token")
+            assert csrf_resp.status_code == 200
+            csrf_token = (csrf_resp.get_json() or {}).get("csrf_token")
+            assert csrf_token
 
             import uuid as _uuid
             ll = LookupList(name=f"Matrix List {_uuid.uuid4().hex[:8]}", columns_config=[{"name": "name", "type": "string"}])
@@ -1829,6 +1833,7 @@ class TestEntryFormMatrixOperations:
             resp = client.post(
                 "/forms/matrix/search-rows",
                 json={"lookup_list_id": ll.id, "display_column": "name", "filters": [], "search_term": "", "existing_rows": []},
+                headers={"X-CSRFToken": csrf_token},
             )
             assert resp.status_code == 200
             data = resp.get_json()
@@ -1871,7 +1876,7 @@ class TestEntryFormRepeatSections:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1924,7 +1929,7 @@ class TestEntryFormDynamicIndicators:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()
@@ -1981,7 +1986,7 @@ class TestEntryFormDynamicIndicators:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()

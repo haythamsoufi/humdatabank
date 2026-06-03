@@ -152,7 +152,7 @@
         autoHeight: true,
         wrapHeaderText: true,
         autoHeaderHeight: true,
-        cellStyle: { 'white-space': 'normal', 'line-height': '1.35', 'align-items': 'flex-start' }
+        cellStyle: { 'white-space': 'normal', 'line-height': '1.4', 'align-items': 'flex-start' }
       },
       {
         field: 'recipients_display',
@@ -165,7 +165,7 @@
         autoHeight: true,
         wrapHeaderText: true,
         autoHeaderHeight: true,
-        cellStyle: { 'white-space': 'normal', 'line-height': '1.45', 'font-size': '12px', color: '#374151' }
+        cellStyle: { 'white-space': 'normal', 'line-height': '1.4', 'font-size': '12px', color: '#374151' }
       },
       {
         field: 'audience_focal_points',

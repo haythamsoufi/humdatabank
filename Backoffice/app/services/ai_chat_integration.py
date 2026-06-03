@@ -373,13 +373,7 @@ class AIChatIntegration:
         access_level = None
 
         if user_id is not None and getattr(current_user, "is_authenticated", False):
-            access_level = (
-                "system_manager"
-                if AuthorizationService.is_system_manager(current_user)
-                else "admin"
-                if AuthorizationService.is_admin(current_user)
-                else "user"
-            )
+            access_level = AuthorizationService.access_level(current_user)
         if user_id is not None and access_level is None:
             # Prefer access_level from platform when user id came from Bearer / platform only.
             try:

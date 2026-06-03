@@ -44,7 +44,7 @@ class TestEntryFormCoreRoutes:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -78,7 +78,7 @@ class TestEntryFormCoreRoutes:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -154,7 +154,7 @@ class TestEntryFormExportAndMatrixRoutes:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()

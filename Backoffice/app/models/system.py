@@ -5,14 +5,15 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Boolean, JSON
 from sqlalchemy.orm import relationship, backref
 from ..extensions import db
-from .enums import NotificationType
+from .enums import (
+    NotificationType,
+    CountryAccessRequestStatus,
+    CountryAccessRequestStatusValue,
+    NotificationCampaignStatusValue,
+    EmailDeliveryStatusValue,
+)
+from app.models.enum_columns import pg_str_enum_column
 from app.utils.datetime_helpers import utcnow
-
-
-class CountryAccessRequestStatus:
-    PENDING = 'pending'
-    APPROVED = 'approved'
-    REJECTED = 'rejected'
 
 
 class CountryAccessRequest(db.Model):
@@ -23,7 +24,12 @@ class CountryAccessRequest(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     country_id = db.Column(db.Integer, db.ForeignKey('country.id'), nullable=False)
     request_message = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), nullable=False, default=CountryAccessRequestStatus.PENDING)  # pending/approved/rejected
+    status = pg_str_enum_column(
+        CountryAccessRequestStatusValue,
+        'countryaccessrequeststatus',
+        default=CountryAccessRequestStatusValue.pending,
+        nullable=False,
+    )
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     processed_at = db.Column(db.DateTime, nullable=True)
     processed_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -251,7 +257,12 @@ class NotificationCampaign(db.Model):
 
     # Scheduling
     scheduled_for = db.Column(db.DateTime, nullable=True)  # When campaign should be sent
-    status = db.Column(db.String(20), nullable=False, default='draft')  # 'draft', 'scheduled', 'sent', 'failed', 'cancelled'
+    status = pg_str_enum_column(
+        NotificationCampaignStatusValue,
+        'notificationcampaignstatus',
+        default=NotificationCampaignStatusValue.draft,
+        nullable=False,
+    )
 
     # User selection (stored as JSON array of user IDs or filter criteria)
     user_selection_type = db.Column(db.String(20), nullable=False, default='manual')  # 'manual', 'filter', or 'entity'
@@ -295,7 +306,12 @@ class EmailDeliveryLog(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     email_address = db.Column(db.String(255), nullable=False)
     subject = db.Column(db.String(500), nullable=True)
-    status = db.Column(db.String(50), nullable=False, default='pending')  # pending, sent, failed, retrying
+    status = pg_str_enum_column(
+        EmailDeliveryStatusValue,
+        'emaildeliverystatus',
+        default=EmailDeliveryStatusValue.pending,
+        nullable=False,
+    )
     error_message = db.Column(db.Text, nullable=True)
     retry_count = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)

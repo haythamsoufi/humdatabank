@@ -60,7 +60,16 @@ def init_scheduler(app, is_reloader):
                         return
 
                     from apscheduler.schedulers.background import BackgroundScheduler
-                    scheduler = BackgroundScheduler()
+                    try:
+                        misfire_grace_seconds = int(app.config.get('SCHEDULER_MISFIRE_GRACE_SECONDS', 30))
+                    except (TypeError, ValueError):
+                        misfire_grace_seconds = 30
+
+                    scheduler = BackgroundScheduler(job_defaults={
+                        'coalesce': True,
+                        'max_instances': 1,
+                        'misfire_grace_time': max(1, misfire_grace_seconds),
+                    })
                     app.scheduler = scheduler
 
                     def _cleanup_notifications_with_context():
@@ -86,13 +95,15 @@ def init_scheduler(app, is_reloader):
                     scheduler.add_job(
                         func=_cleanup_notifications_with_context,
                         trigger="cron", hour=2, minute=0,
-                        id='cleanup_notifications', replace_existing=True
+                        id='cleanup_notifications', name='Cleanup old notifications',
+                        replace_existing=True
                     )
 
                     scheduler.add_job(
                         func=_cleanup_sessions_with_context,
                         trigger="interval", minutes=60,
-                        id='cleanup_inactive_sessions', replace_existing=True
+                        id='cleanup_inactive_sessions', name='Cleanup inactive user sessions',
+                        replace_existing=True
                     )
 
                     def _retry_failed_emails_with_context():
@@ -111,7 +122,8 @@ def init_scheduler(app, is_reloader):
                     scheduler.add_job(
                         func=_retry_failed_emails_with_context,
                         trigger="interval", minutes=15,
-                        id='retry_failed_emails', replace_existing=True
+                        id='retry_failed_emails', name='Retry failed notification emails',
+                        replace_existing=True
                     )
 
                     def _send_digest_emails_with_context():
@@ -127,7 +139,8 @@ def init_scheduler(app, is_reloader):
                     scheduler.add_job(
                         func=_send_digest_emails_with_context,
                         trigger="interval", minutes=1,
-                        id='check_and_send_digest_emails', replace_existing=True
+                        id='check_and_send_digest_emails', name='Send notification digest emails',
+                        replace_existing=True
                     )
 
                     def _process_scheduled_notifications_with_context():
@@ -145,7 +158,8 @@ def init_scheduler(app, is_reloader):
                     scheduler.add_job(
                         func=_process_scheduled_notifications_with_context,
                         trigger="interval", minutes=1,
-                        id='process_scheduled_notifications', replace_existing=True
+                        id='process_scheduled_notifications', name='Process scheduled notifications',
+                        replace_existing=True
                     )
 
                     def _cleanup_stale_websockets_with_context():
@@ -161,7 +175,8 @@ def init_scheduler(app, is_reloader):
                     scheduler.add_job(
                         func=_cleanup_stale_websockets_with_context,
                         trigger="interval", minutes=5,
-                        id='cleanup_stale_websockets', replace_existing=True
+                        id='cleanup_stale_websockets', name='Cleanup stale WebSocket connections',
+                        replace_existing=True
                     )
 
                     if not scheduler.running:

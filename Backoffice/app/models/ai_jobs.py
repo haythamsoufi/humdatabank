@@ -16,6 +16,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.extensions import db
+from app.models.enums import AIJobStatusValue, AIJobItemStatusValue
+from app.models.enum_columns import pg_str_enum_column
 from app.utils.datetime_helpers import utcnow
 
 
@@ -28,7 +30,13 @@ class AIJob(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
     user = relationship("User", foreign_keys=[user_id])
 
-    status = db.Column(db.String(32), nullable=False, default="queued", index=True)
+    status = pg_str_enum_column(
+        AIJobStatusValue,
+        'aijobstatus',
+        default=AIJobStatusValue.queued,
+        nullable=False,
+        index=True,
+    )
     # statuses: queued, running, completed, failed, cancel_requested, cancelled
 
     total_items = db.Column(db.Integer, nullable=False, default=0)
@@ -61,7 +69,13 @@ class AIJobItem(db.Model):
     entity_type = db.Column(db.String(64), nullable=True, index=True)  # e.g. "ai_document"
     entity_id = db.Column(db.Integer, nullable=True, index=True)
 
-    status = db.Column(db.String(32), nullable=False, default="queued", index=True)
+    status = pg_str_enum_column(
+        AIJobItemStatusValue,
+        'aijobitemstatus',
+        default=AIJobItemStatusValue.queued,
+        nullable=False,
+        index=True,
+    )
     # statuses: queued, downloading, processing, completed, failed, cancelled
     error = db.Column(db.Text, nullable=True)
 

@@ -376,7 +376,7 @@ def get_platform_stats(user_scoped: bool = True) -> Dict[str, int]:
                 stats['total_submissions'] = AssignmentEntityStatus.query.filter(
                     AssignmentEntityStatus.entity_id.in_(allowed_ids),
                     AssignmentEntityStatus.entity_type == 'country',
-                    AssignmentEntityStatus.status.in_(['Submitted', 'Approved'])
+                    AssignmentEntityStatus.status.in_(['submitted', 'approved'])
                 ).count()
         else:
             stats['total_assignments'] = AssignmentEntityStatus.query.filter(
@@ -384,7 +384,7 @@ def get_platform_stats(user_scoped: bool = True) -> Dict[str, int]:
             ).count()
             stats['total_submissions'] = AssignmentEntityStatus.query.filter(
                 AssignmentEntityStatus.entity_type == 'country',
-                AssignmentEntityStatus.status.in_(['Submitted', 'Approved'])
+                AssignmentEntityStatus.status.in_(['submitted', 'approved'])
             ).count()
 
         return stats
@@ -437,7 +437,7 @@ def get_user_data_context(user_id: Optional[int] = None) -> Dict[str, Any]:
                 completed = AssignmentEntityStatus.query.filter(
                     AssignmentEntityStatus.entity_id.in_(country_ids),
                     AssignmentEntityStatus.entity_type == 'country',
-                    AssignmentEntityStatus.status.in_(['Submitted', 'Approved'])
+                    AssignmentEntityStatus.status.in_(['submitted', 'approved'])
                 ).count()
                 user_data['total_assignments'] = total
                 user_data['completed_assignments'] = completed
@@ -452,7 +452,7 @@ def get_user_data_context(user_id: Optional[int] = None) -> Dict[str, Any]:
                     .filter(
                         AssignmentEntityStatus.entity_id.in_(country_ids),
                         AssignmentEntityStatus.entity_type == 'country',
-                        ~AssignmentEntityStatus.status.in_(['Submitted', 'Approved'])
+                        ~AssignmentEntityStatus.status.in_(['submitted', 'approved'])
                     )
                     .order_by(AssignmentEntityStatus.due_date.asc().nullslast())
                     .limit(10)
@@ -461,6 +461,7 @@ def get_user_data_context(user_id: Optional[int] = None) -> Dict[str, Any]:
                 user_data['pending_assignment_details'] = [
                     {
                         'template_name': s.assigned_form.template.name if s.assigned_form and s.assigned_form.template else 'Unknown',
+                        'status': s.status or 'pending',
                         'deadline': s.due_date.isoformat() if s.due_date else None,
                         'country': s.country.name if s.country else 'Unknown',
                     }
@@ -470,12 +471,12 @@ def get_user_data_context(user_id: Optional[int] = None) -> Dict[str, Any]:
         elif AuthorizationService.is_admin(user):
             user_data['recent_submissions_count'] = AssignmentEntityStatus.query.filter(
                 AssignmentEntityStatus.entity_type == 'country',
-                AssignmentEntityStatus.status.in_(['Submitted', 'Approved']),
+                AssignmentEntityStatus.status.in_(['submitted', 'approved']),
                 AssignmentEntityStatus.status_timestamp >= utcnow() - timedelta(days=30)
             ).count()
             user_data['pending_assignments'] = AssignmentEntityStatus.query.filter(
                 AssignmentEntityStatus.entity_type == 'country',
-                ~AssignmentEntityStatus.status.in_(['Submitted', 'Approved'])
+                ~AssignmentEntityStatus.status.in_(['submitted', 'approved'])
             ).count()
 
         return user_data

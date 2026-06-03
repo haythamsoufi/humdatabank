@@ -9,6 +9,7 @@ from wtforms.validators import DataRequired, Optional
 from wtforms.widgets import ListWidget, CheckboxInput
 from app.models import FormTemplate, Country, User
 from app.models.rbac import RbacUserRole, RbacRole, RbacRolePermission, RbacPermission
+from app.models.enums import AssignmentEntityStatusValue
 from ..base import BaseForm
 
 
@@ -86,13 +87,7 @@ class AssignedFormForm(BaseForm):
 class AssignmentEntityStatusForm(BaseForm):
     """Form for editing the status and due date of an entity (country, branch, etc.) within an assignment."""
 
-    status = SelectField("Status", choices=[
-        ("Pending", "Pending"),
-        ("In Progress", "In Progress"),
-        ("Submitted", "Submitted"),
-        ("Approved", "Approved"),
-        ("Requires Revision", "Requires Revision")
-    ], validators=[DataRequired()])
+    status = SelectField("Status", choices=AssignmentEntityStatusValue.choices(), validators=[DataRequired()])
     due_date = DateField("Due Date", format='%Y-%m-%d', validators=[Optional()])
     submit = SubmitField("Save Status")
 

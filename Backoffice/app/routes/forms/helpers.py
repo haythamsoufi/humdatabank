@@ -334,7 +334,7 @@ def calculate_section_completion_status(all_sections, existing_data_processed, e
         elif filled_items_count == 0:
             section_statuses[section.name] = 'Not Started'
         elif filled_items_count < total_items_in_section:
-            section_statuses[section.name] = 'In Progress'
+            section_statuses[section.name] = 'in_progress'
         else:
             section_statuses[section.name] = 'Completed'
 

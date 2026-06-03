@@ -865,7 +865,7 @@ class AuthorizationService:
             return False
 
         # Focal points can only edit assignments that are not submitted or approved
-        return assignment_entity_status.status not in ["Submitted", "Approved"]
+        return assignment_entity_status.status not in ["submitted", "approved"]
 
     @staticmethod
     def can_submit_assignment(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
@@ -909,7 +909,7 @@ class AuthorizationService:
             return False
 
         # Can only submit if status allows (not already approved)
-        return assignment_entity_status.status not in ["Approved"]
+        return assignment_entity_status.status not in ["approved"]
 
     @staticmethod
     def can_approve_assignment(assignment_entity_status: AssignmentEntityStatus, user) -> bool:

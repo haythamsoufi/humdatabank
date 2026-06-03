@@ -107,7 +107,7 @@ class DocumentService:
         user_country_ids = [country.id for country in current_user.countries.all()]
         is_valid_user_for_country_status = aes.country_id in user_country_ids
         from app.services.authorization_service import AuthorizationService
-        can_edit = aes.status not in ["Submitted", "Approved"] or AuthorizationService.is_admin(current_user)
+        can_edit = aes.status not in ["submitted", "approved"] or AuthorizationService.is_admin(current_user)
 
         if not is_valid_user_for_country_status and not AuthorizationService.is_admin(current_user):
             raise PermissionError("Not authorized to delete this document")

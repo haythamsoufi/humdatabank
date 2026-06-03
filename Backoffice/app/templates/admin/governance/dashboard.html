@@ -708,11 +708,11 @@ document.addEventListener('click', function(e) {
     const labels = Object.keys(byStatus);
     const data   = Object.values(byStatus);
     const COLORS = {
-        'Pending':     '#e5e7eb',
+        'pending':     '#e5e7eb',
         'Assigned':    '#93c5fd',
-        'In Progress': '#fbbf24',
-        'Submitted':   '#3b82f6',
-        'Approved':    '#22c55e',
+        'in_progress': '#fbbf24',
+        'submitted':   '#3b82f6',
+        'approved':    '#22c55e',
     };
     const colors = labels.map(l => COLORS[l] || '#a5b4fc');
 

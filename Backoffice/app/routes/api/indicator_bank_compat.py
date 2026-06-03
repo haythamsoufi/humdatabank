@@ -785,7 +785,7 @@ def indicator_suggestion():
         related_programs=related_text or None,
         reason=reason,
         additional_notes=additional_notes or None,
-        status="Pending",
+        status="pending",
         submitted_at=utcnow(),
     )
     db.session.add(suggestion)

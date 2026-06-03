@@ -6,7 +6,8 @@ from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Bool
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, backref
 from ..extensions import db
-from .enums import SectionType, FormItemType
+from .enums import SectionType, FormItemType, FormTemplateVersionStatusValue
+from app.models.enum_columns import pg_str_enum_column
 from config import Config
 import json
 from app.utils.datetime_helpers import utcnow
@@ -183,7 +184,12 @@ class FormTemplateVersion(db.Model):
     id = Column(Integer, primary_key=True)
     template_id = Column(Integer, ForeignKey('form_template.id', ondelete='CASCADE'), nullable=False)
     version_number = Column(Integer, nullable=False)  # Template-scoped version number (1, 2, 3, ...)
-    status = Column(String(20), nullable=False, default='draft')  # draft, published, archived
+    status = pg_str_enum_column(
+        FormTemplateVersionStatusValue,
+        'formtemplateversionstatus',
+        default=FormTemplateVersionStatusValue.draft,
+        nullable=False,
+    )
     comment = Column(Text, nullable=True)
     based_on_version_id = Column(Integer, ForeignKey('form_template_version.id', ondelete='SET NULL'), nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
@@ -533,35 +539,216 @@ class FormSection(db.Model):
         return f'<FormSection {self.name}{parent_info} (Template: {template_name})>'
 
 
-class FormData(db.Model):
+class DataEntryMixin:
+    """Shared value/disaggregation columns and helpers for submission data tables.
+
+    Invariant (F7):
+    - ``value`` is a denormalized cache of the numeric total when ``disagg_data`` is set.
+    - Always use ``total_value`` for reads; use ``set_simple_value`` / ``set_disaggregated_data``
+      for writes — never mutate ``disagg_data`` in-place.
+    """
+
+    value = db.Column(db.String(255), nullable=True)
+    # IMPORTANT: store Python None as SQL NULL (not JSON literal `null`)
+    disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
+    disagg_type = db.Column(db.String(20), nullable=True)
+    data_not_available = db.Column(db.Boolean, nullable=False, default=False)
+    not_applicable = db.Column(db.Boolean, nullable=False, default=False)
+    numeric_value = db.Column(db.Float, nullable=True)
+    submitted_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+
+    @staticmethod
+    def _parse_numeric_string(value):
+        """Return float when value is a numeric string, else None."""
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return float(text)
+        except (ValueError, TypeError):
+            return None
+
+    @classmethod
+    def _calculate_disagg_total(cls, values):
+        """Sum numeric leaf values from a disaggregation values dict."""
+        total = 0
+        if 'direct' in values:
+            if isinstance(values['direct'], dict):
+                for key, val in values['direct'].items():
+                    if isinstance(val, (int, float)):
+                        total += val
+            elif isinstance(values['direct'], (int, float)):
+                total += values['direct']
+            if 'indirect' in values and isinstance(values['indirect'], (int, float)):
+                total += values['indirect']
+        else:
+            for key, val in values.items():
+                if key != 'indirect' and isinstance(val, (int, float)):
+                    total += val
+        return total
+
+    def _sync_numeric_value_from_string(self):
+        """Populate numeric_value from the string value column."""
+        self.numeric_value = self._parse_numeric_string(self.value)
+
+    @classmethod
+    def sync_imputed_numeric_value(cls, entry, imputed_value):
+        """Set imputed_numeric_value alongside imputed_value when imputed_value is numeric."""
+        entry.imputed_value = imputed_value
+        if imputed_value is None:
+            entry.imputed_numeric_value = None
+            return
+        if isinstance(imputed_value, (int, float)):
+            entry.imputed_numeric_value = float(imputed_value)
+            return
+        entry.imputed_numeric_value = cls._parse_numeric_string(imputed_value)
+
+    @property
+    def has_disaggregation(self):
+        """Check if this data entry has disaggregated data."""
+        return self.disagg_data is not None
+
+    @property
+    def disaggregation_mode(self):
+        """Get the disaggregation mode (total, sex, age, sex_age)."""
+        if self.disagg_data:
+            return self.disagg_data.get('mode')
+        return None
+
+    @property
+    def total_value(self):
+        """Get the total value, either from value field or calculated from disaggregation."""
+        if self.value and not self.data_not_available and not self.not_applicable:
+            return self.value
+        if self.disagg_data:
+            values = self.disagg_data.get('values', {})
+            return sum(v for v in values.values() if isinstance(v, (int, float)))
+        return None
+
+    def get_disaggregated_value(self, category):
+        """Get value for specific age/sex category."""
+        if self.disagg_data:
+            return self.disagg_data.get('values', {}).get(category)
+        return None
+
+    def get_effective_value(self):
+        """Get the effective value considering data availability flags."""
+        if self.data_not_available or self.not_applicable:
+            return None
+        return self.value
+
+    @property
+    def is_matrix(self):
+        """Check if this entry stores matrix cell data."""
+        return self.disagg_type == 'matrix'
+
+    def set_simple_value(self, value):
+        """Set a simple value (clears disaggregation data)."""
+        if value is None:
+            self.value = None
+            self.numeric_value = None
+            self.disagg_type = None
+        else:
+            self.value = str(value)
+            self._sync_numeric_value_from_string()
+            self.disagg_type = 'simple'
+        self.disagg_data = db.null()
+        self.data_not_available = False
+        self.not_applicable = False
+
+    def set_disaggregated_data(self, mode, values):
+        """Set disaggregated data (clears simple value)."""
+        total = self._calculate_disagg_total(values)
+        self.value = str(total) if total > 0 else None
+        self.numeric_value = float(total) if total > 0 else None
+        self.disagg_data = {
+            'mode': mode,
+            'values': values,
+        }
+        self.disagg_type = 'standard_disagg'
+        self.data_not_available = False
+        self.not_applicable = False
+
+    def set_data_availability(self, data_not_available=False, not_applicable=False):
+        """Set data availability flags (clears actual values when flagged)."""
+        if data_not_available or not_applicable:
+            self.value = None
+            self.numeric_value = None
+            self.disagg_data = db.null()
+            self.disagg_type = None
+            self.data_not_available = bool(data_not_available)
+            self.not_applicable = bool(not_applicable)
+        else:
+            self.data_not_available = False
+            self.not_applicable = False
+
+    @property
+    def has_data_availability_flags(self):
+        """Check if this entry has data availability flags set."""
+        return bool(self.data_not_available or self.not_applicable)
+
+    @property
+    def is_data_not_available(self):
+        """Check if data is marked as not available."""
+        return bool(self.data_not_available)
+
+    @property
+    def is_not_applicable(self):
+        """Check if data is marked as not applicable."""
+        return bool(self.not_applicable)
+
+
+class FormData(DataEntryMixin, db.Model):
     __tablename__ = 'form_data'
     id = db.Column(db.Integer, primary_key=True)
     # Polymorphic foreign key for multi-entity support
     assignment_entity_status_id = db.Column(db.Integer, db.ForeignKey('assignment_entity_status.id'), nullable=True)
     public_submission_id = db.Column(db.Integer, db.ForeignKey('public_submission.id'), nullable=True)
     form_item_id = db.Column(db.Integer, db.ForeignKey('form_item.id'), nullable=False)
-    value = db.Column(db.String(255), nullable=True)
-    # IMPORTANT: store Python None as SQL NULL (not JSON literal `null`)
-    disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    data_not_available = db.Column(db.Boolean, nullable=True)
-    not_applicable = db.Column(db.Boolean, nullable=True)
     prefilled_value = db.Column(db.JSON(none_as_null=True), nullable=True)
     # Prefilled values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_value = db.Column(db.JSON(none_as_null=True), nullable=True)
     # Imputed values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    submitted_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+    imputed_numeric_value = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     form_item = relationship('FormItem', foreign_keys=[form_item_id], overlaps="data_entries")
     assignment_entity_status = relationship('AssignmentEntityStatus', foreign_keys=[assignment_entity_status_id], overlaps="data_entries")
     public_submission = relationship('PublicSubmission', overlaps="data_entries")
+    created_by_user = relationship('User', foreign_keys=[created_by_user_id])
 
     __table_args__ = (
         db.Index('ix_form_data_aes_item', 'assignment_entity_status_id', 'form_item_id'),
         db.Index('ix_form_data_public_item', 'public_submission_id', 'form_item_id'),
         db.Index('ix_form_data_form_item', 'form_item_id'),
         db.Index('ix_form_data_submitted_at', 'submitted_at'),
+        db.Index('ix_form_data_created_by', 'created_by_user_id'),
+        db.CheckConstraint(
+            '(assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)',
+            name='ck_form_data_parent',
+        ),
+        db.CheckConstraint(
+            "disagg_data IS NULL OR NOT (disagg_data::jsonb ? 'mode') OR "
+            "(disagg_data::jsonb ? 'mode' AND disagg_data::jsonb ? 'values')",
+            name='ck_form_data_disagg_shape',
+        ),
     )
+
+    @classmethod
+    def sync_imputed_numeric_value(cls, entry, imputed_value):
+        """Set imputed_numeric_value alongside imputed_value when imputed_value is numeric."""
+        entry.imputed_value = imputed_value
+        if imputed_value is None:
+            entry.imputed_numeric_value = None
+            return
+        if isinstance(imputed_value, (int, float)):
+            entry.imputed_numeric_value = float(imputed_value)
+            return
+        entry.imputed_numeric_value = cls._parse_numeric_string(imputed_value)
 
     # Helper methods for prefilled values
     def get_display_value(self):
@@ -603,116 +790,6 @@ class FormData(db.Model):
         has_prefilled = (self.prefilled_value is not None) or (self.prefilled_disagg_data is not None)
         return (not has_reported) and has_prefilled
 
-    @property
-    def has_disaggregation(self):
-        """Check if this data entry has disaggregated data"""
-        return self.disagg_data is not None
-
-    @property
-    def disaggregation_mode(self):
-        """Get the disaggregation mode (total, sex, age, sex_age)"""
-        if self.disagg_data:
-            return self.disagg_data.get('mode')
-        return None
-
-    @property
-    def total_value(self):
-        """Get the total value, either from value field or calculated from disaggregation"""
-        if self.value and not self.data_not_available and not self.not_applicable:
-            return self.value
-        elif self.disagg_data:
-            values = self.disagg_data.get('values', {})
-            return sum(v for v in values.values() if v is not None)
-        return None
-
-    def get_disaggregated_value(self, category):
-        """Get value for specific age/sex category"""
-        if self.disagg_data:
-            return self.disagg_data.get('values', {}).get(category)
-        return None
-
-    def get_effective_value(self):
-        """Get the effective value considering data availability flags"""
-        if self.data_not_available:
-            return None
-        if self.not_applicable:
-            return None
-        return self.value
-
-    def set_simple_value(self, value):
-        """Set a simple value (clears disaggregation data)"""
-        if value is None:
-            self.value = None
-        else:
-            # Store all values as strings
-            self.value = str(value)
-        self.disagg_data = db.null()
-        self.data_not_available = False
-        self.not_applicable = False
-
-    def set_disaggregated_data(self, mode, values):
-        """Set disaggregated data (clears simple value)"""
-        # Calculate the total from all values (excluding 'indirect' if present)
-        total = 0
-
-        # Handle nested structure for indirect reach items
-        if 'direct' in values:
-            if isinstance(values['direct'], dict):
-                # For disaggregated modes (sex, age, sex_age), values are nested under 'direct'
-                direct_values = values['direct']
-                for key, value in direct_values.items():
-                    if isinstance(value, (int, float)):
-                        total += value
-            elif isinstance(values['direct'], (int, float)):
-                # For total mode, 'direct' contains a single value
-                total += values['direct']
-
-            # Add indirect value if present
-            if 'indirect' in values and isinstance(values['indirect'], (int, float)):
-                total += values['indirect']
-        else:
-            # For items without indirect reach, values are at the top level
-            for key, value in values.items():
-                if key != 'indirect' and isinstance(value, (int, float)):
-                    total += value
-
-        # Save the calculated total to the main value field
-        self.value = str(total) if total > 0 else None
-
-        # Save the disaggregated data structure
-        self.disagg_data = {
-            'mode': mode,
-            'values': values
-        }
-        self.data_not_available = False
-        self.not_applicable = False
-
-    def set_data_availability(self, data_not_available=False, not_applicable=False):
-        """Set data availability flags (clears actual values)"""
-        if data_not_available or not_applicable:
-            self.value = None
-            self.disagg_data = db.null()
-            self.data_not_available = data_not_available
-            self.not_applicable = not_applicable
-        else:
-            self.data_not_available = False
-            self.not_applicable = False
-
-    @property
-    def has_data_availability_flags(self):
-        """Check if this entry has data availability flags set."""
-        return bool(self.data_not_available or self.not_applicable)
-
-    @property
-    def is_data_not_available(self):
-        """Check if data is marked as not available."""
-        return bool(self.data_not_available)
-
-    @property
-    def is_not_applicable(self):
-        """Check if data is marked as not applicable."""
-        return bool(self.not_applicable)
-
     def __repr__(self):
         item_label = 'N/A'
         if self.form_item:
@@ -740,8 +817,8 @@ class FormData(db.Model):
         return f'<FormData Assignment:{assignment_id} Country:{country_name} {item_label} Value:{display_value}>'
 
 
-class DynamicIndicatorData(db.Model):
-    """Tracks dynamically added indicators by focal points in repeat group sections and stores their data."""
+class DynamicIndicatorData(DataEntryMixin, db.Model):
+    """Tracks dynamically added indicators by focal points in dynamic sections and stores their data."""
     __tablename__ = 'dynamic_indicator_data'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -756,21 +833,21 @@ class DynamicIndicatorData(db.Model):
     order = db.Column(db.Float, nullable=False, default=0)
     added_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     added_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    # Data fields (merged from DynamicIndicatorData)
-    value = db.Column(db.String(255), nullable=True)
-    # IMPORTANT: store Python None as SQL NULL (not JSON literal `null`)
-    disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    data_not_available = db.Column(db.Boolean, nullable=True)
-    not_applicable = db.Column(db.Boolean, nullable=True)
-    submitted_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+    prefilled_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_numeric_value = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
 
     # Relationships
     assignment_entity_status = db.relationship('AssignmentEntityStatus', foreign_keys=[assignment_entity_status_id])
     public_submission = db.relationship('PublicSubmission')
     # Note: 'section' relationship is defined in FormSection with cascade delete
     indicator_bank = db.relationship('IndicatorBank', backref='dynamic_assignments')
-    added_by_user = db.relationship('User', backref='added_dynamic_indicators')
+    added_by_user = db.relationship('User', foreign_keys=[added_by_user_id], backref='added_dynamic_indicators')
+    created_by_user = db.relationship('User', foreign_keys=[created_by_user_id])
 
     # Ensure unique assignment per country/section/indicator combination
     __table_args__ = (
@@ -781,93 +858,17 @@ class DynamicIndicatorData(db.Model):
         db.Index('ix_dynamic_indicator_section', 'section_id'),
         db.Index('ix_dynamic_indicator_added_by', 'added_by_user_id'),
         db.Index('ix_dynamic_indicator_added_at', 'added_at'),
+        db.Index('ix_dynamic_indicator_data_created_by', 'created_by_user_id'),
+        db.CheckConstraint(
+            '(assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)',
+            name='ck_dynamic_indicator_data_parent',
+        ),
+        db.CheckConstraint(
+            "disagg_data IS NULL OR NOT (disagg_data::jsonb ? 'mode') OR "
+            "(disagg_data::jsonb ? 'mode' AND disagg_data::jsonb ? 'values')",
+            name='ck_dynamic_indicator_data_disagg_shape',
+        ),
     )
-
-    # Data properties (moved from DynamicIndicatorData)
-    @property
-    def has_disaggregation(self):
-        """Check if this data entry has disaggregated data"""
-        return self.disagg_data is not None
-
-    @property
-    def disaggregation_mode(self):
-        """Get the disaggregation mode (total, sex, age, sex_age)"""
-        if self.disagg_data:
-            return self.disagg_data.get('mode')
-        return None
-
-    @property
-    def total_value(self):
-        """Get the total value, either from value field or calculated from disaggregation"""
-        if self.value and not self.data_not_available and not self.not_applicable:
-            return self.value
-        elif self.disagg_data:
-            values = self.disagg_data.get('values', {})
-            return sum(v for v in values.values() if v is not None)
-        return None
-
-    def get_disaggregated_value(self, category):
-        """Get value for specific age/sex category"""
-        if self.disagg_data:
-            return self.disagg_data.get('values', {}).get(category)
-        return None
-
-    def get_effective_value(self):
-        """Get the effective value considering data availability flags"""
-        if self.data_not_available:
-            return None
-        if self.not_applicable:
-            return None
-        return self.value
-
-    def set_simple_value(self, value):
-        """Set a simple value (clears disaggregation data)"""
-        self.value = str(value) if value is not None else None
-        self.disagg_data = db.null()
-        self.data_not_available = False
-        self.not_applicable = False
-
-    def set_disaggregated_data(self, mode, values):
-        """Set disaggregated data (clears simple value)"""
-        # Calculate the total from all values (excluding 'indirect' if present)
-        total = 0
-
-        # Handle nested structure for indirect reach items
-        if 'direct' in values:
-            if isinstance(values['direct'], dict):
-                # For disaggregated modes (sex, age, sex_age), values are nested under 'direct'
-                direct_values = values['direct']
-                for key, value in direct_values.items():
-                    if isinstance(value, (int, float)):
-                        total += value
-            elif isinstance(values['direct'], (int, float)):
-                # For total mode, 'direct' contains a single value
-                total += values['direct']
-
-            # Add indirect value if present
-            if 'indirect' in values and isinstance(values['indirect'], (int, float)):
-                total += values['indirect']
-        else:
-            # For items without indirect reach, values are at the top level
-            for key, value in values.items():
-                if key != 'indirect' and isinstance(value, (int, float)):
-                    total += value
-
-        # Save the calculated total to the main value field
-        self.value = str(total) if total > 0 else None
-
-        # Save the disaggregated data structure
-        self.disagg_data = {
-            'mode': mode,
-            'values': values
-        }
-        self.data_not_available = False
-        self.not_applicable = False
-
-    def set_data_availability(self, data_not_available=False, not_applicable=False):
-        """Set data availability flags."""
-        self.data_not_available = data_not_available if data_not_available else None
-        self.not_applicable = not_applicable if not_applicable else None
 
     def __repr__(self):
         # Show appropriate value based on data type
@@ -885,8 +886,6 @@ class DynamicIndicatorData(db.Model):
         if self.assignment_entity_status and self.assignment_entity_status.country:
             country_name = self.assignment_entity_status.country.name
         return f'<DynamicIndicatorData {self.indicator_bank.name} for {country_name or "N/A"} Value:{display_value}>'
-
-
 
 
 class RepeatGroupInstance(db.Model):
@@ -920,13 +919,17 @@ class RepeatGroupInstance(db.Model):
         db.Index('ix_repeat_instance_section', 'section_id'),
         db.Index('ix_repeat_instance_created_by', 'created_by_user_id'),
         db.Index('ix_repeat_instance_label', 'instance_label'),
+        db.CheckConstraint(
+            '(assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)',
+            name='ck_repeat_group_instance_parent',
+        ),
     )
 
     def __repr__(self):
         return f'<RepeatGroupInstance {self.instance_number} for Section {self.section_id}>'
 
 
-class RepeatGroupData(db.Model):
+class RepeatGroupData(DataEntryMixin, db.Model):
     """Stores data entries for fields within a repeat group instance."""
     __tablename__ = 'repeat_group_data'
 
@@ -936,115 +939,30 @@ class RepeatGroupData(db.Model):
     # Unified approach - link to FormItem instead of separate indicator_id/question_id
     form_item_id = db.Column(db.Integer, db.ForeignKey('form_item.id'), nullable=False)
 
-    # 1. Main value field - for totals, yes/no, text, etc.
-    value = db.Column(db.String(255), nullable=True)
-
-    # 2. Age disaggregation data - structured JSON for age/sex breakdowns
-    # IMPORTANT: store Python None as SQL NULL (not JSON literal `null`)
-    disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-
-    # 3. Data availability flags - separate boolean fields for clarity (nullable for migration)
-    data_not_available = db.Column(db.Boolean, nullable=True)
-    not_applicable = db.Column(db.Boolean, nullable=True)
-
-    submitted_at = db.Column(db.DateTime, nullable=True, default=utcnow, onupdate=utcnow)
-
     # Unified relationship - primary approach
     form_item = db.relationship('FormItem', foreign_keys=[form_item_id], overlaps="repeat_data_entries")
     repeat_instance = relationship('RepeatGroupInstance', overlaps="data_entries")
+    prefilled_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_numeric_value = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    created_by_user = db.relationship('User', foreign_keys=[created_by_user_id])
 
     __table_args__ = (
         db.Index('ix_repeat_data_instance', 'repeat_instance_id'),
         db.Index('ix_repeat_data_instance_item', 'repeat_instance_id', 'form_item_id'),
         db.Index('ix_repeat_data_form_item', 'form_item_id'),
         db.Index('ix_repeat_data_submitted_at', 'submitted_at'),
+        db.Index('ix_repeat_group_data_created_by', 'created_by_user_id'),
+        db.CheckConstraint(
+            "disagg_data IS NULL OR NOT (disagg_data::jsonb ? 'mode') OR "
+            "(disagg_data::jsonb ? 'mode' AND disagg_data::jsonb ? 'values')",
+            name='ck_repeat_group_data_disagg_shape',
+        ),
     )
-
-    @property
-    def has_disaggregation(self):
-        """Check if this data entry has disaggregated data"""
-        return self.disagg_data is not None
-
-    @property
-    def disaggregation_mode(self):
-        """Get the disaggregation mode (total, sex, age, sex_age)"""
-        if self.disagg_data:
-            return self.disagg_data.get('mode')
-        return None
-
-    @property
-    def total_value(self):
-        """Get the total value, either from value field or calculated from disaggregation"""
-        if self.value and not self.data_not_available and not self.not_applicable:
-            return self.value
-        elif self.disagg_data:
-            values = self.disagg_data.get('values', {})
-            return sum(v for v in values.values() if v is not None)
-        return None
-
-    def get_disaggregated_value(self, category):
-        """Get value for specific age/sex category"""
-        if self.disagg_data:
-            return self.disagg_data.get('values', {}).get(category)
-        return None
-
-    def get_effective_value(self):
-        """Get the effective value considering data availability flags"""
-        if self.data_not_available:
-            return None
-        if self.not_applicable:
-            return None
-        return self.value
-
-    def set_simple_value(self, value):
-        """Set a simple value (clears disaggregation data)"""
-        self.value = str(value) if value is not None else None
-        # Store SQL NULL (not JSON literal `null`)
-        self.disagg_data = db.null()
-        self.data_not_available = False
-        self.not_applicable = False
-
-    def set_disaggregated_data(self, mode, values):
-        """Set disaggregated data (clears simple value)"""
-        # Calculate the total from all values (excluding 'indirect' if present)
-        total = 0
-
-        # Handle nested structure for indirect reach items
-        if 'direct' in values:
-            if isinstance(values['direct'], dict):
-                # For disaggregated modes (sex, age, sex_age), values are nested under 'direct'
-                direct_values = values['direct']
-                for key, value in direct_values.items():
-                    if isinstance(value, (int, float)):
-                        total += value
-            elif isinstance(values['direct'], (int, float)):
-                # For total mode, 'direct' contains a single value
-                total += values['direct']
-
-            # Add indirect value if present
-            if 'indirect' in values and isinstance(values['indirect'], (int, float)):
-                total += values['indirect']
-        else:
-            # For items without indirect reach, values are at the top level
-            for key, value in values.items():
-                if key != 'indirect' and isinstance(value, (int, float)):
-                    total += value
-
-        # Save the calculated total to the main value field
-        self.value = str(total) if total > 0 else None
-
-        # Save the disaggregated data structure
-        self.disagg_data = {
-            'mode': mode,
-            'values': values
-        }
-        self.data_not_available = False
-        self.not_applicable = False
-
-    def set_data_availability(self, data_not_available=False, not_applicable=False):
-        """Set data availability flags."""
-        self.data_not_available = data_not_available if data_not_available else None
-        self.not_applicable = not_applicable if not_applicable else None
 
     def __repr__(self):
         item_label = 'N/A'

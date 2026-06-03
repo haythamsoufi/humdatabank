@@ -87,13 +87,13 @@ def get_country_info(country_identifier: Union[int, str]) -> Dict[str, Any]:
         )
 
         total = len(statuses)
-        completed = sum(1 for s in statuses if s.status in ['Submitted', 'Approved'])
+        completed = sum(1 for s in statuses if s.status in ['submitted', 'approved'])
         pending = total - completed
 
         now = utcnow()
         upcoming = []
         for s in statuses:
-            if s.status not in ['Submitted', 'Approved'] and s.due_date and s.due_date > now:
+            if s.status not in ['submitted', 'approved'] and s.due_date and s.due_date > now:
                 upcoming.append({
                     'template_name': s.assigned_form.template.name if s.assigned_form and s.assigned_form.template else 'Unknown',
                     'due_date': s.due_date.isoformat(),
@@ -103,7 +103,7 @@ def get_country_info(country_identifier: Union[int, str]) -> Dict[str, Any]:
 
         recent_submissions = []
         for s in sorted(statuses, key=lambda x: x.status_timestamp or datetime.min, reverse=True)[:5]:
-            if s.status in ['Submitted', 'Approved']:
+            if s.status in ['submitted', 'approved']:
                 recent_submissions.append({
                     'template_name': s.assigned_form.template.name if s.assigned_form and s.assigned_form.template else 'Unknown',
                     'status': s.status,
@@ -159,7 +159,7 @@ def get_assignments_for_country(
                 'template_name': assignment.template.name if assignment.template else 'Unknown Template',
                 'period_name': assignment.period_name,
                 'deadline': status_info.due_date.isoformat() if status_info and status_info.due_date else None,
-                'is_completed': status_info.status in ['Submitted', 'Approved'] if status_info else False,
+                'is_completed': status_info.status in ['submitted', 'approved'] if status_info else False,
                 'created_at': assignment.assigned_at.isoformat() if assignment.assigned_at else None,
                 'status': status_info.status if status_info else 'Unknown'
             }

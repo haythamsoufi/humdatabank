@@ -30,20 +30,58 @@ from app.routes.admin.utilities.helpers import _translations_dir, _translations_
 logger = logging.getLogger(__name__)
 
 
+def _language_display_name(lang_code):
+    """Human-readable label for a locale code (for flash messages)."""
+    from config import Config
+
+    names_map = (
+        getattr(Config, 'LANGUAGE_DISPLAY_NAMES', None)
+        or getattr(Config, 'ALL_LANGUAGES_DISPLAY_NAMES', None)
+        or {}
+    )
+    base = str(lang_code).lower().split('_')[0]
+    return names_map.get(lang_code) or names_map.get(base) or str(lang_code).upper()
+
+
+def _format_language_display_list(lang_codes):
+    """Comma-separated display names, preserving caller order."""
+    return ', '.join(_language_display_name(code) for code in lang_codes)
+
+
+def _translation_update_success_message(updated_langs):
+    """Flash/API message listing languages whose msgstr actually changed."""
+    if not updated_langs:
+        return _('No translations were updated')
+    labels = _format_language_display_list(updated_langs)
+    if len(updated_langs) == 1:
+        return _('Translation updated successfully for %(language)s.', language=labels)
+    return _('Translation updated successfully for: %(languages)s', languages=labels)
+
+
+def _translation_added_success_message(updated_langs):
+    """Flash message when new translation entries are added."""
+    if not updated_langs:
+        return _('No translations were added. Please provide at least one translation.')
+    labels = _format_language_display_list(updated_langs)
+    if len(updated_langs) == 1:
+        return _('Translation added successfully for %(language)s.', language=labels)
+    return _('Translation added successfully for: %(languages)s', languages=labels)
+
+
 def _update_po_translations(msgid, lang_to_msgstr):
     """Update PO translation files for the given msgid across languages.
 
     For each (lang, msgstr) pair: update the existing entry or create a new one
     (new entries are only created when msgstr is non-empty).
-    Returns the count of languages successfully updated.
+    Returns (count, list of language codes whose translation value changed).
     """
     try:
         import polib  # type: ignore
     except ImportError:
         current_app.logger.warning("polib not available - translation file updates will be skipped")
-        return 0
+        return 0, []
 
-    updated = 0
+    updated_langs = []
     for lang, msgstr in lang_to_msgstr.items():
         po_file_path = _translations_po_path(lang)
         if not os.path.exists(po_file_path):
@@ -51,17 +89,20 @@ def _update_po_translations(msgid, lang_to_msgstr):
         try:
             po = polib.pofile(po_file_path)
             entry = po.find(msgid)
+            changed = False
             if entry is None:
                 if str(msgstr).strip():
                     po.append(polib.POEntry(msgid=msgid, msgstr=msgstr))
-                    updated += 1
-            else:
+                    changed = True
+            elif entry.msgstr != msgstr:
                 entry.msgstr = msgstr
-                updated += 1
-            po.save(po_file_path)
+                changed = True
+            if changed:
+                po.save(po_file_path)
+                updated_langs.append(lang)
         except Exception as e:
             current_app.logger.error("Failed to update translation for %s: %s", lang, e)
-    return updated
+    return len(updated_langs), updated_langs
 
 
 def _decode_translation_payload(data):
@@ -971,12 +1012,12 @@ def add_translation():
             msgstr = (msgstr_field.data if msgstr_field else None)
             if msgstr and str(msgstr).strip():
                 lang_to_msgstr[lang] = msgstr
-        added_count = _update_po_translations(msgid, lang_to_msgstr)
+        added_count, added_langs = _update_po_translations(msgid, lang_to_msgstr)
 
         if added_count > 0:
-            flash(_('Translation added successfully for %(count)d language(s)', count=added_count), 'success')
+            flash(_translation_added_success_message(added_langs), 'success')
         else:
-            flash(_('No translations were added. Please provide at least one translation.'), 'warning')
+            flash(_translation_added_success_message(added_langs), 'warning')
 
         return redirect(url_for('utilities.manage_translations'))
 
@@ -1028,16 +1069,12 @@ def edit_translation():
             msgstr = data.get(f'msgstr_{lang}')
             if msgstr is not None:
                 lang_to_msgstr[lang] = msgstr
-        updated_count = _update_po_translations(msgid, lang_to_msgstr)
+        updated_count, updated_langs = _update_po_translations(msgid, lang_to_msgstr)
 
-        if updated_count > 0:
-            return json_ok(
-                message=_('Translation updated successfully for %(count)d language(s)', count=updated_count),
-                updated_count=updated_count,
-            )
         return json_ok(
-            message=_('No translations were updated'),
-            updated_count=0,
+            message=_translation_update_success_message(updated_langs),
+            updated_count=updated_count,
+            updated_languages=updated_langs,
         )
 
     # --- Legacy WTForms POST path (non-JSON form submissions) ---
@@ -1055,25 +1092,17 @@ def edit_translation():
             msgstr = (msgstr_field.data if msgstr_field else None)
             if msgstr is not None:
                 lang_to_msgstr[lang] = msgstr
-        updated_count = _update_po_translations(msgid, lang_to_msgstr)
+        updated_count, updated_langs = _update_po_translations(msgid, lang_to_msgstr)
+        update_message = _translation_update_success_message(updated_langs)
 
         if is_ajax:
-            if updated_count > 0:
-                return json_ok(
-                    message=_('Translation updated successfully for %(count)d language(s)', count=updated_count),
-                    updated_count=updated_count,
-                )
-            else:
-                return json_ok(
-                    message=_('No translations were updated'),
-                    updated_count=0,
-                )
-        else:
-            if updated_count > 0:
-                flash(_('Translation updated successfully for %(count)d language(s)', count=updated_count), 'success')
-            else:
-                flash(_('No translations were updated'), 'warning')
-            return redirect(url_for('utilities.manage_translations'))
+            return json_ok(
+                message=update_message,
+                updated_count=updated_count,
+                updated_languages=updated_langs,
+            )
+        flash(update_message, 'success' if updated_count > 0 else 'warning')
+        return redirect(url_for('utilities.manage_translations'))
 
     # --- GET path: support base64-encoded msgid to avoid WAF triggers ---
     import base64 as _b64

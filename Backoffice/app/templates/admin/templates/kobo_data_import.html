@@ -31,19 +31,19 @@
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 /* Preview grid: compact wrapped rows; break long tokens (URLs, codes) */
 #previewGrid.ag-theme-alpine {
-    --ag-line-height: 1.3;
+    --ag-line-height: 1.4;
     --ag-cell-horizontal-padding: 8px;
 }
 #previewGrid.ag-theme-alpine .ag-cell {
     word-break: break-word;
     overflow-wrap: anywhere;
-    line-height: 1.3;
+    line-height: 1.4;
 }
 #previewGrid.ag-theme-alpine .ag-cell-wrapper {
     align-items: flex-start;
 }
 #previewGrid.ag-theme-alpine .ag-cell-value {
-    line-height: 1.3;
+    line-height: 1.4;
 }
 #previewGrid.ag-theme-alpine .ag-header-cell-label,
 #previewGrid.ag-theme-alpine .ag-header-cell-text-container,
@@ -51,7 +51,7 @@
     word-break: break-word;
     overflow-wrap: anywhere;
     white-space: normal;
-    line-height: 1.35;
+    line-height: 1.4;
     max-height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
@@ -1543,7 +1543,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        var gridOptions = {
+        var gridOptions = Object.assign({}, AgGridHelper.getTextSelectionGridOptions(), {
             columnDefs: processedDefs,
             rowData: rowData,
             headerHeight: 72,
@@ -1574,7 +1574,7 @@ document.addEventListener('DOMContentLoaded', function() {
             onFirstDataRendered: function(ev) {
                 schedulePreviewRowHeightRefresh(ev.api);
             },
-        };
+        });
 
         previewGridApi = agGrid.createGrid(gridEl, gridOptions);
     }

@@ -47,6 +47,7 @@ import json
 import os
 from typing import Dict, List, Tuple, Any, Optional
 from app.models import QuestionType
+from app.models.enums import AssignmentEntityStatusValue
 from app.utils.transactions import request_transaction_rollback, register_post_commit
 
 # Create a specific logger for this module using the debug manager
@@ -239,8 +240,8 @@ class FormDataService:
             # Availability flags are handled during field processing; skip redundant pass
 
             # Update assignment status if needed
-            if assignment_entity_status.status == "Pending":
-                assignment_entity_status.status = "In Progress"
+            if assignment_entity_status.status == AssignmentEntityStatusValue.pending:
+                assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
 
             # Persist changes (middleware will commit if we're in a managed request)
             cls._commit_or_flush()
@@ -254,7 +255,7 @@ class FormDataService:
                     all_sections, assignment_entity_status
                 )
                 if validation_result['is_valid']:
-                    assignment_entity_status.status = "Submitted"
+                    assignment_entity_status.status = AssignmentEntityStatusValue.submitted
                     now = utcnow()
                     assignment_entity_status.status_timestamp = now
                     assignment_entity_status.submitted_at = now
@@ -437,7 +438,9 @@ class FormDataService:
                     json_data = json.loads(processed_value) if processed_value else {}
                     # For plugin data, store JSON in disagg_data and leave value as None
                     data_entry.value = None
+                    data_entry.numeric_value = None
                     data_entry.disagg_data = json_data
+                    data_entry.disagg_type = 'plugin'
                     new_effective_value = json_data
                 except (json.JSONDecodeError, TypeError):
                     # If it's not JSON, store as simple value
@@ -510,7 +513,9 @@ class FormDataService:
                     json_data = json.loads(processed_value) if processed_value else {}
                     # For plugin data, store JSON in disagg_data and leave value as None
                     data_entry.value = None
+                    data_entry.numeric_value = None
                     data_entry.disagg_data = json_data
+                    data_entry.disagg_type = 'plugin'
                 except (json.JSONDecodeError, TypeError):
                     # If it's not JSON, store as simple value
                     data_entry.set_simple_value(processed_value)
@@ -638,6 +643,8 @@ class FormDataService:
 
         # Clear the field completely
         data_entry.value = None
+        data_entry.numeric_value = None
+        data_entry.disagg_type = None
         data_entry.data_not_available = False
         data_entry.not_applicable = False
 
@@ -720,6 +727,8 @@ class FormDataService:
 
             # Clear the field completely
             data_entry.value = None
+            data_entry.numeric_value = None
+            data_entry.disagg_type = None
             data_entry.data_not_available = False
             data_entry.not_applicable = False
 
@@ -1008,7 +1017,10 @@ class FormDataService:
                 data_entry.set_data_availability(data_not_available, not_applicable)
                 # Only set value if we have a value AND no data availability flags
                 if processed_value is not None and not data_not_available and not not_applicable:
-                    data_entry.set_simple_value(processed_value)
+                    if isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
+                        data_entry.set_disaggregated_data(processed_value['mode'], processed_value['values'])
+                    else:
+                        data_entry.set_simple_value(processed_value)
 
                 db.session.add(data_entry)
 
@@ -1036,7 +1048,10 @@ class FormDataService:
                 data_entry.set_data_availability(data_not_available, not_applicable)
                 # Only set value if we have a value AND no data availability flags
                 if processed_value is not None and not data_not_available and not not_applicable:
-                    data_entry.set_simple_value(processed_value)
+                    if isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
+                        data_entry.set_disaggregated_data(processed_value['mode'], processed_value['values'])
+                    else:
+                        data_entry.set_simple_value(processed_value)
 
                 db.session.add(data_entry)
 
@@ -1098,10 +1113,10 @@ class FormDataService:
                     'mode': 'total',
                     'values': {
                         'total': final_value,
-                        'indirect_reach': indirect_reach_value
+                        'indirect': indirect_reach_value
                     }
                 }
-                return json.dumps(disaggregation_data)
+                return disaggregation_data
             except ValueError:
                 flash(f"Invalid indirect reach for question '{question.label}'.", "warning")
 
@@ -1773,6 +1788,7 @@ class FormDataService:
 
                         dynamic_assignment.value = None
                         dynamic_assignment.disagg_data = db.null()
+                        dynamic_assignment.disagg_type = None
                         dynamic_assignment.data_not_available = False
                         dynamic_assignment.not_applicable = False
                         db.session.add(dynamic_assignment)
@@ -1812,15 +1828,19 @@ class FormDataService:
                     old_value = dynamic_assignment.get_effective_value()
 
                 # Update the dynamic indicator assignment directly with data
-                if isinstance(processed_value, dict):
-                    # For JSON data, store in disagg_data and leave value as None
+                if data_not_available or not_applicable:
+                    dynamic_assignment.set_data_availability(data_not_available, not_applicable)
+                elif isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
+                    dynamic_assignment.set_disaggregated_data(processed_value['mode'], processed_value['values'])
+                elif isinstance(processed_value, dict):
                     dynamic_assignment.value = None
+                    dynamic_assignment.numeric_value = None
                     dynamic_assignment.disagg_data = processed_value
+                    dynamic_assignment.disagg_type = 'matrix'
+                    dynamic_assignment.data_not_available = False
+                    dynamic_assignment.not_applicable = False
                 else:
-                    dynamic_assignment.value = str(processed_value) if processed_value is not None else None
-                    dynamic_assignment.disagg_data = db.null()
-                dynamic_assignment.data_not_available = data_not_available
-                dynamic_assignment.not_applicable = not_applicable
+                    dynamic_assignment.set_simple_value(processed_value)
                 db.session.add(dynamic_assignment)
 
                 # IMPORTANT: For dynamic indicator sections, the "field id" used in the UI
@@ -2321,7 +2341,9 @@ class FormDataService:
             # Matrix data - store in disagg_data, leave value as None
             # IMPORTANT: Do NOT call set_simple_value for matrix data as it clears disagg_data
             entry.value = None
+            entry.numeric_value = None
             entry.disagg_data = processed_value
+            entry.disagg_type = 'matrix'
             # Explicitly ensure data_not_available and not_applicable are set AFTER setting disagg_data
             # (they will be set at the end, but being explicit here)
             cls._log_verbose(f"Stored matrix data in disagg_data for field {entry.form_item_id}: keys={list(processed_value.keys())}, sample_data={dict(list(processed_value.items())[:3])}")
@@ -2331,6 +2353,8 @@ class FormDataService:
             import json
             entry.value = json.dumps(processed_value) if processed_value else None
             entry.disagg_data = db.null()
+            entry._sync_numeric_value_from_string()
+            entry.disagg_type = 'simple' if entry.value is not None else None
             cls._log_verbose(f"Stored non-matrix dict as JSON string: {entry.value}")
         else:
             # Simple value - but check if it's a matrix field first to avoid overwriting
@@ -2338,6 +2362,7 @@ class FormDataService:
                 # Matrix field but value is not a dict - might be empty/None
                 entry.value = None
                 entry.disagg_data = db.null()
+                entry.disagg_type = None
                 cls._log_verbose(f"Matrix field with non-dict value (empty matrix): {processed_value}")
             else:
                 # Simple value
@@ -2345,8 +2370,11 @@ class FormDataService:
                 cls._log_verbose(f"Stored simple value: {processed_value}")
 
         # Set data availability flags for all field types
-        entry.data_not_available = data_not_available
-        entry.not_applicable = not_applicable
+        if data_not_available or not_applicable:
+            entry.set_data_availability(data_not_available, not_applicable)
+        else:
+            entry.data_not_available = False
+            entry.not_applicable = False
 
     @classmethod
     def _process_repeat_document_data_comprehensive(cls, field, field_values, field_index):
@@ -2788,10 +2816,10 @@ class FormDataService:
 
             # Determine final value and disagg_data
             if data_not_available:
-                final_value = "data_not_available"
+                final_value = None
                 final_disagg_data = None
             elif not_applicable:
-                final_value = "not_applicable"
+                final_value = None
                 final_disagg_data = None
             elif matrix_data:
                 # For matrix data, store JSON in disagg_data and leave value as None
@@ -2819,10 +2847,15 @@ class FormDataService:
                     old_value = data_entry.get_effective_value()
 
                 # Update with new value and disagg_data
-                data_entry.value = final_value
-                data_entry.disagg_data = final_disagg_data
-                data_entry.data_not_available = data_not_available
-                data_entry.not_applicable = not_applicable
+                if data_not_available or not_applicable:
+                    data_entry.set_data_availability(data_not_available, not_applicable)
+                else:
+                    data_entry.value = final_value
+                    data_entry.numeric_value = None
+                    data_entry.disagg_data = final_disagg_data
+                    data_entry.disagg_type = 'matrix' if final_disagg_data is not None else None
+                    data_entry.data_not_available = False
+                    data_entry.not_applicable = False
                 db.session.add(data_entry)
 
                 # Determine new value for comparison - use disagg_data if present, otherwise use final_value
@@ -2870,10 +2903,15 @@ class FormDataService:
             elif final_value is not None or final_disagg_data is not None or data_not_available or not_applicable:
                 # Create new entry using helper method
                 data_entry = cls._create_data_entry(assignment_entity_status, matrix.id)
-                data_entry.value = final_value
-                data_entry.disagg_data = final_disagg_data
-                data_entry.data_not_available = data_not_available
-                data_entry.not_applicable = not_applicable
+                if data_not_available or not_applicable:
+                    data_entry.set_data_availability(data_not_available, not_applicable)
+                else:
+                    data_entry.value = final_value
+                    data_entry.numeric_value = None
+                    data_entry.disagg_data = final_disagg_data
+                    data_entry.disagg_type = 'matrix' if final_disagg_data is not None else None
+                    data_entry.data_not_available = False
+                    data_entry.not_applicable = False
                 db.session.add(data_entry)
 
                 # Determine new value for change tracking - use disagg_data if present, otherwise use final_value
@@ -2939,19 +2977,27 @@ class FormDataService:
             }
 
     @classmethod
-    def _create_data_entry(cls, obj, form_item_id):
-        """Create a new data entry with the appropriate model"""
+    def _create_data_entry(cls, obj, form_item_id, created_by_user_id=None):
+        """Create a new data entry with the appropriate model."""
         DataModel = cls._get_data_model(obj)
         if cls._is_public_submission(obj):
-            return DataModel(
-                public_submission_id=obj.id,
-                form_item_id=form_item_id
-            )
+            kwargs = {
+                'public_submission_id': obj.id,
+                'form_item_id': form_item_id,
+            }
         else:
-            return DataModel(
-                assignment_entity_status_id=obj.id,
-                form_item_id=form_item_id
-            )
+            kwargs = {
+                'assignment_entity_status_id': obj.id,
+                'form_item_id': form_item_id,
+            }
+
+        if DataModel is FormData:
+            kwargs['created_at'] = utcnow()
+            if created_by_user_id is None and current_user.is_authenticated:
+                created_by_user_id = current_user.id
+            kwargs['created_by_user_id'] = created_by_user_id
+
+        return DataModel(**kwargs)
 
     @classmethod
     def save_simple_field(cls, assignment_entity_status, form_item_id: int, value: str) -> Dict[str, Any]:

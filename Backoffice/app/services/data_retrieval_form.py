@@ -17,6 +17,7 @@ import logging
 import math
 import re
 import unicodedata
+from contextlib import suppress
 from datetime import datetime as _dt
 from typing import Callable, Dict, List, Optional, Union, Any
 
@@ -153,6 +154,7 @@ def get_indicator_timeseries(
                 AssignmentEntityStatus.status.label("status"),
                 AssignmentEntityStatus.status_timestamp.label("status_timestamp"),
                 AssignedForm.period_name.label("period_name"),
+                AssignedForm.period_start.label("period_start"),
                 FormData.value.label("value"),
                 FormData.disagg_data.label("disagg_data"),
             )
@@ -168,7 +170,7 @@ def get_indicator_timeseries(
             )
         )
         if not include_saved:
-            q = q.filter(AssignmentEntityStatus.status.in_(["Submitted", "Approved"]))
+            q = q.filter(AssignmentEntityStatus.status.in_(["submitted", "approved"]))
 
         rows = q.all()
         if not rows:
@@ -352,6 +354,7 @@ def get_indicator_timeseries(
                 entry = {
                     "submission_id": sid,
                     "period_name": getattr(r, "period_name", None),
+                    "period_start": getattr(r, "period_start", None),
                     "timestamp": getattr(r, "status_timestamp", None),
                     "status": getattr(r, "status", None),
                     "total": 0.0,
@@ -370,19 +373,28 @@ def get_indicator_timeseries(
 
         def _status_rank(status: Any) -> int:
             s = str(status or "").strip()
-            if s in ("Approved", "Submitted"):
+            if s in ("approved", "submitted"):
                 return 2
             if s:
                 return 1
             return 0
 
-        # Choose best submission per year (year derived ONLY from period_name)
+        def _period_year(entry: Dict[str, Any]) -> tuple[Optional[int], str, Optional[int]]:
+            period_start = entry.get("period_start")
+            if period_start is not None:
+                with suppress(Exception):
+                    return int(period_start.year), "period_start", None
+            period_name_raw = str(entry.get("period_name") or "").strip() or None
+            parsed = _parse_year(period_name_raw) if period_name_raw else None
+            return parsed, ("period_name" if parsed is not None else "none"), parsed
+
+        # Choose best submission per year (prefer typed period_start, fallback to period_name)
         best_by_year: Dict[int, Dict[str, Any]] = {}
         for e in by_submission.values():
             if not bool(e.get("has_numeric")):
                 # Avoid emitting misleading 0.0 points when the period exists but no numeric value was found.
                 period_name_raw = str(e.get("period_name") or "").strip() or None
-                parsed = _parse_year(period_name_raw) if period_name_raw else None
+                parsed, _, _ = _period_year(e)
                 if parsed is not None:
                     try:
                         escaped = (period_name_raw or "").encode("unicode_escape").decode("ascii")
@@ -400,8 +412,7 @@ def get_indicator_timeseries(
                     )
                 continue
             period_name = str(e.get("period_name") or "").strip() or None
-            parsed_year = _parse_year(period_name) if period_name else None
-            year = parsed_year
+            year, year_source, parsed_year = _period_year(e)
             if year is None:
                 # No timestamp fallback: if parsing fails, skip (but log loudly so we can fix period formats).
                 try:
@@ -425,7 +436,7 @@ def get_indicator_timeseries(
                 e["_year_debug"] = {
                     "parsed_year": parsed_year,
                     "used_year": year,
-                    "source": ("period_name" if parsed_year is not None else "none"),
+                    "source": year_source,
                 }
             except Exception as exc:
                 logger.debug("_year_debug attach failed: %s", exc)
@@ -494,9 +505,9 @@ def get_indicator_timeseries(
             # Keep a compact status for the UI (used for chart legend / highlighting).
             # Historically we collapsed Approved → submitted, but charts benefit from
             # showing Approved distinctly.
-            if st == "Approved":
+            if st == "approved":
                 data_status = "approved"
-            elif st == "Submitted":
+            elif st == "submitted":
                 data_status = "submitted"
             else:
                 data_status = "saved"
@@ -575,8 +586,24 @@ def query_form_data(
             public_q = public_q.filter(PublicSubmission.country_id == country_id)
         if period_name:
             _pat = f"%{escape_like_pattern(period_name)}%"
-            assigned_q = assigned_q.filter(AssignedForm.period_name.ilike(_pat, escape="\\"))
-            public_q = public_q.filter(AssignedForm.period_name.ilike(_pat, escape="\\"))
+            period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
+            years = [int(y) for y in re.findall(r"\b(19\d{2}|20\d{2}|21\d{2})\b", str(period_name))]
+            if years:
+                start_year = min(years)
+                end_year = max(years)
+                period_start = _dt(start_year, 1, 1).date()
+                period_end = _dt(end_year, 12, 31).date()
+                period_filter = or_(
+                    period_filter,
+                    and_(
+                        AssignedForm.period_start.isnot(None),
+                        AssignedForm.period_end.isnot(None),
+                        AssignedForm.period_start <= period_end,
+                        AssignedForm.period_end >= period_start,
+                    ),
+                )
+            assigned_q = assigned_q.filter(period_filter)
+            public_q = public_q.filter(period_filter)
 
         if submission_id:
             # For assigned path, ensure ACStatus join exists
@@ -763,7 +790,7 @@ def get_value_breakdown(
                         IndicatorBank.id.in_(candidate_ids),
                         AssignmentEntityStatus.entity_type == "country",
                         AssignmentEntityStatus.entity_id == country_id,
-                        AssignmentEntityStatus.status.in_(['Submitted', 'Approved']),
+                        AssignmentEntityStatus.status.in_(['submitted', 'approved']),
                         or_(FormData.data_not_available.is_(None), FormData.data_not_available.is_(False)),
                         or_(FormData.not_applicable.is_(None), FormData.not_applicable.is_(False)),
                         or_(FormData.value.isnot(None), FormData.disagg_data.isnot(None)),
@@ -788,7 +815,7 @@ def get_value_breakdown(
                         IndicatorBank.id.in_(candidate_ids),
                         AssignmentEntityStatus.entity_type == "country",
                         AssignmentEntityStatus.entity_id == country_id,
-                        ~AssignmentEntityStatus.status.in_(['Submitted', 'Approved']),
+                        ~AssignmentEntityStatus.status.in_(['submitted', 'approved']),
                         or_(FormData.data_not_available.is_(None), FormData.data_not_available.is_(False)),
                         or_(FormData.not_applicable.is_(None), FormData.not_applicable.is_(False)),
                         or_(FormData.value.isnot(None), FormData.disagg_data.isnot(None)),
@@ -987,9 +1014,9 @@ def get_value_breakdown(
 
             # Load both submitted and saved/draft data so we have all periods per country+indicator.
             # Otherwise we only get one status (e.g. submitted 2018 with 0) and never see saved 2024 with 14k.
-            submitted_q = base_q.filter(AssignmentEntityStatus.status.in_(['Submitted', 'Approved']))
+            submitted_q = base_q.filter(AssignmentEntityStatus.status.in_(['submitted', 'approved']))
             submitted_records = submitted_q.all()
-            saved_q = base_q.filter(~AssignmentEntityStatus.status.in_(['Submitted', 'Approved']))
+            saved_q = base_q.filter(~AssignmentEntityStatus.status.in_(['submitted', 'approved']))
             saved_records = saved_q.all()
             # Include saved records that have any value (including 0) or disagg_data, so latest period
             # is visible. Excluding value=0 with (r.value or r.disagg_data) dropped 2024 and left only 2018.
@@ -1044,7 +1071,7 @@ def get_value_breakdown(
             base_q = base_q.filter(
                 AssignmentEntityStatus.entity_id == country_id,
                 AssignmentEntityStatus.entity_type == 'country',
-                AssignmentEntityStatus.status.in_(['Submitted', 'Approved']),
+                AssignmentEntityStatus.status.in_(['submitted', 'approved']),
                 FormData.form_item_id.in_(visible_item_ids),
             )
             if period:
@@ -1267,7 +1294,7 @@ def get_value_breakdown(
             period_used = chosen.get("period_name")
             # Reflect status of the submission we actually used (submitted vs saved/draft).
             chosen_status = (chosen.get("status") or "").strip()
-            data_status = 'submitted' if chosen_status in ('Submitted', 'Approved') else 'saved'
+            data_status = 'submitted' if chosen_status in ('submitted', 'approved') else 'saved'
         else:
             # Non-point indicators: preserve legacy behavior (sum across all records)
             for r in records:
@@ -2004,7 +2031,7 @@ def get_indicator_values_for_all_countries(
                 if tpl is not None:
                     assignment_name = tpl.name
             chosen_status = (chosen.get("status") or "").strip()
-            data_status = 'submitted' if chosen_status in ('Submitted', 'Approved') else 'saved'
+            data_status = 'submitted' if chosen_status in ('submitted', 'approved') else 'saved'
 
             if value_out is None:
                 continue
@@ -2176,7 +2203,7 @@ def get_assignment_indicator_values(
         # Use the first matching assignment (e.g. FDRS 2024)
         aes, assigned_form = rows[0]
         aes_id = int(aes.id)
-        data_status = "submitted" if aes.status in ("Submitted", "Approved") else "saved"
+        data_status = "submitted" if aes.status in ("submitted", "approved") else "saved"
 
         # FormData for this assignment, only for form items that are indicators
         fd_q = (
@@ -2358,12 +2385,12 @@ def get_form_field_value(
 
         # Prefer submitted/approved.
         # Public callers should never see draft/saved values; RBAC users may.
-        submitted_q = base_q.filter(AssignmentEntityStatus.status.in_(['Submitted', 'Approved']))
+        submitted_q = base_q.filter(AssignmentEntityStatus.status.in_(['submitted', 'approved']))
         records = submitted_q.all()
         data_status = 'submitted'
         if has_country_access:
             if not records or all(not r.value and not r.disagg_data for r in records):
-                saved_q = base_q.filter(~AssignmentEntityStatus.status.in_(['Submitted', 'Approved']))
+                saved_q = base_q.filter(~AssignmentEntityStatus.status.in_(['submitted', 'approved']))
                 saved = saved_q.all()
                 saved_with_data = [r for r in saved if r.value or r.disagg_data]
                 if saved_with_data:

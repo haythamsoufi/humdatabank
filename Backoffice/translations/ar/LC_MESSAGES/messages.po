@@ -34,7 +34,7 @@ msgstr ""
 #: app/templates/admin/dashboard.html:41
 #, python-format
 msgid "%(active)s active sessions"
-msgstr "%(active)s الدورات العاملة"
+msgstr "%(active)s الجلسات النشطة"
 
 #: app/templates/admin/ai/reasoning_traces.html:69
 #, python-format
@@ -259,7 +259,7 @@ msgstr "مساعد الاستعلام الذكي"
 #: app/templates/admin/ai/reasoning_traces.html:4
 #: app/templates/admin/ai/reasoning_traces.html:12
 msgid "AI Reasoning Traces"
-msgstr "AI Reasoning Traces"
+msgstr "خطوات استدلال الذكاء الاصطناعي"
 
 #: app/templates/admin/ai/review_queue.html:4
 #: app/templates/admin/ai/review_queue.html:8

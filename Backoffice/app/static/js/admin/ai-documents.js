@@ -1052,7 +1052,7 @@ const columnDefs = [
         cellStyle: {
             'display': 'flex',
             'white-space': 'normal',
-            'line-height': '1.35',
+            'line-height': '1.4',
             'align-items': 'flex-start',
             'padding-top': '6px',
             'padding-bottom': '6px'
@@ -2211,7 +2211,7 @@ const importSystemDocumentsColumnDefs = [
         },
         cellStyle: {
             'white-space': 'normal',
-            'line-height': '1.35',
+            'line-height': '1.4',
             'display': 'flex',
             'align-items': 'flex-start',
             'padding-top': '6px',
@@ -2763,7 +2763,7 @@ const ifrcDocumentsColumnDefs = [
         },
         cellStyle: {
             'white-space': 'normal',
-            'line-height': '1.35',
+            'line-height': '1.4',
             'display': 'flex',
             'align-items': 'flex-start',
             'padding-top': '6px',
@@ -2824,7 +2824,7 @@ const ifrcDocumentsColumnDefs = [
         },
         cellStyle: {
             'white-space': 'normal',
-            'line-height': '1.35',
+            'line-height': '1.4',
             'display': 'flex',
             'align-items': 'flex-start',
             'padding-top': '6px',

@@ -7,7 +7,7 @@ import pytest
 @dataclass
 class _AES:
     id: int
-    status: str = "Pending"
+    status: str = "pending"
 
 
 @pytest.mark.integration
@@ -18,7 +18,7 @@ class TestExcelRoutes:
             assert resp.status_code in (301, 302, 303, 307, 308)
 
     def test_export_success_sets_headers_and_content_type(self, logged_in_client):
-        aes = _AES(id=123, status="Pending")
+        aes = _AES(id=123, status="pending")
 
         fake_output = io.BytesIO(b"excel-bytes")
         with patch("app.routes.excel_routes.get_aes_with_joins", return_value=aes), patch(
@@ -46,7 +46,7 @@ class TestExcelRoutes:
             assert data["success"] is False
 
     def test_import_ajax_400_invalid_extension(self, logged_in_client):
-        aes = _AES(id=123, status="Pending")
+        aes = _AES(id=123, status="pending")
 
         with patch("app.routes.excel_routes.get_aes_with_joins", return_value=aes):
             resp = logged_in_client.post(
@@ -60,7 +60,7 @@ class TestExcelRoutes:
             assert data["success"] is False
 
     def test_import_ajax_400_oversize_file(self, logged_in_client):
-        aes = _AES(id=123, status="Pending")
+        aes = _AES(id=123, status="pending")
 
         with patch("app.routes.excel_routes.get_aes_with_joins", return_value=aes), patch(
             "app.routes.excel_routes.MAX_EXCEL_FILE_SIZE", 10
@@ -75,7 +75,7 @@ class TestExcelRoutes:
             assert resp.get_json()["success"] is False
 
     def test_import_ajax_403_when_not_editable_and_not_admin(self, logged_in_client):
-        aes = _AES(id=123, status="Submitted")
+        aes = _AES(id=123, status="submitted")
 
         with patch("app.routes.excel_routes.get_aes_with_joins", return_value=aes), patch(
             "app.services.authorization_service.AuthorizationService.is_admin", return_value=False
@@ -90,7 +90,7 @@ class TestExcelRoutes:
             assert resp.get_json()["success"] is False
 
     def test_import_ajax_success_contract(self, logged_in_client):
-        aes = _AES(id=123, status="Pending")
+        aes = _AES(id=123, status="pending")
 
         with patch("app.routes.excel_routes.get_aes_with_joins", return_value=aes), patch(
             "app.routes.excel_routes.ExcelService.load_workbook", return_value=object()
@@ -110,7 +110,7 @@ class TestExcelRoutes:
             assert data["updated_count"] == 1
 
     def test_import_ajax_failure_contract(self, logged_in_client):
-        aes = _AES(id=123, status="Pending")
+        aes = _AES(id=123, status="pending")
 
         with patch("app.routes.excel_routes.get_aes_with_joins", return_value=aes), patch(
             "app.routes.excel_routes.ExcelService.load_workbook", return_value=object()

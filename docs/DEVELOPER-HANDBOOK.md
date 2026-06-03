@@ -206,6 +206,24 @@ npm run lint
 
 ## Database Architecture
 
+### Form submission data tables
+
+Entity answers are stored in three data tables, all keyed by either `assignment_entity_status_id` (authenticated entity submission) or `public_submission_id` (public URL submission):
+
+| Table | Purpose |
+|-------|---------|
+| `form_data` | Standard form item answers (indicators, questions, matrix, plugins) |
+| `dynamic_indicator_data` | Focal-point-selected indicators in dynamic sections |
+| `repeat_group_instance` + `repeat_group_data` | Repeat section row registry and per-row field answers |
+
+**Dual-nullable-FK parent pattern (F10):** `form_data`, `dynamic_indicator_data`, and `repeat_group_instance` each have both parent FK columns nullable at the column level, with a PostgreSQL `CHECK` constraint enforcing that **at least one** is set. This is the canonical extension point if a third submission context is ever added (add another nullable FK + widen the check constraint). Do not introduce a different parent-link pattern for new submission types.
+
+**Shared data columns:** `value`, `disagg_data`, `data_not_available`, `not_applicable`, `numeric_value`, and `submitted_at` are defined once on `DataEntryMixin` in [`Backoffice/app/models/forms.py`](Backoffice/app/models/forms.py) and inherited by the three data-entry models.
+
+**Value / disaggregation invariant (F7):** When `disagg_data` is set for standard disaggregation (`mode` + `values` keys), `value` is a denormalized string cache of the numeric total. Matrix and plugin payloads may use `disagg_data` without `mode`/`values`. Always use `total_value` for reads and `set_simple_value` / `set_disaggregated_data` for writes — never mutate `disagg_data` in-place.
+
+**Pre-migration integrity checks:** Run `python scripts/check_data_submission_integrity.py` from `Backoffice/` before applying submission-data migrations (duplicate rows, orphan parents, malformed disagg shapes).
+
 ### Key Models Relationships
 - **User ↔ Country**: Many-to-many (user_countries table)
 - **FormTemplate ↔ FormSection**: One-to-many

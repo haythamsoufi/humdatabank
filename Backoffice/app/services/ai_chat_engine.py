@@ -607,6 +607,222 @@ def _generate_out_of_scope_reply_llm(
     return (text if text else fallback, str(model))
 
 
+_FOCAL_ORIENTATION_RE = re.compile(
+    r"(?i)\b("
+    r"what\s+is\s+this\s+(platform|site|tool|app)|"
+    r"what\s+should\s+i\s+do|what\s+do\s+i\s+(need\s+to\s+do|do\s+here)|"
+    r"what\s+am\s+i\s+(supposed|here)|"
+    r"get(?:ting)?\s+started|"
+    r"what\s+is\s+my\s+(role|purpose)|"
+    r"introduce\s+(yourself|the\s+platform)|"
+    r"help\s+me\s+(?:get\s+started|understand\s+this)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _is_focal_point_from_context(platform_context: Dict[str, Any]) -> bool:
+    """Return True if platform_context clearly belongs to a focal-point user.
+
+    Uses the RBAC ``assignment.enter`` permission — correctly computed from the
+    user's actual DB roles regardless of the identity access_level bug.
+    Falls back to checking whether user_data.countries was populated (only done
+    for focal-point users by get_user_data_context).
+    """
+    if not isinstance(platform_context, dict):
+        return False
+    access = platform_context.get("access") or {}
+    perms = access.get("permissions") if isinstance(access, dict) else {}
+    if isinstance(perms, dict) and perms.get("assignment.enter"):
+        return True
+    user_data = platform_context.get("user_data") or {}
+    if isinstance(user_data, dict) and user_data.get("countries"):
+        return True
+    return False
+
+
+def _build_focal_orientation_fallback(
+    ns_label: Optional[str],
+    pending_count: int,
+    pending_details: list,
+) -> str:
+    """Template fallback used only when the LLM is unavailable."""
+    from datetime import datetime, timezone
+
+    ns_phrase = f" for **{ns_label}**" if ns_label else ""
+    lines = [
+        f"You're set up here as the **Data Entry Focal Point{ns_phrase}**. "
+        "Your main responsibility is to fill in and submit the assigned data forms for your National Society."
+    ]
+    if pending_count > 0:
+        lines.append(f"\n**Your pending/in-progress assignments ({pending_count}):**")
+        for a in pending_details[:5]:
+            template = str(a.get("template_name") or "Unknown").strip()
+            country = str(a.get("country") or "").strip()
+            raw_dl = a.get("deadline")
+            deadline_text = ""
+            if raw_dl:
+                try:
+                    dl = datetime.fromisoformat(str(raw_dl).replace("Z", "+00:00"))
+                    now_dt = datetime.now(timezone.utc) if dl.tzinfo else datetime.now()
+                    days = (dl - now_dt).days
+                    if days < 0:
+                        deadline_text = " — overdue"
+                    elif days == 0:
+                        deadline_text = " — due today"
+                    else:
+                        deadline_text = f" — due in {days} day{'s' if days != 1 else ''}"
+                except Exception:
+                    pass
+            entry = f"- {template}"
+            if country:
+                entry += f" ({country})"
+            entry += deadline_text
+            lines.append(entry)
+        if len(pending_details) > 5:
+            lines.append(f"- ...and {len(pending_details) - 5} more")
+    else:
+        lines.append("\nYou have no pending assignments right now.")
+    lines.append(
+        "\nScroll down to the **Assignments** section on this page and click **Enter Data** to get started. "
+        "You can also ask me to look up data, compare indicators, or search documents for any National Society."
+    )
+    return "\n".join(lines)
+
+
+def _generate_focal_orientation_reply(
+    *,
+    platform_context: Dict[str, Any],
+    preferred_language: str,
+) -> Tuple[str, str]:
+    """
+    LLM-generated orientation reply for focal-point users.
+
+    Builds a concise, personalised reply using the user's live assignment data
+    from platform_context, with a small fast model and a tight system prompt
+    that enforces the correct response format.
+    """
+    from datetime import datetime, timezone
+    from app.utils.ai_utils import openai_model_supports_sampling_params
+
+    lang = (preferred_language or "en").split("-")[0]
+
+    # --- collect user data ----------------------------------------------------
+    user_data = platform_context.get("user_data", {}) if isinstance(platform_context, dict) else {}
+
+    # NS / country names — prefer user_data.countries, fall back to available_countries
+    countries: List[str] = list(user_data.get("countries") or [])
+    if not countries:
+        raw_ac = platform_context.get("available_countries") or []
+        countries = [
+            (c.get("name") or str(c)) if isinstance(c, dict) else str(c)
+            for c in raw_ac[:5]
+        ]
+
+    total_assignments = int(user_data.get("total_assignments") or 0)
+    pending_count = int(user_data.get("pending_assignments") or 0)
+    pending_details: list = list(user_data.get("pending_assignment_details") or [])
+
+    ns_label: Optional[str] = ", ".join(str(c) for c in countries[:3]) if countries else None
+
+    # --- build context block for the LLM --------------------------------------
+    ctx_lines = []
+    if ns_label:
+        ctx_lines.append(f"National Society / assigned countries: {ns_label}")
+    if total_assignments:
+        ctx_lines.append(f"Total assignments (all statuses): {total_assignments}")
+    ctx_lines.append(
+        f"Pending / in-progress assignments (not yet submitted or approved): {pending_count}"
+    )
+    if pending_details:
+        ctx_lines.append("Assignment list:")
+        for a in pending_details[:10]:
+            template = str(a.get("template_name") or "Unknown").strip()
+            country = str(a.get("country") or "").strip()
+            status = str(a.get("status") or "pending").strip()
+            raw_dl = a.get("deadline")
+            deadline_text = ""
+            if raw_dl:
+                try:
+                    dl = datetime.fromisoformat(str(raw_dl).replace("Z", "+00:00"))
+                    now_dt = datetime.now(timezone.utc) if dl.tzinfo else datetime.now()
+                    days = (dl - now_dt).days
+                    if days < 0:
+                        deadline_text = " (OVERDUE)"
+                    elif days == 0:
+                        deadline_text = " (due today)"
+                    else:
+                        deadline_text = f" (due in {days} day{'s' if days != 1 else ''})"
+                except Exception:
+                    pass
+            entry = f"  - [{status}] {template}"
+            if country:
+                entry += f" [{country}]"
+            entry += deadline_text
+            ctx_lines.append(entry)
+    elif total_assignments == 0 and not ns_label:
+        ctx_lines.append(
+            "NOTE: assignment data could not be loaded — tell the user to check the "
+            "Assignments section on the dashboard directly."
+        )
+    user_ctx_str = "\n".join(ctx_lines)
+
+    # --- LLM call -------------------------------------------------------------
+    api_key = current_app.config.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    model = str(
+        current_app.config.get("AI_QUERY_REWRITE_MODEL")
+        or current_app.config.get("OPENAI_MODEL")
+        or "gpt-4o-mini"
+    )
+
+    if not api_key:
+        return _build_focal_orientation_fallback(ns_label, pending_count, pending_details), model
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key=api_key,
+            timeout=int(current_app.config.get("AI_QUERY_REWRITE_TIMEOUT_SECONDS", 30)),
+            max_retries=0,
+        )
+        system = (
+            f"You write a short, friendly onboarding message for a user of the Humanitarian Databank platform "
+            f"who has just logged in as a Data Entry Focal Point. Reply in {lang}. "
+            "Use markdown (bold key terms, bullet list for assignments). MAXIMUM 120 words total.\n"
+            "\n"
+            "Follow this EXACT structure — nothing else:\n"
+            "1. One sentence naming their role and National Society (use the name from context).\n"
+            "2. One sentence explaining their job: fill in and submit the assigned data forms.\n"
+            "3. Bullet list of their pending/in-progress assignments from the context — include "
+            "the template name, and flag OVERDUE clearly. If count is 0, say so.\n"
+            "4. One sentence: scroll to the Assignments section and click Enter Data.\n"
+            "5. One closing sentence: they can also ask the assistant to look up indicators, "
+            "compare data, or search documents.\n"
+            "\n"
+            "FORBIDDEN: platform feature lists, example queries, tips, 'next steps' sections, "
+            "'Quick practical tips', 'How I can help', 'What the platform is for' headings."
+        )
+        kwargs: Dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"User context:\n{user_ctx_str}"},
+            ],
+            "max_completion_tokens": 320,
+        }
+        if openai_model_supports_sampling_params(model):
+            kwargs["temperature"] = 0.3
+        resp = client.chat.completions.create(**kwargs)
+        text = (resp.choices[0].message.content or "").strip()
+        if text:
+            return text, model
+    except Exception as e:
+        logger.warning("_generate_focal_orientation_reply LLM failed: %s", e)
+
+    return _build_focal_orientation_fallback(ns_label, pending_count, pending_details), model
+
+
 @dataclass
 class ChatResult:
     success: bool
@@ -889,6 +1105,44 @@ class AIChatEngine:
                     )
             except Exception as e:
                 logger.warning("AIChatEngine: out-of-scope reply path failed, using normal path: %s", e)
+
+        # Focal-point orientation: short LLM-generated personalised reply.
+        # Intercept "what is this platform / what should I do here" questions for focal-point
+        # users and return a tight, role-specific response with their live assignment data.
+        if _FOCAL_ORIENTATION_RE.search(message) and _is_focal_point_from_context(platform_context) and not _is_cancelled():
+            try:
+                preferred_lang = str(
+                    (platform_context or {}).get("preferred_language")
+                    or current_app.config.get("AI_DEFAULT_LANGUAGE", "en")
+                )
+                reply_text, orient_model = _generate_focal_orientation_reply(
+                    platform_context=platform_context,
+                    preferred_language=preferred_lang,
+                )
+                html = format_ai_response_for_html(reply_text) if reply_text else ""
+                if html:
+                    _stream_html(html)
+                trace_id = _record_fallback_trace(
+                    query=safe_message,
+                    final_answer=reply_text,
+                    model_name=orient_model,
+                    execution_path="focal_point_orientation",
+                    status="completed",
+                    platform_context=platform_context,
+                )
+                return ChatResult(
+                    success=True,
+                    response_html=html,
+                    provider="openai",
+                    model=orient_model,
+                    function_calls_used=[],
+                    used_agent=False,
+                    streamed=bool(on_delta),
+                    trace_id=trace_id,
+                    confidence="high",
+                )
+            except Exception as e:
+                logger.warning("AIChatEngine: focal-point orientation reply failed, using agent: %s", e)
 
         # 1) Agent (tools + reasoning traces)
         if enable_agent and current_app.config.get("AI_AGENT_ENABLED", True) and not _is_cancelled():

@@ -203,6 +203,7 @@ def tool_wrapper(func: Callable) -> Callable:
                 "get_form_field_value",
                 "search_documents", "search_documents_hybrid",
                 "list_documents",
+                "search_workflow_docs", "get_workflow_guide",
             } | UPR_CACHEABLE_TOOLS
 
             cache_key = None
@@ -429,7 +430,7 @@ class AIToolsRegistry:
 
         Args:
             country_identifier: Country name, ISO3 code, or ID
-            status: Optional status filter ('Pending', 'Submitted', etc.)
+            status: Optional status filter ('pending', 'submitted', etc.)
 
         Returns:
             List of assignments
@@ -1510,6 +1511,7 @@ class AIToolsRegistry:
         - "How do I add a user?"
         - "How to create a template?"
         - "What are the steps for submitting data?"
+        - "What does Original vs Current mean in a matrix tooltip?"
         - "Guide me through [workflow]"
 
         Args:
@@ -2025,7 +2027,7 @@ class AIToolsRegistry:
                             },
                             "status": {
                                 "type": "string",
-                                "description": "Optional status filter: 'Pending', 'Submitted', 'Approved', etc."
+                                "description": "Optional status filter: 'pending', 'submitted', 'approved', etc."
                             }
                         },
                         "required": ["country_identifier"]
@@ -2202,6 +2204,56 @@ class AIToolsRegistry:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_workflow_docs",
+                    "description": (
+                        "Search platform workflow documentation for how-to guidance, navigation help, "
+                        "and explanations of on-screen UI concepts. Use when the user asks how to use "
+                        "the platform, what a form field/tooltip/status/label means, or how a workflow "
+                        "works. Examples: 'How do I submit data?', 'Where are my assignments?', "
+                        "'What does Original vs Current mean in a matrix tooltip?'. Do NOT use for "
+                        "uploaded PDF/report evidence; use document search only when the user asks "
+                        "about document contents."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Short platform workflow or UI-help query.",
+                            },
+                            "top_k": {
+                                "type": "integer",
+                                "description": "Number of workflow results to return (default 5, max 10).",
+                                "default": 5,
+                            },
+                        },
+                        "required": ["query"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_workflow_guide",
+                    "description": (
+                        "Get a detailed platform workflow guide by workflow ID after workflow search "
+                        "has identified the relevant guide."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "workflow_id": {
+                                "type": "string",
+                                "description": "Workflow identifier returned by search_workflow_docs.",
+                            },
+                        },
+                        "required": ["workflow_id"],
+                    },
+                },
+            },
         ]
         tool_defs.extend(UPR_TOOL_SPECS)
         tool_defs = _filter_indicator_bank_mgmt_tools(tool_defs)
@@ -2213,7 +2265,7 @@ class AIToolsRegistry:
             return tool_defs
 
         docs_enabled = bool(sources_norm.get("system_documents") or sources_norm.get("upr_documents"))
-        allowed: set[str] = set()
+        allowed: set[str] = {"search_workflow_docs", "get_workflow_guide"}
 
         if sources_norm.get("historical"):
             allowed.update(

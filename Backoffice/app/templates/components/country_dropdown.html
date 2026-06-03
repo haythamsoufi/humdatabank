@@ -59,11 +59,14 @@
     <div id="search_dropdown" class="absolute z-50 w-80 mt-1 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-60 overflow-y-auto">
         <div id="search_list" class="py-1">
             {% for country in user_countries %}
+                {% set country_name = get_localized_country_name(country) %}
+                {% set national_society_name = get_localized_national_society_name(country) %}
                 <div class="dropdown-option px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-center justify-between"
                      data-item-id="{{ country.id }}"
-                     data-item-name="{{ get_localized_country_name(country) }}"
+                     data-item-name="{{ country_name }}"
+                     data-search-text="{{ country_name }} {{ national_society_name }}"
                      {% if selected_country and selected_country.id == country.id %}data-selected="true"{% endif %}>
-                    <span class="item-name">{{ get_localized_country_name(country) }}</span>
+                    <span class="item-name">{{ country_name }}</span>
                     {% if selected_country and selected_country.id == country.id %}
                         <svg class="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>

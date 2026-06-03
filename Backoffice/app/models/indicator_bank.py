@@ -7,6 +7,8 @@ from sqlalchemy import Column, Integer, ForeignKey, String, Text, Boolean, JSON,
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, backref
 from ..extensions import db
+from app.models.enums import IndicatorSuggestionStatusValue, IndicatorSuggestionTypeValue
+from app.models.enum_columns import pg_str_enum_column
 from app.utils.datetime_helpers import utcnow
 
 # Import FormItem for the template_instances property
@@ -125,6 +127,7 @@ class IndicatorBank(db.Model):
     comments = db.Column(db.Text, nullable=True)
     emergency = db.Column(db.Boolean, default=False, nullable=False)
     related_programs = db.Column(db.Text, nullable=True)  # Comma separated list
+    _related_programs_list = db.Column("related_programs_list", JSONB, nullable=True)
 
     # JSON fields for Sector and Sub-Sector with Primary/Secondary/Tertiary levels
     # Format: {"primary": sector_id, "secondary": sector_id, "tertiary": sector_id}
@@ -198,6 +201,8 @@ class IndicatorBank(db.Model):
     @property
     def related_programs_list(self):
         """Returns related programs as a list."""
+        if self._related_programs_list is not None:
+            return self._related_programs_list if isinstance(self._related_programs_list, list) else []
         if not self.related_programs:
             return []
 
@@ -210,6 +215,27 @@ class IndicatorBank(db.Model):
             ]
 
         return self._cached_programs_list
+
+    @related_programs_list.setter
+    def related_programs_list(self, value):
+        """Store related programs in the JSONB column while keeping the legacy text fallback."""
+        if value is None:
+            self._related_programs_list = None
+        elif isinstance(value, list):
+            self._related_programs_list = [str(program).strip() for program in value if str(program).strip()]
+        else:
+            self._related_programs_list = [
+                program.strip()
+                for program in re.split(r"[,|]", str(value))
+                if program.strip()
+            ]
+        if hasattr(self, '_cached_programs_list'):
+            delattr(self, '_cached_programs_list')
+
+    @property
+    def related_programs_list_resolved(self):
+        """Return related programs from JSONB, falling back to the legacy text column."""
+        return self.related_programs_list
 
     # Helper methods for sector and sub-sector access
     def get_sector_by_level(self, level):
@@ -472,8 +498,18 @@ class IndicatorSuggestion(db.Model):
     submitter_email = db.Column(db.String(255), nullable=False)
 
     # Suggestion metadata
-    suggestion_type = db.Column(db.String(50), nullable=False)  # 'correction', 'improvement', 'new_indicator', 'other'
-    status = db.Column(db.String(20), default='Pending', nullable=False)  # 'Pending', 'reviewed', 'approved', 'rejected'
+    suggestion_type = pg_str_enum_column(
+        IndicatorSuggestionTypeValue,
+        'indicatorsuggestiontype',
+        default=IndicatorSuggestionTypeValue.other,
+        nullable=False,
+    )
+    status = pg_str_enum_column(
+        IndicatorSuggestionStatusValue,
+        'indicatorsuggestionstatus',
+        default=IndicatorSuggestionStatusValue.pending,
+        nullable=False,
+    )
     submitted_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     reviewed_at = db.Column(db.DateTime, nullable=True)
     reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -515,7 +551,7 @@ class IndicatorSuggestion(db.Model):
 
     @property
     def is_new_indicator(self):
-        return self.suggestion_type == 'new_indicator'
+        return self.suggestion_type == IndicatorSuggestionTypeValue.new_indicator.value
 
     @property
     def status_display(self):
@@ -523,9 +559,10 @@ class IndicatorSuggestion(db.Model):
             'pending': 'Pending Review',
             'reviewed': 'Under Review',
             'approved': 'Approved',
-            'rejected': 'Rejected'
+            'rejected': 'Rejected',
+            'implemented': 'Implemented',
         }
-        return status_map.get(self.status, self.status.title())
+        return status_map.get(str(self.status).casefold(), str(self.status).title())
 
     @property
     def suggestion_type_display(self):
@@ -535,7 +572,7 @@ class IndicatorSuggestion(db.Model):
             'new_indicator': 'Propose new indicator',
             'other': 'Other'
         }
-        return type_map.get(self.suggestion_type, self.suggestion_type.title())
+        return type_map.get(str(self.suggestion_type), str(self.suggestion_type).title())
 
     @property
     def has_data_availability_flags(self):

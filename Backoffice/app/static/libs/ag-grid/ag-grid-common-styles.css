@@ -4,6 +4,14 @@
  * These styles can be included in templates to ensure consistent appearance
  */
 
+/* Standard body/header line spacing for all Backoffice AG Grid tables */
+.ag-theme-alpine,
+.ag-theme-balham,
+.ag-theme-quartz,
+.ag-theme-material {
+    --ag-line-height: 1.4;
+}
+
 /* Column visibility toolbar (Columns + Clear filters): ag-column-visibility-manager.css */
 
 /* Row selection column — no vertical rule between checkboxes and the next column */
@@ -114,6 +122,7 @@
     display: flex !important;
     align-items: center !important;
     justify-content: flex-start !important;
+    line-height: 1.4 !important;
     padding-top: 16px !important;
     padding-bottom: 16px !important;
     min-height: 42px !important;
@@ -184,17 +193,59 @@
     display: flex !important;
     align-items: center !important;
     width: 100% !important;
+    line-height: 1.4 !important;
 }
 
-/* Enable text selection in AG Grid cells */
+/* Header labels use the same line spacing as body cells */
+.ag-theme-alpine .ag-header-cell-label,
+.ag-theme-balham .ag-header-cell-label,
+.ag-theme-quartz .ag-header-cell-label,
+.ag-theme-material .ag-header-cell-label,
+.ag-header-cell-label {
+    line-height: 1.4 !important;
+}
+
+/* Enable text selection in AG Grid cells (requires enableCellTextSelection in grid options) */
 .ag-theme-alpine .ag-cell,
 .ag-theme-balham .ag-cell,
 .ag-theme-quartz .ag-cell,
-.ag-theme-material .ag-cell {
+.ag-theme-material .ag-cell,
+.ag-cell {
     user-select: text !important;
     -webkit-user-select: text !important;
     -moz-user-select: text !important;
     -ms-user-select: text !important;
+}
+
+.ag-theme-alpine .ag-cell-value,
+.ag-theme-balham .ag-cell-value,
+.ag-theme-quartz .ag-cell-value,
+.ag-theme-material .ag-cell-value,
+.ag-cell-value,
+.ag-theme-alpine .ag-cell .ag-cell-value *,
+.ag-theme-balham .ag-cell .ag-cell-value *,
+.ag-theme-quartz .ag-cell .ag-cell-value *,
+.ag-theme-material .ag-cell .ag-cell-value *,
+.ag-cell .ag-cell-value * {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+/* Row selection checkboxes stay non-selectable */
+.ag-theme-alpine .ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-balham .ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-quartz .ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-material .ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-theme-alpine .ag-selection-column-cell,
+.ag-theme-balham .ag-selection-column-cell,
+.ag-theme-quartz .ag-selection-column-cell,
+.ag-theme-material .ag-selection-column-cell,
+.ag-cell[col-id="ag-Grid-SelectionColumn"],
+.ag-selection-column-cell {
+    user-select: none !important;
+    -webkit-user-select: none !important;
 }
 
 /* -------------------------------------------------------------

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if error_code %}{{ error_code }}{% endif %} - {{ error_title }} - {{ ORG_NAME }}</title>
-    <link rel="icon" href="{{ static_url('favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ org_visual_asset_url((ORGANIZATION_BRANDING or {}).get('organization_favicon_path'), 'favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
     <style nonce="{{ csp_style_nonce() }}">

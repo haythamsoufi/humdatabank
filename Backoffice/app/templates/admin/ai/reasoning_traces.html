@@ -286,7 +286,7 @@
             tooltipField: 'query',
             wrapText: true,
             autoHeight: true,
-            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.35' },
+            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.4' },
             cellRenderer: function(params) {
                 const query = params.value;
                 const url = params.data && params.data.view_url;
@@ -300,9 +300,9 @@
                 const inner = '<span style="display:flex;align-items:flex-start;gap:0;min-width:0;">' + shield + '<span style="min-width:0;flex:1 1 auto;">' + text + '</span></span>';
                 if (url) {
                     const safeUrl = escapeHtml(url);
-                    return '<a href="' + safeUrl + '" class="text-purple-600 hover:text-purple-900 hover:underline" style="display:block;word-break:break-word;overflow-wrap:break-word;white-space:normal;line-height:1.35;">' + inner + '</a>';
+                    return '<a href="' + safeUrl + '" class="text-purple-600 hover:text-purple-900 hover:underline" style="display:block;word-break:break-word;overflow-wrap:break-word;white-space:normal;line-height:1.4;">' + inner + '</a>';
                 }
-                return '<span style="display:block;word-break:break-word;overflow-wrap:break-word;white-space:normal;line-height:1.35;">' + inner + '</span>';
+                return '<span style="display:block;word-break:break-word;overflow-wrap:break-word;white-space:normal;line-height:1.4;">' + inner + '</span>';
             }
         },
         {
@@ -530,7 +530,7 @@
             },
             wrapText: true,
             autoHeight: true,
-            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.35' },
+            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.4' },
             cellRenderer: function(params) {
                 var d = params.data;
                 if (!d) return '';
@@ -579,7 +579,7 @@
             tooltipField: 'first_query_preview',
             wrapText: true,
             autoHeight: true,
-            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.35' },
+            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.4' },
             cellRenderer: function(params) {
                 var preview = params.value;
                 var suspicious = params.data && params.data.query_suspicious;
@@ -621,9 +621,6 @@
                 pagination: true,
                 paginationPageSize: 25,
                 paginationPageSizeSelector: [25, 50, 100, 200, 10000],
-                suppressCellFocus: false,
-                enableCellTextSelection: true,
-                ensureDomOrder: true,
                 defaultColDef: {
                     cellStyle: {
                         display: 'flex',
@@ -632,7 +629,7 @@
                         overflowWrap: 'break-word',
                         whiteSpace: 'normal',
                         minWidth: 0,
-                        lineHeight: '1.35'
+                        lineHeight: '1.4'
                     }
                 }
             },
@@ -652,9 +649,6 @@
                 pagination: true,
                 paginationPageSize: 25,
                 paginationPageSizeSelector: [25, 50, 100, 200, 10000],
-                suppressCellFocus: false,
-                enableCellTextSelection: true,
-                ensureDomOrder: true,
                 defaultColDef: {
                     cellStyle: {
                         display: 'flex',
@@ -663,7 +657,7 @@
                         overflowWrap: 'break-word',
                         whiteSpace: 'normal',
                         minWidth: 0,
-                        lineHeight: '1.35'
+                        lineHeight: '1.4'
                     }
                 }
             },

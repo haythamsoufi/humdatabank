@@ -20,6 +20,7 @@ from app.models import (
     IndicatorBank,
     PublicSubmission,
 )
+from app.models.enums import AssignmentEntityStatusValue
 from app.services.ai_vector_store import AIVectorStore
 from app.utils.datetime_helpers import utcnow
 
@@ -2506,9 +2507,9 @@ class AIFormDataValidationService:
         # Include draft-ish statuses too. In many deployments, older periods exist in the databank
         # but the AES status is not always Submitted/Approved (e.g. Assigned/In Progress).
         # We still want a plausibility series for validation.
-        # NOTE: Older imported periods are often left in "Pending" (default AES status),
+        # NOTE: Older imported periods are often left in "pending" (default AES status),
         # but still represent useful historical values for plausibility checks.
-        included_statuses = ["Pending", "Submitted", "Approved", "Completed", "In Progress", "Assigned"]
+        included_statuses = list(AssignmentEntityStatusValue.values())
 
         try:
             # Build indicator_bank_id set (handles historical duplicates via fdrs_kpi_code when present).

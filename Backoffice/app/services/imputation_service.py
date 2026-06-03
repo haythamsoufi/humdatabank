@@ -15,6 +15,7 @@ from app.models import (
     FormTemplate,
     FormItem,
     FormData,
+    DynamicIndicatorData,
     Country,
 )
 from app.models.assignments import AssignmentEntityStatus
@@ -25,6 +26,88 @@ logger = logging.getLogger(__name__)
 
 class ImputationService:
     """Service methods for imputing data for special templates."""
+
+    @staticmethod
+    def _format_imputed_value(value):
+        """Format carried-forward values consistently with existing imputation behavior."""
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return str(value)
+
+    @staticmethod
+    def _copy_dynamic_indicator_imputations(
+        current_aes: AssignmentEntityStatus,
+        previous_aes: AssignmentEntityStatus,
+        *,
+        imputation_mode: str = 'all',
+        item_filter: Optional[str] = None,
+    ) -> Tuple[int, int]:
+        """
+        Carry previous dynamic indicator values into current dynamic rows.
+
+        Dynamic rows are assignment metadata as well as value storage, so this
+        intentionally updates only dynamic indicators already present in the
+        target assignment. It does not create new dynamic assignment rows.
+        """
+        rows_updated = 0
+        items_imputed = 0
+
+        current_rows = DynamicIndicatorData.query.filter_by(
+            assignment_entity_status_id=current_aes.id
+        ).all()
+
+        for current_row in current_rows:
+            indicator_name = None
+            if current_row.indicator_bank:
+                indicator_name = current_row.indicator_bank.name
+            effective_label = current_row.custom_label or indicator_name
+            if item_filter and effective_label != item_filter:
+                continue
+
+            previous_row = DynamicIndicatorData.query.filter_by(
+                assignment_entity_status_id=previous_aes.id,
+                section_id=current_row.section_id,
+                indicator_bank_id=current_row.indicator_bank_id,
+            ).first()
+            if not previous_row:
+                previous_row = DynamicIndicatorData.query.filter_by(
+                    assignment_entity_status_id=previous_aes.id,
+                    indicator_bank_id=current_row.indicator_bank_id,
+                ).first()
+            if not previous_row:
+                continue
+
+            source_value = previous_row.value
+            if source_value is None or source_value == '':
+                source_value = previous_row.total_value
+            source_disagg_data = previous_row.disagg_data
+            if source_value is None and source_disagg_data is None:
+                continue
+
+            if imputation_mode == 'missing_only':
+                has_existing_data = (
+                    (current_row.value is not None and current_row.value != '') or
+                    (current_row.disagg_data is not None) or
+                    (current_row.imputed_value is not None and current_row.imputed_value != '') or
+                    (current_row.imputed_disagg_data is not None)
+                )
+                if has_existing_data:
+                    continue
+
+            if source_value is not None:
+                DynamicIndicatorData.sync_imputed_numeric_value(
+                    current_row,
+                    ImputationService._format_imputed_value(source_value),
+                )
+            if source_disagg_data is not None:
+                current_row.imputed_disagg_data = source_disagg_data
+
+            db.session.add(current_row)
+            rows_updated += 1
+            items_imputed += 1
+
+        return rows_updated, items_imputed
 
     @staticmethod
     def impute_template_2(target_year: str) -> Dict[str, Any]:
@@ -253,7 +336,7 @@ class ImputationService:
 
                     if current_fd:
                         # Update existing entry
-                        current_fd.imputed_value = imputed_formatted
+                        FormData.sync_imputed_numeric_value(current_fd, imputed_formatted)
                         if source_disagg_data is not None:
                             current_fd.imputed_disagg_data = source_disagg_data
                         db.session.add(current_fd)
@@ -264,9 +347,9 @@ class ImputationService:
                             current_fd = FormData(
                                 assignment_entity_status_id=aes.id,
                                 form_item_id=item_id,
-                                imputed_value=imputed_formatted,
                                 imputed_disagg_data=source_disagg_data,
                             )
+                            FormData.sync_imputed_numeric_value(current_fd, imputed_formatted)
                             db.session.add(current_fd)
                             db.session.flush()  # Flush to get the ID and check for conflicts
                             total_rows_created += 1
@@ -278,7 +361,7 @@ class ImputationService:
                                 form_item_id=item_id,
                             ).first()
                             if current_fd:
-                                current_fd.imputed_value = imputed_formatted
+                                FormData.sync_imputed_numeric_value(current_fd, imputed_formatted)
                                 if source_disagg_data is not None:
                                     current_fd.imputed_disagg_data = source_disagg_data
                                 db.session.add(current_fd)
@@ -294,6 +377,15 @@ class ImputationService:
 
                     items_imputed_for_country += 1
                     total_items_imputed += 1
+
+                dynamic_rows_updated, dynamic_items_imputed = ImputationService._copy_dynamic_indicator_imputations(
+                    aes,
+                    prev_aes,
+                    imputation_mode='all',
+                )
+                total_rows_updated += dynamic_rows_updated
+                items_imputed_for_country += dynamic_items_imputed
+                total_items_imputed += dynamic_items_imputed
 
                 if items_imputed_for_country > 0:
                     total_countries_processed += 1
@@ -590,7 +682,7 @@ class ImputationService:
                     if should_impute:
                         if current_fd:
                             # Update existing entry
-                            current_fd.imputed_value = imputed_formatted
+                            FormData.sync_imputed_numeric_value(current_fd, imputed_formatted)
                             # Carry-forward disagg payload for last_year method when present
                             if imputation_method == "last_year":
                                 try:
@@ -619,9 +711,9 @@ class ImputationService:
                                 current_fd = FormData(
                                     assignment_entity_status_id=aes.id,
                                     form_item_id=item_id,
-                                    imputed_value=imputed_formatted,
                                     imputed_disagg_data=imputed_disagg_data,
                                 )
+                                FormData.sync_imputed_numeric_value(current_fd, imputed_formatted)
                                 db.session.add(current_fd)
                                 db.session.flush()  # Flush to get the ID and check for conflicts
                                 total_rows_created += 1
@@ -633,7 +725,7 @@ class ImputationService:
                                     form_item_id=item_id,
                                 ).first()
                                 if current_fd:
-                                    current_fd.imputed_value = imputed_formatted
+                                    FormData.sync_imputed_numeric_value(current_fd, imputed_formatted)
                                     if imputation_method == "last_year":
                                         with suppress(Exception):
                                             prev_fd: Optional[FormData] = FormData.query.filter_by(
@@ -655,6 +747,16 @@ class ImputationService:
 
                         items_imputed_for_country += 1
                         total_items_imputed += 1
+
+                dynamic_rows_updated, dynamic_items_imputed = ImputationService._copy_dynamic_indicator_imputations(
+                    aes,
+                    prev_aes,
+                    imputation_mode=imputation_mode,
+                    item_filter=item_filter,
+                )
+                total_rows_updated += dynamic_rows_updated
+                items_imputed_for_country += dynamic_items_imputed
+                total_items_imputed += dynamic_items_imputed
 
                 if items_imputed_for_country > 0:
                     total_countries_processed += 1

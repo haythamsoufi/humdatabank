@@ -107,11 +107,13 @@
                         {% set entity_type = entity_item.entity_type %}
                         {% set entity_id = entity_item.entity_id %}
                         {% set entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
+                        {% set country_ns_name = get_localized_national_society_name(entity) if entity_type == 'country' else '' %}
                         {% set __ = sorted_entities.append({
                             'entity': entity,
                             'entity_type': entity_type,
                             'entity_id': entity_id,
                             'entity_name': entity_name,
+                            'entity_search_text': entity_name ~ ' ' ~ country_ns_name,
                             'entity_item': entity_item
                         }) %}
                     {% endfor %}
@@ -122,11 +124,13 @@
                         {% set entity_type = entity_data.entity_type %}
                         {% set entity_id = entity_data.entity_id %}
                         {% set entity_name = entity_data.entity_name %}
+                        {% set entity_search_text = entity_data.entity_search_text %}
                         {% set is_selected = selected_entity_type == entity_type and selected_entity_id == entity_id %}
 
                         <div class="dropdown-option px-3 py-2 pl-6 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-start justify-between"
                              data-item-id="{{ entity_type }}:{{ entity_id }}"
                              data-item-name="{{ entity_name }}"
+                             data-search-text="{{ entity_search_text }}"
                              data-item-type="{{ entity_type }}"
                              data-group-header="{{ type_label }}"
                              {% if is_selected %}data-selected="true"{% endif %}>
@@ -178,11 +182,13 @@
                         {% set entity_type = entity_item.entity_type %}
                         {% set entity_id = entity_item.entity_id %}
                         {% set entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
+                        {% set country_ns_name = get_localized_national_society_name(entity) if entity_type == 'country' else '' %}
                         {% set __ = sorted_entities.append({
                             'entity': entity,
                             'entity_type': entity_type,
                             'entity_id': entity_id,
                             'entity_name': entity_name,
+                            'entity_search_text': entity_name ~ ' ' ~ country_ns_name,
                             'entity_item': entity_item
                         }) %}
                     {% endfor %}
@@ -193,11 +199,13 @@
                         {% set entity_type = entity_data.entity_type %}
                         {% set entity_id = entity_data.entity_id %}
                         {% set entity_name = entity_data.entity_name %}
+                        {% set entity_search_text = entity_data.entity_search_text %}
                         {% set is_selected = selected_entity_type == entity_type and selected_entity_id == entity_id %}
 
                         <div class="dropdown-option px-3 py-2 pl-6 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-start justify-between"
                              data-item-id="{{ entity_type }}:{{ entity_id }}"
                              data-item-name="{{ entity_name }}"
+                             data-search-text="{{ entity_search_text }}"
                              data-item-type="{{ entity_type }}"
                              data-group-header="{{ type_label }}"
                              {% if is_selected %}data-selected="true"{% endif %}>
@@ -269,10 +277,11 @@
 
         // Filter entities
         options.forEach(function(option) {
-            const name = option.querySelector('.item-name').textContent.toLowerCase();
+            const name = option.querySelector('.item-name').textContent;
+            const customSearchText = option.dataset.searchText || '';
             const type = option.dataset.itemType || '';
             const groupHeader = option.dataset.groupHeader || '';
-            const searchText = name + ' ' + type + ' ' + groupHeader;
+            const searchText = (name + ' ' + customSearchText + ' ' + type + ' ' + groupHeader).toLowerCase();
 
             if (query === '' || searchText.includes(query)) {
                 option.style.display = '';

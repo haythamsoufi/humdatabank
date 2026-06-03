@@ -60,7 +60,19 @@ class TestEntryFormFormsApiRepeatInstances:
             user = create_test_user(db_session, role="admin")
             _login(client, user.id)
 
+            country = create_test_country(db_session)
             template = create_test_template(db_session)
+            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+            db_session.add(assigned_form)
+            db_session.flush()
+            aes = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(aes)
+            db_session.flush()
             section = FormSection(
                 template_id=template.id,
                 name="Repeat",
@@ -73,7 +85,7 @@ class TestEntryFormFormsApiRepeatInstances:
 
             inst = RepeatGroupInstance(
                 section_id=section.id,
-                assignment_entity_status_id=None,
+                assignment_entity_status_id=aes.id,
                 instance_number=1,
                 created_by_user_id=user.id,
             )
@@ -107,7 +119,7 @@ class TestEntryFormFormsApiDynamicIndicators:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -169,7 +181,7 @@ class TestEntryFormFormsApiDynamicIndicators:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()
@@ -228,7 +240,7 @@ class TestEntryFormFormsApiPresence:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress",
+                status="in_progress",
             )
             db_session.add(aes)
             db_session.flush()

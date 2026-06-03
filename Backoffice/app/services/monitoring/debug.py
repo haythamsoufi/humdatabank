@@ -65,22 +65,45 @@ class DebugManager:
         else:
             app.logger.info("Terminal logging: quiet mode enabled (LOG_MODE=quiet / LOG_LEVEL>=WARNING)")
 
+        formatter = logging.Formatter(
+            '[%(asctime)s] %(levelname)s in %(name)s: %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        managed_handler_attr = "_hdb_managed_logging_handler"
+
+        def _mark_managed(handler):
+            setattr(handler, managed_handler_attr, True)
+            return handler
+
+        def _clear_managed_handlers(logger):
+            for handler in list(logger.handlers):
+                if getattr(handler, managed_handler_attr, False):
+                    logger.removeHandler(handler)
+                    try:
+                        handler.close()
+                    except Exception:
+                        pass
+
+        def _clear_app_handlers():
+            for handler in list(app.logger.handlers):
+                app.logger.removeHandler(handler)
+                try:
+                    handler.close()
+                except Exception:
+                    pass
+
+        log_to_stdout = app.config.get('LOG_TO_STDOUT', True)
+
         # Configure console output if LOG_TO_STDOUT is enabled
         # Default to True for production deployments (Azure, Docker, etc.) where stdout logging is expected
-        if app.config.get('LOG_TO_STDOUT', True):
+        if log_to_stdout:
             # Clear any existing handlers to avoid duplicates
-            app.logger.handlers.clear()
+            _clear_app_handlers()
 
             # Add a single console handler that writes to stdout
             # Azure App Service categorizes stderr as errors, so we use stdout for INFO logs
-            stream_handler = logging.StreamHandler(sys.stdout)
+            stream_handler = _mark_managed(logging.StreamHandler(sys.stdout))
             stream_handler.setLevel(log_level)
-
-            # Create a formatter for cleaner output
-            formatter = logging.Formatter(
-                '[%(asctime)s] %(levelname)s in %(name)s: %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
             stream_handler.setFormatter(formatter)
 
             app.logger.addHandler(stream_handler)
@@ -114,12 +137,8 @@ class DebugManager:
                 )
                 file_handler.setLevel(log_level)
 
-                # Use same formatter as console handler
-                file_formatter = logging.Formatter(
-                    '[%(asctime)s] %(levelname)s in %(name)s: %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S'
-                )
-                file_handler.setFormatter(file_formatter)
+                file_handler = _mark_managed(file_handler)
+                file_handler.setFormatter(formatter)
 
                 # Add file handler to app logger (in addition to stdout handler)
                 app.logger.addHandler(file_handler)
@@ -137,6 +156,31 @@ class DebugManager:
         # Configure root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(log_level)
+        _clear_managed_handlers(root_logger)
+
+        # Third-party libraries such as APScheduler log through the root logger.
+        # Give them the same format as app logs instead of Python's raw fallback.
+        if log_to_stdout:
+            root_stream_handler = _mark_managed(logging.StreamHandler(sys.stdout))
+            root_stream_handler.setLevel(log_level)
+            root_stream_handler.setFormatter(formatter)
+            root_logger.addHandler(root_stream_handler)
+
+        if app.config.get('APPLICATION_LOG_FILE_ENABLED', True) and app.application_log_file_path:
+            try:
+                from logging.handlers import RotatingFileHandler
+                root_file_handler = RotatingFileHandler(
+                    app.application_log_file_path,
+                    maxBytes=app.config.get('APPLICATION_LOG_MAX_BYTES', 50 * 1024 * 1024),
+                    backupCount=app.config.get('APPLICATION_LOG_BACKUP_COUNT', 5),
+                    encoding='utf-8'
+                )
+                root_file_handler = _mark_managed(root_file_handler)
+                root_file_handler.setLevel(log_level)
+                root_file_handler.setFormatter(formatter)
+                root_logger.addHandler(root_file_handler)
+            except Exception as e:
+                app.logger.warning("Failed to set up root application log file handler: %s", e)
 
         # Configure application loggers with pattern matching
         app_loggers = [

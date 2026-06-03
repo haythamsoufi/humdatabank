@@ -1,10 +1,10 @@
 ---
 id: submit-data
 title: Submit Form Data
-description: Guide for focal points to fill out and submit form data
+description: Guide for focal points to fill out and submit form data, including matrix cells and looked-up values
 roles: [focal_point, admin]
 category: data-entry
-keywords: [fill form, enter data, submit, complete assignment, data entry]
+keywords: [fill form, enter data, submit, complete assignment, data entry, matrix, matrix cell, original value, current value, modified value, tooltip, looked up value, source entity, variable value]
 pages:
   - /
   - /forms/assignment
@@ -47,7 +47,7 @@ This workflow guides focal points through filling out and submitting form data f
 - **Page**: `/forms/assignment`
 - **Selector**: `#main-form-area, #sections-container`
 - **Action**: Enter your data
-- **Help**: Fill in each field with the appropriate data. Required fields are marked with an asterisk (*). Your changes are auto-saved as you work.
+- **Help**: Fill in each field with the appropriate data. Required fields are marked with an asterisk (*). Your changes are auto-saved as you work. In matrix cells that are filled from a looked-up variable, the tooltip may show "Original" and "Current" or "Modified". "Original" is the value copied from the source entity assignment when the matrix resolved the variable. "Current" or "Modified" is the value currently saved in this matrix cell after your edits; if it matches the original, the cell is not treated as modified.
 - **ActionText**: Next
 
 ### Step 5: Submit the Form

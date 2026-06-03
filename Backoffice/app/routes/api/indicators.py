@@ -12,6 +12,7 @@ from flask import request, current_app
 from flask_login import current_user
 import uuid
 from sqlalchemy import desc
+from app.models.enums import IndicatorSuggestionStatusValue
 from collections import defaultdict
 from datetime import datetime
 
@@ -684,7 +685,7 @@ def update_indicator_suggestion_status(suggestion_id):
         suggestion = IndicatorSuggestion.query.get_or_404(suggestion_id)
 
         # Update status
-        suggestion.status = data['status']
+        suggestion.status = IndicatorSuggestionStatusValue.normalize(data['status'])
         suggestion.reviewed_at = utcnow()
         suggestion.admin_notes = data.get('admin_notes', suggestion.admin_notes)
 

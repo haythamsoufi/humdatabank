@@ -488,19 +488,43 @@
 					});
 				}
 
-				if (typeof instance.onafterchange === 'function') {
-					instance.onafterchange(function(targetElement) {
-						// Add dynamic adjustment class to tooltip
-						const tooltip = document.querySelector('.humdb-intro');
-						if (tooltip) {
-							tooltip.classList.add('tour-adjusting');
-						}
-						applyOverlayStrength();
+			if (typeof instance.onafterchange === 'function') {
+				instance.onafterchange(function(targetElement) {
+					// Add dynamic adjustment class to tooltip
+					const tooltip = document.querySelector('.humdb-intro');
+					if (tooltip) {
+						tooltip.classList.add('tour-adjusting');
+					}
+					applyOverlayStrength();
 
-						// Ensure proper highlighting with Intro.js system
-						setTimeout(() => {
-							applyOverlayStrength();
-						}, 50);
+					// Ensure proper highlighting with Intro.js system
+					setTimeout(() => {
+						applyOverlayStrength();
+					}, 50);
+
+					// Inject "End tour" button on the left of the button row
+					setTimeout(function() {
+						const btnRow = document.querySelector('.introjs-tooltip.humdb-intro .introjs-tooltipbuttons');
+						if (btnRow && !btnRow.querySelector('.humdb-end-tour-btn')) {
+							const endBtn = document.createElement('a');
+							endBtn.className = 'introjs-button humdb-end-tour-btn';
+							endBtn.setAttribute('role', 'button');
+							endBtn.setAttribute('tabindex', '0');
+							endBtn.textContent = (i18n && i18n.end) || 'End tour';
+							endBtn.style.marginRight = 'auto';
+							endBtn.addEventListener('click', function(e) {
+								e.preventDefault();
+								instance.exit(true);
+							});
+							endBtn.addEventListener('keydown', function(e) {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									instance.exit(true);
+								}
+							});
+							btnRow.insertBefore(endBtn, btnRow.firstChild);
+						}
+					}, 30);
 
 						// If on language button, open dropdown after positioning is complete
 						if (isCurrentStep(languageStepIndex, targetElement)) {

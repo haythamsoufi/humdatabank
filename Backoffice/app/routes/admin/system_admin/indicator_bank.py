@@ -26,6 +26,7 @@ from app.models import (
     IndicatorBankType,
     IndicatorBankUnit,
 )
+from app.models.enums import IndicatorSuggestionStatusValue
 from sqlalchemy.orm import joinedload
 from app.forms.system import IndicatorBankForm, CommonWordForm
 from app.routes.admin.shared import permission_required
@@ -185,10 +186,7 @@ def manage_indicator_bank():
     types = db.session.query(IndicatorBank.type).distinct().filter(IndicatorBank.type.isnot(None)).order_by(IndicatorBank.type).all()
 
     pending_suggestions_count = IndicatorSuggestion.query.filter(
-        or_(
-            func.lower(IndicatorSuggestion.status) == 'pending',
-            IndicatorSuggestion.status == 'Pending Review'
-        )
+        IndicatorSuggestion.status == IndicatorSuggestionStatusValue.pending
     ).count()
 
     return render_template("admin/indicator_bank/indicator_bank.html",
@@ -372,6 +370,7 @@ def edit_indicator_bank(id):
 
     if request.method == 'POST':
         is_ajax = is_json_request()
+        ajax_data = None
 
         # WAF-bypass form submits arrive as JSON with a base64 "payload" key.
         # They are full form submissions and must go through the normal form
@@ -379,11 +378,15 @@ def edit_indicator_bank(id):
         if is_ajax:
             _raw_json = get_json_safe()
             if _raw_json.get("payload") or _raw_json.get("payload_b64"):
-                is_ajax = False
+                _payload_data = get_request_data().to_dict()
+                if _payload_data.pop("_indicator_bank_partial_update", None):
+                    ajax_data = _payload_data
+                else:
+                    is_ajax = False
 
         if is_ajax:
             try:
-                data = get_json_safe()
+                data = ajax_data if ajax_data is not None else get_json_safe()
                 err = require_json_data(data)
                 if err:
                     return err

@@ -312,7 +312,7 @@ def dashboard():
                                      assigned_form_id=assigned_form.id,
                                      entity_type='country',
                                      entity_id=selected_country.id,
-                                     status='Pending', # Default status
+                                     status='pending', # Default status
                                      due_date=None # No default due date for self-reported forms
                                  )
                                  db.session.add(new_acs)
@@ -874,9 +874,9 @@ def dashboard():
                     except (AttributeError, TypeError):
                         pass
                     # For assigned forms, check if they should be in past submissions
-                    if item['status'] == 'Requires Revision':
+                    if item['status'] == 'requires_revision':
                         past_assignments.append(item)
-                    elif item['status'] in ('Approved', 'Pending', 'In Progress'):
+                    elif item['status'] in ('approved', 'pending', 'in_progress'):
                         # Ensure status_timestamp is timezone-aware for comparison
                         status_ts = item.get('status_timestamp')
                         if status_ts is None:
@@ -887,7 +887,7 @@ def dashboard():
                                 status_ts = None
                         if status_ts and status_ts.tzinfo is None:
                             status_ts = status_ts.replace(tzinfo=timezone.utc)
-                        if item['status'] == 'Approved':
+                        if item['status'] == 'approved':
                             if status_ts and status_ts < one_month_ago:
                                 past_assignments.append(item)
                             else:

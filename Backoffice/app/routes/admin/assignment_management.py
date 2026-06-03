@@ -18,7 +18,7 @@ from app.models import (
     PublicSubmission, PublicSubmissionStatus,
     SubmittedDocument, NSBranch, NSSubBranch, NSLocalUnit, SecretariatDivision, SecretariatDepartment
 )
-from app.models.enums import EntityType
+from app.models.enums import AssignmentEntityStatusValue, EntityType
 from app.forms.assignments import (
     AssignedFormForm, AssignmentEntityStatusForm
 )
@@ -306,7 +306,7 @@ def new_assignment():
                             assigned_form_id=new_assignment.id,
                             entity_type=EntityType.country.value,
                             entity_id=country_id,
-                            status='Pending',
+                            status='pending',
                             due_date=form.due_date.data if form.due_date.data else None
                         )
                         db.session.add(aes)
@@ -353,7 +353,7 @@ def new_assignment():
                             assigned_form_id=new_assignment.id,
                             entity_type=entity_type.value,
                             entity_id=entity_id,
-                            status='Pending',
+                            status='pending',
                             due_date=form.due_date.data if form.due_date.data else None
                         )
                         db.session.add(aes)
@@ -526,7 +526,7 @@ def add_countries_to_assignment(assignment_id):
                     assigned_form_id=assignment_id,
                     entity_type=EntityType.country.value,
                     entity_id=country_id,
-                    status='Pending'
+                    status='pending'
                 )
                 db.session.add(aes)
                 created_aes_list.append(aes)
@@ -641,7 +641,7 @@ def add_entity_to_assignment(assignment_id):
         assigned_form_id=assignment_id,
         entity_type=entity_type,
         entity_id=entity_id,
-        status='Pending',
+        status='pending',
         due_date=due_date_obj
     )
     db.session.add(new_aes)
@@ -679,12 +679,12 @@ def update_entity_status(assignment_id, status_id):
     is_public_available = request.json.get('is_public_available')
 
     if status:
-        aes.status = status
+        aes.status = AssignmentEntityStatusValue.normalize(status)
         _now = utcnow()
         aes.status_timestamp = _now
-        if status == 'Approved':
+        if aes.status == AssignmentEntityStatusValue.approved:
             aes.approved_by_user_id = current_user.id
-        elif status == 'Submitted':
+        elif aes.status == AssignmentEntityStatusValue.submitted:
             aes.submitted_by_user_id = current_user.id
             aes.submitted_at = _now
 
@@ -731,6 +731,7 @@ def bulk_update_entity_status(assignment_id):
         return json_bad_request('status_ids array required')
     if not new_status:
         return json_bad_request('status required')
+    normalized_status = AssignmentEntityStatusValue.normalize(new_status)
     due_date_obj = None
     if due_date_str:
         try:
@@ -741,12 +742,12 @@ def bulk_update_entity_status(assignment_id):
     for sid in status_ids:
         aes = AssignmentEntityStatus.query.filter_by(id=int(sid), assigned_form_id=assignment_id).first()
         if aes:
-            aes.status = new_status
+            aes.status = normalized_status
             _now = utcnow()
             aes.status_timestamp = _now
-            if new_status == 'Approved':
+            if normalized_status == AssignmentEntityStatusValue.approved:
                 aes.approved_by_user_id = current_user.id
-            elif new_status == 'Submitted':
+            elif normalized_status == AssignmentEntityStatusValue.submitted:
                 aes.submitted_by_user_id = current_user.id
                 aes.submitted_at = _now
             if due_date_obj is not None:
@@ -764,13 +765,14 @@ def edit_assignment_entity_status(aes_id):
 
     if form.validate():
         try:
-            aes.status = form.status.data
+            normalized_status = AssignmentEntityStatusValue.normalize(form.status.data)
+            aes.status = normalized_status
             _now = utcnow()
             aes.status_timestamp = _now
             aes.due_date = form.due_date.data
-            if form.status.data == 'Approved':
+            if normalized_status == AssignmentEntityStatusValue.approved:
                 aes.approved_by_user_id = current_user.id
-            elif form.status.data == 'Submitted':
+            elif normalized_status == AssignmentEntityStatusValue.submitted:
                 aes.submitted_by_user_id = current_user.id
                 aes.submitted_at = _now
             db.session.flush()

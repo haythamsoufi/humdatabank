@@ -298,10 +298,10 @@
 
         // Helper function to render status badge
         function renderStatusBadge(status) {
-            const statusLower = (status || '').toLowerCase();
+            const statusLower = (status || '').toLowerCase().replace(/_/g, ' ');
             let bgClass = 'bg-gray-100';
             let textClass = 'text-gray-800';
-            if (statusLower === 'completed') {
+            if (statusLower === 'completed' || statusLower === 'submitted' || statusLower === 'approved') {
                 bgClass = 'bg-green-100';
                 textClass = 'text-green-800';
             } else if (statusLower === 'in progress') {

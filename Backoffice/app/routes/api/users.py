@@ -939,15 +939,15 @@ def get_dashboard():
                     past_assignments.append(assignment_data)
                     continue
 
-                if aes.status == 'Requires Revision':
+                if aes.status == 'requires_revision':
                     past_assignments.append(assignment_data)
-                elif aes.status in ('Approved', 'Pending', 'In Progress'):
+                elif aes.status in ('approved', 'pending', 'in_progress'):
                     status_ts_utc = (
                         ensure_utc(aes.status_timestamp) if aes.status_timestamp else None
                     )
                     if status_ts_utc is None and assigned_form and assigned_form.assigned_at:
                         status_ts_utc = ensure_utc(assigned_form.assigned_at)
-                    if aes.status == 'Approved':
+                    if aes.status == 'approved':
                         if status_ts_utc and status_ts_utc < one_month_ago:
                             past_assignments.append(assignment_data)
                         else:

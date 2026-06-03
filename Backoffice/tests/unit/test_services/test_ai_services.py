@@ -176,6 +176,33 @@ class TestAIToolsRegistry:
             assert 'name' in tool['function']
             assert 'description' in tool['function']
 
+    def test_workflow_tools_are_exposed_to_llm(self, tools_registry):
+        """Workflow tools should be available for LLM-selected platform help."""
+        tools = tools_registry.get_tool_definitions_openai()
+        tool_names = {tool['function']['name'] for tool in tools}
+
+        assert 'search_workflow_docs' in tool_names
+        assert 'get_workflow_guide' in tool_names
+
+    def test_workflow_tools_remain_available_with_sources_disabled(self, app, tools_registry):
+        """Platform help is independent of databank/document source toggles."""
+        from flask import g
+
+        try:
+            with app.test_request_context('/api/ai/chat'):
+                g.ai_sources_cfg = {
+                    'historical': False,
+                    'system_documents': False,
+                    'upr_documents': False,
+                }
+                tools = tools_registry.get_tool_definitions_openai()
+        finally:
+            if hasattr(g, 'ai_sources_cfg'):
+                delattr(g, 'ai_sources_cfg')
+
+        tool_names = {tool['function']['name'] for tool in tools}
+        assert tool_names == {'search_workflow_docs', 'get_workflow_guide'}
+
     def test_execute_tool_success(self, tools_registry):
         """Test successful tool execution."""
         with patch.object(tools_registry, 'get_indicator_value') as mock_tool:
@@ -524,10 +551,17 @@ class TestAIQueryIntentHelpers:
 
         assert is_platform_usage_help_question("Where can I find the planning template in the platform?") is True
 
+    def test_matrix_tooltip_terms_do_not_force_agent_side_usage_routing(self):
+        from app.services.ai_query_intent_helpers import is_platform_usage_help_question
+
+        assert is_platform_usage_help_question("what is original vs modified here in the matrix?") is False
+        assert is_platform_usage_help_question("What does Original vs Current mean when I hover over a matrix cell?") is False
+
     def test_platform_usage_help_not_detected_for_document_lookup(self):
         from app.services.ai_query_intent_helpers import is_platform_usage_help_question
 
         assert is_platform_usage_help_question("Find the planning template PDF document for Syria.") is False
+        assert is_platform_usage_help_question("Search documents for original modified matrix.") is False
 
     def test_template_assignment_ambiguous_true(self):
         from app.services.ai_query_intent_helpers import is_template_assignment_ambiguous

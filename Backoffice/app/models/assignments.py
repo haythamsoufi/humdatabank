@@ -9,8 +9,30 @@ from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Bool
 from sqlalchemy.orm import relationship, backref, foreign
 from sqlalchemy import and_
 from ..extensions import db
-from .enums import PublicSubmissionStatus
+from .enums import AssignmentEntityStatusValue, PublicSubmissionStatus
 from app.utils.datetime_helpers import utcnow
+
+
+class ReportingPeriod(db.Model):
+    """Typed reporting period catalog for assignment periods."""
+    __tablename__ = 'reporting_period'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False)
+    period_type = Column(String(20), nullable=False)  # annual, quarterly, custom
+    period_start = Column(Date, nullable=False)
+    period_end = Column(Date, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    assigned_forms = relationship('AssignedForm', backref='reporting_period', lazy='dynamic')
+
+    __table_args__ = (
+        db.Index('ix_reporting_period_dates', 'period_start', 'period_end'),
+        db.Index('ix_reporting_period_type', 'period_type'),
+    )
+
+    def __repr__(self):
+        return f'<ReportingPeriod {self.name} ({self.period_start} - {self.period_end})>'
 
 
 class AssignedForm(db.Model):
@@ -18,6 +40,9 @@ class AssignedForm(db.Model):
     id = Column(Integer, primary_key=True)
     template_id = Column(Integer, ForeignKey('form_template.id'), nullable=False)
     period_name = Column(String(100), nullable=False)
+    period_id = Column(Integer, ForeignKey('reporting_period.id', ondelete='SET NULL'), nullable=True)
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
     assigned_at = Column(DateTime, default=utcnow)
 
     # Assignment active state (inactive assignments are hidden from normal use)
@@ -56,6 +81,8 @@ class AssignedForm(db.Model):
     __table_args__ = (
         db.UniqueConstraint('template_id', 'period_name', name='uq_assigned_form_template_period'),
         db.Index('ix_assigned_form_template_period', 'template_id', 'period_name'),
+        db.Index('ix_assigned_form_period', 'period_id'),
+        db.Index('ix_assigned_form_period_dates', 'period_start', 'period_end'),
         db.Index('ix_assigned_form_public_token', 'unique_token'),
         db.Index('ix_assigned_form_public_active', 'is_public_active'),
         db.Index('ix_assigned_form_assigned_at', 'assigned_at'),
@@ -113,7 +140,7 @@ class AssignedForm(db.Model):
                 assigned_form_id=self.id,
                 entity_type='country',
                 entity_id=country.id,
-                status='Pending'
+                status=AssignmentEntityStatusValue.pending,
             )
             db.session.add(new_aes)
             return new_aes
@@ -190,7 +217,15 @@ class AssignmentEntityStatus(db.Model):
     entity_type = db.Column(db.String(50), nullable=False)  # 'country', 'ns_branch', 'ns_subbranch', etc.
     entity_id = db.Column(db.Integer, nullable=False)
 
-    status = db.Column(db.String(50), default='Pending')
+    status = db.Column(
+        Enum(
+            AssignmentEntityStatusValue,
+            name='assignmententitystatus',
+            values_callable=lambda obj: [member.value for member in obj],
+        ),
+        default=AssignmentEntityStatusValue.pending,
+        nullable=False,
+    )
     status_timestamp = db.Column(db.DateTime, default=db.func.now())
     due_date = db.Column(db.DateTime, nullable=True)
     is_public_available = db.Column(db.Boolean, default=False, nullable=False)
@@ -260,7 +295,7 @@ class AssignmentEntityStatus(db.Model):
 
     def __repr__(self):
         entity_info = f"{self.entity_type}:{self.entity_id}"
-        return f'<AssignmentEntityStatus Assignment:{self.assigned_form_id}, Entity:{entity_info}, Status:{self.status}>'
+        return f'<AssignmentEntityStatus Assignment:{self.assigned_form_id}, Entity:{entity_info}, Status:{self.status.value}>'
 
 
 class PublicSubmission(db.Model):
@@ -269,7 +304,15 @@ class PublicSubmission(db.Model):
     assigned_form_id = db.Column(db.Integer, db.ForeignKey('assigned_form.id'), nullable=True)
     country_id = db.Column(db.Integer, db.ForeignKey('country.id'), nullable=False)
     submitted_at = db.Column(db.DateTime, default=utcnow, nullable=False)
-    status = db.Column(Enum(PublicSubmissionStatus), default=PublicSubmissionStatus.pending, nullable=False)
+    status = db.Column(
+        Enum(
+            PublicSubmissionStatus,
+            name='publicsubmissionstatus',
+            values_callable=lambda obj: [member.value for member in obj],
+        ),
+        default=PublicSubmissionStatus.pending,
+        nullable=False,
+    )
     submitter_name = db.Column(db.String(255), nullable=True)
     submitter_email = db.Column(db.String(255), nullable=True)
 

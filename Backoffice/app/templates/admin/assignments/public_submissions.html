@@ -48,9 +48,9 @@
                 </div>
                 <div class="text-right">
                     <p class="text-sm text-gray-600">{{ _('Status Distribution') }}:</p>
-                    {% set pending_count = submissions|selectattr('status.value', 'equalto', 'Pending')|list|length %}
-                    {% set approved_count = submissions|selectattr('status.value', 'equalto', 'Approved')|list|length %}
-                    {% set rejected_count = submissions|selectattr('status.value', 'equalto', 'Rejected')|list|length %}
+                    {% set pending_count = submissions|selectattr('status.value', 'equalto', 'pending')|list|length %}
+                    {% set approved_count = submissions|selectattr('status.value', 'equalto', 'approved')|list|length %}
+                    {% set rejected_count = submissions|selectattr('status.value', 'equalto', 'rejected')|list|length %}
                     <div class="flex space-x-2 mt-1 justify-end">
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
                             {{ pending_count }} {{ _('Pending') }}
@@ -109,9 +109,9 @@
             </div>
             <div class="text-right">
                 <p class="text-sm text-gray-600">{{ _('Status Distribution') }}:</p>
-                {% set pending_count = submissions|selectattr('status.value', 'equalto', 'Pending')|list|length %}
-                {% set approved_count = submissions|selectattr('status.value', 'equalto', 'Approved')|list|length %}
-                {% set rejected_count = submissions|selectattr('status.value', 'equalto', 'Rejected')|list|length %}
+                {% set pending_count = submissions|selectattr('status.value', 'equalto', 'pending')|list|length %}
+                {% set approved_count = submissions|selectattr('status.value', 'equalto', 'approved')|list|length %}
+                {% set rejected_count = submissions|selectattr('status.value', 'equalto', 'rejected')|list|length %}
                 <div class="flex space-x-2 mt-1">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
                         {{ pending_count }} {{ _('Pending') }}
@@ -192,9 +192,9 @@
         return '<form action="' + params.data.status_update_url + '" method="POST" class="status-update-form">' +
             '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
             '<select name="status" data-confirm-message="{{ _("Are you sure you want to update the status?") }}" class="status-select rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm ' + colorClass + '">' +
-            '<option value="pending" ' + (status === 'pending' ? 'selected' : '') + ' class="text-yellow-600">{{ _("Pending") }}</option>' +
-            '<option value="approved" ' + (status === 'approved' ? 'selected' : '') + ' class="text-green-600">{{ _("Approved") }}</option>' +
-            '<option value="rejected" ' + (status === 'rejected' ? 'selected' : '') + ' class="text-red-600">{{ _("Rejected") }}</option>' +
+            '<option value="pending" ' + (status === 'pending' ? 'selected' : '') + ' class="text-yellow-600">{{ _('Pending') }}</option>' +
+            '<option value="approved" ' + (status === 'approved' ? 'selected' : '') + ' class="text-green-600">{{ _('Approved') }}</option>' +
+            '<option value="rejected" ' + (status === 'rejected' ? 'selected' : '') + ' class="text-red-600">{{ _('Rejected') }}</option>' +
             '</select>' +
             '</form>';
     }

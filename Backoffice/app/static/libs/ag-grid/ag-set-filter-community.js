@@ -60,7 +60,8 @@
         this.hidePopup = (params && typeof params.hidePopup === 'function') ? params.hidePopup : null;
         this.filterChangedCallback = params.filterChangedCallback;
         this.valueGetter = params.valueGetter;
-        this.doesRowPassOtherFilters = params.doesRowPassOtherFilters;
+        // AG Grid uses the singular name; keep the plural fallback for older local wiring.
+        this.doesRowPassOtherFilters = params.doesRowPassOtherFilter || params.doesRowPassOtherFilters;
 
         // Get column field for fallback valueGetter
         this.columnField = params.colDef ? (params.colDef.field || params.colDef.colId) : null;
@@ -77,9 +78,32 @@
             }.bind(this);
         }
 
+        // If column has filterValueGetter, prefer it for the filter list and filter matching.
+        // This keeps set filter values aligned with badge/rendered columns such as Status.
+        if (this.colDef && this.colDef.filterValueGetter && typeof this.colDef.filterValueGetter === 'function') {
+            const originalValueGetter = this.valueGetter;
+            const filterValueGetter = this.colDef.filterValueGetter;
+            this.valueGetter = function(node) {
+                try {
+                    const v = filterValueGetter({
+                        node: node,
+                        data: node && node.data,
+                        colDef: this.colDef,
+                        api: this.params && this.params.api,
+                        context: this.params && this.params.context
+                    });
+                    if (v !== undefined && v !== null) {
+                        return v;
+                    }
+                } catch (e) {
+                    // ignore and fall back
+                }
+                return originalValueGetter ? originalValueGetter(node) : undefined;
+            }.bind(this);
+
         // If column has a valueGetter, prefer it to avoid object values like [object Object]
         // (e.g. field holds an object but valueGetter returns a string for display/filtering).
-        if (this.colDef && this.colDef.valueGetter && typeof this.colDef.valueGetter === 'function') {
+        } else if (this.colDef && this.colDef.valueGetter && typeof this.colDef.valueGetter === 'function') {
             const originalValueGetter = this.valueGetter;
             const columnValueGetter = this.colDef.valueGetter;
             this.valueGetter = function(node) {
@@ -115,6 +139,126 @@
 
     };
 
+    /**
+     * Collect all rows for filter value extraction.
+     * Prefer grid rowData (full dataset, pagination-safe) over forEachNode alone.
+     */
+    CustomSetFilter.prototype.collectAllRowData = function() {
+        const api = this.params.api;
+        const rows = [];
+        const candidates = [];
+
+        if (api && typeof api.getGridOption === 'function') {
+            const gridRowData = api.getGridOption('rowData');
+            if (Array.isArray(gridRowData) && gridRowData.length > 0) {
+                candidates.push(gridRowData);
+            }
+        }
+
+        const contextRowData = this.params && this.params.context && this.params.context.agGridHelperRowData;
+        if (Array.isArray(contextRowData) && contextRowData.length > 0) {
+            candidates.push(contextRowData);
+        }
+
+        if (this.params.rowData && Array.isArray(this.params.rowData) && this.params.rowData.length > 0) {
+            candidates.push(this.params.rowData);
+        }
+
+        if (candidates.length > 0) {
+            candidates.sort(function(a, b) {
+                return b.length - a.length;
+            });
+            return candidates[0].slice();
+        }
+
+        if (api && typeof api.forEachNode === 'function') {
+            api.forEachNode(function(node) {
+                if (node && node.data) {
+                    rows.push(node.data);
+                }
+            });
+        }
+
+        return rows;
+    };
+
+    CustomSetFilter.prototype.rowPassesOtherFilters = function(node) {
+        if (this.doesRowPassOtherFilters && typeof this.doesRowPassOtherFilters === 'function') {
+            try {
+                return this.doesRowPassOtherFilters(node);
+            } catch (error) {
+                return true;
+            }
+        }
+        return true;
+    };
+
+    CustomSetFilter.prototype.collectAllRowNodes = function() {
+        const api = this.params.api;
+        const nodes = [];
+
+        if (api && typeof api.forEachNode === 'function') {
+            api.forEachNode(function(node) {
+                if (node && node.data) {
+                    nodes.push(node);
+                }
+            });
+        }
+
+        return nodes;
+    };
+
+    CustomSetFilter.prototype.collectRowsAfterActiveFilters = function() {
+        const api = this.params.api;
+        const nodes = [];
+
+        if (api && typeof api.forEachNodeAfterFilter === 'function') {
+            api.forEachNodeAfterFilter(function(node) {
+                if (node && node.data) {
+                    nodes.push(node);
+                }
+            });
+        }
+
+        return nodes;
+    };
+
+    CustomSetFilter.prototype.getItemsForNode = function(node) {
+        const value = this.valueGetter(node);
+        return this.parseComplexValue(value, this.columnField);
+    };
+
+    CustomSetFilter.prototype.accumulateTotalValueCounts = function(row, valueCountMap) {
+        const node = { data: row };
+        try {
+            const items = this.getItemsForNode(node);
+            items.forEach(function(item) {
+                if (item && item.trim() !== '') {
+                    valueCountMap[item] = (valueCountMap[item] || 0) + 1;
+                }
+            });
+        } catch (error) {
+            // Value extraction failed for row
+        }
+    };
+
+    CustomSetFilter.prototype.accumulateAvailableValueCounts = function(node, availableValueCountMap) {
+        try {
+            if (!this.rowPassesOtherFilters(node)) {
+                return;
+            }
+
+            const items = this.getItemsForNode(node);
+            items.forEach(function(item) {
+                if (item && item.trim() !== '') {
+                    availableValueCountMap[item] = (availableValueCountMap[item] || 0) + 1;
+                }
+            });
+        } catch (error) {
+            // Value extraction failed for row
+        }
+    };
+
     CustomSetFilter.prototype.extractUniqueValues = function() {
         const valueCountMap = {}; // Track count for each value (all rows)
         const availableValueCountMap = {}; // Track count for each value (rows passing other filters)
@@ -131,187 +275,28 @@
             }.bind(this);
         }
 
-        // Helper to check if row passes other filters (excluding current column)
-        // Note: This is only used as a fallback if forEachNodeAfterFilter is not available
-        const checkOtherFilters = (node) => {
-            // First try the built-in doesRowPassOtherFilters (excludes current filter automatically)
-            if (this.doesRowPassOtherFilters && typeof this.doesRowPassOtherFilters === 'function') {
-                try {
-                    return this.doesRowPassOtherFilters(node);
-                } catch (error) {
-                    // doesRowPassOtherFilters failed, fall through to manual check
-                }
-            }
+        const allRows = this.collectAllRowData();
+        allRows.forEach(function(row) {
+            this.accumulateTotalValueCounts(row, valueCountMap);
+        }.bind(this));
 
-            // If doesRowPassOtherFilters not available, return true (assume all pass)
-            // The manual check below is complex and error-prone, so we skip it
-            return true;
+        const hasOtherFilterPredicate = this.doesRowPassOtherFilters &&
+            typeof this.doesRowPassOtherFilters === 'function';
+        const canCollectFilteredNodes = this.params && this.params.api &&
+            typeof this.params.api.forEachNodeAfterFilter === 'function';
+        const availableNodes = hasOtherFilterPredicate
+            ? this.collectAllRowNodes()
+            : this.collectRowsAfterActiveFilters();
+        const usedGridNodesForAvailability = hasOtherFilterPredicate || canCollectFilteredNodes;
 
-            // Fallback: manually check all other column filters
-            if (this.params.api && node) {
-                try {
-                    // Get all column filters except this one
-                    const columns = this.params.api.getColumns();
-                    if (columns) {
-                        const currentColId = this.columnField || (this.params.colDef && (this.params.colDef.field || this.params.colDef.colId));
-
-                        for (let i = 0; i < columns.length; i++) {
-                            const col = columns[i];
-                            const colId = col.getColId ? col.getColId() : (col.colId || col.field);
-
-                            // Skip current column
-                            if (colId === currentColId) {
-                                continue;
-                            }
-
-                            // Try different ways to get filter instance
-                            let filterInstance = null;
-
-                            // Method 1: Try api.getFilterInstance (if available)
-                            if (this.params.api.getFilterInstance && typeof this.params.api.getFilterInstance === 'function') {
-                                try {
-                                    filterInstance = this.params.api.getFilterInstance(colId);
-                                } catch (e) {
-                                    // Method not available, try next method
-                                }
-                            }
-
-                            // Method 2: Try column.getFilterInstance (if available)
-                            if (!filterInstance && col.getFilterInstance && typeof col.getFilterInstance === 'function') {
-                                try {
-                                    filterInstance = col.getFilterInstance();
-                                } catch (e) {
-                                    // Method not available
-                                }
-                            }
-
-                            // Method 3: Try accessing filter through column's filter property
-                            if (!filterInstance && col.filter) {
-                                filterInstance = col.filter;
-                            }
-
-                            if (filterInstance) {
-                                // Check if filter is active
-                                if (filterInstance.isFilterActive && typeof filterInstance.isFilterActive === 'function') {
-                                    if (filterInstance.isFilterActive()) {
-                                        // Check if row passes this filter
-                                        if (filterInstance.doesFilterPass && typeof filterInstance.doesFilterPass === 'function') {
-                                            try {
-                                                if (!filterInstance.doesFilterPass({ node: node })) {
-                                                    return false;
-                                                }
-                                            } catch (e) {
-                                                // Filter pass check failed
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return true; // Row passes all other filters
-                } catch (error) {
-                    return true;
-                }
-            }
-
-            return true; // If no way to check, assume all rows pass
-        };
-
-        // Get all row data from the grid
-        // First, count all rows (for total counts)
-        if (this.params.api && typeof this.params.api.forEachNode === 'function') {
-            this.params.api.forEachNode(function(node) {
-                if (node && node.data) {
-                    try {
-                        // AG Grid's filter valueGetter expects just the node object
-                        const value = this.valueGetter(node);
-                        const items = this.parseComplexValue(value, this.columnField);
-                        // Count each individual item
-                        items.forEach(function(item) {
-                            if (item && item.trim() !== '') {
-                                valueCountMap[item] = (valueCountMap[item] || 0) + 1;
-                            }
-                        });
-                    } catch (error) {
-                        // Value extraction failed for node
-                    }
-                }
+        if (availableNodes.length > 0) {
+            availableNodes.forEach(function(node) {
+                this.accumulateAvailableValueCounts(node, availableValueCountMap);
             }.bind(this));
-        }
-
-        // Then, count only displayed rows (which already have other filters applied)
-        // This is simpler and more reliable than manually checking filters
-        if (this.params.api && typeof this.params.api.forEachNodeAfterFilter === 'function') {
-            this.params.api.forEachNodeAfterFilter(function(node) {
-                if (node && node.data) {
-                    try {
-                        // AG Grid's filter valueGetter expects just the node object
-                        const value = this.valueGetter(node);
-                        // Parse complex values to extract individual items
-                        const items = this.parseComplexValue(value, this.columnField);
-                        // Count each individual item in displayed rows (after other filters)
-                        items.forEach(function(item) {
-                            if (item && item.trim() !== '') {
-                                availableValueCountMap[item] = (availableValueCountMap[item] || 0) + 1;
-                            }
-                        });
-                    } catch (error) {
-                        // Value extraction failed for displayed row
-                    }
-                }
+        } else if (!usedGridNodesForAvailability) {
+            allRows.forEach(function(row) {
+                this.accumulateAvailableValueCounts({ data: row }, availableValueCountMap);
             }.bind(this));
-        } else if (this.params.api && typeof this.params.api.forEachNode === 'function') {
-            // Fallback: use checkOtherFilters if forEachNodeAfterFilter not available
-            this.params.api.forEachNode(function(node) {
-                if (node && node.data) {
-                    try {
-                        // AG Grid's filter valueGetter expects just the node object
-                        const value = this.valueGetter(node);
-                        // Parse complex values to extract individual items
-                        const items = this.parseComplexValue(value, this.columnField);
-                        // Count occurrences in rows passing other filters
-                        if (checkOtherFilters(node)) {
-                            items.forEach(function(item) {
-                                if (item && item.trim() !== '') {
-                                    availableValueCountMap[item] = (availableValueCountMap[item] || 0) + 1;
-                                }
-                            });
-                        }
-                    } catch (error) {
-                        // Value extraction failed
-                    }
-                }
-            }.bind(this));
-        }
-
-        // Fallback: if no rows loaded yet, return empty array
-        if (Object.keys(valueCountMap).length === 0) {
-            // Try to get from rowData if available
-            if (this.params.rowData && Array.isArray(this.params.rowData)) {
-                this.params.rowData.forEach(function(row) {
-                    try {
-                        const node = { data: row };
-                        // AG Grid's filter valueGetter expects just the node object
-                        const value = this.valueGetter(node);
-                        // Parse complex values to extract individual items
-                        const items = this.parseComplexValue(value, this.columnField);
-                        // Count each individual item
-                        items.forEach(function(item) {
-                            if (item && item.trim() !== '') {
-                                valueCountMap[item] = (valueCountMap[item] || 0) + 1;
-
-                                // Count occurrences in rows passing other filters
-                                if (checkOtherFilters(node)) {
-                                    availableValueCountMap[item] = (availableValueCountMap[item] || 0) + 1;
-                                }
-                            }
-                        });
-                    } catch (error) {
-                        // Value extraction from rowData failed
-                    }
-                }.bind(this));
-            }
         }
 
         // Store counts
@@ -736,7 +721,11 @@
             } else {
                 countText = '(0/' + totalCount + ')';
             }
-            label.innerHTML = value + ' <span style="color: #999; font-size: 11px; margin-left: 4px;">' + countText + '</span>';
+            label.textContent = value + ' ';
+            const countSpan = document.createElement('span');
+            countSpan.style.cssText = 'color: #999; font-size: 11px; margin-left: 4px;';
+            countSpan.textContent = countText;
+            label.appendChild(countSpan);
 
             itemContainer.appendChild(checkbox);
             itemContainer.appendChild(label);
@@ -872,6 +861,7 @@
             this.extractUniqueValues();
             this.renderValues();
             this.updateSelectAllState();
+            this.updateCount();
         }, 10);
     };
 
@@ -885,14 +875,8 @@
             this.extractUniqueValues();
             this.renderValues();
             this.updateSelectAllState();
+            this.updateCount();
         }, 10);
-    };
-
-    CustomSetFilter.prototype.destroy = function() {
-        // Remove event listener when filter is destroyed
-        if (this.params.api && this.onFilterChangedListener) {
-            this.params.api.removeEventListener('filterChanged', this.onFilterChangedListener);
-        }
     };
 
     CustomSetFilter.prototype.getGui = function() {
@@ -1004,14 +988,29 @@
             this.selectedValues.clear();
             this.filterValue = '';
             this.filterCondition = 'contains';
+            if (this.filterInput) {
+                this.filterInput.value = '';
+            }
+            if (this.conditionSelect) {
+                this.conditionSelect.value = 'contains';
+            }
         }
-        this.renderValues();
-        this.updateSelectAllState();
-        this.updateCount();
+        this.filterValues();
+        if (this.valuesContainer) {
+            this.renderValues();
+        }
+        if (this.selectAllCheckbox) {
+            this.updateSelectAllState();
+        }
+        if (this.countDisplay) {
+            this.updateCount();
+        }
     };
 
     CustomSetFilter.prototype.destroy = function() {
-        // Cleanup if needed
+        if (this.params && this.params.api && this.onFilterChangedListener) {
+            this.params.api.removeEventListener('filterChanged', this.onFilterChangedListener);
+        }
     };
 
     // Register the filter component with AG Grid

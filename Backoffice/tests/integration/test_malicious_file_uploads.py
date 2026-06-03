@@ -70,7 +70,7 @@ class TestMaliciousFileUploads:
                 assigned_form_id=assigned_form.id,
                 entity_type=EntityType.country.value,
                 entity_id=country.id,
-                status="In Progress"
+                status="in_progress"
             )
             db_session.add(assignment_status)
             db_session.commit()

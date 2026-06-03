@@ -6,7 +6,8 @@ from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Bool
 from sqlalchemy.orm import relationship, backref
 from ..extensions import db
 from app.utils.datetime_helpers import utcnow
-from app.models.enums import DocumentStatus
+from app.models.enums import DocumentStatus, DocumentStatusValue
+from app.models.enum_columns import pg_str_enum_column
 
 
 submitted_document_countries = Table(
@@ -39,7 +40,12 @@ class SubmittedDocument(db.Model):
     language = db.Column(db.String(10), nullable=True)
     is_public = db.Column(db.Boolean, default=False, nullable=False)
     period = db.Column(db.String(100), nullable=True)
-    status = db.Column(db.String(50), nullable=False, default=DocumentStatus.PENDING)
+    status = pg_str_enum_column(
+        DocumentStatusValue,
+        'documentstatus',
+        default=DocumentStatusValue.pending,
+        nullable=False,
+    )
 
     # Thumbnail fields
     thumbnail_filename = db.Column(db.String(255), nullable=True)

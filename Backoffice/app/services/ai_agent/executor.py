@@ -1361,19 +1361,6 @@ class AIAgentExecutor:
         )
         tools = self.tools_registry.get_tool_definitions_openai()
 
-        # Hard-filter: for platform usage/navigation help questions, restrict
-        # to workflow/help tools only. Data and document tools are irrelevant
-        # and the model frequently misuses them for these queries.
-        if _is_platform_usage_help_question(query) and not _is_assignment_form_question(query):
-            _USAGE_HELP_ALLOWED_TOOLS = frozenset({
-                "search_workflow_docs", "get_workflow_guide",
-            })
-            tools = [
-                t for t in tools
-                if isinstance(t, dict)
-                and str((t.get("function") or {}).get("name") or "").strip() in _USAGE_HELP_ALLOWED_TOOLS
-            ]
-
         steps = []
         tool_call_count = 0
         total_cost = 0.0
@@ -2110,16 +2097,8 @@ class AIAgentExecutor:
         _full_table_requested = _user_expects_full_table(query, conversation_history)
         tool_breaker_factory_react = make_tool_breaker_factory()
 
-        # Hard-filter: for usage-help questions restrict to workflow tools only
-        _usage_help_mode = (
-            _is_platform_usage_help_question(query)
-            and not _is_assignment_form_question(query)
-        )
-
         # Build available tools description
-        tools_description = self._get_tools_text_description(
-            allowed_tools=frozenset({"search_workflow_docs", "get_workflow_guide"}) if _usage_help_mode else None,
-        )
+        tools_description = self._get_tools_text_description()
 
         # Build the ReAct prompt
         react_prompt = self._build_react_prompt(
@@ -2680,6 +2659,7 @@ IMPORTANT:
 - For broad inventory/list requests across countries (e.g. "which country plans mention digital transformation"), call search_documents with return_all_countries=true. You will receive batches (result, total_count, offset, limit): call again with offset=offset+limit until you have received all total_count chunks. Read ALL chunk "content" and only then synthesize; do not answer from a single batch unless total_count equals len(result).
 - Answer with best assumptions: do NOT ask clarifying questions (e.g. format, region, "which do you prefer?"). Give a direct answer; if the user wants something different they will ask.
 - Exception: for platform usage/navigation requests, first classify help/usage vs data/document retrieval. For usage help, do not start with document search.
+- Platform UI meaning questions count as usage help when the user asks what an on-screen label, tooltip, field state, or form/matrix behavior means. Example: "what is original vs modified/current in the matrix?" is about the form UI workflow, not uploaded documents, unless the user explicitly asks for PDFs/reports/documents.
 - If the user says "template" and does not explicitly ask for a PDF/report/document/file, treat it as potentially assignment workflow. Ask one short clarification if needed, then point to /admin/assignments (assigned forms/periods) and /admin/templates (template definitions).
 - For how-to/workflow requests, prefer workflow guide tools when available. If workflow_id + target page are known, include one CTA markdown link in the answer: [Take a quick tour](/target-page#chatbot-tour=workflow-id). Do NOT output raw HTML button tags.
 
@@ -2834,13 +2814,12 @@ User context:
                 "Suggest they ask an admin to add more countries via [User Management](/admin/users) or [Assignment Management](/admin/assignments). "
                 "Keep the answer short and actionable."
             )
-        elif _is_platform_usage_help_question(query) or _is_template_assignment_ambiguous(query):
+        elif _is_template_assignment_ambiguous(query):
             system_content = (
                 system_content
-                + "\n\nCRITICAL FOR THIS TURN: This is a platform usage/navigation help question. "
-                "Give direct, practical guidance. Do NOT call data or document tools (list_documents, "
-                "search_documents, get_indicator_value, get_user_assignments, etc.) — they are irrelevant. "
-                "Restrict navigation guidance to the user's role."
+                + "\n\nCRITICAL FOR THIS TURN: The user's wording around 'template' may refer to the "
+                "assignment/template workflow rather than a PDF/report/document. Give direct, practical "
+                "guidance if the workflow meaning is likely. Restrict navigation guidance to the user's role."
                 "\n- If user role/access is NOT admin/system_manager: NEVER suggest Admin menu paths or /admin/* URLs."
                 "\n- For access/permission requests by non-admin users, instruct them to contact their administrator."
                 "\n- Do NOT include intent classification labels in your response (e.g. 'Classification: …')."

@@ -305,7 +305,13 @@ _PLATFORM_SCOPE_META_RE = re.compile(
     r"(?i)\b("
     r"what\s+can\s+you\s+do|what\s+are\s+you\s+for|who\s+are\s+you|"
     r"how\s+do\s+i\s+use\s+this\s+(platform|site|chat|tool)|"
-    r"help\s+me\s+navigate|how\s+to\s+export|where\s+is\s+the\s+dashboard"
+    r"help\s+me\s+navigate|how\s+to\s+export|where\s+is\s+the\s+dashboard|"
+    r"what\s+is\s+this\s+(platform|site|tool|app|page)|"
+    r"what\s+should\s+i\s+do|what\s+do\s+i\s+(need\s+to\s+do|do\s+here)|"
+    r"what\s+am\s+i\s+(supposed|here)|"
+    r"get(?:ting)?\s+started|"
+    r"introduce\s+(yourself|the\s+platform)|"
+    r"pending\s+tasks?|my\s+tasks?|my\s+assignments?"
     r")\b",
 )
 
@@ -675,6 +681,9 @@ def _unified_preflight_llm(
             "You classify whether this message relates to humanitarian/country data, databank indicators, Unified Plans/documents "
             "in this platform, RCRC/National Societies usage, navigation of this product, "
             "or short follow-ups to such a conversation.\n"
+            "ALWAYS in scope (use data_query): orientation/onboarding questions such as 'what is this platform', "
+            "'what should I do here', 'what am I supposed to do', 'get started', 'what is my role', "
+            "'my pending tasks', 'my assignments', 'introduce yourself', 'help me get started'.\n"
             '- intent MUST be \"out_of_platform_scope\" ONLY for clearly unrelated general requests '
             '(e.g. unrelated programming tutorials, celebrity trivia, unrelated homework) '
             'with NO plausible databank linkage.\n'

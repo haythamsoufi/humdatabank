@@ -675,7 +675,7 @@ def _fill_public_form_impl(public_token):
     period_name = assigned_form.period_name or "Public Submission"
 
     assignment_status = DummyStatus(
-        status="In Progress",
+        status="in_progress",
         template=form_template,
         country=sorted_countries[0] if sorted_countries else None,
         period_name=period_name

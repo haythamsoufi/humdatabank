@@ -1532,7 +1532,7 @@ class KoboDataImportService:
                     assigned_form_id=assigned_form.id,
                     entity_type='country',
                     entity_id=country.id,
-                    status='Pending',
+                    status='pending',
                 )
                 db.session.add(aes)
                 db.session.flush()
@@ -1617,8 +1617,8 @@ class KoboDataImportService:
                             fd = FormData(
                                 assignment_entity_status_id=aes.id,
                                 form_item_id=item_id,
-                                value=str_val,
                             )
+                            fd.set_simple_value(str_val)
                             db.session.add(fd)
                             counts['data_entries'] += 1
                     else:
@@ -1647,8 +1647,8 @@ class KoboDataImportService:
                             fd = FormData(
                                 assignment_entity_status_id=aes.id,
                                 form_item_id=item_id,
-                                value=str_val,
                             )
+                            fd.set_simple_value(str_val)
                             db.session.add(fd)
                             counts['data_entries'] += 1
 

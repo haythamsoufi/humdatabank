@@ -268,7 +268,7 @@ def _get_ownership_metrics() -> Dict[str, Any]:
 
     # AES approved without approver recorded (legacy gap)
     approved_aes_without_approver = AssignmentEntityStatus.query.filter(
-        AssignmentEntityStatus.status == "Approved",
+        AssignmentEntityStatus.status == "approved",
         AssignmentEntityStatus.approved_by_user_id.is_(None),
     ).count()
 
@@ -430,12 +430,12 @@ def _get_quality_metrics() -> Dict[str, Any]:
             AssignmentEntityStatus.entity_type == "country",
             AssignmentEntityStatus.due_date.isnot(None),
             AssignmentEntityStatus.due_date < now,
-            AssignmentEntityStatus.status.in_(["Assigned", "In Progress"]),
+            AssignmentEntityStatus.status.in_(["pending", "in_progress"]),
         )
     )
     overdue_count = overdue_q.count()
 
-    submitted_or_approved = by_status_dict.get("Submitted", 0) + by_status_dict.get("Approved", 0)
+    submitted_or_approved = by_status_dict.get("submitted", 0) + by_status_dict.get("approved", 0)
     submission_rate_pct = (
         (submitted_or_approved / total_country_assignments * 100.0)
         if total_country_assignments else 0.0
@@ -500,7 +500,7 @@ def _get_quality_metrics() -> Dict[str, Any]:
     try:
         non_pending_af_ids = {
             r[0] for r in db.session.query(distinct(AssignmentEntityStatus.assigned_form_id))
-            .filter(AssignmentEntityStatus.status != "Pending")
+            .filter(AssignmentEntityStatus.status != "pending")
             .all()
         }
         all_af_ids_with_entities = {
@@ -745,7 +745,7 @@ def _get_metadata_metrics() -> Dict[str, Any]:
     stale_cutoff = utcnow() - timedelta(days=STALE_SUGGESTION_DAYS)
     try:
         stale_suggestions_q = IndicatorSuggestion.query.filter(
-            IndicatorSuggestion.status == "Pending",
+            IndicatorSuggestion.status == "pending",
             IndicatorSuggestion.submitted_at < stale_cutoff,
         )
         indicator_suggestions_stale = stale_suggestions_q.count()

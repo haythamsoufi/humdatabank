@@ -311,7 +311,7 @@ def create_consistent_description(
         if t in ("form_saved", "form_save"):
             return _form_desc("Saved", " as draft")
         if t in ("form_submitted", "form_submit"):
-            return _form_desc("Submitted", " for review")
+            return _form_desc("submitted", " for review")
 
         if t == "form_approved":
             tn, _an, cn = _resolve_form_context(context_data, endpoint, form_lookups)

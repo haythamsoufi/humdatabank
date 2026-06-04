@@ -1,6 +1,7 @@
 {# File: Dev/app/templates/dashboard.html #}
 {% extends "core/layout.html" %}
 {% from "components/_profile_icon.html" import profile_icon %}
+{% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
 {% from "components/_page_header.html" import page_header %}
 {% block content %}
 <div class="py-2 sharp-ui">
@@ -132,6 +133,22 @@
                 animation: none;
             }
         }
+        /* Hide overflowable actions until dashboard.js lays them out (prevents load flash) */
+        [data-dashboard-card-actions]:not([data-actions-layout-ready]) .dashboard-card-actions-bar {
+            visibility: hidden;
+        }
+        /* Status workflow pipeline tooltip */
+        .assignment-status-pipeline-tooltip {
+            display: none;
+            z-index: 200;
+        }
+        .assignment-status-pipeline-container:hover .assignment-status-pipeline-tooltip,
+        .assignment-status-pipeline-container:focus-within .assignment-status-pipeline-tooltip {
+            display: block;
+        }
+        #current-assignments-section .grid {
+            overflow: visible;
+        }
     </style>
 
     {# Display Combined Assigned Forms and Public Submissions #}
@@ -165,7 +182,7 @@
                 {% for item in current_assignments %}
                             {# Determine if overdue (only for assigned forms still awaiting submission) #}
                             {% set is_overdue = item.type == 'assigned' and item.date_info and item.date_info.date() < current_date
-                                and item.status not in ['submitted', 'approved', 'requires_revision'] %}
+                                and item.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review'] %}
 
                             {# Apply conditional styling based on type #}
                             <div class="dashboard-assignment-card p-4 rounded-lg shadow-md flex flex-col justify-between relative transition-all duration-200 ease-out hover:shadow-xl {% if not is_overdue %}hover:-translate-y-0.5{% endif %} motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-md {% if is_overdue %}dashboard-assignment-card--overdue{% endif %} {# Added relative for delete button positioning #}
@@ -214,35 +231,27 @@
 
                                     {# Display additional info based on type #}
                                     {% if item.type == 'assigned' %}
-                                        {# Primary status line with inline attribution #}
-                                        <p class="text-sm text-gray-600 mb-1">
-                                            {{ _('Status') }}:
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                {% if item.status == 'submitted' or item.status == 'approved' %}
-                                                    bg-green-100 text-green-800
-                                                {% elif item.status == 'requires_revision' %}
-                                                    bg-orange-100 text-orange-800
-                                                {% elif item.status == 'in_progress' %}
-                                                    bg-yellow-100 text-yellow-800
-                                                {% else %}
-                                                    bg-gray-100 text-gray-800
-                                                {% endif %}">
-                                                {% if item.item_object.assigned_form.is_effectively_closed %}
-                                                    {{ localize_status(item.status) }} - {{ _('Closed') }}
-                                                {% else %}
-                                                    {{ localize_status(item.status) }}
-                                                {% endif %}
-                                            </span>
+                                        {# Primary status line with inline attribution (flex keeps badge + date on one row when possible) #}
+                                        <div class="text-sm text-gray-600 mb-1 flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                                            <span class="whitespace-nowrap">{{ _('Status') }}:</span>
+                                            {{ assignment_status_pipeline_badge(
+                                                item.status,
+                                                item.item_object.assigned_form.is_effectively_closed,
+                                                session.get('language', 'en'),
+                                                item.item_object
+                                            ) }}
                                             {# Inline: "by: <user> at: <time>" for the current status actor #}
                                             {% if item.status == 'approved' and item.approved_by_user is defined and item.approved_by_user %}
-                                                <span class="text-xs text-gray-500 ml-1">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.approved_by_user.name or _('Unknown') }}</span></span>
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.approved_by_user.name or _('Unknown') }}</span></span>
                                             {% elif item.status == 'submitted' and item.submitted_by_user is defined and item.submitted_by_user %}
-                                                <span class="text-xs text-gray-500 ml-1">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.submitted_by_user.name or _('Unknown') }}</span></span>
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.submitted_by_user.name or _('Unknown') }}</span></span>
+                                            {% elif item.status == 'sent_for_review' and item.sent_for_review_by_user is defined and item.sent_for_review_by_user %}
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.sent_for_review_by_user.name or _('Unknown') }}</span></span>
                                             {% endif %}
                                             {% if item.status_timestamp %}
-                                                <span class="text-xs text-gray-500 ml-1">{{ _('at') }}: {{ item.status_timestamp|format_datetime_localized('short', 'short') }}</span>
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('at') }}: {{ item.status_timestamp|format_datetime_localized('short', 'short') }}</span>
                                             {% endif %}
-                                        </p>
+                                        </div>
                                         {# Secondary line: show "Submitted by" when status is Approved (so both actors are visible) #}
                                         {% if item.status == 'approved' and item.submitted_by_user is defined and item.submitted_by_user %}
                                             <p class="text-xs text-gray-500 mb-1 ml-1">
@@ -367,12 +376,20 @@
                                         </div>
                                     {% endif %}
                                 </div>
-                                <div class="mt-4 flex space-x-2">
+                                <div class="dashboard-card-actions mt-4 flex items-center gap-2 min-w-0 w-full" data-dashboard-card-actions>
+                                    <div class="dashboard-card-actions-primary flex shrink-0 items-center gap-2">
                                     {# Conditional buttons based on type #}
                                     {% if item.type == 'assigned' %}
                                         {% set aes = item.item_object %}
                                         {# Conditional display of "Enter Data" button for Focal Points (not for closed assignments) #}
-                                        {% if current_user_has_role('assignment_editor_submitter') and aes.status not in ["submitted", "approved", "requires_revision"] and not item.item_object.assigned_form.is_effectively_closed %}
+                                        {% set aes_can_enter = (
+                                            aes.status not in ['submitted', 'approved']
+                                            and (
+                                                aes.status != 'sent_for_review'
+                                                or is_delegation_user
+                                            )
+                                        ) %}
+                                        {% if current_user_has_role('assignment_editor_submitter') and aes_can_enter and not item.item_object.assigned_form.is_effectively_closed %}
                                         <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-primary btn-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
@@ -390,6 +407,12 @@
                                             {{ _('Enter Data') }}
                                         </a>
                                         {% endif %}
+                                    {% endif %}
+                                    </div>
+                                    <div class="dashboard-card-actions-bar flex flex-1 min-w-0 items-center gap-2">
+                                    <div class="dashboard-card-actions-inline flex flex-nowrap items-center gap-2 min-w-0 overflow-hidden">
+                                    {% if item.type == 'assigned' %}
+                                        {% set aes = item.item_object %}
 
                                         {# "Approve" button visible with RBAC permission check when status is Submitted #}
                                         {% if aes.status == 'submitted' and can_approve_assignment(aes) %}
@@ -410,12 +433,22 @@
                                                 <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                             </button>
                                         </form>
-                                        {% elif aes.status in ["submitted", "approved", "requires_revision"] and can_reopen_assignment(aes) %}
-                                        {# "Reopen" button for submitted/approved/requires revision #}
+                                        {% elif aes.status in ["submitted", "approved", "requires_revision", "sent_for_review"] and can_reopen_assignment(aes) %}
+                                        {# "Reopen" button for submitted/approved/requires revision / sent for review #}
                                         <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
                                             {{ reopen_form.csrf_token }} {# Include CSRF token #}
                                             <button type="submit" class="btn btn-warning btn-sm">
                                                 <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {% if aes.status == 'sent_for_review' and can_return_for_revision(aes) %}
+                                        <form action="{{ url_for('main.return_assignment_for_revision', aes_id=aes.id) }}" method="POST" class="inline-block return-for-revision-form">
+                                            {{ reopen_form.csrf_token }}
+                                            <button type="submit" class="btn btn-warning btn-sm"
+                                                    data-confirm-message="{{ _('Return this assignment to the National Society for changes?') }}">
+                                                <i class="fas fa-reply mr-1 -ml-0.5"></i> {{ _('Request changes') }}
                                             </button>
                                         </form>
                                         {% endif %}
@@ -475,6 +508,20 @@
                                             <i class="fas fa-external-link-alt mr-1 -ml-0.5"></i> {{ _('Open Form') }}
                                         </a>
                                     {% endif %}
+                                    </div>
+                                    <div class="dashboard-card-actions-overflow relative shrink-0 hidden">
+                                        <button type="button"
+                                                class="btn btn-secondary btn-sm dashboard-card-actions-overflow-btn"
+                                                aria-haspopup="true"
+                                                aria-expanded="false"
+                                                title="{{ _('More actions') }}"
+                                                aria-label="{{ _('More actions') }}">
+                                            <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                        </button>
+                                        <div class="dashboard-card-actions-overflow-menu origin-top-right absolute right-0 top-full mt-1 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 hidden p-1 flex flex-col items-stretch gap-1"
+                                             role="menu"></div>
+                                    </div>
+                                    </div>
                                 </div>
                             </div>
                     {% endfor %}
@@ -660,22 +707,18 @@
                                                 {% endif %}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                    {% if item.status == 'approved' or item.status == 'submitted' %}
-                                                        bg-green-100 text-green-800
-                                                    {% elif item.status == 'requires_revision' %}
-                                                        bg-orange-100 text-orange-800
-                                                    {% elif item.status == 'in_progress' %}
-                                                        bg-yellow-100 text-yellow-800
-                                                    {% else %}
-                                                        bg-gray-100 text-gray-800
-                                                    {% endif %}">
-                                                    {% if item.type == 'assigned' and item.item_object.assigned_form.is_effectively_closed %}
-                                                        {{ localize_status(item.status) }} - {{ _('Closed') }}
-                                                    {% else %}
+                                                {% if item.type == 'assigned' %}
+                                                    {{ assignment_status_pipeline_badge(
+                                                        item.status,
+                                                        item.item_object.assigned_form.is_effectively_closed,
+                                                        session.get('language', 'en'),
+                                                        item.item_object
+                                                    ) }}
+                                                {% else %}
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                                         {{ localize_status(item.status) }}
-                                                    {% endif %}
-                                                </span>
+                                                    </span>
+                                                {% endif %}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 {% if item.status_timestamp %}

@@ -1157,6 +1157,8 @@ DEFAULT_NOTIFICATION_AUDIENCE_RULES: Dict[str, Dict[str, bool]] = {
     "assignment_submitted": {"focal_points": True, "admin_users": True, "system_managers": True},
     "assignment_approved": {"focal_points": True, "admin_users": False, "system_managers": False},
     "assignment_reopened": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "assignment_sent_for_review": {"focal_points": True, "admin_users": False, "system_managers": False},
+    "assignment_returned_for_revision": {"focal_points": True, "admin_users": False, "system_managers": False},
     "public_submission_received": {"focal_points": False, "admin_users": True, "system_managers": True},
     "form_updated": {"focal_points": True, "admin_users": False, "system_managers": False},
     "document_uploaded": {"focal_points": True, "admin_users": True, "system_managers": True},

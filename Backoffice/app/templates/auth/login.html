@@ -518,7 +518,9 @@ body.modal-open {
             </h2>
 
             <form method="POST" id="loginForm" class="space-y-4">
+            {% if form is defined and 'csrf_token' in form %}
             {{ form.csrf_token(id="login_csrf_token") }}
+            {% endif %}
             <input type="hidden" name="remember" value="true">
             {% if request.args.get('next') %}<input type="hidden" name="next" value="{{ request.args.get('next') }}">{% endif %}
 
@@ -633,7 +635,9 @@ body.modal-open {
     <button type="button" id="closeRegisterModal" class="absolute top-3 right-3 btn-close-icon text-gray-500 hover:text-gray-800" aria-label="{{ _('Close') }}"><i class="fa-solid fa-xmark"></i></button>
     <h2 class="text-xl font-semibold mb-4">{{ _('Create your account') }}</h2>
     <form method="POST" action="{{ url_for('auth.register') }}" class="space-y-2">
+      {% if register_form is defined and 'csrf_token' in register_form %}
       {{ register_form.csrf_token(id="register_csrf_token") }}
+      {% endif %}
       {{ register_form.email(id="register_email", class="block w-full px-4 py-2 border rounded", placeholder=_('Email'), autocomplete="username") }}
       {% for error in register_form.email.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
       <p id="register_email_feedback" class="text-xs mt-1"></p>
@@ -681,7 +685,9 @@ body.modal-open {
     <h2 class="text-xl font-semibold mb-2">{{ _('Forgot your password?') }}</h2>
     <p class="text-sm text-gray-600 mb-4">{{ _('Enter your email and we\'ll send you a link to reset your password.') }}</p>
     <form method="POST" action="{{ url_for('auth.forgot_password') }}" class="space-y-2">
+      {% if forgot_form is defined and 'csrf_token' in forgot_form %}
       {{ forgot_form.csrf_token(id="forgot_csrf_token") }}
+      {% endif %}
       {{ forgot_form.email(id="forgot_email", class="block w-full px-4 py-2 border rounded", placeholder=_('Email')) }}
       {% for error in forgot_form.email.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
       {{ forgot_form.submit(id="forgot_submit", class="btn btn-success btn-block w-full mt-2", value=_('Send Reset Link')) }}

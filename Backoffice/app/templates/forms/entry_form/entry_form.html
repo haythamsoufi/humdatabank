@@ -156,17 +156,22 @@
                                 <span class="font-medium">{{ _('Due Date:') }}</span> {{ assignment_status.due_date|datetime_local('date') if assignment_status.due_date else _('N/A') }}
                                 <span class="mx-2">•</span>
                                 <span class="font-medium">{{ _('Status:') }}</span>
+                                {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    {% if assignment_status.status == 'Completed' or assignment_status.status == 'submitted' %}
+                                    {% if aes_status in ['Completed', 'submitted', 'approved'] %}
                                         bg-green-100 text-green-800
-                                    {% elif assignment_status.status == 'in_progress' %}
-                                        bg-blue-100 text-blue-800
-                                    {% elif assignment_status.status == 'Not Started' %}
+                                    {% elif aes_status == 'sent_for_review' %}
+                                        bg-purple-100 text-purple-800
+                                    {% elif aes_status == 'requires_revision' %}
+                                        bg-orange-100 text-orange-800
+                                    {% elif aes_status == 'in_progress' %}
+                                        bg-yellow-100 text-yellow-800
+                                    {% elif aes_status in ['Not Started', 'pending'] %}
                                         bg-gray-100 text-gray-800
                                     {% else %}
-                                        bg-yellow-100 text-yellow-800
+                                        bg-gray-100 text-gray-800
                                     {% endif %}">
-                                    {{ _(assignment_status.status) }}
+                                    {{ localize_status(assignment_status.status) }}
                                 </span>
                             </div>
                         </div>
@@ -352,7 +357,7 @@
                     <h2 id="sidebar-title" class="text-xl font-semibold text-gray-700">{{ _('Navigation') }}</h2>
 
                     {# Close button for mobile/collapsed navigation #}
-                    <button type="button" id="mobile-nav-close-button" class="btn btn-icon btn-sm btn-secondary xl:hidden z-50">
+                    <button type="button" id="mobile-nav-close-button" class="btn btn-close-icon xl:hidden z-50" aria-label="{{ _('Close navigation') }}">
                         <i class="fas fa-times text-base"></i>
                     </button>
 
@@ -522,7 +527,7 @@
                             </button>
                         </div>
                     {% else %}
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                             {% if not is_public_submission %}
                             <button type="submit" name="action" value="save"
                                     class="btn btn-primary flex-1">
@@ -530,12 +535,32 @@
                                 {{ _('Save') }}
                             </button>
                             {% endif %}
+                            {% if can_send_for_review and not is_delegation_user %}
+                            <button type="submit" name="action" value="send_for_review"
+                                    class="btn btn-success flex-1"
+                                    data-confirm-message="{{ _('Send this assignment to delegation for review? You will not be able to edit it until they return it for changes.') }}">
+                                <i class="fas fa-user-check w-4 h-4 mr-2"></i>
+                                {{ _('Send for Review') }}
+                            </button>
+                            {% endif %}
+                            {% if can_finalize_submit %}
                             <button type="submit" name="action" value="submit"
                                     class="btn btn-success flex-1"
                                     data-confirm-message="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.') }}">
                                 <i class="fas fa-paper-plane w-4 h-4 mr-2"></i>
                                 {{ _('Submit') }}
                             </button>
+                            {% endif %}
+                            {% if can_return_for_revision %}
+                            <form action="{{ url_for('main.return_assignment_for_revision', aes_id=assignment_status.id) }}" method="POST" class="flex-1 return-for-revision-form min-w-[10rem]">
+                                {{ csrf_form.csrf_token }}
+                                <button type="submit" class="btn btn-warning w-full"
+                                        data-confirm-message="{{ _('Return this assignment to the National Society for changes?') }}">
+                                    <i class="fas fa-reply w-4 h-4 mr-2"></i>
+                                    {{ _('Request changes') }}
+                                </button>
+                            </form>
+                            {% endif %}
                             {% if not is_public_submission %}
                             <button type="button" id="auth-save-draft-btn"
                                     class="hidden btn btn-ghost flex-1">
@@ -555,7 +580,7 @@
                 </div>
                 {% elif not is_preview_mode and not is_public_submission %}
                 <div class="sticky bottom-0 z-10 mt-6 pt-6 border-t border-gray-200 bg-white pb-6 -mb-6">
-                    <p class="text-gray-700 font-semibold text-center">{{ _('This form has been %(status)s. Data entry is disabled.', status=_(assignment_status.status)) }}</p>
+                    <p class="text-gray-700 font-semibold text-center">{{ _('This form has been %(status)s. Data entry is disabled.', status=localize_status(assignment_status.status)) }}</p>
                 </div>
                 {% endif %}
             </div>

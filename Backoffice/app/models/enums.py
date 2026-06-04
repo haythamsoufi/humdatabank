@@ -15,6 +15,7 @@ STATUS_DISPLAY_LABELS: dict[str, str] = {
     'submitted': 'Submitted',
     'approved': 'Approved',
     'requires_revision': 'Requires Revision',
+    'sent_for_review': 'Sent for Review',
     'rejected': 'Rejected',
     'reviewed': 'Under Review',
     'implemented': 'Implemented',
@@ -71,18 +72,39 @@ class PublicSubmissionStatus(str, enum.Enum):
         return _normalize_str_enum(cls, raw, default=cls.pending)
 
 
+# UI / form dropdown order (workflow sequence; sent_for_review before submitted).
+_ASSIGNMENT_ENTITY_STATUS_WORKFLOW_ORDER: tuple[str, ...] = (
+    'pending',
+    'in_progress',
+    'requires_revision',
+    'sent_for_review',
+    'submitted',
+    'approved',
+)
+
+
 class AssignmentEntityStatusValue(str, enum.Enum):
     """Canonical workflow statuses for ``assignment_entity_status.status`` (PostgreSQL enum)."""
 
     pending = 'pending'
     in_progress = 'in_progress'
+    requires_revision = 'requires_revision'
+    sent_for_review = 'sent_for_review'
     submitted = 'submitted'
     approved = 'approved'
-    requires_revision = 'requires_revision'
 
     @classmethod
     def choices(cls) -> list[tuple[str, str]]:
-        return [(member.value, status_display_label(member.value)) for member in cls]
+        by_value = {member.value: member for member in cls}
+        ordered = [
+            (value, status_display_label(value))
+            for value in _ASSIGNMENT_ENTITY_STATUS_WORKFLOW_ORDER
+            if value in by_value
+        ]
+        for member in cls:
+            if member.value not in _ASSIGNMENT_ENTITY_STATUS_WORKFLOW_ORDER:
+                ordered.append((member.value, status_display_label(member.value)))
+        return ordered
 
     @classmethod
     def values(cls) -> tuple[str, ...]:
@@ -98,6 +120,8 @@ class AssignmentEntityStatusValue(str, enum.Enum):
                 'completed': cls.approved,
                 'in progress': cls.in_progress,
                 'requires revision': cls.requires_revision,
+                'send for review': cls.sent_for_review,
+                'sent for review': cls.sent_for_review,
             },
             default=cls.pending,
         )
@@ -413,6 +437,8 @@ class NotificationType(enum.Enum):
     assignment_submitted = 'assignment_submitted'
     assignment_approved = 'assignment_approved'
     assignment_reopened = 'assignment_reopened'
+    assignment_sent_for_review = 'assignment_sent_for_review'
+    assignment_returned_for_revision = 'assignment_returned_for_revision'
     public_submission_received = 'public_submission_received'
     form_updated = 'form_updated'
     document_uploaded = 'document_uploaded'

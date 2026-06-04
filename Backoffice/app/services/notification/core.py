@@ -296,6 +296,20 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
             "Assignment '%(template)s' has been reopened."
         ),
 
+        'notification.assignment_sent_for_review.title': _notification_msgid(
+            'Review requested: %(template)s'
+        ),
+        'notification.assignment_sent_for_review.message': _notification_msgid(
+            'Period %(period)s: a National Society focal point sent this assignment for your review before submission.'
+        ),
+
+        'notification.assignment_returned_for_revision.title': _notification_msgid(
+            'Changes requested: %(template)s'
+        ),
+        'notification.assignment_returned_for_revision.message': _notification_msgid(
+            'Period %(period)s: delegation returned this assignment for your changes before resubmitting for review.'
+        ),
+
         # Document notifications
         'notification.document_uploaded.title': _notification_msgid('Document uploaded'),
         'notification.document_uploaded.message': _notification_msgid(
@@ -2280,6 +2294,8 @@ def get_default_icon_for_notification_type(notification_type):
     icon_map = {
         NotificationType.assignment_created: 'fas fa-plus-circle',
         NotificationType.assignment_submitted: 'fas fa-paper-plane',
+        NotificationType.assignment_sent_for_review: 'fas fa-user-check',
+        NotificationType.assignment_returned_for_revision: 'fas fa-undo-alt',
         NotificationType.assignment_approved: 'fas fa-check-circle',
         NotificationType.assignment_reopened: 'fas fa-undo',
         NotificationType.public_submission_received: 'fas fa-inbox',
@@ -2528,6 +2544,153 @@ def notify_assignment_submitted(assignment_entity_status):
         admin_notifications = []
 
     return notifications + (admin_notifications or [])
+
+
+def _focal_point_ids_by_org_domain(entity_type, entity_id, *, org_only: bool, exclude_user_ids=None):
+    """Assignment editor/submitter IDs filtered by organization email domain."""
+    from app.models import User
+    from app.utils.organization_helpers import is_org_email
+
+    exclude_set = set(exclude_user_ids or [])
+    focal_point_ids = get_assignment_editor_submitter_user_ids_for_entity(
+        entity_type,
+        entity_id,
+        exclude_user_ids=list(exclude_set) if exclude_set else None,
+    )
+    if not focal_point_ids:
+        return []
+    users = User.query.filter(User.id.in_(focal_point_ids)).all()
+    if org_only:
+        return [u.id for u in users if is_org_email(getattr(u, 'email', ''))]
+    return [u.id for u in users if not is_org_email(getattr(u, 'email', ''))]
+
+
+def notify_assignment_sent_for_review(assignment_entity_status):
+    """Notify org-email delegation focal points when NS sends an assignment for review."""
+    aes = assignment_entity_status
+    entity_type = aes.entity_type
+    entity_id = aes.entity_id
+    assigned_form = aes.assigned_form
+    from app.models.forms import FormTemplate
+
+    template = FormTemplate.query.get(assigned_form.template_id) if assigned_form and assigned_form.template_id else None
+    template_name = template.name if template else "Unknown Template"
+
+    if assigned_form and (assigned_form.period_name or "").startswith("[LOADTEST]"):
+        return []
+
+    log_entity_activity(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        activity_type='assignment_sent_for_review',
+        activity_description=(
+            f"Assignment '{template_name}' for period '{assigned_form.period_name}' was sent for review"
+        ),
+        summary_key='activity.assignment_sent_for_review',
+        summary_params={'template': template_name},
+        related_object_type='assignment',
+        related_object_id=aes.id,
+        assignment_id=aes.id,
+        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        activity_category='form',
+        icon=None,
+        user_id=None,
+    )
+
+    exclude = [current_user.id] if current_user and current_user.is_authenticated else None
+    org_focal_ids = _focal_point_ids_by_org_domain(
+        entity_type, entity_id, org_only=True, exclude_user_ids=exclude
+    )
+    if not org_focal_ids:
+        return []
+
+    if not audience_bucket_enabled(NotificationType.assignment_sent_for_review, "focal_points"):
+        return []
+
+    return create_notification(
+        user_ids=org_focal_ids,
+        notification_type=NotificationType.assignment_sent_for_review,
+        title_key='notification.assignment_sent_for_review.title',
+        title_params={'template': template_name, 'period': assigned_form.period_name},
+        message_key='notification.assignment_sent_for_review.message',
+        message_params={
+            'template': template_name,
+            'period': assigned_form.period_name,
+            '_entity_type': entity_type,
+            '_entity_id': entity_id,
+        },
+        entity_type=entity_type,
+        entity_id=entity_id,
+        related_object_type='assignment',
+        related_object_id=aes.id,
+        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        priority='high',
+        override_email_preferences=True,
+    )
+
+
+def notify_assignment_returned_for_revision(assignment_entity_status):
+    """Notify non-org NS focal points when delegation returns work for changes."""
+    aes = assignment_entity_status
+    entity_type = aes.entity_type
+    entity_id = aes.entity_id
+    assigned_form = aes.assigned_form
+    from app.models.forms import FormTemplate
+
+    template = FormTemplate.query.get(assigned_form.template_id) if assigned_form and assigned_form.template_id else None
+    template_name = template.name if template else "Unknown Template"
+
+    if assigned_form and (assigned_form.period_name or "").startswith("[LOADTEST]"):
+        return []
+
+    log_entity_activity(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        activity_type='assignment_returned_for_revision',
+        activity_description=(
+            f"Assignment '{template_name}' for period '{assigned_form.period_name}' was returned for revision"
+        ),
+        summary_key='activity.assignment_returned_for_revision',
+        summary_params={'template': template_name},
+        related_object_type='assignment',
+        related_object_id=aes.id,
+        assignment_id=aes.id,
+        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        activity_category='form',
+        icon=None,
+        user_id=None,
+    )
+
+    exclude = [current_user.id] if current_user and current_user.is_authenticated else None
+    ns_focal_ids = _focal_point_ids_by_org_domain(
+        entity_type, entity_id, org_only=False, exclude_user_ids=exclude
+    )
+    if not ns_focal_ids:
+        return []
+
+    if not audience_bucket_enabled(NotificationType.assignment_returned_for_revision, "focal_points"):
+        return []
+
+    return create_notification(
+        user_ids=ns_focal_ids,
+        notification_type=NotificationType.assignment_returned_for_revision,
+        title_key='notification.assignment_returned_for_revision.title',
+        title_params={'template': template_name, 'period': assigned_form.period_name},
+        message_key='notification.assignment_returned_for_revision.message',
+        message_params={
+            'template': template_name,
+            'period': assigned_form.period_name,
+            '_entity_type': entity_type,
+            '_entity_id': entity_id,
+        },
+        entity_type=entity_type,
+        entity_id=entity_id,
+        related_object_type='assignment',
+        related_object_id=aes.id,
+        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        priority='high',
+        override_email_preferences=True,
+    )
 
 
 def notify_document_uploaded(assignment_entity_status, document_name):

@@ -340,7 +340,7 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
             )
             assert resp.status_code == 400
             data = resp.get_json()
-            assert (data or {}).get("error") == "All parameters are required"
+            assert (data or {}).get("error") == "Missing required: source_form_item_id"
 
     def test_auto_load_entities_assignment_entity_status_not_found_returns_404(self, client, db_session, app):
         with app.app_context():

@@ -46,11 +46,35 @@ def inject_rbac_helpers():
             current_app.logger.debug("can_reopen_closed_assignment failed: %s", e)
             return False
 
+    def can_send_for_review(aes):
+        try:
+            return AuthorizationService.can_send_for_review(aes, current_user)
+        except Exception as e:
+            current_app.logger.debug("can_send_for_review failed: %s", e)
+            return False
+
+    def can_return_for_revision(aes):
+        try:
+            return AuthorizationService.can_return_for_revision(aes, current_user)
+        except Exception as e:
+            current_app.logger.debug("can_return_for_revision failed: %s", e)
+            return False
+
+    def can_submit_assignment(aes):
+        try:
+            return AuthorizationService.can_submit_assignment(aes, current_user)
+        except Exception as e:
+            current_app.logger.debug("can_submit_assignment failed: %s", e)
+            return False
+
     return dict(
         has_permission=has_permission,
         can_approve_assignment=can_approve_assignment,
         can_reopen_assignment=can_reopen_assignment,
-        can_reopen_closed_assignment=can_reopen_closed_assignment
+        can_reopen_closed_assignment=can_reopen_closed_assignment,
+        can_send_for_review=can_send_for_review,
+        can_return_for_revision=can_return_for_revision,
+        can_submit_assignment=can_submit_assignment,
     )
 
 

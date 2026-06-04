@@ -2,7 +2,7 @@ from flask import session, current_app
 from flask_login import current_user
 from app.models import Country, FormItem
 from app.models.core import UserEntityPermission
-from app.models.enums import EntityType
+from app.models.enums import AssignmentEntityStatusValue, EntityType
 from app.services.entity_service import EntityService
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.utils.form_localization import (
@@ -1018,6 +1018,46 @@ def get_localized_template_name(template):
         current_app.logger.debug("get_template_name failed: %s", e)
         return template.name if template else _("Unknown Template")
 
+def _assignment_entity_status_value(assignment_entity_status) -> str:
+    status = assignment_entity_status.status
+    if hasattr(status, 'value'):
+        return status.value
+    return str(status).strip().lower().replace(' ', '_')
+
+
+@bp.app_template_global()
+def assignment_status_workflow_steps(assignment_entity_status=None):
+    """Ordered workflow steps for pipeline UI.
+
+    - Omits ``sent_for_review`` unless delegation review is enabled on the assignment.
+    - Shows ``requires_revision`` only when that is the current status (replaces ``in_progress``).
+    """
+    steps = [value for value, _label in AssignmentEntityStatusValue.choices()]
+    if assignment_entity_status is None:
+        return steps
+
+    from app.services.assignment_workflow_service import review_enabled
+
+    current = _assignment_entity_status_value(assignment_entity_status)
+
+    if not review_enabled(assignment_entity_status):
+        steps = [
+            step
+            for step in steps
+            if step != AssignmentEntityStatusValue.sent_for_review.value
+        ]
+
+    revision_value = AssignmentEntityStatusValue.requires_revision.value
+    in_progress_value = AssignmentEntityStatusValue.in_progress.value
+
+    if current == revision_value:
+        steps = [step for step in steps if step != in_progress_value]
+    else:
+        steps = [step for step in steps if step != revision_value]
+
+    return steps
+
+
 @bp.app_template_global()
 def localize_status(status):
     """Jinja helper to localize assignment status strings."""
@@ -1036,6 +1076,7 @@ def localize_status(status):
         'submitted': _('Submitted'),
         'approved': _('Approved'),
         'requires_revision': _('Requires Revision'),
+        'sent_for_review': _('Sent for Review'),
         'rejected': _('Rejected'),
         'closed': _('Closed'),
     }
@@ -1163,6 +1204,8 @@ def render_activity_summary(activity):
     messages = {
         'activity.assignment_created': babel_("Assignment created: %(template)s"),
         'activity.assignment_submitted': babel_("Assignment submitted: %(template)s"),
+        'activity.assignment_sent_for_review': babel_("Assignment sent for review: %(template)s"),
+        'activity.assignment_returned_for_revision': babel_("Assignment returned for revision: %(template)s"),
         'activity.assignment_approved': babel_("Assignment approved: %(template)s"),
         'activity.assignment_reopened': babel_("Assignment reopened: %(template)s"),
         'activity.document_uploaded': babel_("Document uploaded: %(document)s"),

@@ -205,14 +205,18 @@
         const editStatusModalStatusSelect = document.getElementById('status');
         const editStatusModalDueDateInput = document.getElementById('due_date');
 
-        const allModals = document.querySelectorAll('.fixed.inset-0.z-50');
+        const allModals = document.querySelectorAll('[role="dialog"]');
         const closeModalButtons = document.querySelectorAll('.close-modal');
 
         function openModal(modalElement) { if(modalElement) modalElement.classList.remove('hidden'); }
         function closeModal(modalElement) { if(modalElement) modalElement.classList.add('hidden'); }
 
-        closeModalButtons.forEach(btn => btn.addEventListener('click', function() { closeModal(this.closest('.fixed.inset-0.z-50')); }));
-        window.addEventListener('click', e => { allModals.forEach(modal => { if (e.target == modal) closeModal(modal); }); });
+        closeModalButtons.forEach(btn => btn.addEventListener('click', function() {
+            closeModal(this.closest('[role="dialog"]'));
+        }));
+        window.addEventListener('click', e => {
+            allModals.forEach(modal => { if (e.target === modal) closeModal(modal); });
+        });
 
         // --- Edit Entity Status Button Click Handler (using event delegation) ---
         // Use event delegation so it works with AG Grid
@@ -295,15 +299,31 @@
         })();
 
         const hasPublicColumn = cfg.hasPublicUrl;
+        const statusChoices = cfg.statusChoices || [];
 
-        // Helper function to render status badge
-        function renderStatusBadge(status) {
+        function getStatusDisplayLabel(status) {
+            const match = statusChoices.find(function(c) { return c.value === status; });
+            if (match) return match.label;
+            return String(status || '')
+                .replace(/_/g, ' ')
+                .trim()
+                .replace(/\s+/g, ' ')
+                .replace(/\b\w/g, function(chr) { return chr.toUpperCase(); });
+        }
+
+        function getStatusBadgeClasses(status) {
             const statusLower = (status || '').toLowerCase().replace(/_/g, ' ');
             let bgClass = 'bg-gray-100';
             let textClass = 'text-gray-800';
             if (statusLower === 'completed' || statusLower === 'submitted' || statusLower === 'approved') {
                 bgClass = 'bg-green-100';
                 textClass = 'text-green-800';
+            } else if (statusLower === 'sent for review') {
+                bgClass = 'bg-purple-100';
+                textClass = 'text-purple-800';
+            } else if (statusLower === 'requires revision') {
+                bgClass = 'bg-orange-100';
+                textClass = 'text-orange-800';
             } else if (statusLower === 'in progress') {
                 bgClass = 'bg-yellow-100';
                 textClass = 'text-yellow-800';
@@ -311,13 +331,234 @@
                 bgClass = 'bg-blue-100';
                 textClass = 'text-blue-800';
             }
-            const statusTitle = String(status || '')
-                .replace(/_/g, ' ')
-                .trim()
-                .replace(/\s+/g, ' ')
-                .replace(/\b\w/g, function(chr) { return chr.toUpperCase(); });
-            return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + ' ' + textClass + '">' + statusTitle + '</span>';
+            return { bgClass: bgClass, textClass: textClass };
         }
+
+        function applyStatusChip(chipBtn, status) {
+            if (!chipBtn) return;
+            const classes = getStatusBadgeClasses(status);
+            chipBtn.classList.remove('entity-status-chip--loading');
+            chipBtn.removeAttribute('aria-busy');
+            chipBtn.className = 'entity-status-chip inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold leading-5 border-0 ' +
+                classes.bgClass + ' ' + classes.textClass;
+            chipBtn.dataset.status = status || '';
+            chipBtn.setAttribute('aria-label', 'Change status: ' + getStatusDisplayLabel(status));
+            chipBtn.setAttribute('aria-haspopup', 'listbox');
+            while (chipBtn.firstChild) chipBtn.removeChild(chipBtn.firstChild);
+            const label = document.createElement('span');
+            label.className = 'entity-status-chip-label';
+            label.textContent = getStatusDisplayLabel(status);
+            const caret = document.createElement('i');
+            caret.className = 'fas fa-caret-down entity-status-chip-caret';
+            caret.setAttribute('aria-hidden', 'true');
+            chipBtn.appendChild(label);
+            chipBtn.appendChild(caret);
+        }
+
+        function setStatusChipLoading(chipBtn) {
+            if (!chipBtn) return;
+            const status = chipBtn.dataset.status || '';
+            const classes = getStatusBadgeClasses(status);
+            chipBtn.disabled = true;
+            chipBtn.classList.add('entity-status-chip--loading');
+            chipBtn.setAttribute('aria-busy', 'true');
+            chipBtn.setAttribute('aria-label', 'Saving status');
+            chipBtn.removeAttribute('aria-haspopup');
+            chipBtn.className = 'entity-status-chip inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold leading-5 border-0 ' +
+                classes.bgClass + ' ' + classes.textClass;
+            while (chipBtn.firstChild) chipBtn.removeChild(chipBtn.firstChild);
+            const spinner = document.createElement('i');
+            spinner.className = 'fas fa-spinner fa-spin entity-status-chip-spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+            chipBtn.appendChild(spinner);
+        }
+
+        function buildStatusMenuPill(statusValue, labelText) {
+            const classes = getStatusBadgeClasses(statusValue);
+            const pill = document.createElement('span');
+            pill.className = 'entity-status-menu-pill inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ' +
+                classes.bgClass + ' ' + classes.textClass;
+            pill.textContent = labelText;
+            return pill;
+        }
+
+        let entityStatusMenuEl = null;
+        let entityStatusMenuAnchor = null;
+        let entityStatusMenuRenderer = null;
+        let entityStatusMenuListenersBound = false;
+
+        function closeEntityStatusMenu() {
+            if (entityStatusMenuEl) entityStatusMenuEl.classList.add('hidden');
+            if (entityStatusMenuAnchor) entityStatusMenuAnchor.setAttribute('aria-expanded', 'false');
+            entityStatusMenuAnchor = null;
+            entityStatusMenuRenderer = null;
+        }
+
+        function ensureEntityStatusMenu() {
+            if (entityStatusMenuEl) return entityStatusMenuEl;
+            entityStatusMenuEl = document.createElement('div');
+            entityStatusMenuEl.id = 'entity-status-menu';
+            entityStatusMenuEl.className = 'entity-status-menu hidden';
+            entityStatusMenuEl.setAttribute('role', 'listbox');
+            document.body.appendChild(entityStatusMenuEl);
+
+            if (!entityStatusMenuListenersBound) {
+                entityStatusMenuListenersBound = true;
+                document.addEventListener('click', function(e) {
+                    if (!entityStatusMenuEl || entityStatusMenuEl.classList.contains('hidden')) return;
+                    if (entityStatusMenuEl.contains(e.target)) return;
+                    if (e.target.closest && e.target.closest('.entity-status-chip')) return;
+                    closeEntityStatusMenu();
+                });
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') closeEntityStatusMenu();
+                });
+                window.addEventListener('resize', closeEntityStatusMenu);
+                document.addEventListener('scroll', closeEntityStatusMenu, true);
+            }
+            return entityStatusMenuEl;
+        }
+
+        function positionEntityStatusMenu(anchorEl) {
+            const menu = entityStatusMenuEl;
+            if (!menu || !anchorEl) return;
+            const rect = anchorEl.getBoundingClientRect();
+            const gap = 4;
+            let left = rect.left;
+            menu.classList.remove('hidden');
+            menu.style.left = left + 'px';
+            menu.style.top = (rect.bottom + gap) + 'px';
+            let menuRect = menu.getBoundingClientRect();
+            if (menuRect.bottom > window.innerHeight - 8) {
+                menu.style.top = Math.max(8, rect.top - menuRect.height - gap) + 'px';
+                menuRect = menu.getBoundingClientRect();
+            }
+            if (menuRect.right > window.innerWidth - 8) {
+                left = Math.max(8, window.innerWidth - menuRect.width - 8);
+                menu.style.left = left + 'px';
+            }
+        }
+
+        function openEntityStatusMenu(chipBtn, renderer, params) {
+            if (entityStatusMenuAnchor === chipBtn && entityStatusMenuEl && !entityStatusMenuEl.classList.contains('hidden')) {
+                closeEntityStatusMenu();
+                return;
+            }
+            closeEntityStatusMenu();
+            const menu = ensureEntityStatusMenu();
+            while (menu.firstChild) menu.removeChild(menu.firstChild);
+
+            const current = params.value || '';
+            const choices = statusChoices.slice();
+            if (current && !choices.some(function(c) { return c.value === current; })) {
+                choices.unshift({ value: current, label: getStatusDisplayLabel(current) });
+            }
+
+            choices.forEach(function(choice) {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'entity-status-menu-item';
+                item.setAttribute('role', 'option');
+                if (choice.value === current) item.setAttribute('aria-selected', 'true');
+                item.appendChild(buildStatusMenuPill(choice.value, choice.label));
+                item.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    closeEntityStatusMenu();
+                    const newStatus = choice.value;
+                    const oldStatus = (params.data && params.data.status) || params.value || '';
+                    if (newStatus === oldStatus) return;
+                    updateEntityStatusInline(params.data && params.data.id, newStatus, chipBtn, oldStatus, params, renderer);
+                });
+                menu.appendChild(item);
+            });
+
+            entityStatusMenuAnchor = chipBtn;
+            entityStatusMenuRenderer = renderer;
+            chipBtn.setAttribute('aria-expanded', 'true');
+            positionEntityStatusMenu(chipBtn);
+        }
+
+        function updateEntityStatusInline(statusId, newStatus, chipBtn, previousStatus, params, renderer) {
+            const url = cfg.urls && cfg.urls.assignmentBulkUpdateStatus;
+            const numericId = Number(statusId);
+            if (!url || !numericId) {
+                applyStatusChip(chipBtn, previousStatus);
+                return;
+            }
+            setStatusChipLoading(chipBtn);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRFToken': csrfToken || '',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ status_ids: [numericId], status: newStatus })
+            })
+                .then(function(res) {
+                    return res.json()
+                        .then(function(data) { return { ok: res.ok, data: data }; })
+                        .catch(function() {
+                            return { ok: false, data: { error: res.status === 404 ? 'Not found.' : 'Invalid server response.' } };
+                        });
+                })
+                .then(function(result) {
+                    if (result.ok && result.data && result.data.success && result.data.updated > 0) {
+                        if (params && params.data) params.data.status = newStatus;
+                        if (renderer) {
+                            renderer.params = params;
+                            applyStatusChip(chipBtn, newStatus);
+                        }
+                    } else {
+                        if (params && params.data) params.data.status = previousStatus;
+                        if (renderer) applyStatusChip(chipBtn, previousStatus);
+                        var m = (result.data && (result.data.error || result.data.message)) ||
+                            (result.data && result.data.updated === 0 ? 'Entity assignment not found.' : null) ||
+                            'Failed to update status.';
+                        if (window.showAlert) window.showAlert(m, 'error');
+                    }
+                })
+                .catch(function() {
+                    if (params && params.data) params.data.status = previousStatus;
+                    if (renderer) applyStatusChip(chipBtn, previousStatus);
+                    if (window.showAlert) window.showAlert('Request failed.', 'error');
+                })
+                .finally(function() {
+                    chipBtn.disabled = false;
+                });
+        }
+
+        function StatusDropdownCellRenderer() {}
+        StatusDropdownCellRenderer.prototype.init = function(params) {
+            const self = this;
+            const chipBtn = document.createElement('button');
+            chipBtn.type = 'button';
+            applyStatusChip(chipBtn, params.value || '');
+
+            const stopGrid = function(e) { e.stopPropagation(); };
+            chipBtn.addEventListener('click', function(e) {
+                stopGrid(e);
+                if (chipBtn.disabled) return;
+                openEntityStatusMenu(chipBtn, self, params);
+            });
+            chipBtn.addEventListener('mousedown', stopGrid);
+
+            this.eGui = chipBtn;
+            this.chipBtn = chipBtn;
+            this.params = params;
+        };
+        StatusDropdownCellRenderer.prototype.getGui = function() { return this.eGui; };
+        StatusDropdownCellRenderer.prototype.refresh = function(params) {
+            this.params = params;
+            applyStatusChip(this.chipBtn, params.value || '');
+            if (entityStatusMenuAnchor === this.chipBtn) closeEntityStatusMenu();
+            return true;
+        };
+        StatusDropdownCellRenderer.prototype.destroy = function() {
+            if (entityStatusMenuAnchor === this.chipBtn) closeEntityStatusMenu();
+        };
 
         // Helper function to render public reporting badge
         function renderPublicBadge(isAvailable) {
@@ -354,13 +595,20 @@
             {
                 field: 'status',
                 headerName: 'Assignment Status',
-                width: 180,
-                minWidth: 150,
-                maxWidth: 250,
+                width: 200,
+                minWidth: 170,
+                maxWidth: 280,
                 filter: 'customSetFilter',
                 sortable: true,
-                cellRenderer: function(params) {
-                    return renderStatusBadge(params.value);
+                cellRenderer: StatusDropdownCellRenderer,
+                valueFormatter: function(params) {
+                    const match = statusChoices.find(function(c) { return c.value === params.value; });
+                    if (match) return match.label;
+                    return String(params.value || '').replace(/_/g, ' ').replace(/\b\w/g, function(chr) { return chr.toUpperCase(); });
+                },
+                filterValueGetter: function(params) {
+                    const match = statusChoices.find(function(c) { return c.value === params.data.status; });
+                    return match ? match.label : params.data.status;
                 }
             },
             {

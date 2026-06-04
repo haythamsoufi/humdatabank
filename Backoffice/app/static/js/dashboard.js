@@ -40,6 +40,131 @@ function sanitizeTextContent(text) {
                });
 }
 
+const DASHBOARD_CARD_ACTIONS_OVERFLOW_BTN_WIDTH = 40;
+
+function closeDashboardCardActionsOverflowMenus(exceptMenu) {
+    document.querySelectorAll('.dashboard-card-actions-overflow-menu').forEach((menu) => {
+        if (menu === exceptMenu) {
+            return;
+        }
+        menu.classList.add('hidden');
+        const toggle = menu.closest('.dashboard-card-actions-overflow')
+            ?.querySelector('.dashboard-card-actions-overflow-btn');
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+}
+
+function markDashboardCardActionsLayoutReady(container) {
+    container.setAttribute('data-actions-layout-ready', '');
+}
+
+function layoutDashboardCardActions(container) {
+    const bar = container.querySelector('.dashboard-card-actions-bar');
+    const inline = container.querySelector('.dashboard-card-actions-inline');
+    const overflowWrap = container.querySelector('.dashboard-card-actions-overflow');
+    const overflowMenu = container.querySelector('.dashboard-card-actions-overflow-menu');
+
+    if (!bar || !inline || !overflowWrap || !overflowMenu) {
+        markDashboardCardActionsLayoutReady(container);
+        return;
+    }
+
+    while (overflowMenu.firstElementChild) {
+        inline.appendChild(overflowMenu.firstElementChild);
+    }
+    overflowWrap.classList.add('hidden');
+    overflowMenu.classList.add('hidden');
+    const overflowBtn = overflowWrap.querySelector('.dashboard-card-actions-overflow-btn');
+    if (overflowBtn) {
+        overflowBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (inline.children.length) {
+        const needsOverflow = () => {
+            const reserved = overflowWrap.classList.contains('hidden')
+                ? 0
+                : DASHBOARD_CARD_ACTIONS_OVERFLOW_BTN_WIDTH;
+            return inline.scrollWidth > bar.clientWidth - reserved;
+        };
+
+        while (needsOverflow() && inline.lastElementChild) {
+            overflowMenu.insertBefore(inline.lastElementChild, overflowMenu.firstElementChild);
+            overflowWrap.classList.remove('hidden');
+        }
+    }
+
+    markDashboardCardActionsLayoutReady(container);
+}
+
+let dashboardCardActionsOverflowListenersBound = false;
+
+function initializeDashboardCardActionsOverflow() {
+    const containers = document.querySelectorAll('[data-dashboard-card-actions]');
+    if (!containers.length) {
+        return;
+    }
+
+    const relayoutAll = () => {
+        containers.forEach((container) => layoutDashboardCardActions(container));
+    };
+
+    relayoutAll();
+
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(relayoutAll).catch(() => {});
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(relayoutAll);
+        containers.forEach((container) => observer.observe(container));
+    } else {
+        window.addEventListener('resize', relayoutAll);
+    }
+
+    if (dashboardCardActionsOverflowListenersBound) {
+        return;
+    }
+    dashboardCardActionsOverflowListenersBound = true;
+
+    document.addEventListener('click', (event) => {
+        const toggle = event.target.closest('.dashboard-card-actions-overflow-btn');
+        if (toggle) {
+            event.stopPropagation();
+            const wrap = toggle.closest('.dashboard-card-actions-overflow');
+            const menu = wrap?.querySelector('.dashboard-card-actions-overflow-menu');
+            if (!menu) {
+                return;
+            }
+            const isOpen = !menu.classList.contains('hidden');
+            closeDashboardCardActionsOverflowMenus(isOpen ? null : menu);
+            if (isOpen) {
+                menu.classList.add('hidden');
+                toggle.setAttribute('aria-expanded', 'false');
+            } else {
+                menu.classList.remove('hidden');
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+            return;
+        }
+
+        if (!event.target.closest('.dashboard-card-actions-overflow')) {
+            closeDashboardCardActionsOverflowMenus();
+        }
+    });
+}
+
+function bootDashboardCardActionsOverflow() {
+    initializeDashboardCardActionsOverflow();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootDashboardCardActionsOverflow);
+} else {
+    bootDashboardCardActionsOverflow();
+}
+
 // Set background colors for profile avatars from data attributes
 document.addEventListener('DOMContentLoaded', function() {
     const avatars = document.querySelectorAll('[data-bg-color]');
@@ -507,6 +632,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle submission dropdown menus
     document.addEventListener('click', function(event) {
+        if (!event.target.closest('.dashboard-card-actions-overflow')) {
+            closeDashboardCardActionsOverflowMenus();
+        }
+
         // Close all dropdowns when clicking outside
         if (!event.target.closest('.relative.inline-block.text-left')) {
             document.querySelectorAll('[id^="submission-dropdown-menu-"]').forEach(menu => {

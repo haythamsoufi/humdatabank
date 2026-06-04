@@ -55,6 +55,9 @@ class AssignedForm(db.Model):
     unique_token = Column(String(36), unique=True, nullable=True)  # UUID for public URL
     is_public_active = Column(Boolean, default=False, nullable=False)  # Public URL status
 
+    # When true, non-org focal points must use sent_for_review before upstream submit
+    requires_delegation_review = Column(Boolean, default=False, nullable=False)
+
     # Data ownership governance
     data_owner_id = Column(Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
 
@@ -236,10 +239,15 @@ class AssignmentEntityStatus(db.Model):
     # Separate timestamp for when the form was submitted (status_timestamp is overwritten on approval)
     submitted_at = db.Column(db.DateTime, nullable=True)
 
+    # NS review workflow accountability
+    sent_for_review_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    sent_for_review_at = db.Column(db.DateTime, nullable=True)
+
     # Relationships
     assigned_form = relationship('AssignedForm', backref=db.backref('entity_statuses', lazy='dynamic', cascade="all, delete-orphan"))
     submitted_by_user = db.relationship('User', foreign_keys=[submitted_by_user_id])
     approved_by_user = db.relationship('User', foreign_keys=[approved_by_user_id])
+    sent_for_review_by_user = db.relationship('User', foreign_keys=[sent_for_review_by_user_id])
 
     # Relationship to FormData
     data_entries = relationship('FormData', lazy='dynamic', cascade="all, delete-orphan", foreign_keys='FormData.assignment_entity_status_id')
@@ -258,6 +266,8 @@ class AssignmentEntityStatus(db.Model):
         db.Index('ix_aes_submitted_by', 'submitted_by_user_id'),
         db.Index('ix_aes_approved_by', 'approved_by_user_id'),
         db.Index('ix_aes_submitted_at', 'submitted_at'),
+        db.Index('ix_aes_sent_for_review_by', 'sent_for_review_by_user_id'),
+        db.Index('ix_aes_sent_for_review_at', 'sent_for_review_at'),
     )
 
     @property

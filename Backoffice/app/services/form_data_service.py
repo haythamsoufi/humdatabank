@@ -249,19 +249,70 @@ class FormDataService:
             logger.debug(f"FormDataService: Committed changes, action: {action}")
 
             # Handle submission vs save
-            if action == 'submit':
-                logger.debug("FormDataService: Processing submit action")
+            effective_action = action
+            if not is_public_submission:
+                from flask_login import current_user as _cu
+                from app.services.assignment_workflow_service import (
+                    resolve_submit_action,
+                    should_apply_sent_for_review,
+                )
+                effective_action = resolve_submit_action(
+                    assignment_entity_status, _cu, action or 'save'
+                )
+
+            if effective_action in ('submit', 'send_for_review'):
+                logger.debug("FormDataService: Processing %s action", effective_action)
                 validation_result = cls._validate_for_submission(
                     all_sections, assignment_entity_status
                 )
                 if validation_result['is_valid']:
-                    assignment_entity_status.status = AssignmentEntityStatusValue.submitted
                     now = utcnow()
+                    from flask_login import current_user as _cu
+                    from app.services.assignment_workflow_service import should_apply_sent_for_review
+
+                    if (
+                        not is_public_submission
+                        and should_apply_sent_for_review(
+                            assignment_entity_status, _cu, effective_action
+                        )
+                    ):
+                        from app.services.authorization_service import AuthorizationService
+
+                        if not AuthorizationService.can_send_for_review(
+                            assignment_entity_status, _cu
+                        ):
+                            return {
+                                'success': False,
+                                'field_changes': field_changes_tracker,
+                                'validation_errors': [
+                                    'You do not have permission to send this assignment for review.'
+                                ],
+                                'submitted': False,
+                            }
+
+                        assignment_entity_status.status = AssignmentEntityStatusValue.sent_for_review
+                        assignment_entity_status.status_timestamp = now
+                        assignment_entity_status.sent_for_review_at = now
+                        try:
+                            if _cu and _cu.is_authenticated:
+                                assignment_entity_status.sent_for_review_by_user_id = _cu.id
+                        except Exception as e:
+                            current_app.logger.debug(
+                                "sent_for_review_by_user_id assignment failed: %s", e
+                            )
+                        cls._commit_or_flush()
+                        return {
+                            'success': True,
+                            'field_changes': field_changes_tracker,
+                            'validation_errors': [],
+                            'submitted': False,
+                            'sent_for_review': True,
+                        }
+
+                    assignment_entity_status.status = AssignmentEntityStatusValue.submitted
                     assignment_entity_status.status_timestamp = now
                     assignment_entity_status.submitted_at = now
-                    # Record who submitted (governance accountability)
                     try:
-                        from flask_login import current_user as _cu
                         if _cu and _cu.is_authenticated:
                             assignment_entity_status.submitted_by_user_id = _cu.id
                     except Exception as e:
@@ -271,7 +322,7 @@ class FormDataService:
                         'success': True,
                         'field_changes': field_changes_tracker,
                         'validation_errors': [],
-                        'submitted': True
+                        'submitted': True,
                     }
                     logger.debug(f"FormDataService: Returning submit result: {result}")
                     return result

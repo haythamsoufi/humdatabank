@@ -29,7 +29,8 @@ class TestAdminSmoke:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data.get("status") == "success"
-        assert "data" in data and "database_healthy" in data["data"]
+        assert data.get("success") is True
+        assert "database_healthy" in data
 
         resp = logged_in_client.get("/admin/api/users")
         assert resp.status_code == 200

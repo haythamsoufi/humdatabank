@@ -28,9 +28,9 @@ def test_endpoint_path_prefix_strips_flask_variables():
     assert endpoint_path_prefix('/api/v1/data/{template_id}') == '/api/v1/data/'
 
 
-def test_bulk_endpoint_usage_stats_aggregates_by_prefix(app, db):
+def test_bulk_endpoint_usage_stats_aggregates_by_prefix(app, db_session):
     now = utcnow()
-    db.session.add_all([
+    db_session.add_all([
         APIUsage(
             api_endpoint='/api/v1/data',
             ip_address='127.0.0.1',
@@ -56,11 +56,11 @@ def test_bulk_endpoint_usage_stats_aggregates_by_prefix(app, db):
             timestamp=now,
         ),
     ])
-    db.session.commit()
+    db_session.commit()
 
-    stats = bulk_endpoint_usage_stats(['/api/v1/data/', '/api/v1/templates'])
-    assert stats['/api/v1/data/']['total_requests'] == 2
-    assert stats['/api/v1/data/']['success_rate'] == 50.0
+    stats = bulk_endpoint_usage_stats(['/api/v1/data', '/api/v1/templates'])
+    assert stats['/api/v1/data']['total_requests'] == 2
+    assert stats['/api/v1/data']['success_rate'] == 50.0
     assert stats['/api/v1/templates']['total_requests'] == 1
 
 
@@ -71,9 +71,9 @@ def test_subtract_months_handles_year_boundary():
     assert shifted.year == dt.year - 1
 
 
-def test_chart_stats_for_period_quarterly_returns_90_days(app, db):
+def test_chart_stats_for_period_quarterly_returns_90_days(app, db_session):
     now = utcnow()
-    db.session.add(
+    db_session.add(
         APIUsage(
             api_endpoint='/api/v1/data',
             ip_address='127.0.0.1',
@@ -83,7 +83,7 @@ def test_chart_stats_for_period_quarterly_returns_90_days(app, db):
             timestamp=now - timedelta(days=10),
         )
     )
-    db.session.commit()
+    db_session.commit()
 
     from app.models.api_usage import APIUsage as UsageModel
     base_query = UsageModel.query.filter(UsageModel.api_endpoint.like('/api/%'))

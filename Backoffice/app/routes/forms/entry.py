@@ -26,7 +26,11 @@ from app.services.entity_service import EntityService
 from app.services.form_data_service import FormDataService
 from app.services.form_processing_service import get_form_items_for_section, slugify_age_group
 from app.services.monitoring.debug import debug_manager, performance_monitor
-from app.services.notification.core import log_entity_activity, notify_assignment_submitted
+from app.services.notification.core import (
+    log_entity_activity,
+    notify_assignment_sent_for_review,
+    notify_assignment_submitted,
+)
 from app.services.template_preparation_service import TemplatePreparationService
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
@@ -129,6 +133,19 @@ def handle_assignment_form(aes_id):
         return redirect(url_for("main.dashboard"))
 
     can_edit = AuthorizationService.can_edit_assignment(assignment_entity_status, current_user)
+    from app.services.assignment_workflow_service import is_delegation_user, review_enabled
+
+    review_enabled_flag = review_enabled(assignment_entity_status)
+    is_delegation_user_flag = is_delegation_user(current_user)
+    can_send_for_review_flag = AuthorizationService.can_send_for_review(
+        assignment_entity_status, current_user
+    )
+    can_finalize_submit_flag = AuthorizationService.can_submit_assignment(
+        assignment_entity_status, current_user
+    )
+    can_return_for_revision_flag = AuthorizationService.can_return_for_revision(
+        assignment_entity_status, current_user
+    )
     form_template = assignment.template
 
     template, all_sections, available_indicators_by_section = TemplatePreparationService.prepare_template_for_rendering(
@@ -820,14 +837,25 @@ def handle_assignment_form(aes_id):
                     except Exception as e:
                         current_app.logger.error(f"Error logging grouped activity: {e}", exc_info=True)
 
+                if submission_result.get('sent_for_review'):
+                    notify_assignment_sent_for_review(assignment_entity_status)
+                    flash(_("Assignment sent for review successfully."), "success")
+                    is_ajax = is_json_request()
+                    if is_ajax:
+                        return json_ok(
+                            message=_("Assignment sent for review successfully."),
+                            redirect_url=url_for("main.dashboard"),
+                        )
+                    return redirect(url_for("main.dashboard"))
+
                 if submission_result.get('submitted'):
                     notify_assignment_submitted(assignment_entity_status)
-                    flash("Assignment submitted successfully!", "success")
+                    flash(_("Assignment submitted successfully!"), "success")
 
                     is_ajax = is_json_request()
                     if is_ajax:
                         return json_ok(
-                            message="Assignment submitted successfully!",
+                            message=_("Assignment submitted successfully!"),
                             redirect_url=url_for("main.dashboard")
                         )
                     else:
@@ -940,6 +968,11 @@ def handle_assignment_form(aes_id):
         entity_repo_document_ids=entity_repo_document_ids,
         documents_library_url=documents_library_url,
         can_edit=can_edit,
+        review_enabled=review_enabled_flag,
+        is_delegation_user=is_delegation_user_flag,
+        can_send_for_review=can_send_for_review_flag,
+        can_finalize_submit=can_finalize_submit_flag,
+        can_return_for_revision=can_return_for_revision_flag,
         csrf_form=csrf_form,
         sex_categories=SEX_CATEGORIES,
         form_type="assignment",

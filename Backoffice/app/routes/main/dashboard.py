@@ -442,7 +442,10 @@ def dashboard():
                 AssignmentEntityStatus.query
                 .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id)
                 .options(
-                    db.joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template)
+                    db.joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template),
+                    db.joinedload(AssignmentEntityStatus.submitted_by_user),
+                    db.joinedload(AssignmentEntityStatus.approved_by_user),
+                    db.joinedload(AssignmentEntityStatus.sent_for_review_by_user),
                 )
                 .filter(
                     AssignmentEntityStatus.entity_type == selected_entity_type,
@@ -702,6 +705,8 @@ def dashboard():
                     'submitted_by_user': aes.submitted_by_user,
                     'approved_by_user': aes.approved_by_user,
                     'submitted_at': aes.submitted_at,
+                    'sent_for_review_by_user': aes.sent_for_review_by_user,
+                    'sent_for_review_at': aes.sent_for_review_at,
                 })
 
 
@@ -874,8 +879,8 @@ def dashboard():
                     except (AttributeError, TypeError):
                         pass
                     # For assigned forms, check if they should be in past submissions
-                    if item['status'] == 'requires_revision':
-                        past_assignments.append(item)
+                    if item['status'] in ('requires_revision', 'sent_for_review', 'submitted'):
+                        current_assignments.append(item)
                     elif item['status'] in ('approved', 'pending', 'in_progress'):
                         # Ensure status_timestamp is timezone-aware for comparison
                         status_ts = item.get('status_timestamp')
@@ -1066,6 +1071,7 @@ def dashboard():
                        pending_access_requests=pending_access_requests,
                        all_access_requests=all_access_requests,
                        can_request_multiple_countries=can_request_multiple_countries,
+                       is_delegation_user=is_organization_email(getattr(current_user, 'email', '')),
                        non_org_has_counting_request=non_org_has_counting_request,
                        enabled_entity_types=enabled_entity_groups,
                        get_localized_country_name=get_localized_country_name,

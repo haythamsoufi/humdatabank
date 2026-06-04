@@ -939,9 +939,10 @@ def get_dashboard():
                     past_assignments.append(assignment_data)
                     continue
 
-                if aes.status == 'requires_revision':
-                    past_assignments.append(assignment_data)
-                elif aes.status in ('approved', 'pending', 'in_progress'):
+                status_val = aes.status.value if hasattr(aes.status, 'value') else aes.status
+                if status_val in ('requires_revision', 'sent_for_review', 'submitted'):
+                    current_assignments.append(assignment_data)
+                elif status_val in ('approved', 'pending', 'in_progress'):
                     status_ts_utc = (
                         ensure_utc(aes.status_timestamp) if aes.status_timestamp else None
                     )

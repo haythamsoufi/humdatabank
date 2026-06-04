@@ -19,8 +19,11 @@ def test_plugin_entry_templates_render_smoke(app):
     field_id = "test123"
 
     active_field_types = plugin_manager.list_active_field_types()
-    if not active_field_types:
-        pytest.skip("No active plugin field types registered in this environment")
+    assert active_field_types, (
+        "No active plugin field types registered: "
+        f"plugins={list(plugin_manager.plugins.keys())}, "
+        f"active={list(plugin_manager.active_plugins)}"
+    )
 
     for field_type in active_field_types:
         cfg = plugin_manager.get_field_type_config(field_type) or {}

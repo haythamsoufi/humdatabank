@@ -132,6 +132,49 @@ def approve_assignment(aes_id):
     else:
          return redirect(url_for("main.dashboard"))
 
+
+@bp.route("/return_assignment_for_revision/<int:aes_id>", methods=["POST"])
+@login_required
+def return_assignment_for_revision(aes_id):
+    """Delegation returns a sent-for-review assignment to NS focal points for changes."""
+    from app.services.authorization_service import AuthorizationService
+    from app.services.notification.core import notify_assignment_returned_for_revision
+
+    assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
+
+    if not AuthorizationService.can_return_for_revision(assignment_entity_status, current_user):
+        flash(_("You do not have permission to return this assignment for revision."), "danger")
+        return redirect(url_for("main.dashboard"))
+
+    form = ReopenAssignmentForm()
+    if not form.validate_on_submit():
+        flash(_("Invalid request. Please try again."), "danger")
+        return redirect(url_for("main.dashboard"))
+
+    try:
+        assignment_entity_status.status = AssignmentEntityStatusValue.requires_revision
+        assignment_entity_status.status_timestamp = utcnow()
+        db.session.flush()
+        try:
+            notify_assignment_returned_for_revision(assignment_entity_status)
+        except Exception as e:
+            current_app.logger.error(
+                "Error sending assignment returned for revision notification: %s", e, exc_info=True
+            )
+        flash(_("Assignment returned to the National Society for changes."), "success")
+    except Exception as e:
+        request_transaction_rollback()
+        flash(_("Error returning assignment for revision."), "danger")
+        current_app.logger.error(
+            "Error returning assignment %s for revision: %s", aes_id, e, exc_info=True
+        )
+
+    selected_country_id = session.get(SELECTED_COUNTRY_ID_SESSION_KEY)
+    if selected_country_id:
+        return redirect(url_for("main.dashboard", country_id=selected_country_id))
+    return redirect(url_for("main.dashboard"))
+
+
 @bp.route("/request_country_access", methods=["POST"])
 @login_required
 def request_country_access():

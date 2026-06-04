@@ -231,6 +231,27 @@
                 </div>
                 <span class="ml-2 text-xs text-gray-500">{{ _('Focal points will be notified about the new assignment. Uncheck to create without sending notifications.') }}</span>
             </div>
+            {% if form.requires_delegation_review is defined %}
+            <div class="flex items-start pt-2 border-t border-gray-200">
+                <div class="flex items-center">
+                    {{ form.requires_delegation_review(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                    {{ form.requires_delegation_review.label(class="ml-2 text-sm text-gray-700") }}
+                </div>
+                <span class="ml-2 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if assignment and form.requires_delegation_review is defined %}
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div class="flex items-start">
+                <div class="flex items-center">
+                    {{ form.requires_delegation_review(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                    {{ form.requires_delegation_review.label(class="ml-2 text-sm text-gray-700") }}
+                </div>
+                <span class="ml-2 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</span>
+            </div>
         </div>
         {% endif %}
 
@@ -696,7 +717,12 @@
 
             <div class="mb-4">
                  {{ edit_aes_form.status.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-                 {{ edit_aes_form.status(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                 <select name="status" id="status"
+                         class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                     {% for value, label in assignment_entity_status_choices %}
+                     <option value="{{ value }}">{{ _(label) }}</option>
+                     {% endfor %}
+                 </select>
                  {% for error in edit_aes_form.status.errors %}
                      <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                  {% endfor %}
@@ -725,11 +751,9 @@
         <label for="bulk-status-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('New status') }}</label>
         <select id="bulk-status-select" name="status" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
             <option value="">{{ _('Select status') }}</option>
-            <option value="pending">{{ _('Pending') }}</option>
-            <option value="in_progress">{{ _('in_progress') }}</option>
-            <option value="submitted">{{ _('Submitted') }}</option>
-            <option value="approved">{{ _('Approved') }}</option>
-            <option value="Completed">{{ _('Completed') }}</option>
+            {% for value, label in assignment_entity_status_choices %}
+            <option value="{{ value }}">{{ _(label) }}</option>
+            {% endfor %}
         </select>
     </div>
     <div class="flex justify-end space-x-3">
@@ -800,6 +824,13 @@
 <script nonce="{{ csp_nonce() }}">
 window.manageAssignmentConfig = {
     assignmentId: {{ assignment.id if assignment else 'null' }},
+    statusChoices: [
+        {%- if assignment and assignment_entity_status_choices is defined -%}
+        {%- for value, label in assignment_entity_status_choices -%}
+        { "value": {{ value|tojson }}, "label": {{ _(label)|tojson }} }{% if not loop.last %},{% endif %}
+        {%- endfor -%}
+        {%- endif -%}
+    ],
     isNew: {{ 'true' if not assignment else 'false' }},
     periodName: {{ (assignment.period_name if assignment and assignment.period_name else none)|tojson }},
     hasPublicUrl: {{ (assignment.has_public_url() if assignment else false)|tojson }},
@@ -902,6 +933,80 @@ window.manageAssignmentConfig = {
 #entityManagementGrid {
     width: 100%;
     height: 600px;
+}
+
+/* Status cell: single colored chip; caret opens floating menu */
+#entityManagementGrid .entity-status-chip {
+    cursor: pointer;
+    transition: filter 0.15s ease, box-shadow 0.15s ease;
+    max-width: 100%;
+    white-space: nowrap;
+}
+
+#entityManagementGrid .entity-status-chip:hover:not(:disabled) {
+    filter: brightness(0.97);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+#entityManagementGrid .entity-status-chip:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+#entityManagementGrid .entity-status-chip-caret {
+    font-size: 0.65rem;
+    line-height: 1;
+    opacity: 0.65;
+    margin-left: 0.125rem;
+}
+
+#entityManagementGrid .entity-status-chip--loading {
+    cursor: wait;
+    pointer-events: none;
+    min-width: 4.5rem;
+}
+
+#entityManagementGrid .entity-status-chip-spinner {
+    font-size: 0.75rem;
+    line-height: 1;
+    opacity: 0.85;
+}
+
+.entity-status-menu {
+    position: fixed;
+    z-index: 1100;
+    min-width: 11rem;
+    max-width: 16rem;
+    padding: 0.25rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+.entity-status-menu-item {
+    display: flex;
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+}
+
+.entity-status-menu-item:hover,
+.entity-status-menu-item:focus-visible {
+    background: #f3f4f6;
+    outline: none;
+}
+
+.entity-status-menu-item[aria-selected="true"] {
+    background: #eff6ff;
+}
+
+.entity-status-menu-pill {
+    pointer-events: none;
 }
 
 /*

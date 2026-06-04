@@ -34,7 +34,7 @@ from app.utils.form_localization import get_localized_country_name
 from app.utils.country_utils import get_countries_by_region
 from app.services.entity_service import EntityService
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, SubmitField, DateField
+from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField
 from wtforms.validators import Optional, DataRequired
 from app.utils.entity_groups import get_enabled_entity_groups
 
@@ -81,6 +81,10 @@ class EditAssignmentDetailsForm(FlaskForm):
         "Data Owner",
         coerce=lambda x: int(x) if x and str(x).isdigit() else None,
         validators=[Optional()],
+    )
+    requires_delegation_review = BooleanField(
+        "Require delegation review before final submission",
+        default=False,
     )
     submit = SubmitField("Update Assignment")
 
@@ -139,6 +143,7 @@ def manage_assignments():
                 'is_public_active': assignment.is_public_active if hasattr(assignment, 'is_public_active') else False,
                 'public_url': public_url,
                 'public_submission_count': public_submission_count,
+                'requires_delegation_review': bool(getattr(assignment, 'requires_delegation_review', False)),
             })
         return json_ok(assignments=assignments_data, count=len(assignments_data))
 
@@ -277,6 +282,7 @@ def new_assignment():
                 period_name=period_name,
                 expiry_date=form.expiry_date.data if form.expiry_date.data else None,
                 data_owner_id=form.data_owner_id.data or None,
+                requires_delegation_review=bool(form.requires_delegation_review.data),
                 activated_by_user_id=current_user.id,
             )
 
@@ -460,6 +466,7 @@ def edit_assignment(assignment_id):
             assignment.period_name = form.period_name.data
             assignment.expiry_date = form.expiry_date.data if form.expiry_date.data else None
             assignment.data_owner_id = form.data_owner_id.data or None
+            assignment.requires_delegation_review = bool(form.requires_delegation_review.data)
 
             # Warn if active assignment has no data owner
             if assignment.is_active and not assignment.data_owner_id:
@@ -489,6 +496,7 @@ def edit_assignment(assignment_id):
 
     # Create form for editing assignment entity status
     edit_aes_form = AssignmentEntityStatusForm()
+    assignment_entity_status_choices = AssignmentEntityStatusValue.choices()
 
     return render_template("admin/assignments/manage_assignment.html",
                          assignment=assignment,
@@ -497,6 +505,7 @@ def edit_assignment(assignment_id):
                          assignment_entities=assignment_entities,
                          countries_by_region=countries_by_region,
                          edit_aes_form=edit_aes_form,
+                         assignment_entity_status_choices=assignment_entity_status_choices,
                          get_localized_country_name=get_localized_country_name,
                          EntityService=EntityService,
                          title=f"Edit Assignment: {assignment.period_name}",
@@ -687,6 +696,9 @@ def update_entity_status(assignment_id, status_id):
         elif aes.status == AssignmentEntityStatusValue.submitted:
             aes.submitted_by_user_id = current_user.id
             aes.submitted_at = _now
+        elif aes.status == AssignmentEntityStatusValue.sent_for_review:
+            aes.sent_for_review_by_user_id = current_user.id
+            aes.sent_for_review_at = _now
 
     if due_date:
         with suppress(Exception):
@@ -750,6 +762,9 @@ def bulk_update_entity_status(assignment_id):
             elif normalized_status == AssignmentEntityStatusValue.submitted:
                 aes.submitted_by_user_id = current_user.id
                 aes.submitted_at = _now
+            elif normalized_status == AssignmentEntityStatusValue.sent_for_review:
+                aes.sent_for_review_by_user_id = current_user.id
+                aes.sent_for_review_at = _now
             if due_date_obj is not None:
                 aes.due_date = due_date_obj
             updated += 1
@@ -775,6 +790,9 @@ def edit_assignment_entity_status(aes_id):
             elif normalized_status == AssignmentEntityStatusValue.submitted:
                 aes.submitted_by_user_id = current_user.id
                 aes.submitted_at = _now
+            elif normalized_status == AssignmentEntityStatusValue.sent_for_review:
+                aes.sent_for_review_by_user_id = current_user.id
+                aes.sent_for_review_at = _now
             db.session.flush()
             flash(f"Status updated for {EntityService.get_entity_name(aes.entity_type, aes.entity_id)}.", "success")
         except Exception as e:

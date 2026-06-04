@@ -1194,46 +1194,41 @@ class TestAIReasoningTraceService:
 # ============================================================================
 
 @pytest.mark.integration
+@pytest.mark.db
 class TestAIServicesIntegration:
     """Integration tests that require a database connection."""
 
-    @pytest.fixture
-    def db_session(self, app):
-        """Get database session."""
-        from app.extensions import db
-        with app.app_context():
-            yield db.session
-
     def test_save_and_retrieve_trace(self, db_session, app):
         """Test saving and retrieving a reasoning trace."""
-        with app.app_context():
-            from app.services.ai_reasoning_trace import AIReasoningTraceService
-            from app.models import AIReasoningTrace
+        from app.extensions import db
+        from app.models import AIReasoningTrace
+        from app.models.enums import AIReasoningTraceStatusValue
+        from app.services.ai_reasoning_trace import AIReasoningTraceService
 
+        with app.app_context():
             service = AIReasoningTraceService()
 
-            try:
-                # Save trace
-                service.save_trace(
-                    query="Test query",
-                    steps=[{'step': 1, 'thought': 'thinking', 'action': 'test_action'}],
-                    final_answer="Test answer",
-                    status='completed',
-                    total_cost=0.001,
-                    user_id=None,
-                    conversation_id='test-conv-123',
-                    llm_provider='test',
-                    llm_model='test-model'
-                )
+            service.save_trace(
+                query="Test query",
+                steps=[{'step': 1, 'thought': 'thinking', 'action': 'test_action'}],
+                final_answer="Test answer",
+                status='completed',
+                total_cost=0.001,
+                user_id=None,
+                conversation_id=None,
+                llm_provider='test',
+                llm_model='test-model'
+            )
 
-                # Verify it was saved
-                trace = AIReasoningTrace.query.filter_by(conversation_id='test-conv-123').first()
-                if trace:  # Only assert if tables exist
-                    assert trace.query == "Test query"
-                    assert trace.status == 'completed'
+            trace = (
+                db.session.query(AIReasoningTrace)
+                .filter_by(final_answer="Test answer")
+                .order_by(AIReasoningTrace.id.desc())
+                .first()
+            )
+            assert trace is not None
+            assert trace.query == "Test query"
+            assert trace.status == AIReasoningTraceStatusValue.completed
 
-                    # Cleanup
-                    db_session.delete(trace)
-                    db_session.commit()
-            except Exception as e:
-                pytest.skip(f"Integration DB not available for trace test: {e}")
+            db_session.delete(trace)
+            db_session.commit()

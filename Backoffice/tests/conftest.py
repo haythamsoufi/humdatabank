@@ -79,6 +79,14 @@ def app():
     app.config['API_KEY'] = os.environ.get('API_KEY') or 'test-api-key'
     app.config['SCHEDULER_ENABLED'] = False
 
+    # Plugin manager is initialized during create_app(); ensure field types are
+    # registered even if DEBUG was True at config import time (before FLASK_CONFIG=testing).
+    plugin_manager = getattr(app, 'plugin_manager', None)
+    if plugin_manager is not None and not plugin_manager.field_types:
+        plugin_manager.load_plugins()
+        plugin_manager.register_template_loader()
+        plugin_manager.register_blueprints()
+
     with app.app_context():
         yield app
 
@@ -87,6 +95,20 @@ def app():
 def client(app):
     """Create test client."""
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def reset_site_lock_flags(app):
+    """Reset coming-soon / maintenance locks so later tests are not blocked."""
+    app.config["COMING_SOON_LOCK"] = False
+    app.config["MAINTENANCE_LOCK"] = False
+    app.config.pop("COMING_SOON_BYPASS_SECRET", None)
+    app.config.pop("MAINTENANCE_BYPASS_SECRET", None)
+    yield
+    app.config["COMING_SOON_LOCK"] = False
+    app.config["MAINTENANCE_LOCK"] = False
+    app.config.pop("COMING_SOON_BYPASS_SECRET", None)
+    app.config.pop("MAINTENANCE_BYPASS_SECRET", None)
 
 
 @pytest.fixture(autouse=True)
@@ -125,7 +147,7 @@ def db_session(app):
             User, Country, FormTemplate, FormTemplateVersion, FormSection,
             FormItem, FormData, DynamicIndicatorData, AssignedForm,
             AssignmentEntityStatus, PublicSubmission, IndicatorBank,
-            SubmittedDocument, APIKey
+            SubmittedDocument, APIKey, AIReasoningTrace,
         )
         from app.models.api_usage import APIUsage  # noqa: F401 — ensures api_usage table is created
 
@@ -400,10 +422,12 @@ def test_user(db_session, app):
 
 
 @pytest.fixture(scope='function')
-def logged_in_client(client, admin_user):
+def logged_in_client(client, admin_user, app):
     """Return a test client with logged-in admin user."""
+    with app.app_context():
+        user_id = admin_user.id
     with client.session_transaction() as sess:
-        sess['_user_id'] = str(admin_user.id)
+        sess['_user_id'] = str(user_id)
         sess['_fresh'] = True
     return client
 

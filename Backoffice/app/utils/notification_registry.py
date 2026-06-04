@@ -73,6 +73,26 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
     },
     {
         "group": "Assignments",
+        "type_key": "assignment_sent_for_review",
+        "emitter_active": True,
+        "audiences": ["focal_points"],
+        "description": (
+            "Created when a National Society focal point sends an assignment to org delegation for review."
+        ),
+        "recipients": "Organization-email focal points on the assignment entity.",
+    },
+    {
+        "group": "Assignments",
+        "type_key": "assignment_returned_for_revision",
+        "emitter_active": True,
+        "audiences": ["focal_points"],
+        "description": (
+            "Created when delegation returns a sent-for-review assignment to the National Society for changes."
+        ),
+        "recipients": "Non-organization-email focal points on the assignment entity.",
+    },
+    {
+        "group": "Assignments",
         "type_key": "self_report_created",
         "emitter_active": True,
         "audiences": ["focal_points"],

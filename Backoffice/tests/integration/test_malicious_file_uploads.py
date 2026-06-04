@@ -361,7 +361,7 @@ class TestMaliciousFileUploads:
     def test_oversized_file_rejected(self, app, setup_form_with_document_field, db_session):
         """Test that files exceeding size limits are rejected."""
         # Create a large file (exceeds 25MB default limit)
-        large_content = b'X' * (26 * 1024 * 1024)  # 26MB
+        large_content = b'%PDF-1.4\n' + (b'X' * (26 * 1024 * 1024))
         malicious_file = FileStorage(
             stream=io.BytesIO(large_content),
             filename='large_file.pdf',

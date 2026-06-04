@@ -199,11 +199,25 @@ body.overflow-hidden { overflow: hidden; }
   pointer-events: auto; /* Allow interaction when visible */
 }
 
-/* Ensure it's hidden on larger screens */
+/* Ensure it's hidden on larger screens unless forced mobile overlay is active */
 @media (min-width: 1100px) {
-  #fab-menu {
+  #fab-menu:not(.force-visible) {
     display: none !important;
     visibility: hidden !important;
+  }
+
+  #fab-menu.force-visible {
+    display: flex !important;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #mobile-nav-toggle-button.force-visible:hover + #fab-menu.force-visible,
+  #fab-menu.force-visible:hover {
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto;
   }
 }
 
@@ -504,6 +518,11 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   /* Mobile sidebar slide animation */
   #section-navigation-sidebar {
     transition: transform 0.3s ease-in-out !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: none !important;
   }
 
   /* Hide expand button */
@@ -527,8 +546,11 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   width: 80% !important;
   max-width: 24rem !important;
   height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: none !important;
   z-index: 40 !important;
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
   transform: translateX(-100%) !important;
   transition: transform 300ms ease-in-out !important;
   border-radius: 0 !important;
@@ -570,11 +592,40 @@ button.force-visible,
   pointer-events: auto !important;
 }
 
+/* FAB stack stays hover-revealed; override generic force-visible defaults above */
+@media (min-width: 1100px) {
+  #fab-menu.force-visible {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  #mobile-nav-toggle-button.force-visible:hover + #fab-menu.force-visible,
+  #fab-menu.force-visible:hover {
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
 /* Hide button when sidebar is open */
 #mobile-nav-toggle-button.sidebar-open {
   opacity: 0 !important;
   pointer-events: none !important;
   visibility: hidden !important;
+}
+
+/* Collapse Save/Submit FAB stack as soon as the sections menu opens */
+#mobile-nav-toggle-button.sidebar-open + #fab-menu,
+#mobile-nav-toggle-button.sidebar-open:hover + #fab-menu,
+#mobile-nav-toggle-button.sidebar-open + #fab-menu:hover,
+#mobile-nav-toggle-button.sidebar-open + #fab-menu.force-visible,
+#mobile-nav-toggle-button.sidebar-open:hover + #fab-menu.force-visible,
+#mobile-nav-toggle-button.sidebar-open + #fab-menu.force-visible:hover {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: none !important;
 }
 
 /* Match corner FAB inset (see responsive.css #mobileMenuFAB / #aiChatbotFAB) incl. iOS home indicator */

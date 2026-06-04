@@ -50,11 +50,11 @@ This workflow guides focal points through filling out and submitting form data f
 - **Help**: Fill in each field with the appropriate data. Required fields are marked with an asterisk (*). Your changes are auto-saved as you work. In matrix cells that are filled from a looked-up variable, the tooltip may show "Original" and "Current" or "Modified". "Original" is the value copied from the source entity assignment when the matrix resolved the variable. "Current" or "Modified" is the value currently saved in this matrix cell after your edits; if it matches the original, the cell is not treated as modified.
 - **ActionText**: Next
 
-### Step 5: Submit the Form
+### Step 5: Submit or Send for Review
 - **Page**: `/forms/assignment`
-- **Selector**: `button[value="submit"], #fab-submit-btn, button.bg-green-600`
-- **Action**: Click Submit
-- **Help**: Once all required fields are complete, click the green Submit button to finalize your data. On mobile, use the floating action button. You'll receive a confirmation message.
+- **Selector**: `button[value="submit"], button[value="send_for_review"], #fab-submit-btn, button.bg-green-600`
+- **Action**: Click **Submit** or **Send for Review** (when the assignment requires delegation review before final submission)
+- **Help**: Once all required fields are complete, use **Send for Review** if your assignment is configured for delegation review. National Society focal points send work to delegation; delegation can edit, request changes, or submit upstream. Otherwise click **Submit** to finalize your data. On mobile, use the floating action button. You'll receive a confirmation message.
 - **ActionText**: Got it
 
 ## Saving Your Progress

@@ -1,0 +1,66 @@
+{# Assignment workflow pipeline tooltip (hover on status badge). #}
+{% macro assignment_status_pipeline_badge(status, is_closed=false, lang='en', assignment_entity_status=none) %}
+    {% set raw_status = status.value if status is not none and status.value is defined else status %}
+    {% set status_key = raw_status|string|lower|replace(' ', '_') %}
+    {% set steps = assignment_status_workflow_steps(assignment_entity_status) %}
+    {% set cur_idx = steps.index(status_key) if status_key in steps else -1 %}
+
+    <span class="assignment-status-pipeline-container relative inline-flex align-middle shrink-0">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
+            {% if status_key in ['submitted', 'approved'] %}
+                bg-green-100 text-green-800
+            {% elif status_key == 'requires_revision' %}
+                bg-orange-100 text-orange-800
+            {% elif status_key == 'sent_for_review' %}
+                bg-purple-100 text-purple-800
+            {% elif status_key == 'in_progress' %}
+                bg-yellow-100 text-yellow-800
+            {% else %}
+                bg-gray-100 text-gray-800
+            {% endif %}"
+              tabindex="0"
+              aria-label="{{ _('Status') }}: {{ localize_status(status) }}">
+            {% if is_closed %}
+                {{ localize_status(status) }} - {{ _('Closed') }}
+            {% else %}
+                {{ localize_status(status) }}
+            {% endif %}
+        </span>
+        <span class="assignment-status-pipeline-tooltip absolute top-full mt-1 px-3 py-2.5 bg-white text-gray-800 text-xs rounded-lg border border-gray-200 shadow-lg {% if lang == 'ar' %}right-0{% else %}left-0{% endif %}"
+              role="tooltip">
+            <span class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">{{ _('Workflow progress') }}</span>
+            <span class="assignment-status-pipeline flex items-start" role="list" aria-label="{{ _('Assignment status workflow') }}">
+                {% for step in steps %}
+                    {% set step_idx = loop.index0 %}
+                    <span class="assignment-status-pipeline-step flex flex-col items-center flex-1 min-w-[3.25rem] max-w-[5.5rem]
+                        {% if cur_idx >= 0 and step_idx < cur_idx and step == 'pending' %}is-passed
+                        {% elif cur_idx >= 0 and step_idx < cur_idx %}is-complete
+                        {% elif cur_idx >= 0 and step_idx == cur_idx %}is-current
+                        {% else %}is-upcoming{% endif %}"
+                          role="listitem">
+                        <span class="assignment-status-pipeline-track flex items-center w-full h-3">
+                            {% if not loop.first %}
+                                <span class="assignment-status-pipeline-connector assignment-status-pipeline-connector--leading flex-1 h-0.5 min-w-[0.25rem]" aria-hidden="true"></span>
+                            {% else %}
+                                <span class="flex-1" aria-hidden="true"></span>
+                            {% endif %}
+                            <span class="assignment-status-pipeline-marker shrink-0 inline-flex items-center justify-center w-4 h-4" aria-hidden="true">
+                                <span class="assignment-status-pipeline-dot w-2.5 h-2.5 rounded-full border-2 border-white"></span>
+                                <i class="fas fa-check assignment-status-pipeline-check" aria-hidden="true"></i>
+                            </span>
+                            {% if not loop.last %}
+                                <span class="assignment-status-pipeline-connector assignment-status-pipeline-connector--trailing flex-1 h-0.5 min-w-[0.25rem]" aria-hidden="true"></span>
+                            {% else %}
+                                <span class="flex-1" aria-hidden="true"></span>
+                            {% endif %}
+                        </span>
+                        <span class="assignment-status-pipeline-label mt-1 text-center text-[10px] leading-tight font-medium px-0.5">{{ localize_status(step) }}</span>
+                    </span>
+                {% endfor %}
+            </span>
+            {% if is_closed %}
+                <span class="block text-[11px] text-gray-500 mt-2 pt-2 border-t border-gray-100">{{ _('Assignment is closed') }}</span>
+            {% endif %}
+        </span>
+    </span>
+{% endmacro %}

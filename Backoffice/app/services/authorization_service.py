@@ -864,8 +864,24 @@ class AuthorizationService:
         if not AuthorizationService.has_rbac_permission(user, "assignment.enter", scope=scope):
             return False
 
-        # Focal points can only edit assignments that are not submitted or approved
-        return assignment_entity_status.status not in ["submitted", "approved"]
+        from app.models.enums import AssignmentEntityStatusValue
+        from app.services.assignment_workflow_service import is_delegation_user, review_enabled
+
+        status = assignment_entity_status.status
+        if hasattr(status, 'value'):
+            status = status.value
+
+        locked = {
+            AssignmentEntityStatusValue.submitted.value,
+            AssignmentEntityStatusValue.approved.value,
+        }
+        if status in locked:
+            return False
+
+        if status == AssignmentEntityStatusValue.sent_for_review.value:
+            return review_enabled(assignment_entity_status) and is_delegation_user(user)
+
+        return True
 
     @staticmethod
     def can_submit_assignment(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
@@ -908,8 +924,115 @@ class AuthorizationService:
         if not AuthorizationService.has_rbac_permission(user, "assignment.submit", scope=scope):
             return False
 
-        # Can only submit if status allows (not already approved)
-        return assignment_entity_status.status not in ["approved"]
+        from app.models.enums import AssignmentEntityStatusValue
+        from app.services.assignment_workflow_service import (
+            is_delegation_user,
+            ns_review_source_statuses,
+            review_enabled,
+        )
+
+        status = assignment_entity_status.status
+        if hasattr(status, 'value'):
+            status = status.value
+
+        if status == AssignmentEntityStatusValue.approved.value:
+            return False
+
+        if status == AssignmentEntityStatusValue.sent_for_review.value:
+            return review_enabled(assignment_entity_status) and is_delegation_user(user)
+
+        if review_enabled(assignment_entity_status) and not is_delegation_user(user):
+            if status in {m.value for m in ns_review_source_statuses()}:
+                return False
+
+        return True
+
+    @staticmethod
+    def can_send_for_review(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
+        """NS focal points: send in-progress work to org delegation for review."""
+        if not user or not user.is_authenticated:
+            return False
+        if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
+            return False
+
+        from app.models.enums import AssignmentEntityStatusValue
+        from app.services.assignment_workflow_service import (
+            is_delegation_user,
+            ns_review_source_statuses,
+            review_enabled,
+        )
+
+        if not review_enabled(assignment_entity_status) or is_delegation_user(user):
+            return False
+
+        if AuthorizationService.is_system_manager(user):
+            return True
+
+        try:
+            scope = {
+                "entity_type": assignment_entity_status.entity_type,
+                "entity_id": assignment_entity_status.entity_id,
+                "assigned_form_id": assignment_entity_status.assigned_form_id,
+                "template_id": assignment_entity_status.assigned_form.template_id
+                if assignment_entity_status.assigned_form
+                else None,
+            }
+        except Exception as e:
+            current_app.logger.debug("can_send_for_review scope build failed: %s", e)
+            scope = {
+                "entity_type": assignment_entity_status.entity_type,
+                "entity_id": assignment_entity_status.entity_id,
+                "assigned_form_id": assignment_entity_status.assigned_form_id,
+            }
+        if not AuthorizationService.has_rbac_permission(user, "assignment.submit", scope=scope):
+            return False
+
+        status = assignment_entity_status.status
+        if hasattr(status, 'value'):
+            status = status.value
+        return status in {m.value for m in ns_review_source_statuses()}
+
+    @staticmethod
+    def can_return_for_revision(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
+        """Org delegation: return sent-for-review assignment to NS for changes."""
+        if not user or not user.is_authenticated:
+            return False
+        if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
+            return False
+
+        from app.models.enums import AssignmentEntityStatusValue
+
+        status = assignment_entity_status.status
+        if hasattr(status, 'value'):
+            status = status.value
+        if status != AssignmentEntityStatusValue.sent_for_review.value:
+            return False
+
+        if AuthorizationService.is_system_manager(user):
+            return True
+
+        from app.services.assignment_workflow_service import is_delegation_user, review_enabled
+
+        if not review_enabled(assignment_entity_status) or not is_delegation_user(user):
+            return False
+
+        try:
+            scope = {
+                "entity_type": assignment_entity_status.entity_type,
+                "entity_id": assignment_entity_status.entity_id,
+                "assigned_form_id": assignment_entity_status.assigned_form_id,
+                "template_id": assignment_entity_status.assigned_form.template_id
+                if assignment_entity_status.assigned_form
+                else None,
+            }
+        except Exception as e:
+            current_app.logger.debug("can_return_for_revision scope build failed: %s", e)
+            scope = {
+                "entity_type": assignment_entity_status.entity_type,
+                "entity_id": assignment_entity_status.entity_id,
+                "assigned_form_id": assignment_entity_status.assigned_form_id,
+            }
+        return AuthorizationService.has_rbac_permission(user, "assignment.submit", scope=scope)
 
     @staticmethod
     def can_approve_assignment(assignment_entity_status: AssignmentEntityStatus, user) -> bool:

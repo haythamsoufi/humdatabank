@@ -71,7 +71,8 @@ class TestNotificationsRoutes:
             )
         assert resp.status_code == 400
         data = resp.get_json()
-        assert data["success"] is False
+        assert data is not None
+        assert "error" in data
 
     def test_mark_read_happy_path_updates_counts(self, logged_in_client):
         with patch(

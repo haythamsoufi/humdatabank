@@ -134,6 +134,26 @@ def display_document_file_public(doc_id):
         filename=document.filename, as_attachment=False,
     )
 
+# =================== LEGACY URL REDIRECTS ===================
+
+@bp.route("/form/<uuid:public_token>", methods=["GET"])
+def legacy_public_form_redirect(public_token):
+    """Backward-compatible redirect for old public form URLs."""
+    return redirect(url_for("forms.fill_public_form", public_token=public_token), code=302)
+
+
+@bp.route("/public_submission_success/<int:submission_id>", methods=["GET"])
+def legacy_public_submission_success_redirect(submission_id):
+    """Backward-compatible redirect for old public submission success URLs."""
+    return redirect(url_for("forms.public_submission_success", submission_id=submission_id), code=302)
+
+
+@bp.route("/public_documents/download/<int:document_id>", methods=["GET"])
+def legacy_public_document_download_redirect(document_id):
+    """Backward-compatible redirect for old public document download URLs."""
+    return redirect(url_for("forms.download_public_document_public", document_id=document_id), code=302)
+
+
 @bp.route("/landing", methods=["GET"])
 def landing_page():
     """Public landing page introducing the platform and its features."""

@@ -35,6 +35,12 @@ class AssignedFormForm(BaseForm):
     # Notify assigned entities when assignment is created
     send_notifications = BooleanField("Notify assigned entities when assignment is created", default=True)
 
+    # NS must send for org delegation review before upstream submit
+    requires_delegation_review = BooleanField(
+        "Require delegation review before final submission",
+        default=False,
+    )
+
     # Data owner governance — who is accountable for this collection cycle
     data_owner_id = SelectField(
         "Data Owner",

@@ -4,6 +4,7 @@ from uuid import uuid4
 from unittest.mock import patch
 
 import pytest
+from flask import Response
 
 from app.models import Resource
 from app.models.documents import ResourceTranslation, SubmittedDocument
@@ -38,9 +39,9 @@ class TestPublicRoutesResources:
             )
             db_session.commit()
 
-            with patch("app.routes.public.resolve_resource_file", side_effect=PermissionError()):
+            with patch("app.routes.public.storage.exists", return_value=False):
                 resp = client.get(f"/resources/download/{resource.id}/en")
-                assert resp.status_code == 403
+                assert resp.status_code == 404
 
     def test_resource_download_404_when_file_missing(self, client, db_session, app):
         with app.app_context():
@@ -58,9 +59,7 @@ class TestPublicRoutesResources:
             )
             db_session.commit()
 
-            with patch("app.routes.public.resolve_resource_file", return_value="C:\\nope\\missing.pdf"), patch(
-                "app.routes.public.get_resource_upload_path", return_value="C:\\nope"
-            ):
+            with patch("app.routes.public.storage.exists", return_value=False):
                 resp = client.get(f"/resources/download/{resource.id}/en")
                 assert resp.status_code == 404
 
@@ -80,26 +79,22 @@ class TestPublicRoutesResources:
             )
             db_session.commit()
 
-            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-                pdf_path = os.path.join(tmpdir, "report.pdf")
-                with open(pdf_path, "wb") as f:
-                    f.write(b"%PDF-1.4\n%test\n")
-
-                with patch("app.routes.public.resolve_resource_file", return_value=pdf_path), patch(
-                    "app.routes.public.get_resource_upload_path", return_value=tmpdir
-                ):
-                    resp = client.get(f"/resources/download/{resource.id}/en")
-                    resp.close()
-                    assert resp.status_code == 200
-                    assert resp.headers.get("Content-Type") == "application/pdf"
-                    assert resp.headers.get("Accept-Ranges") == "bytes"
+            mock_response = Response(b"%PDF-1.4", mimetype="application/pdf")
+            mock_response.headers["Accept-Ranges"] = "bytes"
+            with patch("app.routes.public.storage.exists", return_value=True), patch(
+                "app.routes.public.storage.stream_response", return_value=mock_response
+            ):
+                resp = client.get(f"/resources/download/{resource.id}/en")
+                resp.close()
+                assert resp.status_code == 200
+                assert resp.headers.get("Content-Type") == "application/pdf"
+                assert resp.headers.get("Accept-Ranges") == "bytes"
 
     def test_resource_thumbnail_falls_back_to_english(self, client, db_session, app):
         with app.app_context():
             resource = Resource(default_title="R5", resource_type="publication")
             db_session.add(resource)
             db_session.flush()
-            # Only EN has a thumbnail
             db_session.add(
                 ResourceTranslation(
                     resource_id=resource.id,
@@ -113,17 +108,13 @@ class TestPublicRoutesResources:
             )
             db_session.commit()
 
-            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-                thumb_path = os.path.join(tmpdir, "t.png")
-                with open(thumb_path, "wb") as f:
-                    f.write(b"\x89PNG\r\n\x1a\n")
-
-                with patch("app.routes.public.resolve_resource_thumbnail", return_value=thumb_path), patch(
-                    "app.routes.public.get_resource_upload_path", return_value=tmpdir
-                ):
-                    resp = client.get(f"/resources/thumbnail/{resource.id}/fr")
-                    resp.close()
-                    assert resp.status_code == 200
+            mock_response = Response(b"\x89PNG\r\n\x1a\n", mimetype="image/png")
+            with patch("app.routes.public.storage.exists", return_value=True), patch(
+                "app.routes.public.storage.stream_response", return_value=mock_response
+            ):
+                resp = client.get(f"/resources/thumbnail/{resource.id}/fr")
+                resp.close()
+                assert resp.status_code == 200
 
 
 @pytest.mark.integration
@@ -165,17 +156,13 @@ class TestPublicRoutesSubmittedDocuments:
             db_session.add(doc)
             db_session.commit()
 
-            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-                thumb_path = os.path.join(tmpdir, "t.png")
-                with open(thumb_path, "wb") as f:
-                    f.write(b"\x89PNG\r\n\x1a\n")
-
-                with patch("app.routes.public.resolve_admin_document_thumbnail", return_value=thumb_path), patch(
-                    "app.routes.public.get_admin_documents_upload_path", return_value=tmpdir
-                ):
-                    resp = client.get(f"/documents/thumbnail/{doc.id}")
-                    resp.close()
-                    assert resp.status_code == 200
+            mock_response = Response(b"\x89PNG\r\n\x1a\n", mimetype="image/png")
+            with patch("app.routes.public.storage.exists", return_value=True), patch(
+                "app.routes.public.storage.stream_response", return_value=mock_response
+            ):
+                resp = client.get(f"/documents/thumbnail/{doc.id}")
+                resp.close()
+                assert resp.status_code == 200
 
     def test_public_document_thumbnail_404_when_not_public(self, client, db_session, app):
         with app.app_context():
@@ -207,11 +194,8 @@ class TestPublicRoutesSubmittedDocuments:
             db_session.add(doc)
             db_session.commit()
 
-            with patch("app.routes.public.resolve_admin_document", return_value="C:\\tmp\\x.pdf"), patch(
-                "app.routes.public.os.path.exists", return_value=True
-            ):
-                resp = client.get(f"/documents/display/{doc.id}")
-                assert resp.status_code == 404
+            resp = client.get(f"/documents/display/{doc.id}")
+            assert resp.status_code == 404
 
 
 @pytest.mark.integration
@@ -232,4 +216,3 @@ class TestPublicRoutesHealth:
             data = resp.get_json()
             assert data["status"] == "degraded"
             assert data["database"] == "error"
-

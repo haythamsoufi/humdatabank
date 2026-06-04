@@ -5,6 +5,7 @@ from uuid import uuid4
 from unittest.mock import patch
 
 import pytest
+from flask import Response
 
 from app.models import (
     db,
@@ -20,6 +21,14 @@ from app.models import (
 from app.models.enums import EntityType
 
 from tests.factories import create_test_admin, create_test_country, create_test_template, create_test_user
+
+
+def _get_csrf_headers(client) -> dict:
+    resp = client.get("/api/v1/csrf-token")
+    assert resp.status_code == 200
+    token = (resp.get_json() or {}).get("csrf_token")
+    assert token
+    return {"X-CSRFToken": token}
 
 
 def _login(client, user_id: int) -> None:
@@ -102,24 +111,18 @@ class TestEntryFormDocumentRoutes:
             user = create_test_user(db_session, role="admin")
             _login(client, user.id)
 
-            # ignore_cleanup_errors avoids PermissionError on Windows when
-            # Flask still holds a file handle during TemporaryDirectory cleanup.
-            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-                filename = "hello.txt"
-                path = os.path.join(tmpdir, filename)
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write("hello")
-
-                with patch(
-                    "app.services.document_service.DocumentService.get_assignment_download_paths",
-                    return_value=(tmpdir, filename, filename),
-                ):
-                    resp = client.get("/forms/download_document/123")
-                    # Close the response to release the file handle before cleanup
-                    resp.close()
-                    assert resp.status_code == 200
-                    disp = resp.headers.get("Content-Disposition") or ""
-                    assert filename in disp
+            filename = "hello.txt"
+            with patch(
+                "app.services.document_service.DocumentService.stream_download_response",
+            ) as mock_stream:
+                mock_response = Response(b"hello", mimetype="text/plain")
+                mock_response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+                mock_stream.return_value = mock_response
+                resp = client.get("/forms/download_document/123")
+                resp.close()
+                assert resp.status_code == 200
+                disp = resp.headers.get("Content-Disposition") or ""
+                assert filename in disp
 
     def test_delete_document_redirects_back(self, client, db_session, app):
         with app.app_context():
@@ -197,6 +200,7 @@ class TestEntryFormExportAndMatrixRoutes:
                 "/forms/matrix/search-rows",
                 data=json.dumps(payload),
                 content_type="application/json",
+                headers=_get_csrf_headers(client),
             )
             assert resp.status_code == 200
             data = resp.get_json()

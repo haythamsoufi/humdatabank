@@ -1,6 +1,7 @@
 import { debugLog } from './debug.js';
 import { evaluateConditions } from './conditions.js';
 import { getCurrentFieldValue } from './field-management.js';
+import { closeEntryFormMobileNav } from './sidebar-collapse.js';
 
 const MODULE_NAME = 'form_validation';
 
@@ -1635,13 +1636,7 @@ class FormValidator {
         } catch (_) { /* no-op */ }
 
         // Close mobile navigation if open
-        const mobileNav = document.getElementById('section-navigation-sidebar');
-        const overlay = document.getElementById('mobile-nav-overlay');
-        if (mobileNav && overlay) {
-            mobileNav.classList.add('-translate-x-full');
-            overlay.classList.add('hidden');
-            document.body.classList.remove('overflow-hidden');
-        }
+        closeEntryFormMobileNav();
 
         // Scroll to field with "near top" protection and without over-scrolling.
         // Use CSS scroll-margin-top when present; fallback to 100px.

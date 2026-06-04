@@ -54,14 +54,16 @@ def test_profile_summary_focal_point_gets_full_profile_when_one_scope_overlaps(
             )
         )
         db.session.commit()
-        db.session.refresh(privileged)
+        privileged_id = privileged.id
+        privileged_external_id = str(privileged.external_id)
+        privileged_email = privileged.email
+        focal_id = focal.id
 
     with client.session_transaction() as sess:
-        sess["_user_id"] = str(focal.id)
+        sess["_user_id"] = str(focal_id)
         sess["_fresh"] = True
 
-    ext = str(privileged.external_id)
-    resp = client.get(f"/api/users/profile-summary?external_ids={ext}")
+    resp = client.get(f"/api/users/profile-summary?external_ids={privileged_external_id}")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body.get("success") is True
@@ -69,8 +71,8 @@ def test_profile_summary_focal_point_gets_full_profile_when_one_scope_overlaps(
     assert len(profiles) == 1
     row = profiles[0]
     assert row.get("id") is None
-    assert row.get("external_id") == ext
-    assert row["email"] == privileged.email
+    assert row.get("external_id") == privileged_external_id
+    assert row["email"] == privileged_email
     assert row.get("role_badge_key") == "system_manager"
 
 
@@ -109,12 +111,14 @@ def test_profile_summary_focal_point_empty_when_no_scope_overlap(
             )
         )
         db.session.commit()
+        focal_id = focal.id
+        other_id = other.id
 
     with client.session_transaction() as sess:
-        sess["_user_id"] = str(focal.id)
+        sess["_user_id"] = str(focal_id)
         sess["_fresh"] = True
 
-    resp = client.get(f"/api/users/profile-summary?user_ids={other.id}")
+    resp = client.get(f"/api/users/profile-summary?user_ids={other_id}")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body.get("profiles") == []

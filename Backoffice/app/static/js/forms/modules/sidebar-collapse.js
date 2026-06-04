@@ -135,6 +135,33 @@ class SidebarCollapseController {
   }
 
   /**
+   * True when the sections pane behaves as a slide-over (mobile or forced mobile).
+   */
+  usesMobileOverlay() {
+    const { sidebar } = this.elements;
+    if (!sidebar) return false;
+    return !this.isLargeScreen() || sidebar.classList.contains('force-mobile-mode');
+  }
+
+  /**
+   * Show/hide the Save/Submit FAB stack for forced mobile overlay on large screens.
+   */
+  setFabMenuForceVisible(visible) {
+    const { fabmenu } = this.elements;
+    if (!fabmenu) return;
+    if (visible) {
+      fabmenu.classList.add('force-visible');
+      fabmenu.classList.remove('xl:hidden');
+    } else {
+      fabmenu.classList.remove('force-visible');
+      fabmenu.classList.add('xl:hidden');
+      fabmenu.style.left = '';
+      fabmenu.style.bottom = '';
+      fabmenu.style.display = '';
+    }
+  }
+
+  /**
    * Mobile sidebar operations
    */
   closeMobileSidebar() {
@@ -149,6 +176,8 @@ class SidebarCollapseController {
     if (mobiletoggle) {
       mobiletoggle.classList.remove('sidebar-open');
     }
+    document.body.classList.remove('overflow-hidden');
+    this.adjustFloatingButtonPosition();
   }
 
   openMobileSidebar() {
@@ -163,6 +192,7 @@ class SidebarCollapseController {
     if (mobiletoggle) {
       mobiletoggle.classList.add('sidebar-open');
     }
+    document.body.classList.add('overflow-hidden');
   }
 
   /**
@@ -184,10 +214,14 @@ class SidebarCollapseController {
       this.elements.mobiletoggle.classList.remove('sidebar-open');
     }
 
+    this.setFabMenuForceVisible(true);
+
     // Hide expand button
     if (this.elements.expandbutton) {
       this.elements.expandbutton.style.display = 'none';
     }
+
+    this.adjustFloatingButtonPosition();
   }
 
   /**
@@ -210,6 +244,7 @@ class SidebarCollapseController {
     if (this.elements.expandbutton) {
       this.elements.expandbutton.style.display = '';
     }
+    this.setFabMenuForceVisible(false);
   }
 
   /**
@@ -403,12 +438,17 @@ class SidebarCollapseController {
       });
     }
 
-    // Mobile close button (forces mobile mode)
+    // Mobile close button (forces mobile mode on large screens only)
     if (this.elements.mobileclose) {
       this.elements.mobileclose.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.forceMobileSidebarMode();
+        if (this.isLargeScreen()) {
+          this.forceMobileSidebarMode();
+        } else {
+          this.closeMobileSidebar();
+          document.body.classList.remove('overflow-hidden');
+        }
       });
     }
 
@@ -420,11 +460,14 @@ class SidebarCollapseController {
     // Window resize
     window.addEventListener('resize', () => this.handleResize());
 
-    // Close sidebar when clicking section links (mobile only)
+    // Close sidebar when clicking section links in overlay mode
     const sectionLinks = this.elements.sidebar?.querySelectorAll('.section-link');
     sectionLinks?.forEach(link => {
       link.addEventListener('click', () => {
-        if (!this.isLargeScreen()) {
+        if (
+          this.usesMobileOverlay() &&
+          this.elements.sidebar?.classList.contains('translate-x-0')
+        ) {
           setTimeout(() => this.closeMobileSidebar(), 100);
         }
       });
@@ -536,9 +579,17 @@ class SidebarCollapseController {
 /**
  * Initialize the sidebar collapse system
  */
+let sidebarCollapseController = null;
+
 export function initializeSidebarCollapse() {
-  const controller = new SidebarCollapseController();
-  controller.init();
+  sidebarCollapseController = new SidebarCollapseController();
+  sidebarCollapseController.init();
+  return sidebarCollapseController;
+}
+
+/** Close the sections overlay and restore the floating toggle (shared helper). */
+export function closeEntryFormMobileNav() {
+  sidebarCollapseController?.closeMobileSidebar();
 }
 
 // Auto-initialize

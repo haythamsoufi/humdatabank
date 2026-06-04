@@ -1140,6 +1140,7 @@ class StagingConfig(ProductionConfig):
 
 class TestingConfig(Config):
     TESTING = True
+    DEBUG = False
     # Use TEST_DATABASE_URL or fallback to DATABASE_URL. No SQLite allowed.
     SQLALCHEMY_DATABASE_URI = _normalize_database_uri(os.environ.get('TEST_DATABASE_URL') or os.environ.get('DATABASE_URL'))
     WTF_CSRF_ENABLED = False

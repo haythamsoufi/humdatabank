@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 MESSAGE_PRIMARY_NOTIFICATION_TYPES = frozenset({
     'access_request_received',
     'assignment_submitted',
+    'assignment_sent_for_review',
+    'assignment_returned_for_revision',
     'assignment_approved',
     'assignment_reopened',
     'assignment_created',
@@ -44,6 +46,8 @@ MESSAGE_PRIMARY_NOTIFICATION_TYPES = frozenset({
 ACTOR_BADGE_ICON_BY_TYPE = {
     'access_request_received': 'fa-key',
     'assignment_submitted': 'fa-paper-plane',
+    'assignment_sent_for_review': 'fa-user-check',
+    'assignment_returned_for_revision': 'fa-undo-alt',
     'assignment_approved': 'fa-check',
     'assignment_reopened': 'fa-undo',
     'assignment_created': 'fa-plus-circle',
@@ -77,6 +81,8 @@ class NotificationService:
         type_source_map = {
             'assignment_created': 'New Assignment Created',  # Matches translation file
             'assignment_submitted': 'Assignment Submitted',
+            'assignment_sent_for_review': 'Sent for Review',
+            'assignment_returned_for_revision': 'Returned for Revision',
             'assignment_approved': 'Assignment Approved',
             'assignment_reopened': 'Assignment Reopened',
             'public_submission_received': 'Public Submission Received',

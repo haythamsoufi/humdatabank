@@ -4,7 +4,7 @@ import pytest
 @pytest.mark.api
 @pytest.mark.integration
 class TestApiIndicators:
-    def test_indicator_bank_public_without_api_key(self, client):
+    def test_indicator_bank_public_without_api_key(self, client, db_session):
         resp = client.get("/api/v1/indicator-bank")
         assert resp.status_code == 200
         data = resp.get_json()

@@ -51,6 +51,15 @@ def _sum_numeric_mapping(mapping: dict) -> float:
     return total
 
 
+def form_item_label(item: FormItem | None, fallback_code: str) -> str:
+    if item and item.label:
+        return str(item.label).strip()
+    bank = getattr(item, "indicator_bank", None) if item else None
+    if bank and getattr(bank, "name", None):
+        return str(bank.name).strip()
+    return fallback_code
+
+
 def parse_disagg_sex_age_totals(disagg_data: dict | None) -> tuple[float, float]:
     """
     Extract sex- and age-covered totals from FDRS disagg payloads.

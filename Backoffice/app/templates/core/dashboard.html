@@ -339,6 +339,38 @@
             color: #4b5563;
             line-height: 1.35;
         }
+        .data-quality-sub-pillar--expandable .data-quality-sub-pillar__toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            grid-column: 1;
+            min-width: 0;
+            padding: 0;
+            border: none;
+            background: none;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            color: inherit;
+        }
+        .data-quality-sub-pillar--expandable .data-quality-sub-pillar__toggle:hover .data-quality-sub-pillar__label {
+            color: #5b21b6;
+        }
+        .data-quality-sub-pillar--expandable .data-quality-sub-pillar__toggle:focus-visible {
+            outline: 2px solid #7c3aed;
+            outline-offset: 2px;
+            border-radius: 0.25rem;
+        }
+        .data-quality-sub-pillar__chevron {
+            font-size: 0.5rem;
+            color: #9ca3af;
+            margin-left: 0.25rem;
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+        .data-quality-sub-pillar__toggle.is-expanded .data-quality-sub-pillar__chevron {
+            transform: rotate(90deg);
+        }
         .data-quality-sub-pillar__score {
             font-weight: 600;
             white-space: nowrap;
@@ -368,6 +400,69 @@
             color: #16a34a;
         }
         .data-quality-sub-pillar__status.is-missing {
+            color: #dc2626;
+        }
+        .data-quality-component-list {
+            list-style: none;
+            margin: 0.375rem 0 0;
+            padding: 0.25rem 0 0 0.5rem;
+            border-left: 2px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            grid-column: 1 / -1;
+        }
+        .data-quality-component-list.is-collapsed {
+            display: none;
+        }
+        .data-quality-component-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.25rem 0.5rem;
+            align-items: baseline;
+            font-size: 0.625rem;
+        }
+        .data-quality-component-row__label-wrap {
+            min-width: 0;
+        }
+        .data-quality-component-row__label {
+            display: block;
+            color: #6b7280;
+            line-height: 1.35;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .data-quality-component-row__weight {
+            display: block;
+            color: #9ca3af;
+            font-size: 0.5625rem;
+            line-height: 1.2;
+        }
+        .data-quality-component-row__score {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .data-quality-component-row__bar-track {
+            grid-column: 1 / -1;
+            height: 0.1875rem;
+            overflow: hidden;
+            border-radius: 9999px;
+            background: #f3f4f6;
+        }
+        .data-quality-component-row__bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+        }
+        .data-quality-component-row__status {
+            display: inline-flex;
+            font-size: 0.75rem;
+            line-height: 1;
+        }
+        .data-quality-component-row__status.is-present {
+            color: #16a34a;
+        }
+        .data-quality-component-row__status.is-missing {
             color: #dc2626;
         }
         .data-quality-pillars-toolbar {
@@ -2167,13 +2262,21 @@
      data-sub-people-reached="{{ _('People reached') }}"
      data-sub-sex="{{ _('Sex disaggregation') }}"
      data-sub-age="{{ _('Age disaggregation') }}"
-     data-sub-disability="{{ _('Disability (DDD/WGQ)') }}"
+     data-sub-disability="{{ _('Disability') }}"
+     data-sub-reported-income="{{ _('Reported income') }}"
+     data-sub-reported-expenditure="{{ _('Reported expenditure') }}"
+     data-sub-income-sources="{{ _('Income sources') }}"
+     data-sub-disaggregated-disability="{{ _('Disaggregated disability') }}"
+     data-sub-washington-group="{{ _('Washington Group questions') }}"
      data-sub-pillars-label="{{ _('Components') }}"
      data-pillar-breakdown="{{ _('Breakdown') }}"
      data-pillar-breakdown-expand="{{ _('Show score breakdown') }}"
      data-pillar-breakdown-collapse="{{ _('Hide score breakdown') }}"
      data-sub-pillar-present="{{ _('Present') }}"
      data-sub-pillar-missing="{{ _('Missing') }}"
+     data-component-breakdown-label="{{ _('Score components') }}"
+     data-sub-pillar-components-expand="{{ _('Show score components') }}"
+     data-sub-pillar-components-collapse="{{ _('Hide score components') }}"
      data-no-filtered-activities="{{ _('No activities match the selected filters') }}"
      data-loading="{{ _('Loading...') }}"
      data-thats-all='{{ _("That's all") }}' style="display: none;"></div>
@@ -2231,12 +2334,20 @@
         subSex: translationsEl.dataset.subSex,
         subAge: translationsEl.dataset.subAge,
         subDisability: translationsEl.dataset.subDisability,
+        subReportedIncome: translationsEl.dataset.subReportedIncome,
+        subReportedExpenditure: translationsEl.dataset.subReportedExpenditure,
+        subIncomeSources: translationsEl.dataset.subIncomeSources,
+        subDisaggregatedDisability: translationsEl.dataset.subDisaggregatedDisability,
+        subWashingtonGroup: translationsEl.dataset.subWashingtonGroup,
         subPillarsLabel: translationsEl.dataset.subPillarsLabel,
         pillarBreakdown: translationsEl.dataset.pillarBreakdown,
         pillarBreakdownExpand: translationsEl.dataset.pillarBreakdownExpand,
         pillarBreakdownCollapse: translationsEl.dataset.pillarBreakdownCollapse,
         subPillarPresent: translationsEl.dataset.subPillarPresent,
-        subPillarMissing: translationsEl.dataset.subPillarMissing
+        subPillarMissing: translationsEl.dataset.subPillarMissing,
+        componentBreakdownLabel: translationsEl.dataset.componentBreakdownLabel,
+        subPillarComponentsExpand: translationsEl.dataset.subPillarComponentsExpand,
+        subPillarComponentsCollapse: translationsEl.dataset.subPillarComponentsCollapse
     };
 </script>
 

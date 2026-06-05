@@ -16,6 +16,7 @@ class DataQualityResult:
     period_name: str
     pillars: dict[str, Any] = field(default_factory=dict)
     sub_pillars: dict[str, Any] = field(default_factory=dict)
+    component_details: dict[str, Any] = field(default_factory=dict)
     trend: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     validation_summary: dict[str, int] = field(default_factory=dict)
@@ -30,6 +31,7 @@ class DataQualityResult:
             "period_name": self.period_name,
             "pillars": self.pillars,
             "sub_pillars": self.sub_pillars,
+            "component_details": self.component_details,
             "trend": self.trend,
             "warnings": self.warnings,
             "validation_summary": self.validation_summary,

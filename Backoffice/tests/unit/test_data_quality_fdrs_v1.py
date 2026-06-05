@@ -53,7 +53,12 @@ def test_fdrs_v1_weighted_formula_testland_2024_scenario():
     kpi_data["KPI_PeopleVol"] = (disagg_entry, MagicMock(id=50))
 
     two_thirds = 2 / 3
+    mock_form_item_query = MagicMock()
+    mock_form_item_query.filter.return_value.all.return_value = []
     with patch(
+        "app.services.data_quality.methodologies.fdrs_v1.FormItem.query",
+        mock_form_item_query,
+    ), patch(
         "app.services.data_quality.methodologies.fdrs_v1.get_assignment_aes",
         return_value=aes,
     ), patch(
@@ -63,8 +68,8 @@ def test_fdrs_v1_weighted_formula_testland_2024_scenario():
         methodology,
         "_documents_score",
         return_value=(0.0, {"annual_report": 0, "audited_financial_statement": 0}),
-    ), patch.object(methodology, "_reporting_score", return_value=(two_thirds, {})), patch.object(
-        methodology, "_disaggregation_score", return_value=(two_thirds, {})
+    ), patch.object(methodology, "_reporting_score", return_value=(two_thirds, {}, {})), patch.object(
+        methodology, "_disaggregation_score", return_value=(two_thirds, {}, {})
     ), patch.object(methodology, "_timeliness_score", return_value=(1.0, {})), patch(
         "app.services.data_quality.methodologies.fdrs_v1.validation_question_counts",
         return_value={"asked": 0, "answered": 0, "open": 0, "waived": 0},
@@ -80,6 +85,7 @@ def test_fdrs_v1_weighted_formula_testland_2024_scenario():
     assert result.overall_pct == 60.0
     assert result.pillars["documents"] == 0.0
     assert result.pillars["validation_questions"] == 100.0
+    assert "reporting" in result.component_details
 
 
 def test_reporting_score_partial_governance():
@@ -94,9 +100,31 @@ def test_reporting_score_partial_governance():
     for code in cat.REACH_KPI_CODES[:3]:
         kpi_data[code] = (_mock_form_data(5), None)
 
-    score, detail = methodology._reporting_score(kpi_data)
+    score, detail, components = methodology._reporting_score(kpi_data)
     assert 0 < score < 1
     assert "governance_structure" in detail
+    finance = components["finance_partnership"]
+    assert finance["reported_income"] == 1.0
+    assert finance["reported_expenditure"] == 1.0
+    assert finance["income_sources"] == 1.0
+
+
+def test_disaggregation_disability_components():
+    methodology = FdrsV1Methodology()
+    kpi_data = {
+        "KPI_PeopleVol": (
+            _mock_form_data(100, disagg_data={"values": {"male": 50, "female": 50}}),
+            None,
+        ),
+        "KPI_PeopleVol_ddd": (_mock_form_data(1), None),
+        "KPI_PeopleVol_wgq": (None, None),
+    }
+    warnings: list[str] = []
+    score, detail, components = methodology._disaggregation_score(kpi_data, warnings)
+    assert score > 0
+    disability = components["disability"]
+    assert disability["disaggregated_disability"] == 1.0
+    assert disability["washington_group_questions"] == 0.0
 
 
 @pytest.mark.parametrize(

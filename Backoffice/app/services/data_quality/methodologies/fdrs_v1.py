@@ -66,8 +66,10 @@ class FdrsV1Methodology:
         kpi_data = load_form_data_by_kpi(aes.id, template_id, version_id)
 
         docs_score, docs_detail = self._documents_score(aes.id, template_id)
-        reporting_score, reporting_detail = self._reporting_score(kpi_data)
-        disagg_score, disagg_detail = self._disaggregation_score(kpi_data, warnings)
+        reporting_score, reporting_detail, reporting_components = self._reporting_score(kpi_data)
+        disagg_score, disagg_detail, disagg_components = self._disaggregation_score(
+            kpi_data, warnings
+        )
         timeliness_score, timeliness_detail = self._timeliness_score(
             aes, template_id, version_id, period_name
         )
@@ -90,7 +92,6 @@ class FdrsV1Methodology:
             if include_trend
             else []
         )
-
         return DataQualityResult(
             overall_pct=overall,
             methodology=self.code,
@@ -110,6 +111,10 @@ class FdrsV1Methodology:
                 "reporting": reporting_detail,
                 "disaggregation": disagg_detail,
                 "timeliness": timeliness_detail,
+            },
+            component_details={
+                "reporting": reporting_components,
+                "disaggregation": disagg_components,
             },
             trend=trend,
             warnings=warnings,
@@ -148,7 +153,7 @@ class FdrsV1Methodology:
         score = (ar + afs) / 2.0
         return score, {"annual_report": ar, "audited_financial_statement": afs}
 
-    def _reporting_score(self, kpi_data: dict) -> tuple[float, dict]:
+    def _reporting_score(self, kpi_data: dict) -> tuple[float, dict, dict]:
         gov_reported = sum(
             1 for code in cat.GOVERNANCE_KPI_CODES if is_reported_value(kpi_data.get(code, (None, None))[0])
         )
@@ -190,9 +195,17 @@ class FdrsV1Methodology:
             "governance_structure": round(gov_score, 3),
             "finance_partnership": round(finance_score, 3),
             "people_reached": round(reach_score, 3),
+        }, {
+            "finance_partnership": {
+                "reported_income": income_reported,
+                "reported_expenditure": expend_reported,
+                "income_sources": round(income_sources_ratio, 3),
+            }
         }
 
-    def _disaggregation_score(self, kpi_data: dict, warnings: list[str]) -> tuple[float, dict]:
+    def _disaggregation_score(
+        self, kpi_data: dict, warnings: list[str]
+    ) -> tuple[float, dict, dict]:
         total_people = 0.0
         sex_disagg = 0.0
         age_disagg = 0.0
@@ -232,7 +245,12 @@ class FdrsV1Methodology:
 
         if total_people <= 0:
             warnings.append("No people-count indicators with values for disaggregation scoring.")
-            return 0.0, {"sex": 0, "age": 0, "disability": 0}
+            return 0.0, {"sex": 0, "age": 0, "disability": 0}, {
+                "disability": {
+                    "disaggregated_disability": 0.0,
+                    "washington_group_questions": 0.0,
+                }
+            }
 
         sex_score = min(1.0, sex_disagg / total_people)
         age_score = min(1.0, age_disagg / total_people)
@@ -247,6 +265,11 @@ class FdrsV1Methodology:
             "sex": round(sex_score, 3),
             "age": round(age_score, 3),
             "disability": round(disability_score, 3),
+        }, {
+            "disability": {
+                "disaggregated_disability": round(ddd_ratio, 3),
+                "washington_group_questions": round(wgq_ratio, 3),
+            }
         }
 
     def _timeliness_score(

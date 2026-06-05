@@ -339,6 +339,8 @@ function renderDataQualityScoreRing(pct) {
 }
 
 const DATA_QUALITY_DETAILS_STORAGE_KEY = 'dataQualityPillarDetailsExpanded';
+const DATA_QUALITY_TREND_MODE_STORAGE_KEY = 'dataQualityTrendMode';
+const DATA_QUALITY_COMPONENT_STORAGE_PREFIX = 'dataQualityComponentExpanded:';
 
 function isDataQualityPillarDetailsExpanded() {
     try {
@@ -367,8 +369,24 @@ function updateDataQualityDetailsToggleButton(expanded) {
     btn.setAttribute('aria-label', actionLabel);
 }
 
-function getDataQualityTrendMode(expanded) {
-    return expanded ? 'pillars' : 'overall';
+function getDataQualityTrendMode() {
+    try {
+        const mode = sessionStorage.getItem(DATA_QUALITY_TREND_MODE_STORAGE_KEY);
+        return mode === 'pillars' ? 'pillars' : 'overall';
+    } catch (e) {
+        return 'overall';
+    }
+}
+
+function setDataQualityTrendMode(mode) {
+    try {
+        sessionStorage.setItem(
+            DATA_QUALITY_TREND_MODE_STORAGE_KEY,
+            mode === 'pillars' ? 'pillars' : 'overall'
+        );
+    } catch (e) {
+        /* sessionStorage unavailable */
+    }
 }
 
 function setDataQualityTrendToggleUi(mode) {
@@ -382,11 +400,11 @@ function setDataQualityTrendToggleUi(mode) {
     });
 }
 
-function applyDataQualityTrendMode(expanded) {
+function applyDataQualityTrendMode(mode) {
     if (!dataQualityTrendData.length) return;
-    const mode = getDataQualityTrendMode(expanded);
-    renderDataQualityTrendChart(dataQualityTrendData, mode);
-    setDataQualityTrendToggleUi(mode);
+    const resolvedMode = mode || getDataQualityTrendMode();
+    renderDataQualityTrendChart(dataQualityTrendData, resolvedMode);
+    setDataQualityTrendToggleUi(resolvedMode);
 }
 
 function applyDataQualityPillarDetailsVisibility(expanded) {
@@ -394,19 +412,64 @@ function applyDataQualityPillarDetailsVisibility(expanded) {
         el.classList.toggle('is-collapsed', !expanded);
     });
     updateDataQualityDetailsToggleButton(expanded);
-    applyDataQualityTrendMode(expanded);
+}
+
+function dataQualityComponentStorageKey(pillarKey, subPillarKey) {
+    return `${DATA_QUALITY_COMPONENT_STORAGE_PREFIX}${pillarKey}:${subPillarKey}`;
+}
+
+function isDataQualityComponentExpanded(pillarKey, subPillarKey) {
+    try {
+        return sessionStorage.getItem(dataQualityComponentStorageKey(pillarKey, subPillarKey)) === 'true';
+    } catch (e) {
+        return false;
+    }
+}
+
+function setDataQualityComponentExpanded(pillarKey, subPillarKey, expanded) {
+    try {
+        sessionStorage.setItem(
+            dataQualityComponentStorageKey(pillarKey, subPillarKey),
+            expanded ? 'true' : 'false'
+        );
+    } catch (e) {
+        /* sessionStorage unavailable */
+    }
+}
+
+function subPillarHasComponents(pillarKey, subPillarKey, pillarComponentDetails) {
+    const meta = getDataQualityComponentMeta()[pillarKey];
+    if (!meta || !meta[subPillarKey]) {
+        return false;
+    }
+    const detail = pillarComponentDetails && pillarComponentDetails[subPillarKey];
+    return Boolean(detail && typeof detail === 'object' && Object.keys(detail).length);
+}
+
+function dataQualityComponentListId(pillarKey, subPillarKey) {
+    return `dq-components-${pillarKey}-${subPillarKey}`;
+}
+
+function updateDataQualitySubPillarToggleLabel(btn, expanded) {
+    const label = expanded
+        ? getSecureConfirmMessage('subPillarComponentsCollapse', 'Hide score components')
+        : getSecureConfirmMessage('subPillarComponentsExpand', 'Show score components');
+    btn.setAttribute('aria-label', label);
 }
 
 function syncDataQualityPillarDetailsToggle() {
     const toggleWrap = document.getElementById('data-quality-details-toggle-wrap');
     const hasSubPillars = document.querySelector('.data-quality-sub-pillars');
-    const hasTrend = dataQualityTrendData.length > 0;
-    if (!hasSubPillars && !hasTrend) {
+    if (!hasSubPillars) {
         if (toggleWrap) toggleWrap.classList.add('is-unavailable');
         return;
     }
     if (toggleWrap) toggleWrap.classList.remove('is-unavailable');
     applyDataQualityPillarDetailsVisibility(isDataQualityPillarDetailsExpanded());
+}
+
+function syncDataQualityTrendToggle() {
+    applyDataQualityTrendMode(getDataQualityTrendMode());
 }
 
 function bindDataQualityPillarDetailsToggle() {
@@ -417,6 +480,39 @@ function bindDataQualityPillarDetailsToggle() {
         const nextExpanded = btn.getAttribute('aria-expanded') !== 'true';
         setDataQualityPillarDetailsExpanded(nextExpanded);
         applyDataQualityPillarDetailsVisibility(nextExpanded);
+    });
+}
+
+function bindDataQualitySubPillarComponentToggles() {
+    document.querySelectorAll('.data-quality-sub-pillar__toggle').forEach((btn) => {
+        if (btn.dataset.bound === 'true') {
+            return;
+        }
+        btn.dataset.bound = 'true';
+
+        const pillarKey = btn.dataset.pillarKey;
+        const subPillarKey = btn.dataset.subPillarKey;
+        const listId = btn.getAttribute('aria-controls');
+        const list = listId ? document.getElementById(listId) : null;
+        const expanded = isDataQualityComponentExpanded(pillarKey, subPillarKey);
+
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        btn.classList.toggle('is-expanded', expanded);
+        updateDataQualitySubPillarToggleLabel(btn, expanded);
+        if (list) {
+            list.classList.toggle('is-collapsed', !expanded);
+        }
+
+        btn.addEventListener('click', () => {
+            const nextExpanded = btn.getAttribute('aria-expanded') !== 'true';
+            setDataQualityComponentExpanded(pillarKey, subPillarKey, nextExpanded);
+            btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+            btn.classList.toggle('is-expanded', nextExpanded);
+            updateDataQualitySubPillarToggleLabel(btn, nextExpanded);
+            if (list) {
+                list.classList.toggle('is-collapsed', !nextExpanded);
+            }
+        });
     });
 }
 
@@ -434,8 +530,26 @@ function getDataQualitySubPillarMeta() {
         disaggregation: [
             { key: 'sex', label: getSecureConfirmMessage('subSex', 'Sex disaggregation'), format: 'fraction' },
             { key: 'age', label: getSecureConfirmMessage('subAge', 'Age disaggregation'), format: 'fraction' },
-            { key: 'disability', label: getSecureConfirmMessage('subDisability', 'Disability (DDD/WGQ)'), format: 'fraction' }
+            { key: 'disability', label: getSecureConfirmMessage('subDisability', 'Disability'), format: 'fraction' }
         ]
+    };
+}
+
+function getDataQualityComponentMeta() {
+    return {
+        reporting: {
+            finance_partnership: [
+                { key: 'reported_income', label: getSecureConfirmMessage('subReportedIncome', 'Reported income'), weight: 35, format: 'binary' },
+                { key: 'reported_expenditure', label: getSecureConfirmMessage('subReportedExpenditure', 'Reported expenditure'), weight: 35, format: 'binary' },
+                { key: 'income_sources', label: getSecureConfirmMessage('subIncomeSources', 'Income sources'), weight: 30, format: 'fraction' }
+            ]
+        },
+        disaggregation: {
+            disability: [
+                { key: 'disaggregated_disability', label: getSecureConfirmMessage('subDisaggregatedDisability', 'Disaggregated disability'), weight: 80, format: 'fraction' },
+                { key: 'washington_group_questions', label: getSecureConfirmMessage('subWashingtonGroup', 'Washington Group questions'), weight: 20, format: 'fraction' }
+            ]
+        }
     };
 }
 
@@ -453,7 +567,102 @@ function formatSubPillarPct(value, format) {
     return Math.round(n * 1000) / 10;
 }
 
-function renderDataQualitySubPillars(pillarKey, subDetail) {
+function renderDataQualityComponentRows(pillarKey, subPillarKey, componentDetail) {
+    const spec = getDataQualityComponentMeta()[pillarKey];
+    const items = spec && spec[subPillarKey];
+    if (!items || !componentDetail || typeof componentDetail !== 'object') {
+        return '';
+    }
+
+    const listId = dataQualityComponentListId(pillarKey, subPillarKey);
+    const expanded = isDataQualityComponentExpanded(pillarKey, subPillarKey);
+    const collapsedClass = expanded ? '' : ' is-collapsed';
+    const weightLabel = getSecureConfirmMessage('weightLabel', 'Weight');
+    const rows = items.map((item) => {
+        if (componentDetail[item.key] == null) {
+            return null;
+        }
+        const label = sanitizeTextContent(item.label);
+        const weightHtml = item.weight != null
+            ? `<span class="data-quality-component-row__weight">${weightLabel}: ${item.weight}%</span>`
+            : '';
+
+        if (item.format === 'binary') {
+            const isPresent = Number(componentDetail[item.key]) >= 1;
+            const statusLabel = isPresent
+                ? getSecureConfirmMessage('subPillarPresent', 'Present')
+                : getSecureConfirmMessage('subPillarMissing', 'Missing');
+            return `
+                <li class="data-quality-component-row">
+                    <div class="data-quality-component-row__label-wrap">
+                        <span class="data-quality-component-row__label" title="${label}">${label}</span>
+                        ${weightHtml}
+                    </div>
+                    <span class="data-quality-component-row__status ${isPresent ? 'is-present' : 'is-missing'}"
+                          aria-label="${label}: ${statusLabel}">
+                        <i class="fas ${isPresent ? 'fa-check-circle' : 'fa-times-circle'}" aria-hidden="true"></i>
+                    </span>
+                </li>
+            `;
+        }
+
+        const pct = formatSubPillarPct(componentDetail[item.key], item.format);
+        if (pct == null) {
+            return null;
+        }
+        const barWidth = Math.max(0, Math.min(100, pct));
+        const scoreColor = scoreHexColor(pct);
+        const barColor = scoreHexColor(pct);
+        return `
+            <li class="data-quality-component-row">
+                <div class="data-quality-component-row__label-wrap">
+                    <span class="data-quality-component-row__label" title="${label}">${label}</span>
+                    ${weightHtml}
+                </div>
+                <span class="data-quality-component-row__score" style="color: ${scoreColor}">${pct}%</span>
+                <div class="data-quality-component-row__bar-track" role="progressbar"
+                     aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
+                     aria-label="${label}">
+                    <div class="data-quality-component-row__bar-fill"
+                         style="width: ${barWidth}%; background-color: ${barColor};"></div>
+                </div>
+            </li>
+        `;
+    }).filter(Boolean);
+
+    if (!rows.length) {
+        return '';
+    }
+
+    return `<ul id="${listId}" class="data-quality-component-list${collapsedClass}" aria-label="${getSecureConfirmMessage('componentBreakdownLabel', 'Score components')}">${rows.join('')}</ul>`;
+}
+
+function renderDataQualitySubPillarLabel(item, pillarKey, hasComponents) {
+    if (!hasComponents) {
+        return `<span class="data-quality-sub-pillar__label">${item.label}</span>`;
+    }
+
+    const listId = dataQualityComponentListId(pillarKey, item.key);
+    const expanded = isDataQualityComponentExpanded(pillarKey, item.key);
+    const actionLabel = expanded
+        ? getSecureConfirmMessage('subPillarComponentsCollapse', 'Hide score components')
+        : getSecureConfirmMessage('subPillarComponentsExpand', 'Show score components');
+
+    return `
+        <button type="button"
+                class="data-quality-sub-pillar__toggle${expanded ? ' is-expanded' : ''}"
+                data-pillar-key="${pillarKey}"
+                data-sub-pillar-key="${item.key}"
+                aria-expanded="${expanded ? 'true' : 'false'}"
+                aria-controls="${listId}"
+                aria-label="${actionLabel}">
+            <span class="data-quality-sub-pillar__label">${item.label}</span>
+            <i class="fas fa-chevron-right data-quality-sub-pillar__chevron" aria-hidden="true"></i>
+        </button>
+    `;
+}
+
+function renderDataQualitySubPillars(pillarKey, subDetail, pillarComponentDetails) {
     const spec = getDataQualitySubPillarMeta()[pillarKey];
     if (!spec || !subDetail || typeof subDetail !== 'object') {
         return '';
@@ -464,6 +673,20 @@ function renderDataQualitySubPillars(pillarKey, subDetail) {
             if (subDetail[item.key] == null) {
                 return null;
             }
+            const hasComponents = subPillarHasComponents(
+                pillarKey,
+                item.key,
+                pillarComponentDetails
+            );
+            const componentRowsHtml = hasComponents
+                ? renderDataQualityComponentRows(
+                    pillarKey,
+                    item.key,
+                    pillarComponentDetails[item.key]
+                )
+                : '';
+            const labelHtml = renderDataQualitySubPillarLabel(item, pillarKey, hasComponents);
+            const expandableClass = hasComponents ? ' data-quality-sub-pillar--expandable' : '';
 
             if (item.format === 'binary') {
                 const isPresent = Number(subDetail[item.key]) >= 1;
@@ -471,12 +694,13 @@ function renderDataQualitySubPillars(pillarKey, subDetail) {
                     ? getSecureConfirmMessage('subPillarPresent', 'Present')
                     : getSecureConfirmMessage('subPillarMissing', 'Missing');
                 return `
-                    <li class="data-quality-sub-pillar data-quality-sub-pillar--binary">
-                        <span class="data-quality-sub-pillar__label">${item.label}</span>
+                    <li class="data-quality-sub-pillar data-quality-sub-pillar--binary${expandableClass}">
+                        ${labelHtml}
                         <span class="data-quality-sub-pillar__status ${isPresent ? 'is-present' : 'is-missing'}"
                               aria-label="${item.label}: ${statusLabel}">
                             <i class="fas ${isPresent ? 'fa-check-circle' : 'fa-times-circle'}" aria-hidden="true"></i>
                         </span>
+                        ${componentRowsHtml}
                     </li>
                 `;
             }
@@ -489,8 +713,8 @@ function renderDataQualitySubPillars(pillarKey, subDetail) {
             const scoreColor = scoreHexColor(pct);
             const barColor = scoreHexColor(pct);
             return `
-                <li class="data-quality-sub-pillar">
-                    <span class="data-quality-sub-pillar__label">${item.label}</span>
+                <li class="data-quality-sub-pillar${expandableClass}">
+                    ${labelHtml}
                     <span class="data-quality-sub-pillar__score" style="color: ${scoreColor}">${pct}%</span>
                     <div class="data-quality-sub-pillar__bar-track" role="progressbar"
                          aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
@@ -498,6 +722,7 @@ function renderDataQualitySubPillars(pillarKey, subDetail) {
                         <div class="data-quality-sub-pillar__bar-fill"
                              style="width: ${barWidth}%; background-color: ${barColor};"></div>
                     </div>
+                    ${componentRowsHtml}
                 </li>
             `;
         })
@@ -515,7 +740,7 @@ function renderDataQualitySubPillars(pillarKey, subDetail) {
     </ul>`;
 }
 
-function renderDataQualityPillarCard(key, meta, pillars, weightLabel, subDetail) {
+function renderDataQualityPillarCard(key, meta, pillars, weightLabel, subDetail, pillarComponentDetails) {
     const pct = pillars[key];
     const hasScore = pct != null;
     const score = hasScore ? Number(pct) : null;
@@ -524,7 +749,7 @@ function renderDataQualityPillarCard(key, meta, pillars, weightLabel, subDetail)
     const barColor = hasScore ? scoreHexColor(score) : '#d1d5db';
     const iconColor = meta.color || '#6d28d9';
     const iconBg = meta.bg || '#f5f3ff';
-    const subPillarsHtml = renderDataQualitySubPillars(key, subDetail);
+    const subPillarsHtml = renderDataQualitySubPillars(key, subDetail, pillarComponentDetails);
 
     return `
         <div class="data-quality-pillar-card">
@@ -721,9 +946,8 @@ function bindDataQualityTrendToggle() {
         }
         const mode = button.getAttribute('data-trend-mode');
         if (!mode) return;
-        const expanded = mode === 'pillars';
-        setDataQualityPillarDetailsExpanded(expanded);
-        applyDataQualityPillarDetailsVisibility(expanded);
+        setDataQualityTrendMode(mode);
+        applyDataQualityTrendMode(mode);
     });
 }
 
@@ -734,9 +958,9 @@ function renderDataQualityTrendSection(trend) {
         </div>`;
     }
 
-    const expanded = isDataQualityPillarDetailsExpanded();
-    const overallActive = !expanded;
-    const pillarsActive = expanded;
+    const trendMode = getDataQualityTrendMode();
+    const overallActive = trendMode === 'overall';
+    const pillarsActive = trendMode === 'pillars';
 
     return `<div class="rounded-lg border border-gray-200 bg-gray-50/60 p-4" id="data-quality-trend-section">
         <div class="data-quality-trend-header">
@@ -781,6 +1005,7 @@ function renderDataQualityPanel(data) {
 
     const pillars = data.pillars || {};
     const subPillars = data.sub_pillars || {};
+    const componentDetails = data.component_details || {};
     const val = data.validation_summary || {};
     const pillarMeta = getDataQualityPillarMeta();
     const overallPct = Number(data.overall_pct) || 0;
@@ -812,7 +1037,7 @@ function renderDataQualityPanel(data) {
         : '';
 
     const pillarCards = Object.keys(pillarMeta).map((key) =>
-        renderDataQualityPillarCard(key, pillarMeta[key], pillars, weightLabel, subPillars[key])
+        renderDataQualityPillarCard(key, pillarMeta[key], pillars, weightLabel, subPillars[key], componentDetails[key])
     ).join('');
 
     const trend = data.trend || [];
@@ -836,6 +1061,8 @@ function renderDataQualityPanel(data) {
     `;
 
     syncDataQualityPillarDetailsToggle();
+    syncDataQualityTrendToggle();
+    bindDataQualitySubPillarComponentToggles();
 }
 
 async function loadDataQualityScore(templateId, period, entityType, entityId) {

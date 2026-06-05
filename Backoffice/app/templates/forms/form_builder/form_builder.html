@@ -317,7 +317,7 @@
 </script>
 
 <script nonce="{{ csp_nonce() }}">
-    // Pagination toggle - translation utilities are provided by components
+    // Pagination and data-quality toggles - translation utilities are provided by components
     document.addEventListener('DOMContentLoaded', function () {
         const paginatedCheckbox = document.querySelector('input[name="is_paginated"]');
         const managePagesContainer = document.getElementById('manage-pages-fields-container');
@@ -334,6 +334,20 @@
             };
             updateVisibility();
             paginatedCheckbox.addEventListener('change', updateVisibility);
+        }
+
+        const dataQualityCheckbox = document.querySelector('input[name="enable_data_quality"]');
+        const dataQualityFields = document.getElementById('data-quality-methodology-fields');
+        if (dataQualityCheckbox && dataQualityFields) {
+            const updateDataQualityVisibility = () => {
+                if (dataQualityCheckbox.checked) {
+                    dataQualityFields.classList.remove('hidden');
+                } else {
+                    dataQualityFields.classList.add('hidden');
+                }
+            };
+            updateDataQualityVisibility();
+            dataQualityCheckbox.addEventListener('change', updateDataQualityVisibility);
         }
     });
 </script>

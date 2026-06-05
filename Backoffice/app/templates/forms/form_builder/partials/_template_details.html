@@ -256,6 +256,31 @@
                         {% endif %}
                     </div>
 
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.enable_data_quality(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.enable_data_quality.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                        </div>
+                        {% if form.enable_data_quality.errors %}
+                            {% for error in form.enable_data_quality.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4{% if not form.enable_data_quality.data %} hidden{% endif %}" id="data-quality-methodology-fields">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="{{ form.data_quality_methodology.id }}" class="block text-gray-700 text-sm font-semibold mb-1">{{ form.data_quality_methodology.label.text }}</label>
+                                {{ form.data_quality_methodology(class="form-select w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500") }}
+                            </div>
+                            <div>
+                                <label for="{{ form.validation_rule_pack.id }}" class="block text-gray-700 text-sm font-semibold mb-1">{{ form.validation_rule_pack.label.text }}</label>
+                                {{ form.validation_rule_pack(class="form-select w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500") }}
+                            </div>
+                        </div>
+                    </div>
+
                     {# Manage Pages UI - shown when paginated is checked #}
                     <div id="manage-pages-fields-container" class="hidden">
                         <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">

@@ -26,6 +26,19 @@ class FormTemplateForm(BaseForm):
     enable_export_excel = BooleanField(_("Enable Export Excel button"), default=False)
     enable_import_excel = BooleanField(_("Enable Import Excel button"), default=False)
     enable_ai_validation = BooleanField(_("Enable Run AI validation button"), default=False)
+    enable_data_quality = BooleanField(_("Enable Data Quality (QoD) dashboard and validation checks"), default=False)
+    data_quality_methodology = SelectField(
+        _("Data quality methodology"),
+        choices=[("", _("— None —"))],
+        validators=[Optional()],
+        default="",
+    )
+    validation_rule_pack = SelectField(
+        _("Validation rule pack"),
+        choices=[("", _("— Default from methodology —"))],
+        validators=[Optional()],
+        default="",
+    )
     owned_by = SelectField(_("Template Owner"), coerce=int_or_none, validators=[Optional()])
     shared_with_admins = SelectMultipleField(_("Shared Access"), coerce=int, validators=[Optional()])
 
@@ -33,6 +46,15 @@ class FormTemplateForm(BaseForm):
 
     def __init__(self, *args, **kwargs):
         super(FormTemplateForm, self).__init__(*args, **kwargs)
+
+        from app.utils.data_quality_constants import REGISTERED_METHODOLOGIES, REGISTERED_RULE_PACKS
+
+        self.data_quality_methodology.choices = [("", _("— None —"))] + [
+            (code, code) for code in REGISTERED_METHODOLOGIES
+        ]
+        self.validation_rule_pack.choices = [("", _("— Default from methodology —"))] + [
+            (code, code) for code in REGISTERED_RULE_PACKS
+        ]
 
         # Populate admin choices (only admin and system_manager roles) — used for both owner and sharing
         admin_role_ids = select(RbacRole.id).where(

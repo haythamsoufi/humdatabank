@@ -13,6 +13,14 @@ class TestApiData:
     def test_get_data_contract_with_api_key(self, client, auth_headers):
         resp = client.get("/api/v1/data", headers=auth_headers)
         assert resp.status_code == 200
+
+    def test_get_data_contract_with_api_key_query_param(self, client, api_key):
+        _api_key_obj, full_key = api_key
+        resp = client.get(f"/api/v1/data?api_key={full_key}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert isinstance(data, dict)
+        assert "data" in data
         data = resp.get_json()
         assert isinstance(data, dict)
         assert "data" in data

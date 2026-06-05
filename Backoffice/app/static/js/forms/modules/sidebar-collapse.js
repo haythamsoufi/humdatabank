@@ -248,6 +248,26 @@ class SidebarCollapseController {
   }
 
   /**
+   * Center the Save/Submit FAB stack on the sections toggle button.
+   */
+  alignFabMenuToToggle(fabmenu, mobiletoggle) {
+    if (!fabmenu || !mobiletoggle) return;
+
+    const toggleRect = mobiletoggle.getBoundingClientRect();
+    if (toggleRect.width <= 0 || toggleRect.height <= 0) return;
+
+    const menuWidth = fabmenu.offsetWidth || toggleRect.width;
+    const centeredLeft = toggleRect.left + (toggleRect.width - menuWidth) / 2;
+
+    fabmenu.style.left = `${Math.round(centeredLeft)}px`;
+
+    const toggleBottomPx = parseFloat(window.getComputedStyle(mobiletoggle).bottom) || 24;
+    const toggleHeightPx = mobiletoggle.offsetHeight || toggleRect.height;
+    fabmenu.style.bottom = `${toggleBottomPx + toggleHeightPx + FAB_SPACING}px`;
+    fabmenu.style.display = '';
+  }
+
+  /**
    * Adjust floating button positions based on screen size and admin sidebar state
    */
   adjustFloatingButtonPosition() {
@@ -260,19 +280,7 @@ class SidebarCollapseController {
       // Small screens: pin Save/Submit FAB column above the sections toggle (toggle uses CSS)
       const { fabmenu, mobiletoggle } = this.elements;
       if (fabmenu && mobiletoggle) {
-        const rect = mobiletoggle.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          fabmenu.style.left = `${Math.round(rect.left)}px`;
-        } else {
-          fabmenu.style.left = this.getAdminSidebarAdjustedPosition();
-        }
-        const toggleBottomPx = parseInt(
-          window.getComputedStyle(mobiletoggle).bottom || '24',
-          10
-        );
-        const toggleHeightPx = mobiletoggle.offsetHeight || 56;
-        fabmenu.style.bottom = `${toggleBottomPx + toggleHeightPx + FAB_SPACING}px`;
-        fabmenu.style.display = '';
+        this.alignFabMenuToToggle(fabmenu, mobiletoggle);
       } else {
         this.clearInlinePositions();
       }
@@ -321,16 +329,9 @@ class SidebarCollapseController {
       expandbutton.style.left = leftPosition;
     }
 
-    // Position FAB menu above the toggle button
+    // Position FAB menu above the toggle button, centered horizontally
     if (fabmenu && mobiletoggle) {
-      const toggleBottomPx = parseInt(
-        window.getComputedStyle(mobiletoggle).bottom || '24',
-        10
-      );
-      const toggleHeightPx = mobiletoggle.offsetHeight || 56;
-      fabmenu.style.left = leftPosition;
-      fabmenu.style.bottom = (toggleBottomPx + toggleHeightPx + FAB_SPACING) + 'px';
-      fabmenu.style.display = '';
+      this.alignFabMenuToToggle(fabmenu, mobiletoggle);
     }
   }
 

@@ -1,0 +1,34 @@
+{% if open_validation_questions %}
+<div id="validation-questions-banner" class="bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-4 mb-6 rounded-r-lg" role="alert">
+    <div class="flex justify-between items-start gap-4">
+        <div>
+            <p class="font-semibold">{{ _('Validation questions require your attention') }} ({{ open_validation_questions|length }})</p>
+            <p class="text-sm mt-1">{{ _('Please review and answer the questions below. Your responses affect your data quality score.') }}</p>
+        </div>
+        <button type="button" id="validation-questions-toggle" class="text-sm underline">{{ _('Show / hide') }}</button>
+    </div>
+    <div id="validation-questions-list" class="mt-4 space-y-4">
+        {% for q in open_validation_questions %}
+        <div class="bg-white border border-amber-200 rounded p-4 validation-question-card"
+             data-question-id="{{ q.id }}"
+             {% if q.form_item_id %}data-form-item-id="{{ q.form_item_id }}"{% endif %}>
+            <div class="flex gap-2 text-xs text-gray-500 mb-2">
+                <span class="font-medium uppercase">{{ q.severity }}</span>
+                <span>{{ q.rule_code }}</span>
+            </div>
+            <p class="text-sm text-gray-800 whitespace-pre-wrap mb-2">{{ q.question_text }}</p>
+            {% if q.context %}
+            <details class="text-xs text-gray-600 mb-2">
+                <summary class="cursor-pointer">{{ _('Evidence') }}</summary>
+                <pre class="mt-1 p-2 bg-gray-50 rounded overflow-x-auto">{{ q.context | tojson(indent=2) }}</pre>
+            </details>
+            {% endif %}
+            <textarea class="form-textarea w-full border rounded p-2 text-sm validation-answer-input" rows="2"
+                      placeholder="{{ _('Your answer…') }}"></textarea>
+            <button type="button" class="btn btn-primary btn-sm mt-2 validation-answer-submit"
+                    data-question-id="{{ q.id }}">{{ _('Submit answer') }}</button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

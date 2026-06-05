@@ -8,6 +8,9 @@
     /* Bottom inset for fixed FABs — matches responsive.css #mobileMenuFAB on phones */
     --chat-fab-bottom-inset: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     --chat-fab-tooltip-gap: 16px;
+    --fab-hover-duration: 0.28s;
+    --fab-hover-stagger: 55ms;
+    --fab-hover-ease: cubic-bezier(0.34, 1.25, 0.64, 1);
     --chat-message-max-width: 85%;
     --chat-input-max-height: 200px;
     --chat-input-min-height: 44px;

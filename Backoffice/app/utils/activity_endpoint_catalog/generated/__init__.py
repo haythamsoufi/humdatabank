@@ -12,15 +12,20 @@ from app.utils.activity_endpoint_catalog.generated.partials.ai_documents import 
 from app.utils.activity_endpoint_catalog.generated.partials.ai_management import SPECS as _S_ai_management
 from app.utils.activity_endpoint_catalog.generated.partials.ai_v2 import SPECS as _S_ai_v2
 from app.utils.activity_endpoint_catalog.generated.partials.analytics import SPECS as _S_analytics
+from app.utils.activity_endpoint_catalog.generated.partials.api_key_management import SPECS as _S_api_key_management
+from app.utils.activity_endpoint_catalog.generated.partials.api_management import SPECS as _S_api_management
 from app.utils.activity_endpoint_catalog.generated.partials.assignment_management import SPECS as _S_assignment_management
 from app.utils.activity_endpoint_catalog.generated.partials.auth import SPECS as _S_auth
 from app.utils.activity_endpoint_catalog.generated.partials.content_management import SPECS as _S_content_management
 from app.utils.activity_endpoint_catalog.generated.partials.data_exploration import SPECS as _S_data_exploration
 from app.utils.activity_endpoint_catalog.generated.partials.embed_management import SPECS as _S_embed_management
+from app.utils.activity_endpoint_catalog.generated.partials.emergency_operations_plugin import SPECS as _S_emergency_operations_plugin
 from app.utils.activity_endpoint_catalog.generated.partials.excel import SPECS as _S_excel
 from app.utils.activity_endpoint_catalog.generated.partials.form_builder import SPECS as _S_form_builder
 from app.utils.activity_endpoint_catalog.generated.partials.forms import SPECS as _S_forms
 from app.utils.activity_endpoint_catalog.generated.partials.forms_api import SPECS as _S_forms_api
+from app.utils.activity_endpoint_catalog.generated.partials.indicator_bank_compat import SPECS as _S_indicator_bank_compat
+from app.utils.activity_endpoint_catalog.generated.partials.interactive_map_plugin import SPECS as _S_interactive_map_plugin
 from app.utils.activity_endpoint_catalog.generated.partials.main import SPECS as _S_main
 from app.utils.activity_endpoint_catalog.generated.partials.monitoring import SPECS as _S_monitoring
 from app.utils.activity_endpoint_catalog.generated.partials.notifications import SPECS as _S_notifications
@@ -41,15 +46,20 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_ai_management,
     _S_ai_v2,
     _S_analytics,
+    _S_api_key_management,
+    _S_api_management,
     _S_assignment_management,
     _S_auth,
     _S_content_management,
     _S_data_exploration,
     _S_embed_management,
+    _S_emergency_operations_plugin,
     _S_excel,
     _S_form_builder,
     _S_forms,
     _S_forms_api,
+    _S_indicator_bank_compat,
+    _S_interactive_map_plugin,
     _S_main,
     _S_monitoring,
     _S_notifications,

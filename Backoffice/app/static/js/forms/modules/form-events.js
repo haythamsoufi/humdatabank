@@ -576,21 +576,26 @@ export function initFormEvents() {
       chatbotAiMenu.style.bottom = `${bottomOffset}px`;
     };
 
+    const hideMenuImmediately = () => {
+      clearTimeout(hideTimer);
+      chatbotAiMenu.classList.remove('is-visible');
+    };
+
     const showMenu = () => {
+      if (chatbotFAB.classList.contains('chat-open')) return;
       clearTimeout(hideTimer);
       alignMenuToFab();
-      chatbotAiMenu.style.pointerEvents = 'auto';
-      chatbotAiMenu.style.opacity = '1';
+      chatbotAiMenu.classList.add('is-visible');
     };
     const scheduleHide = () => {
       hideTimer = setTimeout(() => {
-        chatbotAiMenu.style.opacity = '0';
-        chatbotAiMenu.style.pointerEvents = 'none';
+        chatbotAiMenu.classList.remove('is-visible');
       }, 200);
     };
 
     chatbotFAB.addEventListener('mouseenter', showMenu);
     chatbotFAB.addEventListener('mouseleave', scheduleHide);
+    chatbotFAB.addEventListener('click', hideMenuImmediately);
     chatbotAiMenu.addEventListener('mouseenter', showMenu);
     chatbotAiMenu.addEventListener('mouseleave', scheduleHide);
     window.addEventListener('resize', alignMenuToFab);

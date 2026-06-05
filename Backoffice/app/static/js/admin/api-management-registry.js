@@ -957,6 +957,9 @@
             templateId: 'api-mgmt-endpoint-registry',
             columnDefs: columnDefs,
             rowData: gridRowData,
+            contextMenuLabels: {
+                copyUrl: cfg.t.copy_url_8f2e1a0b,
+            },
             columnVisibilityOptions: {
                 buttonPlaceholderId: 'ep-registry-col-vis-placeholder',
                 persistOnChange: true,

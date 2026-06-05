@@ -20,8 +20,10 @@ def supports_disaggregation(unit, indicator_type=None):
     if not unit:
         return False
 
-    # Check if unit is in the allowed units for disaggregation
-    unit_supports_disagg = unit in Config.DISAGGREGATION_ALLOWED_UNITS
+    # Check if unit is in the allowed units for disaggregation (case-insensitive;
+    # lookup catalog codes are lowercase e.g. "people" while legacy values may be "People")
+    allowed_units = {u.lower() for u in Config.DISAGGREGATION_ALLOWED_UNITS}
+    unit_supports_disagg = unit.strip().lower() in allowed_units
 
     # If indicator_type is provided, also check that it's 'Number'
     if indicator_type is not None:

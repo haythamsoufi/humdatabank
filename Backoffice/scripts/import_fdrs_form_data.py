@@ -209,16 +209,16 @@ def _disagg_data_for_db(val: Any) -> Optional[Any]:
     return val
 
 
-def _parse_bool(raw: Optional[str]) -> Optional[bool]:
-    """Parse boolean (data_not_available, not_applicable)."""
+def _parse_bool(raw: Optional[str]) -> bool:
+    """Parse boolean (data_not_available, not_applicable). Defaults to False when absent."""
     if raw is None or (isinstance(raw, str) and not raw.strip()):
-        return None
+        return False
     s = str(raw).strip().lower()
     if s in ("1", "true", "yes", "on"):
         return True
     if s in ("0", "false", "no", "off"):
         return False
-    return None
+    return False
 
 
 _THOUSANDS_GROUPING_RE = re.compile(r"^\s*[-+]?\d{1,3}(,\d{3})+(\.\d+)?\s*$")
@@ -672,8 +672,6 @@ def _fetch_databank_tables_local(template_id: int) -> Tuple[List[Dict[str, Any]]
     loaded from the current app's database (no HTTP). Used when FDRS import runs in-process without
     a databank Bearer token (e.g. admin FDRS sync modal — urllib cannot send browser session cookies).
     """
-    from sqlalchemy import func
-
     from app.extensions import db
     from app.models.assignments import AssignedForm, AssignmentEntityStatus
     from app.models.core import Country
@@ -708,7 +706,7 @@ def _fetch_databank_tables_local(template_id: int) -> Tuple[List[Dict[str, Any]]
         db.session.query(FormItem)
         .join(FormTemplateVersion, FormItem.version_id == FormTemplateVersion.id)
         .filter(FormItem.template_id == template_id)
-        .filter(func.lower(FormTemplateVersion.status) == "published")
+        .filter(FormTemplateVersion.status == "published")
         .all()
     )
     form_item_rows: List[Dict[str, Any]] = []

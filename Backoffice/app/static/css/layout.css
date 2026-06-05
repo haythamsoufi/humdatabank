@@ -902,10 +902,6 @@ nav .relative {
     left: 96px !important; /* 72px (collapsed sidebar) + 24px spacing */
 }
 
-.content-with-collapsed-sidebar #fab-menu {
-    left: 96px !important; /* 72px (collapsed sidebar) + 24px spacing */
-}
-
 .sidebar-initially-collapsed .sidebar-text,
 .sidebar-initially-collapsed .admin-panel-title,
 .sidebar-initially-collapsed .sidebar-section-title {

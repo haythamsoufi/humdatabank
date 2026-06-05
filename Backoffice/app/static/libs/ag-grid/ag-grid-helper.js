@@ -2541,7 +2541,7 @@
     };
 
     /**
-     * Setup custom right-click context menu (Copy cell, Export table to Excel).
+     * Setup custom right-click context menu (Copy URL on endpoint links, Copy cell, Export table to Excel).
      * Uses DOM listener so it works in AG Grid Community edition (context menu is Enterprise-only).
      */
     AgGridHelper.prototype.setupContextMenuFallback = function() {
@@ -2643,6 +2643,21 @@
                     closeMenu();
                 });
                 menu.appendChild(item);
+            }
+
+            const endpointLink = ev.target.closest && ev.target.closest('a.api-endpoint-link');
+            if (endpointLink && endpointLink.href) {
+                const copyUrlLabel = (self.config.contextMenuLabels && self.config.contextMenuLabels.copyUrl) || 'Copy URL';
+                addItem(copyUrlLabel, function() {
+                    const url = endpointLink.href;
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        navigator.clipboard.writeText(url).catch(function() {
+                            fallbackCopyToClipboard(url);
+                        });
+                    } else {
+                        fallbackCopyToClipboard(url);
+                    }
+                });
             }
 
             addItem('Copy cell', function() {

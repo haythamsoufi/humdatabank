@@ -174,6 +174,24 @@ class FormTemplate(db.Model):
             return first_version.enable_ai_validation
         return False
 
+    @property
+    def enable_data_quality(self):
+        if self.published_version:
+            return self.published_version.enable_data_quality
+        first_version = self.versions.order_by('created_at').first()
+        if first_version:
+            return first_version.enable_data_quality
+        return False
+
+    @property
+    def data_quality_methodology(self):
+        if self.published_version:
+            return self.published_version.data_quality_methodology
+        first_version = self.versions.order_by('created_at').first()
+        if first_version:
+            return first_version.data_quality_methodology
+        return None
+
     def __repr__(self):
         return f'<FormTemplate {self.name}>'
 
@@ -213,6 +231,9 @@ class FormTemplateVersion(db.Model):
     enable_export_excel = Column(Boolean, default=False, nullable=False)
     enable_import_excel = Column(Boolean, default=False, nullable=False)
     enable_ai_validation = Column(Boolean, default=False, nullable=False)
+    enable_data_quality = Column(Boolean, default=False, nullable=False)
+    data_quality_methodology = Column(String(64), nullable=True)
+    validation_rule_pack = Column(String(64), nullable=True)
 
     # Template variables for referencing values from other form submissions
     # Structure: {"variable_name": {"source_template_id": int, "source_assignment_period": str,
@@ -268,6 +289,9 @@ class FormTemplateVersion(db.Model):
     def get_effective_enable_ai_validation(self):
         """Get the effective enable_ai_validation for this version."""
         return self.enable_ai_validation
+
+    def get_effective_enable_data_quality(self):
+        return self.enable_data_quality
 
     def get_name_translation(self, language):
         """Get the translated name for a specific language."""

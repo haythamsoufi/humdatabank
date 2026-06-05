@@ -55,6 +55,9 @@ from app.routes.admin.embed_management import bp as embed_management_bp
 # Create main admin blueprint
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
+# Attach routes to main admin bp (must import before register_blueprint(bp))
+from app.routes.admin import validation_questions  # noqa: F401, E402
+
 # Register all sub-blueprints
 def register_admin_blueprints(app):
     """Register all admin blueprints with the main application"""

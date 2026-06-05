@@ -955,8 +955,25 @@ def handle_assignment_form(aes_id):
         elif AuthorizationService.has_rbac_permission(current_user, "assignment.documents.upload"):
             documents_library_url = url_for("main.documents_submit")
 
+    open_validation_questions = []
+    if form_template and getattr(form_template, "enable_data_quality", False):
+        try:
+            from app.models.validation import ValidationQuestion
+
+            open_validation_questions = (
+                ValidationQuestion.query.filter_by(
+                    assignment_entity_status_id=assignment_entity_status.id,
+                    status="open",
+                )
+                .order_by(ValidationQuestion.severity, ValidationQuestion.asked_at.desc())
+                .all()
+            )
+        except Exception:
+            open_validation_questions = []
+
     return render_template(
         "forms/entry_form/entry_form.html",
+        open_validation_questions=open_validation_questions,
         template_structure=template_structure,
         sections=db_sections,
         all_sections=all_sections,

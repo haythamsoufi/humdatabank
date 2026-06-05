@@ -360,6 +360,14 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         # Admin message notifications (these use custom messages, so we handle them specially)
         'notification.admin_message.title': _notification_msgid('Admin Message'),
         'notification.admin_message.message': _notification_msgid('You have received an admin message'),
+
+        # Validation questions (data quality checks)
+        'notification.validation_questions.title': _notification_msgid(
+            'Validation questions for %(template)s (%(period)s)'
+        ),
+        'notification.validation_questions.message': _notification_msgid(
+            '%(count)s data validation question(s) for %(entity)s require your response.'
+        ),
     }
 
     # Try to get translation source from map
@@ -2305,7 +2313,8 @@ def get_default_icon_for_notification_type(notification_type):
         NotificationType.template_updated: 'fas fa-file-alt',
         NotificationType.self_report_created: 'fas fa-clipboard-list',
         NotificationType.deadline_reminder: 'fas fa-clock',
-        NotificationType.access_request_received: 'fas fa-user-plus'
+        NotificationType.access_request_received: 'fas fa-user-plus',
+        NotificationType.validation_questions: 'fas fa-clipboard-question',
     }
     return icon_map.get(notification_type, 'fas fa-bell')
 

@@ -10,7 +10,7 @@ from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec
 
 SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("DELETE", "content_management.resource_subcategory_api_delete"): ActivityEndpointSpec(description="Deleted Resource Subcategory Api Delete", activity_type="admin_content"),
-    ("POST", "content_management.approve_document"): ActivityEndpointSpec(description="Approved Document", activity_type="admin_content"),
+    ("POST", "content_management.approve_document"): ActivityEndpointSpec(description="approved Document", activity_type="admin_content"),
     ("POST", "content_management.decline_document"): ActivityEndpointSpec(description="Declined Document", activity_type="admin_content"),
     ("POST", "content_management.delete_document"): ActivityEndpointSpec(description="Deleted Document", activity_type="admin_content"),
     ("POST", "content_management.delete_document_thumbnail"): ActivityEndpointSpec(description="Deleted Document Thumbnail", activity_type="admin_content"),

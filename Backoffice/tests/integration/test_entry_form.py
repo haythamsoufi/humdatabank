@@ -553,6 +553,194 @@ class TestFormDataService:
                 assert result['success'] is True
                 assert result.get('submitted') is False
 
+    def test_save_preserves_indicator_when_empty_hidden_total_submitted(self, db_session, app, admin_user):
+        """Regression: save must not clear stored disaggregated data when only empty total_value is posted."""
+        with app.app_context():
+            from flask_login import login_user
+
+            login_user(admin_user)
+
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+
+            section = FormSection(
+                template_id=template.id,
+                name="Disagg Section",
+                order=1,
+                version_id=template.published_version_id,
+            )
+            db_session.add(section)
+            db_session.flush()
+
+            import uuid as _uuid
+            indicator_bank = IndicatorBank(
+                name=f"Blood donors {_uuid.uuid4().hex[:8]}",
+                definition="Test",
+                type="Number",
+                unit="People",
+            )
+            db_session.add(indicator_bank)
+            db_session.flush()
+
+            indicator = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                item_type='indicator',
+                label=indicator_bank.name,
+                order=1,
+                version_id=template.published_version_id,
+                indicator_bank_id=indicator_bank.id,
+                allowed_disaggregation_options=['total', 'sex_age'],
+            )
+            db_session.add(indicator)
+            db_session.flush()
+
+            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+            db_session.add(assigned_form)
+            db_session.flush()
+
+            assignment_status = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(assignment_status)
+            db_session.flush()
+
+            existing_disagg = {
+                'mode': 'sex_age',
+                'values': {
+                    'direct': {
+                        'female_5_17': 3,
+                        'male_18_49': 19,
+                    },
+                    'indirect': None,
+                },
+            }
+            form_data = FormData(
+                assignment_entity_status_id=assignment_status.id,
+                form_item_id=indicator.id,
+            )
+            form_data.set_disaggregated_data('sex_age', existing_disagg['values'])
+            db_session.add(form_data)
+            db_session.commit()
+
+            indicator_id = indicator.id
+            aes_id = assignment_status.id
+            with app.test_request_context(
+                method='POST',
+                data={
+                    'action': 'save',
+                    f'indicator_{indicator_id}_reporting_mode': 'sex_age',
+                    f'indicator_{indicator_id}_total_value': '',
+                },
+            ):
+                from flask_wtf import FlaskForm
+                csrf_form = FlaskForm()
+                csrf_form.validate_on_submit = Mock(return_value=True)
+
+                section.fields_ordered = [indicator]
+                result = FormDataService.process_form_submission(
+                    assignment_status, [section], csrf_form
+                )
+
+            assert result['success'] is True
+            saved = FormData.query.filter_by(
+                assignment_entity_status_id=aes_id,
+                form_item_id=indicator_id,
+            ).first()
+            assert saved is not None
+            assert saved.disagg_data is not None
+            assert saved.disagg_data.get('mode') == 'sex_age'
+
+    def test_save_total_mode_value_when_stale_sex_age_mode_in_post(self, db_session, app, admin_user):
+        """Regression: total entry must save even if POST still carries sex_age reporting_mode."""
+        with app.app_context():
+            from flask_login import login_user
+
+            login_user(admin_user)
+
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+
+            section = FormSection(
+                template_id=template.id,
+                name="Total mode section",
+                order=1,
+                version_id=template.published_version_id,
+            )
+            db_session.add(section)
+            db_session.flush()
+
+            import uuid as _uuid
+            indicator_bank = IndicatorBank(
+                name=f"Funding {_uuid.uuid4().hex[:8]}",
+                definition="Test",
+                type="Number",
+                unit="Currency",
+            )
+            db_session.add(indicator_bank)
+            db_session.flush()
+
+            indicator = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                item_type='indicator',
+                label=indicator_bank.name,
+                order=1,
+                version_id=template.published_version_id,
+                indicator_bank_id=indicator_bank.id,
+                type='Number',
+                allowed_disaggregation_options=['total', 'sex_age'],
+            )
+            db_session.add(indicator)
+            db_session.flush()
+
+            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+            db_session.add(assigned_form)
+            db_session.flush()
+
+            assignment_status = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(assignment_status)
+            db_session.commit()
+
+            indicator_id = indicator.id
+            aes_id = assignment_status.id
+            with app.test_request_context(
+                method='POST',
+                data={
+                    'action': 'save',
+                    f'indicator_{indicator_id}_reporting_mode': 'sex_age',
+                    f'indicator_{indicator_id}_total_value': '196411',
+                },
+            ):
+                from flask_wtf import FlaskForm
+                csrf_form = FlaskForm()
+                csrf_form.validate_on_submit = Mock(return_value=True)
+
+                section.fields_ordered = [indicator]
+                result = FormDataService.process_form_submission(
+                    assignment_status, [section], csrf_form
+                )
+
+            assert result['success'] is True
+            assert any(c.get('type') == 'added' for c in result.get('field_changes', []))
+
+            saved = FormData.query.filter_by(
+                assignment_entity_status_id=aes_id,
+                form_item_id=indicator_id,
+            ).first()
+            assert saved is not None
+            assert saved.disagg_data is not None
+            assert saved.disagg_data.get('mode') == 'total'
+            assert saved.disagg_data.get('values', {}).get('total') == 196411
+
     def test_process_form_submission_submit_action(self, db_session, app, admin_user):
         """Test processing form submission with submit action."""
         with app.app_context():

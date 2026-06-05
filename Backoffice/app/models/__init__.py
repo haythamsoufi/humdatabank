@@ -143,6 +143,16 @@ from .ai_validation import (
     AIFormDataValidation,
 )
 
+from .validation import (
+    ValidationQuestion,
+    ValidationDispatchBatch,
+    ValidationThreshold,
+    ValidationKpiCheckType,
+    ValidationQuestionTemplate,
+    CountryYearReference,
+    CountryAttribute,
+)
+
 from .ai_terminology import (
     AITermConcept,
     AITermGlossary,
@@ -285,6 +295,15 @@ __all__ = [
 
     # AI validation models
     'AIFormDataValidation',
+
+    # Validation / data quality models
+    'ValidationQuestion',
+    'ValidationDispatchBatch',
+    'ValidationThreshold',
+    'ValidationKpiCheckType',
+    'ValidationQuestionTemplate',
+    'CountryYearReference',
+    'CountryAttribute',
 
     # AI terminology models
     'AITermConcept',

@@ -307,6 +307,9 @@ def new_template():
                         form.enable_export_excel.data = source_version.enable_export_excel
                         form.enable_import_excel.data = source_version.enable_import_excel
                         form.enable_ai_validation.data = source_version.enable_ai_validation
+                        form.enable_data_quality.data = source_version.enable_data_quality
+                        form.data_quality_methodology.data = source_version.data_quality_methodology or ""
+                        form.validation_rule_pack.data = source_version.validation_rule_pack or ""
                     else:
                         # Fallback if no version exists (shouldn't happen normally, use defaults)
                         form.name.data = "New Template (Copy)"
@@ -360,6 +363,9 @@ def new_template():
         enable_export_excel = request.form.get('enable_export_excel') == 'y'
         enable_import_excel = request.form.get('enable_import_excel') == 'y'
         enable_ai_validation = request.form.get('enable_ai_validation') == 'y'
+        enable_data_quality = request.form.get('enable_data_quality') == 'y'
+        data_quality_methodology = (request.form.get('data_quality_methodology') or '').strip() or None
+        validation_rule_pack = (request.form.get('validation_rule_pack') or '').strip() or None
         description = request.form.get('description', '')
         owned_by = request.form.get('owned_by', type=int) or current_user.id
 
@@ -389,6 +395,9 @@ def new_template():
             enable_export_excel=enable_export_excel,
             enable_import_excel=enable_import_excel,
             enable_ai_validation=enable_ai_validation,
+            enable_data_quality=enable_data_quality,
+            data_quality_methodology=data_quality_methodology if enable_data_quality else None,
+            validation_rule_pack=validation_rule_pack if enable_data_quality else None,
             created_by=current_user.id,
             updated_by=current_user.id,
             created_at=now,
@@ -591,6 +600,9 @@ def new_template():
             enable_export_excel=form.enable_export_excel.data,
             enable_import_excel=form.enable_import_excel.data,
             enable_ai_validation=form.enable_ai_validation.data,
+            enable_data_quality=form.enable_data_quality.data,
+            data_quality_methodology=form.data_quality_methodology.data or None if form.enable_data_quality.data else None,
+            validation_rule_pack=form.validation_rule_pack.data or None if form.enable_data_quality.data else None,
             created_by=current_user.id,
             updated_by=current_user.id,
             created_at=now,
@@ -696,6 +708,9 @@ def get_template_clone_data(template_id):
         enable_export_excel=version.enable_export_excel if version else False,
         enable_import_excel=version.enable_import_excel if version else False,
         enable_ai_validation=version.enable_ai_validation if version else False,
+        enable_data_quality=version.enable_data_quality if version else False,
+        data_quality_methodology=version.data_quality_methodology if version else None,
+        validation_rule_pack=version.validation_rule_pack if version else None,
         name_translations=version_translations,
     )
 
@@ -761,6 +776,9 @@ def edit_template(template_id):
         form.enable_export_excel.data = selected_version.enable_export_excel
         form.enable_import_excel.data = selected_version.enable_import_excel
         form.enable_ai_validation.data = selected_version.enable_ai_validation
+        form.enable_data_quality.data = selected_version.enable_data_quality
+        form.data_quality_methodology.data = selected_version.data_quality_methodology or ""
+        form.validation_rule_pack.data = selected_version.validation_rule_pack or ""
 
         # Populate translation fields with existing values from version
         _populate_version_translations(form, selected_version)
@@ -874,8 +892,11 @@ def edit_template(template_id):
         selected_version.enable_export_excel = get_boolean_from_form('enable_export_excel', default_when_missing=False)
         selected_version.enable_import_excel = get_boolean_from_form('enable_import_excel', default_when_missing=False)
         selected_version.enable_ai_validation = get_boolean_from_form('enable_ai_validation', default_when_missing=False)
-
-
+        selected_version.enable_data_quality = get_boolean_from_form('enable_data_quality', default_when_missing=False)
+        methodology = (data.get('data_quality_methodology') or form.data_quality_methodology.data or "").strip() or None
+        rule_pack = (data.get('validation_rule_pack') or form.validation_rule_pack.data or "").strip() or None
+        selected_version.data_quality_methodology = methodology if selected_version.enable_data_quality else None
+        selected_version.validation_rule_pack = rule_pack if selected_version.enable_data_quality else None
 
         # Update template ownership if changed
         if form.owned_by.data and form.owned_by.data != template.owned_by:
@@ -1436,7 +1457,10 @@ def duplicate_template(template_id):
             enable_export_pdf=source_version.enable_export_pdf if source_version else None,
             enable_export_excel=source_version.enable_export_excel if source_version else None,
             enable_import_excel=source_version.enable_import_excel if source_version else None,
-            enable_ai_validation=source_version.enable_ai_validation if source_version else False
+            enable_ai_validation=source_version.enable_ai_validation if source_version else False,
+            enable_data_quality=source_version.enable_data_quality if source_version else False,
+            data_quality_methodology=source_version.data_quality_methodology if source_version else None,
+            validation_rule_pack=source_version.validation_rule_pack if source_version else None,
         )
         db.session.add(new_published)
         db.session.flush()

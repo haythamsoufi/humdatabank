@@ -297,10 +297,689 @@ function renderDataQualityChart() {
     });
 }
 
+function scoreColorClass(pct) {
+    if (pct >= 80) return 'text-green-700';
+    if (pct >= 50) return 'text-amber-600';
+    return 'text-red-600';
+}
+
+function scoreHexColor(pct) {
+    if (pct >= 80) return '#15803d';
+    if (pct >= 50) return '#d97706';
+    return '#dc2626';
+}
+
+function scoreRingColor(pct) {
+    if (pct >= 80) return '#16a34a';
+    if (pct >= 50) return '#d97706';
+    return '#dc2626';
+}
+
+function renderDataQualityScoreRing(pct) {
+    const color = scoreRingColor(pct);
+    const radius = 40;
+    const stroke = 7;
+    const normalizedRadius = radius - stroke / 2;
+    const circumference = normalizedRadius * 2 * Math.PI;
+    const offset = circumference - (Math.max(0, Math.min(100, pct)) / 100) * circumference;
+    const label = `${getSecureConfirmMessage('overallScore', 'Overall score')}: ${pct}%`;
+
+    return `
+        <svg class="shrink-0" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="${label}">
+            <circle cx="48" cy="48" r="${normalizedRadius}" fill="none" stroke="#e5e7eb" stroke-width="${stroke}"></circle>
+            <circle cx="48" cy="48" r="${normalizedRadius}" fill="none" stroke="${color}" stroke-width="${stroke}"
+                    stroke-dasharray="${circumference.toFixed(2)}"
+                    stroke-dashoffset="${offset.toFixed(2)}"
+                    stroke-linecap="round"
+                    transform="rotate(-90 48 48)"></circle>
+            <text x="48" y="48" text-anchor="middle" dominant-baseline="middle"
+                  font-size="22" font-weight="700" fill="${color}">${pct}%</text>
+        </svg>
+    `;
+}
+
+const DATA_QUALITY_DETAILS_STORAGE_KEY = 'dataQualityPillarDetailsExpanded';
+
+function isDataQualityPillarDetailsExpanded() {
+    try {
+        return sessionStorage.getItem(DATA_QUALITY_DETAILS_STORAGE_KEY) === 'true';
+    } catch (e) {
+        return false;
+    }
+}
+
+function setDataQualityPillarDetailsExpanded(expanded) {
+    try {
+        sessionStorage.setItem(DATA_QUALITY_DETAILS_STORAGE_KEY, expanded ? 'true' : 'false');
+    } catch (e) {
+        /* sessionStorage unavailable */
+    }
+}
+
+function updateDataQualityDetailsToggleButton(expanded) {
+    const btn = document.getElementById('data-quality-pillar-details-toggle');
+    if (!btn) return;
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.classList.toggle('is-expanded', expanded);
+    const actionLabel = expanded
+        ? getSecureConfirmMessage('pillarBreakdownCollapse', 'Hide score breakdown')
+        : getSecureConfirmMessage('pillarBreakdownExpand', 'Show score breakdown');
+    btn.setAttribute('aria-label', actionLabel);
+}
+
+function getDataQualityTrendMode(expanded) {
+    return expanded ? 'pillars' : 'overall';
+}
+
+function setDataQualityTrendToggleUi(mode) {
+    const toggle = document.getElementById('data-quality-trend-toggle');
+    if (!toggle) return;
+    toggle.querySelectorAll('[data-trend-mode]').forEach((btn) => {
+        const btnMode = btn.getAttribute('data-trend-mode');
+        const active = btnMode === mode;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+}
+
+function applyDataQualityTrendMode(expanded) {
+    if (!dataQualityTrendData.length) return;
+    const mode = getDataQualityTrendMode(expanded);
+    renderDataQualityTrendChart(dataQualityTrendData, mode);
+    setDataQualityTrendToggleUi(mode);
+}
+
+function applyDataQualityPillarDetailsVisibility(expanded) {
+    document.querySelectorAll('.data-quality-sub-pillars').forEach((el) => {
+        el.classList.toggle('is-collapsed', !expanded);
+    });
+    updateDataQualityDetailsToggleButton(expanded);
+    applyDataQualityTrendMode(expanded);
+}
+
+function syncDataQualityPillarDetailsToggle() {
+    const toggleWrap = document.getElementById('data-quality-details-toggle-wrap');
+    const hasSubPillars = document.querySelector('.data-quality-sub-pillars');
+    const hasTrend = dataQualityTrendData.length > 0;
+    if (!hasSubPillars && !hasTrend) {
+        if (toggleWrap) toggleWrap.classList.add('is-unavailable');
+        return;
+    }
+    if (toggleWrap) toggleWrap.classList.remove('is-unavailable');
+    applyDataQualityPillarDetailsVisibility(isDataQualityPillarDetailsExpanded());
+}
+
+function bindDataQualityPillarDetailsToggle() {
+    const btn = document.getElementById('data-quality-pillar-details-toggle');
+    if (!btn || btn.dataset.bound === 'true') return;
+    btn.dataset.bound = 'true';
+    btn.addEventListener('click', () => {
+        const nextExpanded = btn.getAttribute('aria-expanded') !== 'true';
+        setDataQualityPillarDetailsExpanded(nextExpanded);
+        applyDataQualityPillarDetailsVisibility(nextExpanded);
+    });
+}
+
+function getDataQualitySubPillarMeta() {
+    return {
+        documents: [
+            { key: 'annual_report', label: getSecureConfirmMessage('subAnnualReport', 'Annual Report'), format: 'binary' },
+            { key: 'audited_financial_statement', label: getSecureConfirmMessage('subAuditedFinancial', 'Audited Financial Statement'), format: 'binary' }
+        ],
+        reporting: [
+            { key: 'governance_structure', label: getSecureConfirmMessage('subGovernance', 'Governance & structure'), format: 'fraction' },
+            { key: 'finance_partnership', label: getSecureConfirmMessage('subFinance', 'Finance & partnership'), format: 'fraction' },
+            { key: 'people_reached', label: getSecureConfirmMessage('subPeopleReached', 'People reached'), format: 'fraction' }
+        ],
+        disaggregation: [
+            { key: 'sex', label: getSecureConfirmMessage('subSex', 'Sex disaggregation'), format: 'fraction' },
+            { key: 'age', label: getSecureConfirmMessage('subAge', 'Age disaggregation'), format: 'fraction' },
+            { key: 'disability', label: getSecureConfirmMessage('subDisability', 'Disability (DDD/WGQ)'), format: 'fraction' }
+        ]
+    };
+}
+
+function formatSubPillarPct(value, format) {
+    if (value == null || value === '') {
+        return null;
+    }
+    const n = Number(value);
+    if (Number.isNaN(n)) {
+        return null;
+    }
+    if (format === 'binary') {
+        return n >= 1 ? 100 : 0;
+    }
+    return Math.round(n * 1000) / 10;
+}
+
+function renderDataQualitySubPillars(pillarKey, subDetail) {
+    const spec = getDataQualitySubPillarMeta()[pillarKey];
+    if (!spec || !subDetail || typeof subDetail !== 'object') {
+        return '';
+    }
+
+    const rows = spec
+        .map((item) => {
+            if (subDetail[item.key] == null) {
+                return null;
+            }
+
+            if (item.format === 'binary') {
+                const isPresent = Number(subDetail[item.key]) >= 1;
+                const statusLabel = isPresent
+                    ? getSecureConfirmMessage('subPillarPresent', 'Present')
+                    : getSecureConfirmMessage('subPillarMissing', 'Missing');
+                return `
+                    <li class="data-quality-sub-pillar data-quality-sub-pillar--binary">
+                        <span class="data-quality-sub-pillar__label">${item.label}</span>
+                        <span class="data-quality-sub-pillar__status ${isPresent ? 'is-present' : 'is-missing'}"
+                              aria-label="${item.label}: ${statusLabel}">
+                            <i class="fas ${isPresent ? 'fa-check-circle' : 'fa-times-circle'}" aria-hidden="true"></i>
+                        </span>
+                    </li>
+                `;
+            }
+
+            const pct = formatSubPillarPct(subDetail[item.key], item.format);
+            if (pct == null) {
+                return null;
+            }
+            const barWidth = Math.max(0, Math.min(100, pct));
+            const scoreColor = scoreHexColor(pct);
+            const barColor = scoreHexColor(pct);
+            return `
+                <li class="data-quality-sub-pillar">
+                    <span class="data-quality-sub-pillar__label">${item.label}</span>
+                    <span class="data-quality-sub-pillar__score" style="color: ${scoreColor}">${pct}%</span>
+                    <div class="data-quality-sub-pillar__bar-track" role="progressbar"
+                         aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
+                         aria-label="${item.label}">
+                        <div class="data-quality-sub-pillar__bar-fill"
+                             style="width: ${barWidth}%; background-color: ${barColor};"></div>
+                    </div>
+                </li>
+            `;
+        })
+        .filter(Boolean);
+
+    if (!rows.length) {
+        return '';
+    }
+
+    const expanded = isDataQualityPillarDetailsExpanded();
+    const collapsedClass = expanded ? '' : ' is-collapsed';
+
+    return `<ul class="data-quality-sub-pillars${collapsedClass}" aria-label="${getSecureConfirmMessage('subPillarsLabel', 'Components')}">
+        ${rows.join('')}
+    </ul>`;
+}
+
+function renderDataQualityPillarCard(key, meta, pillars, weightLabel, subDetail) {
+    const pct = pillars[key];
+    const hasScore = pct != null;
+    const score = hasScore ? Number(pct) : null;
+    const barWidth = hasScore ? Math.max(0, Math.min(100, score)) : 0;
+    const scoreColor = hasScore ? scoreHexColor(score) : '#9ca3af';
+    const barColor = hasScore ? scoreHexColor(score) : '#d1d5db';
+    const iconColor = meta.color || '#6d28d9';
+    const iconBg = meta.bg || '#f5f3ff';
+    const subPillarsHtml = renderDataQualitySubPillars(key, subDetail);
+
+    return `
+        <div class="data-quality-pillar-card">
+            <div class="data-quality-pillar-card__header">
+                <div class="data-quality-pillar-card__title-row">
+                    <span class="data-quality-pillar-card__icon" style="background-color: ${iconBg}; color: ${iconColor};">
+                        <i class="fas ${meta.icon}" aria-hidden="true"></i>
+                    </span>
+                    <div>
+                        <p class="data-quality-pillar-card__label">${meta.label}</p>
+                        <p class="data-quality-pillar-card__weight">${weightLabel}: ${meta.weight}%</p>
+                    </div>
+                </div>
+                <p class="data-quality-pillar-card__score" style="color: ${scoreColor}">
+                    ${hasScore ? `${score}%` : '—'}
+                </p>
+            </div>
+            <div class="data-quality-pillar-card__bar-track" role="progressbar"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="${hasScore ? barWidth : 0}"
+                 aria-label="${meta.label}">
+                <div class="data-quality-pillar-card__bar-fill"
+                     style="width: ${barWidth}%; background-color: ${barColor};"></div>
+            </div>
+            <p class="data-quality-pillar-card__desc">${meta.description}</p>
+            ${subPillarsHtml}
+        </div>
+    `;
+}
+
+function getDataQualityPillarColors() {
+    return {
+        documents: { color: '#6366f1', bg: '#eef2ff' },
+        reporting: { color: '#0891b2', bg: '#ecfeff' },
+        disaggregation: { color: '#059669', bg: '#ecfdf5' },
+        timeliness: { color: '#d97706', bg: '#fffbeb' },
+        validation_questions: { color: '#db2777', bg: '#fdf2f8' }
+    };
+}
+
+function getDataQualityPillarMeta() {
+    const colors = getDataQualityPillarColors();
+    return {
+        documents: {
+            label: getSecureConfirmMessage('pillarDocuments', 'Documents'),
+            weight: 20,
+            icon: 'fa-file-alt',
+            color: colors.documents.color,
+            bg: colors.documents.bg,
+            description: getSecureConfirmMessage('pillarDocumentsDesc', 'Annual Report and Audited Financial Statement uploads')
+        },
+        reporting: {
+            label: getSecureConfirmMessage('pillarReporting', 'Reporting'),
+            weight: 30,
+            icon: 'fa-chart-bar',
+            color: colors.reporting.color,
+            bg: colors.reporting.bg,
+            description: getSecureConfirmMessage('pillarReportingDesc', 'Governance, finance, and people-reached indicators')
+        },
+        disaggregation: {
+            label: getSecureConfirmMessage('pillarDisaggregation', 'Disaggregation'),
+            weight: 30,
+            icon: 'fa-users',
+            color: colors.disaggregation.color,
+            bg: colors.disaggregation.bg,
+            description: getSecureConfirmMessage('pillarDisaggregationDesc', 'Sex, age, and disability breakdowns where applicable')
+        },
+        timeliness: {
+            label: getSecureConfirmMessage('pillarTimeliness', 'Timeliness'),
+            weight: 10,
+            icon: 'fa-clock',
+            color: colors.timeliness.color,
+            bg: colors.timeliness.bg,
+            description: getSecureConfirmMessage('pillarTimelinessDesc', 'Whether sections were submitted before the cutoff')
+        },
+        validation_questions: {
+            label: getSecureConfirmMessage('pillarValidationQuestions', 'Validation questions'),
+            weight: 10,
+            icon: 'fa-check-circle',
+            color: colors.validation_questions.color,
+            bg: colors.validation_questions.bg,
+            description: getSecureConfirmMessage('pillarValidationDesc', 'Responses to automatic data checks')
+        }
+    };
+}
+
+function buildDataQualityTrendDatasets(trend, mode, pillarMeta) {
+    if (mode === 'pillars') {
+        return Object.keys(pillarMeta).map((key) => {
+            const lineColor = pillarMeta[key].color || '#6d28d9';
+            return {
+                label: pillarMeta[key].label,
+                data: trend.map((entry) => {
+                    const pillars = entry.pillars || {};
+                    return pillars[key] != null ? Number(pillars[key]) : null;
+                }),
+                borderColor: lineColor,
+                backgroundColor: lineColor,
+                pointBackgroundColor: lineColor,
+                pointRadius: 3,
+                pointHoverRadius: 4,
+                tension: 0.25,
+                fill: false,
+                clip: false
+            };
+        });
+    }
+
+    return [{
+        label: getSecureConfirmMessage('dataQualityIndex', 'Data Quality Index'),
+        data: trend.map((entry) => entry.overall_pct),
+        borderColor: 'rgb(124, 58, 237)',
+        backgroundColor: 'rgba(124, 58, 237, 0.08)',
+        pointBackgroundColor: 'rgb(124, 58, 237)',
+        pointRadius: 4,
+        pointHoverRadius: 5,
+        tension: 0.25,
+        fill: true,
+        clip: false
+    }];
+}
+
+let dataQualityTrendChartInstance = null;
+let dataQualityTrendData = [];
+
+function destroyDataQualityTrendChart() {
+    if (dataQualityTrendChartInstance) {
+        dataQualityTrendChartInstance.destroy();
+        dataQualityTrendChartInstance = null;
+    }
+}
+
+function renderDataQualityTrendChart(trend, mode) {
+    const ctx = document.getElementById('dataQualityTrendChart');
+    if (!ctx || typeof Chart === 'undefined' || !trend.length) {
+        return;
+    }
+
+    destroyDataQualityTrendChart();
+    const pillarMeta = getDataQualityPillarMeta();
+    const datasets = buildDataQualityTrendDatasets(trend, mode, pillarMeta);
+    const showLegend = mode === 'pillars';
+    const chartWrap = ctx.closest('.data-quality-trend-chart-wrap');
+    if (chartWrap) {
+        chartWrap.classList.toggle('data-quality-trend-chart-wrap--pillars', showLegend);
+    }
+
+    dataQualityTrendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: trend.map((entry) => entry.period),
+            datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: { top: 12, right: 8, left: 4, bottom: 0 }
+            },
+            plugins: {
+                legend: {
+                    display: showLegend,
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 10,
+                        boxHeight: 10,
+                        padding: 12,
+                        font: { size: 11 }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    min: 0,
+                    max: 100,
+                    grace: '4%',
+                    ticks: { callback: (value) => `${value}%` }
+                }
+            }
+        }
+    });
+}
+
+function bindDataQualityTrendToggle() {
+    const panelContent = document.getElementById('data-quality-panel-content');
+    if (!panelContent || panelContent.dataset.trendToggleBound === 'true') return;
+    panelContent.dataset.trendToggleBound = 'true';
+
+    panelContent.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-trend-mode]');
+        const toggle = document.getElementById('data-quality-trend-toggle');
+        if (!button || !toggle || !toggle.contains(button) || button.classList.contains('is-active')) {
+            return;
+        }
+        const mode = button.getAttribute('data-trend-mode');
+        if (!mode) return;
+        const expanded = mode === 'pillars';
+        setDataQualityPillarDetailsExpanded(expanded);
+        applyDataQualityPillarDetailsVisibility(expanded);
+    });
+}
+
+function renderDataQualityTrendSection(trend) {
+    if (!trend.length) {
+        return `<div class="rounded-lg border border-dashed border-gray-200 bg-gray-50/40 px-4 py-6 text-center text-sm text-gray-500">
+            ${getSecureConfirmMessage('noTrendData', 'Not enough history to show a trend yet.')}
+        </div>`;
+    }
+
+    const expanded = isDataQualityPillarDetailsExpanded();
+    const overallActive = !expanded;
+    const pillarsActive = expanded;
+
+    return `<div class="rounded-lg border border-gray-200 bg-gray-50/60 p-4" id="data-quality-trend-section">
+        <div class="data-quality-trend-header">
+            <h4 class="data-quality-trend-header__title">${getSecureConfirmMessage('scoreTrend', 'Score trend')}</h4>
+            <div class="data-quality-trend-toggle" id="data-quality-trend-toggle" role="group" aria-label="${getSecureConfirmMessage('scoreTrend', 'Score trend')}">
+                <button type="button"
+                        class="data-quality-trend-toggle__btn${overallActive ? ' is-active' : ''}"
+                        data-trend-mode="overall"
+                        aria-pressed="${overallActive ? 'true' : 'false'}">
+                    ${getSecureConfirmMessage('trendOverall', 'Overall')}
+                </button>
+                <button type="button"
+                        class="data-quality-trend-toggle__btn${pillarsActive ? ' is-active' : ''}"
+                        data-trend-mode="pillars"
+                        aria-pressed="${pillarsActive ? 'true' : 'false'}">
+                    ${getSecureConfirmMessage('trendByPillar', 'By pillar')}
+                </button>
+            </div>
+        </div>
+        <div class="data-quality-trend-chart-wrap"><canvas id="dataQualityTrendChart" aria-label="${getSecureConfirmMessage('dataQualityIndexTrend', 'Data Quality Index Trend')}"></canvas></div>
+    </div>`;
+}
+
+function renderDataQualityLoadingSkeleton() {
+    return `
+        <div class="space-y-4" id="data-quality-loading">
+            <div class="data-quality-pillars-grid">
+                ${Array.from({ length: 5 }).map(() => `
+                    <div class="data-quality-skeleton data-quality-pillar-card" style="min-height: 7.5rem;"></div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderDataQualityPanel(data) {
+    const panelContent = document.getElementById('data-quality-panel-content');
+    const ringSlot = document.getElementById('data-quality-ring-slot');
+    const validationSlot = document.getElementById('data-quality-validation-slot');
+    const periodSelect = document.getElementById('data-quality-period-select');
+    if (!panelContent || !data) return;
+
+    const pillars = data.pillars || {};
+    const subPillars = data.sub_pillars || {};
+    const val = data.validation_summary || {};
+    const pillarMeta = getDataQualityPillarMeta();
+    const overallPct = Number(data.overall_pct) || 0;
+    const weightLabel = getSecureConfirmMessage('weightLabel', 'Weight');
+
+    if (ringSlot) {
+        ringSlot.innerHTML = renderDataQualityScoreRing(overallPct);
+    }
+
+    if (periodSelect && data.period_name) {
+        periodSelect.value = data.period_name;
+    }
+
+    if (validationSlot) {
+        validationSlot.innerHTML = val.asked
+            ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                (val.answered || 0) >= val.asked ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+            }">
+                <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+                ${val.answered || 0}/${val.asked} ${getSecureConfirmMessage('validationAnswered', 'validation questions answered')}
+            </span>`
+            : '';
+    }
+
+    const warningsHtml = (data.warnings || []).length
+        ? `<div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            ${data.warnings.map((w) => `<p>${sanitizeTextContent(w)}</p>`).join('')}
+        </div>`
+        : '';
+
+    const pillarCards = Object.keys(pillarMeta).map((key) =>
+        renderDataQualityPillarCard(key, pillarMeta[key], pillars, weightLabel, subPillars[key])
+    ).join('');
+
+    const trend = data.trend || [];
+    dataQualityTrendData = trend;
+    const trendSection = renderDataQualityTrendSection(trend);
+
+    destroyDataQualityTrendChart();
+
+    panelContent.innerHTML = `
+        <div class="mb-5">
+            <div class="data-quality-pillars-toolbar" id="data-quality-pillars-toolbar">
+                <h4 class="data-quality-pillars-toolbar__title">${getSecureConfirmMessage('scorePillars', 'Score pillars')}</h4>
+            </div>
+            <div class="data-quality-pillars-grid">
+                ${pillarCards}
+            </div>
+        </div>
+
+        ${trendSection}
+        ${warningsHtml}
+    `;
+
+    syncDataQualityPillarDetailsToggle();
+}
+
+async function loadDataQualityScore(templateId, period, entityType, entityId) {
+    const panelContent = document.getElementById('data-quality-panel-content');
+    const ringSlot = document.getElementById('data-quality-ring-slot');
+    const toggleWrap = document.getElementById('data-quality-details-toggle-wrap');
+    if (toggleWrap) toggleWrap.classList.add('is-unavailable');
+    dataQualityTrendData = [];
+    if (panelContent) {
+        panelContent.innerHTML = renderDataQualityLoadingSkeleton();
+    }
+    destroyDataQualityTrendChart();
+    if (ringSlot) {
+        ringSlot.innerHTML = '<div class="data-quality-skeleton w-24 h-24 rounded-full bg-violet-100"></div>';
+    }
+
+    if (!templateId || !period || !entityType || entityId == null || entityId === '') {
+        if (panelContent) {
+            panelContent.innerHTML = '<p class="text-gray-500 text-sm py-6 text-center">No reporting period available for this template.</p>';
+        }
+        return;
+    }
+
+    const params = new URLSearchParams({
+        entity_type: entityType,
+        entity_id: entityId,
+        template_id: templateId,
+        period: period
+    });
+
+    try {
+        const resp = await fetch(`/api/v1/dashboard/data-quality?${params.toString()}`, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        const contentType = resp.headers.get('content-type') || '';
+        let data = null;
+        if (contentType.includes('application/json')) {
+            data = await resp.json();
+        } else {
+            const text = await resp.text();
+            console.error('Data quality API returned non-JSON response', resp.status, text.slice(0, 200));
+            if (panelContent) {
+                panelContent.innerHTML = '<p class="text-red-600 text-sm">Failed to load data quality score. Please refresh or contact support.</p>';
+            }
+            return;
+        }
+        if (!resp.ok) {
+            if (panelContent) panelContent.innerHTML = `<p class="text-red-600 text-sm">${sanitizeTextContent(data.error || 'Failed to load score')}</p>`;
+            return;
+        }
+        renderDataQualityPanel(data);
+    } catch (err) {
+        console.error('Data quality fetch failed', err);
+        if (panelContent) {
+            panelContent.innerHTML = '<p class="text-red-600 text-sm">Failed to load data quality score. Please refresh or contact support.</p>';
+        }
+    }
+}
+
+function initDataQualityDashboard() {
+    const root = document.getElementById('data-quality-dashboard');
+    if (!root) return;
+
+    bindDataQualityPillarDetailsToggle();
+    bindDataQualityTrendToggle();
+
+    const entityType = root.dataset.entityType;
+    const entityId = root.dataset.entityId;
+    const periodSelect = document.getElementById('data-quality-period-select');
+    const periodWrap = document.getElementById('data-quality-period-wrap');
+    let templates = [];
+    try {
+        templates = JSON.parse(root.dataset.templates || '[]');
+    } catch (e) {
+        templates = [];
+    }
+
+    const templatesById = {};
+    templates.forEach((t) => {
+        if (t && t.template_id != null) {
+            templatesById[String(t.template_id)] = t;
+        }
+    });
+
+    function populatePeriodSelect(templateId, preferredPeriod) {
+        if (!periodSelect) return;
+        const tmpl = templatesById[String(templateId)];
+        const periods = (tmpl && Array.isArray(tmpl.periods)) ? tmpl.periods : [];
+        const previous = preferredPeriod || periodSelect.value;
+        periodSelect.innerHTML = '';
+        periods.forEach((period) => {
+            const option = document.createElement('option');
+            option.value = period;
+            option.textContent = period;
+            periodSelect.appendChild(option);
+        });
+        if (previous && periods.includes(previous)) {
+            periodSelect.value = previous;
+        }
+        periodSelect.disabled = periods.length <= 1;
+        if (periodWrap) {
+            periodWrap.classList.toggle('is-interactive', periods.length > 1);
+        }
+    }
+
+    function loadActiveScore() {
+        const activeTab = root.querySelector('.data-quality-tab[aria-selected="true"]');
+        if (!activeTab) return;
+        const templateId = activeTab.dataset.templateId;
+        const period = periodSelect ? periodSelect.value : '';
+        if (templateId && period) {
+            loadDataQualityScore(templateId, period, entityType, entityId);
+        }
+    }
+
+    const tabs = root.querySelectorAll('.data-quality-tab');
+    const activate = (tab) => {
+        tabs.forEach((t) => {
+            const active = t === tab;
+            t.setAttribute('aria-selected', active ? 'true' : 'false');
+            if (window.AdminUnderlineTabs) {
+                window.AdminUnderlineTabs.setStripButtonActive(t, active);
+            }
+        });
+        populatePeriodSelect(tab.dataset.templateId);
+        loadActiveScore();
+    };
+
+    if (periodSelect) {
+        periodSelect.addEventListener('change', loadActiveScore);
+    }
+    tabs.forEach((tab) => tab.addEventListener('click', () => activate(tab)));
+    if (tabs.length) activate(tabs[0]);
+}
+
 // Render charts and set up event listeners when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    renderCompletionRateChart();
-    renderDataQualityChart();
+    if (document.getElementById('data-quality-dashboard')) {
+        initDataQualityDashboard();
+    } else {
+        renderCompletionRateChart();
+        renderDataQualityChart();
+    }
 
     // Initialize filtering and pagination for Past Assignments
     initializeFilteringAndPagination();

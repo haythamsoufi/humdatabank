@@ -27,6 +27,8 @@ from app.utils.error_handling import handle_json_view_exception
 from app.services.app_settings_service import is_organization_email
 
 from app.routes.main import bp
+from app.utils.data_quality_constants import is_data_quality_dashboard_enabled
+from app.services.data_quality.service import list_data_quality_templates_for_entity
 from app.routes.main.helpers import (
     SELECTED_ENTITY_TYPE_SESSION_KEY,
     SELECTED_ENTITY_ID_SESSION_KEY,
@@ -1045,8 +1047,20 @@ def dashboard():
             )
 
     # Always render the dashboard; the template handles None values where applicable
+    data_quality_dashboard_enabled = is_data_quality_dashboard_enabled()
+    data_quality_templates = []
+    if data_quality_dashboard_enabled and selected_entity_type and selected_entity_id:
+        try:
+            data_quality_templates = list_data_quality_templates_for_entity(
+                selected_entity_type, selected_entity_id
+            )
+        except Exception as dq_err:
+            current_app.logger.warning("Failed to load data quality templates: %s", dq_err)
+
     return render_template("core/dashboard.html",
                        user=current_user,
+                       data_quality_dashboard_enabled=data_quality_dashboard_enabled,
+                       data_quality_templates=data_quality_templates,
                        user_countries=user_countries,
                        user_entities=user_entities,
                        selected_country=selected_country,

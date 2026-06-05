@@ -105,6 +105,8 @@
         </div>
     {% endif %}
 
+    {% include "forms/entry_form/_validation_questions_panel.html" %}
+
     {% if assignment_status %}
         {# Assignment Details Section - Executive Style Header #}
         <div class="executive-page-header mb-6">
@@ -1062,7 +1064,7 @@
                                                             {% set current_reporting_mode = existing_entry_data.get('mode', field.allowed_disaggregation_options[0] if field.allowed_disaggregation_options else 'total') if isinstance(existing_entry_data, dict) else (field.allowed_disaggregation_options[0] if field.allowed_disaggregation_options else 'total') %}
                                                             {% set current_values = existing_entry_data.get('values', {}) if isinstance(existing_entry_data, dict) else {} %}
                                                             {% set raw_value_indicator = existing_entry_data if not isinstance(existing_entry_data, dict) else '' %}
-                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.unit and field.unit in ['People', 'Volunteers', 'Staff'] else ['total'] %}
+                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.supports_disaggregation else ['total'] %}
 
                                                             {% if field.field_type_for_js|lower == 'number' or field.field_type_for_js|lower == 'currency' %}
                                                                 {% if allowed_modes and allowed_modes|length > 1 %}
@@ -1196,7 +1198,7 @@
                                                                 {# Simple value for items without indirect reach (not in disaggregation structure) #}
                                                                 {% set current_values = {'total': existing_entry_data} %}
                                                             {% endif %}
-                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.unit and field.unit in ['People', 'Volunteers', 'Staff'] else ['total'] %}
+                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.supports_disaggregation else ['total'] %}
 
                                                             {# Check for aux values for indicators (prefilled vs imputed) #}
                                                             {% set indicator_is_prefilled = existing_data.get('field_value[' ~ field.id ~ ']_is_prefilled', false) %}
@@ -1349,7 +1351,7 @@
                                                                 {# Simple value for items without indirect reach (not in disaggregation structure) #}
                                                                 {% set current_values = {'total': existing_entry_data} %}
                                                             {% endif %}
-                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.unit and field.unit in ['People', 'Volunteers', 'Staff'] else ['total'] %}
+                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.supports_disaggregation else ['total'] %}
 
                                                             {# Check for aux values for indicators (prefilled vs imputed) #}
                                                             {% set indicator_is_prefilled = existing_data.get('field_value[' ~ field.id ~ ']_is_prefilled', false) %}
@@ -2050,7 +2052,7 @@
                                                                 {# Simple value for items without indirect reach (not in disaggregation structure) #}
                                                                 {% set current_values = {'total': existing_entry_data} %}
                                                             {% endif %}
-                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.unit and field.unit in ['People', 'Volunteers', 'Staff'] else ['total'] %}
+                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.supports_disaggregation else ['total'] %}
 
                                                             {% if field.field_type_for_js|lower == 'number' or field.field_type_for_js|lower == 'currency' %}
                                                                                                                                      {% if allowed_modes and allowed_modes|length > 1 %}
@@ -2209,7 +2211,7 @@
                                                             {% set current_reporting_mode = existing_entry_data.get('mode', field.allowed_disaggregation_options[0] if field.allowed_disaggregation_options else 'total') if isinstance(existing_entry_data, dict) else (field.allowed_disaggregation_options[0] if field.allowed_disaggregation_options else 'total') %}
                                                             {% set current_values = existing_entry_data.get('values', {}) if isinstance(existing_entry_data, dict) else {} %}
                                                             {% set raw_value_indicator = existing_entry_data if not isinstance(existing_entry_data, dict) else '' %}
-                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.unit and field.unit in ['People', 'Volunteers', 'Staff'] else ['total'] %}
+                                                            {% set allowed_modes = field.allowed_disaggregation_options if field.supports_disaggregation else ['total'] %}
 
                                                             {% if field.field_type_for_js|lower == 'number' or field.field_type_for_js|lower == 'currency' %}
                                                                 {% if allowed_modes and allowed_modes|length > 1 %}
@@ -2553,9 +2555,9 @@
             {% if not is_public_submission and not is_preview_mode and is_admin_user %}
             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
             <div id="chatbot-ai-hover-menu"
-                 class="fixed z-[1059] flex flex-col items-end gap-3 pointer-events-none opacity-0 transition-all duration-200"
+                 class="fixed z-[1059] flex flex-col items-end gap-3"
                  style="bottom: calc(var(--chat-fab-bottom-inset, 1.5rem) + 72px); right: calc(var(--chat-fab-offset, 1.5rem) + env(safe-area-inset-right, 0px));">
-                <div class="chatbot-ai-hover-row flex items-center gap-3 pointer-events-auto">
+                <div class="chatbot-ai-hover-row flex items-center gap-3">
                     <span class="chatbot-ai-tooltip">{{ _('Validation Summary') }}</span>
                     <button type="button" id="fab-validation-summary-btn"
                             class="rounded-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center shadow-lg transition-all duration-150 hover:scale-105"
@@ -2565,7 +2567,7 @@
                     </button>
                 </div>
                 {% if tmpl and tmpl.enable_ai_validation and user_has_ai_beta_access(current_user) %}
-                <div class="chatbot-ai-hover-row flex items-center gap-3 pointer-events-auto">
+                <div class="chatbot-ai-hover-row flex items-center gap-3">
                     <span class="chatbot-ai-tooltip">{{ _('Run AI validation') }}</span>
                     <button type="button" id="fab-run-ai-opinions-btn"
                             class="rounded-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center shadow-lg transition-all duration-150 hover:scale-105"
@@ -2937,6 +2939,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ static_url('js/forms/validation-questions-panel.js') }}"></script>
 {# Fallback if forms.css failed to load from the head block #}
         <script nonce="{{ csp_nonce() }}">
         (function ensureFormsCss(){

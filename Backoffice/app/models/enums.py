@@ -448,3 +448,4 @@ class NotificationType(enum.Enum):
     deadline_reminder = 'deadline_reminder'
     admin_message = 'admin_message'  # Custom admin push notifications
     access_request_received = 'access_request_received'  # Country access request received
+    validation_questions = 'validation_questions'  # Data validation questions for focal points

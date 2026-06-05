@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, request
+import io
+
+from flask import Blueprint, render_template, request, send_file
 from sqlalchemy import func
 from datetime import timedelta
 from app.models.api_usage import APIUsage
@@ -8,7 +10,8 @@ from app.routes.admin.shared import admin_permission_required
 from flask import current_app
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error
+from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.power_query_workbook import build_power_query_workbook
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
 
@@ -155,6 +158,9 @@ EXTERNAL_API_REGISTRY = [
      'auth': 'api_key', 'rate_limited': True,
      'description': 'Resources library with pagination and filters',
      'overlaps': ['/api/mobile/v1/data/resources']},
+    {'group': 'Embed Content', 'path': '/api/v1/embed-content', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Active embed content items, optionally filtered by category slug'},
     {'group': 'Documents & Resources', 'path': '/api/v1/uploads/sectors/<filename>', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': False,
      'description': 'Stream a sector logo file from system storage'},
@@ -457,8 +463,8 @@ MOBILE_ENDPOINT_REGISTRY = [
      ),
      'flutter': 'UnifiedPlanningPdfThumbnailCache'},
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/quiz/leaderboard', 'methods': ['GET'],
-     'auth': 'public', 'rate_limited': True,
-     'description': 'Quiz global leaderboard — publicly accessible, rate-limited',
+     'auth': 'user', 'rate_limited': True,
+     'description': 'Quiz global leaderboard — requires mobile JWT (scores attributed to users)',
      'flutter': 'LeaderboardProvider',
      'overlaps': ['/api/v1/quiz/leaderboard']},
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/quiz/submit-score', 'methods': ['POST'],
@@ -550,10 +556,7 @@ MOBILE_ENDPOINT_REGISTRY = [
     {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/notifications/send', 'methods': ['POST'],
      'auth': 'rbac', 'permission': 'admin.notifications.manage',
      'description': 'Send push notification to selected users',
-     'flutter': 'AdminDashboardProvider',
-     'flags': [{'type': 'unused',
-                'note': 'AppConfig.mobileAdminSendNotificationEndpoint is defined but not '
-                        'wired in any provider — endpoint exists on backend, never called.'}]},
+     'flutter': 'AdminDashboardProvider'},
 
     # ── ADMIN — CONTENT ───────────────────────────────────────────────────────
     {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/templates', 'methods': ['GET'],
@@ -567,6 +570,10 @@ MOBILE_ENDPOINT_REGISTRY = [
     {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments', 'methods': ['GET'],
      'auth': 'rbac', 'permission': 'admin.assignments.view',
      'description': 'List form assignments',
+     'flutter': 'AssignmentsProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments/<assignment_id>', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.assignments.view',
+     'description': 'Single assignment detail with entity rows and deadline fields',
      'flutter': 'AssignmentsProvider'},
     {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments/<assignment_id>/delete', 'methods': ['POST'],
      'auth': 'rbac', 'permission': 'admin.assignments.delete',
@@ -584,6 +591,10 @@ MOBILE_ENDPOINT_REGISTRY = [
      'auth': 'rbac', 'permission': 'admin.documents.manage',
      'description': 'List submitted documents',
      'flutter': 'DocumentManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/documents/<document_id>/file', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'Stream submitted document bytes (JWT; entity-level access via _check_document_access)',
+     'flutter': 'DocumentManagementProvider'},
     {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/documents/<document_id>/delete', 'methods': ['POST'],
      'auth': 'rbac', 'permission': 'admin.documents.manage',
      'description': 'Delete a submitted document',
@@ -591,6 +602,10 @@ MOBILE_ENDPOINT_REGISTRY = [
     {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/resources', 'methods': ['GET'],
      'auth': 'rbac', 'permission': 'admin.resources.manage',
      'description': 'List resources',
+     'flutter': 'ResourcesManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/resources/<resource_id>/file', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.resources.manage',
+     'description': 'Stream a resource translation file (optional language query param)',
      'flutter': 'ResourcesManagementProvider'},
     {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/resources/<resource_id>/delete', 'methods': ['POST'],
      'auth': 'rbac', 'permission': 'admin.resources.manage',
@@ -1009,6 +1024,34 @@ def api_management():
         mobile_summary=surface_summary['mobile'],
     )
 
+
+
+@bp.route('/api-management/power-query-workbook', methods=['POST'])
+@admin_permission_required('admin.api.manage')
+def power_query_workbook():
+    payload = request.get_json(silent=True) or {}
+    queries = payload.get('queries')
+    if not isinstance(queries, list) or not queries:
+        return json_bad_request('At least one query is required')
+
+    try:
+        workbook_bytes = build_power_query_workbook(queries)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        current_app.logger.error('power_query_workbook failed: %s', exc, exc_info=True)
+        return json_server_error(GENERIC_ERROR_MESSAGE)
+
+    filename = (payload.get('filename') or 'databank-queries.xlsx').strip()
+    if not filename.lower().endswith('.xlsx'):
+        filename = f'{filename}.xlsx'
+
+    return send_file(
+        io.BytesIO(workbook_bytes),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename,
+    )
 
 
 @bp.route('/api-management/stats')

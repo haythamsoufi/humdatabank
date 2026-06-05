@@ -3,6 +3,7 @@
 {% from "components/_profile_icon.html" import profile_icon %}
 {% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% block content %}
 <div class="py-2 sharp-ui">
 
@@ -148,6 +149,326 @@
         }
         #current-assignments-section .grid {
             overflow: visible;
+        }
+        /* Data Quality dashboard */
+        @keyframes data-quality-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+        }
+        .data-quality-skeleton {
+            animation: data-quality-pulse 1.5s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .data-quality-skeleton {
+                animation: none;
+            }
+        }
+        #data-quality-period-select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background: transparent;
+            background-image: none !important;
+            border: 0;
+            margin: 0;
+            padding: 0.3125rem 1.5rem 0.3125rem 0.625rem;
+            max-width: 100%;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #111827;
+            cursor: pointer;
+        }
+        #data-quality-period-select:focus {
+            outline: none;
+        }
+        #data-quality-period-select::-ms-expand {
+            display: none;
+        }
+        .data-quality-index-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.375rem;
+        }
+        .data-quality-index-label {
+            margin: 0;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: rgba(91, 33, 182, 0.85);
+        }
+        .data-quality-period-wrap {
+            display: inline-flex;
+            align-items: center;
+            position: relative;
+            max-width: 100%;
+        }
+        .data-quality-period-wrap.is-interactive {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .data-quality-period-wrap.is-interactive:focus-within {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+        }
+        .data-quality-period-wrap:not(.is-interactive) #data-quality-period-select {
+            padding: 0;
+            cursor: default;
+            font-size: 1rem;
+        }
+        .data-quality-period-chevron {
+            position: absolute;
+            right: 0.5rem;
+            font-size: 0.625rem;
+            color: #9ca3af;
+            pointer-events: none;
+        }
+        .data-quality-period-wrap:not(.is-interactive) .data-quality-period-chevron {
+            display: none;
+        }
+        .data-quality-pillars-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        @media (min-width: 640px) {
+            .data-quality-pillars-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (min-width: 1024px) {
+            .data-quality-pillars-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+        .data-quality-pillar-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            height: 100%;
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background: #fff;
+        }
+        .data-quality-pillar-card__header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+        .data-quality-pillar-card__title-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.625rem;
+            min-width: 0;
+            flex: 1;
+        }
+        .data-quality-pillar-card__icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.375rem;
+            flex-shrink: 0;
+            font-size: 0.875rem;
+        }
+        .data-quality-pillar-card__label {
+            margin: 0;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.35;
+            color: #1f2937;
+        }
+        .data-quality-pillar-card__weight {
+            margin: 0.125rem 0 0;
+            font-size: 0.75rem;
+            line-height: 1.35;
+            color: #6b7280;
+        }
+        .data-quality-pillar-card__score {
+            margin: 0;
+            font-size: 1.125rem;
+            font-weight: 700;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+        .data-quality-pillar-card__bar-track {
+            height: 0.375rem;
+            overflow: hidden;
+            border-radius: 9999px;
+            background: #f3f4f6;
+        }
+        .data-quality-pillar-card__bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+        }
+        .data-quality-pillar-card__desc {
+            margin: 0;
+            font-size: 0.75rem;
+            line-height: 1.5;
+            color: #6b7280;
+        }
+        .data-quality-sub-pillars {
+            list-style: none;
+            margin: 0.75rem 0 0;
+            padding: 0.625rem 0 0;
+            border-top: 1px solid #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .data-quality-sub-pillars.is-collapsed {
+            display: none;
+        }
+        .data-quality-sub-pillar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.5rem;
+            align-items: center;
+            font-size: 0.6875rem;
+        }
+        .data-quality-sub-pillar__label {
+            color: #4b5563;
+            line-height: 1.35;
+        }
+        .data-quality-sub-pillar__score {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .data-quality-sub-pillar__bar-track {
+            grid-column: 1 / -1;
+            height: 0.25rem;
+            overflow: hidden;
+            border-radius: 9999px;
+            background: #f3f4f6;
+        }
+        .data-quality-sub-pillar__bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+        }
+        .data-quality-sub-pillar--binary {
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+        .data-quality-sub-pillar__status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            line-height: 1;
+        }
+        .data-quality-sub-pillar__status.is-present {
+            color: #16a34a;
+        }
+        .data-quality-sub-pillar__status.is-missing {
+            color: #dc2626;
+        }
+        .data-quality-pillars-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .data-quality-pillars-toolbar__title {
+            margin: 0;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        .data-quality-details-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #4b5563;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .data-quality-details-toggle:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+        }
+        .data-quality-details-toggle:focus-visible {
+            outline: 2px solid #7c3aed;
+            outline-offset: 2px;
+        }
+        .data-quality-details-toggle.is-expanded {
+            color: #5b21b6;
+            border-color: #c4b5fd;
+            background: #f5f3ff;
+        }
+        .data-quality-details-toggle.is-expanded .data-quality-details-toggle__chevron {
+            transform: rotate(180deg);
+        }
+        .data-quality-details-toggle__chevron {
+            font-size: 0.625rem;
+            transition: transform 0.15s ease;
+        }
+        .data-quality-details-toggle-wrap.is-unavailable {
+            display: none;
+        }
+        .data-quality-trend-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .data-quality-trend-header__title {
+            margin: 0;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        .data-quality-trend-toggle {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            background: #fff;
+        }
+        .data-quality-trend-toggle__btn {
+            border: 0;
+            margin: 0;
+            padding: 0.3125rem 0.625rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #6b7280;
+            background: transparent;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+        .data-quality-trend-toggle__btn.is-active {
+            color: #1d4ed8;
+            background: #eff6ff;
+        }
+        .data-quality-trend-toggle__btn:focus-visible {
+            outline: 2px solid #8b5cf6;
+            outline-offset: 1px;
+        }
+        .data-quality-trend-chart-wrap {
+            position: relative;
+            height: 14rem;
+        }
+        .data-quality-trend-chart-wrap--pillars {
+            height: 16rem;
         }
     </style>
 
@@ -842,7 +1163,81 @@
                          {% endif %}
                      </h2>
 
-                     {# Content wrapper with overlay #}
+                     {% if data_quality_dashboard_enabled and data_quality_templates %}
+                     <div id="data-quality-dashboard"
+                          class="mb-2"
+                          data-entity-type="{{ selected_entity_type|e }}"
+                          data-entity-id="{{ selected_entity_id }}"
+                          data-templates="{{ data_quality_templates|tojson|forceescape }}">
+                         <div class="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/70 via-white to-white overflow-hidden shadow-sm">
+                             {# Toolbar: template tabs #}
+                             {% call scroll_tab_bar(inner_id='data-quality-tab-bar', aria_label=_('Data quality templates'), wrapper_class='px-4 sm:px-5') %}
+                                 {% for t in data_quality_templates %}
+                                 <button type="button"
+                                         role="tab"
+                                         class="data-quality-tab {{ admin_underline_tab_btn_classes(loop.first) }}"
+                                         data-template-id="{{ t.template_id }}"
+                                         aria-selected="{{ 'true' if loop.first else 'false' }}">
+                                     {{ t.template_name }}
+                                 </button>
+                                 {% endfor %}
+                             {% endcall %}
+
+                             {# Score panel (populated by dashboard.js) #}
+                             <div id="data-quality-panel" class="p-4 sm:p-5">
+                                 <div id="data-quality-score-header" class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-5 pb-5 border-b border-gray-100">
+                                     <div id="data-quality-ring-slot" class="shrink-0">
+                                         <div class="data-quality-skeleton w-24 h-24 rounded-full bg-violet-100"></div>
+                                     </div>
+                                     <div class="min-w-0 flex-1">
+                                         <div class="data-quality-index-heading">
+                                             <p class="data-quality-index-label">{{ _('Data Quality Index') }}</p>
+                                             <div id="data-quality-details-toggle-wrap" class="is-unavailable">
+                                                 <button type="button"
+                                                         id="data-quality-pillar-details-toggle"
+                                                         class="data-quality-details-toggle"
+                                                         aria-expanded="false"
+                                                         aria-label="{{ _('Show score breakdown') }}">
+                                                     <span>{{ _('Breakdown') }}</span>
+                                                     <i class="fas fa-chevron-down data-quality-details-toggle__chevron" aria-hidden="true"></i>
+                                                 </button>
+                                             </div>
+                                         </div>
+                                         <div id="data-quality-period-wrap" class="data-quality-period-wrap">
+                                             <label for="data-quality-period-select" class="sr-only">{{ _('Reporting period') }}</label>
+                                             <select id="data-quality-period-select"
+                                                     aria-label="{{ _('Reporting period') }}">
+                                             </select>
+                                             <i class="fas fa-chevron-down data-quality-period-chevron" aria-hidden="true"></i>
+                                         </div>
+                                         <div id="data-quality-validation-slot" class="flex flex-wrap items-center gap-2 mt-2"></div>
+                                     </div>
+                                 </div>
+                                 <div id="data-quality-panel-content" class="min-h-[180px]" aria-live="polite">
+                                     <div id="data-quality-loading" class="space-y-4">
+                                         <div class="data-quality-pillars-grid">
+                                             {% for _ in range(5) %}
+                                             <div class="data-quality-skeleton data-quality-pillar-card" style="min-height: 7.5rem;"></div>
+                                             {% endfor %}
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             {# Footer #}
+                             <div class="px-4 py-3 bg-gray-50/90 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                                 <span>{{ _('Scores are calculated automatically from submitted data and documents.') }}</span>
+                                 <a href="{{ url_for('help_docs.view_doc', doc_path='user-guides/focal-point/data-quality-index') }}"
+                                    class="inline-flex items-center gap-1 text-violet-700 hover:text-violet-900 font-medium whitespace-nowrap"
+                                    id="data-quality-guide-link">
+                                     <i class="fas fa-circle-question" aria-hidden="true"></i>
+                                     {{ _('How is this calculated?') }}
+                                 </a>
+                             </div>
+                         </div>
+                     </div>
+                     {% else %}
+                     {# Content wrapper with overlay (placeholder — shown when QoD dashboard disabled) #}
                      <div class="relative">
                          {# Section for overall stats #}
                          <div class="mb-6">
@@ -897,6 +1292,7 @@
                              </div>
                          </div>
                      </div>
+                     {% endif %}
                  </div>
             </div>
 
@@ -1746,6 +2142,38 @@
      data-data-quality-index="{{ _('Data Quality Index') }}"
      data-data-quality-index-trend="{{ _('Data Quality Index Trend') }}"
      data-quality-index="{{ _('Quality Index') }}"
+     data-validation-answered="{{ _('validation questions answered') }}"
+     data-pillar-documents="{{ _('Documents') }}"
+     data-pillar-reporting="{{ _('Reporting') }}"
+     data-pillar-disaggregation="{{ _('Disaggregation') }}"
+     data-pillar-timeliness="{{ _('Timeliness') }}"
+     data-pillar-validation-questions="{{ _('Validation questions') }}"
+     data-pillar-documents-desc="{{ _('Annual Report and Audited Financial Statement uploads') }}"
+     data-pillar-reporting-desc="{{ _('Governance, finance, and people-reached indicators') }}"
+     data-pillar-disaggregation-desc="{{ _('Sex, age, and disability breakdowns where applicable') }}"
+     data-pillar-timeliness-desc="{{ _('Whether sections were submitted before the cutoff') }}"
+     data-pillar-validation-desc="{{ _('Responses to automatic data checks') }}"
+     data-score-pillars="{{ _('Score pillars') }}"
+     data-score-trend="{{ _('Score trend') }}"
+     data-trend-overall="{{ _('Overall') }}"
+     data-trend-by-pillar="{{ _('By pillar') }}"
+     data-overall-score="{{ _('Overall score') }}"
+     data-no-trend-data="{{ _('Not enough history to show a trend yet.') }}"
+     data-weight-label="{{ _('Weight') }}"
+     data-sub-annual-report="{{ _('Annual Report') }}"
+     data-sub-audited-financial="{{ _('Audited Financial Statement') }}"
+     data-sub-governance="{{ _('Governance & structure') }}"
+     data-sub-finance="{{ _('Finance & partnership') }}"
+     data-sub-people-reached="{{ _('People reached') }}"
+     data-sub-sex="{{ _('Sex disaggregation') }}"
+     data-sub-age="{{ _('Age disaggregation') }}"
+     data-sub-disability="{{ _('Disability (DDD/WGQ)') }}"
+     data-sub-pillars-label="{{ _('Components') }}"
+     data-pillar-breakdown="{{ _('Breakdown') }}"
+     data-pillar-breakdown-expand="{{ _('Show score breakdown') }}"
+     data-pillar-breakdown-collapse="{{ _('Hide score breakdown') }}"
+     data-sub-pillar-present="{{ _('Present') }}"
+     data-sub-pillar-missing="{{ _('Missing') }}"
      data-no-filtered-activities="{{ _('No activities match the selected filters') }}"
      data-loading="{{ _('Loading...') }}"
      data-thats-all='{{ _("That's all") }}' style="display: none;"></div>
@@ -1775,7 +2203,40 @@
         completionRateOverTime: translationsEl.dataset.completionRateOverTime,
         dataQualityIndex: translationsEl.dataset.dataQualityIndex,
         dataQualityIndexTrend: translationsEl.dataset.dataQualityIndexTrend,
-        qualityIndex: translationsEl.dataset.qualityIndex
+        qualityIndex: translationsEl.dataset.qualityIndex,
+        validationAnswered: translationsEl.dataset.validationAnswered,
+        loading: translationsEl.dataset.loading,
+        pillarDocuments: translationsEl.dataset.pillarDocuments,
+        pillarReporting: translationsEl.dataset.pillarReporting,
+        pillarDisaggregation: translationsEl.dataset.pillarDisaggregation,
+        pillarTimeliness: translationsEl.dataset.pillarTimeliness,
+        pillarValidationQuestions: translationsEl.dataset.pillarValidationQuestions,
+        pillarDocumentsDesc: translationsEl.dataset.pillarDocumentsDesc,
+        pillarReportingDesc: translationsEl.dataset.pillarReportingDesc,
+        pillarDisaggregationDesc: translationsEl.dataset.pillarDisaggregationDesc,
+        pillarTimelinessDesc: translationsEl.dataset.pillarTimelinessDesc,
+        pillarValidationDesc: translationsEl.dataset.pillarValidationDesc,
+        scorePillars: translationsEl.dataset.scorePillars,
+        scoreTrend: translationsEl.dataset.scoreTrend,
+        trendOverall: translationsEl.dataset.trendOverall,
+        trendByPillar: translationsEl.dataset.trendByPillar,
+        overallScore: translationsEl.dataset.overallScore,
+        noTrendData: translationsEl.dataset.noTrendData,
+        weightLabel: translationsEl.dataset.weightLabel,
+        subAnnualReport: translationsEl.dataset.subAnnualReport,
+        subAuditedFinancial: translationsEl.dataset.subAuditedFinancial,
+        subGovernance: translationsEl.dataset.subGovernance,
+        subFinance: translationsEl.dataset.subFinance,
+        subPeopleReached: translationsEl.dataset.subPeopleReached,
+        subSex: translationsEl.dataset.subSex,
+        subAge: translationsEl.dataset.subAge,
+        subDisability: translationsEl.dataset.subDisability,
+        subPillarsLabel: translationsEl.dataset.subPillarsLabel,
+        pillarBreakdown: translationsEl.dataset.pillarBreakdown,
+        pillarBreakdownExpand: translationsEl.dataset.pillarBreakdownExpand,
+        pillarBreakdownCollapse: translationsEl.dataset.pillarBreakdownCollapse,
+        subPillarPresent: translationsEl.dataset.subPillarPresent,
+        subPillarMissing: translationsEl.dataset.subPillarMissing
     };
 </script>
 

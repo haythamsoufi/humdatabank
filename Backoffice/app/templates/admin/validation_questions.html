@@ -1,0 +1,114 @@
+{% extends "core/layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <h1 class="text-2xl font-semibold text-gray-800 mb-4">{{ _('Validation Questions') }}</h1>
+    <p class="text-gray-600 mb-6">{{ _('Review auto-generated validation questions, run checks, and send them to focal points.') }}</p>
+
+    <div class="bg-white rounded-lg shadow border border-gray-200 p-4 mb-6 flex flex-wrap gap-4 items-end">
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">{{ _('Template') }}</label>
+            <select id="vq-template" class="form-select border rounded px-3 py-2">
+                <option value="">{{ _('All') }}</option>
+                {% for t in template_options %}
+                <option value="{{ t.id }}">{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">{{ _('Period') }}</label>
+            <input type="text" id="vq-period" class="form-input border rounded px-3 py-2" placeholder="2024">
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">{{ _('Country ID') }}</label>
+            <input type="number" id="vq-country" class="form-input border rounded px-3 py-2 w-28">
+        </div>
+        <button type="button" id="vq-refresh" class="btn btn-secondary">{{ _('Refresh') }}</button>
+        <button type="button" id="vq-run-checks" class="btn btn-primary">{{ _('Run checks') }}</button>
+        <button type="button" id="vq-send" class="btn btn-warning">{{ _('Send to focal points') }}</button>
+    </div>
+
+    <div class="bg-white rounded-lg shadow border border-gray-200 overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm" id="vq-table">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left">{{ _('Country') }}</th>
+                    <th class="px-4 py-2 text-left">{{ _('Period') }}</th>
+                    <th class="px-4 py-2 text-left">{{ _('Rule') }}</th>
+                    <th class="px-4 py-2 text-left">{{ _('Severity') }}</th>
+                    <th class="px-4 py-2 text-left">{{ _('Status') }}</th>
+                    <th class="px-4 py-2 text-left">{{ _('Question') }}</th>
+                </tr>
+            </thead>
+            <tbody id="vq-tbody"></tbody>
+        </table>
+    </div>
+</div>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    async function loadRows() {
+        const params = new URLSearchParams();
+        const tid = document.getElementById('vq-template').value;
+        const period = document.getElementById('vq-period').value;
+        const country = document.getElementById('vq-country').value;
+        if (tid) params.set('template_id', tid);
+        if (period) params.set('period', period);
+        if (country) params.set('country_id', country);
+        const resp = await fetch('/admin/validation-questions/api/list?' + params.toString());
+        const data = await resp.json();
+        const tbody = document.getElementById('vq-tbody');
+        tbody.innerHTML = '';
+        (data.rows || []).forEach((r) => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-t';
+            tr.innerHTML = `<td class="px-4 py-2">${r.entity_name || ''}</td>
+                <td class="px-4 py-2">${r.period_name || ''}</td>
+                <td class="px-4 py-2">${r.rule_code || ''}</td>
+                <td class="px-4 py-2">${r.severity || ''}</td>
+                <td class="px-4 py-2">${r.status || ''}</td>
+                <td class="px-4 py-2 max-w-md truncate">${r.question_text || ''}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+    document.getElementById('vq-refresh').addEventListener('click', loadRows);
+    document.getElementById('vq-run-checks').addEventListener('click', async () => {
+        const template_id = document.getElementById('vq-template').value;
+        const period_name = document.getElementById('vq-period').value;
+        const entity_id = document.getElementById('vq-country').value;
+        if (!template_id || !period_name || !entity_id) {
+            alert('Template, period, and country ID required for run checks');
+            return;
+        }
+        await fetch('/admin/validation-questions/run-checks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({ template_id: +template_id, period_name, entity_id: +entity_id, entity_type: 'country' })
+        });
+        loadRows();
+    });
+    document.getElementById('vq-send').addEventListener('click', async () => {
+        const template_id = document.getElementById('vq-template').value;
+        const period_name = document.getElementById('vq-period').value;
+        const entity_id = document.getElementById('vq-country').value;
+        if (!template_id || !period_name) {
+            alert('Template and period required');
+            return;
+        }
+        await fetch('/admin/validation-questions/dispatch/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({
+                template_id: +template_id,
+                period_name,
+                entity_type: entity_id ? 'country' : null,
+                entity_id: entity_id ? +entity_id : null,
+                channels: ['in_app', 'email']
+            })
+        });
+        loadRows();
+    });
+    loadRows();
+})();
+</script>
+{% endblock %}

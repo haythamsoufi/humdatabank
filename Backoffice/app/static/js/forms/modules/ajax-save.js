@@ -103,11 +103,17 @@ async function saveFormOnce(options = {}) {
             debugLog(MODULE_NAME, '✅ Matrix data collected');
         }
 
-        // Unformat numeric inputs (thousand separators) before collecting FormData
-        const numericInputs = Array.from(form.querySelectorAll('input[data-numeric="true"]'));
+        // Unformat numeric inputs (thousand separators) before collecting FormData.
+        // Include type=number as well as data-numeric text inputs used by the formatter.
+        const numericInputs = Array.from(
+            form.querySelectorAll('input[data-numeric="true"], input[type="number"]')
+        );
         originalNumericValues = new Map();
         const unformatFn = (window.__numericUnformat || (v => (v || '').replace(/[\s,\u00A0\u202F]/g, '')));
         numericInputs.forEach(input => {
+            if (input.disabled) {
+                return;
+            }
             originalNumericValues.set(input, input.value);
             try { input.value = unformatFn(input.value); } catch (_) { /* no-op */ }
         });

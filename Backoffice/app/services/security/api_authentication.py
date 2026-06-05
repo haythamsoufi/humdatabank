@@ -254,8 +254,8 @@ def authenticate_api_request():
     Authenticate API request and determine access level.
 
     Standard authentication (one of):
-    1. API key in Authorization header: Bearer YOUR_API_KEY (database ``api_keys``
-       or optional ``MOBILE_APP_API_KEY`` env when no DB row matches)
+    1. API key via Authorization: Bearer YOUR_API_KEY (preferred) or ``?api_key=``
+       query parameter (legacy / Power Query clients that cannot send custom headers)
     2. HTTP Basic auth (email/password)
     3. Flask-Login session (browser)
 
@@ -270,13 +270,17 @@ def authenticate_api_request():
     auth_user = None
     api_key_record = None
 
-    # API key only from Authorization header (no query params for security)
     provided_key = None
     key_source = None
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
         provided_key = auth_header[7:].strip()
         key_source = 'header'
+    else:
+        query_key = (request.args.get('api_key') or '').strip()
+        if query_key:
+            provided_key = query_key
+            key_source = 'query'
 
     # Authenticate with database-managed API keys
     if provided_key:
@@ -377,7 +381,7 @@ def authenticate_api_request():
             resp = api_error(
                 "Authentication required",
                 401,
-                extra={"hint": "Use Authorization: Bearer YOUR_API_KEY or HTTP Basic auth (email/password)"},
+                extra={"hint": "Use Authorization: Bearer YOUR_API_KEY, ?api_key= (Power Query), or HTTP Basic auth (email/password)"},
             )
             from app.services.app_settings_service import get_organization_name
             org_name = get_organization_name()

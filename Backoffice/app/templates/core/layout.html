@@ -466,6 +466,12 @@
                                 <span class="sidebar-text">{{ _('Explore Data') }}</span>
                             </a>
                             {% endif %}
+                            {% if is_system_manager or has_permission('admin.data_explore.compliance') %}
+                            <a href="{{ url_for('admin.validation_questions_admin') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Validation Questions') }}">
+                                <i class="fas fa-clipboard-question sidebar-icon w-6 h-6 mr-3 text-center"></i>
+                                <span class="sidebar-text">{{ _('Validation Questions') }}</span>
+                            </a>
+                            {% endif %}
                         </div>
                     </div>
                     {% endif %}
@@ -912,6 +918,12 @@
                         <a href="{{ url_for('data_exploration.explore_data') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Explore Data') }}">
                             {{ svg_icon('explore-data', 'sidebar-icon w-6 h-6 mr-3') }}
                             <span class="sidebar-text">{{ _('Explore Data') }}</span>
+                        </a>
+                        {% endif %}
+                        {% if is_system_manager or has_permission('admin.data_explore.compliance') %}
+                        <a href="{{ url_for('admin.validation_questions_admin') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Validation Questions') }}">
+                            <i class="fas fa-clipboard-question sidebar-icon w-6 h-6 mr-3 text-center"></i>
+                            <span class="sidebar-text">{{ _('Validation Questions') }}</span>
                         </a>
                         {% endif %}
                     </div>

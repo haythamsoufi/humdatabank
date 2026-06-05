@@ -170,25 +170,33 @@ body.overflow-hidden { overflow: hidden; }
 #fab-menu {
   position: fixed;
   pointer-events: none;
-  transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
   display: flex !important; /* Use flex for proper button stacking */
   flex-direction: column;
-  visibility: hidden; /* Use visibility instead of display for smoother transitions */
+  align-items: center;
+  visibility: hidden;
   opacity: 0;
   /* Add padding to create seamless hover area */
   padding-bottom: 20px; /* This creates overlap with main FAB */
   z-index: 49; /* Just below the toggle button (z-50) */
+  transition: visibility 0s linear 0.32s, opacity 0.18s ease;
 }
 
 #fab-menu button {
   pointer-events: auto;
-  transition: all 0.2s ease-in-out;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transform: translateY(14px) scale(0.86);
+  transition:
+    opacity var(--fab-hover-duration, 0.28s) var(--fab-hover-ease, cubic-bezier(0.34, 1.25, 0.64, 1)),
+    transform var(--fab-hover-duration, 0.28s) var(--fab-hover-ease, cubic-bezier(0.34, 1.25, 0.64, 1)),
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+  transition-delay: 0ms;
 }
 
 #fab-menu button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  transform: translateY(0) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* Create a hover container that includes both the FAB and menu */
@@ -197,6 +205,29 @@ body.overflow-hidden { overflow: hidden; }
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto; /* Allow interaction when visible */
+  transition: visibility 0s, opacity 0.18s ease;
+}
+
+/* Stagger from the main FAB upward (Submit → Save → Pin) */
+#mobile-nav-toggle-button:hover + #fab-menu button:nth-child(3),
+#fab-menu:hover button:nth-child(3) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: 0ms;
+}
+
+#mobile-nav-toggle-button:hover + #fab-menu button:nth-child(2),
+#fab-menu:hover button:nth-child(2) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: var(--fab-hover-stagger, 55ms);
+}
+
+#mobile-nav-toggle-button:hover + #fab-menu button:nth-child(1),
+#fab-menu:hover button:nth-child(1) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: calc(var(--fab-hover-stagger, 55ms) * 2);
 }
 
 /* Ensure it's hidden on larger screens unless forced mobile overlay is active */
@@ -994,8 +1025,40 @@ a.btn.entry-form-doc-library-btn {
   padding-right: 2.25rem;
 }
 
+#chatbot-ai-hover-menu {
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: visibility 0s linear 0.32s, opacity 0.18s ease;
+}
+
+#chatbot-ai-hover-menu.is-visible {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  transition: visibility 0s, opacity 0.18s ease;
+}
+
 #chatbot-ai-hover-menu .chatbot-ai-hover-row {
   min-height: var(--chat-fab-size, 56px);
+  opacity: 0;
+  transform: translateY(14px) scale(0.86);
+  transition:
+    opacity var(--fab-hover-duration, 0.28s) var(--fab-hover-ease, cubic-bezier(0.34, 1.25, 0.64, 1)),
+    transform var(--fab-hover-duration, 0.28s) var(--fab-hover-ease, cubic-bezier(0.34, 1.25, 0.64, 1));
+  transition-delay: 0ms;
+}
+
+#chatbot-ai-hover-menu.is-visible .chatbot-ai-hover-row:nth-last-child(1) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: 0ms;
+}
+
+#chatbot-ai-hover-menu.is-visible .chatbot-ai-hover-row:nth-last-child(2) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: var(--fab-hover-stagger, 55ms);
 }
 
 #chatbot-ai-hover-menu .chatbot-ai-tooltip {
@@ -1011,4 +1074,42 @@ a.btn.entry-form-doc-library-btn {
   line-height: 1.2;
   white-space: nowrap;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateX(8px);
+  transition:
+    opacity calc(var(--fab-hover-duration, 0.28s) * 0.85) ease,
+    transform calc(var(--fab-hover-duration, 0.28s) * 0.85) var(--fab-hover-ease, cubic-bezier(0.34, 1.25, 0.64, 1));
+  transition-delay: 0ms;
+}
+
+#chatbot-ai-hover-menu.is-visible .chatbot-ai-hover-row:nth-last-child(1) .chatbot-ai-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: calc(var(--fab-hover-stagger, 55ms) * 0.75);
+}
+
+#chatbot-ai-hover-menu.is-visible .chatbot-ai-hover-row:nth-last-child(2) .chatbot-ai-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: calc(var(--fab-hover-stagger, 55ms) * 1.75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #fab-menu,
+  #fab-menu button,
+  #chatbot-ai-hover-menu,
+  #chatbot-ai-hover-menu .chatbot-ai-hover-row,
+  #chatbot-ai-hover-menu .chatbot-ai-tooltip {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  #fab-menu button,
+  #chatbot-ai-hover-menu .chatbot-ai-hover-row {
+    transform: none !important;
+  }
+
+  #chatbot-ai-hover-menu .chatbot-ai-tooltip {
+    transform: none !important;
+  }
 }

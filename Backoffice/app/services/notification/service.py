@@ -58,6 +58,7 @@ ACTOR_BADGE_ICON_BY_TYPE = {
     'template_updated': 'fa-file-alt',
     'self_report_created': 'fa-clipboard-list',
     'deadline_reminder': 'fa-clock',
+    'validation_questions': 'fa-clipboard-question',
 }
 
 
@@ -94,6 +95,7 @@ class NotificationService:
             'deadline_reminder': 'Deadline Reminder',
             'admin_message': 'Admin Message',
             'access_request_received': 'Country Access Request Received',  # Matches translation file
+            'validation_questions': 'Data Validation Questions',
         }
 
         # Get the source string and translate it at request time

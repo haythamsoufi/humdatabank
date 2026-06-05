@@ -368,7 +368,7 @@ class FormItemProcessor:
                 return val_str.lower(), True, False, False
             return None, False, False, False
 
-        elif form_item.type in ['Number', 'Percentage', 'Currency']:
+        elif (form_item.field_type_for_js or '').lower() in ('number', 'currency', 'percentage'):
             # Check if this item truly supports disaggregation (beyond just 'total')
             supports_disaggregation = cls._field_supports_disaggregation(form_item)
 
@@ -379,7 +379,9 @@ class FormItemProcessor:
                 # Numeric indicators without disaggregation - store simple numeric value
                 val_str = form_data.get(f'{field_prefix}_total_value', '')
                 if val_str and val_str.strip():
-                    result = cls._process_numeric_value_simple(val_str, form_item.type)
+                    result = cls._process_numeric_value_simple(
+                        val_str, form_item.field_type_for_js or form_item.type
+                    )
                     if result is not None:
                         current_app.logger.info(f"Successfully processed numeric value: {result}")
                         return result, True, False, False
@@ -396,9 +398,111 @@ class FormItemProcessor:
             return None, False, False, False
 
     @classmethod
+    def _is_percentage_type(cls, form_item: FormItem) -> bool:
+        field_type = (form_item.field_type_for_js or form_item.type or '').lower()
+        return field_type == 'percentage'
+
+    @classmethod
+    def _has_non_empty_form_value(cls, form_data: Dict, key: str) -> bool:
+        val = form_data.get(key, '')
+        return bool(val is not None and str(val).strip())
+
+    @classmethod
+    def _indicator_mode_has_submitted_values(
+        cls, form_item: FormItem, form_data: Dict, field_prefix: str, mode: str
+    ) -> bool:
+        """Return True when POST contains a non-empty value for the given reporting mode."""
+        if mode == 'total':
+            return cls._has_non_empty_form_value(form_data, f'{field_prefix}_total_value')
+
+        if mode == 'sex':
+            for sex_cat in form_item.effective_sex_categories:
+                sex_slug = sex_cat.lower().replace(' ', '_').replace('-', '_')
+                if cls._has_non_empty_form_value(form_data, f'{field_prefix}_sex_{sex_slug}'):
+                    return True
+            return False
+
+        if mode == 'age':
+            for age_group in form_item.effective_age_groups:
+                age_slug = cls.slugify_age_group(age_group)
+                if cls._has_non_empty_form_value(form_data, f'{field_prefix}_age_{age_slug}'):
+                    return True
+            return False
+
+        if mode == 'sex_age':
+            for sex_cat in form_item.effective_sex_categories:
+                sex_slug = sex_cat.lower().replace(' ', '_').replace('-', '_')
+                for age_group in form_item.effective_age_groups:
+                    age_slug = cls.slugify_age_group(age_group)
+                    key = f'{field_prefix}_sexage_{sex_slug}_{age_slug}'
+                    if cls._has_non_empty_form_value(form_data, key):
+                        return True
+            return False
+
+        return False
+
+    @classmethod
+    def _resolve_indicator_reporting_mode(
+        cls, form_item: FormItem, form_data: Dict, field_prefix: str
+    ) -> str:
+        """
+        Determine the active reporting mode from POST.
+
+        Prefer modes that actually contain values so a stale sex_age radio cannot
+        ignore a total the user just entered.
+        """
+        explicit = (form_data.get(f'{field_prefix}_reporting_mode') or '').strip()
+        allowed = set(getattr(form_item, 'allowed_disaggregation_options', None) or ['total'])
+
+        modes_with_values = [
+            mode for mode in ('total', 'sex', 'age', 'sex_age')
+            if mode in allowed and cls._indicator_mode_has_submitted_values(form_item, form_data, field_prefix, mode)
+        ]
+
+        if len(modes_with_values) == 1:
+            return modes_with_values[0]
+
+        if explicit in ('total', 'sex', 'age', 'sex_age'):
+            if cls._indicator_mode_has_submitted_values(form_item, form_data, field_prefix, explicit):
+                return explicit
+
+        if modes_with_values:
+            if explicit in modes_with_values:
+                return explicit
+            return modes_with_values[0]
+
+        if explicit in ('total', 'sex', 'age', 'sex_age'):
+            return explicit
+        return 'total'
+
+    @classmethod
+    def _indicator_active_inputs_in_post(
+        cls, form_item: FormItem, form_data: Dict, field_prefix: str
+    ) -> bool:
+        """Return True when POST includes inputs for the resolved reporting mode."""
+        mode = cls._resolve_indicator_reporting_mode(form_item, form_data, field_prefix)
+        total_value_field = f'{field_prefix}_total_value'
+        standard_value_field = f'{field_prefix}_standard_value'
+
+        if mode == 'total':
+            return (total_value_field in form_data) or (standard_value_field in form_data)
+
+        if f'{field_prefix}_reporting_mode' in form_data:
+            return True
+
+        if mode == 'sex':
+            return any(k.startswith(f'{field_prefix}_sex_') for k in form_data.keys())
+        if mode == 'age':
+            return any(k.startswith(f'{field_prefix}_age_') for k in form_data.keys())
+        if mode == 'sex_age':
+            return any(f'{field_prefix}_sexage_' in k for k in form_data.keys())
+
+        return False
+
+    @classmethod
     def _process_numeric_indicator(cls, form_item: FormItem, form_data: Dict, field_prefix: str) -> Tuple[Any, bool, bool, bool]:
         """Process numeric indicators with disaggregation support"""
-        reporting_mode = form_data.get(f'{field_prefix}_reporting_mode', 'total')
+        reporting_mode = cls._resolve_indicator_reporting_mode(form_item, form_data, field_prefix)
         collected_values = {}
         has_any_value = False
 
@@ -407,7 +511,7 @@ class FormItemProcessor:
             if val_str and str(val_str).strip():
                 cleaned = cls._unformat_numeric_string(val_str)
                 try:
-                    if form_item.type == 'Percentage':
+                    if cls._is_percentage_type(form_item):
                         collected_values['direct' if form_item.indirect_reach else 'total'] = float(cleaned)
                     else:
                         collected_values['direct' if form_item.indirect_reach else 'total'] = int(cleaned)
@@ -455,7 +559,7 @@ class FormItemProcessor:
             if val_str and val_str.strip():
                 cleaned = cls._unformat_numeric_string(val_str)
                 try:
-                    if form_item.type == 'Percentage':
+                    if cls._is_percentage_type(form_item):
                         sex_values[sex_slug] = float(cleaned)
                     else:
                         sex_values[sex_slug] = int(cleaned)
@@ -476,7 +580,7 @@ class FormItemProcessor:
             if val_str and val_str.strip():
                 cleaned = cls._unformat_numeric_string(val_str)
                 try:
-                    if form_item.type == 'Percentage':
+                    if cls._is_percentage_type(form_item):
                         age_values[age_slug] = float(cleaned)
                     else:
                         age_values[age_slug] = int(cleaned)
@@ -500,7 +604,7 @@ class FormItemProcessor:
                 if val_str and val_str.strip():
                     cleaned = cls._unformat_numeric_string(val_str)
                     try:
-                        if form_item.type == 'Percentage':
+                        if cls._is_percentage_type(form_item):
                             sex_age_values[field_key] = float(cleaned)
                         else:
                             sex_age_values[field_key] = int(cleaned)
@@ -599,7 +703,7 @@ class FormItemProcessor:
         """Process numeric value based on field type"""
         cleaned = cls._unformat_numeric_string(val_str)
         try:
-            if field_type == 'Percentage':
+            if str(field_type or '').lower() == 'percentage':
                 return str(float(cleaned))
             else:
                 return str(int(cleaned))
@@ -856,8 +960,17 @@ def _set_dynamic_indicator_field_type(dynamic_indicator, indicator_bank):
 
 def _set_dynamic_indicator_disaggregation(dynamic_indicator, dynamic_assignment, section_obj):
     """Set disaggregation options for dynamic indicators"""
-    if (dynamic_assignment.indicator_bank.type == 'Number' and
-        dynamic_assignment.indicator_bank.unit in ['People', 'Staff', 'Volunteers']):
+    from app.utils.indicator_utils import supports_disaggregation
+
+    bank = dynamic_assignment.indicator_bank
+    bank_supports_disagg = supports_disaggregation(bank.unit, bank.type)
+    if bank.indicator_unit_id and bank.measurement_unit is not None:
+        bank_supports_disagg = (
+            str(bank.type or '').lower() == 'number'
+            and bool(bank.measurement_unit.allows_disaggregation)
+        )
+
+    if bank_supports_disagg:
 
         if hasattr(section_obj, 'allowed_disaggregation_options_list') and section_obj.allowed_disaggregation_options_list:
             dynamic_indicator.allowed_disaggregation_options = section_obj.allowed_disaggregation_options_list
@@ -866,6 +979,10 @@ def _set_dynamic_indicator_disaggregation(dynamic_indicator, dynamic_assignment,
     else:
         # For numeric indicators without people-based units, only support total (no disaggregation)
         dynamic_indicator.allowed_disaggregation_options = ["total"]
+
+    dynamic_indicator.indicator_unit_id = bank.indicator_unit_id
+    dynamic_indicator.measurement_unit = bank.measurement_unit
+    dynamic_indicator.supports_disaggregation = bank_supports_disagg
 
     dynamic_indicator.age_groups_config = None
     dynamic_indicator.allow_data_not_available = getattr(section_obj, 'allow_data_not_available', False) if section_obj else False

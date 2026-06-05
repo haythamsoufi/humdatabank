@@ -812,6 +812,51 @@ class FormDataService:
         return field_changes
 
     @classmethod
+    def _should_preserve_existing_on_empty_save(
+        cls,
+        form_item_id: int,
+        data_entry,
+        *,
+        is_presave: bool,
+        field_cleared: bool,
+        indicator: FormItem = None,
+        field_prefix: str = None,
+    ) -> bool:
+        """
+        Avoid wiping stored values on action=save when the POST contains empty inputs
+        for fields the user did not change (e.g. hidden disaggregation total_value inputs).
+        """
+        if is_presave or field_cleared:
+            return is_presave
+        if request.form.get('action', 'save') != 'save':
+            return False
+        if not data_entry or not cls._has_meaningful_data(data_entry):
+            return False
+        if cls._check_for_field_clearing_signals(form_item_id):
+            return False
+        if indicator is not None and field_prefix and FormItemProcessor._field_supports_disaggregation(indicator):
+            mode = FormItemProcessor._resolve_indicator_reporting_mode(
+                indicator, request.form, field_prefix
+            )
+            if FormItemProcessor._indicator_mode_has_submitted_values(
+                indicator, request.form, field_prefix, mode
+            ):
+                return False
+        return True
+
+    @classmethod
+    def _indicator_field_was_submitted(cls, indicator: FormItem, field_prefix: str) -> bool:
+        """Determine whether this indicator's active-mode inputs were present in the POST."""
+        if not FormItemProcessor._field_supports_disaggregation(indicator):
+            total_value_field = f'{field_prefix}_total_value'
+            standard_value_field = f'{field_prefix}_standard_value'
+            return (total_value_field in request.form) or (standard_value_field in request.form)
+
+        return FormItemProcessor._indicator_active_inputs_in_post(
+            indicator, request.form, field_prefix
+        )
+
+    @classmethod
     def _process_indicator_data(cls, indicator: FormItem, assignment_entity_status, validation_errors: List) -> List[Dict]:
         """
         Process indicator data with JavaScript-compatible field patterns.
@@ -836,15 +881,11 @@ class FormDataService:
                 indicator, request.form, assignment_entity_status.id, field_prefix
             )
 
-        # Check if the indicator field was submitted (even if empty) - this allows us to clear existing values
-        # Indicators can have total_value or standard_value fields
         total_value_field = f'{field_prefix}_total_value'
         standard_value_field = f'{field_prefix}_standard_value'
-        # Check if field exists in form (even if empty string) - empty number inputs still submit as empty strings
         total_value_raw = request.form.get(total_value_field)
         standard_value_raw = request.form.get(standard_value_field)
-        # Field was submitted if it's in the form (even if value is empty string)
-        field_was_submitted = (total_value_field in request.form) or (standard_value_field in request.form)
+        field_was_submitted = cls._indicator_field_was_submitted(indicator, field_prefix)
 
         # Get or create form data entry using helper methods
         form_item_id = indicator.id
@@ -858,15 +899,21 @@ class FormDataService:
         # Handle the case where field was submitted but has no value (clearing existing value)
         # This happens when user clears a field - it's submitted as empty string but has_value is False
         if field_was_submitted and not has_value and not data_not_available and not not_applicable:
-            # IMPORTANT: For presave (save-before-submit) requests we must NOT clear existing values
-            # just because empty strings were submitted for untouched fields.
-            if is_presave:
+            if cls._should_preserve_existing_on_empty_save(
+                form_item_id,
+                data_entry,
+                is_presave=is_presave,
+                field_cleared=field_cleared,
+                indicator=indicator,
+                field_prefix=field_prefix,
+            ):
                 logger.info(
-                    "Indicator %s: presave request submitted empty (total_value=%r, standard_value=%r); "
-                    "skipping clear to avoid overwriting existing values.",
+                    "Indicator %s: save submitted empty (total_value=%r, standard_value=%r) but existing "
+                    "data preserved (presave=%s).",
                     form_item_id,
                     total_value_raw,
                     standard_value_raw,
+                    is_presave,
                 )
                 return field_changes
 
@@ -1022,10 +1069,13 @@ class FormDataService:
 
         # Handle the case where field was submitted but has no value (clearing existing value)
         if field_was_submitted and not has_value and not data_not_available and not not_applicable:
-            if is_presave:
+            if cls._should_preserve_existing_on_empty_save(
+                form_item_id, data_entry, is_presave=is_presave, field_cleared=field_cleared
+            ):
                 cls._log_verbose(
-                    "Question %s: presave request submitted empty; skipping clear to avoid overwriting existing values.",
+                    "Question %s: save submitted empty but existing data preserved (presave=%s).",
                     form_item_id,
+                    is_presave,
                 )
                 return field_changes
 

@@ -991,7 +991,7 @@ def _export_excel_impl(aes_id):
                     item_key = f"form_item_{field_data['id']}"
                     entry_data = existing_data_processed_for_export.get(item_key, {})
 
-                    allowed_modes = indicator.allowed_disaggregation_options if indicator.unit and indicator.unit in ['People', 'Volunteers', 'Staff'] else ['total']
+                    allowed_modes = indicator.allowed_disaggregation_options if indicator.supports_disaggregation else ['total']
 
                     if indicator.type == 'Number':
                         for mode in allowed_modes:

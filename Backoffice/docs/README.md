@@ -49,6 +49,7 @@ Detailed setup for optional features and production:
 ### Focal point
 
 - [View your assignments](user-guides/focal-point/view-assignments.md)
+- [Data Quality Index](user-guides/focal-point/data-quality-index.md)
 - [Fill and submit a form](user-guides/focal-point/submit-data.md)
 - [Supporting documents (Focal point)](user-guides/focal-point/supporting-documents.md)
 - [Troubleshooting (Focal point)](user-guides/focal-point/troubleshooting.md)

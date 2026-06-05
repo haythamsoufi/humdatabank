@@ -34,3 +34,19 @@ class ValidationRunResult:
     resolved: int = 0
     skipped: int = 0
     drafts: list[ValidationQuestionDraft] = field(default_factory=list)
+
+
+@dataclass
+class ValidationEvaluationResult:
+    """Dry-run output from evaluate_validation_checks (no DB writes)."""
+
+    template_id: int
+    entity_type: str
+    entity_id: int
+    period_name: str
+    resolved_period: str
+    rule_pack: str
+    assignment_entity_status_id: int | None = None
+    kpi_data: dict = field(default_factory=dict)
+    check_results: list[CheckResult] = field(default_factory=list)
+    drafts: list[ValidationQuestionDraft] = field(default_factory=list)

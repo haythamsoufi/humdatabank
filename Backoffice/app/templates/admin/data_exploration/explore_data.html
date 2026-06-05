@@ -52,51 +52,36 @@
         /* Column visibility toolbar: ag-column-visibility-manager.css */
         /* Additional template-specific overrides can be added here if needed */
 
-        /* Compliance Table styling */
-        #compliance-table-container {
-            max-height: 600px;
-            overflow-y: auto;
-            border: 1px solid #d1d5db;
-            border-radius: 0.375rem;
+        /* Compliance grid styling */
+        #complianceGrid-container {
+            overflow-x: auto;
+            position: relative;
         }
 
-        #compliance-table {
-            border-spacing: 0 !important;
-            border-collapse: collapse !important;
+        #complianceGrid.ag-theme-alpine .ag-cell,
+        #complianceGrid.ag-theme-alpine .ag-cell.ag-cell-auto-height {
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+            box-sizing: border-box !important;
         }
 
-        /* Header cells */
-        #compliance-table thead th {
-            border: 1px solid #d1d5db !important;
-            background-color: #f3f4f6 !important;
-            vertical-align: middle;
+        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center,
+        #complianceGrid.ag-theme-alpine .ag-header-cell.compliance-header-center {
+            text-align: center !important;
         }
 
-        /* All table cells get borders */
-        #compliance-table td,
-        #compliance-table tbody td {
-            border: 1px solid #d1d5db !important;
+        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-wrapper,
+        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-value {
+            width: 100% !important;
+            justify-content: center !important;
+            text-align: center !important;
         }
 
-        #compliance-table tbody tr {
-            transition: background-color 0.15s ease;
+        #complianceGrid.ag-theme-alpine .ag-header-cell.compliance-header-center .ag-header-cell-label {
+            justify-content: center !important;
         }
 
-        #compliance-table tbody tr:hover td {
-            background-color: #f0f9ff !important;
-        }
-
-        /* Alternating row backgrounds */
-        #compliance-table tr.group-even td {
-            background-color: #ffffff;
-        }
-        #compliance-table tr.group-odd td {
-            background-color: #f8fafc;
-        }
-
-        /* Top-level and sub-tab styling */
-        .tab-main.aria-selected-true, .tab-main[aria-selected="true"] { border-bottom-color: #2563eb; color: #2563eb; background-color: #eff6ff; }
-        .tab-main:not([aria-selected="true"]) { border-bottom-color: transparent; }
+        /* Disaggregation sub-tab styling */
         .disagg-subtab.active { border-bottom-color: #2563eb; color: #2563eb; }
         /* ApexCharts container styling */
         .chart-container { min-height: 0; overflow: visible; }
@@ -108,7 +93,7 @@
 {% endblock %}
 
 {% block content %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {{ page_header(
     title=_('Explore Data'),
@@ -117,93 +102,106 @@
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
         {'name': _('Data Exploration')}
     ],
-    info_tooltip=_('Explore and filter form data directly from the database. Use the parameters below to narrow down data by template and assignment period.') if (can_access_data_table or can_access_analysis) else _('View FDRS document compliance by country.'),
+    info_tooltip=_('Explore and filter form data directly from the database. Use the parameters on the Data Table and Analysis tabs to narrow down data by template and assignment period.') if (can_access_data_table or can_access_analysis) else _('View FDRS document compliance by country.'),
     actions=[]
 ) }}
 
-    <!-- Parameters Section (shared: applies to Data Table and Analysis; hidden when user has access only to Compliance) -->
-    {% if can_access_data_table or can_access_analysis %}
-    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Parameters') }}</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div class="space-y-2">
-                <label for="template-filter" class="block text-sm font-medium text-gray-700">{{ _('Template') }}</label>
-                <select id="template-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">{{ _('All Templates') }}</option>
-                    {% for template in templates %}
-                    <option value="{{ template.id }}">{{ template.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+    {% set explore_first_tab = 'data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else 'compliance') %}
 
-            <div class="space-y-2">
-                <label for="form-item-filter" class="block text-sm font-medium text-gray-700">{{ _('Form Item') }}</label>
-                <select id="form-item-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
-                    <option value="">{{ _('All Form Items') }}</option>
-                </select>
-                <p class="text-xs text-gray-500 mt-1">{{ _('Select a template first to load form items') }}</p>
-            </div>
-
-            <div class="space-y-2">
-                <label for="assignment-filter" class="block text-sm font-medium text-gray-700">{{ _('Assignment Period') }}</label>
-                <select id="assignment-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
-                    <option value="">{{ _('All Periods') }}</option>
-                </select>
-                <p class="text-xs text-gray-500 mt-1" id="assignment-filter-help">{{ _('Select a template first to load periods') }}</p>
-            </div>
-
-            <div class="space-y-2">
-                <label for="country-filter" class="block text-sm font-medium text-gray-700">{{ _('Country') }}</label>
-                <select id="country-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
-                    <option value="">{{ _('All Countries') }}</option>
-                </select>
-                <p class="text-xs text-gray-500 mt-1" id="country-filter-help">{{ _('Select a template first to load countries') }}</p>
-            </div>
-        </div>
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <button id="apply-filters-btn" class="btn btn-primary">
-                    <i class="fas fa-download mr-2"></i>{{ _('Load Data') }}
-                </button>
-                <button id="clear-filters-btn" class="btn btn-secondary ml-2">
-                    <i class="fas fa-times mr-2"></i>{{ _('Clear Parameters') }}
-                </button>
-            </div>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input id="include-non-reported"
-                       type="checkbox"
-                       class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                <span>{{ _('Include non-reported items (no saved value)') }}</span>
-                <span id="include-non-reported-help" class="text-xs text-gray-500"></span>
-            </label>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Top-level tab bar: Data Table | Analysis | Compliance (conditionally shown based on permissions) -->
-    <div class="bg-white mb-6">
-        {% call scroll_tab_bar(aria_label=_('Explore Data tabs'), inner_class='space-x-1') %}
+    <div class="bg-white shadow-md border border-gray-200 mb-6">
+        {# ── Tab navigation (settings-style underline tabs) ──────────────────── #}
+        {% call scroll_tab_bar(inner_id='explore-data-tabs', aria_label=_('Explore Data tabs')) %}
             {% if can_access_data_table %}
-            <button type="button" id="tab-data-table" class="tab-main py-4 px-4 font-semibold border-b-2 border-blue-600 text-blue-600 bg-blue-50" data-tab="data-table" aria-selected="true">
-                <i class="fas fa-table mr-2"></i>{{ _('Data Table') }}
+            <button type="button" role="tab" id="tab-data-table"
+                    data-tab="data-table"
+                    aria-selected="{{ 'true' if explore_first_tab == 'data-table' else 'false' }}"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'data-table') }}">
+                <i class="fas fa-table mr-1.5"></i>{{ _('Data Table') }}
             </button>
             {% endif %}
             {% if can_access_analysis %}
-            <button type="button" id="tab-disaggregation" class="tab-main py-4 px-4 font-semibold border-b-2 {% if can_access_data_table %}border-transparent text-gray-600{% else %}border-blue-600 text-blue-600 bg-blue-50{% endif %} hover:text-blue-600 hover:border-gray-300" data-tab="disaggregation" aria-selected="{% if not can_access_data_table %}true{% else %}false{% endif %}">
-                <i class="fas fa-chart-pie mr-2"></i>{{ _('Analysis') }}
+            <button type="button" role="tab" id="tab-disaggregation"
+                    data-tab="disaggregation"
+                    aria-selected="{{ 'true' if explore_first_tab == 'disaggregation' else 'false' }}"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'disaggregation') }}">
+                <i class="fas fa-chart-pie mr-1.5"></i>{{ _('Analysis') }}
             </button>
             {% endif %}
             {% if can_access_compliance %}
-            <button type="button" id="tab-compliance" class="tab-main py-4 px-4 font-semibold border-b-2 {% if not can_access_data_table and not can_access_analysis %}border-blue-600 text-blue-600 bg-blue-50{% else %}border-transparent text-gray-600{% endif %} hover:text-blue-600 hover:border-gray-300" data-tab="compliance" aria-selected="{% if not can_access_data_table and not can_access_analysis %}true{% else %}false{% endif %}">
-                <i class="fas fa-clipboard-check mr-2"></i>{{ _('Compliance') }}
+            <button type="button" role="tab" id="tab-compliance"
+                    data-tab="compliance"
+                    aria-selected="{{ 'true' if explore_first_tab == 'compliance' else 'false' }}"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'compliance') }}">
+                <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Compliance') }}
             </button>
             {% endif %}
         {% endcall %}
-    </div>
+
+        {# Parameters: Data Table and Analysis only (hidden on Compliance tab) #}
+        {% if can_access_data_table or can_access_analysis %}
+        <div id="explore-parameters-section"
+             class="p-4 sm:p-6 border-b border-gray-200{% if explore_first_tab == 'compliance' %} hidden{% endif %}">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Parameters') }}</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div class="space-y-2">
+                    <label for="template-filter" class="block text-sm font-medium text-gray-700">{{ _('Template') }}</label>
+                    <select id="template-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">{{ _('All Templates') }}</option>
+                        {% for template in templates %}
+                        <option value="{{ template.id }}">{{ template.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="space-y-2">
+                    <label for="form-item-filter" class="block text-sm font-medium text-gray-700">{{ _('Form Item') }}</label>
+                    <select id="form-item-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+                        <option value="">{{ _('All Form Items') }}</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">{{ _('Select a template first to load form items') }}</p>
+                </div>
+
+                <div class="space-y-2">
+                    <label for="assignment-filter" class="block text-sm font-medium text-gray-700">{{ _('Assignment Period') }}</label>
+                    <select id="assignment-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+                        <option value="">{{ _('All Periods') }}</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1" id="assignment-filter-help">{{ _('Select a template first to load periods') }}</p>
+                </div>
+
+                <div class="space-y-2">
+                    <label for="country-filter" class="block text-sm font-medium text-gray-700">{{ _('Country') }}</label>
+                    <select id="country-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+                        <option value="">{{ _('All Countries') }}</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1" id="country-filter-help">{{ _('Select a template first to load countries') }}</p>
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <button id="apply-filters-btn" class="btn btn-primary">
+                        <i class="fas fa-download mr-2"></i>{{ _('Load Data') }}
+                    </button>
+                    <button id="clear-filters-btn" class="btn btn-secondary ml-2">
+                        <i class="fas fa-times mr-2"></i>{{ _('Clear Parameters') }}
+                    </button>
+                </div>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input id="include-non-reported"
+                           type="checkbox"
+                           class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <span>{{ _('Include non-reported items (no saved value)') }}</span>
+                    <span id="include-non-reported-help" class="text-xs text-gray-500"></span>
+                </label>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="p-4 sm:p-6">
 
     <!-- Tab panel: Data Table -->
     {% if can_access_data_table %}
-    <div id="panel-data-table" class="tab-panel" role="tabpanel" aria-labelledby="tab-data-table">
+    <div id="panel-data-table" class="explore-panel{% if explore_first_tab != 'data-table' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-data-table">
     <!-- Initial prompt message -->
     <div id="initial-prompt" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
         <div class="text-center py-12 text-gray-500">
@@ -291,7 +289,7 @@
 
     <!-- Tab panel: Analysis -->
     {% if can_access_analysis %}
-    <div id="panel-disaggregation" class="tab-panel {% if can_access_data_table %}hidden{% endif %}" role="tabpanel" aria-labelledby="tab-disaggregation">
+    <div id="panel-disaggregation" class="explore-panel{% if explore_first_tab != 'disaggregation' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-disaggregation">
         <!-- Initial prompt message (shown when no data is loaded) -->
         <div id="disagg-initial-prompt" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
             <div class="text-center py-12 text-gray-500">
@@ -471,8 +469,8 @@
 
     <!-- Tab panel: Compliance -->
     {% if can_access_compliance %}
-    <div id="panel-compliance" class="tab-panel {% if can_access_data_table or can_access_analysis %}hidden{% endif %}" role="tabpanel" aria-labelledby="tab-compliance">
-        <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+    <div id="panel-compliance" class="explore-panel{% if explore_first_tab != 'compliance' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-compliance">
+        <div>
             <div class="flex justify-between items-center mb-4">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-900">{{ _('FDRS Document Compliance') }}</h3>
@@ -541,16 +539,22 @@
                 </div>
             </div>
 
-            <!-- Compliance Table -->
-            <div id="compliance-table-container" class="overflow-x-auto" style="display: none;">
-                <table id="compliance-table" class="min-w-full" style="border-collapse: collapse; border: 1px solid #d1d5db;">
-                    <thead id="compliance-table-head" class="bg-gray-100 sticky top-0 z-10">
-                        <!-- Header rows will be populated by JavaScript based on periods -->
-                    </thead>
-                    <tbody id="compliance-table-body">
-                        <!-- Rows will be populated by JavaScript -->
-                    </tbody>
-                </table>
+            <div id="compliance-pending-validation-notice" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" style="display: none;" role="status" aria-live="polite">
+                <div class="flex items-start gap-2">
+                    <i class="fas fa-clock text-amber-600 mt-0.5" aria-hidden="true"></i>
+                    <div>
+                        <p id="compliance-pending-validation-title" class="font-semibold mb-1"></p>
+                        <p id="compliance-pending-validation-body" class="mb-0 text-amber-800"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compliance Grid -->
+            <div id="compliance-grid-toolbar" class="flex justify-end items-center mb-4" style="display: none;">
+                <div id="compliance-column-visibility-placeholder"></div>
+            </div>
+            <div id="complianceGrid-container" class="overflow-x-auto" style="display: none;">
+                <div id="complianceGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="compliance-column-visibility-placeholder"></div>
             </div>
 
             <!-- Error message -->
@@ -562,6 +566,9 @@
     </div>
     {% endif %}
     <!-- End Tab panel: Compliance -->
+
+        </div>{# /p-4 sm:p-6 content wrapper #}
+    </div>{# /bg-white card #}
 
 {% endblock %}
 
@@ -797,6 +804,7 @@
         domCache.panelDataTable = document.getElementById('panel-data-table');
         domCache.panelDisaggregation = document.getElementById('panel-disaggregation');
         domCache.panelCompliance = document.getElementById('panel-compliance');
+        domCache.exploreParametersSection = document.getElementById('explore-parameters-section');
         domCache.disaggStatsBar = document.getElementById('disagg-stats-bar');
         domCache.disaggInitialPrompt = document.getElementById('disagg-initial-prompt');
         domCache.disaggLoading = document.getElementById('disagg-loading');
@@ -807,9 +815,11 @@
         domCache.complianceLoading = document.getElementById('compliance-loading');
         domCache.complianceInitial = document.getElementById('compliance-initial');
         domCache.complianceSummary = document.getElementById('compliance-summary');
-        domCache.complianceTableContainer = document.getElementById('compliance-table-container');
-        domCache.complianceTableHead = document.getElementById('compliance-table-head');
-        domCache.complianceTableBody = document.getElementById('compliance-table-body');
+        domCache.compliancePendingValidationNotice = document.getElementById('compliance-pending-validation-notice');
+        domCache.compliancePendingValidationTitle = document.getElementById('compliance-pending-validation-title');
+        domCache.compliancePendingValidationBody = document.getElementById('compliance-pending-validation-body');
+        domCache.complianceGridContainer = document.getElementById('complianceGrid-container');
+        domCache.complianceGridToolbar = document.getElementById('compliance-grid-toolbar');
         domCache.complianceError = document.getElementById('compliance-error');
         domCache.complianceErrorText = document.getElementById('compliance-error-text');
         domCache.compliantCount = document.getElementById('compliant-count');
@@ -819,6 +829,51 @@
 
     // Track if compliance data has been loaded
     let complianceDataLoaded = false;
+    let complianceGridHelper = null;
+    let complianceGridApi = null;
+
+    const COMPLIANCE_DOC_TYPE_LABELS = {
+        'Annual Report': '{{ _("Annual Report") }}',
+        'Audited Financial Statement': '{{ _("Audited Financial Statement") }}'
+    };
+    const DEFAULT_COMPLIANCE_DOC_TYPES = ['Annual Report', 'Audited Financial Statement'];
+    const COMPLIANCE_DOC_STATUS_LABELS = {
+        missing: '{{ _("Missing") }}',
+        pending: '{{ _("Pending validation") }}',
+        approved: '{{ _("Approved") }}',
+        rejected: '{{ _("Rejected") }}'
+    };
+    const COMPLIANCE_YEAR_STORAGE_KEY = 'humdb_compliance_reference_year_v1';
+
+    function getSavedComplianceReferenceYear() {
+        try {
+            const raw = localStorage.getItem(COMPLIANCE_YEAR_STORAGE_KEY);
+            return raw ? String(raw).trim() : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function saveComplianceReferenceYear(value) {
+        try {
+            const normalized = value == null ? '' : String(value).trim();
+            if (normalized) {
+                localStorage.setItem(COMPLIANCE_YEAR_STORAGE_KEY, normalized);
+            } else {
+                localStorage.removeItem(COMPLIANCE_YEAR_STORAGE_KEY);
+            }
+        } catch (e) {
+            // Ignore storage failures (private browsing, quota, etc.)
+        }
+    }
+
+    function resolveComplianceReferenceYear() {
+        const filterValue = domCache.complianceYearFilter?.value;
+        if (filterValue) {
+            return filterValue;
+        }
+        return getSavedComplianceReferenceYear();
+    }
 
     // Debounce helper function
     function debounce(func, wait) {
@@ -2112,19 +2167,173 @@
         setTimeout(() => observer.disconnect(), 5000);
     }
 
-    // Compliance data loading and rendering with HTML table
+    function complianceDocFieldKey(periodIndex, docIndex) {
+        return `period_${periodIndex}_doc_${docIndex}`;
+    }
+
+    function buildComplianceDocColumn(periodIndex, docIndex, docType) {
+        const field = complianceDocFieldKey(periodIndex, docIndex);
+        return {
+            field: field,
+            colId: field,
+            headerName: COMPLIANCE_DOC_TYPE_LABELS[docType] || docType,
+            width: 130,
+            minWidth: 110,
+            maxWidth: 180,
+            sortable: true,
+            filter: 'customSetFilter',
+            cellRenderer: function(params) {
+                return renderDocIcon(params.value);
+            },
+            filterValueGetter: function(params) {
+                const status = params.data ? params.data[field] : 'missing';
+                return COMPLIANCE_DOC_STATUS_LABELS[status] || COMPLIANCE_DOC_STATUS_LABELS.missing;
+            },
+            cellClass: 'compliance-cell-center',
+            headerClass: 'compliance-header-center',
+            cellStyle: { textAlign: 'center' }
+        };
+    }
+
+    function buildComplianceColumnDefs(periods, docTypes) {
+        const complianceDocTypes = docTypes && docTypes.length ? docTypes : DEFAULT_COMPLIANCE_DOC_TYPES;
+        const periodGroups = (periods || []).map(function(period, periodIndex) {
+            return {
+                headerName: String(period),
+                headerClass: 'compliance-header-center',
+                children: complianceDocTypes.map(function(docType, docIndex) {
+                    return buildComplianceDocColumn(periodIndex, docIndex, docType);
+                })
+            };
+        });
+
+        return [
+            {
+                field: 'country_name',
+                headerName: '{{ _("Country") }}',
+                pinned: 'left',
+                width: 220,
+                minWidth: 180,
+                maxWidth: 320,
+                filter: 'customSetFilter',
+                sortable: true,
+                cellStyle: { display: 'flex', alignItems: 'center', fontWeight: '600' }
+            },
+            ...periodGroups,
+            {
+                field: 'is_compliant',
+                headerName: '{{ _("Compliance Status") }}',
+                pinned: 'right',
+                width: 170,
+                minWidth: 150,
+                maxWidth: 220,
+                sortable: true,
+                filter: 'customSetFilter',
+                cellRenderer: function(params) {
+                    return renderComplianceBadge(!!params.value);
+                },
+                filterValueGetter: function(params) {
+                    return params.data && params.data.is_compliant ? '{{ _("Compliant") }}' : '{{ _("Non-Compliant") }}';
+                },
+                cellClass: 'compliance-cell-center',
+                headerClass: 'compliance-header-center',
+                cellStyle: { textAlign: 'center' }
+            }
+        ];
+    }
+
+    function buildComplianceRowData(data, periods, docTypes) {
+        const complianceDocTypes = docTypes && docTypes.length ? docTypes : DEFAULT_COMPLIANCE_DOC_TYPES;
+
+        return (data || []).map(function(country) {
+            const row = {
+                country_id: country.country_id,
+                country_name: country.country_name,
+                country_iso3: country.country_iso3,
+                is_compliant: !!country.is_compliant
+            };
+
+            const periodDocsMap = {};
+            (country.periods || []).forEach(function(p) {
+                periodDocsMap[p.period] = p.documents || {};
+            });
+
+            (periods || []).forEach(function(period, periodIndex) {
+                const docs = periodDocsMap[period] || {};
+                complianceDocTypes.forEach(function(docType, docIndex) {
+                    row[complianceDocFieldKey(periodIndex, docIndex)] = docs[docType] || 'missing';
+                });
+            });
+
+            return row;
+        });
+    }
+
+    function initializeComplianceGrid() {
+        if (complianceGridHelper) {
+            return complianceGridApi;
+        }
+
+        complianceGridHelper = new AgGridHelper({
+            containerId: 'complianceGrid',
+            templateId: 'compliance',
+            columnDefs: buildComplianceColumnDefs([], DEFAULT_COMPLIANCE_DOC_TYPES),
+            rowData: [],
+            options: {
+                pagination: false
+            },
+            columnVisibilityOptions: {
+                enableExport: true,
+                enableReset: true,
+                buttonPlaceholderId: 'compliance-column-visibility-placeholder'
+            }
+        });
+
+        complianceGridApi = complianceGridHelper.initialize();
+        window.complianceGridApi = complianceGridApi;
+        window.complianceGridHelper = complianceGridHelper;
+        return complianceGridApi;
+    }
+
+    function updateComplianceGrid(columnDefs, rowData) {
+        if (!complianceGridHelper) {
+            initializeComplianceGrid();
+        }
+
+        complianceGridHelper.config.columnDefs = columnDefs;
+
+        if (complianceGridApi) {
+            if (typeof complianceGridApi.setGridOption === 'function') {
+                complianceGridApi.setGridOption('columnDefs', columnDefs);
+                complianceGridApi.setGridOption('rowData', rowData);
+            } else {
+                if (typeof complianceGridApi.setColumnDefs === 'function') {
+                    complianceGridApi.setColumnDefs(columnDefs);
+                }
+                complianceGridHelper.setRowData(rowData);
+            }
+        }
+
+        if (complianceGridHelper) {
+            complianceGridHelper.refresh();
+        }
+    }
+
+    // Compliance data loading and rendering with AG Grid
     async function loadComplianceData() {
         // Show loading, hide other elements
         if (domCache.complianceLoading) domCache.complianceLoading.style.display = 'block';
         if (domCache.complianceInitial) domCache.complianceInitial.style.display = 'none';
         if (domCache.complianceSummary) domCache.complianceSummary.style.display = 'none';
-        if (domCache.complianceTableContainer) domCache.complianceTableContainer.style.display = 'none';
+        if (domCache.compliancePendingValidationNotice) domCache.compliancePendingValidationNotice.style.display = 'none';
+        if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'none';
+        if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'none';
         if (domCache.complianceError) domCache.complianceError.style.display = 'none';
 
         try {
-            // Build URL with reference year if selected
+            // Build URL with reference year if selected (includes browser-saved preference)
             let url = '/admin/data-exploration/compliance';
-            const referenceYear = domCache.complianceYearFilter?.value;
+            const referenceYear = resolveComplianceReferenceYear();
             if (referenceYear) {
                 url += `?reference_year=${encodeURIComponent(referenceYear)}`;
             }
@@ -2155,7 +2364,7 @@
                 populateComplianceYearDropdown(result.available_years, result.reference_year);
             }
 
-            renderComplianceData(result.data, result.periods, result.doc_types);
+            renderComplianceData(result.data, result.periods, result.doc_types, result.pending_validation_notice);
 
         } catch (error) {
             console.error('Error loading compliance data:', error);
@@ -2173,8 +2382,14 @@
         const yearFilter = domCache.complianceYearFilter;
         if (!yearFilter) return;
 
-        // Remember current selection if any
-        const currentValue = yearFilter.value || (selectedYear ? String(selectedYear) : '');
+        const savedValue = getSavedComplianceReferenceYear();
+        const preferredValue = savedValue || yearFilter.value || (selectedYear ? String(selectedYear) : '');
+        const availableSet = new Set((availableYears || []).map(function(year) { return String(year); }));
+        const selectedValue = preferredValue && availableSet.has(String(preferredValue)) ? String(preferredValue) : '';
+
+        if (savedValue && !selectedValue) {
+            saveComplianceReferenceYear('');
+        }
 
         // Clear and rebuild options
         yearFilter.innerHTML = '<option value="">{{ _("Latest") }}</option>';
@@ -2183,20 +2398,28 @@
             const option = document.createElement('option');
             option.value = year;
             option.textContent = `${year} (${year}, ${year - 1}, ${year - 2})`;
-            if (String(year) === currentValue) {
+            if (String(year) === selectedValue) {
                 option.selected = true;
             }
             yearFilter.appendChild(option);
         }
+
+        yearFilter.value = selectedValue;
     }
 
-    // Render document status icon
-    function renderDocIcon(hasDoc) {
-        if (hasDoc) {
-            return '<i class="fas fa-check-circle text-green-500 text-lg"></i>';
-        } else {
-            return '<i class="fas fa-times-circle text-red-400 text-lg"></i>';
+    // Render document status icon (missing | pending | approved | rejected)
+    function renderDocIcon(status) {
+        const value = status || 'missing';
+        if (value === 'pending') {
+            return `<i class="fas fa-clock text-amber-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.pending)}"></i>`;
         }
+        if (value === 'approved') {
+            return `<i class="fas fa-check-circle text-green-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.approved)}"></i>`;
+        }
+        if (value === 'rejected') {
+            return `<i class="fas fa-ban text-red-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.rejected)}"></i>`;
+        }
+        return `<i class="fas fa-times-circle text-red-400 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.missing)}"></i>`;
     }
 
     // Render compliance status badge
@@ -2212,7 +2435,40 @@
         `;
     }
 
-    function renderComplianceData(data, periods, docTypes) {
+    function renderCompliancePendingValidationNotice(notice) {
+        const noticeEl = domCache.compliancePendingValidationNotice;
+        if (!noticeEl) return;
+
+        const countries = notice && Array.isArray(notice.countries) ? notice.countries : [];
+        if (!countries.length) {
+            noticeEl.style.display = 'none';
+            return;
+        }
+
+        const count = countries.length;
+        const names = countries.map(function(country) { return country.country_name; }).filter(Boolean);
+        const maxNames = 12;
+        let namesText = names.slice(0, maxNames).map(function(name) { return escapeHtml(name); }).join(', ');
+        if (names.length > maxNames) {
+            namesText += ` {{ _('and') }} ${names.length - maxNames} {{ _('more') }}`;
+        }
+
+        if (domCache.compliancePendingValidationTitle) {
+            domCache.compliancePendingValidationTitle.textContent = count === 1
+                ? '{{ _("1 non-compliant country has compliance documents pending validation.") }}'
+                : String(count) + ' {{ _("non-compliant countries have compliance documents pending validation.") }}';
+        }
+        if (domCache.compliancePendingValidationBody) {
+            domCache.compliancePendingValidationBody.innerHTML = `
+                {{ _('These countries have uploaded Annual Reports or Audited Financial Statements that are still awaiting document approval.') }}
+                <span class="block mt-1"><span class="font-medium">{{ _('Countries:') }}</span> ${namesText}</span>
+            `;
+        }
+
+        noticeEl.style.display = 'block';
+    }
+
+    function renderComplianceData(data, periods, docTypes, pendingValidationNotice) {
         if (!data || data.length === 0) {
             if (domCache.complianceInitial) {
                 domCache.complianceInitial.innerHTML = `
@@ -2221,6 +2477,9 @@
                 `;
                 domCache.complianceInitial.style.display = 'block';
             }
+            if (domCache.compliancePendingValidationNotice) domCache.compliancePendingValidationNotice.style.display = 'none';
+            if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'none';
+            if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'none';
             return;
         }
 
@@ -2233,96 +2492,20 @@
         if (domCache.nonCompliantCount) domCache.nonCompliantCount.textContent = nonCompliantCount;
         if (domCache.totalCountriesCount) domCache.totalCountriesCount.textContent = totalCount;
         if (domCache.complianceSummary) domCache.complianceSummary.style.display = 'block';
+        renderCompliancePendingValidationNotice(pendingValidationNotice);
 
-        const cellStyle = 'border: 1px solid #d1d5db; padding: 12px 16px;';
-        const headerStyle = 'border: 1px solid #d1d5db; padding: 12px 16px; background-color: #f3f4f6;';
-        const numPeriods = periods.length;
+        const columnDefs = buildComplianceColumnDefs(periods, docTypes);
+        const rowData = buildComplianceRowData(data, periods, docTypes);
+        updateComplianceGrid(columnDefs, rowData);
 
-        // Build two-level table header
-        let headerHtml = `
-            <tr>
-                <th rowspan="2" style="${headerStyle}" class="text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    {{ _('Country') }}
-                </th>
-                <th colspan="${numPeriods}" style="${headerStyle}" class="text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    {{ _('Annual Report') }}
-                </th>
-                <th colspan="${numPeriods}" style="${headerStyle}" class="text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    {{ _('Audited Financial Statement') }}
-                </th>
-                <th rowspan="2" style="${headerStyle}" class="text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    {{ _('Compliance Status') }}
-                </th>
-            </tr>
-            <tr>
-        `;
+        if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'flex';
+        if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'block';
 
-        // Add period columns for Annual Report
-        periods.forEach(period => {
-            headerHtml += `<th style="${headerStyle}" class="text-center text-xs font-semibold text-gray-600">${escapeHtml(period)}</th>`;
+        requestAnimationFrame(function() {
+            if (complianceGridHelper) {
+                complianceGridHelper.refresh();
+            }
         });
-
-        // Add period columns for Audited Financial Statement
-        periods.forEach(period => {
-            headerHtml += `<th style="${headerStyle}" class="text-center text-xs font-semibold text-gray-600">${escapeHtml(period)}</th>`;
-        });
-
-        headerHtml += '</tr>';
-
-        // Update table header
-        if (domCache.complianceTableHead) {
-            domCache.complianceTableHead.innerHTML = headerHtml;
-        }
-
-        // Build table body - one row per country
-        let bodyHtml = '';
-
-        data.forEach((country, countryIndex) => {
-            const rowClass = countryIndex % 2 === 0 ? 'group-even' : 'group-odd';
-
-            bodyHtml += `<tr class="${rowClass}">`;
-
-            // Country cell
-            bodyHtml += `
-                <td style="${cellStyle}" class="text-sm font-semibold text-gray-900">
-                    ${escapeHtml(country.country_name)}
-                </td>
-            `;
-
-            // Build a map of period -> documents for easy lookup
-            const periodDocsMap = {};
-            country.periods.forEach(p => {
-                periodDocsMap[p.period] = p.documents || {};
-            });
-
-            // Annual Report columns (one per period)
-            periods.forEach(period => {
-                const docs = periodDocsMap[period] || {};
-                bodyHtml += `<td style="${cellStyle}" class="text-center">${renderDocIcon(docs['Annual Report'])}</td>`;
-            });
-
-            // Audited Financial Statement columns (one per period)
-            periods.forEach(period => {
-                const docs = periodDocsMap[period] || {};
-                bodyHtml += `<td style="${cellStyle}" class="text-center">${renderDocIcon(docs['Audited Financial Statement'])}</td>`;
-            });
-
-            // Compliance status cell
-            bodyHtml += `
-                <td style="${cellStyle}" class="text-center">
-                    ${renderComplianceBadge(country.is_compliant)}
-                </td>
-            `;
-
-            bodyHtml += '</tr>';
-        });
-
-        // Update table body
-        if (domCache.complianceTableBody) {
-            domCache.complianceTableBody.innerHTML = bodyHtml;
-        }
-
-        if (domCache.complianceTableContainer) domCache.complianceTableContainer.style.display = 'block';
 
         // Mark as loaded
         complianceDataLoaded = true;
@@ -2334,9 +2517,11 @@
         if (CAN_ACCESS_DATA_TABLE) {
             initializeGrid();
         }
+        if (CAN_ACCESS_COMPLIANCE) {
+            initializeComplianceGrid();
+        }
         setupEventHandlers();
-        // When user has only Compliance tab, no tab switch will occur — auto-load compliance data
-        if (CAN_ACCESS_COMPLIANCE && !CAN_ACCESS_DATA_TABLE && !CAN_ACCESS_ANALYSIS) {
+        if (CAN_ACCESS_COMPLIANCE) {
             loadComplianceData();
         }
     }
@@ -2703,32 +2888,26 @@
             });
         }
 
-        // Helper function to switch main tabs
+        // Helper function to switch main tabs (settings-style underline tabs)
         function switchMainTab(activeTab) {
-            const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance];
-            const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance];
-
-            tabs.forEach((tab, index) => {
-                if (!tab) return;
-                const isActive = tab === activeTab;
-                tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                if (isActive) {
-                    tab.classList.add('border-blue-600', 'text-blue-600', 'bg-blue-50');
-                    tab.classList.remove('border-transparent', 'text-gray-600');
-                } else {
-                    tab.classList.remove('border-blue-600', 'text-blue-600', 'bg-blue-50');
-                    tab.classList.add('border-transparent', 'text-gray-600');
-                }
-            });
-
-            panels.forEach((panel, index) => {
-                if (!panel) return;
-                if (tabs[index] === activeTab) {
-                    panel.classList.remove('hidden');
-                } else {
-                    panel.classList.add('hidden');
-                }
-            });
+            if (!activeTab) return;
+            const tabId = activeTab.getAttribute('data-tab');
+            if (window.AdminUnderlineTabs) {
+                AdminUnderlineTabs.activateStripTab('#explore-data-tabs', tabId, { panelSelector: '.explore-panel' });
+            } else {
+                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance];
+                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance];
+                tabs.forEach((tab, index) => {
+                    if (!tab) return;
+                    const isActive = tab === activeTab;
+                    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    if (panels[index]) panels[index].classList.toggle('hidden', !isActive);
+                });
+            }
+            if (domCache.exploreParametersSection) {
+                const showParams = tabId === 'data-table' || tabId === 'disaggregation';
+                domCache.exploreParametersSection.classList.toggle('hidden', !showParams);
+            }
         }
 
         // Main tab switch: Data Table | Analysis | Compliance
@@ -2753,6 +2932,10 @@
                 // Auto-load compliance data when tab is first accessed
                 if (!complianceDataLoaded) {
                     loadComplianceData();
+                } else if (complianceGridHelper) {
+                    requestAnimationFrame(function() {
+                        complianceGridHelper.refresh();
+                    });
                 }
             });
         }
@@ -2762,9 +2945,10 @@
             domCache.refreshComplianceBtn.addEventListener('click', loadComplianceData);
         }
 
-        // Reload compliance data when year filter changes
+        // Reload compliance data when year filter changes (persist selection in browser)
         if (domCache.complianceYearFilter) {
             domCache.complianceYearFilter.addEventListener('change', function() {
+                saveComplianceReferenceYear(domCache.complianceYearFilter.value);
                 loadComplianceData();
             });
         }

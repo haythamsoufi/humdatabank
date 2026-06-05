@@ -554,6 +554,11 @@
                                     <p class="mb-1"><strong>{{ _('Indirect Reach') }}:</strong> {{ _('Yes') }}</p>
                                 {% endif %}
 
+                                {# Disability questions (indicators only) #}
+                                {% if item_type == 'indicator' and item_instance.allow_disability_questions %}
+                                    <p class="mb-1"><strong>{{ _('Disability questions') }}:</strong> {{ _('Yes') }}</p>
+                                {% endif %}
+
                                 {# Show layout configuration for all item types - only when different from default #}
                                 {% if hasattr(item_instance, 'layout_column_width') and item_instance.layout_column_width != 12 and item_instance.layout_column_width != '12' %}
                                     <p class="mb-1"><strong>{{ _('Layout') }}:</strong> {{ item_instance.layout_column_width }}/12 {{ _('width') }}{% if item_instance.layout_break_after %}, {{ _('Break after') }}{% endif %}</p>
@@ -598,6 +603,7 @@
                                             data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
                                             data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
                                             data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+                                            data-allow-disability-questions="{{ item_instance.allow_disability_questions | default(false) }}"
                                             data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
                                             data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
                                             data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
@@ -642,6 +648,7 @@
                                             data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
                                             data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
                                             data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+                                            data-allow-disability-questions="{{ item_instance.allow_disability_questions | default(false) }}"
                                             data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
                                             data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
                                             data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
@@ -751,6 +758,7 @@
                                             data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
                                             data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
                                             data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
+                                            data-allow-disability-questions="{{ item_instance.allow_disability_questions | default(false) }}"
                                             data-indirect-reach="{{ item_instance.indirect_reach | default(false) }}"
                                             data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
                                             data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"

@@ -1,114 +1,146 @@
 {% extends "core/layout.html" %}
-{% block title %}{{ title }}{% endblock %}
-{% block content %}
-<div class="container mx-auto px-4 py-6">
-    <h1 class="text-2xl font-semibold text-gray-800 mb-4">{{ _('Validation Questions') }}</h1>
-    <p class="text-gray-600 mb-6">{{ _('Review auto-generated validation questions, run checks, and send them to focal points.') }}</p>
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container, ag_grid_page_config %}
 
-    <div class="bg-white rounded-lg shadow border border-gray-200 p-4 mb-6 flex flex-wrap gap-4 items-end">
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">{{ _('Template') }}</label>
-            <select id="vq-template" class="form-select border rounded px-3 py-2">
-                <option value="">{{ _('All') }}</option>
-                {% for t in template_options %}
-                <option value="{{ t.id }}">{{ t.name }}</option>
-                {% endfor %}
-            </select>
+{% block title %}{{ _('Validation Questions') }} — {{ _('Admin') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+
+{{ page_header(
+    title=_('Validation Questions'),
+    subtitle=_('Manage validation questions and review country-level status summaries.'),
+    icon='fas fa-clipboard-question',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Explore Data'), 'url': url_for('data_exploration.explore_data')},
+        {'name': _('Validation Questions')}
+    ],
+    actions=[
+        {
+            'type': 'link',
+            'text': _('Validation Dashboard'),
+            'icon': 'fas fa-chart-line',
+            'url': url_for('admin.validation_dashboard'),
+            'classes': 'professional-action-btn professional-action-btn-blue'
+        }
+    ]
+) }}
+
+<div id="vq-feedback" class="hidden mb-4 rounded-md px-4 py-3 text-sm border" role="status" aria-live="polite"></div>
+
+<div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 mb-6">
+    {% call scroll_tab_bar(inner_id='vq-tabs', aria_label=_('Validation questions views')) %}
+        <button type="button" role="tab" data-tab="all-questions" id="vq-tab-all"
+                class="{{ admin_underline_tab_btn_classes(true) }}">
+            <i class="fas fa-list mr-1.5" aria-hidden="true"></i>{{ _('All questions') }}
+        </button>
+        <button type="button" role="tab" data-tab="country-summary" id="vq-tab-summary"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-globe mr-1.5" aria-hidden="true"></i>{{ _('Country summary') }}
+        </button>
+    {% endcall %}
+
+    {# Tab: All questions #}
+    <div id="panel-all-questions" class="vq-panel p-6">
+        <div class="flex flex-wrap gap-3 items-center justify-between mb-4">
+            <p class="text-sm text-ifrc-gray-600 mb-0">
+                {{ _('Use column filters to narrow results. Run automatic checks from the Validation Dashboard.') }}
+            </p>
+            <div class="flex flex-wrap gap-3">
+                <button type="button" id="vq-refresh" class="btn btn-secondary">
+                    <i class="fas fa-sync-alt mr-2" aria-hidden="true"></i>{{ _('Refresh') }}
+                </button>
+                <button type="button" id="vq-export" class="btn btn-secondary">
+                    <i class="fas fa-download mr-2" aria-hidden="true"></i>{{ _('Export Excel') }}
+                </button>
+                <a href="{{ url_for('admin.validation_questions_import_template') }}" class="btn btn-secondary">
+                    <i class="fas fa-file-excel mr-2" aria-hidden="true"></i>{{ _('Import template') }}
+                </a>
+                <input type="file" id="vq-import-file" accept=".xlsx,.xls" class="hidden">
+                <button type="button" id="vq-import" class="btn btn-secondary">
+                    <i class="fas fa-upload mr-2" aria-hidden="true"></i>{{ _('Import Excel') }}
+                </button>
+            </div>
         </div>
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">{{ _('Period') }}</label>
-            <input type="text" id="vq-period" class="form-input border rounded px-3 py-2" placeholder="2024">
-        </div>
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">{{ _('Country ID') }}</label>
-            <input type="number" id="vq-country" class="form-input border rounded px-3 py-2 w-28">
-        </div>
-        <button type="button" id="vq-refresh" class="btn btn-secondary">{{ _('Refresh') }}</button>
-        <button type="button" id="vq-run-checks" class="btn btn-primary">{{ _('Run checks') }}</button>
-        <button type="button" id="vq-send" class="btn btn-warning">{{ _('Send to focal points') }}</button>
+        {{ ag_grid_container('validationQuestionsGrid', loading_text=_('Loading validation questions…'), grid_height='640px', placeholder_id='vq-col-vis-placeholder', include_card=false) }}
     </div>
 
-    <div class="bg-white rounded-lg shadow border border-gray-200 overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 text-sm" id="vq-table">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-2 text-left">{{ _('Country') }}</th>
-                    <th class="px-4 py-2 text-left">{{ _('Period') }}</th>
-                    <th class="px-4 py-2 text-left">{{ _('Rule') }}</th>
-                    <th class="px-4 py-2 text-left">{{ _('Severity') }}</th>
-                    <th class="px-4 py-2 text-left">{{ _('Status') }}</th>
-                    <th class="px-4 py-2 text-left">{{ _('Question') }}</th>
-                </tr>
-            </thead>
-            <tbody id="vq-tbody"></tbody>
-        </table>
+    {# Tab: Country summary #}
+    <div id="panel-country-summary" class="vq-panel hidden p-6">
+        <p class="text-sm text-ifrc-gray-600 mb-4">
+            {{ _('Open, answered, and total question counts per country for a template and reporting period.') }}
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label for="vqs-template" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Template') }}</label>
+                <select id="vqs-template" class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md text-sm">
+                    <option value="">{{ _('Select template') }}</option>
+                    {% for t in template_options %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="vqs-period" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Reporting period') }}</label>
+                <select id="vqs-period" class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md text-sm" disabled>
+                    <option value="">{{ _('Select template first') }}</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button type="button" id="vqs-load" class="btn btn-primary w-full md:w-auto">
+                    <i class="fas fa-sync-alt mr-2" aria-hidden="true"></i>{{ _('Load summary') }}
+                </button>
+            </div>
+        </div>
+        {{ ag_grid_container('validationCountrySummaryGrid', loading_text=_('Loading country summary…'), grid_height='560px', placeholder_id='vqs-col-vis-placeholder', include_card=false) }}
     </div>
 </div>
-<script nonce="{{ csp_nonce() }}">
-(function() {
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    async function loadRows() {
-        const params = new URLSearchParams();
-        const tid = document.getElementById('vq-template').value;
-        const period = document.getElementById('vq-period').value;
-        const country = document.getElementById('vq-country').value;
-        if (tid) params.set('template_id', tid);
-        if (period) params.set('period', period);
-        if (country) params.set('country_id', country);
-        const resp = await fetch('/admin/validation-questions/api/list?' + params.toString());
-        const data = await resp.json();
-        const tbody = document.getElementById('vq-tbody');
-        tbody.innerHTML = '';
-        (data.rows || []).forEach((r) => {
-            const tr = document.createElement('tr');
-            tr.className = 'border-t';
-            tr.innerHTML = `<td class="px-4 py-2">${r.entity_name || ''}</td>
-                <td class="px-4 py-2">${r.period_name || ''}</td>
-                <td class="px-4 py-2">${r.rule_code || ''}</td>
-                <td class="px-4 py-2">${r.severity || ''}</td>
-                <td class="px-4 py-2">${r.status || ''}</td>
-                <td class="px-4 py-2 max-w-md truncate">${r.question_text || ''}</td>`;
-            tbody.appendChild(tr);
-        });
+
+{% set vq_grid_bootstrap = {
+    'listUrl': url_for('admin.validation_questions_list_api'),
+    'exportUrl': url_for('admin.validation_questions_export'),
+    'importUrl': url_for('admin.validation_questions_import'),
+    'periodsUrl': url_for('admin.validation_questions_periods_api'),
+    'countriesUrl': url_for('admin.validation_questions_countries_api'),
+    'statusUrlTemplate': '/admin/validation-questions/api/{id}/status',
+    'translations': {
+        'country': _('Country'),
+        'template': _('Template'),
+        'period': _('Period'),
+        'rule': _('Rule'),
+        'severity': _('Severity'),
+        'status': _('Status'),
+        'question': _('Question'),
+        'answer': _('Answer'),
+        'sent': _('Sent'),
+        'source': _('Source'),
+        'actions': _('Actions'),
+        'waive': _('Waive'),
+        'reopen': _('Reopen'),
+        'openQuestions': _('Open questions'),
+        'answered': _('Answered'),
+        'waived': _('Waived'),
+        'resolved': _('Resolved'),
+        'totalQuestions': _('Total questions'),
+        'loadFailed': _('Failed to load validation questions'),
+        'summaryFailed': _('Failed to load country summary'),
+        'importFailed': _('Import failed'),
+        'exportFailed': _('Export failed'),
+        'updated': _('Status updated'),
+        'selectTemplatePeriod': _('Select a template and period.'),
     }
-    document.getElementById('vq-refresh').addEventListener('click', loadRows);
-    document.getElementById('vq-run-checks').addEventListener('click', async () => {
-        const template_id = document.getElementById('vq-template').value;
-        const period_name = document.getElementById('vq-period').value;
-        const entity_id = document.getElementById('vq-country').value;
-        if (!template_id || !period_name || !entity_id) {
-            alert('Template, period, and country ID required for run checks');
-            return;
-        }
-        await fetch('/admin/validation-questions/run-checks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-            body: JSON.stringify({ template_id: +template_id, period_name, entity_id: +entity_id, entity_type: 'country' })
-        });
-        loadRows();
-    });
-    document.getElementById('vq-send').addEventListener('click', async () => {
-        const template_id = document.getElementById('vq-template').value;
-        const period_name = document.getElementById('vq-period').value;
-        const entity_id = document.getElementById('vq-country').value;
-        if (!template_id || !period_name) {
-            alert('Template and period required');
-            return;
-        }
-        await fetch('/admin/validation-questions/dispatch/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-            body: JSON.stringify({
-                template_id: +template_id,
-                period_name,
-                entity_type: entity_id ? 'country' : null,
-                entity_id: entity_id ? +entity_id : null,
-                channels: ['in_app', 'email']
-            })
-        });
-        loadRows();
-    });
-    loadRows();
-})();
-</script>
+} %}
+{{ ag_grid_page_config('validationQuestionsGridConfig', 'VQ_GRID_TRANSLATIONS', vq_grid_bootstrap) }}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ ag_grid_js() }}
+<script src="{{ static_url('js/admin/validation-questions-grid.js') }}"></script>
 {% endblock %}

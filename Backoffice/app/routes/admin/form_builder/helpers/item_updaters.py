@@ -521,6 +521,7 @@ def _update_item_config(form_item, form, request_form):
     form_item.config['layout_break_after'] = form.layout_break_after.data if hasattr(form, 'layout_break_after') and hasattr(form.layout_break_after, 'data') else False
     form_item.config['allow_data_not_available'] = form.allow_data_not_available.data if hasattr(form, 'allow_data_not_available') and hasattr(form.allow_data_not_available, 'data') else False
     form_item.config['allow_not_applicable'] = form.allow_not_applicable.data if hasattr(form, 'allow_not_applicable') and hasattr(form.allow_not_applicable, 'data') else False
+    form_item.config['allow_disability_questions'] = form.allow_disability_questions.data if hasattr(form, 'allow_disability_questions') and hasattr(form.allow_disability_questions, 'data') else False
     form_item.config['indirect_reach'] = form.indirect_reach.data if hasattr(form, 'indirect_reach') and hasattr(form.indirect_reach, 'data') else False
 
     # Allow over 100% for percentage items

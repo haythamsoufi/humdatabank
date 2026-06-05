@@ -49,8 +49,16 @@ def reopen_assignment(aes_id):
 
     if assignment_entity_status:
         try:
+            assigned_form = assignment_entity_status.assigned_form
+            round_was_closed = bool(
+                assigned_form
+                and assigned_form.is_effectively_closed
+                and not assignment_entity_status.reopened_after_close
+            )
             assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
             assignment_entity_status.status_timestamp = utcnow()  # Set timestamp when status changes
+            if round_was_closed:
+                assignment_entity_status.reopened_after_close = True
             db.session.flush()
 
             # Send notification to focal points about reopening
@@ -60,7 +68,31 @@ def reopen_assignment(aes_id):
             except Exception as e:
                 current_app.logger.error(f"Error sending assignment reopened notification: {e}", exc_info=True)
 
-            flash(f"Assignment '{assignment_entity_status.assigned_form.template.name if assignment_entity_status.assigned_form.template else 'Template Missing'}' for {assignment_entity_status.country.name if assignment_entity_status.country else 'N/A'} has been reopened.", "success")
+            entity_name = (
+                assignment_entity_status.country.name
+                if assignment_entity_status.country
+                else "N/A"
+            )
+            template_name = (
+                assignment_entity_status.assigned_form.template.name
+                if assignment_entity_status.assigned_form
+                and assignment_entity_status.assigned_form.template
+                else "Template Missing"
+            )
+            if round_was_closed:
+                flash(
+                    _(
+                        "Assignment '%(template)s' has been reopened for %(entity)s only.",
+                        template=template_name,
+                        entity=entity_name,
+                    ),
+                    "success",
+                )
+            else:
+                flash(
+                    _("Assignment '%(template)s' for %(entity)s has been reopened.", template=template_name, entity=entity_name),
+                    "success",
+                )
         except Exception as e:
             request_transaction_rollback()
             flash("Error reopening assignment.", "danger")

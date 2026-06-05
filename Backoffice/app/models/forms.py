@@ -609,7 +609,7 @@ class DataEntryMixin:
                 total += values['indirect']
         else:
             for key, val in values.items():
-                if key != 'indirect' and isinstance(val, (int, float)):
+                if key not in ('indirect', 'disability') and isinstance(val, (int, float)):
                     total += val
         return total
 

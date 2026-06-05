@@ -16,6 +16,7 @@
 | Understand application logs | [Logging & health](observability/logging-and-health.md) |
 | Investigate a WAF 403 in production | [WAF 403 guide](incidents/waf-403-form-payload-refactor-guide.md) |
 | Manage database migrations safely | [Flask-Migrate & pgvector](data/flask-migrate-and-pgvector.md) |
+| Track FDRS sync field coverage (template 21) | [FDRS sync coverage](fdrs-sync-coverage.md) |
 | Restore from backup | [Backup & restore](data/backup-and-restore.md) |
 | Understand the AI chat system | [AI system docs](ai/) |
 | Set up a new developer locally | **[Developer handbook](../../../docs/DEVELOPER-HANDBOOK.md)** — Quickstarts · [Backoffice README](../../README.md) · [Documentation index](../../docs/README.md) |

@@ -13,6 +13,8 @@ from app import db
 from app.models import FormData, FormItem, FormSection, SubmittedDocument
 from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
 from app.services.data_quality.helpers import (
+    compute_income_sources_ratio,
+    fdrs_compliance_doc_label_matches,
     get_assignment_aes,
     is_reported_value,
     load_form_data_by_kpi,
@@ -66,7 +68,12 @@ class FdrsV1Methodology:
         kpi_data = load_form_data_by_kpi(aes.id, template_id, version_id)
 
         docs_score, docs_detail = self._documents_score(aes.id, template_id)
-        reporting_score, reporting_detail, reporting_components = self._reporting_score(kpi_data)
+        reporting_score, reporting_detail, reporting_components = self._reporting_score(
+            kpi_data,
+            aes_id=aes.id,
+            template_id=template_id,
+            version_id=version_id,
+        )
         disagg_score, disagg_detail, disagg_components = self._disaggregation_score(
             kpi_data, warnings
         )
@@ -136,7 +143,7 @@ class FdrsV1Methodology:
         for item in doc_items:
             label = (item.label or "").lower()
             for doc_type in cat.COMPLIANCE_DOC_TYPES:
-                if doc_type.lower() in label:
+                if fdrs_compliance_doc_label_matches(item.label, doc_type):
                     has_doc = (
                         SubmittedDocument.query.filter(
                             SubmittedDocument.assignment_entity_status_id == aes_id,
@@ -153,7 +160,14 @@ class FdrsV1Methodology:
         score = (ar + afs) / 2.0
         return score, {"annual_report": ar, "audited_financial_statement": afs}
 
-    def _reporting_score(self, kpi_data: dict) -> tuple[float, dict, dict]:
+    def _reporting_score(
+        self,
+        kpi_data: dict,
+        *,
+        aes_id: int,
+        template_id: int,
+        version_id: int | None,
+    ) -> tuple[float, dict, dict]:
         gov_reported = sum(
             1 for code in cat.GOVERNANCE_KPI_CODES if is_reported_value(kpi_data.get(code, (None, None))[0])
         )
@@ -165,30 +179,21 @@ class FdrsV1Methodology:
         expend_reported = 1.0 if is_reported_value(expend_entry) else 0.0
 
         total_income = numeric_value(income_entry) or 0.0
-        source_sum = 0.0
-        for code in cat.INCOME_SOURCE_KPI_CODES:
-            entry = kpi_data.get(code, (None, None))[0]
-            v = numeric_value(entry)
-            if v is not None:
-                source_sum += v
-        income_sources_ratio = min(1.0, source_sum / total_income) if total_income > 0 else 0.0
+        income_sources_ratio = compute_income_sources_ratio(
+            aes_id,
+            template_id,
+            version_id,
+            kpi_data,
+            cat.INCOME_SOURCE_KPI_CODES,
+            total_income,
+        )
 
         finance_score = income_reported * 0.35 + expend_reported * 0.35 + income_sources_ratio * 0.30
 
-        applicable_reach = []
-        reported_reach = 0
-        for code in cat.REACH_KPI_CODES:
-            entry, _ = kpi_data.get(code, (None, None))
-            if entry is not None:
-                applicable_reach.append(code)
-            if is_reported_value(entry):
-                nv = numeric_value(entry)
-                if nv is not None and nv > 0:
-                    reported_reach += 1
-
-        if not applicable_reach:
-            applicable_reach = list(cat.REACH_KPI_CODES)
-        reach_score = reported_reach / len(applicable_reach) if applicable_reach else 0.0
+        reported_reach = sum(
+            1 for code in cat.REACH_KPI_CODES if is_reported_value(kpi_data.get(code, (None, None))[0])
+        )
+        reach_score = reported_reach / len(cat.REACH_KPI_CODES) if cat.REACH_KPI_CODES else 0.0
 
         reporting_score = gov_score * 0.33 + finance_score * 0.33 + reach_score * 0.33
         return reporting_score, {
@@ -225,23 +230,38 @@ class FdrsV1Methodology:
                 sex_disagg += sex_part
                 age_disagg += age_part
 
-            ddd_code = f"{code}_ddd" if not code.endswith("_ddd") else code
-            wgq_code = f"{code}_wgq" if not code.endswith("_wgq") else code
-            for suffix, answered_attr, disagg_attr in (
-                ("_ddd", "ddd", "ddd_disagg"),
-                ("_wgq", "wgq", "wgq_followed"),
-            ):
-                alt_code = code + suffix if not code.endswith(suffix) else code
-                d_entry, _ = kpi_data.get(alt_code, (None, None))
-                if d_entry is not None:
-                    if suffix == "_ddd":
+            disability_handled = False
+            if entry and isinstance(getattr(entry, "disagg_data", None), dict):
+                disagg_values = entry.disagg_data.get("values") or {}
+                if isinstance(disagg_values, dict):
+                    disability_meta = disagg_values.get("disability")
+                    if isinstance(disability_meta, dict) and "disaggregated_by_disability" in disability_meta:
                         ddd_answered += 1
-                        if is_reported_value(d_entry):
+                        if disability_meta.get("disaggregated_by_disability"):
                             ddd_disagg += 1
-                    else:
-                        wgq_answered += 1
-                        if is_reported_value(d_entry):
-                            wgq_followed += 1
+                            wgq_answered += 1
+                            if disability_meta.get("washington_group_compliant"):
+                                wgq_followed += 1
+                        disability_handled = True
+
+            if not disability_handled:
+                ddd_code = f"{code}_ddd" if not code.endswith("_ddd") else code
+                wgq_code = f"{code}_wgq" if not code.endswith("_wgq") else code
+                for suffix, answered_attr, disagg_attr in (
+                    ("_ddd", "ddd", "ddd_disagg"),
+                    ("_wgq", "wgq", "wgq_followed"),
+                ):
+                    alt_code = code + suffix if not code.endswith(suffix) else code
+                    d_entry, _ = kpi_data.get(alt_code, (None, None))
+                    if d_entry is not None:
+                        if suffix == "_ddd":
+                            ddd_answered += 1
+                            if is_reported_value(d_entry):
+                                ddd_disagg += 1
+                        else:
+                            wgq_answered += 1
+                            if is_reported_value(d_entry):
+                                wgq_followed += 1
 
         if total_people <= 0:
             warnings.append("No people-count indicators with values for disaggregation scoring.")
@@ -298,41 +318,49 @@ class FdrsV1Methodology:
                 if section_name_matches(section, keywords):
                     section_ids_by_group[group_key].append(section.id)
 
-        group_submitted: dict[str, datetime | None] = {}
-        for group_key, section_ids in section_ids_by_group.items():
-            if not section_ids:
-                group_submitted[group_key] = None
-                continue
-            item_ids = [
-                i.id
-                for i in FormItem.query.filter(
-                    FormItem.section_id.in_(section_ids),
-                    FormItem.archived == False,
-                ).all()
-            ]
-            if not item_ids:
-                group_submitted[group_key] = None
-                continue
-            latest = (
-                db.session.query(db.func.max(FormData.submitted_at))
-                .filter(
-                    FormData.assignment_entity_status_id == aes.id,
-                    FormData.form_item_id.in_(item_ids),
-                )
-                .scalar()
-            )
-            group_submitted[group_key] = latest
-
-        if aes.submitted_at:
-            for key in group_submitted:
-                if group_submitted[key] is None:
-                    group_submitted[key] = aes.submitted_at
-
         groups_with_sections = [k for k, ids in section_ids_by_group.items() if ids]
-        all_on_time = bool(groups_with_sections) and all(
-            group_submitted.get(k) is not None and group_submitted[k] <= cutoff
-            for k in groups_with_sections
-        )
+        group_submitted: dict[str, datetime | None] = {gk: None for gk, _ in cat.TIMELINESS_SECTION_GROUPS}
+
+        if aes.submitted_at and groups_with_sections:
+            # Use the assignment submission timestamp — FormData.submitted_at is updated on
+            # every edit/import and is not a reliable measure of original timeliness.
+            for group_key in groups_with_sections:
+                group_submitted[group_key] = aes.submitted_at
+        else:
+            for group_key, section_ids in section_ids_by_group.items():
+                if not section_ids:
+                    continue
+                item_ids = [
+                    i.id
+                    for i in FormItem.query.filter(
+                        FormItem.section_id.in_(section_ids),
+                        FormItem.archived == False,
+                    ).all()
+                ]
+                if not item_ids:
+                    continue
+                latest = (
+                    db.session.query(db.func.max(FormData.submitted_at))
+                    .filter(
+                        FormData.assignment_entity_status_id == aes.id,
+                        FormData.form_item_id.in_(item_ids),
+                    )
+                    .scalar()
+                )
+                group_submitted[group_key] = latest
+
+            if aes.submitted_at:
+                for key in groups_with_sections:
+                    if group_submitted.get(key) is None:
+                        group_submitted[key] = aes.submitted_at
+
+        if not groups_with_sections and aes.submitted_at:
+            all_on_time = aes.submitted_at <= cutoff
+        else:
+            all_on_time = bool(groups_with_sections) and all(
+                group_submitted.get(k) is not None and group_submitted[k] <= cutoff
+                for k in groups_with_sections
+            )
         score = 1.0 if all_on_time else 0.0
         return score, {
             "cutoff": cutoff.isoformat(),

@@ -109,25 +109,23 @@
                 var isActive = params.data.is_active !== false;
                 var isClosed = params.data.is_closed === true;
                 var html = '<div class="flex items-center justify-center gap-2">';
+                if (toggleActiveUrl) {
+                    html += '<form action="' + toggleActiveUrl + '" method="POST" class="inline-block">';
+                    html += '<input type="hidden" name="csrf_token" value="' + csrfToken + '">';
+                    html += '<button type="submit" class="' + (isActive ? 'text-amber-600 hover:text-amber-900' : 'text-green-600 hover:text-green-900') + '" title="' + (isActive ? cfg.t.deactivate_a69a5bbb : cfg.t.activate_7de8b7d4) + '" data-loading-text=""><i class="fas fa-fw ' + (isActive ? 'fa-pause-circle' : 'fa-play-circle') + '"></i></button>';
+                    html += '</form>';
+                }
                 if (isClosed && reopenClosedUrl) {
                     html += '<form action="' + reopenClosedUrl + '" method="POST" class="inline-block">';
                     html += '<input type="hidden" name="csrf_token" value="' + csrfToken + '">';
                     html += '<button type="submit" class="text-orange-600 hover:text-orange-900" title="' + cfg.t.reopen_e5aae0b1 + '" data-loading-text=""><i class="fas fa-fw fa-undo"></i></button>';
                     html += '</form>';
-                } else {
-                    if (toggleActiveUrl) {
-                        html += '<form action="' + toggleActiveUrl + '" method="POST" class="inline-block">';
-                        html += '<input type="hidden" name="csrf_token" value="' + csrfToken + '">';
-                        html += '<button type="submit" class="' + (isActive ? 'text-amber-600 hover:text-amber-900' : 'text-green-600 hover:text-green-900') + '" title="' + (isActive ? cfg.t.deactivate_a69a5bbb : cfg.t.activate_7de8b7d4) + '" data-loading-text=""><i class="fas fa-fw ' + (isActive ? 'fa-pause-circle' : 'fa-play-circle') + '"></i></button>';
-                        html += '</form>';
-                    }
-                    if (closeUrl) {
-                        var closeConfirm = (params.data.close_confirm || '').replace(/'/g, "\\'");
-                        html += '<form action="' + closeUrl + '" method="POST" class="inline-block close-assignment-form" data-confirm="' + closeConfirm + '">';
-                        html += '<input type="hidden" name="csrf_token" value="' + csrfToken + '">';
-                        html += '<button type="submit" class="close-assignment-btn text-slate-600 hover:text-slate-900" title="' + cfg.t.close_dce5c6fe + '" data-loading-text=""><i class="fas fa-fw fa-lock"></i></button>';
-                        html += '</form>';
-                    }
+                } else if (closeUrl) {
+                    var closeConfirm = (params.data.close_confirm || '').replace(/'/g, "\\'");
+                    html += '<form action="' + closeUrl + '" method="POST" class="inline-block close-assignment-form" data-confirm="' + closeConfirm + '">';
+                    html += '<input type="hidden" name="csrf_token" value="' + csrfToken + '">';
+                    html += '<button type="submit" class="close-assignment-btn text-slate-600 hover:text-slate-900" title="' + cfg.t.close_dce5c6fe + '" data-loading-text=""><i class="fas fa-fw fa-lock"></i></button>';
+                    html += '</form>';
                 }
                 if (editUrl) {
                     html += '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-900" title="' + cfg.t.edit_21ec7a3d + '"><i class="fas fa-pen fa-fw"></i></a>';

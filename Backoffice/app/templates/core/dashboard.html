@@ -797,7 +797,7 @@
                                     {# Conditional buttons based on type #}
                                     {% if item.type == 'assigned' %}
                                         {% set aes = item.item_object %}
-                                        {# Conditional display of "Enter Data" button for Focal Points (not for closed assignments) #}
+                                        {# Conditional display of "Enter Data" button for Focal Points #}
                                         {% set aes_can_enter = (
                                             aes.status not in ['submitted', 'approved']
                                             and (
@@ -805,7 +805,12 @@
                                                 or is_delegation_user
                                             )
                                         ) %}
-                                        {% if current_user_has_role('assignment_editor_submitter') and aes_can_enter and not item.item_object.assigned_form.is_effectively_closed %}
+                                        {% if current_user_has_role('assignment_editor_submitter') and item.item_object.assigned_form.is_effectively_closed %}
+                                        <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-secondary btn-sm">
+                                            <i class="fas fa-eye mr-1 -ml-0.5"></i>
+                                            {{ _('View') }}
+                                        </a>
+                                        {% elif current_user_has_role('assignment_editor_submitter') and aes_can_enter %}
                                         <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-primary btn-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
@@ -813,8 +818,8 @@
                                             </svg>
                                             {{ _('Enter Data') }}
                                         </a>
-                                        {% elif (current_user_has_role('system_manager') or is_admin_user) and not item.item_object.assigned_form.is_effectively_closed %}
-                                        {# Admins and System Managers see "Enter Data" for assigned forms (not when closed) #}
+                                        {% elif (current_user_has_role('system_manager') or is_admin_user) %}
+                                        {# Admins and System Managers see "Enter Data" for assigned forms #}
                                         <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-primary btn-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />

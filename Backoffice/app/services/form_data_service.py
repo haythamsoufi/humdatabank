@@ -1031,7 +1031,9 @@ class FormDataService:
     def _calculate_total_from_values(cls, values: Dict) -> float:
         """Calculate total from disaggregated values"""
         total = 0
-        for value in values.values():
+        for key, value in values.items():
+            if key in ('indirect', 'disability'):
+                continue
             if isinstance(value, (int, float)):
                 total += value
         return total

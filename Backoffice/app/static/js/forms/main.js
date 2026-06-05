@@ -10,6 +10,7 @@ import { initLayout } from './modules/layout.js';
 import { initMultiSelect } from './modules/multi-select.js';
 import { initCheckboxHandlers, handleYesNoCheckbox } from './modules/checkbox-handlers.js';
 import { initDataAvailability } from './modules/data-availability.js';
+import { initDisabilityQuestions } from './modules/disability-questions.js';
 import { initCalculatedLists } from './modules/calculated-lists-runtime.js';
 import { initDisaggregationCalculator } from './modules/disaggregation-calculator.js';
 import { initializeFormValidation } from './modules/form-validation.js';
@@ -85,6 +86,7 @@ async function initializeEntryForm() {
         safeInit('initMultiSelect', () => initMultiSelect());
         safeInit('initCheckboxHandlers', () => initCheckboxHandlers());
         safeInit('initDataAvailability', () => initDataAvailability());
+        safeInit('initDisabilityQuestions', () => initDisabilityQuestions());
         safeInit('initCalculatedLists', () => initCalculatedLists());
         safeInit('initDisaggregationCalculator', () => initDisaggregationCalculator());
         safeInit('initTooltips', () => initTooltips());

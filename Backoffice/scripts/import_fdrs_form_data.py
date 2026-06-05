@@ -81,6 +81,10 @@ import re
 import sys
 
 logger = logging.getLogger(__name__)
+
+
+class FdrsSyncCancelled(Exception):
+    """Raised when an in-flight FDRS sync is cancelled by the user."""
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -142,8 +146,19 @@ PREVIEW_EXCEL_COLUMNS = DEBUG_EXCEL_COLUMNS + ALL_COLUMNS
 # Columns for KPI mapping Excel (export for manual edit; later load with --indicator-mapping)
 MAPPING_EXCEL_COLUMNS = ("fdrs_code", "indicator_bank_id", "item_id", "indicator_name")
 
-# Question KPIs: no indicator bank link; map directly to form_item_id. Single-choice answer: Male, Female, Other.
-FDRS_QUESTION_KPI_TO_ITEM = {"KPI_pr_sex": 924, "KPI_sg_sex": 934}
+from fdrs_sync_constants import (
+    FDRS_INCOME_KPI_TO_MATRIX_ROW,
+    FDRS_INCOME_SOURCES_MATRIX_COLUMN,
+    FDRS_INCOME_SOURCES_MATRIX_ITEM_ID,
+    FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX,
+    FDRS_NETWORK_SUPPORT_GIVEN_COLUMN,
+    FDRS_NETWORK_SUPPORT_GIVEN_ITEM_ID,
+    FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX,
+    FDRS_NETWORK_SUPPORT_RECEIVED_COLUMN,
+    FDRS_NETWORK_SUPPORT_RECEIVED_ITEM_ID,
+    FDRS_NETWORK_SUPPORT_SLOT_COUNT,
+    FDRS_QUESTION_KPI_TO_ITEM,
+)
 
 SNAPSHOT_EXCEL_COLUMNS = (
     "year",
@@ -769,6 +784,37 @@ def _pick_total_row_for_base(rows: List[Dict[str, Any]], base_kpi: str) -> Dict[
 _EXCLUSION_LIST_CAP = 500
 
 
+def _normalize_fdrs_date(value: Any) -> str:
+    """Normalize FDRS date KPI values to YYYY-MM-DD for form date questions."""
+    if value is None:
+        return ""
+    s = str(value).strip()
+    if not s:
+        return ""
+    if "T" in s:
+        s = s.split("T", 1)[0]
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(s[:10], fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return s[:10] if len(s) >= 10 else s
+
+
+def _normalize_question_value(base_kpi: str, value: Any) -> str:
+    if base_kpi in ("KPI_pr_sex", "KPI_sg_sex"):
+        return _normalize_sex_choice(value)
+    if base_kpi in ("KPI_StartDate", "KPI_EndDate"):
+        return _normalize_fdrs_date(value)
+    if base_kpi == "KPI_CUR_Code":
+        if value is None:
+            return ""
+        return str(value).strip()
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def _normalize_sex_choice(value: Any) -> str:
     """Normalize FDRS value for sex single-choice questions (KPI_pr_sex, KPI_sg_sex) to Male, Female, or Other."""
     if value is None:
@@ -787,6 +833,49 @@ def _normalize_sex_choice(value: Any) -> str:
     if s in ("Male", "Female", "Other"):
         return s
     return "Other"  # fallback
+
+
+def _merge_disability_into_disagg_data(disagg_data: str, disability: Dict[str, bool]) -> str:
+    """Merge disability answers into disagg_data JSON (entry-form compatible)."""
+    if not disability:
+        return disagg_data or ""
+    if disagg_data:
+        try:
+            obj = json.loads(disagg_data)
+        except (json.JSONDecodeError, TypeError):
+            obj = {"mode": "total", "values": {}}
+    else:
+        obj = {"mode": "total", "values": {}}
+    if not isinstance(obj, dict):
+        obj = {"mode": "total", "values": {}}
+    values = dict(obj.get("values") or {})
+    values["disability"] = disability
+    obj["values"] = values
+    if "mode" not in obj:
+        obj["mode"] = "total"
+    return json.dumps(obj)
+
+
+def _seed_groups_from_disability_keys(
+    groups: Dict[Tuple[str, str, str], List[Dict[str, Any]]],
+    disability_by_key: Dict[Tuple[str, str, str], Dict[str, bool]],
+    base_to_indicator_id: Dict[str, int],
+    bank_to_item_id: Dict[int, int],
+    assignment_by_key: Dict[Tuple[str, str], int],
+) -> None:
+    """Ensure disability-only indicators appear in groups even without a main FDRS value row."""
+    for (iso3, year, base_kpi), disability_meta in (disability_by_key or {}).items():
+        if not disability_meta or base_kpi in FDRS_QUESTION_KPI_TO_ITEM:
+            continue
+        if base_to_indicator_id.get(base_kpi) is None:
+            continue
+        if bank_to_item_id.get(base_to_indicator_id[base_kpi]) is None:
+            continue
+        if assignment_by_key.get((year, iso3)) is None:
+            continue
+        key = (iso3, year, base_kpi)
+        if key not in groups:
+            groups[key] = []
 
 
 def _data_availability_from_group_rows(group_rows: List[Dict[str, Any]]) -> tuple:
@@ -895,6 +984,7 @@ def build_ready_to_import_from_new_pipeline(
     submitted_at_default: Optional[datetime] = None,
     debug_iso3_year_item: Optional[Tuple[str, str, int]] = None,
     exclusion_summary: Optional[Dict[str, Any]] = None,
+    disability_by_key: Optional[Dict[Tuple[str, str, str], Dict[str, bool]]] = None,
 ) -> List[Dict[str, str]]:
     """
     Ready to import: merge FDRS Data + disagg + Indicator_Bank (BaseKPI = fdrs_kpi_code)
@@ -951,6 +1041,14 @@ def build_ready_to_import_from_new_pipeline(
             continue
         groups[(iso3, year, base_kpi)].append(r)
 
+    _seed_groups_from_disability_keys(
+        groups,
+        disability_by_key or {},
+        base_to_indicator_id,
+        bank_to_item_id,
+        assignment_by_key,
+    )
+
     if rti_excl is not None and isinstance(rti_excl, dict):
         rti_excl["no_assignment"] = sorted([f"{iso3},{yr}" for (iso3, yr) in no_assignment_set])[:_EXCLUSION_LIST_CAP]
         rti_excl["no_indicator"] = sorted(no_indicator_set)[:_EXCLUSION_LIST_CAP]
@@ -979,7 +1077,7 @@ def build_ready_to_import_from_new_pipeline(
             item_id = FDRS_QUESTION_KPI_TO_ITEM[base_kpi]
             # Pick row with KPI_code == base_kpi (single-choice question: one value per iso3/year)
             r = next((x for x in group_rows if (x.get("KPI_code") or "").strip() == base_kpi), group_rows[0])
-            value = _normalize_sex_choice(r.get("Value"))
+            value = _normalize_question_value(base_kpi, r.get("Value"))
             if not value:
                 if rti_excl is not None and isinstance(rti_excl, dict):
                     rti_excl["main_value_empty_or_zero_count"] = rti_excl.get("main_value_empty_or_zero_count", 0) + 1
@@ -991,11 +1089,12 @@ def build_ready_to_import_from_new_pipeline(
         else:
             indicator_id = base_to_indicator_id[base_kpi]
             item_id = bank_to_item_id[indicator_id]
+            disability_meta = (disability_by_key or {}).get((iso3, year, base_kpi))
             data_not_available_flag, not_applicable_flag = _data_availability_from_group_rows(group_rows)
-            r = _pick_total_row_for_base(group_rows, base_kpi)
-            value = r.get("Value")
-            # Emit row when value present OR when data_not_available/not_applicable set (FDRS data availability KPIs)
-            if not (data_not_available_flag or not_applicable_flag) and _main_value_empty_or_zero(value):
+            r = _pick_total_row_for_base(group_rows, base_kpi) if group_rows else {}
+            value = r.get("Value") if group_rows else None
+            # Emit row when value present OR when data_not_available/not_applicable set OR disability answers exist
+            if not (data_not_available_flag or not_applicable_flag or disability_meta) and _main_value_empty_or_zero(value):
                 if rti_excl is not None and isinstance(rti_excl, dict):
                     rti_excl["main_value_empty_or_zero_count"] = rti_excl.get("main_value_empty_or_zero_count", 0) + 1
                     main_value_empty_or_zero_set.add((iso3, year, base_kpi))
@@ -1005,9 +1104,11 @@ def build_ready_to_import_from_new_pipeline(
             else:
                 value = str(value) if value is not None else ""
             disagg_data = disagg_by_key.get((iso3, year, base_kpi)) or ""
+            if disability_meta:
+                disagg_data = _merge_disability_into_disagg_data(disagg_data, disability_meta)
         aes_id = assignment_by_key[(year, iso3)]
         sub_at = submitted_at_default.strftime("%d/%m/%Y  %H:%M:%S") if submitted_at_default else ""
-        kpi_code = (r.get("KPI_code") or base_kpi or "").strip()
+        kpi_code = (r.get("KPI_code") or base_kpi or "").strip() if r else base_kpi
 
         if debug_iso3_year_item:
             debug_iso3, debug_year, debug_item = debug_iso3_year_item
@@ -1056,6 +1157,288 @@ def build_ready_to_import_from_new_pipeline(
             for (iso3, yr, base) in sorted(main_value_empty_or_zero_set)
         ][: _EXCLUSION_LIST_CAP]
     return out
+
+
+def _split_fdrs_csv_field(raw: Any) -> List[str]:
+    if raw is None:
+        return []
+    s = str(raw).strip()
+    if not s:
+        return []
+    return [part.strip() for part in s.split(",")]
+
+
+def _parse_don_code_amount_pairs(codes_raw: Any, amounts_raw: Any) -> List[Tuple[str, int]]:
+    """Zip parallel CSV DonCode / amount lists from FDRS network-support KPIs."""
+    codes = _split_fdrs_csv_field(codes_raw)
+    amounts = _split_fdrs_csv_field(amounts_raw)
+    if not codes:
+        return []
+    n = max(len(codes), len(amounts))
+    while len(codes) < n:
+        codes.append("")
+    while len(amounts) < n:
+        amounts.append("")
+    pairs: List[Tuple[str, int]] = []
+    for don, amt_raw in zip(codes, amounts):
+        don = (don or "").strip()
+        if not don:
+            continue
+        amt_s = (amt_raw or "").strip()
+        if not amt_s:
+            continue
+        try:
+            amt = int(float(amt_s))
+        except (ValueError, TypeError):
+            continue
+        if amt == 0:
+            continue
+        pairs.append((don, amt))
+    return pairs
+
+
+def _load_don_code_to_matrix_row_label(
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> Dict[str, str]:
+    """
+    Map FDRS DonCode -> matrix row label (National Society name).
+    Prefers active NationalSociety.name in DB (via iso3); falls back to entities/ns NSO_DON_name.
+    """
+    from fdrs_data_fetcher import DEFAULT_DATA_API_BASE, fetch_country_map
+
+    base = (base_url or DEFAULT_FDRS_DATA_API_BASE).rstrip("/")
+    don_to_iso = fetch_country_map(base_url=base, api_key=api_key)
+
+    iso_to_ns_name: Dict[str, str] = {}
+    try:
+        from app.models.core import Country
+        from app.models.organization import NationalSociety
+
+        for ns in (
+            NationalSociety.query.filter_by(is_active=True)
+            .join(Country)
+            .order_by(NationalSociety.display_order.asc(), NationalSociety.id.asc())
+            .all()
+        ):
+            iso = (ns.country.iso3 or "").strip() if ns.country else ""
+            if iso and iso not in iso_to_ns_name and (ns.name or "").strip():
+                iso_to_ns_name[iso] = ns.name.strip()
+    except Exception as e:
+        logger.debug("NationalSociety lookup for FDRS network support failed: %s", e)
+
+    don_to_nso_name: Dict[str, str] = {}
+    try:
+        import urllib.parse
+        import urllib.request
+
+        url = f"{base}/api/entities/ns"
+        if api_key:
+            url += f"?apiKey={urllib.parse.quote(api_key)}"
+        with urllib.request.urlopen(url, timeout=120) as resp:
+            entities = json.loads(resp.read().decode("utf-8"))
+        for ent in entities or []:
+            if not isinstance(ent, dict):
+                continue
+            don = (ent.get("KPI_DON_code") or ent.get("DonCode") or "").strip()
+            if not don:
+                continue
+            nso = (ent.get("NSO_DON_name") or ent.get("country") or "").strip()
+            if nso:
+                don_to_nso_name[don] = nso
+    except Exception as e:
+        logger.debug("entities/ns fetch for network support labels failed: %s", e)
+
+    out: Dict[str, str] = {}
+    for don, iso in don_to_iso.items():
+        label = iso_to_ns_name.get(iso) or don_to_nso_name.get(don) or iso or don
+        out[don] = label
+    for don, label in don_to_nso_name.items():
+        out.setdefault(don, label)
+    return out
+
+
+def _fdrs_data_kpi_index(fdrs_data: List[Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """(iso3, year) -> {KPI_code: Value}."""
+    from collections import defaultdict
+
+    index: Dict[Tuple[str, str], Dict[str, Any]] = defaultdict(dict)
+    for r in fdrs_data or []:
+        iso3 = (r.get("ISO3") or "").strip()
+        year = str(r.get("year") or "").strip()
+        kpi = (r.get("KPI_code") or r.get("BaseKPI") or "").strip()
+        if not iso3 or not year or not kpi:
+            continue
+        index[(iso3, year)][kpi] = r.get("Value")
+    return index
+
+
+def _network_support_cells_from_slots(
+    kpi_values: Dict[str, Any],
+    *,
+    code_prefix: str,
+    column: str,
+    don_to_label: Dict[str, str],
+    slot_count: int = FDRS_NETWORK_SUPPORT_SLOT_COUNT,
+) -> Dict[str, int]:
+    cells: Dict[str, int] = {}
+    for slot in range(1, slot_count + 1):
+        codes_kpi = f"{code_prefix}{slot}"
+        amounts_kpi = f"{code_prefix}{slot}_amount"
+        pairs = _parse_don_code_amount_pairs(kpi_values.get(codes_kpi), kpi_values.get(amounts_kpi))
+        for don, amount in pairs:
+            row_label = don_to_label.get(don, don)
+            cell_key = f"{row_label}_{column}"
+            cells[cell_key] = cells.get(cell_key, 0) + amount
+    return cells
+
+
+def build_network_support_matrix_rows(
+    fdrs_data: List[Dict[str, Any]],
+    assignment_rows: List[Dict[str, Any]],
+    submitted_at_default: Optional[datetime] = None,
+    don_to_label: Optional[Dict[str, str]] = None,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> List[Dict[str, str]]:
+    """
+    Build matrix FormData rows for Network Support items 919 (given) and 929 (received).
+    FDRS stores parallel CSV fields: supported1 + supported1_amount, received_support1 + received_support1_amount
+    (slots 1..10).
+    """
+    if don_to_label is None:
+        don_to_label = _load_don_code_to_matrix_row_label(base_url=base_url, api_key=api_key)
+
+    assignment_by_key: Dict[Tuple[str, str], int] = {
+        (r["period_name"], r["iso3"]): int(r["assignment_entity_status_id"]) for r in assignment_rows
+    }
+    kpi_index = _fdrs_data_kpi_index(fdrs_data)
+    sub_at = submitted_at_default.strftime("%d/%m/%Y  %H:%M:%S") if submitted_at_default else ""
+    out: List[Dict[str, str]] = []
+
+    matrix_specs = (
+        (FDRS_NETWORK_SUPPORT_GIVEN_ITEM_ID, FDRS_NETWORK_SUPPORT_GIVEN_COLUMN, FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX, "network_support_given"),
+        (FDRS_NETWORK_SUPPORT_RECEIVED_ITEM_ID, FDRS_NETWORK_SUPPORT_RECEIVED_COLUMN, FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX, "network_support_received"),
+    )
+
+    for (iso3, year), kpi_values in kpi_index.items():
+        aes_id = assignment_by_key.get((year, iso3))
+        if aes_id is None:
+            continue
+        for item_id, column, prefix, debug_tag in matrix_specs:
+            cells = _network_support_cells_from_slots(
+                kpi_values,
+                code_prefix=prefix,
+                column=column,
+                don_to_label=don_to_label,
+            )
+            if not cells:
+                continue
+            out.append(
+                _normalize_headers(
+                    {
+                        "_debug_year": year,
+                        "_debug_iso3": iso3,
+                        "_debug_kpi_code": debug_tag,
+                        "_debug_disagg_type": "matrix",
+                        COL_ASSIGNMENT: str(aes_id),
+                        COL_PUBLIC: "",
+                        COL_ITEM: str(item_id),
+                        COL_VALUE: "",
+                        COL_DISAGG: json.dumps(cells),
+                        COL_DATA_NA: "",
+                        COL_NA: "",
+                        COL_PREFILLED: "",
+                        COL_IMPUTED: "",
+                        COL_SUBMITTED: sub_at,
+                    }
+                )
+            )
+    return out
+
+
+def build_income_sources_matrix_rows(
+    fdrs_data: List[Dict[str, Any]],
+    assignment_rows: List[Dict[str, Any]],
+    submitted_at_default: Optional[datetime] = None,
+    matrix_item_id: int = FDRS_INCOME_SOURCES_MATRIX_ITEM_ID,
+    matrix_column: str = FDRS_INCOME_SOURCES_MATRIX_COLUMN,
+) -> List[Dict[str, str]]:
+    """
+    Aggregate FDRS income-source KPIs into one matrix FormData row per (iso3, year) for item 943.
+    disagg_data uses keys ``{row_label}_{column}`` (e.g. Home Government_Funding).
+    """
+    from collections import defaultdict
+
+    assignment_by_key: Dict[Tuple[str, str], int] = {
+        (r["period_name"], r["iso3"]): int(r["assignment_entity_status_id"]) for r in assignment_rows
+    }
+    cells_by_key: Dict[Tuple[str, str, int], Dict[str, Any]] = defaultdict(dict)
+
+    for r in fdrs_data:
+        base_kpi = (r.get("BaseKPI") or "").strip()
+        kpi_code = (r.get("KPI_code") or "").strip()
+        row_label = FDRS_INCOME_KPI_TO_MATRIX_ROW.get(base_kpi) or FDRS_INCOME_KPI_TO_MATRIX_ROW.get(kpi_code)
+        if not row_label:
+            continue
+        iso3 = (r.get("ISO3") or "").strip()
+        year = (r.get("year") or "").strip()
+        aes_id = assignment_by_key.get((year, iso3))
+        if aes_id is None:
+            continue
+        val = r.get("Value")
+        if _main_value_empty_or_zero(val):
+            continue
+        try:
+            num = int(float(str(val).strip()))
+        except (ValueError, TypeError):
+            continue
+        cell_key = f"{row_label}_{matrix_column}"
+        cells_by_key[(iso3, year, aes_id)][cell_key] = num
+
+    sub_at = submitted_at_default.strftime("%d/%m/%Y  %H:%M:%S") if submitted_at_default else ""
+    out: List[Dict[str, str]] = []
+    for (iso3, year, aes_id), cells in cells_by_key.items():
+        if not cells:
+            continue
+        out.append(
+            _normalize_headers(
+                {
+                    "_debug_year": year,
+                    "_debug_iso3": iso3,
+                    "_debug_kpi_code": "income_sources_matrix",
+                    "_debug_disagg_type": "matrix",
+                    COL_ASSIGNMENT: str(aes_id),
+                    COL_PUBLIC: "",
+                    COL_ITEM: str(matrix_item_id),
+                    COL_VALUE: "",
+                    COL_DISAGG: json.dumps(cells),
+                    COL_DATA_NA: "",
+                    COL_NA: "",
+                    COL_PREFILLED: "",
+                    COL_IMPUTED: "",
+                    COL_SUBMITTED: sub_at,
+                }
+            )
+        )
+    return out
+
+
+def _resolve_fdrs_sync_user_id(explicit: Optional[int] = None) -> int:
+    """User id for FDRS-imported SubmittedDocument rows (required FK)."""
+    if explicit is not None and int(explicit) > 0:
+        return int(explicit)
+    env_raw = (os.environ.get("FDRS_SYNC_USER_ID") or "").strip()
+    if env_raw:
+        return int(env_raw)
+    from app.models.core import User
+
+    user = User.query.filter_by(active=True).order_by(User.id.asc()).first()
+    if user is None:
+        raise ValueError(
+            "No active user for FDRS document import. Set FDRS_SYNC_USER_ID or ensure at least one active user exists."
+        )
+    return int(user.id)
 
 
 def _load_indicator_mapping(csv_path: str) -> Dict[str, int]:
@@ -1767,6 +2150,7 @@ def row_to_payload(row: Dict[str, str]) -> Tuple[Optional[int], Optional[int], O
         "prefilled_value": _normalize_json_numbers_to_ints(prefilled_value),
         "imputed_value": _normalize_json_numbers_to_ints(imputed_value),
         "submitted_at": _parse_submitted_at(row.get(COL_SUBMITTED)),
+        "disagg_type": (row.get("_debug_disagg_type") or "").strip() or None,
     }
     return assignment_entity_status_id, public_submission_id, form_item_id, payload
 
@@ -1797,6 +2181,10 @@ def run_import(
     batch_size: int = 1000,
     template_id: Optional[int] = 21,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    sync_user_id: Optional[int] = None,
+    sync_documents: bool = True,
+    sync_assignment_status: bool = True,
 ) -> Dict[str, int]:
     """Load from file, FDRS API (ready-to-import), or data-api.ifrc.org pipeline; upsert into form_data.
 
@@ -1819,6 +2207,34 @@ def run_import(
 
     app = create_app()
     stats = {"loaded": 0, "skipped": 0, "inserted": 0, "updated": 0, "errors": 0}
+    stats.setdefault("documents_inserted", 0)
+    stats.setdefault("documents_updated", 0)
+    stats.setdefault("documents_errors", 0)
+    stats.setdefault("assignment_status_updated", 0)
+    stats.setdefault("assignment_status_skipped", 0)
+    stats.setdefault("assignment_status_errors", 0)
+
+    assignment_rows: List[Dict[str, Any]] = []
+    fdrs_sync_base_url: Optional[str] = None
+    fdrs_sync_api_key: Optional[str] = None
+    fdrs_sync_years: Optional[List[int]] = fdrs_years
+
+    def _check_cancel() -> None:
+        if cancel_check and cancel_check():
+            try:
+                db.session.rollback()
+            except Exception as e:
+                logger.debug("rollback on cancel failed: %s", e)
+            raise FdrsSyncCancelled()
+
+    def _emit_progress(payload: Dict[str, Any]) -> None:
+        _check_cancel()
+        if not progress_cb:
+            return
+        try:
+            progress_cb(payload)
+        except Exception as e:
+            logger.debug("progress_cb failed: %s", e)
 
     def _progress(
         stage: str,
@@ -1830,6 +2246,9 @@ def run_import(
         extra: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Best-effort progress reporting (must never break import)."""
+        if not progress_cb and not cancel_check:
+            return
+        _check_cancel()
         if not progress_cb:
             return
         payload: Dict[str, Any] = {
@@ -1896,10 +2315,13 @@ def run_import(
             # wrong or non-matching keys cause 401 and zero rows; urllib cannot send a browser session.
             use_local_databank = not explicit_databank_base
 
+            fdrs_sync_base_url = base_data
+            fdrs_sync_api_key = fdrs_api_key
+            fdrs_sync_years = fdrs_years
             _progress(stage="fetch_fdrs", message="Fetching FDRS data (codebook, fdrsdata, disagg)...", percent=1.0)
             logger.info("Fetching FDRS data (codebook, fdrsdata, country map, FDRS Data + disagg)...")
             cache_dir = os.path.join(current_app.instance_path, "fdrs_imputed_cache")
-            fdrs_data, disagg_by_key, exclusion_summary, fdrs_snapshot_rows = build_fdrs_table(
+            fdrs_data, disagg_by_key, exclusion_summary, fdrs_snapshot_rows, disability_by_key = build_fdrs_table(
                 base_url=base_data,
                 api_key=fdrs_api_key,
                 years=fdrs_years,
@@ -1907,10 +2329,10 @@ def run_import(
                 imputed_api_key=fdrs_api_key,
                 use_imputed_cache=fdrs_imputed_use_cache,
                 cache_dir=cache_dir,
-                progress_cb=progress_cb,
+                progress_cb=_emit_progress,
                 reported_import_states=fdrs_reported_import_states,
             )
-            logger.info("FDRS Data rows: %d, disagg keys: %d", len(fdrs_data), len(disagg_by_key))
+            logger.info("FDRS Data rows: %d, disagg keys: %d, disability keys: %d", len(fdrs_data), len(disagg_by_key), len(disability_by_key))
 
             _progress(stage="fetch_databank", message="Fetching databank lookups (assignments, form items, indicator bank)...", percent=8.0)
             if use_local_databank:
@@ -1949,7 +2371,26 @@ def run_import(
                 submitted_at_default=utcnow(),
                 debug_iso3_year_item=debug_iso3_year_item,
                 exclusion_summary=exclusion_summary,
+                disability_by_key=disability_by_key,
             )
+            income_matrix_rows = build_income_sources_matrix_rows(
+                fdrs_data,
+                assignment_rows,
+                submitted_at_default=utcnow(),
+            )
+            if income_matrix_rows:
+                logger.info("Income Sources matrix rows: %d", len(income_matrix_rows))
+                rows.extend(income_matrix_rows)
+            network_matrix_rows = build_network_support_matrix_rows(
+                fdrs_data,
+                assignment_rows,
+                submitted_at_default=utcnow(),
+                base_url=base_data,
+                api_key=fdrs_api_key,
+            )
+            if network_matrix_rows:
+                logger.info("Network Support matrix rows: %d", len(network_matrix_rows))
+                rows.extend(network_matrix_rows)
             dropped_rows = []
             stats["exclusion_summary"] = exclusion_summary
             summary_text = format_exclusion_summary(exclusion_summary)
@@ -2074,6 +2515,9 @@ def run_import(
         _progress(stage="upsert", message="Starting upsert...", current=0, total=total_rows, percent=20.0, extra={"stats": dict(stats)})
 
         def _maybe_report(i: int, row: Dict[str, Any]) -> None:
+            if not progress_cb and not cancel_check:
+                return
+            _check_cancel()
             if not progress_cb:
                 return
             if not (i == 1 or i % 50 == 0 or i == total_rows):
@@ -2097,6 +2541,7 @@ def run_import(
         prefetch_size = max(2000, int(batch_size or 1000))
 
         for batch_start in range(0, total_rows, prefetch_size):
+            _check_cancel()
             batch = rows[batch_start: batch_start + prefetch_size]
 
             # Prefetch existing records for this batch
@@ -2178,11 +2623,14 @@ def run_import(
                     imputed_for_db = payload["imputed_value"]
                     if imputed_for_db is None or imputed_for_db == {} or imputed_for_db == []:
                         imputed_for_db = db.null()
-                    disagg_type = None
-                    if isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"].get("mode"):
-                        disagg_type = "standard_disagg"
-                    elif payload.get("value") not in (None, ""):
-                        disagg_type = "simple"
+                    disagg_type = payload.get("disagg_type")
+                    if not disagg_type:
+                        if isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"].get("mode"):
+                            disagg_type = "standard_disagg"
+                        elif payload.get("value") not in (None, ""):
+                            disagg_type = "simple"
+                        elif isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"]:
+                            disagg_type = "matrix"
                     if existing:
                         existing.value = payload["value"]
                         existing._sync_numeric_value_from_string()
@@ -2232,6 +2680,67 @@ def run_import(
 
         if not dry_run and (stats["inserted"] + stats["updated"]) > 0:
             db.session.commit()
+
+        if fdrs_from_data_api and sync_documents:
+            _check_cancel()
+            try:
+                from fdrs_documents_sync import run_fdrs_documents_sync
+
+                doc_user_id = _resolve_fdrs_sync_user_id(sync_user_id)
+                doc_result = run_fdrs_documents_sync(
+                    base_url=base_data if fdrs_from_data_api else (fdrs_data_api_base or DEFAULT_FDRS_DATA_API_BASE),
+                    api_key=fdrs_api_key if fdrs_from_data_api else (fdrs_data_api_key or DEFAULT_FDRS_DATA_API_KEY or ""),
+                    assignment_rows=assignment_rows if fdrs_from_data_api else [],
+                    years=fdrs_years,
+                    uploaded_by_user_id=doc_user_id,
+                    dry_run=dry_run,
+                    batch_size=batch_size,
+                    progress_cb=_emit_progress,
+                )
+                ds = doc_result.get("documents_stats") or {}
+                stats["documents_inserted"] = ds.get("inserted", 0)
+                stats["documents_updated"] = ds.get("updated", 0)
+                stats["documents_errors"] = ds.get("errors", 0)
+                stats["documents_summary"] = doc_result.get("documents_summary")
+                logger.info(
+                    "FDRS documents metadata: inserted=%s updated=%s errors=%s planned=%s",
+                    stats["documents_inserted"],
+                    stats["documents_updated"],
+                    stats["documents_errors"],
+                    (doc_result.get("documents_summary") or {}).get("planned"),
+                )
+            except Exception as e:
+                stats["documents_errors"] = stats.get("documents_errors", 0) + 1
+                logger.error("FDRS documents sync failed: %s", e, exc_info=True)
+
+        if fdrs_from_data_api and sync_assignment_status and assignment_rows:
+            _check_cancel()
+            try:
+                from fdrs_assignment_status_sync import run_fdrs_assignment_status_sync
+
+                aes_result = run_fdrs_assignment_status_sync(
+                    base_url=fdrs_sync_base_url or DEFAULT_FDRS_DATA_API_BASE,
+                    api_key=fdrs_sync_api_key or "",
+                    assignment_rows=assignment_rows,
+                    years=fdrs_sync_years,
+                    dry_run=dry_run,
+                    progress_cb=_emit_progress,
+                )
+                aes_stats = aes_result.get("assignment_status_stats") or {}
+                stats["assignment_status_updated"] = aes_stats.get("updated", 0)
+                stats["assignment_status_skipped"] = aes_stats.get("skipped", 0)
+                stats["assignment_status_errors"] = aes_stats.get("errors", 0)
+                stats["assignment_status_summary"] = aes_result.get("assignment_status_summary")
+                logger.info(
+                    "FDRS assignment status: updated=%s skipped=%s errors=%s planned=%s",
+                    stats["assignment_status_updated"],
+                    stats["assignment_status_skipped"],
+                    stats["assignment_status_errors"],
+                    (aes_result.get("assignment_status_summary") or {}).get("planned"),
+                )
+            except Exception as e:
+                stats["assignment_status_errors"] = stats.get("assignment_status_errors", 0) + 1
+                logger.error("FDRS assignment status sync failed: %s", e, exc_info=True)
 
         _progress(stage="complete", message="Sync completed.", current=total_rows, total=total_rows, percent=100.0, extra={"stats": dict(stats)})
     return stats
@@ -2336,6 +2845,11 @@ def main() -> int:
         help="Print why this BaseKPI was/wasn't imported (counts by import_status and import_filter_reason). Use with --fdrs-from-data-api.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing to the database")
+    parser.add_argument(
+        "--no-sync-assignment-status",
+        action="store_true",
+        help="Skip syncing FDRS section workflow KPIs to assignment_entity_status (data-api mode only).",
+    )
     parser.add_argument("--batch-size", type=int, default=1000, help="Commit every N rows (default: 1000)")
     parser.add_argument(
         "--template-id",
@@ -2519,6 +3033,7 @@ def main() -> int:
             dry_run=args.dry_run,
             batch_size=args.batch_size,
             template_id=template_id,
+            sync_assignment_status=not getattr(args, "no_sync_assignment_status", False),
         )
     except (ValueError, RuntimeError) as e:
         logger.error("Error: %s", e)

@@ -1,5 +1,6 @@
 import { debugLog } from './debug.js';
 import { initDataAvailability } from './data-availability.js';
+import { initDisabilityQuestions } from './disability-questions.js';
 import { setupNumberInputFormatting } from './formatting.js';
 import { copyFormElementValues } from './form-item-utils.js';
 
@@ -192,6 +193,7 @@ function applyFlexibleLayoutToSection(container) {
 
     // Re-initialize data availability after layout changes
     initDataAvailability();
+    initDisabilityQuestions();
 
     debugLog('layout', `After layout: ${container.querySelectorAll('.form-item-block').length} total fields in the DOM`);
     debugLog('layout', `✅ Layout applied successfully - ${parentFields.length} parent fields + ${subSections.length} sub-sections preserved`);
@@ -478,6 +480,7 @@ export function applyLayoutToContainer(container) {
 
     // Re-initialize data availability for the new content
     initDataAvailability();
+    initDisabilityQuestions();
 
     debugLog('layout', `✅ Layout applied to repeat entry successfully`);
 }

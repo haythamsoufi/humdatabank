@@ -115,9 +115,14 @@ def handle_assignment_form(aes_id):
 
     assignment = assignment_entity_status.assigned_form
 
-    if assignment is not None and getattr(assignment, "is_active", True) is False:
-        flash(_("This assignment is currently inactive."), "warning")
-        return redirect(url_for("main.dashboard"))
+    from app.utils.form_authorization import redirect_if_assignment_entry_blocked
+
+    blocked = redirect_if_assignment_entry_blocked(
+        assignment,
+        inactive_message=_("This assignment is currently inactive."),
+    )
+    if blocked is not None:
+        return blocked
 
     from app.services.authorization_service import AuthorizationService
 

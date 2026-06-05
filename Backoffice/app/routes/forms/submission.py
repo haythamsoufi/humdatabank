@@ -485,10 +485,14 @@ def _fill_public_form_impl(public_token):
                                title="Form Unavailable",
                                message="This form is currently not active.")
 
-    if getattr(assigned_form, "is_active", True) is False:
+    if not assigned_form.is_public_submission_allowed:
+        if not assigned_form.is_active:
+            message = _("This form is currently inactive.")
+        else:
+            message = _("This form is closed.")
         return render_template("admin/public/public_form_unavailable.html",
-                               title="Form Unavailable",
-                               message="This form is currently inactive.")
+                               title=_("Form Unavailable"),
+                               message=message)
 
     form_template = assigned_form.template
     sections = FormSection.query.filter_by(template_id=form_template.id, version_id=form_template.published_version_id).order_by(FormSection.order).all()

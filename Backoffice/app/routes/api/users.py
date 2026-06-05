@@ -607,7 +607,7 @@ def get_dashboard():
                 .filter(
                     AssignmentEntityStatus.entity_type == selected_entity_type,
                     AssignmentEntityStatus.entity_id == selected_entity_id,
-                    or_(AF.is_active == True, AF.is_closed == True),
+                    AF.is_active == True,
                 )
                 .order_by(
                     AssignmentEntityStatus.due_date.asc().nulls_last(),

@@ -256,6 +256,8 @@ def edit_item(item_id):
         form.allow_data_not_available.data = ('allow_data_not_available' in data) and (data.get('allow_data_not_available') in ['true', 'on', '1', True])
     if hasattr(form, 'allow_not_applicable'):
         form.allow_not_applicable.data = ('allow_not_applicable' in data) and (data.get('allow_not_applicable') in ['true', 'on', '1', True])
+    if hasattr(form, 'allow_disability_questions'):
+        form.allow_disability_questions.data = ('allow_disability_questions' in data) and (data.get('allow_disability_questions') in ['true', 'on', '1', True])
     if hasattr(form, 'indirect_reach'):
         form.indirect_reach.data = ('indirect_reach' in data) and (data.get('indirect_reach') in ['true', 'on', '1', True])
 

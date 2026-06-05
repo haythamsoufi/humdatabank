@@ -360,23 +360,21 @@ class FormItemProcessor:
             # No value, but flags present
             return None, False, data_not_available, not_applicable
 
+        processed_value: Any = None
+        has_value = False
+
         # Process based on field type
         if form_item.field_type_for_js == 'yesno':
             # Yes/No indicators use standard_value
             val_str = form_data.get(f'{field_prefix}_standard_value', '').strip()
             if val_str:
-                return val_str.lower(), True, False, False
-            return None, False, False, False
-
+                processed_value = val_str.lower()
+                has_value = True
         elif (form_item.field_type_for_js or '').lower() in ('number', 'currency', 'percentage'):
-            # Check if this item truly supports disaggregation (beyond just 'total')
             supports_disaggregation = cls._field_supports_disaggregation(form_item)
-
             if supports_disaggregation:
-                # Numeric indicators with real disaggregation support (sex/age/sex_age) or indirect reach
-                return cls._process_numeric_indicator(form_item, form_data, field_prefix)
+                processed_value, has_value, _, _ = cls._process_numeric_indicator(form_item, form_data, field_prefix)
             else:
-                # Numeric indicators without disaggregation - store simple numeric value
                 val_str = form_data.get(f'{field_prefix}_total_value', '')
                 if val_str and val_str.strip():
                     result = cls._process_numeric_value_simple(
@@ -384,18 +382,70 @@ class FormItemProcessor:
                     )
                     if result is not None:
                         current_app.logger.info(f"Successfully processed numeric value: {result}")
-                        return result, True, False, False
+                        processed_value = result
+                        has_value = True
                     else:
                         current_app.logger.warning(f"Invalid number for {form_item.label}: {val_str}")
-                        return str(val_str), True, False, False
-                return None, False, False, False
-
+                        processed_value = str(val_str)
+                        has_value = True
         else:
-            # Text and other types
             val_str = form_data.get(f'{field_prefix}_standard_value', '').strip()
             if val_str:
-                return val_str, True, False, False
-            return None, False, False, False
+                processed_value = val_str
+                has_value = True
+
+        processed_value, has_value = cls._apply_disability_questions_to_indicator(
+            form_item, form_data, field_prefix, processed_value, has_value
+        )
+        return processed_value, has_value, False, False
+
+    @classmethod
+    def _apply_disability_questions_to_indicator(
+        cls,
+        form_item: FormItem,
+        form_data: Dict,
+        field_prefix: str,
+        processed_value: Any,
+        has_value: bool,
+    ) -> Tuple[Any, bool]:
+        disability = cls._extract_disability_answers(form_item, form_data, field_prefix)
+        if not disability:
+            return processed_value, has_value
+        return cls._merge_disability_into_indicator_value(form_item, processed_value, disability, has_value)
+
+    @classmethod
+    def _extract_disability_answers(cls, form_item: FormItem, form_data: Dict, field_prefix: str) -> Optional[Dict[str, bool]]:
+        if not getattr(form_item, 'allow_disability_questions', False):
+            return None
+        raw = (form_data.get(f'{field_prefix}_disability_disaggregated') or '').strip().lower()
+        if raw not in ('yes', 'no'):
+            return None
+        disaggregated = raw == 'yes'
+        out: Dict[str, bool] = {'disaggregated_by_disability': disaggregated}
+        if disaggregated:
+            wg_raw = (form_data.get(f'{field_prefix}_disability_washington_group') or '').strip().lower()
+            if wg_raw in ('yes', 'no'):
+                out['washington_group_compliant'] = wg_raw == 'yes'
+        return out
+
+    @classmethod
+    def _merge_disability_into_indicator_value(
+        cls,
+        form_item: FormItem,
+        processed_value: Any,
+        disability: Dict[str, bool],
+        has_value: bool,
+    ) -> Tuple[Any, bool]:
+        if isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
+            values = dict(processed_value.get('values') or {})
+            values['disability'] = disability
+            return {**processed_value, 'values': values}, True
+
+        values: Dict[str, Any] = {'disability': disability}
+        if processed_value is not None:
+            value_key = 'direct' if getattr(form_item, 'indirect_reach', False) else 'total'
+            values[value_key] = processed_value
+        return {'mode': 'total', 'values': values}, True
 
     @classmethod
     def _is_percentage_type(cls, form_item: FormItem) -> bool:
@@ -794,8 +844,8 @@ def calculate_disaggregation_total(collected_values: Dict) -> float:
 
     total = 0
     for key, value in collected_values.items():
-        # Skip indirect values in total calculation (handled separately)
-        if key == 'indirect':
+        # Skip indirect values and disability metadata in total calculation
+        if key in ('indirect', 'disability'):
             continue
 
         if isinstance(value, (int, float)):

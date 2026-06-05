@@ -1,0 +1,62 @@
+{# Disability disaggregation follow-up questions (stored in form_data.disagg_data.values.disability) #}
+{% if field.allow_disability_questions %}
+    {% set disability_data = {} %}
+    {% if existing_entry_data is mapping and existing_entry_data.get('values') is mapping %}
+        {% set disability_data = existing_entry_data.get('values', {}).get('disability', {}) %}
+    {% endif %}
+    {% set disagg_answer = disability_data.get('disaggregated_by_disability') %}
+    {% set wg_answer = disability_data.get('washington_group_compliant') %}
+    <div class="disability-questions mt-4 p-4 border border-gray-200 rounded-md bg-gray-50 space-y-4"
+         data-field-prefix="{{ name_prefix }}">
+        <div>
+            <p class="text-sm font-medium text-gray-800 mb-2">
+                {{ _('Is your National Society capturing disaggregated data based on disability for this indicator, i.e. the number of persons with disabilities?') }}
+            </p>
+            <div class="flex flex-wrap items-center gap-4 text-sm">
+                <label class="inline-flex items-center">
+                    <input type="radio"
+                           name="{{ name_prefix }}_disability_disaggregated"
+                           value="yes"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 disability-disaggregated-radio"
+                           {% if disagg_answer is sameas true %}checked{% endif %}
+                           {% if not can_edit %}disabled{% endif %}>
+                    <span class="ml-2 text-gray-700">{{ _('Yes') }}</span>
+                </label>
+                <label class="inline-flex items-center">
+                    <input type="radio"
+                           name="{{ name_prefix }}_disability_disaggregated"
+                           value="no"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 disability-disaggregated-radio"
+                           {% if disagg_answer is sameas false %}checked{% endif %}
+                           {% if not can_edit %}disabled{% endif %}>
+                    <span class="ml-2 text-gray-700">{{ _('No') }}</span>
+                </label>
+            </div>
+        </div>
+        <div class="disability-washington-group-block{% if disagg_answer is not sameas true %} hidden{% endif %}">
+            <p class="text-sm font-medium text-gray-800 mb-2">
+                {{ _('If answered yes, is your disability disaggregated data in accordance to the Washington Group questions?') }}
+            </p>
+            <div class="flex flex-wrap items-center gap-4 text-sm">
+                <label class="inline-flex items-center">
+                    <input type="radio"
+                           name="{{ name_prefix }}_disability_washington_group"
+                           value="yes"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 disability-washington-group-radio"
+                           {% if wg_answer is sameas true %}checked{% endif %}
+                           {% if not can_edit %}disabled{% endif %}>
+                    <span class="ml-2 text-gray-700">{{ _('Yes') }}</span>
+                </label>
+                <label class="inline-flex items-center">
+                    <input type="radio"
+                           name="{{ name_prefix }}_disability_washington_group"
+                           value="no"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 disability-washington-group-radio"
+                           {% if wg_answer is sameas false %}checked{% endif %}
+                           {% if not can_edit %}disabled{% endif %}>
+                    <span class="ml-2 text-gray-700">{{ _('No') }}</span>
+                </label>
+            </div>
+        </div>
+    </div>
+{% endif %}

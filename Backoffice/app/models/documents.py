@@ -33,7 +33,12 @@ class SubmittedDocument(db.Model):
     linked_entity_id = db.Column(db.Integer, nullable=True)
     form_item_id = db.Column(db.Integer, db.ForeignKey('form_item.id'), nullable=True)
     filename = db.Column(db.String(255), nullable=False)
-    storage_path = db.Column(db.String(255), nullable=False)
+    storage_path = db.Column(db.String(255), nullable=True)
+    # External FDRS URL when file bytes are not yet imported (file_pending=True)
+    source_url = db.Column(db.String(2000), nullable=True)
+    thumbnail_source_url = db.Column(db.String(2000), nullable=True)
+    fdrs_import_key = db.Column(db.String(64), nullable=True)
+    file_pending = db.Column(db.Boolean, default=False, nullable=False)
     uploaded_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     document_type = db.Column(db.String(255), nullable=True)
@@ -75,6 +80,7 @@ class SubmittedDocument(db.Model):
         db.Index('ix_submitted_doc_period', 'period'),
         db.Index('ix_submitted_doc_is_public', 'is_public'),
         db.Index('ix_submitted_doc_language', 'language'),
+        db.Index('ix_submitted_doc_fdrs_import_key', 'fdrs_import_key', unique=True),
     )
 
     @property

@@ -21,6 +21,13 @@ from app.routes.admin.shared import admin_required, permission_required
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.utils.datetime_helpers import utcnow
 from app.services.authorization_service import AuthorizationService
+from app.services.data_quality.catalogs.fdrs_v1_catalog import COMPLIANCE_DOC_TYPES
+from app.services.data_quality.helpers import (
+    active_country_map_query,
+    build_compliance_document_lookups,
+    compliance_doc_status_counts_toward_requirement,
+    fdrs_compliance_doc_label_matches,
+)
 from flask_babel import gettext as _
 import json
 import logging
@@ -800,13 +807,6 @@ def apply_imputed_value():
 # FDRS Template ID for compliance check
 FDRS_TEMPLATE_ID = 21
 
-# Document types for compliance check (only the required documents)
-COMPLIANCE_DOC_TYPES = [
-    "Annual Report",
-    "Audited Financial Statement"
-]
-
-
 @bp.route("/data-exploration/compliance", methods=["GET"])
 @permission_required('admin.data_explore.compliance')
 def get_compliance_data():
@@ -875,8 +875,8 @@ def get_compliance_data():
                 message="No FDRS assignment periods found",
             )
 
-        # Get all countries
-        countries = Country.query.order_by(Country.name).all()
+        # Active countries only (country map status=Active)
+        countries = active_country_map_query().all()
 
         # Get document fields from FDRS template that match our compliance doc types
         doc_items = (
@@ -895,7 +895,7 @@ def get_compliance_data():
         for item in doc_items:
             label = item.label.strip() if item.label else ""
             for doc_type in COMPLIANCE_DOC_TYPES:
-                if doc_type.lower() in label.lower():
+                if fdrs_compliance_doc_label_matches(label, doc_type):
                     if doc_type not in doc_item_map:
                         doc_item_map[doc_type] = []
                     doc_item_map[doc_type].append(item.id)
@@ -954,36 +954,40 @@ def get_compliance_data():
                 .all()
             )
 
-        # Build lookup: (aes_id, doc_type) -> True
-        doc_lookup = {}
-        for doc in submitted_docs:
-            doc_type = item_id_to_doc_type.get(doc.form_item_id)
-            if doc_type:
-                doc_lookup[(doc.assignment_entity_status_id, doc_type)] = True
+        _, _, doc_status_lookup = build_compliance_document_lookups(
+            submitted_docs, item_id_to_doc_type
+        )
 
         # ========== PROCESS DATA IN MEMORY ==========
         compliance_data = []
+        pending_validation_countries = []
 
         for country in countries:
             country_periods = []
             has_annual_report = False
             has_audited_financial = False
+            pending_validation_documents = []
 
             for period in periods:
-                period_docs = {doc_type: False for doc_type in COMPLIANCE_DOC_TYPES}
+                period_docs = {doc_type: "missing" for doc_type in COMPLIANCE_DOC_TYPES}
 
                 assignment = assignment_map.get(period)
                 if assignment:
                     aes = aes_lookup.get((assignment.id, country.id))
                     if aes:
-                        # Check for each document type using the lookup
                         for doc_type in COMPLIANCE_DOC_TYPES:
-                            if doc_lookup.get((aes.id, doc_type)):
-                                period_docs[doc_type] = True
+                            doc_status = doc_status_lookup.get((aes.id, doc_type), "missing")
+                            period_docs[doc_type] = doc_status
+                            if compliance_doc_status_counts_toward_requirement(doc_status):
                                 if doc_type == "Annual Report":
                                     has_annual_report = True
                                 elif doc_type == "Audited Financial Statement":
                                     has_audited_financial = True
+                            if doc_status == "pending":
+                                pending_validation_documents.append({
+                                    "period": period,
+                                    "doc_type": doc_type,
+                                })
 
                 country_periods.append({
                     "period": period,
@@ -993,7 +997,7 @@ def get_compliance_data():
             # Determine compliance: must have at least 1 Annual Report AND 1 Audited Financial Statement
             is_compliant = has_annual_report and has_audited_financial
 
-            compliance_data.append({
+            country_row = {
                 "country_id": country.id,
                 "country_name": country.name,
                 "country_iso3": country.iso3,
@@ -1001,8 +1005,16 @@ def get_compliance_data():
                 "periods": country_periods,
                 "is_compliant": is_compliant,
                 "has_annual_report": has_annual_report,
-                "has_audited_financial": has_audited_financial
-            })
+                "has_audited_financial": has_audited_financial,
+            }
+            compliance_data.append(country_row)
+
+            if not is_compliant and pending_validation_documents:
+                pending_validation_countries.append({
+                    "country_id": country.id,
+                    "country_name": country.name,
+                    "pending_documents": pending_validation_documents,
+                })
 
         return json_ok(
             success=True,
@@ -1011,6 +1023,10 @@ def get_compliance_data():
             available_years=available_years,
             reference_year=reference_year,
             doc_types=COMPLIANCE_DOC_TYPES,
+            pending_validation_notice={
+                "count": len(pending_validation_countries),
+                "countries": pending_validation_countries,
+            },
         )
 
     except Exception as e:
@@ -1066,8 +1082,8 @@ def download_compliance_excel():
             # Default: get the last 3 periods
             periods = all_periods[:3]
 
-        # Get all countries
-        countries = Country.query.order_by(Country.name).all()
+        # Active countries only (country map status=Active)
+        countries = active_country_map_query().all()
 
         # Get document fields from FDRS template
         doc_items = (
@@ -1086,7 +1102,7 @@ def download_compliance_excel():
         for item in doc_items:
             label = item.label.strip() if item.label else ""
             for doc_type in COMPLIANCE_DOC_TYPES:
-                if doc_type.lower() in label.lower():
+                if fdrs_compliance_doc_label_matches(label, doc_type):
                     if doc_type not in doc_item_map:
                         doc_item_map[doc_type] = []
                     doc_item_map[doc_type].append(item.id)
@@ -1169,10 +1185,12 @@ def download_compliance_excel():
         center_align = Alignment(horizontal='center', vertical='center')
 
         # Build headers dynamically based on periods
-        # Row 1: Country | Annual Report (merged) | Audited Financial Statement (merged) | Compliance Status
-        # Row 2: (empty) | period1 | period2 | period3 | period1 | period2 | period3 | (empty)
+        # Row 1: Country | period1 (merged) | period2 (merged) | ... | Compliance Status
+        # Row 2: (empty) | Annual Report | Audited Financial Statement | ... | (empty)
 
         num_periods = len(periods)
+        num_doc_types = len(COMPLIANCE_DOC_TYPES)
+        data_start_col = 2
 
         # First header row
         ws.cell(row=1, column=1, value="Country").font = header_font
@@ -1181,49 +1199,39 @@ def download_compliance_excel():
         ws.cell(row=1, column=1).border = thin_border
         ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
 
-        # Annual Report header (spans num_periods columns)
-        ar_start_col = 2
-        ar_end_col = ar_start_col + num_periods - 1
-        ws.cell(row=1, column=ar_start_col, value="Annual Report").font = header_font
-        ws.cell(row=1, column=ar_start_col).fill = header_fill
-        ws.cell(row=1, column=ar_start_col).alignment = center_align
-        ws.cell(row=1, column=ar_start_col).border = thin_border
-        if num_periods > 1:
-            ws.merge_cells(start_row=1, start_column=ar_start_col, end_row=1, end_column=ar_end_col)
-
-        # Audited Financial Statement header (spans num_periods columns)
-        afs_start_col = ar_end_col + 1
-        afs_end_col = afs_start_col + num_periods - 1
-        ws.cell(row=1, column=afs_start_col, value="Audited Financial Statement").font = header_font
-        ws.cell(row=1, column=afs_start_col).fill = header_fill
-        ws.cell(row=1, column=afs_start_col).alignment = center_align
-        ws.cell(row=1, column=afs_start_col).border = thin_border
-        if num_periods > 1:
-            ws.merge_cells(start_row=1, start_column=afs_start_col, end_row=1, end_column=afs_end_col)
+        for idx, period in enumerate(periods):
+            period_start_col = data_start_col + (idx * num_doc_types)
+            period_end_col = period_start_col + num_doc_types - 1
+            cell = ws.cell(row=1, column=period_start_col, value=period)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_align
+            cell.border = thin_border
+            if num_doc_types > 1:
+                ws.merge_cells(
+                    start_row=1,
+                    start_column=period_start_col,
+                    end_row=1,
+                    end_column=period_end_col,
+                )
 
         # Compliance Status header
-        compliance_col = afs_end_col + 1
+        compliance_col = data_start_col + (num_periods * num_doc_types)
         ws.cell(row=1, column=compliance_col, value="Compliance Status").font = header_font
         ws.cell(row=1, column=compliance_col).fill = header_fill
         ws.cell(row=1, column=compliance_col).alignment = center_align
         ws.cell(row=1, column=compliance_col).border = thin_border
         ws.merge_cells(start_row=1, start_column=compliance_col, end_row=2, end_column=compliance_col)
 
-        # Second header row with period names
-        for idx, period in enumerate(periods):
-            # Annual Report period column
-            cell = ws.cell(row=2, column=ar_start_col + idx, value=period)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = center_align
-            cell.border = thin_border
-
-            # Audited Financial Statement period column
-            cell = ws.cell(row=2, column=afs_start_col + idx, value=period)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = center_align
-            cell.border = thin_border
+        # Second header row with document types under each period
+        for idx, _period in enumerate(periods):
+            period_start_col = data_start_col + (idx * num_doc_types)
+            for doc_idx, doc_type in enumerate(COMPLIANCE_DOC_TYPES):
+                cell = ws.cell(row=2, column=period_start_col + doc_idx, value=doc_type)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = center_align
+                cell.border = thin_border
 
         # Add borders to merged cells in row 2 for Country and Compliance Status
         for col in [1, compliance_col]:
@@ -1258,29 +1266,19 @@ def download_compliance_excel():
             # Write single row for country
             ws.cell(row=row_num, column=1, value=country.name).border = thin_border
 
-            # Annual Report columns (one per period)
+            # Document columns grouped by period
             for idx, period in enumerate(periods):
-                cell = ws.cell(row=row_num, column=ar_start_col + idx)
-                if period_docs_map.get(period, {}).get("Annual Report", False):
-                    cell.value = "Yes"
-                    cell.font = yes_font
-                else:
-                    cell.value = "No"
-                    cell.font = no_font
-                cell.alignment = center_align
-                cell.border = thin_border
-
-            # Audited Financial Statement columns (one per period)
-            for idx, period in enumerate(periods):
-                cell = ws.cell(row=row_num, column=afs_start_col + idx)
-                if period_docs_map.get(period, {}).get("Audited Financial Statement", False):
-                    cell.value = "Yes"
-                    cell.font = yes_font
-                else:
-                    cell.value = "No"
-                    cell.font = no_font
-                cell.alignment = center_align
-                cell.border = thin_border
+                period_start_col = data_start_col + (idx * num_doc_types)
+                for doc_idx, doc_type in enumerate(COMPLIANCE_DOC_TYPES):
+                    cell = ws.cell(row=row_num, column=period_start_col + doc_idx)
+                    if period_docs_map.get(period, {}).get(doc_type, False):
+                        cell.value = "Yes"
+                        cell.font = yes_font
+                    else:
+                        cell.value = "No"
+                        cell.font = no_font
+                    cell.alignment = center_align
+                    cell.border = thin_border
 
             # Compliance Status
             cell = ws.cell(row=row_num, column=compliance_col)
@@ -1293,9 +1291,8 @@ def download_compliance_excel():
 
         # Adjust column widths dynamically
         ws.column_dimensions[get_column_letter(1)].width = 30  # Country
-        for idx in range(num_periods):
-            ws.column_dimensions[get_column_letter(ar_start_col + idx)].width = 12  # AR periods
-            ws.column_dimensions[get_column_letter(afs_start_col + idx)].width = 12  # AFS periods
+        for idx in range(num_periods * num_doc_types):
+            ws.column_dimensions[get_column_letter(data_start_col + idx)].width = 18
         ws.column_dimensions[get_column_letter(compliance_col)].width = 18  # Compliance Status
 
         # Freeze header rows (data starts at row 3)

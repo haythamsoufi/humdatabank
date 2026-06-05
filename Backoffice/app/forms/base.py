@@ -159,6 +159,7 @@ class CommonFields:
     DATA_AVAILABILITY_FIELDS = {
         'allow_data_not_available': BooleanField('Allow "Data not available" option', default=False),
         'allow_not_applicable': BooleanField('Allow "Not applicable" option', default=False),
+        'allow_disability_questions': BooleanField('Allow disability questions', default=False),
         'indirect_reach': BooleanField('Indirect reach', default=False)
     }
 

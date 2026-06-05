@@ -39,6 +39,7 @@ class FormItem(db.Model):
         'default_value': None,
         'allow_data_not_available': False,
         'allow_not_applicable': False,
+        'allow_disability_questions': False,
         'indirect_reach': False,
         'privacy': 'ifrc_network'
     })
@@ -235,6 +236,16 @@ class FormItem(db.Model):
         self.set_allow_not_applicable(value)
 
     @property
+    def allow_disability_questions(self):
+        """Get allow_disability_questions from config."""
+        return self.config.get('allow_disability_questions', False) if self.config else False
+
+    @allow_disability_questions.setter
+    def allow_disability_questions(self, value):
+        """Set allow_disability_questions in config."""
+        self.set_allow_disability_questions(value)
+
+    @property
     def indirect_reach(self):
         """Get indirect_reach from config."""
         return self.config.get('indirect_reach', False) if self.config else False
@@ -328,6 +339,12 @@ class FormItem(db.Model):
         if self.config is None:
             self.config = {}
         self.config['allow_not_applicable'] = bool(value)
+
+    def set_allow_disability_questions(self, value):
+        """Set allow_disability_questions in config."""
+        if self.config is None:
+            self.config = {}
+        self.config['allow_disability_questions'] = bool(value)
 
     def set_indirect_reach(self, value):
         """Set indirect_reach in config."""

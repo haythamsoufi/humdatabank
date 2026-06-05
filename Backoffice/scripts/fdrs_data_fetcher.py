@@ -203,6 +203,11 @@ DEFAULT_FDRS_YEARS_END = 2024  # inclusive
 _BASE_KPI_FULL_CODES = frozenset({
     "KPI_IncomeLC_CHF", "KPI_expenditureLC_CHF",
     "KPI_pr_sex", "KPI_sg_sex",
+    "KPI_CUR_Code", "KPI_StartDate", "KPI_EndDate",
+    # Income-by-source KPIs (matrix item 943 on template 21)
+    "h_gov_CHF", "f_gov_CHF", "ind_CHF", "corp_CHF", "found_CHF", "un_CHF",
+    "pooled_f_CHF", "ngo_CHF", "si_CHF", "iga_CHF", "other_CHF",
+    "KPI_incomeFromNSsLC_CHF", "ifrc_CHF", "icrc_CHF",
 })
 
 # NewAgeGroups: AgeGroup -> New (from Power Query base64 compressed JSON)
@@ -418,6 +423,89 @@ def get_valid_kpi_codes(
 # ---------- FDRS - Data API / FDRS - ImputedValue API ----------
 
 
+def _extract_fdrs_row_value(row: Dict[str, Any]) -> Any:
+    """First non-null value field from a fdrsdata API row."""
+    int_v = row.get("IntValue")
+    bool_v = row.get("BoolValue")
+    str_v = row.get("StrValue")
+    date_v = row.get("DateValue")
+    generic_v = row.get("value")
+    if generic_v is None:
+        generic_v = row.get("Value")
+    for v in (generic_v, int_v, bool_v, str_v, date_v):
+        if v is not None:
+            return v
+    return None
+
+
+def _fetch_fdrsdata_raw(
+    base_url: str = DEFAULT_DATA_API_BASE,
+    api_key: Optional[str] = None,
+    years: Optional[List[int]] = None,
+    min_status: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """GET /api/fdrsdata and return the raw API list (before valid-KPI filtering)."""
+    if years is None:
+        years = list(range(DEFAULT_FDRS_YEARS_START, DEFAULT_FDRS_YEARS_END + 1))
+    years_str = ",".join(str(y) for y in years)
+    ms = 100 if min_status is None else int(min_status)
+    ms = max(0, min(ms, 500))
+    params = {
+        "year": years_str,
+        "force": "true",
+        "minstatus": str(ms),
+        "showunpublished": "true",
+    }
+    if api_key:
+        params["apiKey"] = api_key
+    url = f"{base_url.rstrip('/')}/api/fdrsdata?{urllib.parse.urlencode(params)}"
+    data = _get(url, api_key=None)
+    return data if isinstance(data, list) else []
+
+
+def _disability_combined_from_raw(
+    raw_list: List[Dict[str, Any]],
+    country_map: Dict[str, str],
+    import_state_allowlist: FrozenSet[int],
+) -> List[Dict[str, Any]]:
+    """
+    Build combined-style rows for KPI_*_ddd / KPI_*_wgq from raw fdrsdata.
+
+    These KPIs are excluded from the codebook valid-KPI list, so they never
+    appear in the main reported pipeline unless extracted here.
+    """
+    out: List[Dict[str, Any]] = []
+    for row in raw_list or []:
+        if not isinstance(row, dict):
+            continue
+        kpi = (row.get("KPICode") or row.get("KPI_code") or "").strip()
+        if not (kpi.endswith("_ddd") or kpi.endswith("_wgq")):
+            continue
+        don = (row.get("DonCode") or row.get("id") or "").strip()
+        year_raw = row.get("Year") or row.get("year")
+        if year_raw is None or not don:
+            continue
+        state_i = _fdrs_state_as_int(row.get("State"))
+        if state_i is None or state_i not in import_state_allowlist:
+            continue
+        value = _extract_fdrs_row_value(row)
+        if value is None:
+            continue
+        iso3 = (country_map.get(don) or "").strip()
+        if not iso3:
+            continue
+        yk = _fdrs_reporting_year_key(year_raw)
+        year_text = str(yk) if yk is not None else str(year_raw)
+        out.append({
+            "ISO3": iso3,
+            "DonCode": don,
+            "year": year_text,
+            "KPI_code": kpi,
+            "Value": value,
+        })
+    return out
+
+
 def _fdrsdata_rows(
     raw_list: List[Dict],
     valid_kpi_codes: Optional[List[str]] = None,
@@ -441,18 +529,7 @@ def _fdrsdata_rows(
         if year_raw is None:
             continue
         state = row.get("State")
-        int_v = row.get("IntValue")
-        bool_v = row.get("BoolValue")
-        str_v = row.get("StrValue")
-        date_v = row.get("DateValue")
-        generic_v = row.get("value")
-        if generic_v is None:
-            generic_v = row.get("Value")
-        value = None
-        for v in (generic_v, int_v, bool_v, str_v, date_v):
-            if v is not None:
-                value = v
-                break
+        value = _extract_fdrs_row_value(row)
         yk = _fdrs_reporting_year_key(year_raw)
         year_out = yk if isinstance(yk, int) else year_raw
         out.append({
@@ -479,22 +556,12 @@ def fetch_fdrsdata(
     inner-join with ValidKPIs (3_FDRS List IDs); value = first non-null field; year normalized to calendar int when parseable.
     min_status: IFRC minstatus query param (default 100). Use min of selected import states when stricter fetch is desired.
     """
-    if years is None:
-        years = list(range(DEFAULT_FDRS_YEARS_START, DEFAULT_FDRS_YEARS_END + 1))
-    years_str = ",".join(str(y) for y in years)
-    ms = 100 if min_status is None else int(min_status)
-    ms = max(0, min(ms, 500))
-    params = {
-        "year": years_str,
-        "force": "true",
-        "minstatus": str(ms),
-        "showunpublished": "true",
-    }
-    if api_key:
-        params["apiKey"] = api_key
-    url = f"{base_url.rstrip('/')}/api/fdrsdata?{urllib.parse.urlencode(params)}"
-    data = _get(url, api_key=None)
-    raw = data if isinstance(data, list) else []
+    raw = _fetch_fdrsdata_raw(
+        base_url=base_url,
+        api_key=api_key,
+        years=years,
+        min_status=min_status,
+    )
     if valid_kpi_codes is None:
         valid_kpi_codes = get_valid_kpi_codes(base_url=base_url, api_key=api_key)
     return _fdrsdata_rows(raw, valid_kpi_codes=valid_kpi_codes, source_type="Reported")
@@ -794,6 +861,79 @@ def _classify_fdrs_combined_row(
     return (reason == ""), reason, year_text, tokens, base_kpi
 
 
+def _parent_kpi_from_disability_suffix(kpi: str) -> str:
+    s = (kpi or "").strip()
+    if s.endswith("_ddd"):
+        return s[:-4]
+    if s.endswith("_wgq"):
+        return s[:-4]
+    return s
+
+
+def _fdrs_logical_to_optional_bool(val: Any) -> Optional[bool]:
+    """Parse FDRS logical KPI values (_ddd / _wgq) to bool; None when unparseable or empty."""
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    s = str(val).strip().lower()
+    if not s:
+        return None
+    if s in ("0", "false", "no", "n"):
+        return False
+    if s in ("1", "true", "yes", "y", "on"):
+        return True
+    return None
+
+
+def build_disability_by_key(
+    fdrs_combined: List[Dict[str, Any]],
+) -> Dict[Tuple[str, str, str], Dict[str, bool]]:
+    """
+    Extract KPI_*_ddd / KPI_*_wgq answers from raw combined FDRS rows.
+
+    Keys match ready-to-import groups: (ISO3, year, BaseKPI).
+    Values match entry-form disagg_data.values.disability.
+    """
+    scratch: Dict[Tuple[str, str, str], Dict[str, Optional[bool]]] = {}
+    for r in fdrs_combined:
+        kpi = (r.get("KPI_code") or "").strip()
+        if not (kpi.endswith("_ddd") or kpi.endswith("_wgq")):
+            continue
+        parsed = _fdrs_logical_to_optional_bool(r.get("Value"))
+        if parsed is None:
+            continue
+        parent = _parent_kpi_from_disability_suffix(kpi)
+        _, _, year_text, _, base_kpi = _classify_fdrs_combined_row({
+            "KPI_code": parent,
+            "Value": "1",
+            "year": r.get("year"),
+        })
+        iso3 = (r.get("ISO3") or "").strip()
+        if not iso3 or not year_text or not base_kpi:
+            continue
+        key = (iso3, year_text, base_kpi)
+        entry = scratch.setdefault(key, {})
+        if kpi.endswith("_ddd"):
+            entry["disaggregated_by_disability"] = parsed
+        else:
+            entry["washington_group_compliant"] = parsed
+
+    out: Dict[Tuple[str, str, str], Dict[str, bool]] = {}
+    for key, partial in scratch.items():
+        if "disaggregated_by_disability" not in partial:
+            continue
+        meta: Dict[str, bool] = {
+            "disaggregated_by_disability": bool(partial["disaggregated_by_disability"]),
+        }
+        if meta["disaggregated_by_disability"] and partial.get("washington_group_compliant") is not None:
+            meta["washington_group_compliant"] = bool(partial["washington_group_compliant"])
+        out[key] = meta
+    return out
+
+
 def build_fdrs_snapshot_rows(
     fdrs_combined: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
@@ -963,11 +1103,17 @@ def build_fdrs_table(
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     exclusion_summary: Optional[Dict[str, Any]] = None,
     reported_import_states: Optional[Sequence[int]] = None,
-) -> Tuple[List[Dict[str, Any]], Dict[Tuple[str, str, str], str], Dict[str, Any], List[Dict[str, Any]]]:
+) -> Tuple[
+    List[Dict[str, Any]],
+    Dict[Tuple[str, str, str], str],
+    Dict[str, Any],
+    List[Dict[str, Any]],
+    Dict[Tuple[str, str, str], Dict[str, bool]],
+]:
     """
     Run the full pipeline: codebook -> valid KPIs -> Data API + Imputed API -> Country Map
     -> FDRS combined -> FDRS Data -> disagg.
-    Returns (fdrs_data_rows, disagg_by_key, exclusion_summary, fdrs_snapshot_rows).
+    Returns (fdrs_data_rows, disagg_by_key, exclusion_summary, fdrs_snapshot_rows, disability_by_key).
     If exclusion_summary is None, a new one is created and returned (describes what was excluded at each stage).
     When imputed_url is not set, imputed values are fetched per (KPI, year) from the API; this can be slow.
     use_imputed_cache=True (default) uses a file cache when available; use_imputed_cache=False forces a fresh fetch.
@@ -1001,13 +1147,13 @@ def build_fdrs_table(
         base_url=base_url, api_key=api_key, codebook=codebook, exclusion_summary=exclusion_summary
     )
     _progress(f"Fetching reported fdrsdata ({len(years)} year(s))...", percent=2.5)
-    reported = fetch_fdrsdata(
+    raw_fdrsdata = _fetch_fdrsdata_raw(
         base_url=base_url,
         api_key=api_key,
         years=years,
-        valid_kpi_codes=valid_kpis,
         min_status=api_min_status,
     )
+    reported = _fdrsdata_rows(raw_fdrsdata, valid_kpi_codes=valid_kpis, source_type="Reported")
     imputed = []
     if imputed_url:
         _progress("Fetching imputed values (bulk URL)...", percent=5.5)
@@ -1079,5 +1225,8 @@ def build_fdrs_table(
     fdrs_snapshot_rows = build_fdrs_snapshot_rows(combined)
     fdrs_data = build_fdrs_data(combined, exclusion_summary=exclusion_summary)
     disagg_by_key = build_disagg(fdrs_data, exclusion_summary=exclusion_summary)
+    disability_by_key = build_disability_by_key(
+        _disability_combined_from_raw(raw_fdrsdata, country_map, import_allowlist)
+    )
     _progress("FDRS fetch complete.", percent=8.0)
-    return fdrs_data, disagg_by_key, exclusion_summary, fdrs_snapshot_rows
+    return fdrs_data, disagg_by_key, exclusion_summary, fdrs_snapshot_rows, disability_by_key

@@ -7,7 +7,8 @@ from typing import Any
 from sqlalchemy.orm import joinedload
 
 from app import db
-from app.models import FormData, FormItem, IndicatorBank, AssignmentEntityStatus, AssignedForm
+from app.models import Country, FormData, FormItem, IndicatorBank, AssignmentEntityStatus, AssignedForm
+from app.models.enums import DocumentStatus
 from app.models.forms import FormSection
 
 
@@ -151,6 +152,174 @@ def get_assignment_aes(
     )
 
 
+def list_assignment_periods(
+    template_id: int,
+    entity_type: str,
+    entity_id: int,
+) -> list[str]:
+    """Reporting periods that have an assignment for this template + entity."""
+    rows = (
+        db.session.query(AssignedForm.period_name)
+        .join(
+            AssignmentEntityStatus,
+            AssignmentEntityStatus.assigned_form_id == AssignedForm.id,
+        )
+        .filter(
+            AssignedForm.template_id == template_id,
+            AssignmentEntityStatus.entity_type == entity_type,
+            AssignmentEntityStatus.entity_id == entity_id,
+            AssignedForm.period_name.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    periods = [r[0] for r in rows if r[0]]
+
+    def _sort_key(period_name: str) -> tuple[int, str]:
+        year = parse_period_year(period_name)
+        return (year or 0, period_name)
+
+    return sorted(periods, key=_sort_key, reverse=True)
+
+
+def resolve_assignment_aes(
+    template_id: int,
+    entity_type: str,
+    entity_id: int,
+    period_name: str,
+) -> tuple[AssignmentEntityStatus | None, str]:
+    """
+    Resolve assignment for a period string.
+
+    Tries an exact ``AssignedForm.period_name`` match first, then matches by year
+    (e.g. user enters ``2024`` when the assignment period is ``FDRS 2024``).
+    """
+    import re
+
+    exact = get_assignment_aes(template_id, entity_type, entity_id, period_name)
+    if exact:
+        return exact, period_name
+
+    target_year = parse_period_year(period_name)
+    if target_year is None:
+        return None, period_name
+
+    for pn in list_assignment_periods(template_id, entity_type, entity_id):
+        years = re.findall(r"20\d{2}", str(pn))
+        if any(int(y) == target_year for y in years):
+            aes = get_assignment_aes(template_id, entity_type, entity_id, pn)
+            if aes:
+                return aes, pn
+    return None, period_name
+
+
+def sum_matrix_disagg_values(disagg_data: dict | None) -> float:
+    """Sum numeric cell values from a matrix FormData payload."""
+    if not disagg_data or not isinstance(disagg_data, dict):
+        return 0.0
+
+    if "values" in disagg_data and isinstance(disagg_data["values"], dict):
+        payload = disagg_data["values"]
+    else:
+        payload = disagg_data
+
+    total = 0.0
+    for key, val in payload.items():
+        if key in ("mode", "values", "direct", "indirect"):
+            continue
+        if isinstance(val, dict):
+            total += sum_matrix_disagg_values(val)
+        else:
+            try:
+                total += float(val or 0)
+            except (TypeError, ValueError):
+                pass
+    return total
+
+
+def _find_income_sources_matrix_item(
+    template_id: int,
+    version_id: int | None,
+) -> FormItem | None:
+    items = (
+        FormItem.query.filter(
+            FormItem.template_id == template_id,
+            FormItem.item_type == "matrix",
+            FormItem.archived == False,
+        ).all()
+    )
+    if version_id:
+        items = [i for i in items if i.version_id == version_id or i.version_id is None]
+
+    for item in items:
+        label = (item.label or "").lower()
+        if "income" in label and "source" in label:
+            return item
+    return None
+
+
+def _matrix_row_has_value(disagg_data: dict, row_name: str, column_names: list[str]) -> bool:
+    for column in column_names:
+        key = f"{row_name}_{column}"
+        try:
+            if float(disagg_data.get(key) or 0) != 0:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
+def compute_income_sources_ratio(
+    aes_id: int,
+    template_id: int,
+    version_id: int | None,
+    kpi_data: dict,
+    income_source_kpi_codes: tuple[str, ...],
+    total_income: float,
+) -> float:
+    """
+    Score income-by-source reporting.
+
+    - Legacy layouts: sum of per-KPI source fields vs total income.
+    - FDRS matrix layout (template 21): share of matrix rows with values,
+      boosted when the matrix sum reconciles with total income.
+    """
+    source_sum = 0.0
+    for code in income_source_kpi_codes:
+        entry = kpi_data.get(code, (None, None))[0]
+        v = numeric_value(entry)
+        if v is not None:
+            source_sum += v
+    if source_sum > 0 and total_income > 0:
+        return min(1.0, source_sum / total_income)
+
+    matrix_item = _find_income_sources_matrix_item(template_id, version_id)
+    if not matrix_item:
+        return 0.0
+
+    entry = FormData.query.filter_by(
+        assignment_entity_status_id=aes_id,
+        form_item_id=matrix_item.id,
+    ).first()
+    if not entry or not entry.disagg_data:
+        return 0.0
+
+    matrix_sum = sum_matrix_disagg_values(entry.disagg_data)
+    reconciliation = min(1.0, matrix_sum / total_income) if total_income > 0 else 0.0
+
+    matrix_config = (matrix_item.config or {}).get("matrix_config") or {}
+    rows = matrix_config.get("rows") or []
+    columns = [c.get("name") for c in (matrix_config.get("columns") or []) if c.get("name")]
+    if not rows or not columns:
+        return reconciliation
+
+    filled_rows = sum(
+        1 for row in rows if _matrix_row_has_value(entry.disagg_data, row, columns)
+    )
+    row_coverage = filled_rows / len(rows)
+    return max(row_coverage, reconciliation)
+
+
 def load_form_data_by_kpi(
     aes_id: int,
     template_id: int,
@@ -221,3 +390,68 @@ def validation_question_counts(
     open_count = base.filter(ValidationQuestion.status == "open").count()
     waived = base.filter(ValidationQuestion.status == "waived").count()
     return {"asked": asked, "answered": answered, "open": open_count, "waived": waived}
+
+
+def build_compliance_document_lookups(submitted_docs, item_id_to_doc_type):
+    """
+    Build presence, pending-validation, and cell-status lookups for FDRS compliance documents.
+
+    Returns:
+        present_lookup: (aes_id, doc_type) -> True when any submitted document exists
+        pending_lookup: (aes_id, doc_type) -> True when a pending-validation document exists
+        status_lookup: (aes_id, doc_type) -> missing | pending | approved | rejected
+    """
+    present_lookup: dict[tuple[int, str], bool] = {}
+    pending_lookup: dict[tuple[int, str], bool] = {}
+    status_lookup: dict[tuple[int, str], str] = {}
+    for doc in submitted_docs or []:
+        doc_type = item_id_to_doc_type.get(doc.form_item_id)
+        if not doc_type:
+            continue
+        key = (doc.assignment_entity_status_id, doc_type)
+        present_lookup[key] = True
+        normalized = DocumentStatus.normalize(getattr(doc, "status", None))
+        current = status_lookup.get(key)
+        if normalized == DocumentStatus.PENDING:
+            status_lookup[key] = "pending"
+            pending_lookup[key] = True
+        elif normalized == DocumentStatus.APPROVED:
+            if current != "pending":
+                status_lookup[key] = "approved"
+        elif normalized == DocumentStatus.REJECTED:
+            if current not in ("pending", "approved"):
+                status_lookup[key] = "rejected"
+    for key in present_lookup:
+        status_lookup.setdefault(key, "approved")
+    return present_lookup, pending_lookup, status_lookup
+
+
+def compliance_doc_status_counts_toward_requirement(status: str | None) -> bool:
+    """True when an uploaded document should count toward the compliance requirement."""
+    return status in ("approved", "pending")
+
+
+def active_country_map_query():
+    """Active countries from the country map (Country.status == 'Active')."""
+    return Country.query.filter_by(status="Active").order_by(Country.name)
+
+
+def fdrs_compliance_doc_label_matches(label: str | None, doc_type: str) -> bool:
+    """
+    Return True when a FDRS document-field label maps to a compliance doc type.
+
+    Uses substring matching for flexibility (e.g. "Our Audited Financial Statements"),
+    but excludes unaudited statements from counting as audited.
+    """
+    normalized = (label or "").strip().lower()
+    if not normalized:
+        return False
+
+    target = (doc_type or "").strip().lower()
+    if not target:
+        return False
+
+    if target == "audited financial statement" and "unaudited financial statement" in normalized:
+        return False
+
+    return target in normalized

@@ -315,14 +315,19 @@ function scoreRingColor(pct) {
     return '#dc2626';
 }
 
+function formatDataQualityOverallPct(pct) {
+    return Math.round(Math.max(0, Math.min(100, Number(pct) || 0)));
+}
+
 function renderDataQualityScoreRing(pct) {
-    const color = scoreRingColor(pct);
+    const displayPct = formatDataQualityOverallPct(pct);
+    const color = scoreRingColor(displayPct);
     const radius = 40;
     const stroke = 7;
     const normalizedRadius = radius - stroke / 2;
     const circumference = normalizedRadius * 2 * Math.PI;
-    const offset = circumference - (Math.max(0, Math.min(100, pct)) / 100) * circumference;
-    const label = `${getSecureConfirmMessage('overallScore', 'Overall score')}: ${pct}%`;
+    const offset = circumference - (displayPct / 100) * circumference;
+    const label = `${getSecureConfirmMessage('overallScore', 'Overall score')}: ${displayPct}%`;
 
     return `
         <svg class="shrink-0" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="${label}">
@@ -333,7 +338,7 @@ function renderDataQualityScoreRing(pct) {
                     stroke-linecap="round"
                     transform="rotate(-90 48 48)"></circle>
             <text x="48" y="48" text-anchor="middle" dominant-baseline="middle"
-                  font-size="22" font-weight="700" fill="${color}">${pct}%</text>
+                  font-size="22" font-weight="700" fill="${color}">${displayPct}%</text>
         </svg>
     `;
 }
@@ -859,7 +864,7 @@ function buildDataQualityTrendDatasets(trend, mode, pillarMeta) {
 
     return [{
         label: getSecureConfirmMessage('dataQualityIndex', 'Data Quality Index'),
-        data: trend.map((entry) => entry.overall_pct),
+        data: trend.map((entry) => formatDataQualityOverallPct(entry.overall_pct)),
         borderColor: 'rgb(124, 58, 237)',
         backgroundColor: 'rgba(124, 58, 237, 0.08)',
         pointBackgroundColor: 'rgb(124, 58, 237)',

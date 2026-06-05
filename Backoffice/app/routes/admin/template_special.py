@@ -30,6 +30,7 @@ bp = Blueprint("template_special", __name__, url_prefix="/admin/templates/specia
 # -----------------------------
 _FDRS_SYNC_LOCK = threading.Lock()
 _FDRS_SYNC_JOBS: Dict[str, Dict[str, Any]] = {}
+_FDRS_SYNC_CANCEL_EVENTS: Dict[str, threading.Event] = {}
 _FDRS_SYNC_TTL_SECONDS = 6 * 60 * 60
 
 
@@ -48,6 +49,7 @@ def _cleanup_fdrs_jobs_locked(now_ts: Optional[float] = None) -> None:
             expired.append(jid)
     for jid in expired:
         job = _FDRS_SYNC_JOBS.pop(jid, None)
+        _FDRS_SYNC_CANCEL_EVENTS.pop(jid, None)
         # Best-effort cleanup of temporary preview files
         if job:
             path = job.get("preview_path")
@@ -95,6 +97,20 @@ def _parse_fdrs_reported_import_states_from_request(data: Dict[str, Any]) -> Opt
             % (", ".join(str(x) for x in sorted(set(bad))),)
         )
     return out
+
+
+def _get_fdrs_sync_cancel_event(job_id: str) -> threading.Event:
+    with _FDRS_SYNC_LOCK:
+        ev = _FDRS_SYNC_CANCEL_EVENTS.get(job_id)
+        if ev is None:
+            ev = threading.Event()
+            _FDRS_SYNC_CANCEL_EVENTS[job_id] = ev
+        return ev
+
+
+def _clear_fdrs_sync_cancel_event(job_id: str) -> None:
+    with _FDRS_SYNC_LOCK:
+        _FDRS_SYNC_CANCEL_EVENTS.pop(job_id, None)
 
 
 @bp.route("/<int:template_id>", methods=["GET"])
@@ -1166,6 +1182,15 @@ def run_fdrs_sync(template_id: int):
 
             def _run_job() -> None:
                 log = logging.getLogger(__name__)
+                cancel_ev = _get_fdrs_sync_cancel_event(job_id)
+
+                def _cancel_check() -> bool:
+                    if cancel_ev.is_set():
+                        return True
+                    with _FDRS_SYNC_LOCK:
+                        job = _FDRS_SYNC_JOBS.get(job_id)
+                        return bool(job and job.get("status") == "cancel_requested")
+
                 with _FDRS_SYNC_LOCK:
                     job = _FDRS_SYNC_JOBS.get(job_id)
                     if job:
@@ -1177,6 +1202,8 @@ def run_fdrs_sync(template_id: int):
                 logger.info("FDRS sync %s: starting (template_id=%s, dry_run=%s, test=%s)", job_id, template_id, dry_run, test_mode)
 
                 try:
+                    from import_fdrs_form_data import FdrsSyncCancelled
+
                     stats = run_import(
                         input_path=None,
                         fdrs_api_url=None,
@@ -1200,6 +1227,8 @@ def run_fdrs_sync(template_id: int):
                         batch_size=batch_size,
                         template_id=template_id,
                         progress_cb=_progress_cb,
+                        cancel_check=_cancel_check,
+                        sync_user_id=int(getattr(current_user, "id", 0) or 0) or None,
                     )
                     with _FDRS_SYNC_LOCK:
                         job = _FDRS_SYNC_JOBS.get(job_id)
@@ -1221,6 +1250,17 @@ def run_fdrs_sync(template_id: int):
                         stats.get("updated"),
                         stats.get("errors"),
                     )
+                except FdrsSyncCancelled:
+                    with _FDRS_SYNC_LOCK:
+                        job = _FDRS_SYNC_JOBS.get(job_id)
+                        if job:
+                            job["status"] = "cancelled"
+                            job["stage"] = "cancelled"
+                            job["message"] = "Cancelled"
+                            job["error"] = "Sync cancelled by user."
+                            job["updated_at"] = _utc_iso()
+                            job["updated_ts"] = time.time()
+                    logger.info("FDRS sync %s: cancelled", job_id)
                 except Exception as e:
                     log.exception("FDRS async sync job failed: %s", e)
                     err_msg = str(e).strip() or type(e).__name__
@@ -1237,7 +1277,7 @@ def run_fdrs_sync(template_id: int):
                             job["updated_ts"] = time.time()
                     logger.error("FDRS sync %s: failed: %s", job_id, e, exc_info=True)
                 finally:
-                    pass
+                    _clear_fdrs_sync_cancel_event(job_id)
 
             threading.Thread(target=_run_job, daemon=True).start()
             return json_accepted(job_id=job_id)
@@ -1264,6 +1304,7 @@ def run_fdrs_sync(template_id: int):
             dry_run=dry_run,
             batch_size=batch_size,
             template_id=template_id,
+            sync_user_id=int(getattr(current_user, "id", 0) or 0) or None,
         )
 
         if dry_run and preview_path and os.path.isfile(preview_path):
@@ -1288,6 +1329,13 @@ def run_fdrs_sync(template_id: int):
             message=(
                 f"Loaded: {stats['loaded']}, Skipped: {stats['skipped']}, "
                 f"Inserted: {stats['inserted']}, Updated: {stats['updated']}, Errors: {stats['errors']}"
+                + (
+                    f"; Documents: +{stats.get('documents_inserted', 0)} "
+                    f"~{stats.get('documents_updated', 0)} "
+                    f"err={stats.get('documents_errors', 0)}"
+                    if stats.get("documents_inserted") is not None or stats.get("documents_updated")
+                    else ""
+                )
             ),
         )
     except (ValueError, RuntimeError) as e:
@@ -1330,6 +1378,30 @@ def fdrs_sync_status(template_id: int, job_id: str):
     if resp["job"]["download_ready"]:
         resp["job"]["download_url"] = url_for("template_special.fdrs_sync_download", template_id=template_id, job_id=job_id)
     return json_ok(**resp) if isinstance(resp, dict) else json_ok(data=resp)
+
+
+@bp.route("/<int:template_id>/fdrs-sync-cancel/<job_id>", methods=["POST"])
+@admin_permission_required("admin.templates.edit")
+def fdrs_sync_cancel(template_id: int, job_id: str):
+    """Request cancellation for a running FDRS sync job (best-effort)."""
+    with _FDRS_SYNC_LOCK:
+        job = _FDRS_SYNC_JOBS.get(job_id)
+        if not job or int(job.get("template_id") or 0) != int(template_id):
+            return json_not_found("Job not found")
+        if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
+            return json_forbidden("Access denied")
+
+        status = job.get("status")
+        if status in ("completed", "failed", "cancelled"):
+            return json_ok(status=status)
+
+        job["status"] = "cancel_requested"
+        job["message"] = "Cancellation requested..."
+        job["updated_at"] = _utc_iso()
+        job["updated_ts"] = time.time()
+
+    _get_fdrs_sync_cancel_event(job_id).set()
+    return json_ok(status="cancel_requested")
 
 
 @bp.route("/<int:template_id>/fdrs-sync-download/<job_id>", methods=["GET"])

@@ -65,6 +65,8 @@ class DocumentService:
     @classmethod
     def stream_download_response(cls, submitted_document_id: int, current_user, *, as_attachment: bool = True):
         """Return a Flask Response streaming the document.  Works with both local and Azure storage."""
+        from flask import flash, redirect
+
         submitted_document = SubmittedDocument.query.get_or_404(submitted_document_id)
         aes = submitted_document.assignment_entity_status
         if not aes:
@@ -74,6 +76,17 @@ class DocumentService:
         from app.services.authorization_service import AuthorizationService
         if aes.country_id not in user_country_ids and not AuthorizationService.is_admin(current_user):
             raise PermissionError("Not authorized to download this document")
+
+        if getattr(submitted_document, "file_pending", False) and submitted_document.source_url:
+            flash(
+                "This document was imported from FDRS with metadata only; opening the external source URL. "
+                "IFRC is fixing direct file access — re-run FDRS sync after URLs work to import the file.",
+                "info",
+            )
+            return redirect(submitted_document.source_url)
+
+        if not submitted_document.storage_path:
+            raise FileNotFoundError("Document file has not been imported yet")
 
         download_name = submitted_document.filename or os.path.basename(submitted_document.storage_path)
         main_cat = _storage.submitted_document_rel_storage_category(submitted_document.storage_path)

@@ -73,11 +73,14 @@ INCOME_SOURCE_KPI_CODES = (
 
 COMPLIANCE_DOC_TYPES = ("Annual Report", "Audited Financial Statement")
 
-# FDRS section groups for timeliness (matched by section name substring)
+# FDRS section groups for timeliness (matched by section name/display substring).
+# Template 21 published sections: Governing Board, Local Units and Branches,
+# National Society Volunteers/Staff, National Society Financial Data, Network Support,
+# Blood and First Aid Activities, By Type of Programme, By thematic areas.
 TIMELINESS_SECTION_GROUPS = (
-    ("governance", ("governance", "structure")),
-    ("finance", ("finance", "partnership")),
-    ("reach", ("reach",)),
+    ("governance", ("governing board", "local units", "volunteer", "staff")),
+    ("finance", ("financial data", "network support")),
+    ("reach", ("blood", "first aid", "type of programme", "thematic")),
 )
 
 TIMELINESS_CUTOFF_MONTH = 11

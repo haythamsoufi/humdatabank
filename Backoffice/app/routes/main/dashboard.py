@@ -439,7 +439,7 @@ def dashboard():
 
             # Query AssignmentEntityStatus for the selected entity (supports all entity types)
             AF = aliased(AssignedForm)
-            # Include active assignments and closed ones (closed sets is_active=False but we still show them under Past Assignments)
+            # Only active assignments (close no longer deactivates; deactivated rows are hidden)
             assigned_forms_statuses = (
                 AssignmentEntityStatus.query
                 .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id)
@@ -452,7 +452,7 @@ def dashboard():
                 .filter(
                     AssignmentEntityStatus.entity_type == selected_entity_type,
                     AssignmentEntityStatus.entity_id == selected_entity_id,
-                    or_(AF.is_active == True, AF.is_closed == True)
+                    AF.is_active == True,
                 )
                 .order_by(
                     AssignmentEntityStatus.due_date.asc().nulls_last(),

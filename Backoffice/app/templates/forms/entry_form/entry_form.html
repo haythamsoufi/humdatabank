@@ -215,7 +215,7 @@
                                     </button>
                                 </form>
                                 {% endif %}
-                                {% if assignment_status.status in ['submitted', 'approved', 'requires_revision'] and can_reopen_assignment(assignment_status) %}
+                                {% if can_reopen_assignment(assignment_status) %}
                                 <form action="{{ url_for('main.reopen_assignment', aes_id=assignment_status.id) }}" method="POST" class="inline-block reopen-assignment-form">
                                     {{ csrf_form.csrf_token }}
                                     <button type="submit" class="professional-action-btn professional-action-btn-orange">
@@ -247,7 +247,11 @@
         {% if not can_edit and not is_preview_mode %}
             <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
                 <p class="font-bold">{{ _('Read Only') }}</p>
+                {% if assignment_status is defined and assignment_status.is_round_closed_for_entity %}
+                <p>{{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}</p>
+                {% else %}
                 <p>{{ _('You cannot make changes to this form because it has been submitted. To request reopening this form, please write to') }} data@{{ get_organization_email_domain() or get_organization_domain() }} {{ _('including your reason for the request.') }}</p>
+                {% endif %}
             </div>
         {% endif %}
 
@@ -1502,6 +1506,10 @@
                                                                     {% endif %}
                                                                 </div>
                                                             {% endif %}
+
+                                                            {% with name_prefix='indicator_' ~ field.id|string %}
+                                                                {% include 'forms/entry_form/partials/disability_questions.html' %}
+                                                            {% endwith %}
                                                         {# --- QUESTION RENDERING (Parent Section) --- #}
                                                         {% elif field.is_question %}
                                                             {% set existing_q_value = existing_data.get('field_value[' ~ field.id ~ ']') %}
@@ -2413,6 +2421,12 @@
                                     {% endif %}
                                                                                 </div>
                                                                             {% endif %}
+                                                                        {% endif %}
+
+                                                                        {% if field.is_indicator and field.allow_disability_questions %}
+                                                                            {% with name_prefix='indicator_' ~ field.id|string %}
+                                                                                {% include 'forms/entry_form/partials/disability_questions.html' %}
+                                                                            {% endwith %}
                                                                         {% endif %}
 
                                                                             <div id="error-field-{{ field.id }}" class="text-red-600 text-sm mt-1" style="display: none;"></div>

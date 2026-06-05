@@ -94,6 +94,7 @@ def _create_indicator_form_item(template, section, form_data, default_order):
         'age_groups_config': None,
         'allow_data_not_available': bool(get_field_value('allow_data_not_available', '')),
         'allow_not_applicable': bool(get_field_value('allow_not_applicable', '')),
+        'allow_disability_questions': bool(get_field_value('allow_disability_questions', '')),
         'indirect_reach': bool(get_field_value('indirect_reach', '')),
         'default_value': None,
         'privacy': (get_field_value('privacy', '') or 'ifrc_network'),
@@ -255,6 +256,7 @@ def _create_question_form_item(template, section, form_data, default_order):
         'age_groups_config': None,  # Not used for questions but kept for consistency
         'allow_data_not_available': bool(get_field_value('allow_data_not_available', '')),
         'allow_not_applicable': bool(get_field_value('allow_not_applicable', '')),
+        'allow_disability_questions': bool(get_field_value('allow_disability_questions', '')),
         'indirect_reach': bool(get_field_value('indirect_reach', '')),
         'privacy': (get_field_value('privacy', '') or 'ifrc_network'),
         'allow_over_100': False  # Default to False

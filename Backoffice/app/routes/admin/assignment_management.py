@@ -850,8 +850,10 @@ def close_assignment(assignment_id):
     assignment = AssignedForm.query.get_or_404(assignment_id)
     try:
         assignment.is_closed = True
-        assignment.is_active = False
-        assignment.deactivated_by_user_id = current_user.id
+        AssignmentEntityStatus.query.filter_by(assigned_form_id=assignment_id).update(
+            {AssignmentEntityStatus.reopened_after_close: False},
+            synchronize_session=False,
+        )
         db.session.flush()
         flash(_("Assignment '%(name)s' has been closed.", name=assignment.period_name), "success")
     except Exception as e:
@@ -868,9 +870,11 @@ def reopen_closed_assignment(assignment_id):
     assignment = AssignedForm.query.get_or_404(assignment_id)
     try:
         assignment.is_closed = False
-        assignment.is_active = True
         assignment.expiry_date = None  # Clear expiry so assignment stays open until a new expiry is set
-        assignment.activated_by_user_id = current_user.id
+        AssignmentEntityStatus.query.filter_by(assigned_form_id=assignment_id).update(
+            {AssignmentEntityStatus.reopened_after_close: False},
+            synchronize_session=False,
+        )
         db.session.flush()
         flash(f"Assignment '{assignment.period_name}' has been reopened.", "success")
     except Exception as e:

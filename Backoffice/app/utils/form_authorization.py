@@ -12,6 +12,16 @@ from app.models.assignments import AssignmentEntityStatus
 from typing import List, Optional
 
 
+def redirect_if_assignment_entry_blocked(assigned_form, *, inactive_message: str):
+    """Return a dashboard redirect when a deactivated assignment cannot be opened, else None."""
+    if assigned_form is None:
+        return None
+    if not assigned_form.is_entry_allowed:
+        flash(inactive_message, "warning")
+        return redirect(url_for("main.dashboard"))
+    return None
+
+
 def has_country_access(user, country_id: int) -> bool:
     """
     Centralized access control logic.
@@ -53,11 +63,13 @@ def check_assignment_access(f):
         try:
             aes = AssignmentEntityStatus.query.get_or_404(aes_id)
 
-            # Deactivated assignment guard: treat inactive assignments as unavailable in focal-point flows
             assigned_form = getattr(aes, "assigned_form", None)
-            if assigned_form is not None and getattr(assigned_form, "is_active", True) is False:
-                flash("This assignment is currently inactive and cannot be accessed.", "warning")
-                return redirect(url_for("main.dashboard"))
+            blocked = redirect_if_assignment_entry_blocked(
+                assigned_form,
+                inactive_message="This assignment is currently inactive and cannot be accessed.",
+            )
+            if blocked is not None:
+                return blocked
 
             # Check entity access (supports all entity types)
             from app.services.authorization_service import AuthorizationService
@@ -90,11 +102,13 @@ def check_assignment_edit_access(f):
         try:
             aes = AssignmentEntityStatus.query.get_or_404(aes_id)
 
-            # Deactivated assignment guard: prevent edits/submissions when assignment is inactive
             assigned_form = getattr(aes, "assigned_form", None)
-            if assigned_form is not None and getattr(assigned_form, "is_active", True) is False:
-                flash("This assignment is currently inactive and cannot be edited.", "warning")
-                return redirect(url_for("main.dashboard"))
+            blocked = redirect_if_assignment_entry_blocked(
+                assigned_form,
+                inactive_message="This assignment is currently inactive and cannot be edited.",
+            )
+            if blocked is not None:
+                return blocked
 
             # Check entity access (supports all entity types)
             from app.services.authorization_service import AuthorizationService
@@ -156,11 +170,13 @@ def check_document_access(f):
                     flash("Error accessing document.", "danger")
                     return redirect(url_for("main.dashboard"))
 
-                # Deactivated assignment guard
                 assigned_form = getattr(aes, "assigned_form", None)
-                if assigned_form is not None and getattr(assigned_form, "is_active", True) is False:
-                    flash("This assignment is currently inactive and documents cannot be accessed.", "warning")
-                    return redirect(url_for("main.dashboard"))
+                blocked = redirect_if_assignment_entry_blocked(
+                    assigned_form,
+                    inactive_message="This assignment is currently inactive and documents cannot be accessed.",
+                )
+                if blocked is not None:
+                    return blocked
 
                 # Get country_id from entity_id when entity_type is 'country'
                 country_id = aes.entity_id if aes.entity_type == 'country' else None

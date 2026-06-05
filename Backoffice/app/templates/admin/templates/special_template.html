@@ -65,7 +65,7 @@
   <!-- FDRS Sync Settings Modal -->
   {% from "macros/modal_shell.html" import modal_shell %}
   {% call modal_shell('fdrs-sync-modal', _('FDRS Data Sync Settings'), max_width='max-w-lg', close_id='fdrs-sync-modal-close') %}
-      <div class="space-y-4">
+      <div id="fdrs-sync-settings" class="space-y-4">
         <p class="text-sm text-gray-600">{{ _('Sync FDRS data from your configured FDRS / data API endpoint into form data for this template.') }}</p>
         <div>
           <label for="fdrs-sync-years" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Years (comma-separated)') }}</label>
@@ -136,6 +136,12 @@
         </div>
       </div>
 
+      <!-- Running config summary (shown while sync is in progress) -->
+      <div id="fdrs-sync-config-summary" class="hidden mb-4 border border-purple-200 rounded-md p-4 bg-purple-50">
+        <h4 class="text-sm font-medium text-purple-900 mb-3">{{ _('Sync configuration') }}</h4>
+        <div id="fdrs-sync-config-summary-body" class="space-y-2 text-sm"></div>
+      </div>
+
       <!-- Live progress -->
       <div id="fdrs-sync-progress" class="pb-4 hidden">
         <div class="text-sm text-gray-700 mb-2">
@@ -153,7 +159,7 @@
       <div id="fdrs-sync-result" class="py-3 border-t border-gray-200 hidden">
         <p id="fdrs-sync-result-text" class="text-sm"></p>
       </div>
-      <div class="pt-4 border-t border-gray-200 flex justify-end gap-2">
+      <div id="fdrs-sync-footer-settings" class="pt-4 border-t border-gray-200 flex justify-end gap-2">
         <button type="button"
                 id="fdrs-sync-modal-cancel"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -164,6 +170,27 @@
                 class="btn btn-purple">
           <i class="fas fa-sync-alt mr-2"></i>
           <span id="fdrs-sync-run-btn-text">{{ _('Run Sync') }}</span>
+        </button>
+      </div>
+      <div id="fdrs-sync-footer-running" class="pt-4 border-t border-gray-200 flex justify-end hidden">
+        <button type="button"
+                id="fdrs-sync-stop-btn"
+                class="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500">
+          <i class="fas fa-stop mr-2"></i>
+          <span id="fdrs-sync-stop-btn-text">{{ _('Stop sync') }}</span>
+        </button>
+      </div>
+      <div id="fdrs-sync-footer-done" class="pt-4 border-t border-gray-200 flex justify-end gap-2 hidden">
+        <button type="button"
+                id="fdrs-sync-modal-close-btn"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          {{ _('Close') }}
+        </button>
+        <button type="button"
+                id="fdrs-sync-reload-btn"
+                class="btn btn-purple">
+          <i class="fas fa-redo mr-2"></i>
+          {{ _('Reload page') }}
         </button>
       </div>
   {% endcall %}
@@ -1196,6 +1223,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const fdrsSyncModalCancel = document.getElementById('fdrs-sync-modal-cancel');
     const fdrsSyncRunBtn = document.getElementById('fdrs-sync-run-btn');
     const fdrsSyncRunBtnText = document.getElementById('fdrs-sync-run-btn-text');
+    const fdrsSyncSettings = document.getElementById('fdrs-sync-settings');
+    const fdrsSyncConfigSummary = document.getElementById('fdrs-sync-config-summary');
+    const fdrsSyncConfigSummaryBody = document.getElementById('fdrs-sync-config-summary-body');
+    const fdrsSyncFooterSettings = document.getElementById('fdrs-sync-footer-settings');
+    const fdrsSyncFooterRunning = document.getElementById('fdrs-sync-footer-running');
+    const fdrsSyncFooterDone = document.getElementById('fdrs-sync-footer-done');
+    const fdrsSyncStopBtn = document.getElementById('fdrs-sync-stop-btn');
+    const fdrsSyncStopBtnText = document.getElementById('fdrs-sync-stop-btn-text');
+    const fdrsSyncModalCloseBtn = document.getElementById('fdrs-sync-modal-close-btn');
+    const fdrsSyncReloadBtn = document.getElementById('fdrs-sync-reload-btn');
     const fdrsSyncResult = document.getElementById('fdrs-sync-result');
     const fdrsSyncResultText = document.getElementById('fdrs-sync-result-text');
     const fdrsSyncProgress = document.getElementById('fdrs-sync-progress');
@@ -1204,9 +1241,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const fdrsSyncProgressText = document.getElementById('fdrs-sync-progress-text');
     const fdrsSyncProgressCount = document.getElementById('fdrs-sync-progress-count');
 
+    const FDRS_SYNC_STATUS_LABELS = {
+        0: '{{ _("Not filled") }}',
+        100: '{{ _("Saved") }}',
+        200: '{{ _("Reopened") }}',
+        300: '{{ _("Submitted") }}',
+        400: '{{ _("Validated") }}',
+        500: '{{ _("Published") }}'
+    };
+
     const fdrsSyncStatusUrlTemplate = '{{ url_for("template_special.fdrs_sync_status", template_id=template.id, job_id="__JOB_ID__") }}';
+    const fdrsSyncCancelUrlTemplate = '{{ url_for("template_special.fdrs_sync_cancel", template_id=template.id, job_id="__JOB_ID__") }}';
     let fdrsSyncActiveJobId = null;
     let fdrsSyncPollTimer = null;
+    let fdrsSyncUIMode = 'settings';
+    let fdrsSyncStopRequested = false;
 
     function isSafeHref(url) {
         if (!url || typeof url !== 'string') return false;
@@ -1222,6 +1271,120 @@ document.addEventListener('DOMContentLoaded', function() {
         fdrsSyncActiveJobId = null;
     }
 
+    function collectFdrsSyncParams() {
+        const years = (document.getElementById('fdrs-sync-years') && document.getElementById('fdrs-sync-years').value) || '';
+        const batchSizeRaw = (document.getElementById('fdrs-sync-batch-size') && document.getElementById('fdrs-sync-batch-size').value) || '';
+        const batchSizeRawTrim = (batchSizeRaw || '').trim();
+        const batchSize = batchSizeRawTrim ? parseInt(batchSizeRawTrim, 10) : null;
+        const dryRun = !!(document.getElementById('fdrs-sync-dry-run') && document.getElementById('fdrs-sync-dry-run').checked);
+        const test = !!(document.getElementById('fdrs-sync-test') && document.getElementById('fdrs-sync-test').checked);
+        const imputedUseCache = !!(document.getElementById('fdrs-sync-imputed-cache') && document.getElementById('fdrs-sync-imputed-cache').checked);
+        const statusBoxes = document.querySelectorAll('input[name="fdrs-sync-status"]:checked');
+        const fdrsReportedStates = Array.from(statusBoxes).map(function (el) {
+            return parseInt(el.value, 10);
+        }).filter(function (n) { return !isNaN(n); });
+
+        return {
+            years: years.trim(),
+            batchSizeRawTrim: batchSizeRawTrim,
+            batchSize: batchSize,
+            dryRun: dryRun,
+            test: test,
+            imputedUseCache: imputedUseCache,
+            fdrsReportedStates: fdrsReportedStates
+        };
+    }
+
+    function fdrsSyncBoolIcon(isTrue) {
+        if (isTrue) {
+            return '<span class="inline-flex items-center text-green-600" aria-label="{{ _("Yes") }}"><i class="fas fa-check-circle" aria-hidden="true"></i></span>';
+        }
+        return '<span class="inline-flex items-center text-gray-400" aria-label="{{ _("No") }}"><i class="fas fa-times-circle" aria-hidden="true"></i></span>';
+    }
+
+    function renderFdrsSyncConfigSummary(params) {
+        if (!fdrsSyncConfigSummaryBody) return;
+
+        const yearsDisplay = params.years || '{{ _("Default (2010–2024)") }}';
+        const batchDisplay = params.batchSize !== null && !isNaN(params.batchSize)
+            ? String(params.batchSize)
+            : '{{ _("Default (1000)") }}';
+        const statusLabels = (params.fdrsReportedStates || [])
+            .map(function (code) { return FDRS_SYNC_STATUS_LABELS[code] || String(code); })
+            .join(', ');
+
+        const rows = [
+            { label: '{{ _("Years") }}', value: yearsDisplay },
+            { label: '{{ _("Batch size") }}', value: batchDisplay },
+            { label: '{{ _("Data status") }}', value: statusLabels || '-' },
+            { label: '{{ _("Dry run") }}', value: fdrsSyncBoolIcon(params.dryRun), html: true, inline: true },
+            { label: '{{ _("Test mode") }}', value: fdrsSyncBoolIcon(params.test), html: true, inline: true },
+            { label: '{{ _("Cached imputed values") }}', value: fdrsSyncBoolIcon(params.imputedUseCache), html: true, inline: true }
+        ];
+
+        fdrsSyncConfigSummaryBody.innerHTML = rows.map(function (row) {
+            const valueHtml = row.html ? row.value : escapeHtmlAttr(row.value);
+            if (row.inline) {
+                return '<div class="flex items-center gap-2">'
+                    + '<span class="text-gray-500">' + escapeHtmlAttr(row.label) + '</span>'
+                    + valueHtml
+                    + '</div>';
+            }
+            return '<div class="flex items-start justify-between gap-4">'
+                + '<span class="text-gray-500 shrink-0">' + escapeHtmlAttr(row.label) + '</span>'
+                + '<span class="font-medium text-gray-900 text-right">' + valueHtml + '</span>'
+                + '</div>';
+        }).join('');
+    }
+
+    function setFdrsSyncUIMode(mode) {
+        fdrsSyncUIMode = mode;
+        const isSettings = mode === 'settings';
+        const isRunning = mode === 'running';
+        const isDone = mode === 'done';
+
+        if (fdrsSyncSettings) fdrsSyncSettings.classList.toggle('hidden', !isSettings);
+        if (fdrsSyncConfigSummary) fdrsSyncConfigSummary.classList.toggle('hidden', isSettings);
+        if (fdrsSyncFooterSettings) fdrsSyncFooterSettings.classList.toggle('hidden', !isSettings);
+        if (fdrsSyncFooterRunning) fdrsSyncFooterRunning.classList.toggle('hidden', !isRunning);
+        if (fdrsSyncFooterDone) fdrsSyncFooterDone.classList.toggle('hidden', !isDone);
+
+        if (fdrsSyncModalClose) {
+            fdrsSyncModalClose.disabled = isRunning;
+            fdrsSyncModalClose.classList.toggle('opacity-50', isRunning);
+            fdrsSyncModalClose.classList.toggle('pointer-events-none', isRunning);
+        }
+    }
+
+    function resetFdrsSyncRunButton() {
+        if (!fdrsSyncRunBtn || !fdrsSyncRunBtnText) return;
+        fdrsSyncRunBtn.disabled = false;
+        fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
+        const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
+        if (spinIcon) spinIcon.remove();
+        if (!fdrsSyncRunBtn.querySelector('i.fa-sync-alt')) {
+            fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+        }
+    }
+
+    function resetFdrsSyncStopButton() {
+        fdrsSyncStopRequested = false;
+        if (!fdrsSyncStopBtn || !fdrsSyncStopBtnText) return;
+        fdrsSyncStopBtn.disabled = false;
+        fdrsSyncStopBtnText.textContent = '{{ _("Stop sync") }}';
+    }
+
+    function setFdrsSyncStopping() {
+        fdrsSyncStopRequested = true;
+        if (!fdrsSyncStopBtn || !fdrsSyncStopBtnText) return;
+        fdrsSyncStopBtn.disabled = true;
+        fdrsSyncStopBtnText.textContent = '{{ _("Stopping...") }}';
+    }
+
+    function showFdrsSyncDone() {
+        setFdrsSyncUIMode('done');
+    }
+
     function resetFdrsSyncUI() {
         fdrsSyncResult.classList.add('hidden');
         fdrsSyncResultText.textContent = '';
@@ -1230,7 +1393,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (fdrsSyncProgressBar) fdrsSyncProgressBar.style.width = '0%';
         if (fdrsSyncProgressText) fdrsSyncProgressText.textContent = '0%';
         if (fdrsSyncProgressCount) fdrsSyncProgressCount.textContent = '';
+        if (fdrsSyncConfigSummaryBody) fdrsSyncConfigSummaryBody.innerHTML = '';
         stopFdrsSyncPolling();
+        resetFdrsSyncRunButton();
+        resetFdrsSyncStopButton();
+        setFdrsSyncUIMode('settings');
     }
 
     function setFdrsSyncProgress(percent, stage, message, current, total) {
@@ -1277,15 +1444,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         fdrsSyncResultText.textContent = msg;
                     }
                     fdrsSyncResultText.className = 'text-sm text-green-700';
-
-                    // Re-enable button
-                    fdrsSyncRunBtn.disabled = false;
-                    fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
-                    const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
-                    if (spinIcon) spinIcon.remove();
-                    if (!fdrsSyncRunBtn.querySelector('i.fa-sync-alt')) {
-                        fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
-                    }
+                    showFdrsSyncDone();
                     return;
                 }
                 if (job.status === 'failed') {
@@ -1293,36 +1452,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     fdrsSyncResult.classList.remove('hidden');
                     fdrsSyncResultText.textContent = job.error || '{{ _("Sync failed") }}';
                     fdrsSyncResultText.className = 'text-sm text-red-700';
-
-                    // Re-enable button
-                    fdrsSyncRunBtn.disabled = false;
-                    fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
-                    const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
-                    if (spinIcon) spinIcon.remove();
-                    if (!fdrsSyncRunBtn.querySelector('i.fa-sync-alt')) {
-                        fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
-                    }
+                    showFdrsSyncDone();
                     return;
+                }
+                if (job.status === 'cancelled') {
+                    stopFdrsSyncPolling();
+                    fdrsSyncResult.classList.remove('hidden');
+                    fdrsSyncResultText.textContent = job.error || '{{ _("Sync cancelled.") }}';
+                    fdrsSyncResultText.className = 'text-sm text-amber-700';
+                    showFdrsSyncDone();
+                    return;
+                }
+                if (job.status === 'cancel_requested') {
+                    setFdrsSyncStopping();
                 }
 
                 // Continue polling
                 fdrsSyncPollTimer = setTimeout(pollFdrsSyncStatus, 1000);
             })
             .catch(err => {
-                // Stop polling on hard failures (network / server)
                 stopFdrsSyncPolling();
                 fdrsSyncResult.classList.remove('hidden');
                 fdrsSyncResultText.textContent = err.message || '{{ _("Request failed") }}';
                 fdrsSyncResultText.className = 'text-sm text-red-700';
-
-                // Re-enable button
-                fdrsSyncRunBtn.disabled = false;
-                fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
-                const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
-                if (spinIcon) spinIcon.remove();
-                if (!fdrsSyncRunBtn.querySelector('i.fa-sync-alt')) {
-                    fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
-                }
+                showFdrsSyncDone();
             });
     }
 
@@ -1333,6 +1486,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function closeFdrsSyncModal() {
+        if (fdrsSyncUIMode === 'running') return;
         stopFdrsSyncPolling();
         fdrsSyncModal.classList.add('hidden');
         fdrsSyncModal.classList.remove('flex');
@@ -1347,23 +1501,53 @@ document.addEventListener('DOMContentLoaded', function() {
     if (fdrsSyncModalCancel) {
         fdrsSyncModalCancel.addEventListener('click', closeFdrsSyncModal);
     }
+    if (fdrsSyncModalCloseBtn) {
+        fdrsSyncModalCloseBtn.addEventListener('click', closeFdrsSyncModal);
+    }
+    if (fdrsSyncReloadBtn) {
+        fdrsSyncReloadBtn.addEventListener('click', function() {
+            window.location.reload();
+        });
+    }
+    if (fdrsSyncStopBtn) {
+        fdrsSyncStopBtn.addEventListener('click', function() {
+            if (!fdrsSyncActiveJobId || fdrsSyncStopRequested) return;
+            setFdrsSyncStopping();
+            const url = fdrsSyncCancelUrlTemplate.replace('__JOB_ID__', encodeURIComponent(fdrsSyncActiveJobId));
+            const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken || ''
+                }
+            })
+            .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+            .then(function(result) {
+                if (!result.ok || !(result.data && result.data.success)) {
+                    throw new Error((result.data && result.data.error) || '{{ _("Failed to stop sync") }}');
+                }
+            })
+            .catch(function(err) {
+                resetFdrsSyncStopButton();
+                fdrsSyncResult.classList.remove('hidden');
+                fdrsSyncResultText.textContent = err.message || '{{ _("Failed to stop sync") }}';
+                fdrsSyncResultText.className = 'text-sm text-red-700';
+            });
+        });
+    }
     fdrsSyncModal.addEventListener('click', function(e) {
-        if (e.target === fdrsSyncModal) {
+        if (e.target === fdrsSyncModal && fdrsSyncUIMode !== 'running') {
             closeFdrsSyncModal();
         }
     });
 
     if (fdrsSyncRunBtn) {
         fdrsSyncRunBtn.addEventListener('click', function() {
-            const years = (document.getElementById('fdrs-sync-years') && document.getElementById('fdrs-sync-years').value) || '';
-            const batchSizeRaw = (document.getElementById('fdrs-sync-batch-size') && document.getElementById('fdrs-sync-batch-size').value) || '';
-            const batchSizeRawTrim = (batchSizeRaw || '').trim();
-            const batchSize = batchSizeRawTrim ? parseInt(batchSizeRawTrim, 10) : null;
-            const dryRun = document.getElementById('fdrs-sync-dry-run') && document.getElementById('fdrs-sync-dry-run').checked;
-            const test = document.getElementById('fdrs-sync-test') && document.getElementById('fdrs-sync-test').checked;
+            const params = collectFdrsSyncParams();
 
-            if (batchSizeRawTrim) {
-                if (isNaN(batchSize) || batchSize < 100) {
+            if (params.batchSizeRawTrim) {
+                if (isNaN(params.batchSize) || params.batchSize < 100) {
                     fdrsSyncResult.classList.remove('hidden');
                     fdrsSyncResultText.textContent = '{{ _("Invalid batch size. Please enter a number >= 100 (or leave empty).") }}';
                     fdrsSyncResultText.className = 'text-sm text-red-700';
@@ -1371,11 +1555,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            const statusBoxes = document.querySelectorAll('input[name="fdrs-sync-status"]:checked');
-            const fdrsReportedStates = Array.from(statusBoxes).map(function (el) {
-                return parseInt(el.value, 10);
-            }).filter(function (n) { return !isNaN(n); });
-            if (!fdrsReportedStates.length) {
+            if (!params.fdrsReportedStates.length) {
                 fdrsSyncResult.classList.remove('hidden');
                 fdrsSyncResultText.textContent = '{{ _("Select at least one data status to include.") }}';
                 fdrsSyncResultText.className = 'text-sm text-red-700';
@@ -1383,6 +1563,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             resetFdrsSyncUI();
+            renderFdrsSyncConfigSummary(params);
+            setFdrsSyncUIMode('running');
             if (fdrsSyncProgress) fdrsSyncProgress.classList.remove('hidden');
             setFdrsSyncProgress(0, 'starting', '{{ _("Starting...") }}', 0, null);
             fdrsSyncRunBtn.disabled = true;
@@ -1391,18 +1573,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const iconEl = fdrsSyncRunBtn.querySelector('i.fa-sync-alt');
             if (iconEl) iconEl.remove();
 
-            const imputedUseCache = !!(document.getElementById('fdrs-sync-imputed-cache') && document.getElementById('fdrs-sync-imputed-cache').checked);
             const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             const payload = {
-                fdrs_years: years,
-                dry_run: dryRun,
-                test: test,
+                fdrs_years: params.years,
+                dry_run: params.dryRun,
+                test: params.test,
                 async: true,
-                imputed_use_cache: imputedUseCache,
-                fdrs_reported_import_states: fdrsReportedStates
+                imputed_use_cache: params.imputedUseCache,
+                fdrs_reported_import_states: params.fdrsReportedStates
             };
-            if (batchSize !== null) {
-                payload.batch_size = batchSize;
+            if (params.batchSize !== null) {
+                payload.batch_size = params.batchSize;
             }
             fetch('{{ url_for("template_special.run_fdrs_sync", template_id=template.id) }}', {
                 method: 'POST',
@@ -1426,11 +1607,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 fdrsSyncResult.classList.remove('hidden');
                 fdrsSyncResultText.textContent = err.message || '{{ _("Request failed") }}';
                 fdrsSyncResultText.className = 'text-sm text-red-700';
-                fdrsSyncRunBtn.disabled = false;
-                fdrsSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
-                const spinIcon = fdrsSyncRunBtn.querySelector('i.fa-spinner');
-                if (spinIcon) spinIcon.remove();
-                fdrsSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+                showFdrsSyncDone();
             });
         });
     }

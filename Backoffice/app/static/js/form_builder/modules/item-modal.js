@@ -721,6 +721,19 @@ export const ItemModal = {
                     cb.disabled = false;
                 }
             }
+            const disabilityRow = this.modalElement ? this.modalElement.querySelector('#disability-questions-row') : document.getElementById('disability-questions-row');
+            const disabilityCb = disabilityRow ? disabilityRow.querySelector('#item-allow-disability-questions') : document.getElementById('item-allow-disability-questions');
+            if (disabilityRow) {
+                disabilityRow.style.display = itemType === 'indicator' ? '' : 'none';
+            }
+            if (disabilityCb) {
+                if (itemType !== 'indicator') {
+                    disabilityCb.checked = false;
+                    disabilityCb.disabled = true;
+                } else {
+                    disabilityCb.disabled = false;
+                }
+            }
         } catch (_e) {}
 
         // When switching to question with a specific type, set select and hidden input so trigger shows correct label and submit sends question_type
@@ -2719,6 +2732,7 @@ export const ItemModal = {
         const orderInput = this.modalElement.querySelector('#item-order');
         const dataNotAvailableCheckbox = this.modalElement.querySelector('#item-allow-data-not-available');
         const notApplicableCheckbox = this.modalElement.querySelector('#item-allow-not-applicable');
+        const disabilityQuestionsCheckbox = this.modalElement.querySelector('#item-allow-disability-questions');
         const indirectReachCheckbox = this.modalElement.querySelector('#item-indirect-reach');
         const layoutWidthSelect = this.modalElement.querySelector('#item-layout-column-width');
         const breakAfterCheckbox = this.modalElement.querySelector('#item-layout-break-after');
@@ -2746,6 +2760,11 @@ export const ItemModal = {
         if (notApplicableCheckbox) {
             const val2 = itemData.allow_not_applicable;
             notApplicableCheckbox.checked = val2 === true || val2 === 'true' || val2 === 1 || val2 === '1';
+        }
+
+        if (disabilityQuestionsCheckbox) {
+            const valDisability = itemData.allow_disability_questions;
+            disabilityQuestionsCheckbox.checked = valDisability === true || valDisability === 'true' || valDisability === 1 || valDisability === '1';
         }
 
         if (indirectReachCheckbox) {

@@ -32,13 +32,14 @@ from app.models.rbac import (
     RbacUserRole,
     RbacAccessGrant,
 )
+from app.services.data_quality.catalogs.fdrs_v1_catalog import COMPLIANCE_DOC_TYPES
+from app.services.data_quality.helpers import active_country_map_query, fdrs_compliance_doc_label_matches
 from app.utils.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
-# FDRS template and compliance doc types (aligned with data_exploration)
+# FDRS template (aligned with data_exploration)
 FDRS_TEMPLATE_ID = 21
-COMPLIANCE_DOC_TYPES = ["Annual Report", "Audited Financial Statement"]
 
 # Max countries per user to flag for "many countries" review
 MAX_COUNTRIES_PER_USER_FLAG = 10
@@ -246,12 +247,12 @@ def _get_ownership_metrics() -> Dict[str, Any]:
     ).count()
 
     # Assignment data owner gaps
-    total_active_assignments = AssignedForm.query.filter(AssignedForm.is_active == True).count()
+    total_active_assignments = AssignedForm.query.filter(AssignedForm.operational_clause()).count()
     assignments_without_data_owner = AssignedForm.query.filter(
         AssignedForm.data_owner_id.is_(None)
     ).count()
     active_assignments_without_data_owner = AssignedForm.query.filter(
-        AssignedForm.is_active == True,
+        AssignedForm.operational_clause(),
         AssignedForm.data_owner_id.is_(None),
     ).count()
     active_assignments_no_owner_list = [
@@ -261,7 +262,7 @@ def _get_ownership_metrics() -> Dict[str, Any]:
             "template_name": a.template.name if a.template else "Unknown",
         }
         for a in AssignedForm.query.filter(
-            AssignedForm.is_active == True,
+            AssignedForm.operational_clause(),
             AssignedForm.data_owner_id.is_(None),
         ).limit(30).all()
     ]
@@ -517,7 +518,7 @@ def _get_quality_metrics() -> Dict[str, Any]:
             }
             for a in AssignedForm.query.filter(
                 AssignedForm.id.in_(never_started_af_ids),
-                AssignedForm.is_active == True,
+                AssignedForm.operational_clause(),
             ).limit(20).all()
         ]
     except Exception as e:
@@ -573,7 +574,7 @@ def _get_compliance_metrics() -> Dict[str, Any]:
     periods = all_periods[:3]
 
     if not periods:
-        total_countries = Country.query.count()
+        total_countries = active_country_map_query().count()
         return {
             "compliant_count": 0,
             "non_compliant_count": total_countries,
@@ -581,7 +582,7 @@ def _get_compliance_metrics() -> Dict[str, Any]:
             "flags": {"non_compliant_countries": []},
         }
 
-    countries = Country.query.order_by(Country.name).all()
+    countries = active_country_map_query().all()
     doc_items = (
         FormItem.query.filter(
             FormItem.template_id == FDRS_TEMPLATE_ID,
@@ -595,7 +596,7 @@ def _get_compliance_metrics() -> Dict[str, Any]:
     for item in doc_items:
         label = (item.label or "").strip()
         for doc_type in COMPLIANCE_DOC_TYPES:
-            if doc_type.lower() in label.lower():
+            if fdrs_compliance_doc_label_matches(label, doc_type):
                 if doc_type not in doc_item_map:
                     doc_item_map[doc_type] = []
                 doc_item_map[doc_type].append(item.id)

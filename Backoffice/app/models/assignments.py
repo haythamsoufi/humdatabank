@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum
+from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, and_, or_
 from sqlalchemy.orm import relationship, backref, foreign
 from sqlalchemy import and_
 from ..extensions import db
@@ -45,9 +45,9 @@ class AssignedForm(db.Model):
     period_end = Column(Date, nullable=True)
     assigned_at = Column(DateTime, default=utcnow)
 
-    # Assignment active state (inactive assignments are hidden from normal use)
+    # Admin pause toggle (independent of closed lifecycle state)
     is_active = Column(Boolean, default=True, nullable=False)
-    # Closed state: closed assignments (e.g. after one year) can be reopened by admins
+    # Reporting cycle ended (UI/workflow label); does not block viewing the form
     is_closed = Column(Boolean, default=False, nullable=False)
     # Expiry date: after this date the assignment is treated as Closed (optional)
     expiry_date = Column(Date, nullable=True)
@@ -193,6 +193,26 @@ class AssignedForm(db.Model):
         today = utcnow().date()
         return self.expiry_date < today
 
+    @property
+    def is_entry_allowed(self) -> bool:
+        """Whether logged-in users may open the assignment form (deactivate blocks; close does not)."""
+        return self.is_active
+
+    @property
+    def is_public_submission_allowed(self) -> bool:
+        """Whether the public URL may accept new submissions."""
+        return self.is_active and not self.is_effectively_closed
+
+    @classmethod
+    def operational_clause(cls):
+        """SQL filter for assignments with an open data-collection round (governance metrics)."""
+        today = utcnow().date()
+        return and_(
+            cls.is_active.is_(True),
+            cls.is_closed.is_(False),
+            or_(cls.expiry_date.is_(None), cls.expiry_date >= today),
+        )
+
     def toggle_public_access(self):
         """Toggle the public access status."""
         if self.has_public_url():
@@ -242,6 +262,8 @@ class AssignmentEntityStatus(db.Model):
     # NS review workflow accountability
     sent_for_review_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     sent_for_review_at = db.Column(db.DateTime, nullable=True)
+    # When the parent assignment round is closed, admins can reopen data entry for this entity only
+    reopened_after_close = db.Column(db.Boolean, default=False, nullable=False)
 
     # Relationships
     assigned_form = relationship('AssignedForm', backref=db.backref('entity_statuses', lazy='dynamic', cascade="all, delete-orphan"))
@@ -254,6 +276,13 @@ class AssignmentEntityStatus(db.Model):
 
     # Relationship to SubmittedDocuments
     submitted_documents = relationship('SubmittedDocument', lazy='dynamic', cascade="all, delete-orphan", foreign_keys='SubmittedDocument.assignment_entity_status_id')
+
+    def is_round_closed_for_entity(self) -> bool:
+        """True when the parent assignment round is closed and this entity has not been reopened."""
+        if self.reopened_after_close:
+            return False
+        assigned_form = self.assigned_form
+        return bool(assigned_form and assigned_form.is_effectively_closed)
 
     __table_args__ = (
         db.UniqueConstraint('assigned_form_id', 'entity_type', 'entity_id', name='_assigned_entity_uc'),

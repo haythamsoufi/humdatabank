@@ -12,15 +12,21 @@ from app.models import Country, FormData, FormItem, FormTemplate
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.validation import ValidationQuestion
 from app.services.data_quality.helpers import (
-    get_assignment_aes,
+    list_assignment_periods,
     load_form_data_by_kpi,
     numeric_value,
     parse_period_year,
+    resolve_assignment_aes,
 )
 from app.services.data_quality.service import get_rule_pack_for_template
 from app.services.validation.fdrs_matrix.rules import run_fdrs_matrix_rules
 from app.services.validation.question_assembler import assemble_question_for_kpi
-from app.services.validation.types import CheckResult, ValidationQuestionDraft, ValidationRunResult
+from app.services.validation.types import (
+    CheckResult,
+    ValidationEvaluationResult,
+    ValidationQuestionDraft,
+    ValidationRunResult,
+)
 from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
 from app.utils.datetime_helpers import utcnow
 
@@ -89,7 +95,7 @@ def _load_history(
     return history
 
 
-def run_validation_checks(
+def evaluate_validation_checks(
     template_id: int,
     entity_type: str,
     entity_id: int,
@@ -97,18 +103,26 @@ def run_validation_checks(
     *,
     rule_pack: str | None = None,
     language: str = "en",
-) -> ValidationRunResult:
+) -> ValidationEvaluationResult:
+    """Run validation rules without persisting questions (dashboard preview)."""
     template = FormTemplate.query.get(template_id)
     if not template:
         raise ValueError(f"Template {template_id} not found.")
 
     pack = rule_pack or get_rule_pack_for_template(template)
     if not pack:
-        raise ValueError(f"Template {template_id} has no validation rule pack.")
+        raise ValueError(
+            f"Template {template_id} does not have validation checks enabled. "
+            "Edit the template version, enable Data Quality (QoD), and set a validation rule pack."
+        )
 
-    aes = get_assignment_aes(template_id, entity_type, entity_id, period_name)
+    aes, resolved_period = resolve_assignment_aes(template_id, entity_type, entity_id, period_name)
     if aes is None:
-        return ValidationRunResult(skipped=1)
+        available = list_assignment_periods(template_id, entity_type, entity_id)
+        hint = ", ".join(available) if available else "none"
+        raise ValueError(
+            f"No assignment found for period '{period_name}'. Available periods: {hint}."
+        )
 
     version_id = template.published_version_id
     kpi_data = load_form_data_by_kpi(aes.id, template_id, version_id)
@@ -118,12 +132,12 @@ def run_validation_checks(
         template_id=template_id,
         entity_type=entity_type,
         entity_id=entity_id,
-        period_name=period_name,
+        period_name=resolved_period,
         rule_pack=pack,
         language=language,
         aes=aes,
         kpi_data=kpi_data,
-        history_by_kpi=_load_history(template_id, entity_type, entity_id, period_name, kpi_to_item),
+        history_by_kpi=_load_history(template_id, entity_type, entity_id, resolved_period, kpi_to_item),
         country_id=_resolve_country_id(entity_type, entity_id),
     )
 
@@ -133,7 +147,67 @@ def run_validation_checks(
         check_results = []
 
     drafts = _results_to_drafts(check_results, ctx)
-    return _upsert_questions(drafts, ctx, aes)
+    return ValidationEvaluationResult(
+        template_id=template_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        period_name=period_name,
+        resolved_period=resolved_period,
+        rule_pack=pack,
+        assignment_entity_status_id=aes.id,
+        kpi_data=kpi_data,
+        check_results=check_results,
+        drafts=drafts,
+    )
+
+
+def run_validation_checks(
+    template_id: int,
+    entity_type: str,
+    entity_id: int,
+    period_name: str,
+    *,
+    rule_pack: str | None = None,
+    language: str = "en",
+) -> ValidationRunResult:
+    evaluation = evaluate_validation_checks(
+        template_id,
+        entity_type,
+        entity_id,
+        period_name,
+        rule_pack=rule_pack,
+        language=language,
+    )
+    aes = AssignmentEntityStatus.query.get(evaluation.assignment_entity_status_id)
+    if aes is None:
+        raise ValueError(f"Assignment entity status {evaluation.assignment_entity_status_id} not found.")
+    ctx = _evaluation_to_context(evaluation, aes)
+    return _upsert_questions(evaluation.drafts, ctx, aes)
+
+
+def _evaluation_to_context(
+    evaluation: ValidationEvaluationResult,
+    aes: AssignmentEntityStatus,
+) -> ValidationContext:
+    kpi_to_item = {code: item for code, (_, item) in evaluation.kpi_data.items() if item}
+    return ValidationContext(
+        template_id=evaluation.template_id,
+        entity_type=evaluation.entity_type,
+        entity_id=evaluation.entity_id,
+        period_name=evaluation.resolved_period,
+        rule_pack=evaluation.rule_pack,
+        language="en",
+        aes=aes,
+        kpi_data=evaluation.kpi_data,
+        history_by_kpi=_load_history(
+            evaluation.template_id,
+            evaluation.entity_type,
+            evaluation.entity_id,
+            evaluation.resolved_period,
+            kpi_to_item,
+        ),
+        country_id=_resolve_country_id(evaluation.entity_type, evaluation.entity_id),
+    )
 
 
 def _results_to_drafts(results: list[CheckResult], ctx: ValidationContext) -> list[ValidationQuestionDraft]:

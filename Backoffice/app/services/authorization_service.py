@@ -824,6 +824,51 @@ class AuthorizationService:
         return has_entity_permission
 
     @staticmethod
+    def can_manage_closed_assignment(user) -> bool:
+        """Whether the user may edit assignments while the collection round is closed."""
+        if not user or not user.is_authenticated:
+            return False
+        if AuthorizationService.is_system_manager(user):
+            return True
+        return AuthorizationService.has_rbac_permission(user, "admin.assignments.edit")
+
+    @staticmethod
+    def _assignment_is_effectively_closed(assignment_entity_status: AssignmentEntityStatus) -> bool:
+        try:
+            round_closed = assignment_entity_status.is_round_closed_for_entity()
+            if isinstance(round_closed, bool):
+                return round_closed
+        except Exception:
+            pass
+        if getattr(assignment_entity_status, "reopened_after_close", False) is True:
+            return False
+        assigned_form = getattr(assignment_entity_status, "assigned_form", None)
+        if assigned_form is None:
+            return False
+        try:
+            return assigned_form.is_effectively_closed is True
+        except Exception:
+            return False
+
+    @staticmethod
+    def _assignment_needs_reopen(assignment_entity_status: AssignmentEntityStatus) -> bool:
+        from app.models.enums import AssignmentEntityStatusValue
+
+        status = assignment_entity_status.status
+        if hasattr(status, "value"):
+            status = status.value
+        if status in {
+            AssignmentEntityStatusValue.submitted.value,
+            AssignmentEntityStatusValue.approved.value,
+            AssignmentEntityStatusValue.requires_revision.value,
+            AssignmentEntityStatusValue.sent_for_review.value,
+        }:
+            return True
+        if AuthorizationService._assignment_is_effectively_closed(assignment_entity_status):
+            return getattr(assignment_entity_status, "reopened_after_close", False) is not True
+        return False
+
+    @staticmethod
     def can_edit_assignment(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
         """
         Check if user can edit an assignment based on status and role for any entity type.
@@ -841,6 +886,9 @@ class AuthorizationService:
         # Must have entity access first
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
             return False
+
+        if AuthorizationService._assignment_is_effectively_closed(assignment_entity_status):
+            return AuthorizationService.can_manage_closed_assignment(user)
 
         # System managers can edit any assignment
         if AuthorizationService.is_system_manager(user):
@@ -902,6 +950,9 @@ class AuthorizationService:
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
             return False
 
+        if AuthorizationService._assignment_is_effectively_closed(assignment_entity_status):
+            return False
+
         # System managers can always submit
         if AuthorizationService.is_system_manager(user):
             return True
@@ -953,6 +1004,9 @@ class AuthorizationService:
         if not user or not user.is_authenticated:
             return False
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
+            return False
+
+        if AuthorizationService._assignment_is_effectively_closed(assignment_entity_status):
             return False
 
         from app.models.enums import AssignmentEntityStatusValue
@@ -1093,7 +1147,10 @@ class AuthorizationService:
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
             return False
 
-        # System managers can always reopen
+        if not AuthorizationService._assignment_needs_reopen(assignment_entity_status):
+            return False
+
+        # System managers can always reopen when needed
         if AuthorizationService.is_system_manager(user):
             return True
 

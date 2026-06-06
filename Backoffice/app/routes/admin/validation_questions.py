@@ -15,18 +15,22 @@ from app.services.validation_dashboard_service import (
     template_options,
 )
 from app.services.validation_questions_excel_service import (
+    apply_manual_question_update,
     build_import_template_workbook,
     export_filename,
     export_questions_workbook,
+    form_item_labels_for_questions,
     import_question_updates,
     query_validation_questions,
+    serialize_validation_question_grid_row,
 )
+from app.services.validation_question_follow_up import create_follow_up, parent_ids_with_open_follow_up
+from app.services.validation_question_lifecycle import clear_answer_received, clear_review_state, mark_answer_received
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe
 from app.utils.file_parsing import EXCEL_EXTENSIONS
 from flask_wtf import FlaskForm
-from app.utils.datetime_helpers import utcnow
 from app.utils.request_validation import enforce_csrf_json
 
 
@@ -79,29 +83,98 @@ def validation_questions_list_api():
     )
     countries = {c.id: c.name for c in Country.query.all()}
     templates = {t.id: t.name for t in FormTemplate.query.all()}
+    row_ids = [r.id for r in rows]
+    blocked_follow_up_parents = parent_ids_with_open_follow_up(row_ids)
+    form_item_labels = form_item_labels_for_questions(rows)
+    payload_rows = [
+        serialize_validation_question_grid_row(
+            r,
+            countries=countries,
+            templates=templates,
+            form_item_labels=form_item_labels,
+            blocked_follow_up_parents=blocked_follow_up_parents,
+        )
+        for r in rows
+    ]
+    response, status = json_ok(rows=payload_rows)
+    response.headers["Cache-Control"] = "no-store"
+    return response, status
+
+
+@bp.route("/validation-questions/api/<int:question_id>/follow-up", methods=["POST"])
+@login_required
+@permission_required("admin.data_explore.compliance")
+def validation_questions_create_follow_up(question_id: int):
+    csrf_error = enforce_csrf_json()
+    if csrf_error:
+        return csrf_error
+    data = get_json_safe()
+    parent = ValidationQuestion.query.get_or_404(question_id)
+    try:
+        follow_up = create_follow_up(
+            parent,
+            question_text=data.get("question_text", ""),
+            definition_text=data.get("definition_text", ""),
+            severity=data.get("severity"),
+        )
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        db.session.rollback()
+        return json_server_error(str(exc))
+
+    db.session.commit()
     return json_ok(
-        rows=[
-            {
-                "id": r.id,
-                "template_id": r.template_id,
-                "template_name": templates.get(r.template_id, ""),
-                "entity_type": r.entity_type,
-                "entity_id": r.entity_id,
-                "entity_name": countries.get(r.entity_id) if r.entity_type == "country" else f"{r.entity_type}:{r.entity_id}",
-                "period_name": r.period_name,
-                "rule_code": r.rule_code,
-                "severity": r.severity,
-                "status": r.status,
-                "question_text": r.question_text,
-                "definition_text": r.definition_text,
-                "answer_text": r.answer_text,
-                "answered_at": r.answered_at.isoformat() if r.answered_at else None,
-                "sent_at": r.sent_at.isoformat() if r.sent_at else None,
-                "source": r.source,
-                "form_item_id": r.form_item_id,
-            }
-            for r in rows
-        ]
+        id=follow_up.id,
+        parent_question_id=follow_up.parent_question_id,
+        follow_up_round=follow_up.follow_up_round,
+        status=follow_up.status,
+        question_text=follow_up.question_text,
+    )
+
+
+@bp.route("/validation-questions/api/<int:question_id>", methods=["POST"])
+@login_required
+@permission_required("admin.data_explore.compliance")
+def validation_questions_update(question_id: int):
+    csrf_error = enforce_csrf_json()
+    if csrf_error:
+        return csrf_error
+    data = get_json_safe()
+    question = ValidationQuestion.query.get_or_404(question_id)
+    try:
+        apply_manual_question_update(
+            question,
+            question_text=data.get("question_text", ""),
+            definition_text=data.get("definition_text", ""),
+            status=data.get("status", ""),
+            answer_text=data.get("answer_text", ""),
+            severity=data.get("severity", question.severity),
+            answer_outcome=data.get("answer_outcome"),
+            updated_by_user_id=current_user.id,
+        )
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        db.session.rollback()
+        return json_server_error(str(exc))
+
+    db.session.commit()
+    return json_ok(
+        id=question.id,
+        status=question.status,
+        severity=question.severity,
+        question_text=question.question_text,
+        definition_text=question.definition_text,
+        answer_text=question.answer_text,
+        answer_outcome=question.answer_outcome,
+        answered_at=question.answered_at.isoformat() if question.answered_at else None,
+        changes_made_approved_at=question.changes_made_approved_at.isoformat()
+        if question.changes_made_approved_at
+        else None,
+        no_changes_approved_at=question.no_changes_approved_at.isoformat()
+        if question.no_changes_approved_at
+        else None,
     )
 
 
@@ -125,12 +198,16 @@ def validation_questions_update_status(question_id: int):
             return json_bad_request("answer_text is required when status is answered")
         if answer_text:
             question.answer_text = answer_text
-        question.answered_at = utcnow()
-        question.answered_by_user_id = current_user.id
+        if not question.answered_at:
+            mark_answer_received(question, user_id=current_user.id)
+        else:
+            question.answered_by_user_id = current_user.id
     elif status == "open":
         question.answer_text = None
-        question.answered_at = None
-        question.answered_by_user_id = None
+        clear_answer_received(question)
+        clear_review_state(question)
+    elif status == "waived":
+        clear_review_state(question)
     db.session.commit()
     return json_ok(id=question.id, status=question.status)
 

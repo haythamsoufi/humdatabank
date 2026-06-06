@@ -428,11 +428,16 @@
                     const pinned = this.isSelectionCheckboxColumn(column)
                         ? null
                         : this.resolvePinnedForApply(colDef, saved);
+                    var width = saved.width || colDef.width;
+                    var minW = colDef.minWidth;
+                    if (minW && (!width || width < minW)) {
+                        width = minW;
+                    }
                     columnState.push({
                         colId: field,
                         hide: !saved.visible,
                         pinned: pinned,
-                        width: saved.width || colDef.width,
+                        width: width,
                         sort: saved.sort || null,
                         sortIndex: saved.sortIndex !== undefined ? saved.sortIndex : null
                     });
@@ -445,6 +450,9 @@
                     applyOrder: true
                 });
                 this.ensureSelectionColumnFirst();
+                if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.enforceColumnMinWidths === 'function') {
+                    AgGridHelper.enforceColumnMinWidths(apiToUse);
+                }
             }
         } catch (e) {
             console.warn('Failed to apply column state:', e);

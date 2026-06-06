@@ -83,12 +83,13 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                     )
                 )
 
+        fired_indicator_not_reported = False
         if kpi_code in NON_ZERO_KPI_CODES:
-            nv = numeric_value(entry)
-            if nv is not None and nv == 0:
+            if not is_reported_value(entry):
+                fired_indicator_not_reported = True
                 results.append(
                     CheckResult(
-                        rule_code="non_zero",
+                        rule_code="indicator_not_reported",
                         form_item_id=item.id if item else None,
                         fired=True,
                         severity="warning",
@@ -127,7 +128,7 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                     )
 
         prior = ctx.history_by_kpi.get(kpi_code, {}).get((year - 1) if year else 0)
-        if year and prior and prior != 0 and not is_reported_value(entry):
+        if year and prior and prior != 0 and not is_reported_value(entry) and not fired_indicator_not_reported:
             results.append(
                 CheckResult(
                     rule_code="not_reported",

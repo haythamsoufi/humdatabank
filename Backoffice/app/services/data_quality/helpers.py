@@ -182,6 +182,39 @@ def list_assignment_periods(
     return sorted(periods, key=_sort_key, reverse=True)
 
 
+def list_exploration_period_names(template_id: int | None = None) -> list[str]:
+    """
+    Distinct reporting periods for Data Explorer filters.
+
+    Includes all assignment lifecycle states (active, closed, deactivated) and
+    any period that still has saved FormData rows.
+    """
+    from sqlalchemy import union
+
+    af_q = db.session.query(AssignedForm.period_name.label("period_name")).filter(
+        AssignedForm.period_name.isnot(None),
+    )
+    if template_id is not None:
+        af_q = af_q.filter(AssignedForm.template_id == int(template_id))
+
+    fd_q = (
+        db.session.query(AssignedForm.period_name.label("period_name"))
+        .join(
+            AssignmentEntityStatus,
+            AssignmentEntityStatus.assigned_form_id == AssignedForm.id,
+        )
+        .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
+        .filter(AssignedForm.period_name.isnot(None))
+    )
+    if template_id is not None:
+        fd_q = fd_q.filter(AssignedForm.template_id == int(template_id))
+
+    combined = union(af_q, fd_q).subquery()
+    rows = db.session.query(combined.c.period_name).distinct().all()
+    periods = [r[0] for r in rows if r[0]]
+    return sorted(periods, key=lambda p: (parse_period_year(p) or 0, p), reverse=True)
+
+
 def resolve_assignment_aes(
     template_id: int,
     entity_type: str,

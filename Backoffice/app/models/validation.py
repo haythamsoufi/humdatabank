@@ -33,9 +33,18 @@ class ValidationQuestion(db.Model):
 
     source = db.Column(db.String(16), nullable=False, default="auto")
     asked_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    drafted_at = db.Column(db.DateTime, nullable=True)
     answered_at = db.Column(db.DateTime, nullable=True)
     answered_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     answer_text = db.Column(db.Text, nullable=True)
+    answer_outcome = db.Column(db.String(32), nullable=True)
+    changes_made_approved_at = db.Column(db.DateTime, nullable=True)
+    no_changes_approved_at = db.Column(db.DateTime, nullable=True)
+
+    parent_question_id = db.Column(
+        db.Integer, db.ForeignKey("validation_question.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    follow_up_round = db.Column(db.Integer, nullable=False, default=0)
 
     dispatch_batch_id = db.Column(
         db.Integer, db.ForeignKey("validation_dispatch_batch.id", ondelete="SET NULL"), nullable=True
@@ -46,6 +55,12 @@ class ValidationQuestion(db.Model):
     template = db.relationship("FormTemplate", foreign_keys=[template_id])
     form_item = db.relationship("FormItem", foreign_keys=[form_item_id])
     answered_by_user = db.relationship("User", foreign_keys=[answered_by_user_id])
+    parent_question = db.relationship(
+        "ValidationQuestion",
+        remote_side=[id],
+        foreign_keys=[parent_question_id],
+        backref=db.backref("follow_up_questions", lazy="dynamic"),
+    )
 
     __table_args__ = (
         db.Index(

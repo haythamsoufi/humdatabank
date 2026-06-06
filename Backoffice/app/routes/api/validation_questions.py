@@ -5,9 +5,9 @@ from flask_login import login_required, current_user
 
 from app import db
 from app.models.validation import ValidationQuestion
+from app.services.validation_question_lifecycle import clear_answer_received, clear_review_state, mark_answer_received
 from app.routes.api import api_bp
 from app.utils.api_helpers import json_response, api_error, get_json_safe
-from app.utils.datetime_helpers import utcnow
 from app.utils.request_validation import enforce_csrf_json
 
 
@@ -54,6 +54,8 @@ def list_validation_questions():
                     "form_item_id": r.form_item_id,
                     "answer_text": r.answer_text,
                     "sent_at": r.sent_at.isoformat() if r.sent_at else None,
+                    "parent_question_id": r.parent_question_id,
+                    "follow_up_round": r.follow_up_round or 0,
                 }
                 for r in rows
             ]
@@ -76,8 +78,7 @@ def answer_validation_question(question_id: int):
 
     question.answer_text = answer_text
     question.status = "answered"
-    question.answered_at = utcnow()
-    question.answered_by_user_id = current_user.id
+    mark_answer_received(question, user_id=current_user.id)
     db.session.commit()
 
     return json_response({"success": True, "id": question.id, "status": question.status})

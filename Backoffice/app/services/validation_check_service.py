@@ -27,6 +27,7 @@ from app.services.validation.types import (
     ValidationQuestionDraft,
     ValidationRunResult,
 )
+from app.services.validation_question_lifecycle import mark_drafted
 from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
 from app.utils.datetime_helpers import utcnow
 
@@ -156,6 +157,7 @@ def evaluate_validation_checks(
         rule_pack=pack,
         assignment_entity_status_id=aes.id,
         kpi_data=kpi_data,
+        history_by_kpi=ctx.history_by_kpi,
         check_results=check_results,
         drafts=drafts,
     )
@@ -254,7 +256,7 @@ def _upsert_questions(
             rule_code=draft.rule_code,
             form_item_id=draft.form_item_id,
             status="open",
-        ).first()
+        ).filter(ValidationQuestion.parent_question_id.is_(None)).first()
 
         if existing:
             existing.question_text = draft.question_text
@@ -262,8 +264,10 @@ def _upsert_questions(
             existing.severity = draft.severity
             existing.context = draft.context
             existing.language = draft.language
+            mark_drafted(existing)
             result.updated += 1
         else:
+            created_at = utcnow()
             db.session.add(
                 ValidationQuestion(
                     template_id=ctx.template_id,
@@ -281,6 +285,8 @@ def _upsert_questions(
                     context=draft.context,
                     language=draft.language,
                     source="auto",
+                    asked_at=created_at,
+                    drafted_at=created_at,
                 )
             )
             result.created += 1
@@ -292,7 +298,7 @@ def _upsert_questions(
         period_name=ctx.period_name,
         status="open",
         source="auto",
-    ).all()
+    ).filter(ValidationQuestion.parent_question_id.is_(None)).all()
 
     for q in open_questions:
         if (q.rule_code, q.form_item_id) not in draft_keys:

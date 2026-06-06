@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container, ag_grid_page_config %}
 
 {% block title %}{{ _('Validation Dashboard') }} — {{ _('Admin') }}{% endblock %}
@@ -7,13 +8,14 @@
 {% block head %}
     {{ super() }}
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="stylesheet" href="{{ static_url('css/validation-dashboard.css') }}">
 {% endblock %}
 
 {% block content %}
 
 {{ page_header(
     title=_('Validation Dashboard'),
-    subtitle=_('Review automatic validation flags and indicator values, then generate questions for focal points.'),
+    subtitle=_('Monitor automatic validation flags, compare historical values, and generate questions for focal points.'),
     icon='fas fa-chart-line',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
@@ -33,55 +35,73 @@
 
 <div id="vd-feedback" class="hidden mb-4 rounded-md px-4 py-3 text-sm border" role="status" aria-live="polite"></div>
 
-<div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6 mb-6">
-    <h2 class="text-lg font-semibold text-ifrc-navy mb-4">{{ _('Scope') }}</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <div>
-            <label for="vd-template" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Template') }}</label>
-            <select id="vd-template" class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md text-sm">
-                <option value="">{{ _('Select template') }}</option>
-                {% for t in template_options %}
-                <option value="{{ t.id }}">{{ t.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label for="vd-period" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Reporting period') }}</label>
-            <select id="vd-period" class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md text-sm" disabled>
-                <option value="">{{ _('Select template first') }}</option>
-            </select>
-        </div>
-        <div>
-            <label for="vd-country" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Country') }}</label>
-            <select id="vd-country" class="w-full px-3 py-2 border border-ifrc-gray-300 rounded-md text-sm" disabled>
-                <option value="">{{ _('Load dashboard first') }}</option>
-            </select>
-        </div>
-        <div class="flex items-end">
-            <button type="button" id="vd-load" class="btn btn-primary w-full md:w-auto">
-                <i class="fas fa-search mr-2" aria-hidden="true"></i>{{ _('Load dashboard') }}
-            </button>
-        </div>
-    </div>
-    <div class="flex flex-wrap gap-3 pt-4 border-t border-ifrc-gray-100">
-        <button type="button" id="vd-generate-country" class="btn btn-primary" disabled>
-            <i class="fas fa-magic mr-2" aria-hidden="true"></i>{{ _('Generate questions (selected country)') }}
+<div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 mb-6">
+    {% if template_options %}
+    {% call scroll_tab_bar(inner_id='vd-template-tabs', aria_label=_('Templates')) %}
+        {% for tmpl in template_options %}
+        <button type="button" role="tab"
+                class="vd-template-tab {{ admin_underline_tab_btn_classes(loop.first) }}"
+                data-template-id="{{ tmpl.id }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}">
+            {{ tmpl.name }}
         </button>
-        <button type="button" id="vd-generate-all" class="btn btn-secondary" disabled>
-            <i class="fas fa-layer-group mr-2" aria-hidden="true"></i>{{ _('Generate for all countries') }}
-        </button>
-        <button type="button" id="vd-send" class="btn btn-warning" disabled>
-            <i class="fas fa-paper-plane mr-2" aria-hidden="true"></i>{{ _('Send open questions (selected country)') }}
-        </button>
-    </div>
-</div>
+        {% endfor %}
+    {% endcall %}
+    <input type="hidden" id="vd-template" value="{{ template_options[0].id }}">
+    {% else %}
+    <div class="p-6 text-sm text-ifrc-gray-600">{{ _('No templates with validation checks enabled.') }}</div>
+    {% endif %}
 
-<div class="mb-6">
-    <h3 class="text-md font-semibold text-ifrc-navy mb-2">
-        {{ _('Indicators & automatic flags') }}
-        <span id="vd-selected-country" class="text-sm font-normal text-ifrc-gray-500"></span>
-    </h3>
-    {{ ag_grid_container('validationIndicatorsGrid', loading_text=_('Select a country to preview flags…'), grid_height='560px', placeholder_id='vd-indicators-col-vis', include_card=false) }}
+    <div class="p-6{% if not template_options %} hidden{% endif %}">
+        {# Toolbar: scope, view options, summary & actions #}
+        <div class="vd-toolbar mb-6 pb-6 border-b border-ifrc-gray-100">
+            <div class="vd-toolbar-row">
+                <div class="vd-field vd-field-period">
+                    <label for="vd-period" class="vd-field-label">{{ _('Reporting period') }}</label>
+                    <select id="vd-period" class="vd-select"{% if template_options %} disabled{% endif %}>
+                        <option value="">{{ _('Loading periods…') if template_options else _('Select template first') }}</option>
+                    </select>
+                </div>
+                <div class="vd-field vd-field-country">
+                    <label for="vd-country" class="vd-field-label">{{ _('Country') }}</label>
+                    <select id="vd-country" class="vd-select" disabled>
+                        <option value="">{{ _('Loading countries…') }}</option>
+                    </select>
+                </div>
+                <div class="vd-toolbar-options" role="group" aria-label="{{ _('View options') }}">
+                    <label class="vd-toggle">
+                        <input type="checkbox" id="vd-show-historical">
+                        <span>{{ _('Show last 3 years') }}</span>
+                    </label>
+                    <label class="vd-toggle">
+                        <input type="checkbox" id="vd-flagged-only">
+                        <span>{{ _('Flagged indicators only') }}</span>
+                    </label>
+                </div>
+                <div class="vd-flags-stat" aria-live="polite">
+                    <span class="vd-flags-stat-icon" aria-hidden="true"><i class="fas fa-flag"></i></span>
+                    <div class="vd-flags-stat-text">
+                        <span id="vd-kpi-flags" class="vd-flags-stat-value">—</span>
+                        <span class="vd-flags-stat-label">{{ _('Automatic flags') }}</span>
+                    </div>
+                </div>
+                <div class="vd-action-buttons">
+                    <button type="button" id="vd-generate-country" class="btn btn-primary" disabled>
+                        <i class="fas fa-magic mr-2" aria-hidden="true"></i>{{ _('Generate questions') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {# Indicator flags grid #}
+        <div>
+            <h3 class="text-md font-semibold text-ifrc-navy mb-2">
+                <i class="fas fa-flag mr-1.5 text-red-400" aria-hidden="true"></i>
+                {{ _('Indicators & automatic flags') }}
+            </h3>
+            {{ ag_grid_container('validationIndicatorsGrid', loading_text=_('Loading indicator flags…'), grid_height='480px', placeholder_id='vd-indicators-col-vis', include_card=false) }}
+        </div>
+    </div>
 </div>
 
 {% set vd_grid_bootstrap = {
@@ -89,24 +109,30 @@
     'countriesUrl': url_for('admin.validation_dashboard_countries_api'),
     'previewUrl': url_for('admin.validation_dashboard_preview_api'),
     'runChecksUrl': url_for('admin.validation_dashboard_run_checks'),
-    'sendUrl': url_for('admin.validation_dashboard_dispatch_send'),
     'translations': {
         'country': _('Country'),
         'period': _('Period'),
         'indicator': _('Indicator'),
-        'kpiCode': _('KPI code'),
         'value': _('Value'),
-        'flagged': _('Flagged'),
-        'rule': _('Rule'),
+        'priorValue': _('Prior year'),
+        'historicalValues': _('Historical'),
+        'automaticCheck': _('Automatic check'),
         'severity': _('Severity'),
+        'questionStatus': _('Question status'),
+        'sent': _('Sent'),
+        'answer': _('Answer'),
+        'statusOpen': _('Open'),
+        'statusAnswered': _('Answered'),
+        'statusWaived': _('Waived'),
+        'statusResolved': _('Resolved'),
+        'notGenerated': _('Not generated'),
+        'notSent': _('Not sent'),
+        'answerReceived': _('Answer received'),
         'questionPreview': _('Question preview'),
-        'selectTemplatePeriod': _('Select a template and period, then click Load dashboard.'),
-        'selectCountry': _('Select a country to preview indicator flags.'),
+        'selectTemplatePeriod': _('Select a template and reporting period.'),
         'loadFailed': _('Failed to load dashboard data'),
         'previewFailed': _('Failed to load indicator preview'),
         'generateConfirm': _('Generate validation questions for the selected scope?'),
-        'generateAllConfirm': _('Generate validation questions for all countries in this period?'),
-        'sendConfirm': _('Send open validation questions to focal points for the selected country?'),
     }
 } %}
 {{ ag_grid_page_config('validationDashboardConfig', 'VD_GRID_TRANSLATIONS', vd_grid_bootstrap) }}

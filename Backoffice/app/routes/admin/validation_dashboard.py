@@ -12,6 +12,7 @@ from app.services.validation_dashboard_service import (
     global_periods_for_template,
     list_countries_for_period,
     preview_country_validation,
+    summarize_period,
     template_options,
 )
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
@@ -48,6 +49,17 @@ def validation_dashboard_countries_api():
     if not template_id or not period:
         return json_bad_request("template_id and period are required")
     return json_ok(countries=list_countries_for_period(template_id, period))
+
+
+@bp.route("/validation-dashboard/api/summary", methods=["GET"])
+@login_required
+@permission_required("admin.data_explore.compliance")
+def validation_dashboard_summary_api():
+    template_id = request.args.get("template_id", type=int)
+    period = request.args.get("period", type=str)
+    if not template_id or not period:
+        return json_bad_request("template_id and period are required")
+    return json_ok(**summarize_period(template_id, period))
 
 
 @bp.route("/validation-dashboard/api/preview", methods=["GET"])

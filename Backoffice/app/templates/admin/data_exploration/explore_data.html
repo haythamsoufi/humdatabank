@@ -1798,10 +1798,12 @@
 
     // Function to build API URL with parameters (optimized - using /data/tables for better performance)
     function buildApiUrl() {
+        // Session auth returns all accessible rows when per_page is omitted so Analysis
+        // covers every period (including closed/deactivated assignments), not just the
+        // most recently submitted slice.
         const params = new URLSearchParams({
-            per_page: '10000',
             disagg: 'true',
-            related: 'page'  // Only load related data for current page (faster)
+            related: 'all'
         });
 
         const templateId = domCache.templateFilter?.value;
@@ -1937,8 +1939,9 @@
             });
 
             // Update data count (total and filtered - initially the same)
-            totalRowCount = enrichedData.length;
-            updateRecordCountDisplay(totalRowCount, totalRowCount);
+            const apiTotalItems = Number.isFinite(result.total_items) ? result.total_items : enrichedData.length;
+            totalRowCount = apiTotalItems;
+            updateRecordCountDisplay(enrichedData.length, totalRowCount);
             if (domCache.dataInfo) domCache.dataInfo.style.display = 'block';
 
             if (enrichedData.length === 0) {

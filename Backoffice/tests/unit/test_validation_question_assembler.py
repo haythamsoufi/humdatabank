@@ -9,14 +9,14 @@ from app.services.validation.types import CheckResult
 def test_lookup_template_text_fallback():
     with patch("app.services.validation.question_assembler.ValidationQuestionTemplate") as mock_tpl:
         mock_tpl.query.filter_by.return_value.first.return_value = None
-        text, needs_suffix = lookup_template_text("non_zero", "en", "fdrs_matrix_v1")
-    assert "non zero" in text.lower()
+        text, needs_suffix = lookup_template_text("indicator_not_reported", "en", "fdrs_matrix_v1")
+    assert "not reported" in text.lower()
     assert needs_suffix is False
 
 
 def test_assemble_question_picks_highest_severity():
     results = [
-        CheckResult(rule_code="non_zero", form_item_id=1, fired=True, severity="warning"),
+        CheckResult(rule_code="indicator_not_reported", form_item_id=1, fired=True, severity="warning"),
         CheckResult(rule_code="higher_than_pop", form_item_id=1, fired=True, severity="error", context={"population": 1000}),
     ]
     template_row = MagicMock()

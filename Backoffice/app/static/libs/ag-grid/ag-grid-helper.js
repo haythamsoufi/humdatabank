@@ -195,6 +195,13 @@
         this._hasSizedColumnsToFit = false;
     }
 
+    /** Options consumed by AgGridHelper only — not passed to AG Grid. */
+    var HELPER_ONLY_GRID_OPTIONS = [
+        'sizeColumnsToFitOnInit',
+        'sizeColumnsToFitOnRefresh',
+        'sizeColumnsToFitOnColumnChange'
+    ];
+
     /**
      * Grid options that allow selecting/copying cell text (AG Grid defaults block this).
      * Merged into AgGridHelper defaults; use when calling agGrid.createGrid() directly.
@@ -356,6 +363,10 @@
 
         // Deep merge for nested objects
         const merged = Object.assign({}, defaults, custom);
+
+        HELPER_ONLY_GRID_OPTIONS.forEach(function(key) {
+            delete merged[key];
+        });
 
         // Deep merge defaultColDef
         if (custom.defaultColDef) {
@@ -1886,6 +1897,7 @@
                     if (shouldSizeToFit) {
                         apiToUse.sizeColumnsToFit();
                         self._hasSizedColumnsToFit = true;
+                        AgGridHelper.enforceColumnMinWidths(apiToUse);
                     }
                 } catch (e) {
                     // Non-fatal
@@ -2766,6 +2778,7 @@
                     if (shouldSizeToFit) {
                         apiToUse.sizeColumnsToFit();
                         self._hasSizedColumnsToFit = true;
+                        AgGridHelper.enforceColumnMinWidths(apiToUse);
                     }
                 } catch (e) {
                     // Non-fatal
@@ -3629,6 +3642,12 @@
             }
         }, gridOptions);
 
+        HELPER_ONLY_GRID_OPTIONS.forEach(function(key) {
+            if (options[key] !== undefined) {
+                mergedGridOptions[key] = options[key];
+            }
+        });
+
         // Merge default column visibility options
         var mergedColumnVisibility = Object.assign({
             persistOnChange: true,
@@ -3687,6 +3706,7 @@
                     typeof helper.columnVisibilityManager.finishInitialColumnState === 'function') {
                     helper.columnVisibilityManager.finishInitialColumnState();
                 }
+                AgGridHelper.enforceColumnMinWidths(api);
             }, 100);
         }
 
@@ -3738,6 +3758,45 @@
 
             checkContainer();
         });
+    };
+
+    /**
+     * Ensure no column is narrower than its colDef minWidth (or width when minWidth is unset).
+     * Useful after sizeColumnsToFit or restoring saved column widths from localStorage.
+     *
+     * @param {Object} gridApi - AG Grid API instance
+     */
+    AgGridHelper.enforceColumnMinWidths = function(gridApi) {
+        if (!gridApi || typeof gridApi.getColumns !== 'function') {
+            return;
+        }
+
+        var columns = gridApi.getColumns();
+        if (!columns || !columns.length) {
+            return;
+        }
+
+        var state = [];
+        columns.forEach(function(col) {
+            var def = col.getColDef();
+            var minW = def.minWidth || def.width;
+            if (!minW) {
+                return;
+            }
+            if (col.getActualWidth() < minW) {
+                state.push({ colId: col.getColId(), width: minW });
+            }
+        });
+
+        if (!state.length || typeof gridApi.applyColumnState !== 'function') {
+            return;
+        }
+
+        try {
+            gridApi.applyColumnState({ state: state });
+        } catch (e) {
+            console.warn('AgGridHelper: enforceColumnMinWidths failed:', e);
+        }
     };
 
     /**

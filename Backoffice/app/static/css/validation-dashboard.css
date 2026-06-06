@@ -1,0 +1,214 @@
+/* Validation dashboard — toolbar, KPI, grid helpers */
+
+/* Multiline Question/Answer cells — override global flex centering that hides wrapped text */
+#validationQuestionsGrid .ag-cell.vq-multiline-cell,
+#validationQuestionsGrid .ag-cell.vq-multiline-cell .ag-cell-value,
+#validationIndicatorsGrid .ag-cell.vd-multiline-cell,
+#validationIndicatorsGrid .ag-cell.vd-multiline-cell .ag-cell-value {
+    display: block !important;
+    align-items: flex-start !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    height: auto !important;
+}
+
+#validationQuestionsGrid .ag-cell.vq-multiline-cell .ag-cell-wrapper,
+#validationIndicatorsGrid .ag-cell.vd-multiline-cell .ag-cell-wrapper {
+    align-items: flex-start !important;
+    height: auto !important;
+}
+
+.vq-multiline-text,
+.vd-multiline-text {
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+    width: 100%;
+}
+
+.vd-chart-wrap {
+    position: relative;
+    height: 220px;
+    width: 100%;
+}
+
+.vd-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem 1rem;
+}
+
+.vd-field-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgb(55 65 81);
+    margin-bottom: 0.25rem;
+}
+
+.vd-select {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.375rem;
+    background: rgb(255 255 255);
+    color: rgb(17 24 39);
+}
+
+.vd-field-period {
+    width: 7.5rem;
+    flex-shrink: 0;
+}
+
+.vd-field-country {
+    flex: 1 1 10rem;
+    min-width: 9rem;
+    max-width: 16rem;
+}
+
+.vd-toolbar-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem 1rem;
+    padding: 0.5rem 0.875rem;
+    background: rgb(249 250 251);
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.5rem;
+    flex-shrink: 0;
+}
+
+.vd-flags-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vd-flags-stat-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: rgb(254 242 242);
+    color: rgb(220 38 38);
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.vd-flags-stat-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.vd-flags-stat-label {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: rgb(107 114 128);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.vd-flags-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: rgb(220 38 38);
+    line-height: 1.1;
+}
+
+.vd-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+}
+
+.vd-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: rgb(55 65 81);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.vd-toggle input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: rgb(37 99 235);
+    flex-shrink: 0;
+}
+
+.vd-ag-row-flagged .ag-cell {
+    background-color: rgb(254 242 242) !important;
+}
+
+.vd-ag-row-selected-country .ag-cell {
+    background-color: rgb(239 246 255) !important;
+}
+
+#validationCountriesGrid .ag-row {
+    cursor: pointer;
+}
+
+/* Wide screens: single toolbar row */
+@media (min-width: 1280px) {
+    .vd-toolbar-row {
+        flex-wrap: nowrap;
+        gap: 0.875rem 1rem;
+    }
+
+    .vd-field-country {
+        flex: 0 1 14rem;
+        max-width: 14rem;
+    }
+
+    .vd-flags-stat {
+        padding-left: 0.875rem;
+        border-left: 1px solid rgb(229 231 235);
+    }
+
+    .vd-flags-stat-text {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 0.375rem;
+    }
+
+    .vd-action-buttons {
+        margin-left: auto;
+    }
+}
+
+@media (max-width: 767px) {
+    .vd-field-country {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+
+    .vd-toolbar-options {
+        width: 100%;
+    }
+
+    .vd-flags-stat {
+        width: 100%;
+        padding-top: 0.25rem;
+        border-top: 1px solid rgb(243 244 246);
+    }
+
+    .vd-action-buttons {
+        width: 100%;
+    }
+}

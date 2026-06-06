@@ -27,6 +27,7 @@ from app.services.data_quality.helpers import (
     build_compliance_document_lookups,
     compliance_doc_status_counts_toward_requirement,
     fdrs_compliance_doc_label_matches,
+    list_exploration_period_names,
 )
 from flask_babel import gettext as _
 import json
@@ -128,16 +129,8 @@ def explore_data():
         # Note: published_version is already eager-loaded, avoiding N+1 queries
         templates.sort(key=lambda t: t.name if t.name else "")
 
-        # Optimize period names query - use distinct on column directly
-        # This is more efficient than selecting tuples and extracting
-        period_names = (
-            db.session.query(distinct(AssignedForm.period_name))
-            .filter(AssignedForm.period_name.isnot(None))
-            .order_by(AssignedForm.period_name.desc())
-            .all()
-        )
-        # Extract from single-element tuples more efficiently
-        period_names = [p[0] for p in period_names if p[0]]
+        # All periods with assignments or saved data (closed/deactivated included).
+        period_names = list_exploration_period_names()
 
         # Get all countries for filter dropdown
         countries = Country.query.order_by(Country.name).all()
@@ -316,14 +309,8 @@ def get_assignment_filters_for_template():
         if not template:
             return json_not_found('Template not found')
 
-        # Distinct period names for this template's assignments
-        period_names = (
-            db.session.query(distinct(AssignedForm.period_name))
-            .filter(AssignedForm.template_id == template_id, AssignedForm.period_name.isnot(None))
-            .order_by(AssignedForm.period_name.desc())
-            .all()
-        )
-        period_names = [p[0] for p in period_names if p[0]]
+        # All periods for this template (closed/deactivated assignments and saved data included).
+        period_names = list_exploration_period_names(template_id)
 
         # Distinct countries for this template (via AssignmentEntityStatus where entity_type='country')
         countries_query = (
@@ -825,17 +812,8 @@ def get_compliance_data():
         # Get reference year from query params (optional)
         reference_year = request.args.get('reference_year', type=int)
 
-        # Get all available periods for FDRS template
-        all_periods_query = (
-            db.session.query(distinct(AssignedForm.period_name))
-            .filter(
-                AssignedForm.template_id == FDRS_TEMPLATE_ID,
-                AssignedForm.period_name.isnot(None)
-            )
-            .order_by(AssignedForm.period_name.desc())
-            .all()
-        )
-        all_periods = [p[0] for p in all_periods_query if p[0]]
+        # All FDRS periods (closed/deactivated assignments and saved data included).
+        all_periods = list_exploration_period_names(FDRS_TEMPLATE_ID)
 
         # Extract available years from period names (assuming format like "2024" or "2024-2025")
         available_years = set()
@@ -1053,17 +1031,8 @@ def download_compliance_excel():
         # Get reference year from query params (optional)
         reference_year = request.args.get('reference_year', type=int)
 
-        # Get all available periods for FDRS template
-        all_periods_query = (
-            db.session.query(distinct(AssignedForm.period_name))
-            .filter(
-                AssignedForm.template_id == FDRS_TEMPLATE_ID,
-                AssignedForm.period_name.isnot(None)
-            )
-            .order_by(AssignedForm.period_name.desc())
-            .all()
-        )
-        all_periods = [p[0] for p in all_periods_query if p[0]]
+        # All FDRS periods (closed/deactivated assignments and saved data included).
+        all_periods = list_exploration_period_names(FDRS_TEMPLATE_ID)
 
         # If reference_year is provided, filter periods to those containing that year or earlier (up to 3 years back)
         if reference_year:

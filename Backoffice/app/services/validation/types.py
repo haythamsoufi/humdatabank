@@ -48,5 +48,6 @@ class ValidationEvaluationResult:
     rule_pack: str
     assignment_entity_status_id: int | None = None
     kpi_data: dict = field(default_factory=dict)
+    history_by_kpi: dict[str, dict[int, float]] = field(default_factory=dict)
     check_results: list[CheckResult] = field(default_factory=list)
     drafts: list[ValidationQuestionDraft] = field(default_factory=list)

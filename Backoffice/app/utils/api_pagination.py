@@ -11,6 +11,21 @@ from app import db
 from app.models import FormData, PublicSubmission
 from app.utils.api_helpers import MAX_PER_PAGE, DEFAULT_PER_PAGE, DEFAULT_PAGE
 
+# SQL Server allows at most 2100 bound parameters per query; keep IN batches below that.
+SQL_IN_BATCH_SIZE = 2000
+
+
+def query_filter_in_batches(base_query, column, ids, batch_size=SQL_IN_BATCH_SIZE):
+    """Run base_query.filter(column.in_(batch)) in chunks to avoid DB parameter limits."""
+    if not ids:
+        return []
+    unique_ids = list(dict.fromkeys(ids))
+    rows = []
+    for offset in range(0, len(unique_ids), batch_size):
+        batch = unique_ids[offset:offset + batch_size]
+        rows.extend(base_query.filter(column.in_(batch)).all())
+    return rows
+
 
 def validate_pagination_params(request_args, default_per_page=None, max_per_page=None):
     """
@@ -319,18 +334,13 @@ def fetch_paginated_rows(assigned_form_data_query, public_form_data_query, page_
     assigned_rows = []
     public_rows = []
     if assigned_ids:
-        # Query already has eager loading from query_form_data, just filter by IDs
-        assigned_rows = (
-            assigned_form_data_query
-            .filter(FormData.id.in_(assigned_ids))
-            .all()
+        # Query already has eager loading from query_form_data; batch IDs for SQL Server limits.
+        assigned_rows = query_filter_in_batches(
+            assigned_form_data_query, FormData.id, assigned_ids
         )
     if public_ids:
-        # Query already has eager loading from query_form_data, just filter by IDs
-        public_rows = (
-            public_form_data_query
-            .filter(FormData.id.in_(public_ids))
-            .all()
+        public_rows = query_filter_in_batches(
+            public_form_data_query, FormData.id, public_ids
         )
 
     assigned_map = {row.id: row for row in assigned_rows}

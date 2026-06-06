@@ -26,8 +26,9 @@ from app.utils.api_serialization import format_country_info, format_form_item_in
 from app.services.security.api_authentication import authenticate_api_request, get_user_allowed_template_ids, apply_user_template_scoping
 from app.utils.api_pagination import (
     parse_date_range, get_sort_params, validate_data_endpoint_params,
+    validate_pagination_params,
     build_pagination_queries, get_paginated_data_ids, fetch_paginated_rows,
-    build_paginated_response
+    build_paginated_response, query_filter_in_batches,
 )
 from app.utils.form_localization import get_translation_key
 from app.utils.api_formatting import format_answer_value, format_form_data_response, serialize_form_data_item
@@ -78,11 +79,13 @@ def _resolve_matrix_entity_labels(form_item_id_to_prefix_ids, form_items_orm_lis
         matrix_config = config.get('matrix_config') if isinstance(config, dict) else config
         if not isinstance(matrix_config, dict):
             continue
-        row_mode = (matrix_config.get('row_mode') or '').strip().lower()
+        row_mode = str(matrix_config.get('row_mode') or '').strip().lower()
         if row_mode != 'list_library':
             continue
-        lookup_list_id = (matrix_config.get('lookup_list_id') or matrix_config.get('_table') or '').strip()
-        display_column = (matrix_config.get('list_display_column') or matrix_config.get('display_column') or 'name').strip() or 'name'
+        lookup_raw = matrix_config.get('lookup_list_id') or matrix_config.get('_table') or ''
+        lookup_list_id = str(lookup_raw).strip() if lookup_raw not in (None, '') else ''
+        display_raw = matrix_config.get('list_display_column') or matrix_config.get('display_column') or 'name'
+        display_column = str(display_raw).strip() or 'name'
         labels = _resolve_entity_ids_for_lookup(lookup_list_id, display_column, prefix_ids, current_locale)
         if labels:
             result[form_item_id] = labels
@@ -702,8 +705,8 @@ def get_data_tables():
         # Parse sorting parameters
         sort_field, sort_order, _ = get_sort_params(request.args)
 
-        # Determine if we should paginate based on authentication type
-        # API key auth → paginated, User auth → no pagination (return all accessible data)
+        # API key auth always paginates. Session auth paginates when per_page is requested
+        # (e.g. data explorer sends per_page=10000); otherwise return all accessible rows.
         should_paginate = elevated_access
 
         # Validate and sanitize parameters
@@ -714,14 +717,17 @@ def get_data_tables():
             per_page = validated_params['per_page']
             include_disagg = validated_params['include_disagg']
         else:
-            # User auth: no pagination, but still validate disagg parameter
+            # User auth: no pagination by default, but still validate disagg parameter
             disagg_param = request.args.get('disagg', default=None, type=str)
             include_disagg = False
             if disagg_param is not None:
                 include_disagg = str(disagg_param).strip().lower() in ['1', 'true', 'yes', 'y']
-            # Set defaults for user auth (not used but needed for response structure)
             page = 1
             per_page = None
+            per_page_raw = request.args.get('per_page', default=None, type=int)
+            if per_page_raw is not None and int(per_page_raw) > 0:
+                page, per_page = validate_pagination_params(request.args)
+                should_paginate = True
 
         related_scope = str(request.args.get('related', 'page')).strip().lower()
         if related_scope not in ('page', 'all'):
@@ -1254,14 +1260,13 @@ def get_data_tables():
         if form_item_ids:
             # Use eager loading to reduce N+1 queries
             from sqlalchemy.orm import joinedload
-            form_items = (
-                FormItem.query
-                .options(
+            form_items = query_filter_in_batches(
+                FormItem.query.options(
                     joinedload(FormItem.form_section),
-                    joinedload(FormItem.template)
-                )
-                .filter(FormItem.id.in_(form_item_ids))
-                .all()
+                    joinedload(FormItem.template),
+                ),
+                FormItem.id,
+                list(form_item_ids),
             )
             # Sort in Python after loading (more efficient than DB sort for small sets)
             form_items_sorted = sorted(form_items, key=lambda fi: (fi.template_id or 0, fi.id or 0))
@@ -1281,10 +1286,10 @@ def get_data_tables():
         countries_table = []
         if country_ids:
             # Note: primary_national_society is a property, not a relationship, so we can't eager load it
-            countries = (
-                Country.query
-                .filter(Country.id.in_(country_ids))
-                .all()
+            countries = query_filter_in_batches(
+                Country.query,
+                Country.id,
+                list(country_ids),
             )
             # Sort in Python after loading
             countries_sorted = sorted(countries, key=lambda c: c.name or '')

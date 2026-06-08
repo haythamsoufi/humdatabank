@@ -17,7 +17,7 @@
     var followUpModalCtrl = null;
     var editingRow = null;
     var rowStore = {};
-    var VQ_DEBUG = true;
+    var VQ_DEBUG = false;
 
     function vqLog(label, payload) {
         if (!VQ_DEBUG) return;
@@ -173,73 +173,6 @@
                 alignItems: 'flex-start',
             },
         };
-    }
-
-    function inspectQuestionColumnDebug(api, phase) {
-        if (!VQ_DEBUG || !api) return;
-        setTimeout(function () {
-            var storageKey = 'ag-grid-column-visibility-admin-validation-questions';
-            var saved = null;
-            try {
-                saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
-            } catch (err) {
-                saved = { parseError: String(err) };
-            }
-
-            var col = typeof api.getColumn === 'function' ? api.getColumn('question_text') : null;
-            var colDefs = typeof api.getColumnDefs === 'function' ? api.getColumnDefs() : [];
-            var qDef = colDefs.find(function (c) { return c.field === 'question_text'; });
-            var samples = [];
-
-            api.forEachNode(function (node, idx) {
-                if (idx >= 5) return;
-                samples.push({
-                    rowIndex: idx,
-                    id: node.data && node.data.id,
-                    question_text: node.data && node.data.question_text,
-                    answer_text: node.data && node.data.answer_text,
-                });
-            });
-
-            var cells = document.querySelectorAll('#validationQuestionsGrid .ag-cell[col-id="question_text"]');
-            var cellInfo = Array.prototype.slice.call(cells, 0, 5).map(function (cell, i) {
-                var style = window.getComputedStyle(cell);
-                return {
-                    index: i,
-                    offsetHeight: cell.offsetHeight,
-                    offsetWidth: cell.offsetWidth,
-                    innerHTML: cell.innerHTML.slice(0, 300),
-                    textContent: cell.textContent.slice(0, 200),
-                    display: style.display,
-                    visibility: style.visibility,
-                    opacity: style.opacity,
-                    color: style.color,
-                    overflow: style.overflow,
-                };
-            });
-
-            vqLog(phase + ' — saved question_text column state', saved && saved.question_text);
-            vqLog(phase + ' — all column ids', typeof api.getColumns === 'function'
-                ? api.getColumns().map(function (c) {
-                    return {
-                        colId: c.getColId(),
-                        field: c.getColDef().field,
-                        visible: c.isVisible(),
-                        width: c.getActualWidth(),
-                    };
-                })
-                : 'getColumns unavailable');
-            vqLog(phase + ' — question_text AG Grid column', {
-                found: !!col,
-                visible: col && col.isVisible(),
-                width: col && col.getActualWidth(),
-                pinned: col && col.getPinned(),
-                colDefHasRenderer: !!(qDef && qDef.cellRenderer),
-                colDefRendererType: qDef && typeof qDef.cellRenderer,
-            });
-            vqLog(phase + ' — sample row data', samples);
-            vqLog(phase + ' — question_text DOM cells (' + cells.length + ')', cellInfo);
-        }, phase === 'onReady' ? 450 : 150);
     }
 
     function selectOptionValue(selectEl, value) {
@@ -479,25 +412,13 @@
                 credentials: 'same-origin',
                 cache: 'no-store',
             });
-            var rawText = await resp.text();
-            var data = JSON.parse(rawText || '{}');
+            var data = await resp.json();
             if (!resp.ok) throw new Error(data.error || t.loadFailed);
             var rows = (data.rows || []).map(normalizeListRow);
             indexRowStore(rows);
-            vqLog('loadRows API response', {
-                ok: resp.ok,
-                rowCount: rows.length,
-                rawHasQuestionTextKey: rawText.indexOf('"question_text"') >= 0,
-                withQuestionText: rows.filter(function (r) { return r.question_text; }).length,
-                firstRowKeys: rows[0] ? Object.keys(rows[0]) : [],
-                sample: rows.slice(0, 2).map(function (r) {
-                    return {
-                        id: r.id,
-                        question_text: r.question_text,
-                        question_text_len: r.question_text ? String(r.question_text).length : 0,
-                    };
-                }),
-            });
+            if (data.truncated) {
+                showFeedback(t.truncatedWarning || 'Showing first 500 questions. Use column filters to narrow results.', 'info');
+            }
             if (gridHelper) {
                 gridHelper.setRowData(rows);
                 gridHelper.refresh();
@@ -754,12 +675,6 @@
 
     function initQuestionsGrid(rows) {
         var columnDefs = buildColumnDefs();
-        var questionColDef = columnDefs.find(function (c) { return c.field === 'question_text'; });
-        vqLog('initQuestionsGrid', {
-            rowCount: (rows || []).length,
-            questionColDef: questionColDef,
-            listUrl: config.listUrl,
-        });
 
         var result = AgGridHelper.create(
             'validationQuestionsGrid',
@@ -780,17 +695,13 @@
                         suppressSizeToFit: true,
                     },
                     onFirstDataRendered: function (params) {
-                        vqLog('onFirstDataRendered fired');
                         AgGridHelper.enforceColumnMinWidths(params.api);
-                        inspectQuestionColumnDebug(params.api, 'onFirstDataRendered');
                     },
                 },
                 columnVisibilityOptions: { buttonPlaceholderId: 'vq-col-vis-placeholder', enableExport: true, enableReset: true },
                 onReady: function (api) {
                     gridApi = api;
-                    vqLog('onReady fired');
                     AgGridHelper.pinActionsColumn(api, null, result.helper && result.helper.columnVisibilityManager);
-                    inspectQuestionColumnDebug(api, 'onReady');
                 },
             }
         );
@@ -862,7 +773,13 @@
             var resp = await fetch(config.importUrl, { method: 'POST', body: formData, credentials: 'same-origin', headers: { Accept: 'application/json' } });
             var data = await resp.json();
             if (!resp.ok) throw new Error(data.error || t.importFailed);
-            showFeedback('Import complete — updated: ' + (data.updated || 0), data.has_errors ? 'error' : 'success');
+            var msg = 'Import complete — updated: ' + (data.updated || 0);
+            if (data.errors && data.errors.length) {
+                msg += ' (' + data.errors.length + ' row(s) with errors: ' +
+                    data.errors.slice(0, 3).join('; ') +
+                    (data.errors.length > 3 ? '…' : '') + ')';
+            }
+            showFeedback(msg, data.has_errors ? 'error' : 'success');
             await loadRows();
         } catch (err) {
             showFeedback(t.importFailed || 'Import failed', 'error');
@@ -903,6 +820,5 @@
     initEditModal();
     initFollowUpModal();
     initSummaryGrid();
-    vqLog('script loaded', { listUrl: config.listUrl });
     loadRows().then(initQuestionsGrid);
 })();

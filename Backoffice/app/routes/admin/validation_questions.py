@@ -74,13 +74,17 @@ def validation_questions_list_api():
     status = request.args.get("status", type=str)
     country_id = request.args.get("country_id", type=int)
 
+    _LIMIT = 500
     rows = query_validation_questions(
         template_id=template_id,
         period=period,
         status=status,
         country_id=country_id,
-        limit=500,
+        limit=_LIMIT + 1,
     )
+    truncated = len(rows) > _LIMIT
+    if truncated:
+        rows = rows[:_LIMIT]
     countries = {c.id: c.name for c in Country.query.all()}
     templates = {t.id: t.name for t in FormTemplate.query.all()}
     row_ids = [r.id for r in rows]
@@ -96,9 +100,9 @@ def validation_questions_list_api():
         )
         for r in rows
     ]
-    response, status = json_ok(rows=payload_rows)
+    response, status_code = json_ok(rows=payload_rows, truncated=truncated)
     response.headers["Cache-Control"] = "no-store"
-    return response, status
+    return response, status_code
 
 
 @bp.route("/validation-questions/api/<int:question_id>/follow-up", methods=["POST"])

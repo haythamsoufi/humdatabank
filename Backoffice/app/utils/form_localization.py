@@ -116,28 +116,8 @@ def get_localized_indicator_unit(indicator_unit: str) -> str:
     if not indicator_unit:
         return ''
 
-    with suppress(Exception):
-        from flask import has_app_context
-
-        if has_app_context():
-            from app.extensions import db
-            from app.models import IndicatorBankUnit
-
-            key = " ".join(str(indicator_unit).strip().lower().split())
-            row = IndicatorBankUnit.query.filter(
-                db.func.lower(IndicatorBankUnit.code) == key
-            ).first()
-            if not row:
-                row = IndicatorBankUnit.query.filter(
-                    db.func.lower(IndicatorBankUnit.name) == key
-                ).first()
-            if row and row.is_active:
-                loc = get_translation_key()
-                lab = row.get_name_translation(loc)
-                if lab:
-                    return lab
-
-    # Map indicator units to translation keys
+    # Authoritative code → friendly-label overrides. Defined early so the DB-lookup path
+    # can also apply them when the catalog stores a raw code (e.g. name = "ns").
     unit_translation_map = {
         'people': _('People'),
         'volunteers': _('Volunteers'),
@@ -174,6 +154,29 @@ def get_localized_indicator_unit(indicator_unit: str) -> str:
         'ns': _('National Society'),
     }
 
+    with suppress(Exception):
+        from flask import has_app_context
+
+        if has_app_context():
+            from app.extensions import db
+            from app.models import IndicatorBankUnit
+
+            key = " ".join(str(indicator_unit).strip().lower().split())
+            row = IndicatorBankUnit.query.filter(
+                db.func.lower(IndicatorBankUnit.code) == key
+            ).first()
+            if not row:
+                row = IndicatorBankUnit.query.filter(
+                    db.func.lower(IndicatorBankUnit.name) == key
+                ).first()
+            if row and row.is_active:
+                loc = get_translation_key()
+                lab = row.get_name_translation(loc)
+                if lab:
+                    # If the catalog stored a raw code (e.g. "ns") rather than a human
+                    # label, resolve it through the translation map before returning.
+                    return unit_translation_map.get(lab.lower(), lab)
+
     unit_key = indicator_unit.lower()
     unmapped = unit_translation_map.get(unit_key, None)
     if unmapped is not None:
@@ -204,7 +207,11 @@ def get_indicator_bank_unit_display(indicator_bank) -> str:
     mu = getattr(indicator_bank, "measurement_unit", None)
     if mu is not None:
         loc = get_translation_key()
-        return (mu.get_name_translation(loc) or mu.name or "").strip()
+        raw = (mu.get_name_translation(loc) or mu.name or "").strip()
+        # Run the raw catalog value through the unit localizer so that units whose
+        # catalog name is still a raw code (e.g. "ns") are rendered with their
+        # human-readable label ("National Society") instead.
+        return get_localized_indicator_unit(raw) if raw else ""
     return get_localized_indicator_unit(getattr(indicator_bank, "unit", None) or "")
 
 

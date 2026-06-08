@@ -4,7 +4,7 @@ Data API endpoints.
 Part of the /api/v1 blueprint.
 """
 
-from flask import request, current_app
+from flask import request, current_app, g
 from sqlalchemy import desc, literal, or_
 import uuid
 from contextlib import suppress
@@ -21,9 +21,20 @@ from app.utils.rate_limiting import api_rate_limit
 from app import db
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error, extract_numeric_value
-from app.utils.api_serialization import format_country_info, format_form_item_info
-from app.services.security.api_authentication import authenticate_api_request, get_user_allowed_template_ids, apply_user_template_scoping
+from app.utils.api_helpers import json_response, json_data_response, api_error, extract_numeric_value
+from app.utils.api_serialization import (
+    format_country_info,
+    format_form_item_info,
+    build_star_schema_tables,
+    STAR_SCHEMA_VERSION,
+    STAR_SCHEMA_GRAIN,
+)
+from app.services.security.api_authentication import (
+    authenticate_api_request,
+    get_user_allowed_template_ids,
+    apply_user_template_scoping,
+    apply_api_key_data_scoping,
+)
 from app.utils.api_pagination import (
     parse_date_range, get_sort_params, validate_data_endpoint_params,
     validate_pagination_params,
@@ -501,6 +512,13 @@ def get_all_data():
                             'per_page': per_page if should_paginate else None
                         })
 
+        api_key_scope = getattr(g, 'api_key_data_scope', None)
+        if not elevated_access and api_key_record is not None and api_key_scope:
+            scoped_queries = apply_api_key_data_scoping(
+                queries, api_key_scope, template_id, country_id, period_name
+            )
+            assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
+
         # (Filters already applied by the service and optional RBAC scoping)
 
         # Build pagination queries using helper
@@ -590,6 +608,103 @@ def get_all_data():
         return api_error("Could not fetch data", 500, error_id, None)
 
 
+def _parse_tables_layout_param():
+    """Return ``flat`` (default) or ``star`` for /data/tables response shape."""
+    layout = str(request.args.get('layout', 'flat') or 'flat').strip().lower()
+    if layout not in ('flat', 'star'):
+        layout = 'flat'
+    return layout
+
+
+def _build_flat_tables_response(
+    data_rows,
+    form_items_table,
+    countries_table,
+    matrix_entity_labels,
+    *,
+    should_paginate,
+    total_items,
+    page,
+    per_page,
+    expansion_failed=False,
+):
+    """Legacy multi-table bundle (backward compatible)."""
+    if should_paginate:
+        total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
+        response_data = {
+            'data': data_rows,
+            'form_items': form_items_table,
+            'countries': countries_table,
+            'matrix_entity_labels': matrix_entity_labels,
+            'total_items': total_items,
+            'total_pages': total_pages,
+            'current_page': page,
+            'per_page': per_page,
+        }
+    else:
+        response_data = {
+            'data': data_rows,
+            'form_items': form_items_table,
+            'countries': countries_table,
+            'matrix_entity_labels': matrix_entity_labels,
+            'total_items': total_items,
+            'total_pages': None,
+            'current_page': None,
+            'per_page': None,
+        }
+    if expansion_failed:
+        response_data['warning'] = 'Related tables expansion failed, showing page-scoped results only'
+        response_data['partial'] = True
+    return json_response(response_data)
+
+
+def _build_star_tables_response(
+    data_rows,
+    form_items_table,
+    countries_table,
+    *,
+    include_disagg,
+    should_paginate,
+    total_items,
+    page,
+    per_page,
+    expansion_failed=False,
+):
+    """Star-schema dimensional tables for BI / integrator consumers."""
+    tables = build_star_schema_tables(
+        data_rows,
+        form_items_table,
+        countries_table,
+        include_disagg=include_disagg,
+    )
+    if should_paginate:
+        total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
+        meta = {
+            'total_facts': total_items,
+            'total_pages': total_pages,
+            'current_page': page,
+            'per_page': per_page,
+        }
+    else:
+        meta = {
+            'total_facts': total_items,
+            'total_pages': None,
+            'current_page': None,
+            'per_page': None,
+        }
+    if expansion_failed:
+        meta['warning'] = 'Related tables expansion failed, showing page-scoped results only'
+        meta['partial'] = True
+    return json_data_response(
+        {
+            'schema_version': STAR_SCHEMA_VERSION,
+            'grain': STAR_SCHEMA_GRAIN,
+            'tables': tables,
+        },
+        meta=meta,
+    )
+
+
 @api_bp.route('/data/tables', methods=['GET'])
 def get_data_tables():
     """
@@ -608,8 +723,12 @@ def get_data_tables():
         - related: scope of related tables ('page' or 'all'); default 'page'.
                    'page' returns form_items and countries referenced by the current page of data.
                    'all' returns form_items and countries for the full filtered dataset (not paginated).
+        - layout: response shape — ``flat`` (default, backward compatible) or ``star``
+                  (dimensional tables: fact_form_values, dim_*, bridge_disagg_values).
     """
     try:
+        layout = _parse_tables_layout_param()
+
         # Authenticate request
         auth_result = authenticate_api_request()
         # Check if it's an error response (has status_code attribute)
@@ -830,6 +949,58 @@ def get_data_tables():
                             and str(submission_type or '').strip().lower() == 'assigned'
                         )
                         if not bounded_missing_request:
+                            empty_flat = {
+                                'data': [],
+                                'form_items': [],
+                                'countries': [],
+                                'total_items': 0,
+                                'total_pages': None,
+                                'current_page': None,
+                                'per_page': None,
+                            }
+                            if layout == 'star':
+                                return _build_star_tables_response(
+                                    [], [], [],
+                                    include_disagg=include_disagg,
+                                    should_paginate=should_paginate,
+                                    total_items=0,
+                                    page=page,
+                                    per_page=per_page,
+                                )
+                            return json_response(empty_flat)
+
+        # ---------- Scoped API key: restrict to template_ids / country_ids on the key ----------
+        api_key_scope = getattr(g, 'api_key_data_scope', None)
+        if not elevated_access and api_key_record is not None and api_key_scope:
+            scoped_queries = apply_api_key_data_scoping(
+                queries, api_key_scope, template_id, country_id, period_name
+            )
+            assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
+            if assigned_form_data_query is not None:
+                with suppress(Exception):
+                    test_count = assigned_form_data_query.limit(1).count()
+                    if test_count == 0 and (
+                        public_form_data_query is None
+                        or public_form_data_query.limit(1).count() == 0
+                    ):
+                        bounded_missing_request = (
+                            include_non_reported
+                            and (not should_paginate)
+                            and template_id is not None
+                            and country_id is not None
+                            and period_name
+                            and str(submission_type or '').strip().lower() == 'assigned'
+                        )
+                        if not bounded_missing_request:
+                            if layout == 'star':
+                                return _build_star_tables_response(
+                                    [], [], [],
+                                    include_disagg=include_disagg,
+                                    should_paginate=should_paginate,
+                                    total_items=0,
+                                    page=page,
+                                    per_page=per_page,
+                                )
                             return json_response({
                                 'data': [],
                                 'form_items': [],
@@ -837,7 +1008,7 @@ def get_data_tables():
                                 'total_items': 0,
                                 'total_pages': None,
                                 'current_page': None,
-                                'per_page': None
+                                'per_page': None,
                             })
 
         if submission_type == 'assigned' and public_form_data_query is not None:
@@ -1296,39 +1467,30 @@ def get_data_tables():
             for country in countries_sorted:
                 countries_table.append(format_country_info(country))
 
-        # Build response based on authentication type
-        if should_paginate:
-            # API key auth: return paginated response
-            total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
-            response_data = {
-                'data': data_rows,
-                'form_items': form_items_table,
-                'countries': countries_table,
-                'matrix_entity_labels': matrix_entity_labels,
-                'total_items': total_items,
-                'total_pages': total_pages,
-                'current_page': page,
-                'per_page': per_page
-            }
-        else:
-            # User auth: return all accessible data (no pagination)
-            response_data = {
-                'data': data_rows,
-                'form_items': form_items_table,
-                'countries': countries_table,
-                'matrix_entity_labels': matrix_entity_labels,
-                'total_items': total_items,
-                'total_pages': None,
-                'current_page': None,
-                'per_page': None
-            }
+        if layout == 'star':
+            return _build_star_tables_response(
+                data_rows,
+                form_items_table,
+                countries_table,
+                include_disagg=include_disagg,
+                should_paginate=should_paginate,
+                total_items=total_items,
+                page=page,
+                per_page=per_page,
+                expansion_failed=expansion_failed,
+            )
 
-        # Add warning if related=all expansion failed
-        if expansion_failed:
-            response_data['warning'] = 'Related tables expansion failed, showing page-scoped results only'
-            response_data['partial'] = True
-
-        return json_response(response_data)
+        return _build_flat_tables_response(
+            data_rows,
+            form_items_table,
+            countries_table,
+            matrix_entity_labels,
+            should_paginate=should_paginate,
+            total_items=total_items,
+            page=page,
+            per_page=per_page,
+            expansion_failed=expansion_failed,
+        )
     except Exception as e:
         error_id = str(uuid.uuid4())
         current_app.logger.error(

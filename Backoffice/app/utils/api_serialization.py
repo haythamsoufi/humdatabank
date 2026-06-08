@@ -377,3 +377,261 @@ def serialize_public_data_item(data_item, include_disagg=False, include_full_inf
         item_payload['imputed_disaggregation_data'] = _wrap_disagg(imputed_disagg)
 
     return item_payload
+
+
+# ---------------------------------------------------------------------------
+# Star-schema dimensional tables (GET /api/v1/data/tables?layout=star)
+# ---------------------------------------------------------------------------
+
+STAR_SCHEMA_VERSION = '1.0'
+STAR_SCHEMA_GRAIN = 'one row per form_data value'
+
+
+def format_dim_template(template):
+    """Dimension row for form templates referenced by fact rows."""
+    if not template:
+        return None
+    description = None
+    if getattr(template, 'published_version', None):
+        description = template.published_version.description
+    else:
+        first_version = template.versions.order_by('created_at').first() if hasattr(template, 'versions') else None
+        if first_version:
+            description = first_version.description
+    return {
+        'id': template.id,
+        'name': template.name,
+        'description': description,
+    }
+
+
+def format_dim_period(assigned_form):
+    """Dimension row for reporting periods (natural key: period_name + template_id)."""
+    if not assigned_form:
+        return None
+    return {
+        'period_name': assigned_form.period_name,
+        'period_id': assigned_form.period_id,
+        'period_start': (
+            assigned_form.period_start.isoformat()
+            if getattr(assigned_form, 'period_start', None) else None
+        ),
+        'period_end': (
+            assigned_form.period_end.isoformat()
+            if getattr(assigned_form, 'period_end', None) else None
+        ),
+        'template_id': assigned_form.template_id,
+    }
+
+
+def format_dim_submission_assigned(aes):
+    """Dimension row for assigned submissions (AssignmentEntityStatus)."""
+    if not aes:
+        return None
+    status_val = aes.status.value if hasattr(aes.status, 'value') else aes.status
+    return {
+        'id': aes.id,
+        'type': 'assigned',
+        'status': status_val,
+        'entity_type': aes.entity_type,
+        'entity_id': aes.entity_id,
+        'submitted_at': aes.submitted_at.isoformat() if aes.submitted_at else None,
+        'due_date': aes.due_date.isoformat() if aes.due_date else None,
+        'assigned_form_id': aes.assigned_form_id,
+    }
+
+
+def format_dim_submission_public(public_submission):
+    """Dimension row for public submissions."""
+    if not public_submission:
+        return None
+    status_val = (
+        public_submission.status.value
+        if hasattr(public_submission.status, 'value') else public_submission.status
+    )
+    return {
+        'id': public_submission.id,
+        'type': 'public',
+        'status': status_val,
+        'country_id': public_submission.country_id,
+        'submitted_at': (
+            public_submission.submitted_at.isoformat()
+            if public_submission.submitted_at else None
+        ),
+        'submitter_name': public_submission.submitter_name,
+        'assigned_form_id': public_submission.assigned_form_id,
+    }
+
+
+def format_fact_form_value_row(flat_row):
+    """Map a flat /data/tables row to a star-schema fact row (FK keys only)."""
+    if not flat_row:
+        return None
+    return {
+        'id': flat_row.get('id'),
+        'form_item_id': flat_row.get('form_item_id'),
+        'country_id': flat_row.get('country_id'),
+        'template_id': flat_row.get('template_id'),
+        'period_name': flat_row.get('period_name'),
+        'submission_id': flat_row.get('submission_id'),
+        'submission_type': flat_row.get('submission_type'),
+        'value': flat_row.get('value'),
+        'num_value': flat_row.get('num_value'),
+        'data_status': flat_row.get('data_status'),
+        'submitted_at': flat_row.get('submitted_at'),
+        'is_missing': flat_row.get('is_missing', False),
+    }
+
+
+def format_bridge_disagg_rows(form_data_id, disagg_payload, source='reported'):
+    """
+    Flatten a normalized disaggregation payload into bridge rows.
+
+    Each row: ``form_data_id, source, mode, key, value``.
+    """
+    if not disagg_payload or not isinstance(disagg_payload, dict):
+        return []
+    mode = disagg_payload.get('mode')
+    values = disagg_payload.get('values')
+    if not isinstance(values, dict) or not values:
+        return []
+    rows = []
+    for key, val in values.items():
+        if key is None or (isinstance(key, str) and key.startswith('_')):
+            continue
+        rows.append({
+            'form_data_id': form_data_id,
+            'source': source,
+            'mode': mode,
+            'key': str(key),
+            'value': val,
+        })
+    return rows
+
+
+def build_bridge_disagg_from_flat_rows(data_rows, include_disagg):
+    """Build bridge_disagg_values from flat /data/tables rows."""
+    if not include_disagg:
+        return []
+    bridge = []
+    for row in data_rows or []:
+        if not isinstance(row, dict):
+            continue
+        form_data_id = row.get('id')
+        if form_data_id is None:
+            continue
+        for source, field in (
+            ('reported', 'disaggregation_data'),
+            ('prefilled', 'prefilled_disaggregation_data'),
+            ('imputed', 'imputed_disaggregation_data'),
+        ):
+            bridge.extend(
+                format_bridge_disagg_rows(form_data_id, row.get(field), source=source)
+            )
+    return bridge
+
+
+def build_star_schema_tables(
+    data_rows,
+    form_items_table,
+    countries_table,
+    *,
+    include_disagg=False,
+):
+    """
+    Assemble star-schema table dicts from flat /data/tables intermediate data.
+
+    Loads dim_template, dim_period, and dim_submission from the database using
+    FK references present on the fact rows.
+    """
+    from app.models import AssignedForm
+    from app.models.assignments import AssignmentEntityStatus, PublicSubmission
+
+    fact_rows = [
+        r for r in (format_fact_form_value_row(row) for row in (data_rows or []))
+        if r is not None
+    ]
+
+    template_ids = {
+        int(r['template_id'])
+        for r in fact_rows
+        if r.get('template_id') is not None
+    }
+    dim_template = []
+    if template_ids:
+        from app.models import FormTemplate
+        from sqlalchemy.orm import joinedload
+
+        templates = (
+            FormTemplate.query
+            .options(joinedload(FormTemplate.published_version))
+            .filter(FormTemplate.id.in_(template_ids))
+            .all()
+        )
+        dim_template = sorted(
+            [format_dim_template(t) for t in templates if t],
+            key=lambda x: x['id'],
+        )
+
+    period_keys = {
+        (int(r['template_id']), r['period_name'])
+        for r in fact_rows
+        if r.get('template_id') is not None and r.get('period_name')
+    }
+    dim_period = []
+    if period_keys:
+        template_ids_for_periods = {k[0] for k in period_keys}
+        period_names = {k[1] for k in period_keys}
+        assigned_forms = (
+            AssignedForm.query
+            .filter(
+                AssignedForm.template_id.in_(template_ids_for_periods),
+                AssignedForm.period_name.in_(period_names),
+            )
+            .all()
+        )
+        seen_periods = set()
+        for af in assigned_forms:
+            key = (af.template_id, af.period_name)
+            if key in period_keys and key not in seen_periods:
+                dim_period.append(format_dim_period(af))
+                seen_periods.add(key)
+        dim_period.sort(key=lambda x: (x.get('template_id') or 0, x.get('period_name') or ''))
+
+    assigned_submission_ids = {
+        int(r['submission_id'])
+        for r in fact_rows
+        if r.get('submission_type') == 'assigned' and r.get('submission_id') is not None
+    }
+    public_submission_ids = {
+        int(r['submission_id'])
+        for r in fact_rows
+        if r.get('submission_type') == 'public' and r.get('submission_id') is not None
+    }
+
+    dim_submission = []
+    if assigned_submission_ids:
+        aes_rows = AssignmentEntityStatus.query.filter(
+            AssignmentEntityStatus.id.in_(assigned_submission_ids)
+        ).all()
+        dim_submission.extend(
+            format_dim_submission_assigned(aes) for aes in aes_rows if aes
+        )
+    if public_submission_ids:
+        ps_rows = PublicSubmission.query.filter(
+            PublicSubmission.id.in_(public_submission_ids)
+        ).all()
+        dim_submission.extend(
+            format_dim_submission_public(ps) for ps in ps_rows if ps
+        )
+    dim_submission.sort(key=lambda x: (x.get('type') or '', x.get('id') or 0))
+
+    return {
+        'fact_form_values': fact_rows,
+        'dim_country': countries_table or [],
+        'dim_form_item': form_items_table or [],
+        'dim_template': dim_template,
+        'dim_period': dim_period,
+        'dim_submission': dim_submission,
+        'bridge_disagg_values': build_bridge_disagg_from_flat_rows(data_rows, include_disagg),
+    }

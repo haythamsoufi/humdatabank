@@ -351,6 +351,7 @@ def update_current_user_profile():
 
         # Commit changes
         if updated_fields:
+            saved_user_id = user.id
             db.session.flush()
 
             # Log the activity
@@ -360,12 +361,15 @@ def update_current_user_profile():
                     activity_type='profile_update',
                     description=f'User {user.email} updated their profile information',
                     context_data={
-                        'user_id': user.id,
+                        'user_id': saved_user_id,
                         'updated_fields': {field: getattr(user, field) for field in updated_fields}
                     }
                 )
             except Exception as e:
                 current_app.logger.warning(f"Failed to log user activity: {e}")
+
+            # Re-bind after flush so response building does not hit a detached instance.
+            user = db.session.get(User, saved_user_id) or user
         else:
             # No fields to update
             return api_error('No valid fields provided for update', 400)

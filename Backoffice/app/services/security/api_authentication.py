@@ -333,7 +333,21 @@ def authenticate_api_request():
                 g.api_key_usage_id = db_api_key.id
                 g.api_key_usage_client_name = db_api_key.client_name
                 api_key_record = db_api_key
-                elevated_access = True
+
+                from app.models.api_key_management import (
+                    API_KEY_DATA_NONE,
+                    API_KEY_DATA_READ_SCOPED,
+                    resolve_api_key_data_access,
+                )
+                access_mode, scope = resolve_api_key_data_access(db_api_key.permissions)
+                if access_mode == API_KEY_DATA_NONE:
+                    return api_error("API key has no data access permission", 403)
+                if access_mode == API_KEY_DATA_READ_SCOPED:
+                    g.api_key_data_scope = scope
+                    elevated_access = False
+                else:
+                    g.api_key_data_scope = None
+                    elevated_access = True
 
                 # Log API key usage for security monitoring (optional)
                 if current_app.config.get('LOG_API_KEY_USAGE', False):
@@ -468,4 +482,72 @@ def apply_user_template_scoping(queries, auth_user, template_id=None, country_id
     return {
         'assigned': assigned_form_data_query,
         'public': public_form_data_query
+    }
+
+
+def apply_api_key_data_scoping(queries, scope, template_id=None, country_id=None, period_name=None):
+    """
+    Restrict data queries to template/country IDs allowed on a scoped API key.
+
+    ``scope`` is the dict returned by ``resolve_api_key_data_access`` for
+    ``read_scoped`` keys: ``{"template_ids": [...], "country_ids": [...]}``.
+    """
+    if not scope or not isinstance(scope, dict):
+        return queries
+
+    assigned_form_data_query = queries['assigned']
+    public_form_data_query = queries['public']
+
+    allowed_template_ids = scope.get('template_ids') or []
+    allowed_country_ids = scope.get('country_ids') or []
+
+    if not allowed_template_ids and not allowed_country_ids:
+        return {
+            'assigned': FormData.query.filter(literal(False)),
+            'public': FormData.query.filter(literal(False)),
+        }
+
+    if allowed_template_ids:
+        if template_id is not None and int(template_id) not in allowed_template_ids:
+            return {
+                'assigned': FormData.query.filter(literal(False)),
+                'public': FormData.query.filter(literal(False)),
+            }
+        if assigned_form_data_query is not None:
+            joins_exist = template_id is not None or country_id is not None or period_name is not None
+            if joins_exist:
+                assigned_form_data_query = assigned_form_data_query.filter(
+                    AssignedForm.template_id.in_(allowed_template_ids)
+                )
+            else:
+                assigned_form_data_query = (
+                    assigned_form_data_query
+                    .join(AssignmentEntityStatus)
+                    .join(AssignedForm)
+                    .filter(AssignedForm.template_id.in_(allowed_template_ids))
+                )
+        if public_form_data_query is not None:
+            public_form_data_query = public_form_data_query.filter(
+                AssignedForm.template_id.in_(allowed_template_ids)
+            )
+
+    if allowed_country_ids:
+        if country_id is not None and int(country_id) not in allowed_country_ids:
+            return {
+                'assigned': FormData.query.filter(literal(False)),
+                'public': FormData.query.filter(literal(False)),
+            }
+        if assigned_form_data_query is not None:
+            assigned_form_data_query = assigned_form_data_query.filter(
+                AssignmentEntityStatus.entity_type == 'country',
+                AssignmentEntityStatus.entity_id.in_(allowed_country_ids),
+            )
+        if public_form_data_query is not None:
+            public_form_data_query = public_form_data_query.filter(
+                PublicSubmission.country_id.in_(allowed_country_ids)
+            )
+
+    return {
+        'assigned': assigned_form_data_query,
+        'public': public_form_data_query,
     }

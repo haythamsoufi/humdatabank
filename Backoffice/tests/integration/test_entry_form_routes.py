@@ -20,21 +20,25 @@ from app.models import (
 )
 from app.models.enums import EntityType
 
-from tests.factories import create_test_admin, create_test_country, create_test_template, create_test_user
+from tests.factories import (
+    create_focal_point_with_country,
+    create_test_admin,
+    create_test_assignment_entity_status,
+    create_test_country,
+    create_test_public_submission,
+    create_test_template,
+    create_test_user,
+)
+from tests.helpers import get_csrf_headers as _get_csrf_headers_shared
+from tests.helpers import login_session
 
 
 def _get_csrf_headers(client) -> dict:
-    resp = client.get("/api/v1/csrf-token")
-    assert resp.status_code == 200
-    token = (resp.get_json() or {}).get("csrf_token")
-    assert token
-    return {"X-CSRFToken": token}
+    return _get_csrf_headers_shared(client)
 
 
 def _login(client, user_id: int) -> None:
-    with client.session_transaction() as sess:
-        sess["_user_id"] = str(user_id)
-        sess["_fresh"] = True
+    login_session(client, user_id)
 
 
 @pytest.mark.integration
@@ -75,33 +79,12 @@ class TestEntryFormCoreRoutes:
 
     def test_view_edit_form_assignment_renders_entry_form(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
-            country = create_test_country(db_session)
-            template = create_test_template(db_session)
-
-            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
-            db_session.add(assigned_form)
-            db_session.flush()
-
-            aes = AssignmentEntityStatus(
-                assigned_form_id=assigned_form.id,
-                entity_type=EntityType.country.value,
-                entity_id=country.id,
-                status="in_progress",
-            )
-            db_session.add(aes)
-            db_session.flush()
+            user, _country, aes = create_focal_point_with_country(db_session)
             aes_id = aes.id
-            user_id = user.id
-            db_session.commit()
+            _login(client, user.id)
 
-            _login(client, user_id)
-
-            with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
-                 patch("app.services.authorization_service.AuthorizationService.can_edit_assignment", return_value=True), \
-                 patch("app.routes.forms.entry.TemplatePreparationService.prepare_template_for_rendering", return_value=(template, [], {})):
-                resp = client.get(f"/forms/assignment/{aes_id}")
-                assert resp.status_code == 200
+            resp = client.get(f"/forms/assignment/{aes_id}")
+            assert resp.status_code == 200
 
 
 @pytest.mark.integration
@@ -285,3 +268,223 @@ class TestEntryFormPreviewAndPublicSubmissionRoutes:
 
             resp = client.get(f"/forms/public/{token}")
             assert resp.status_code == 200
+
+
+@pytest.mark.integration
+class TestEntryFormPublicFormPost:
+    def test_fill_public_form_post_saves_data(self, client, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            token = str(uuid4())
+
+            assigned_form = AssignedForm(
+                template_id=template.id,
+                period_name="2024",
+                unique_token=token,
+                is_public_active=True,
+                is_active=True,
+            )
+            db_session.add(assigned_form)
+            db_session.flush()
+            db_session.add(
+                AssignmentEntityStatus(
+                    assigned_form_id=assigned_form.id,
+                    entity_type=EntityType.country.value,
+                    entity_id=country.id,
+                    status="pending",
+                    is_public_available=True,
+                )
+            )
+            db_session.commit()
+            country_id = country.id
+            assigned_form_id = assigned_form.id
+
+            from app.services.form_data_service import FormDataService
+
+            with patch.object(
+                FormDataService,
+                "process_form_submission",
+                return_value={
+                    "success": True,
+                    "field_changes": [],
+                    "validation_errors": [],
+                    "submitted": False,
+                },
+            ):
+                resp = client.post(
+                    f"/forms/public/{token}",
+                    data={
+                        "submit_form": "1",
+                        "submit": "Submit Form",
+                        "submitter_name": "Public User",
+                        "submitter_email": "public@example.com",
+                        "country_id": str(country_id),
+                    },
+                    follow_redirects=False,
+                )
+            assert resp.status_code in (301, 302, 303, 307, 308)
+            location = resp.headers.get("Location") or ""
+            assert "public-submission" in location and "success" in location
+
+            submission = PublicSubmission.query.filter_by(
+                assigned_form_id=assigned_form_id,
+                submitter_email="public@example.com",
+            ).first()
+            assert submission is not None
+            assert submission.country_id == country_id
+
+
+@pytest.mark.integration
+class TestEntryFormPublicSubmissionEdit:
+    def test_edit_public_submission_get_renders_form(self, client, db_session, app):
+        with app.app_context():
+            submission, _assigned_form, _token = create_test_public_submission(
+                db_session,
+                submitter_email="edit@example.com",
+            )
+            submission_id = submission.id
+            admin = create_test_admin(db_session)
+
+            _login(client, admin.id)
+            with patch(
+                "app.routes.forms.submission.render_template",
+                return_value="entry-form-ok",
+            ) as mock_render:
+                resp = client.get(f"/forms/public-submission/{submission_id}/edit")
+
+            assert resp.status_code == 200
+            assert "entry-form-ok" in resp.get_data(as_text=True)
+            assert mock_render.call_args[0][0] == "forms/entry_form/entry_form.html"
+
+    def test_edit_public_submission_post_saves(self, client, db_session, app):
+        with app.app_context():
+            submission, _assigned_form, _token = create_test_public_submission(
+                db_session,
+                submitter_email="save@example.com",
+            )
+            submission_id = submission.id
+            admin = create_test_admin(db_session)
+
+            from app.services.form_data_service import FormDataService
+
+            _login(client, admin.id)
+            with patch.object(
+                FormDataService,
+                "process_form_submission",
+                return_value={
+                    "success": True,
+                    "field_changes": [],
+                    "validation_errors": [],
+                    "submitted": False,
+                },
+            ):
+                resp = client.post(
+                    f"/forms/public-submission/{submission_id}/edit",
+                    data={"action": "save"},
+                    follow_redirects=False,
+                )
+
+            assert resp.status_code in (301, 302, 303, 307, 308)
+            location = resp.headers.get("Location") or ""
+            assert f"/forms/public-submission/{submission_id}/view" in location
+
+
+@pytest.mark.integration
+class TestEntryFormValidationSummary:
+    def test_validation_summary_requires_auth(self, client, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session)
+            aes_id = aes.id
+
+        resp = client.get(
+            f"/forms/assignment_status/{aes_id}/validation_summary",
+            follow_redirects=False,
+        )
+        assert resp.status_code in (301, 302, 303, 307, 308)
+
+    def test_validation_summary_renders_for_admin(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            aes = create_test_assignment_entity_status(db_session)
+            aes_id = aes.id
+            _login(client, user.id)
+
+            with patch(
+                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                return_value=True,
+            ):
+                resp = client.get(f"/forms/assignment_status/{aes_id}/validation_summary")
+
+            assert resp.status_code == 200
+
+    def test_validation_summary_cancel_redirects(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            aes = create_test_assignment_entity_status(db_session)
+            aes_id = aes.id
+            _login(client, user.id)
+
+            with patch(
+                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                return_value=True,
+            ):
+                resp = client.post(
+                    f"/forms/assignment_status/{aes_id}/validation_summary/cancel",
+                    data=json.dumps({"run_id": "test-run-id"}),
+                    content_type="application/json",
+                )
+
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert data["run_id"] == "test-run-id"
+
+
+@pytest.mark.integration
+class TestEntryFormSendForReview:
+    def test_send_for_review_action_transitions_status(
+        self, logged_in_focal_client, focal_point_user, app, db_session
+    ):
+        from app.models.enums import AssignmentEntityStatusValue
+        from app.services.authorization_service import AuthorizationService
+        from app.services.form_data_service import FormDataService
+        from flask_wtf import FlaskForm
+
+        with app.app_context():
+            aes_id = focal_point_user["aes_id"]
+            aes = AssignmentEntityStatus.query.get(aes_id)
+            aes.assigned_form.requires_delegation_review = True
+            db.session.commit()
+
+        def _simulate_send_for_review(aes, sections, csrf_form=None):
+            aes.status = AssignmentEntityStatusValue.sent_for_review
+            db.session.flush()
+            return {
+                "success": True,
+                "field_changes": [],
+                "validation_errors": [],
+                "submitted": False,
+                "sent_for_review": True,
+            }
+
+        with patch.object(AuthorizationService, "can_edit_assignment", return_value=True), \
+             patch.object(FlaskForm, "validate_on_submit", return_value=True), \
+             patch.object(
+                 FormDataService,
+                 "process_form_submission",
+                 side_effect=_simulate_send_for_review,
+             ) as mock_process:
+            resp = logged_in_focal_client.post(
+                f"/forms/assignment/{aes_id}",
+                data={"action": "send_for_review"},
+                follow_redirects=False,
+            )
+
+        assert resp.status_code in (200, 301, 302, 303, 307, 308)
+        mock_process.assert_called_once()
+
+        with app.app_context():
+            refreshed = AssignmentEntityStatus.query.get(aes_id)
+            status = refreshed.status.value if hasattr(refreshed.status, "value") else refreshed.status
+            assert status == "sent_for_review"

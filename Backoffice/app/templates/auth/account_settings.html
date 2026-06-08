@@ -6,6 +6,7 @@
 {% block head %}
 {{ super() }}
 <link rel="stylesheet" href="{{ static_url('css/profile-color-dropdown.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/notifications.css') }}">
 {% endblock %}
 
 {% block title %}Account Settings{% endblock %}
@@ -34,6 +35,10 @@
                     <button type="button" role="tab" data-tab="entity-access"
                             class="{{ admin_underline_tab_btn_classes(false) }}">
                         <i class="fas fa-key mr-1.5"></i>Entity Access
+                    </button>
+                    <button type="button" role="tab" data-tab="notifications"
+                            class="{{ admin_underline_tab_btn_classes(false) }}">
+                        <i class="fas fa-bell mr-1.5"></i>{{ _('Notifications') }}
                     </button>
                     <button type="button" role="tab" data-tab="devices"
                             class="{{ admin_underline_tab_btn_classes(false) }}">
@@ -265,6 +270,22 @@
             </div>
         </div>
 
+        <div class="account-panel hidden" id="panel-notifications">
+            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-bell mr-2 text-blue-600"></i>
+                        {{ _('Notification Preferences') }}
+                    </h2>
+                    <p class="text-gray-600 text-sm">{{ _('Configure email, push, and sound settings for your notifications.') }}</p>
+                </div>
+
+                {% with preferences=notification_preferences %}
+                {% include "notifications/_preferences_form.html" %}
+                {% endwith %}
+            </div>
+        </div>
+
         <!-- Registered Devices Section -->
         <div class="account-panel hidden" id="panel-devices">
         <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
@@ -431,6 +452,7 @@
 {{ datetime_utils_js() }}
 
 <script src="{{ static_url('libs/profile-initials.js') }}"></script>
+<script src="{{ static_url('js/account-notification-preferences.js') }}"></script>
 <script nonce="{{ csp_nonce() }}">
 document.addEventListener('DOMContentLoaded', function() {
     const A = window.AdminUnderlineTabs;

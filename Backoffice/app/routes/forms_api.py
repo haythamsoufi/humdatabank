@@ -307,7 +307,8 @@ def api_render_pending_dynamic_indicator():
             get_localized_indicator_unit=get_localized_indicator_unit,
             isinstance=isinstance,
             json=json,
-            hasattr=hasattr
+            hasattr=hasattr,
+            slugify_age_group=slugify_age_group
         )
 
         return json_ok(html=html)
@@ -356,7 +357,8 @@ def api_render_dynamic_indicator(assignment_id):
             get_localized_indicator_unit=get_localized_indicator_unit,
             isinstance=isinstance,
             json=json,
-            hasattr=hasattr
+            hasattr=hasattr,
+            slugify_age_group=slugify_age_group
         )
 
         return json_ok(html=html)

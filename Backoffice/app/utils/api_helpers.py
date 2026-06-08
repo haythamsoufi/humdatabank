@@ -59,6 +59,19 @@ def get_json_safe(default=None):
     return data if isinstance(data, dict) else (default if default is not None else {})
 
 
+def json_data_response(data, meta=None, status_code=200, pretty=None):
+    """
+    Standard forward-looking API envelope: ``{"data": ..., "meta": ...}``.
+
+    Use for new endpoints and response shapes (e.g. star-schema layout).
+    Legacy v1 endpoints keep their existing top-level keys for compatibility.
+    """
+    body = {'data': data}
+    if meta is not None:
+        body['meta'] = meta
+    return json_response(body, status_code=status_code, pretty=pretty)
+
+
 def json_response(data, status_code=200, pretty=None):
     """Create JSON responses using Flask's JSON provider.
     - ensure_ascii=False for proper UTF-8

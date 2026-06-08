@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec, merge_activity_specs
 
+from app.utils.activity_endpoint_catalog.generated.partials.admin import SPECS as _S_admin
 from app.utils.activity_endpoint_catalog.generated.partials.admin_notifications import SPECS as _S_admin_notifications
 from app.utils.activity_endpoint_catalog.generated.partials.ai_documents import SPECS as _S_ai_documents
 from app.utils.activity_endpoint_catalog.generated.partials.ai_management import SPECS as _S_ai_management
@@ -41,6 +42,7 @@ from app.utils.activity_endpoint_catalog.generated.partials.user_management impo
 from app.utils.activity_endpoint_catalog.generated.partials.utilities import SPECS as _S_utilities
 
 GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_activity_specs(
+    _S_admin,
     _S_admin_notifications,
     _S_ai_documents,
     _S_ai_management,

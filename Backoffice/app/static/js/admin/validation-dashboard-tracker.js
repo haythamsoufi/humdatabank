@@ -308,6 +308,7 @@
             }
             throw new Error('World GeoJSON unavailable');
         })();
+        worldGeoJsonPromise.catch(function () { worldGeoJsonPromise = null; });
         return worldGeoJsonPromise;
     }
 
@@ -390,7 +391,7 @@
                     if (!row) return;
                     layer.bindTooltip(
                         '<strong>' + esc(row.label || iso3) + '</strong><br>' +
-                        esc(STATUS_LABELS[row.status] || row.status),
+                        esc(statusLabel(row.status)),
                         { sticky: true }
                     );
                 },

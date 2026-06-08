@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.factories import create_test_assignment_entity_status
+
 @dataclass
 class _AES:
     id: int
@@ -40,6 +42,24 @@ class TestExcelRoutes:
             )
             assert resp.headers.get("X-hum-databank-Export-Completed") == "1"
             assert resp.headers.get("X-hum-databank-Export-Filename") == "export.xlsx"
+
+    @pytest.mark.critical
+    def test_export_success_with_real_assignment(self, logged_in_client, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status="in_progress")
+            aes_id = aes.id
+
+        fake_output = io.BytesIO(b"excel-bytes")
+        with patch(
+            "app.routes.excel.ExcelService.build_assignment_workbook",
+            return_value=(fake_output, "export.xlsx"),
+        ):
+            resp = logged_in_client.get(f"/excel/assignment/{aes_id}/export")
+            resp.close()
+            assert resp.status_code == 200
+            assert resp.headers.get("Content-Type", "").startswith(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
     def test_import_ajax_404_when_aes_missing(self, logged_in_client):
         with patch("app.routes.excel.get_aes_with_joins", return_value=None):

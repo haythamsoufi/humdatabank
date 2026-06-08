@@ -1277,6 +1277,12 @@ def account_settings():
         all_access_requests = []
         pending_access_requests = []
 
+    from app.routes.notifications import get_notification_type_labels, get_notification_types_for_user
+    from app.services.notification_service import NotificationService
+
+    notification_types_info = get_notification_types_for_user(current_user)
+    notification_preferences = NotificationService.get_notification_preferences(current_user.id)
+
     return render_template("auth/account_settings.html", form=form, title="Account Settings",
                          chatbot_feature_enabled=(current_app.config.get('CHATBOT_ENABLED', True) and user_has_ai_beta_access(current_user)),
                          registered_devices=registered_devices,
@@ -1284,7 +1290,10 @@ def account_settings():
                          request_access_form=request_access_form,
                          all_access_requests=all_access_requests,
                          pending_access_requests=pending_access_requests,
-                         can_request_multiple_countries=is_organization_email(getattr(current_user, 'email', '')))
+                         can_request_multiple_countries=is_organization_email(getattr(current_user, 'email', '')),
+                         notification_preferences=notification_preferences,
+                         notification_types=notification_types_info['for_user'],
+                         notification_type_labels=get_notification_type_labels())
 
 @bp.route("/debug/profile-picture", methods=["GET"])
 @login_required

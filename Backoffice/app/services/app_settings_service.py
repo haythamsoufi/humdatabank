@@ -1168,6 +1168,7 @@ DEFAULT_NOTIFICATION_AUDIENCE_RULES: Dict[str, Dict[str, bool]] = {
     "deadline_reminder": {"focal_points": True, "admin_users": False, "system_managers": False},
     "admin_message": {"focal_points": True, "admin_users": True, "system_managers": True},
     "access_request_received": {"focal_points": False, "admin_users": True, "system_managers": True},
+    "validation_questions": {"focal_points": True, "admin_users": False, "system_managers": False},
 }
 
 

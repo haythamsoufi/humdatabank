@@ -200,11 +200,57 @@
         }
     }
 
+    /**
+     * Show a flash message and return a handle with a dismiss() method.
+     * Useful for transient states like "Saving…" that should be removed as
+     * soon as the operation completes rather than waiting for the 5 s auto-dismiss.
+     *
+     * @param {string} message
+     * @param {string} [category='info']
+     * @returns {{ el: HTMLElement, dismiss: () => void }}
+     */
+    function show(message, category) {
+        if (document.readyState === 'loading') {
+            // Can't return a live handle pre-DOM; fall back to queued add
+            pending.push({ message, category });
+            return { el: null, dismiss: () => {} };
+        }
+
+        const wrapper = ensureFlashWrapper();
+        const alertEl = buildAlertElement(message, category);
+        wrapper.appendChild(alertEl);
+
+        try {
+            const scrollContainer = getScrollableContainer();
+            if (scrollContainer !== window) {
+                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        } catch (_) { /* no-op */ }
+
+        if (window.adjustFABPosition) {
+            setTimeout(() => window.adjustFABPosition(), 50);
+        }
+
+        // No auto-dismiss — caller controls lifetime via dismiss()
+        return {
+            el: alertEl,
+            dismiss() {
+                dismissAlert(alertEl);
+                if (window.adjustFABPosition) {
+                    setTimeout(() => window.adjustFABPosition(), 50);
+                }
+            },
+        };
+    }
+
     // Expose globally
     window.FlashMessages = window.FlashMessages || {};
     window.FlashMessages.add = add;
     window.FlashMessages.addSafe = addSafe;
     window.FlashMessages.normalizeCategory = normalizeCategory;
+    window.FlashMessages.show = show;
 
     /** Global helper: showFlashMessage(message, category). Use instead of local wrappers. */
     window.showFlashMessage = function (message, category) {

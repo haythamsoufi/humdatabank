@@ -1,4 +1,4 @@
-"""Add sent_for_review status and NS review workflow columns
+"""Add sent_for_review status and delegation review workflow columns
 
 Revision ID: add_sent_for_review_workflow
 Revises: normalize_status_enum_casing

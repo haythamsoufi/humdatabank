@@ -172,14 +172,16 @@ def edit_role(role_id):
 
     if request.method == "POST":
         try:
-            old_name = role.name
-            role.name = request.form.get('name', '').strip()
-            role.description = request.form.get('description', '').strip()
+            new_name = request.form.get('name', '').strip()
             permission_ids = request.form.getlist('permissions')
 
-            if not role.name:
+            if not new_name:
                 flash("Role name is required.", "warning")
                 return redirect(url_for("rbac_management.edit_role", role_id=role_id))
+
+            old_name = role.name
+            role.name = new_name
+            role.description = request.form.get('description', '').strip()
 
             # Update permissions
             RbacRolePermission.query.filter_by(role_id=role.id).delete()

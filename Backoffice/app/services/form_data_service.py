@@ -273,7 +273,7 @@ class FormDataService:
                     if (
                         not is_public_submission
                         and should_apply_sent_for_review(
-                            assignment_entity_status, _cu, effective_action
+                            assignment_entity_status, effective_action
                         )
                     ):
                         from app.services.authorization_service import AuthorizationService

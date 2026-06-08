@@ -701,6 +701,113 @@ def get_api_paths():
                 }
             }
         },
+        "/data/tables": {
+            "get": {
+                "tags": ["Data"],
+                "summary": "Get form data tables",
+                "description": (
+                    "Retrieve form data with related dimension tables. "
+                    "Use layout=flat (default) for the legacy bundle "
+                    "(data, form_items, countries) or layout=star for a "
+                    "dimensional export (fact_form_values, dim_*, bridge_disagg_values)."
+                ),
+                "operationId": "getFormDataTables",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "layout",
+                        "in": "query",
+                        "description": "Response shape: flat (default) or star",
+                        "required": False,
+                        "schema": {"type": "string", "enum": ["flat", "star"], "default": "flat"}
+                    },
+                    {
+                        "name": "template_id",
+                        "in": "query",
+                        "description": "Filter by template ID",
+                        "required": False,
+                        "schema": {"type": "integer"}
+                    },
+                    {
+                        "name": "country_id",
+                        "in": "query",
+                        "description": "Filter by country ID",
+                        "required": False,
+                        "schema": {"type": "integer"}
+                    },
+                    {
+                        "name": "disagg",
+                        "in": "query",
+                        "description": "Include disaggregation data (true/false)",
+                        "required": False,
+                        "schema": {"type": "boolean"}
+                    },
+                    {
+                        "name": "related",
+                        "in": "query",
+                        "description": "Related table scope: page or all",
+                        "required": False,
+                        "schema": {"type": "string", "enum": ["page", "all"], "default": "page"}
+                    },
+                    {"$ref": "#/components/parameters/PageParam"},
+                    {"$ref": "#/components/parameters/PerPageParam"}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Form data tables (flat or star layout)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "type": "object",
+                                            "description": "Flat layout (default)",
+                                            "properties": {
+                                                "data": {"type": "array", "items": {"type": "object"}},
+                                                "form_items": {"type": "array", "items": {"type": "object"}},
+                                                "countries": {"type": "array", "items": {"type": "object"}},
+                                                "matrix_entity_labels": {"type": "object"},
+                                                "total_items": {"type": "integer"},
+                                                "total_pages": {"type": "integer"},
+                                                "current_page": {"type": "integer"},
+                                                "per_page": {"type": "integer"}
+                                            }
+                                        },
+                                        {
+                                            "type": "object",
+                                            "description": "Star layout (layout=star)",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "schema_version": {"type": "string"},
+                                                        "grain": {"type": "string"},
+                                                        "tables": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "fact_form_values": {"type": "array"},
+                                                                "dim_country": {"type": "array"},
+                                                                "dim_form_item": {"type": "array"},
+                                                                "dim_template": {"type": "array"},
+                                                                "dim_period": {"type": "array"},
+                                                                "dim_submission": {"type": "array"},
+                                                                "bridge_disagg_values": {"type": "array"}
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "meta": {"type": "object"}
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
         "/submissions": {
             "get": {
                 "tags": ["Submissions"],

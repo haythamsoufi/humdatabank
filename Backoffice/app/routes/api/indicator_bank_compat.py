@@ -28,9 +28,9 @@ from app.models import (
     Sector,
     SubSector,
 )
-from app.routes.api.indicators import (
-    _build_sector_subsector_names,
-    _get_localized_type_unit,
+from app.services.indicator_bank_service import (
+    build_sector_subsector_names as _build_sector_subsector_names,
+    get_localized_type_unit as _get_localized_type_unit,
 )
 from app.services.indicator_resolution_service import IndicatorResolutionService
 from app.services import storage_service as storage

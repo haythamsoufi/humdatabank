@@ -24,6 +24,9 @@ if _BACKOFFICE_ROOT not in sys.path:
 os.chdir(_BACKOFFICE_ROOT)
 if not os.environ.get("FLASK_APP"):
     os.environ["FLASK_APP"] = "run.py"
+# Plugin blueprints register only when DEBUG is false (testing config).
+if not os.environ.get("FLASK_CONFIG"):
+    os.environ["FLASK_CONFIG"] = "testing"
 
 _GENERATED_PKG = os.path.join(
     _BACKOFFICE_ROOT, "app", "utils", "activity_endpoint_catalog", "generated"

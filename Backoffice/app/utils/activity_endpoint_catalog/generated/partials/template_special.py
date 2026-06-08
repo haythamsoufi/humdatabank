@@ -10,6 +10,7 @@ from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec
 
 SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("POST", "template_special.export_preview_excel"): ActivityEndpointSpec(description="Exported Preview Excel", activity_type="admin_system"),
+    ("POST", "template_special.fdrs_sync_cancel"): ActivityEndpointSpec(description="Cancelled Fdrs Sync", activity_type="admin_system"),
     ("POST", "template_special.impute_template2"): ActivityEndpointSpec(description="Completed Impute Template2", activity_type="admin_system"),
     ("POST", "template_special.preview_data_chunked"): ActivityEndpointSpec(description="Previewed Data Chunked", activity_type="admin_system"),
     ("POST", "template_special.preview_imputation"): ActivityEndpointSpec(description="Previewed Imputation", activity_type="admin_system"),

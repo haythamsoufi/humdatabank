@@ -5,9 +5,16 @@ This module provides factory functions to create test data consistently
 across all tests, reducing boilerplate and improving test readability.
 """
 from datetime import datetime, timedelta
-from app.models import User, Country, FormTemplate, FormTemplateVersion, FormItem, LookupList
+from uuid import uuid4
+
+from sqlalchemy import func
+
+from app.models import User, Country, FormTemplate, FormTemplateVersion, FormItem, FormSection, LookupList
 from app.models import IndicatorBank, IndicatorSuggestion, AssignedForm, PublicSubmission
 from app.models import APIKey
+from app.models.assignments import AssignmentEntityStatus
+from app.models.core import UserEntityPermission
+from app.models.enums import EntityType
 from app.models.rbac import RbacRole, RbacPermission, RbacRolePermission, RbacUserRole
 
 # Counter for generating unique values.
@@ -283,9 +290,12 @@ def create_test_template(db_session, **kwargs):
     counter = _get_unique_suffix()
     template_name = kwargs.get('name', f"Test Template {counter}")
     template_description = kwargs.get('description', f"Test template description {counter}")
+    owner_id = kwargs.pop('owner_id', None)
 
     # Create the template first
     template = FormTemplate()
+    if owner_id is not None:
+        template.owned_by = owner_id
     db_session.add(template)
     db_session.flush()  # Get the template ID
 
@@ -300,12 +310,97 @@ def create_test_template(db_session, **kwargs):
     db_session.add(version)
     db_session.flush()
 
-    # Set as published version
-    template.published_version_id = version.id
+    # Set as published version when status is published
+    if kwargs.get('status', 'published') == 'published':
+        template.published_version_id = version.id
 
     db_session.commit()
     db_session.refresh(template)
     return template
+
+
+def create_test_draft_version(db_session, template, **kwargs):
+    """Create a draft FormTemplateVersion for an existing template."""
+    max_version = (
+        db_session.query(func.max(FormTemplateVersion.version_number))
+        .filter_by(template_id=template.id)
+        .scalar()
+    )
+    next_version_number = (max_version or 0) + 1
+    counter = _get_unique_suffix()
+
+    version = FormTemplateVersion(
+        template_id=template.id,
+        version_number=kwargs.get('version_number', next_version_number),
+        status='draft',
+        name=kwargs.get('name', f"Draft Version {counter}"),
+        description=kwargs.get('description', f"Draft description {counter}"),
+    )
+    db_session.add(version)
+    db_session.commit()
+    db_session.refresh(version)
+    return version
+
+
+def create_test_section(db_session, template, version=None, **kwargs):
+    """Create a FormSection for a template version."""
+    if version is None:
+        version = db_session.query(FormTemplateVersion).filter_by(
+            id=template.published_version_id
+        ).first()
+        if version is None:
+            version = (
+                db_session.query(FormTemplateVersion)
+                .filter_by(template_id=template.id)
+                .order_by(FormTemplateVersion.created_at.desc())
+                .first()
+            )
+
+    counter = _get_unique_suffix()
+    section = FormSection(
+        template_id=template.id,
+        version_id=version.id,
+        name=kwargs.get('name', f"Test Section {counter}"),
+        order=kwargs.get('order', 1),
+        section_type=kwargs.get('section_type', 'standard'),
+        parent_section_id=kwargs.get('parent_section_id'),
+        archived=kwargs.get('archived', False),
+    )
+    db_session.add(section)
+    db_session.commit()
+    db_session.refresh(section)
+    return section
+
+
+def create_test_item(db_session, section, template, version=None, item_type="indicator", **kwargs):
+    """Create a FormItem in a section."""
+    if version is None:
+        version = db_session.query(FormTemplateVersion).filter_by(
+            id=section.version_id
+        ).first()
+
+    counter = _get_unique_suffix()
+    defaults = {
+        'section_id': section.id,
+        'template_id': template.id,
+        'version_id': version.id,
+        'item_type': item_type,
+        'label': kwargs.get('label', f"Test Item {counter}"),
+        'order': kwargs.get('order', 1),
+        'archived': kwargs.get('archived', False),
+    }
+    if item_type == 'indicator':
+        defaults['type'] = kwargs.get('type', 'number')
+        defaults['indicator_bank_id'] = kwargs.get('indicator_bank_id')
+    elif item_type == 'question':
+        defaults['type'] = kwargs.get('type', 'text')
+
+    defaults.update({k: v for k, v in kwargs.items() if k not in defaults})
+    item = FormItem(**defaults)
+    db_session.add(item)
+    db_session.commit()
+    db_session.refresh(item)
+    return item
 
 
 def create_test_api_key(db_session, **kwargs):
@@ -337,3 +432,159 @@ def create_test_api_key(db_session, **kwargs):
     db_session.refresh(api_key)
 
     return api_key, full_key
+
+
+def create_test_assignment_entity_status(
+    db_session,
+    *,
+    country=None,
+    template=None,
+    status="in_progress",
+    period_name="2024",
+    commit=True,
+    **kwargs,
+):
+    """Create AssignedForm + AssignmentEntityStatus for integration/route tests."""
+    if country is None:
+        country = create_test_country(db_session)
+    if template is None:
+        template = create_test_template(db_session)
+
+    assigned_form = AssignedForm(
+        template_id=template.id,
+        period_name=period_name,
+        **{k: v for k, v in kwargs.items() if k in ("is_active", "unique_token", "is_public_active")},
+    )
+    db_session.add(assigned_form)
+    db_session.flush()
+
+    aes = AssignmentEntityStatus(
+        assigned_form_id=assigned_form.id,
+        entity_type=EntityType.country.value,
+        entity_id=country.id,
+        status=status,
+    )
+    db_session.add(aes)
+    if commit:
+        db_session.commit()
+        db_session.refresh(aes)
+    else:
+        db_session.flush()
+    return aes
+
+
+def _ensure_permission(db_session, code: str, name: str | None = None) -> int:
+    perm = db_session.query(RbacPermission).filter_by(code=code).first()
+    if perm:
+        return int(perm.id)
+    perm = RbacPermission(code=code, name=name or code, description=code)
+    db_session.add(perm)
+    db_session.flush()
+    return int(perm.id)
+
+
+def _grant_role_permission(db_session, role_code: str, perm_code: str) -> None:
+    role = db_session.query(RbacRole).filter_by(code=role_code).first()
+    if not role:
+        return
+    pid = _ensure_permission(db_session, perm_code)
+    existing = (
+        db_session.query(RbacRolePermission)
+        .filter_by(role_id=role.id, permission_id=pid)
+        .first()
+    )
+    if not existing:
+        db_session.add(RbacRolePermission(role_id=role.id, permission_id=pid))
+
+
+def _grant_entity_permission(db_session, user, entity_type, entity_id):
+    """Grant UserEntityPermission if not already present."""
+    existing = (
+        db_session.query(UserEntityPermission)
+        .filter_by(user_id=user.id, entity_type=entity_type, entity_id=entity_id)
+        .first()
+    )
+    if existing:
+        return existing
+    perm = UserEntityPermission(
+        user_id=user.id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+    db_session.add(perm)
+    db_session.flush()
+    return perm
+
+
+def create_focal_point_with_country(db_session, *, country=None, **user_kwargs):
+    """Focal-point user with entity permission and an in-progress assignment.
+
+    Returns:
+        tuple: (user, country, assignment_entity_status)
+    """
+    if country is None:
+        country = create_test_country(db_session)
+
+    user_kwargs.setdefault("role", "focal_point")
+    user = create_test_user(db_session, **user_kwargs)
+
+    for perm_code in (
+        "assignment.view",
+        "assignment.edit",
+        "assignment.submit",
+    ):
+        _grant_role_permission(db_session, "assignment_editor_submitter", perm_code)
+
+    _grant_entity_permission(db_session, user, EntityType.country.value, country.id)
+    try:
+        if country not in user.countries:
+            user.countries.append(country)
+    except Exception:
+        pass
+
+    aes = create_test_assignment_entity_status(db_session, country=country, commit=False)
+    db_session.commit()
+    db_session.refresh(user)
+    db_session.refresh(aes)
+    return user, country, aes
+
+
+def create_test_public_submission(
+    db_session,
+    *,
+    country=None,
+    template=None,
+    period_name="2024",
+    status="pending",
+    **kwargs,
+):
+    """Create AssignedForm configured for public access plus a PublicSubmission row."""
+    if country is None:
+        country = create_test_country(db_session)
+    if template is None:
+        template = create_test_template(db_session)
+
+    token = kwargs.pop("unique_token", str(uuid4()))
+    assigned_form = AssignedForm(
+        template_id=template.id,
+        period_name=period_name,
+        unique_token=token,
+        is_public_active=True,
+        is_active=True,
+    )
+    db_session.add(assigned_form)
+    db_session.flush()
+    assigned_form.public_countries.append(country)
+
+    submission = PublicSubmission(
+        assigned_form_id=assigned_form.id,
+        country_id=country.id,
+        submitter_name=kwargs.pop("submitter_name", "Public User"),
+        submitter_email=kwargs.pop("submitter_email", "public@example.com"),
+        status=status,
+        **kwargs,
+    )
+    db_session.add(submission)
+    db_session.commit()
+    db_session.refresh(submission)
+    return submission, assigned_form, token

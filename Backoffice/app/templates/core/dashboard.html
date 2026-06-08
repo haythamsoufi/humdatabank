@@ -2012,7 +2012,7 @@
              {% set non_org_can_still_request = can_request_multiple_countries or not (non_org_has_counting_request|default(false)) %}
              {% if non_org_can_still_request %}
              <form method="POST" action="{{ url_for('main.request_country_access') }}" class="max-w-4xl mx-auto">
-                 {{ request_access_form.csrf_token(id="request_access_csrf_token") }}
+                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="request_access_csrf_token">
 
                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                      {# Left column: Country selection #}
@@ -2151,7 +2151,7 @@
 
             {# Request Access Form #}
             <form method="POST" action="{{ url_for('main.request_country_access') }}" id="modal-request-access-form" class="max-w-4xl">
-                {{ request_access_form.csrf_token(id="modal_request_access_csrf_token") }}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="modal_request_access_csrf_token">
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {# Left column: Country selection #}

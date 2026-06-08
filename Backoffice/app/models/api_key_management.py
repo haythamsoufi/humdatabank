@@ -10,8 +10,51 @@ from app import db
 import secrets
 import hashlib
 from sqlalchemy import Index, UniqueConstraint
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple
 from app.utils.datetime_helpers import utcnow, ensure_utc
+
+# Permissions vocabulary for APIKey.permissions JSON column.
+#   {"data": "read_all"}  — full data access (default when permissions is null)
+#   {"data": "read_scoped", "template_ids": [1], "country_ids": [5]} — scoped read
+#   {"data": "none"}      — explicitly no data access
+API_KEY_DATA_READ_ALL = 'read_all'
+API_KEY_DATA_READ_SCOPED = 'read_scoped'
+API_KEY_DATA_NONE = 'none'
+
+
+def resolve_api_key_data_access(permissions: Any) -> Tuple[str, Optional[Dict[str, List[int]]]]:
+    """
+    Interpret ``APIKey.permissions`` for data endpoints.
+
+    Returns:
+        (access_mode, scope) where access_mode is one of
+        ``read_all``, ``read_scoped``, or ``none``; scope is set only for
+        ``read_scoped`` and contains normalized ``template_ids`` / ``country_ids``.
+    """
+    if permissions is None:
+        return API_KEY_DATA_READ_ALL, None
+    if not isinstance(permissions, dict):
+        return API_KEY_DATA_READ_ALL, None
+
+    data_perm = permissions.get('data')
+    if data_perm in (None, API_KEY_DATA_READ_ALL):
+        return API_KEY_DATA_READ_ALL, None
+    if data_perm == API_KEY_DATA_READ_SCOPED:
+        template_ids = [
+            int(x) for x in (permissions.get('template_ids') or [])
+            if x is not None
+        ]
+        country_ids = [
+            int(x) for x in (permissions.get('country_ids') or [])
+            if x is not None
+        ]
+        return API_KEY_DATA_READ_SCOPED, {
+            'template_ids': template_ids,
+            'country_ids': country_ids,
+        }
+    if data_perm == API_KEY_DATA_NONE:
+        return API_KEY_DATA_NONE, None
+    return API_KEY_DATA_READ_ALL, None
 
 
 class APIKey(db.Model):

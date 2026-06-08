@@ -56,97 +56,11 @@ def _get_current_user_id() -> int:
     raise RuntimeError("Could not resolve current user id")
 
 
-def get_notification_types_for_user(user):
-    """
-    Get notification types available for a user based on RBAC.
-
-    Returns:
-        dict: {
-            'all': list of all notification type values,
-            'for_user': list of notification types relevant to the user's role,
-            'by_category': dict with 'focal_point', 'admin', 'both' keys
-        }
-    """
-    all_types = [nt.value for nt in NotificationType]
-
-    # Define which notification types are relevant for which roles
-    focal_point_types = {
-        'assignment_created',      # Focal points get new assignments
-        'assignment_submitted',    # Focal points see when assignments are submitted
-        'assignment_approved',     # Focal points get notified when their assignment is approved
-        'assignment_reopened',     # Focal points get notified when assignment is reopened
-        'form_updated',           # Focal points update forms
-        'document_uploaded',      # Focal points see document uploads (when approved)
-        'user_added_to_country',  # Focal points see new team members
-        'self_report_created',    # Focal points create self-reports
-        'deadline_reminder',      # Focal points have deadlines
-        'admin_message',          # Focal points receive admin messages
-    }
-
-    admin_types = {
-        'assignment_submitted',       # Admins review submitted assignments
-        'assignment_approved',        # Admins approve assignments
-        'assignment_reopened',        # Admins may reopen assignments
-        'public_submission_received', # Admins review public submissions
-        'document_uploaded',          # Admins review pending documents
-        'template_updated',           # Admins manage templates
-        'user_added_to_country',      # Admins manage users
-        'admin_message',              # Admins receive admin messages
-        'access_request_received',    # Admins receive country access requests
-    }
-
-    # Types available to both roles
-    both_types = {
-        'assignment_submitted',
-        'assignment_approved',
-        'assignment_reopened',
-        'document_uploaded',
-        'user_added_to_country',
-        'admin_message',  # Admin messages can go to both roles
-    }
-
-    # Determine user's capabilities (RBAC-only)
-    is_admin = AuthorizationService.is_admin(user)
-    # "Focal point" is represented as assignment editor/submitter in RBAC
-    is_focal_point = AuthorizationService.has_role(user, "assignment_editor_submitter")
-
-    # Get relevant types for this user
-    if is_admin and is_focal_point:
-        # User has both roles - show all types
-        relevant_types = all_types
-    elif is_admin:
-        # Admin only - show admin types
-        relevant_types = [t for t in all_types if t in admin_types]
-    elif is_focal_point:
-        # Focal point only - show focal point types
-        relevant_types = [t for t in all_types if t in focal_point_types]
-    else:
-        # Other roles - show minimal types
-        relevant_types = []
-
-    return {
-        'all': all_types,
-        'for_user': relevant_types,
-        'by_category': {
-            'focal_point': [t for t in all_types if t in focal_point_types and t not in both_types],
-            'admin': [t for t in all_types if t in admin_types and t not in both_types],
-            'both': list(both_types)
-        }
-    }
-
-
-@bp.route("/", methods=["GET"])
-@login_required
-def notifications_center():
-    """Notification center UI"""
+def get_notification_type_labels():
+    """Translated labels for notification type preference rows."""
     from flask_babel import gettext as _
 
-    preferences = NotificationService.get_notification_preferences(current_user.id)
-    notification_types_info = get_notification_types_for_user(current_user)
-    notification_types = notification_types_info['for_user']
-
-    # Create a dictionary mapping notification types to their translated labels
-    notification_type_labels = {
+    return {
         'assignment_created': _('Assignment Created'),
         'assignment_submitted': _('Assignment Submitted'),
         'assignment_approved': _('Assignment Approved'),
@@ -160,16 +74,61 @@ def notifications_center():
         'deadline_reminder': _('Deadline Reminder'),
         'admin_message': _('Admin Message'),
         'access_request_received': _('Access Request Received'),
+        'assignment_sent_for_review': _('Assignment Sent for Review'),
+        'assignment_returned_for_revision': _('Assignment Returned for Revision'),
+        'validation_questions': _('Data Validation Questions'),
     }
 
+
+def get_notification_types_for_user(user):
+    """
+    Get notification types available for a user based on RBAC and audience rules.
+
+    Returns:
+        dict: {
+            'all': list of all notification type values,
+            'for_user': list of notification types relevant to the user's role,
+        }
+    """
+    from app.services.app_settings_service import get_merged_notification_audience_rules
+
+    all_types = [nt.value for nt in NotificationType]
+    merged_rules = get_merged_notification_audience_rules()
+
+    is_focal_point = AuthorizationService.has_role(user, "assignment_editor_submitter")
+    is_system_manager = AuthorizationService.is_system_manager(user)
+    is_org_admin = AuthorizationService.is_admin(user) and not is_system_manager
+
+    relevant_types = []
+    for nt_val in all_types:
+        row = merged_rules.get(nt_val)
+        if not row:
+            continue
+        if (
+            (is_focal_point and row.get("focal_points"))
+            or (is_system_manager and row.get("system_managers"))
+            or (is_org_admin and row.get("admin_users"))
+        ):
+            relevant_types.append(nt_val)
+
+    return {
+        'all': all_types,
+        'for_user': relevant_types,
+    }
+
+
+@bp.route("/", methods=["GET"])
+@login_required
+def notifications_center():
+    """Notification center UI"""
+    notification_types_info = get_notification_types_for_user(current_user)
+    notification_types = notification_types_info['for_user']
 
     return render_template(
         "notifications/center.html",
         title="Notifications",
-        preferences=preferences,
         notification_types=notification_types,
-        notification_types_info=notification_types_info,
-        notification_type_labels=notification_type_labels
+        notification_type_labels=get_notification_type_labels(),
     )
 
 

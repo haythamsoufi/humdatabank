@@ -259,7 +259,7 @@ class AssignmentEntityStatus(db.Model):
     # Separate timestamp for when the form was submitted (status_timestamp is overwritten on approval)
     submitted_at = db.Column(db.DateTime, nullable=True)
 
-    # NS review workflow accountability
+    # Delegation review workflow accountability
     sent_for_review_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     sent_for_review_at = db.Column(db.DateTime, nullable=True)
     # When the parent assignment round is closed, admins can reopen data entry for this entity only

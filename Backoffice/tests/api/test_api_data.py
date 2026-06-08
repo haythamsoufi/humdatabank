@@ -40,6 +40,54 @@ class TestApiData:
         assert "matrix_entity_labels" in data
         assert "total_items" in data
 
+    def test_get_data_tables_star_layout_contract(self, client, auth_headers):
+        resp = client.get("/api/v1/data/tables?layout=star", headers=auth_headers)
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert isinstance(payload, dict)
+        assert "data" in payload
+        assert "meta" in payload
+        star = payload["data"]
+        assert star.get("schema_version") == "1.0"
+        assert "grain" in star
+        tables = star.get("tables") or {}
+        for key in (
+            "fact_form_values",
+            "dim_country",
+            "dim_form_item",
+            "dim_template",
+            "dim_period",
+            "dim_submission",
+            "bridge_disagg_values",
+        ):
+            assert key in tables
+            assert isinstance(tables[key], list)
+
+    def test_api_key_with_no_data_permission_returns_403(self, client, db_session, app):
+        from app import db
+        from app.models import APIKey
+
+        with app.app_context():
+            full_key, key_id, key_hash, key_prefix = APIKey.generate_key()
+            api_key_obj = APIKey(
+                key_id=key_id,
+                key_hash=key_hash,
+                key_prefix=key_prefix,
+                client_name="No Data Client",
+                permissions={"data": "none"},
+                rate_limit_per_minute=1000,
+                is_active=True,
+                is_revoked=False,
+            )
+            db.session.add(api_key_obj)
+            db.session.commit()
+
+        resp = client.get(
+            "/api/v1/data/tables",
+            headers={"Authorization": f"Bearer {full_key}"},
+        )
+        assert resp.status_code == 403
+
 
 @pytest.mark.api
 @pytest.mark.integration

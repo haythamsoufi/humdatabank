@@ -1,4 +1,4 @@
-"""Assignment status workflow helpers (NS review / delegation)."""
+"""Assignment status workflow helpers for the delegation review feature."""
 
 from __future__ import annotations
 
@@ -31,7 +31,8 @@ def _status_value(assignment_entity_status: 'AssignmentEntityStatus') -> str:
     return str(status)
 
 
-def ns_review_source_statuses() -> tuple[AssignmentEntityStatusValue, ...]:
+def delegation_review_source_statuses() -> tuple[AssignmentEntityStatusValue, ...]:
+    """Statuses from which NS focal points can send for delegation review."""
     return (AssignmentEntityStatusValue.in_progress, AssignmentEntityStatusValue.requires_revision)
 
 
@@ -61,7 +62,7 @@ def resolve_submit_action(
         return 'submit'
 
     status = _status_value(assignment_entity_status)
-    if status in {m.value for m in ns_review_source_statuses()}:
+    if status in {m.value for m in delegation_review_source_statuses()}:
         return 'send_for_review'
 
     return 'submit'
@@ -69,7 +70,7 @@ def resolve_submit_action(
 
 def should_apply_sent_for_review(
     assignment_entity_status: 'AssignmentEntityStatus',
-    user,
     effective_action: str,
 ) -> bool:
+    """Return True when the effective action should transition status to sent_for_review."""
     return effective_action == 'send_for_review' and review_enabled(assignment_entity_status)

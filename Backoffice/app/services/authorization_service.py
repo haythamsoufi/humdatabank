@@ -857,6 +857,12 @@ class AuthorizationService:
         status = assignment_entity_status.status
         if hasattr(status, "value"):
             status = status.value
+        # These statuses all lock the NS focal point out of the form, so an admin
+        # "Reopen" action is needed to restore edit access.
+        # sent_for_review is included because the form is locked for NS users while
+        # awaiting delegation — an admin reopen is the escape hatch if delegation
+        # cannot act (it bypasses the delegation workflow and returns to in_progress).
+        # The normal delegation path is can_return_for_revision → requires_revision.
         if status in {
             AssignmentEntityStatusValue.submitted.value,
             AssignmentEntityStatusValue.approved.value,
@@ -978,7 +984,7 @@ class AuthorizationService:
         from app.models.enums import AssignmentEntityStatusValue
         from app.services.assignment_workflow_service import (
             is_delegation_user,
-            ns_review_source_statuses,
+            delegation_review_source_statuses,
             review_enabled,
         )
 
@@ -993,14 +999,14 @@ class AuthorizationService:
             return review_enabled(assignment_entity_status) and is_delegation_user(user)
 
         if review_enabled(assignment_entity_status) and not is_delegation_user(user):
-            if status in {m.value for m in ns_review_source_statuses()}:
+            if status in {m.value for m in delegation_review_source_statuses()}:
                 return False
 
         return True
 
     @staticmethod
     def can_send_for_review(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
-        """NS focal points: send in-progress work to org delegation for review."""
+        """NS focal points: send in-progress or requires-revision work to delegation for review."""
         if not user or not user.is_authenticated:
             return False
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
@@ -1012,10 +1018,13 @@ class AuthorizationService:
         from app.models.enums import AssignmentEntityStatusValue
         from app.services.assignment_workflow_service import (
             is_delegation_user,
-            ns_review_source_statuses,
+            delegation_review_source_statuses,
             review_enabled,
         )
 
+        # Delegation users submit, they don't send for review.
+        # Note: system-manager check is intentionally after this — a system manager
+        # with an org-domain email acts as delegation and cannot send for review.
         if not review_enabled(assignment_entity_status) or is_delegation_user(user):
             return False
 
@@ -1044,11 +1053,11 @@ class AuthorizationService:
         status = assignment_entity_status.status
         if hasattr(status, 'value'):
             status = status.value
-        return status in {m.value for m in ns_review_source_statuses()}
+        return status in {m.value for m in delegation_review_source_statuses()}
 
     @staticmethod
     def can_return_for_revision(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
-        """Org delegation: return sent-for-review assignment to NS for changes."""
+        """Delegation: return a sent-for-review assignment to the focal point for changes."""
         if not user or not user.is_authenticated:
             return False
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):

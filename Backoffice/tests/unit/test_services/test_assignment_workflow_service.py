@@ -1,4 +1,4 @@
-"""Unit tests for assignment NS review workflow helpers."""
+"""Unit tests for assignment delegation review workflow helpers."""
 
 import pytest
 from unittest.mock import MagicMock, patch
@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue, EntityType
 from app.services.assignment_workflow_service import (
+    delegation_review_source_statuses,
     resolve_submit_action,
     review_enabled,
     should_apply_sent_for_review,
@@ -53,6 +54,22 @@ class TestAssignmentWorkflowService:
     @patch('app.services.assignment_workflow_service.is_organization_email', return_value=False)
     def test_should_apply_sent_for_review(self, _mock_org):
         aes = self._aes(requires_delegation_review=True)
+        assert should_apply_sent_for_review(aes, 'send_for_review') is True
+        assert should_apply_sent_for_review(aes, 'submit') is False
+
+    @patch('app.services.assignment_workflow_service.is_organization_email', return_value=False)
+    def test_requires_revision_also_sends_for_review(self, _mock_org):
+        """NS focal points can re-send after delegation returns for changes."""
+        aes = self._aes(
+            requires_delegation_review=True,
+            status=AssignmentEntityStatusValue.requires_revision,
+        )
         user = MagicMock()
-        assert should_apply_sent_for_review(aes, user, 'send_for_review') is True
-        assert should_apply_sent_for_review(aes, user, 'submit') is False
+        user.email = 'fp@national-society.org'
+        assert resolve_submit_action(aes, user, 'submit') == 'send_for_review'
+
+    def test_delegation_review_source_statuses_contains_expected(self):
+        sources = delegation_review_source_statuses()
+        assert AssignmentEntityStatusValue.in_progress in sources
+        assert AssignmentEntityStatusValue.requires_revision in sources
+        assert AssignmentEntityStatusValue.submitted not in sources

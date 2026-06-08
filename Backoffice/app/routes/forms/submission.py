@@ -311,7 +311,7 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
 
                 from app.services.form_data_service import FormDataService
 
-                sections = submission.assigned_form.sections_ordered
+                sections = all_sections
 
                 submission_result = FormDataService.process_form_submission(
                     submission, sections, csrf_form=None
@@ -434,6 +434,7 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
                          assignment_status=dummy_acs,
                          template_structure=template_structure,
                          form=csrf_form,
+                         csrf_form=csrf_form,
                          existing_data=existing_data_processed,
                          existing_submitted_documents=existing_submitted_documents,
                          entity_repo_document_ids=frozenset(),

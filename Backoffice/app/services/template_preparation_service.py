@@ -7,7 +7,10 @@ Centralizes template processing logic to eliminate duplication.
 from flask import current_app
 from app.models import FormSection, DynamicIndicatorData, Config, FormItem, FormPage
 from app import db
-from app.utils.form_localization import get_localized_page_name, get_localized_section_name, get_localized_indicator_name, get_localized_sector_name, get_localized_subsector_name
+from app.utils.form_localization import (
+    get_localized_page_name, get_localized_section_name, get_localized_indicator_name,
+    get_localized_sector_name, get_localized_subsector_name, get_indicator_bank_unit_display,
+)
 from app.services.form_processing_service import get_form_items_for_section, FormItemProcessor, _process_dynamic_indicators_for_section
 from typing import List, Dict, Any, Optional
 import json
@@ -225,7 +228,7 @@ class TemplatePreparationService:
                         'id': indicator.id,
                         'name': get_localized_indicator_name(indicator),
                         'type': indicator.type,
-                        'unit': indicator.unit,
+                        'unit': get_indicator_bank_unit_display(indicator) or indicator.unit,
                         'emergency': str(indicator.emergency).lower() if indicator.emergency is not None else None,
                         # Add sector and subsector information for filtering
                         'sector': cls._get_indicator_sector_name(indicator),

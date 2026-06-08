@@ -32,7 +32,6 @@ class NotificationCenter {
     init() {
         this.attachEventListeners();
         this.loadNotifications();
-        this.loadPreferences();
     }
 
     attachEventListeners() {
@@ -45,30 +44,8 @@ class NotificationCenter {
         document.getElementById('apply-filters')?.addEventListener('click', () => this.applyFilters());
         document.getElementById('clear-filters')?.addEventListener('click', () => this.clearFilters());
 
-        // Preferences toggle
-        document.getElementById('preferences-toggle')?.addEventListener('click', () => this.togglePreferences());
-        document.getElementById('save-preferences')?.addEventListener('click', () => this.savePreferences());
-        document.getElementById('cancel-preferences')?.addEventListener('click', () => this.togglePreferences());
-
-        // Frequency change handler to show/hide digest schedule
-        document.getElementById('pref-frequency')?.addEventListener('change', (e) => this.toggleDigestSchedule(e.target.value));
-
-        // Update digest preview when day or time changes
-        document.getElementById('pref-digest-day')?.addEventListener('change', () => this.updateDigestPreviewFromForm());
-        document.getElementById('pref-digest-time')?.addEventListener('change', () => this.updateDigestPreviewFromForm());
-
-        // Select All checkboxes
-        document.getElementById('select-all-email')?.addEventListener('change', (e) => this.toggleSelectAll('email', e.target.checked));
-        document.getElementById('select-all-push')?.addEventListener('change', (e) => this.toggleSelectAll('push', e.target.checked));
-
-        // Update select all checkboxes when individual checkboxes change
-        document.addEventListener('change', (e) => {
-            if (e.target.classList.contains('notification-type-email')) {
-                this.updateSelectAllState('email');
-            } else if (e.target.classList.contains('notification-type-push')) {
-                this.updateSelectAllState('push');
-            }
-        });
+        // Filters toggle
+        document.getElementById('filters-toggle')?.addEventListener('click', () => this.toggleFilters());
 
         // Bulk actions
         document.getElementById('bulk-mark-read')?.addEventListener('click', () => this.handleBulkAction('mark_read'));
@@ -1375,331 +1352,19 @@ class NotificationCenter {
         }
     }
 
-    togglePreferences() {
-        const panel = document.getElementById('preferences-panel');
-        panel.classList.toggle('hidden');
-    }
+    toggleFilters(forceOpen = null) {
+        const panel = document.getElementById('filters-panel');
+        const toggle = document.getElementById('filters-toggle');
+        if (!panel) return;
 
-    async loadPreferences() {
-        try {
-            const data = await _ncFetch('/notifications/api/preferences');
-
-            if (data.success) {
-                this.populatePreferences(data.preferences);
-            }
-        } catch (error) {
-            console.error('Error loading preferences:', error);
-        }
-    }
-
-    populatePreferences(preferences) {
-        document.getElementById('pref-sound-enabled').checked = preferences.sound_enabled;
-        const frequency = preferences.notification_frequency || 'instant';
-        document.getElementById('pref-frequency').value = frequency;
-
-        // Toggle digest schedule visibility based on frequency
-        this.toggleDigestSchedule(frequency);
-
-        // Set digest day and time if they exist
-        if (preferences.digest_day) {
-            document.getElementById('pref-digest-day').value = preferences.digest_day;
-        }
-        if (preferences.digest_time) {
-            document.getElementById('pref-digest-time').value = preferences.digest_time;
+        const willOpen = forceOpen === null ? panel.classList.contains('hidden') : forceOpen;
+        if (willOpen) {
+            panel.classList.remove('hidden');
         } else {
-            // Default to 9:00 AM if no time set
-            document.getElementById('pref-digest-time').value = '09:00';
+            panel.classList.add('hidden');
         }
-
-        // Set notification type email checkboxes
-        // Empty array means all enabled
-        const emailEnabledTypes = preferences.notification_types_enabled || [];
-        const allEmailEnabled = emailEnabledTypes.length === 0;
-
-        document.querySelectorAll('.notification-type-email').forEach(checkbox => {
-            const type = checkbox.getAttribute('data-type');
-            checkbox.checked = allEmailEnabled || emailEnabledTypes.includes(type);
-        });
-
-        // Update select all email checkbox
-        this.updateSelectAllState('email');
-
-        // Set notification type push checkboxes
-        // Empty array means all enabled
-        const pushEnabledTypes = preferences.push_notification_types_enabled || [];
-        const allPushEnabled = pushEnabledTypes.length === 0;
-
-        document.querySelectorAll('.notification-type-push').forEach(checkbox => {
-            const type = checkbox.getAttribute('data-type');
-            checkbox.checked = allPushEnabled || pushEnabledTypes.includes(type);
-        });
-
-        // Update select all push checkbox
-        this.updateSelectAllState('push');
-
-        // Update digest preview
-        this.updateDigestPreview(preferences);
+        toggle?.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
     }
-
-    toggleDigestSchedule(frequency) {
-        const scheduleGroup = document.getElementById('digest-schedule-group');
-        const dayGroup = document.getElementById('digest-day-group');
-
-        if (frequency === 'daily' || frequency === 'weekly') {
-            if (scheduleGroup) scheduleGroup.style.display = 'grid';
-            // Show day selector only for weekly
-            if (dayGroup) {
-                dayGroup.style.display = frequency === 'weekly' ? 'block' : 'none';
-            }
-        } else {
-            if (scheduleGroup) scheduleGroup.style.display = 'none';
-        }
-
-        // Update digest preview when frequency changes
-        const preferences = {
-            notification_frequency: frequency,
-            digest_day: document.getElementById('pref-digest-day')?.value,
-            digest_time: document.getElementById('pref-digest-time')?.value || '09:00'
-        };
-        this.updateDigestPreview(preferences);
-    }
-
-    updateDigestPreview(preferences) {
-        const previewEl = document.getElementById('digest-preview');
-        const previewText = document.getElementById('digest-preview-text');
-        if (!previewEl || !previewText) return;
-
-        const frequency = preferences.notification_frequency || 'instant';
-        const digestDay = preferences.digest_day;
-        const digestTime = preferences.digest_time || '09:00';
-
-        if (frequency === 'instant') {
-            previewEl.classList.add('hidden');
-        } else if (frequency === 'daily') {
-            previewEl.classList.remove('hidden');
-            previewText.textContent = `You will receive a daily digest email at ${digestTime}.`;
-        } else if (frequency === 'weekly') {
-            const dayName = digestDay ? digestDay.charAt(0).toUpperCase() + digestDay.slice(1) : 'Monday';
-            previewEl.classList.remove('hidden');
-            previewText.textContent = `You will receive a weekly digest email every ${dayName} at ${digestTime}.`;
-        }
-    }
-
-    updateDigestPreviewFromForm() {
-        const preferences = {
-            notification_frequency: document.getElementById('pref-frequency')?.value || 'instant',
-            digest_day: document.getElementById('pref-digest-day')?.value,
-            digest_time: document.getElementById('pref-digest-time')?.value || '09:00'
-        };
-        this.updateDigestPreview(preferences);
-    }
-
-    toggleSelectAll(type, checked) {
-        const selector = type === 'email' ? '.notification-type-email' : '.notification-type-push';
-        document.querySelectorAll(selector).forEach(checkbox => {
-            checkbox.checked = checked;
-        });
-    }
-
-    updateSelectAllState(type) {
-        const selector = type === 'email' ? '.notification-type-email' : '.notification-type-push';
-        const selectAllId = type === 'email' ? 'select-all-email' : 'select-all-push';
-
-        const checkboxes = Array.from(document.querySelectorAll(selector));
-        const allChecked = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
-        const selectAllCheckbox = document.getElementById(selectAllId);
-
-        if (selectAllCheckbox) {
-            selectAllCheckbox.checked = allChecked;
-        }
-    }
-
-    async savePreferences() {
-        // Get save button and store original state
-        const saveButton = document.getElementById('save-preferences');
-        let originalNodes = null;
-
-        if (saveButton) {
-            // Store original button content
-            originalNodes = document.createElement('div');
-            Array.from(saveButton.childNodes).forEach(node => {
-                originalNodes.appendChild(node.cloneNode(true));
-            });
-
-            // Disable button and show loading state
-            saveButton.disabled = true;
-            saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-        }
-
-        // Get all notification types (from email checkboxes)
-        const allNotificationTypes = Array.from(document.querySelectorAll('.notification-type-email'))
-            .map(cb => cb.getAttribute('data-type'));
-
-        // Get enabled email notification types
-        const enabledEmailTypes = Array.from(document.querySelectorAll('.notification-type-email:checked'))
-            .map(cb => cb.getAttribute('data-type'));
-
-        // Get enabled push notification types
-        const enabledPushTypes = Array.from(document.querySelectorAll('.notification-type-push:checked'))
-            .map(cb => cb.getAttribute('data-type'));
-
-        // If all types are enabled, send empty array (backend interprets as all enabled)
-        const allEmailSelected = enabledEmailTypes.length === allNotificationTypes.length;
-        const allPushSelected = enabledPushTypes.length === allNotificationTypes.length;
-
-        const emailTypesToSend = allEmailSelected ? [] : enabledEmailTypes;
-        const pushTypesToSend = allPushSelected ? [] : enabledPushTypes;
-
-        // Determine email_notifications and push_notifications
-        // True if all types selected (empty array) OR if some types are selected
-        const emailNotifications = allEmailSelected || enabledEmailTypes.length > 0;
-        const pushNotifications = allPushSelected || enabledPushTypes.length > 0;
-
-        const frequency = document.getElementById('pref-frequency').value;
-        const preferences = {
-            email_notifications: emailNotifications,
-            sound_enabled: document.getElementById('pref-sound-enabled').checked,
-            notification_frequency: frequency,
-            notification_types_enabled: emailTypesToSend,
-            push_notifications: pushNotifications,
-            push_notification_types_enabled: pushTypesToSend
-        };
-
-        // Add digest day and time if daily or weekly is selected
-        if (frequency === 'daily' || frequency === 'weekly') {
-            preferences.digest_time = document.getElementById('pref-digest-time').value;
-            if (frequency === 'weekly') {
-                preferences.digest_day = document.getElementById('pref-digest-day').value;
-            } else {
-                preferences.digest_day = null; // Clear day for daily
-            }
-        } else {
-            preferences.digest_day = null;
-            preferences.digest_time = null;
-        }
-
-        // Check if user is disabling all notifications
-        if (!emailNotifications && !pushNotifications) {
-            const message = 'You are disabling all email and push notifications. ' +
-                'You will not receive any notifications. Are you sure?';
-            if (window.showDangerConfirmation) {
-                return new Promise((resolve) => {
-                    window.showDangerConfirmation(
-                        message,
-                        async () => {
-                            // Continue with save after confirmation
-                            await this.savePreferencesInternal(preferences, saveButton, originalNodes);
-                            resolve();
-                        },
-                        () => {
-                            // User cancelled - restore button state
-                            if (saveButton && originalNodes) {
-                                saveButton.disabled = false;
-                                saveButton.replaceChildren();
-                                Array.from(originalNodes.childNodes).forEach(node => {
-                                    saveButton.appendChild(node.cloneNode(true));
-                                });
-                            } else if (saveButton) {
-                                saveButton.disabled = false;
-                            }
-                            resolve();
-                        },
-                        'Disable All',
-                        'Cancel',
-                        'Disable All Notifications?'
-                    );
-                });
-            } else if (window.showConfirmation) {
-                return new Promise((resolve) => {
-                    window.showConfirmation(
-                        message,
-                        async () => {
-                            await this.savePreferencesInternal(preferences, saveButton, originalNodes);
-                            resolve();
-                        },
-                        () => {
-                            if (saveButton && originalNodes) {
-                                saveButton.disabled = false;
-                                saveButton.replaceChildren();
-                                Array.from(originalNodes.childNodes).forEach(node => {
-                                    saveButton.appendChild(node.cloneNode(true));
-                                });
-                            } else if (saveButton) {
-                                saveButton.disabled = false;
-                            }
-                            resolve();
-                        },
-                        'Disable All',
-                        'Cancel',
-                        'Disable All Notifications?'
-                    );
-                });
-            } else {
-                if (saveButton && originalNodes) {
-                    saveButton.disabled = false;
-                    saveButton.replaceChildren();
-                    Array.from(originalNodes.childNodes).forEach(node => {
-                        saveButton.appendChild(node.cloneNode(true));
-                    });
-                } else if (saveButton) {
-                    saveButton.disabled = false;
-                }
-                return;
-            }
-        }
-
-        // Continue with save if not using custom dialog (or if confirmed via native)
-        await this.savePreferencesInternal(preferences, saveButton, originalNodes);
-    }
-
-    async savePreferencesInternal(preferences, saveButton, originalNodes) {
-        try {
-            const data = await _ncFetch('/notifications/api/preferences', {
-                method: 'POST',
-                body: JSON.stringify(preferences)
-            });
-
-            if (data.success) {
-                // Show success message
-                this.showFlashMessage('Preferences saved successfully', 'success');
-                this.togglePreferences();
-
-                // Update digest preview with saved preferences
-                if (data.preferences) {
-                    this.updateDigestPreview(data.preferences);
-                }
-            } else {
-                throw new Error(data.error || 'Failed to save preferences');
-            }
-        } catch (error) {
-            console.error('Error saving preferences:', error);
-
-            // Show detailed error message
-            let errorMessage = 'Failed to save preferences. ';
-            if (error.message.includes('Validation')) {
-                errorMessage += 'Please check your settings and try again.';
-            } else if (error.message.includes('network') || error.message.includes('fetch')) {
-                errorMessage += 'Network error. Please check your connection and try again.';
-            } else {
-                errorMessage += error.message || 'Please try again.';
-            }
-
-            this.showFlashMessage(errorMessage, 'error');
-        } finally {
-            // Restore button state
-            if (saveButton && originalNodes) {
-                saveButton.disabled = false;
-                saveButton.replaceChildren();
-                // Clone and append original nodes
-                Array.from(originalNodes.childNodes).forEach(node => {
-                    saveButton.appendChild(node.cloneNode(true));
-                });
-            } else if (saveButton) {
-                saveButton.disabled = false;
-            }
-        }
-    }
-
 
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -1780,12 +1445,6 @@ class NotificationCenter {
         window.open(url, '_blank');
     }
 
-
-    showFlashMessage(message, type = 'success') {
-        if (typeof window.showFlashMessage === 'function') {
-            window.showFlashMessage(message, type);
-        }
-    }
 }
 
 // Initialize notification center when DOM is ready

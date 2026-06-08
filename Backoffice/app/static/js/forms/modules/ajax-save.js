@@ -8,6 +8,10 @@ let drainPromise = null; // drains queued save requests
 let queuedOptions = null; // merged options for next save run
 let saveButton = null;
 let form = null;
+let fabSaveButton = null;
+let fabMenu = null;
+let mobileNavToggle = null;
+let _savingFlashHandle = null; // handle returned by FlashMessages.show() for the "Saving…" toast
 
 /**
  * Initialize AJAX save functionality
@@ -27,6 +31,10 @@ export function initAjaxSave() {
     // Override the save button behavior
     saveButton.addEventListener('click', handleSaveClick);
 
+    fabSaveButton = document.getElementById('fab-save-btn');
+    fabMenu = document.getElementById('fab-menu');
+    mobileNavToggle = document.getElementById('mobile-nav-toggle-button');
+
     debugLog(MODULE_NAME, '✅ AJAX Save initialized');
 }
 
@@ -45,6 +53,9 @@ function handleSaveClick(event) {
     if (window.collectHiddenFieldsForSubmission) {
         window.collectHiddenFieldsForSubmission();
     }
+
+    // Show loading immediately (FAB stack hides before async drain starts)
+    updateSaveButtonState(true);
 
     // Explicit Save should show normal toast + button loading state
     queueSave({ toast: true, buttonState: true });
@@ -91,6 +102,23 @@ async function saveFormOnce(options = {}) {
 
     isSaving = true;
     if (buttonStateEnabled) updateSaveButtonState(true);
+
+    // Show "Saving…" flash for explicit (user-triggered) saves, not background presaves
+    const isPresaveRun = options && options.presave === true;
+    const toastEnabled = (() => {
+        const t = (options && Object.prototype.hasOwnProperty.call(options, 'toast')) ? options.toast : undefined;
+        return (t === undefined) ? true : !!t;
+    })();
+    if (toastEnabled && !isPresaveRun) {
+        // Dismiss any existing "Saving…" handle before showing a new one
+        if (_savingFlashHandle) {
+            try { _savingFlashHandle.dismiss(); } catch (_) { /* no-op */ }
+        }
+        if (window.FlashMessages && typeof window.FlashMessages.show === 'function') {
+            _savingFlashHandle = window.FlashMessages.show('Saving…', 'info');
+        }
+    }
+
     // Keep original formatted numeric values to restore after sending
     let originalNumericValues = null;
 
@@ -248,6 +276,12 @@ async function saveFormOnce(options = {}) {
         showSaveMessage('❌ Save failed: ' + msg, 'error');
         throw error;
     } finally {
+        // Dismiss the "Saving…" toast now that we have a result (success / error already shown above)
+        if (_savingFlashHandle) {
+            try { _savingFlashHandle.dismiss(); } catch (_) { /* no-op */ }
+            _savingFlashHandle = null;
+        }
+
         // Restore original formatted numeric values and reschedule formatting
         if (originalNumericValues) {
             originalNumericValues.forEach((value, input) => {
@@ -286,36 +320,91 @@ function queueSave(options = {}) {
     return drainPromise;
 }
 
+function setIconLoadingState(icon, saving, spinnerClass, defaultClass) {
+    if (!icon) return;
+    if (saving) {
+        if (!icon.dataset.prevClass) {
+            icon.dataset.prevClass = icon.className;
+        }
+        icon.className = spinnerClass;
+        return;
+    }
+    if (icon.dataset.prevClass) {
+        icon.className = icon.dataset.prevClass;
+        delete icon.dataset.prevClass;
+        return;
+    }
+    icon.className = defaultClass;
+}
+
+/**
+ * Update floating FAB controls during save (hide stack, show spinner on main toggle).
+ */
+function updateFabSaveState(saving) {
+    if (fabMenu) {
+        fabMenu.classList.toggle('is-saving', saving);
+    }
+
+    if (mobileNavToggle) {
+        mobileNavToggle.classList.toggle('is-saving', saving);
+        mobileNavToggle.disabled = saving;
+        mobileNavToggle.setAttribute('aria-busy', saving ? 'true' : 'false');
+        setIconLoadingState(
+            mobileNavToggle.querySelector('i'),
+            saving,
+            'fas fa-spinner fa-spin text-xl',
+            'fas fa-list text-xl'
+        );
+    }
+
+    if (fabSaveButton) {
+        fabSaveButton.disabled = saving;
+        setIconLoadingState(
+            fabSaveButton.querySelector('i'),
+            saving,
+            'fas fa-spinner fa-spin',
+            'fas fa-save'
+        );
+    }
+
+    ['fab-submit-btn', 'fab-pin-btn'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = saving;
+    });
+}
+
 /**
  * Update save button state
  */
 function updateSaveButtonState(saving) {
-    if (!saveButton) return;
+    if (saveButton) {
+        const icon = saveButton.querySelector('i');
+        const text = saveButton.querySelector('span') || saveButton;
 
-    const icon = saveButton.querySelector('i');
-    const text = saveButton.querySelector('span') || saveButton;
-
-    if (saving) {
-        saveButton.disabled = true;
-        if (icon) {
-            icon.className = 'fas fa-spinner fa-spin w-4 h-4 mr-2';
-        }
-        // Update text content while preserving structure
-        const textNode = Array.from(text.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
-        if (textNode) {
-            textNode.textContent = textNode.textContent.includes('Save') ? 'Saving...' : textNode.textContent;
-        }
-    } else {
-        saveButton.disabled = false;
-        if (icon) {
-            icon.className = 'fas fa-save w-4 h-4 mr-2';
-        }
-        // Restore text content
-        const textNode = Array.from(text.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
-        if (textNode) {
-            textNode.textContent = textNode.textContent.replace('Saving...', 'Save');
+        if (saving) {
+            saveButton.disabled = true;
+            if (icon) {
+                icon.className = 'fas fa-spinner fa-spin w-4 h-4 mr-2';
+            }
+            // Update text content while preserving structure
+            const textNode = Array.from(text.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+            if (textNode) {
+                textNode.textContent = textNode.textContent.includes('Save') ? 'Saving...' : textNode.textContent;
+            }
+        } else {
+            saveButton.disabled = false;
+            if (icon) {
+                icon.className = 'fas fa-save w-4 h-4 mr-2';
+            }
+            // Restore text content
+            const textNode = Array.from(text.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+            if (textNode) {
+                textNode.textContent = textNode.textContent.replace('Saving...', 'Save');
+            }
         }
     }
+
+    updateFabSaveState(saving);
 }
 
 /**
@@ -362,6 +451,7 @@ function updateFormData(data) {
  */
 export function triggerSave() {
     if (!isSaving) {
+        updateSaveButtonState(true);
         queueSave({ toast: true, buttonState: true });
     }
 }

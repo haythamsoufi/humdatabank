@@ -50,7 +50,8 @@ EXTERNAL_API_REGISTRY = [
     {'group': 'Submissions', 'path': '/api/v1/submissions', 'methods': ['GET'],
      'auth': 'api_key_or_session', 'rate_limited': False,
      'description': 'List submissions; API key gets paginated view, session/Basic returns all accessible',
-     'consumers': 'External integrations'},
+     'consumers': 'External integrations',
+     'deprecated_envelope': True},
     {'group': 'Submissions', 'path': '/api/v1/submissions/<submission_id>', 'methods': ['GET'],
      'auth': 'api_key', 'rate_limited': True,
      'description': 'Full detail for one assigned or public submission'},
@@ -58,7 +59,8 @@ EXTERNAL_API_REGISTRY = [
     # ── Form Templates & Items ─────────────────────────────────────────────────
     {'group': 'Templates & Form Items', 'path': '/api/v1/templates', 'methods': ['GET'],
      'auth': 'api_key_or_session', 'rate_limited': False,
-     'description': 'Template list; pagination differs by auth type'},
+     'description': 'Template list; pagination differs by auth type',
+     'deprecated_envelope': True},
     {'group': 'Templates & Form Items', 'path': '/api/v1/templates/<template_id>', 'methods': ['GET'],
      'auth': 'api_key', 'rate_limited': True,
      'description': 'Full template structure (pages, sections, items)'},
@@ -84,10 +86,15 @@ EXTERNAL_API_REGISTRY = [
     # ── Form Data ──────────────────────────────────────────────────────────────
     {'group': 'Form Data', 'path': '/api/v1/data', 'methods': ['GET'],
      'auth': 'api_key_or_session', 'rate_limited': True, 'featured': True,
-     'description': 'Filtered form data rows; API key paginates, session/Basic returns all accessible'},
+     'description': 'Filtered form data rows; API key paginates, session/Basic returns all accessible',
+     'deprecated_envelope': True},
     {'group': 'Form Data', 'path': '/api/v1/data/tables', 'methods': ['GET'],
      'auth': 'api_key_or_session', 'rate_limited': False, 'featured': True,
-     'description': 'Denormalised data rows + related form_items and countries tables in one response'},
+     'description': (
+         'Multi-table data bundle (layout=flat, default) or star-schema export '
+         '(layout=star: fact_form_values + dim_* + bridge_disagg_values). '
+         'Scoped API keys honour permissions.template_ids / country_ids.'
+     )},
     {'group': 'Form Data', 'path': '/api/v1/countries/<country_id>/data', 'methods': ['GET'],
      'auth': 'api_key', 'rate_limited': True,
      'description': 'Paginated form data scoped to one country'},
@@ -186,7 +193,8 @@ EXTERNAL_API_REGISTRY = [
      'description': 'Issue a CSRF token for session-backed clients (e.g. mobile session mode)'},
     {'group': 'System', 'path': '/api/v1/common-words', 'methods': ['GET'],
      'auth': 'api_key', 'rate_limited': True,
-     'description': 'Active common words / tooltip glossary for a language'},
+     'description': 'Active common words / tooltip glossary for a language',
+     'deprecated_envelope': True},
     {'group': 'System', 'path': '/api/v1/variables/resolve', 'methods': ['POST'],
      'auth': 'session', 'rate_limited': False,
      'description': 'Resolve template variable expressions for the logged-in user'},

@@ -141,141 +141,28 @@ def sectors_subsectors():
 @mobile_rate_limit(requests_per_minute=60)
 def public_indicator_bank():
     """Public indicator bank listing (mirrors /api/v1/indicator-bank)."""
-    from app.models import IndicatorBank, Sector, SubSector
-    from app.routes.api.indicators import (
-        _get_supported_language_codes,
-        _load_measurement_lookup_maps,
-        _serialize_indicator_bank_record,
-    )
+    from app.services.indicator_bank_service import IndicatorBankFilters, get_indicator_list
 
-    # Allow full-catalog loads (hundreds of indicators); cap protects against abuse.
     page, per_page = validate_pagination_params(
         request.args, default_per_page=500, max_per_page=2000
     )
-
-    search_query = request.args.get('search', default='', type=str).strip()
-    indicator_type = request.args.get('type', default='', type=str).strip()
-    sector_name = request.args.get('sector', default='', type=str).strip()
-    sub_sector_name = request.args.get('sub_sector', default='', type=str).strip()
-    emergency = request.args.get('emergency', default='', type=str).strip()
-    archived_param = request.args.get('archived', default=None)
-    sector_id_param = request.args.get('sector_id', type=int)
-
-    supported_langs = _get_supported_language_codes()
-
-    query = IndicatorBank.query
-
-    if archived_param is not None:
-        if archived_param.lower() == 'true':
-            query = query.filter(IndicatorBank.archived == True)  # noqa: E712
-        elif archived_param.lower() == 'false':
-            query = query.filter(IndicatorBank.archived == False)  # noqa: E712
-
-    if search_query:
-        safe_pattern = safe_ilike_pattern(search_query)
-        query = query.filter(
-            db.or_(
-                IndicatorBank.name.ilike(safe_pattern),
-                IndicatorBank.definition.ilike(safe_pattern),
-            )
-        )
-
-    if indicator_type:
-        query = query.filter(
-            IndicatorBank.type.ilike(safe_ilike_pattern(indicator_type))
-        )
-
-    if sector_name:
-        sector_obj = Sector.query.filter_by(name=sector_name, is_active=True).first()
-        if sector_obj:
-            sid = str(sector_obj.id)
-            query = query.filter(
-                db.or_(
-                    IndicatorBank.sector['primary'].astext == sid,
-                    IndicatorBank.sector['secondary'].astext == sid,
-                    IndicatorBank.sector['tertiary'].astext == sid,
-                )
-            )
-
-    if sub_sector_name:
-        subsector_obj = SubSector.query.filter_by(
-            name=sub_sector_name, is_active=True
-        ).first()
-        if subsector_obj:
-            ssid = str(subsector_obj.id)
-            query = query.filter(
-                db.or_(
-                    IndicatorBank.sub_sector['primary'].astext == ssid,
-                    IndicatorBank.sub_sector['secondary'].astext == ssid,
-                    IndicatorBank.sub_sector['tertiary'].astext == ssid,
-                )
-            )
-
-    if sector_id_param is not None:
-        sid = str(sector_id_param)
-        query = query.filter(
-            db.or_(
-                IndicatorBank.sector['primary'].astext == sid,
-                IndicatorBank.sector['secondary'].astext == sid,
-                IndicatorBank.sector['tertiary'].astext == sid,
-            )
-        )
-
-    if emergency:
-        query = query.filter(
-            IndicatorBank.emergency.ilike(safe_ilike_pattern(emergency))
-        )
-
-    paginated = query.order_by(IndicatorBank.name.asc()).paginate(
-        page=page, per_page=per_page, error_out=False
+    filters = IndicatorBankFilters(
+        search=request.args.get('search', default='', type=str).strip(),
+        indicator_type=request.args.get('type', default='', type=str).strip(),
+        sector=request.args.get('sector', default='', type=str).strip(),
+        sub_sector=request.args.get('sub_sector', default='', type=str).strip(),
+        emergency=request.args.get('emergency', default='', type=str).strip(),
+        archived=request.args.get('archived', default=None),
+        sector_id=request.args.get('sector_id', type=int),
     )
-    indicators = paginated.items
-
-    sector_ids = set()
-    subsector_ids = set()
-    for indicator in indicators:
-        if indicator.sector:
-            for level in ('primary', 'secondary', 'tertiary'):
-                sector_id_val = indicator.sector.get(level)
-                if sector_id_val:
-                    sector_ids.add(sector_id_val)
-        if indicator.sub_sector:
-            for level in ('primary', 'secondary', 'tertiary'):
-                subsector_id_val = indicator.sub_sector.get(level)
-                if subsector_id_val:
-                    subsector_ids.add(subsector_id_val)
-
-    sectors_dict = {}
-    if sector_ids:
-        sectors = Sector.query.filter(Sector.id.in_(sector_ids)).all()
-        sectors_dict = {s.id: s.name for s in sectors}
-
-    subsectors_dict = {}
-    if subsector_ids:
-        subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
-        subsectors_dict = {s.id: s.name for s in subsectors}
-
-    types_by_id, types_by_code, units_by_id, units_by_code = _load_measurement_lookup_maps(indicators)
-
-    items = [
-        _serialize_indicator_bank_record(
-            indicator,
-            sectors_dict=sectors_dict,
-            subsectors_dict=subsectors_dict,
-            types_by_id=types_by_id,
-            types_by_code=types_by_code,
-            units_by_id=units_by_id,
-            units_by_code=units_by_code,
-            supported_langs=supported_langs,
-        )
-        for indicator in indicators
-    ]
-
+    items, total, page_out, per_page_out = get_indicator_list(
+        filters, page=page, per_page=per_page
+    )
     return mobile_paginated(
         items=items,
-        total=paginated.total,
-        page=paginated.page,
-        per_page=paginated.per_page,
+        total=total,
+        page=page_out or page,
+        per_page=per_page_out or per_page,
     )
 
 
@@ -283,54 +170,14 @@ def public_indicator_bank():
 @mobile_rate_limit(requests_per_minute=120)
 def public_indicator_detail(indicator_id):
     """Single indicator detail (public) — fully localized."""
-    from app.models import IndicatorBank, Sector, SubSector
-    from app.routes.api.indicators import (
-        _get_supported_language_codes,
-        _load_measurement_lookup_maps,
-        _serialize_indicator_bank_record,
-    )
+    from app.models import IndicatorBank
+    from app.services.indicator_bank_service import serialize_indicator_list
 
     indicator = IndicatorBank.query.get(indicator_id)
     if not indicator:
         return mobile_not_found('Indicator not found')
 
-    # Collect sector/subsector IDs referenced by this indicator
-    sector_ids = set()
-    subsector_ids = set()
-    if indicator.sector:
-        for level in ('primary', 'secondary', 'tertiary'):
-            val = indicator.sector.get(level)
-            if val:
-                sector_ids.add(val)
-    if indicator.sub_sector:
-        for level in ('primary', 'secondary', 'tertiary'):
-            val = indicator.sub_sector.get(level)
-            if val:
-                subsector_ids.add(val)
-
-    sectors_dict = {}
-    if sector_ids:
-        sectors = Sector.query.filter(Sector.id.in_(sector_ids)).all()
-        sectors_dict = {s.id: s.name for s in sectors}
-
-    subsectors_dict = {}
-    if subsector_ids:
-        subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
-        subsectors_dict = {s.id: s.name for s in subsectors}
-
-    supported_langs = _get_supported_language_codes()
-    types_by_id, types_by_code, units_by_id, units_by_code = _load_measurement_lookup_maps([indicator])
-    indicator_data = _serialize_indicator_bank_record(
-        indicator,
-        sectors_dict=sectors_dict,
-        subsectors_dict=subsectors_dict,
-        types_by_id=types_by_id,
-        types_by_code=types_by_code,
-        units_by_id=units_by_id,
-        units_by_code=units_by_code,
-        supported_langs=supported_langs,
-    )
-
+    indicator_data = serialize_indicator_list([indicator])[0]
     return mobile_ok(data={'indicator': indicator_data})
 
 

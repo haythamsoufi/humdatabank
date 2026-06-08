@@ -222,9 +222,13 @@
     color: #1e40af;
 }
 
-/* Filters Bar */
-.filters-bar {
+/* Filters Panel */
+#filters-panel {
     animation: slideDown 0.3s ease-out;
+}
+
+#filters-panel.hidden {
+    display: none;
 }
 
 @keyframes slideDown {

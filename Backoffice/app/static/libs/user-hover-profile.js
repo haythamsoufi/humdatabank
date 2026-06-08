@@ -2,6 +2,10 @@
  * User Hover Profile — centralized
  * Any element with class .ag-user-hover-trigger (tables, dashboard, etc.) shows
  * a user profile popup on hover/click. Configure via window.UserHoverProfileConfig.
+ *
+ * Security (PRAUDIT Finding #1, fixed Apr 2026): prefers data-user-external-id and
+ * external_ids= on GET /api/users/profile-summary; server rejects arbitrary user_ids
+ * for non-privileged callers. See Backoffice/docs/security/pentest-praudit-20260430-response.md §1.
  */
 (function() {
     'use strict';

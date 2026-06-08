@@ -205,6 +205,19 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
             "optional email and mobile push per send. Audience toggles do not apply."
         ),
     },
+    {
+        "group": "Forms & submissions",
+        "type_key": "validation_questions",
+        "emitter_active": True,
+        "audiences": ["focal_points"],
+        "description": (
+            "Sent when data validation questions are dispatched to focal points for a form submission."
+        ),
+        "recipients": (
+            "Focal points assigned to the entity for the relevant form period. "
+            "Delivered via in-app notification and optionally email when dispatched by an admin."
+        ),
+    },
 ]
 
 

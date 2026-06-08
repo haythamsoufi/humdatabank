@@ -44,10 +44,12 @@ def apply_answer_outcome(question: ValidationQuestion, outcome: str | None) -> N
     question.answer_outcome = normalized
     now = utcnow()
     if normalized == "changes_made_approved":
-        question.changes_made_approved_at = now
+        if not question.changes_made_approved_at:
+            question.changes_made_approved_at = now
         question.no_changes_approved_at = None
     elif normalized == "no_changes_approved":
-        question.no_changes_approved_at = now
+        if not question.no_changes_approved_at:
+            question.no_changes_approved_at = now
         question.changes_made_approved_at = None
     else:
         question.changes_made_approved_at = None

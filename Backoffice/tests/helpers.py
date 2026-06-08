@@ -109,3 +109,56 @@ def create_test_data_dict(**kwargs) -> Dict[str, Any]:
     }
     defaults.update(kwargs)
     return defaults
+
+
+# ---------------------------------------------------------------------------
+# HTTP / session helpers (integration route tests)
+# ---------------------------------------------------------------------------
+
+def login_session(client: Any, user_id: int) -> None:
+    """Log a user into the Flask test client via session_transaction."""
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user_id)
+        sess["_fresh"] = True
+
+
+def assert_redirect(resp: Any, contains: Optional[str] = None) -> None:
+    """Assert a response is an HTTP redirect and optionally check Location."""
+    assert resp.status_code in (301, 302, 303, 307, 308)
+    if contains is not None:
+        assert contains in (resp.headers.get("Location") or "")
+
+
+def assert_json_has_keys(resp: Any, *keys: str) -> dict:
+    """Parse JSON and assert top-level keys exist."""
+    data = resp.get_json()
+    assert isinstance(data, dict)
+    for k in keys:
+        assert k in data
+    return data
+
+
+def set_selected_entity_session(
+    client: Any,
+    *,
+    entity_type: str,
+    entity_id: int,
+    country_id: Optional[int] = None,
+) -> None:
+    """Set dashboard entity selection keys on the test client session."""
+    from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
+
+    with client.session_transaction() as sess:
+        sess["selected_entity_type"] = entity_type
+        sess["selected_entity_id"] = entity_id
+        if country_id is not None:
+            sess[SELECTED_COUNTRY_ID_SESSION_KEY] = country_id
+
+
+def get_csrf_headers(client: Any) -> dict:
+    """Fetch CSRF token from /api/v1/csrf-token for unsafe requests."""
+    resp = client.get("/api/v1/csrf-token")
+    assert resp.status_code == 200
+    token = (resp.get_json() or {}).get("csrf_token")
+    assert token
+    return {"X-CSRFToken": token}

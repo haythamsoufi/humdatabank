@@ -541,8 +541,7 @@ def _manage_settings_form_baseline(
     if ai_beta_enabled:
         base["ai_beta_enabled"] = "1"
     uid_list = [str(int(x)) for x in (ai_beta_allowed_user_ids or []) if str(x).strip().isdigit()]
-    if uid_list:
-        base["ai_beta_allowed_user_ids[]"] = uid_list
+    base["ai_beta_allowed_user_ids[]"] = uid_list
 
     return base
 

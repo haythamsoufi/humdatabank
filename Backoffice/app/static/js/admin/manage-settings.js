@@ -2935,6 +2935,12 @@
            so the server merge writes false instead of preserving the baseline "1". */
         if (looksLikeFormCheckbox(form, k)) {
           val = '0';
+        } else if (k.indexOf('[]') !== -1) {
+          /* Multi-select cleared to empty: FormData omits the field entirely when no
+             option is selected, so current[k] is undefined here. Send an explicit empty
+             array so JSON.stringify does not drop the key and the server merge knows to
+             clear the list (instead of preserving the baseline's previous values). */
+          val = [];
         }
       }
       out[k] = val;

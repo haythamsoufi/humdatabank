@@ -255,12 +255,20 @@ body.overflow-hidden { overflow: hidden; }
 /* Tooltip styles for indicator definitions, question units, and matrix descriptions */
 .indicator-definition-tooltip, .question-unit-tooltip, .matrix-description-tooltip { position: relative; }
 .indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text {
-  visibility: hidden; width: 500px; max-width: 90vw; background-color: #1f2937; color: #fff; text-align: left; border-radius: 6px; padding: 12px; position: absolute; z-index: 1000; opacity: 0; transition: opacity .3s, visibility .3s; font-size: .875rem; font-weight: normal; line-height: 1.4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  visibility: hidden; width: max-content; max-width: min(500px, 90vw); background-color: #1f2937; color: #fff; text-align: left; border-radius: 6px; padding: 12px; position: absolute; z-index: 1000; opacity: 0; transition: opacity .3s, visibility .3s; font-size: .875rem; font-weight: normal; line-height: 1.4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
 }
-/* Default position for indicator-definition tooltips (no JS-driven positioning there) */
-.indicator-definition-tooltip .tooltip-text { top: 125%; right: 0; }
+/* Default CSS fallback position for all question tooltips (JS overrides with viewport-aware fixed positioning) */
+.indicator-definition-tooltip .tooltip-text,
+.question-unit-tooltip .tooltip-text,
+.matrix-description-tooltip .tooltip-text { top: 125%; right: 0; }
 .indicator-definition-tooltip .tooltip-text::after, .question-unit-tooltip .tooltip-text::after, .matrix-description-tooltip .tooltip-text::after {
-  content: ""; position: absolute; bottom: 100%; right: 12px; border-width: 5px; border-style: solid; border-color: transparent transparent #1f2937 transparent;
+  content: ""; position: absolute;
+  bottom: var(--tooltip-arrow-bottom, 100%);
+  top: var(--tooltip-arrow-top, auto);
+  left: var(--tooltip-arrow-left, auto);
+  right: var(--tooltip-arrow-right, 12px);
+  border-width: 5px; border-style: solid;
+  border-color: var(--tooltip-arrow-color, transparent transparent #1f2937 transparent);
 }
 .indicator-definition-tooltip:hover .tooltip-text, .question-unit-tooltip:hover .tooltip-text, .matrix-description-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; display: block; }
 
@@ -299,14 +307,12 @@ body.overflow-hidden { overflow: hidden; }
 .dropdown-indicator-tooltip .tooltip-text::after { content: ""; position: absolute; top: -5px; left: 20px; border-width: 5px; border-style: solid; border-color: transparent transparent #1f2937 transparent; transform: rotate(180deg); }
 .dropdown-indicator-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
 
-/* Responsive tooltip adjustments */
+/* Responsive tooltip adjustments — arrow position set dynamically by JS */
 @media (max-width: 640px) {
-  .indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text { width: 350px; font-size: 0.8rem; }
-  .indicator-definition-tooltip .tooltip-text::after, .question-unit-tooltip .tooltip-text::after, .matrix-description-tooltip .tooltip-text::after { right: 24px; }
+  .indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text { max-width: 350px; font-size: 0.8rem; }
 }
 @media (max-width: 400px) {
-  .indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text { width: 280px; right: -20px; }
-  .indicator-definition-tooltip .tooltip-text::after, .question-unit-tooltip .tooltip-text::after, .matrix-description-tooltip .tooltip-text::after { right: 32px; }
+  .indicator-definition-tooltip .tooltip-text, .question-unit-tooltip .tooltip-text, .matrix-description-tooltip .tooltip-text { max-width: 280px; right: -20px; }
 }
 
 /* Data availability checkbox styling */
@@ -657,6 +663,27 @@ button.force-visible,
   opacity: 0 !important;
   pointer-events: none !important;
   transition: none !important;
+}
+
+/* Collapse FAB stack while saving; main toggle shows a spinner instead */
+#fab-menu.is-saving,
+#mobile-nav-toggle-button.is-saving + #fab-menu,
+#mobile-nav-toggle-button.is-saving:hover + #fab-menu,
+#fab-menu.is-saving:hover,
+#mobile-nav-toggle-button:hover + #fab-menu.is-saving,
+#mobile-nav-toggle-button.force-visible:hover + #fab-menu.is-saving.force-visible,
+#fab-menu.is-saving.force-visible:hover {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+#mobile-nav-toggle-button.is-saving {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none !important;
+  cursor: wait;
 }
 
 /* Match corner FAB inset (see responsive.css #mobileMenuFAB / #aiChatbotFAB) incl. iOS home indicator */

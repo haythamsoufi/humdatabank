@@ -433,6 +433,72 @@ def logged_in_client(client, admin_user, app):
 
 
 @pytest.fixture(scope='function')
+def logged_in_admin_client(logged_in_client):
+    """Alias for logged-in admin test client."""
+    return logged_in_client
+
+
+@pytest.fixture(scope='function')
+def focal_point_user(db_session, app):
+    """Focal-point user with country entity permission and one assignment."""
+    from sqlalchemy.orm import joinedload
+    from app.models.assignments import AssignmentEntityStatus
+    from tests.factories import create_focal_point_with_country
+    with app.app_context():
+        user, country, aes = create_focal_point_with_country(db_session)
+        aes = (
+            db_session.query(AssignmentEntityStatus)
+            .options(joinedload(AssignmentEntityStatus.assigned_form))
+            .filter_by(id=aes.id)
+            .one()
+        )
+        yield {
+            "user_id": user.id,
+            "country_id": country.id,
+            "aes_id": aes.id,
+            "period_name": aes.assigned_form.period_name,
+        }
+
+
+@pytest.fixture(scope='function')
+def system_manager_user(db_session, app):
+    """System manager user for admin dashboard routes."""
+    from tests.factories import create_test_user
+    with app.app_context():
+        user = create_test_user(
+            db_session,
+            email='test_sm@example.com',
+            role='system_manager',
+        )
+        yield user
+
+
+@pytest.fixture(scope='function')
+def logged_in_sm_client(client, system_manager_user, app):
+    """Test client logged in as system manager."""
+    from tests.helpers import login_session
+    with app.app_context():
+        login_session(client, system_manager_user.id)
+    return client
+
+
+@pytest.fixture(scope='function')
+def logged_in_focal_client(client, focal_point_user, app):
+    """Test client logged in as focal_point_user."""
+    from tests.helpers import login_session, set_selected_entity_session
+    user_id = focal_point_user["user_id"]
+    country_id = focal_point_user["country_id"]
+    login_session(client, user_id)
+    set_selected_entity_session(
+        client,
+        entity_type="country",
+        entity_id=country_id,
+        country_id=country_id,
+    )
+    return client
+
+
+@pytest.fixture(scope='function')
 def mock_email():
     """Mock email sending."""
     with patch('app.utils.email_client.send_email') as mock:
@@ -495,6 +561,9 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "slow: Slow running tests"
+    )
+    config.addinivalue_line(
+        "markers", "critical: Critical production route smoke tests"
     )
 
 

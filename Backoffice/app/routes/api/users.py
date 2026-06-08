@@ -317,7 +317,15 @@ def update_current_user_profile():
         if csrf_error:
             return csrf_error
 
-        user = current_user
+        # Load from session id — current_user may be a cached detached instance
+        # after prior requests in the same browser/test-client session.
+        session_user_id = session.get("_user_id")
+        if not session_user_id:
+            return api_error('Authentication required', 401)
+        user_id = int(session_user_id)
+        user = db.session.get(User, user_id)
+        if user is None:
+            return api_error('User not found', 404)
 
         # Get request data
         from app.utils.api_responses import require_json_content_type, require_json_data
@@ -351,7 +359,6 @@ def update_current_user_profile():
 
         # Commit changes
         if updated_fields:
-            saved_user_id = user.id
             db.session.flush()
 
             # Log the activity
@@ -361,15 +368,14 @@ def update_current_user_profile():
                     activity_type='profile_update',
                     description=f'User {user.email} updated their profile information',
                     context_data={
-                        'user_id': saved_user_id,
+                        'user_id': user_id,
                         'updated_fields': {field: getattr(user, field) for field in updated_fields}
                     }
                 )
             except Exception as e:
                 current_app.logger.warning(f"Failed to log user activity: {e}")
 
-            # Re-bind after flush so response building does not hit a detached instance.
-            user = db.session.get(User, saved_user_id) or user
+            user = db.session.get(User, user_id)
         else:
             # No fields to update
             return api_error('No valid fields provided for update', 400)

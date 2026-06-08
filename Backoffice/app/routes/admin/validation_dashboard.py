@@ -1,6 +1,6 @@
 """Validation dashboard — preview flags by country and generate questions."""
 
-from flask import render_template, request
+from flask import current_app, render_template, request
 from flask_login import login_required, current_user
 
 from app import db
@@ -15,6 +15,7 @@ from app.services.validation_dashboard_service import (
     summarize_period,
     template_options,
 )
+from app.services.validation_tracker_service import build_tracker_data
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe
 from app.utils.request_validation import enforce_csrf_json
@@ -27,6 +28,8 @@ def validation_dashboard():
     return render_template(
         "admin/validation_dashboard.html",
         template_options=template_options(),
+        mapbox_access_token=current_app.config.get("MAPBOX_ACCESS_TOKEN") or "",
+        mapbox_style_id=current_app.config.get("MAPBOX_STYLE_ID") or "go-ifrc/ckrfe16ru4c8718phmckdfjh0",
     )
 
 
@@ -49,6 +52,17 @@ def validation_dashboard_countries_api():
     if not template_id or not period:
         return json_bad_request("template_id and period are required")
     return json_ok(countries=list_countries_for_period(template_id, period))
+
+
+@bp.route("/validation-dashboard/api/tracker", methods=["GET"])
+@login_required
+@permission_required("admin.data_explore.compliance")
+def validation_dashboard_tracker_api():
+    template_id = request.args.get("template_id", type=int)
+    period = request.args.get("period", type=str)
+    if not template_id or not period:
+        return json_bad_request("template_id and period are required")
+    return json_ok(**build_tracker_data(template_id, period))
 
 
 @bp.route("/validation-dashboard/api/summary", methods=["GET"])

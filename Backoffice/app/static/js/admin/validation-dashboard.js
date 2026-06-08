@@ -64,6 +64,7 @@
         feedbackEl.classList.add.apply(feedbackEl.classList, classes);
         feedbackEl.classList.remove('hidden');
     }
+    window.validationDashboardShowFeedback = showFeedback;
 
     function readSavedScope() {
         try {
@@ -353,6 +354,9 @@
         if (state.indicatorsApi) {
             state.indicatorsApi.setGridOption('columnDefs', indicatorColumnDefs());
             state.indicatorsApi.setGridOption('rowData', rows);
+            if (typeof state.indicatorsApi.refreshHeader === 'function') {
+                state.indicatorsApi.refreshHeader();
+            }
             return;
         }
         var result = AgGridHelper.create('validationIndicatorsGrid', 'admin-validation-indicators', indicatorColumnDefs(), rows, {
@@ -363,6 +367,8 @@
             gridOptions: {
                 defaultColDef: {
                     suppressSizeToFit: true,
+                    wrapHeaderText: true,
+                    autoHeaderHeight: true,
                 },
                 getRowClass: function (p) {
                     if (p.data && p.data.flagged) return 'vd-ag-row-flagged';
@@ -552,8 +558,31 @@
             setTemplateId(id);
             resetDashboardScope();
             applyScope(null, null).catch(function (err) { console.error(err); });
+            if (window.validationDashboardTracker && window.validationDashboardTracker.onTemplateChanged) {
+                window.validationDashboardTracker.onTemplateChanged(null).catch(function (err) { console.error(err); });
+            }
         });
     });
+
+    /* ——— Main view tabs (Tracker | Country Validation) ——— */
+
+    function initMainTabs() {
+        var A = window.AdminUnderlineTabs;
+        if (!A) return;
+        document.querySelectorAll('#vd-main-tabs .settings-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tabId = btn.getAttribute('data-tab');
+                if (!tabId) return;
+                A.activateStripTab('#vd-main-tabs', tabId, { panelSelector: '.vd-panel', panelIdPrefix: 'panel-' });
+                document.dispatchEvent(new CustomEvent('vd-main-tab-activated', { detail: { tab: tabId } }));
+                if (tabId === 'tracker' && window.validationDashboardTracker) {
+                    window.validationDashboardTracker.invalidateMapSize();
+                }
+            });
+        });
+    }
+
+    initMainTabs();
 
     el('vd-period')?.addEventListener('change', function () {
         saveScope();

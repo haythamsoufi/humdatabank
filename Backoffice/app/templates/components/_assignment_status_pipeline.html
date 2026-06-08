@@ -29,33 +29,26 @@
         <span class="assignment-status-pipeline-tooltip absolute top-full mt-1 px-3 py-2.5 bg-white text-gray-800 text-xs rounded-lg border border-gray-200 shadow-lg {% if lang == 'ar' %}right-0{% else %}left-0{% endif %}"
               role="tooltip">
             <span class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">{{ _('Workflow progress') }}</span>
-            <span class="assignment-status-pipeline flex items-start" role="list" aria-label="{{ _('Assignment status workflow') }}">
+            <span class="assignment-status-pipeline flex items-start w-full" role="list" aria-label="{{ _('Assignment status workflow') }}">
                 {% for step in steps %}
                     {% set step_idx = loop.index0 %}
                     <span class="assignment-status-pipeline-step flex flex-col items-center flex-1 min-w-[3.25rem] max-w-[5.5rem]
                         {% if cur_idx >= 0 and step_idx < cur_idx and step == 'pending' %}is-passed
                         {% elif cur_idx >= 0 and step_idx < cur_idx %}is-complete
+                        {% elif cur_idx >= 0 and step_idx == cur_idx and step_idx == (steps|length - 1) %}is-complete
                         {% elif cur_idx >= 0 and step_idx == cur_idx %}is-current
                         {% else %}is-upcoming{% endif %}"
                           role="listitem">
-                        <span class="assignment-status-pipeline-track flex items-center w-full h-3">
-                            {% if not loop.first %}
-                                <span class="assignment-status-pipeline-connector assignment-status-pipeline-connector--leading flex-1 h-0.5 min-w-[0.25rem]" aria-hidden="true"></span>
-                            {% else %}
-                                <span class="flex-1" aria-hidden="true"></span>
-                            {% endif %}
-                            <span class="assignment-status-pipeline-marker shrink-0 inline-flex items-center justify-center w-4 h-4" aria-hidden="true">
-                                <span class="assignment-status-pipeline-dot w-2.5 h-2.5 rounded-full border-2 border-white"></span>
-                                <i class="fas fa-check assignment-status-pipeline-check" aria-hidden="true"></i>
-                            </span>
-                            {% if not loop.last %}
-                                <span class="assignment-status-pipeline-connector assignment-status-pipeline-connector--trailing flex-1 h-0.5 min-w-[0.25rem]" aria-hidden="true"></span>
-                            {% else %}
-                                <span class="flex-1" aria-hidden="true"></span>
-                            {% endif %}
+                        <span class="assignment-status-pipeline-marker shrink-0 inline-flex items-center justify-center w-4 h-4" aria-hidden="true">
+                            <span class="assignment-status-pipeline-dot w-2.5 h-2.5 rounded-full border-2 border-white"></span>
+                            <i class="fas fa-check assignment-status-pipeline-check" aria-hidden="true"></i>
                         </span>
                         <span class="assignment-status-pipeline-label mt-1 text-center text-[10px] leading-tight font-medium px-0.5">{{ localize_status(step) }}</span>
                     </span>
+                    {% if not loop.last %}
+                        <span class="assignment-status-pipeline-connector{% if cur_idx >= 0 and step_idx < cur_idx %} is-filled{% endif %}"
+                              aria-hidden="true"></span>
+                    {% endif %}
                 {% endfor %}
             </span>
             {% if is_closed %}

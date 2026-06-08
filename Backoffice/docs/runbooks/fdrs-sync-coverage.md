@@ -65,7 +65,7 @@ Constants: `Backoffice/scripts/fdrs_sync_constants.py` → `FDRS_QUESTION_KPI_TO
   - any section started only → `in_progress`
 - Sets `status_timestamp` / `submitted_at` from FDRS dates when available.
 - Does **not** set `submitted_by_user_id` / `approved_by_user_id` (FDRS has no user identity).
-- Skips downgrades (e.g. won't move `approved` → `submitted`) and preserves `sent_for_review` / `requires_revision` unless FDRS is fully validated (`approved`).
+- FDRS workflow KPIs **always** overwrite databank assignment status during sync (no downgrade protection).
 - CLI opt-out: `--no-sync-assignment-status`.
 
 ### Documents (metadata only)

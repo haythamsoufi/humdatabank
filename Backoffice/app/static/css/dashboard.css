@@ -163,6 +163,27 @@
     pointer-events: auto !important;
 }
 
+/* Past assignments table: scroll horizontally, but let workflow tooltips escape on hover */
+.past-assignments-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.past-assignments-table-wrap:has(.assignment-status-pipeline-container:hover),
+.past-assignments-table-wrap:has(.assignment-status-pipeline-container:focus-within) {
+    overflow: visible;
+}
+
+#approved-assignments-list td {
+    overflow: visible;
+}
+
+#approved-assignments-list tr:has(.assignment-status-pipeline-container:hover),
+#approved-assignments-list tr:has(.assignment-status-pipeline-container:focus-within) {
+    position: relative;
+    z-index: 10;
+}
+
 /* Assignment status workflow pipeline (hover on status badge) */
 .assignment-status-pipeline-tooltip {
     display: none;
@@ -197,7 +218,13 @@
 }
 
 .assignment-status-pipeline-connector {
-    background-color: #e5e7eb;
+    flex: 1 1 0%;
+    min-width: 0.5rem;
+    height: 2px;
+    margin-top: 7px;
+    border: none;
+    border-radius: 9999px;
+    background: #e5e7eb;
 }
 
 .assignment-status-pipeline-label {
@@ -215,10 +242,6 @@
     border: 2px solid #9ca3af;
     width: 0.5rem;
     height: 0.5rem;
-}
-
-.assignment-status-pipeline-step.is-passed .assignment-status-pipeline-connector {
-    background-color: #e5e7eb;
 }
 
 .assignment-status-pipeline-step.is-passed .assignment-status-pipeline-label {
@@ -242,8 +265,8 @@
     line-height: 1;
 }
 
-.assignment-status-pipeline-step.is-complete .assignment-status-pipeline-connector {
-    background-color: #86efac;
+.assignment-status-pipeline-connector.is-filled {
+    background: #86efac;
 }
 
 .assignment-status-pipeline-step.is-complete .assignment-status-pipeline-label {
@@ -265,10 +288,6 @@
 .assignment-status-pipeline-step.is-current .assignment-status-pipeline-label {
     color: #1d4ed8;
     font-weight: 700;
-}
-
-.assignment-status-pipeline-step.is-current .assignment-status-pipeline-connector--leading {
-    background-color: #86efac;
 }
 
 .assignment-status-pipeline-step.is-upcoming .assignment-status-pipeline-dot {

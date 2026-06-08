@@ -607,6 +607,14 @@ class Config:
     _fdrs_databank_api_key_raw = (os.environ.get("FDRS_DATABANK_API_KEY") or "").strip()
     FDRS_DATABANK_API_KEY = _fdrs_databank_api_key_raw or None
 
+    # Mapbox (Validation Dashboard tracker world map; not shared with Interactive Map plugin UI settings)
+    _mapbox_access_token_raw = (os.environ.get("MAPBOX_ACCESS_TOKEN") or "").strip()
+    MAPBOX_ACCESS_TOKEN = _mapbox_access_token_raw or None
+    MAPBOX_STYLE_ID = (
+        (os.environ.get("MAPBOX_STYLE_ID") or "go-ifrc/ckrfe16ru4c8718phmckdfjh0").strip()
+        or "go-ifrc/ckrfe16ru4c8718phmckdfjh0"
+    )
+
     # Session / cookie behavior
     # NOTE: Session durations are defined below (PERMANENT_SESSION_LIFETIME + SESSION_INACTIVITY_TIMEOUT).
     SESSION_REFRESH_EACH_REQUEST = True  # Refresh session on each request

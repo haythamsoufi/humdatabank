@@ -212,3 +212,185 @@
         width: 100%;
     }
 }
+
+/* Tracker tab — map + chart, country slicer */
+.vd-tracker-toolbar-row {
+    align-items: flex-start;
+}
+
+.vd-tracker-slicer-field {
+    flex: 1 1 12rem;
+    min-width: 9rem;
+    max-width: 16rem;
+}
+
+@media (max-width: 767px) {
+    .vd-tracker-slicer-field {
+        flex: 1 1 100%;
+    }
+}
+
+.vd-tracker-viz {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    align-items: stretch;
+}
+
+@media (min-width: 1024px) {
+    .vd-tracker-viz {
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    }
+}
+
+.vd-tracker-viz-map,
+.vd-tracker-viz-chart {
+    min-width: 0;
+}
+
+.vd-tracker-map,
+.vd-tracker-chart {
+    height: 340px;
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(229 231 235);
+    overflow: hidden;
+    background: rgb(248 250 252);
+}
+
+.vd-tracker-map {
+    background: rgb(248 250 252);
+}
+
+.vd-tracker-chart {
+    background: rgb(255 255 255);
+}
+
+.vd-icon-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 0.95rem;
+}
+
+.vd-icon-yes {
+    color: rgb(22 163 74);
+}
+
+.vd-icon-no {
+    color: rgb(209 213 219);
+}
+
+.vd-tracker-legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+}
+
+.vd-tracker-legend-row .vd-tracker-legend {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.vd-tracker-col-vis {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+.vd-tracker-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.75rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.5rem;
+    background: rgb(249 250 251);
+    font-size: 0.75rem;
+    color: rgb(55 65 81);
+}
+
+.vd-tracker-legend-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    min-width: 0;
+}
+
+.vd-tracker-legend-title {
+    font-weight: 600;
+    color: rgb(31 41 55);
+    white-space: nowrap;
+}
+
+.vd-tracker-legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.875rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vd-tracker-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.vd-section-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    font-size: 0.875rem;
+    line-height: 1;
+}
+
+.vd-section-icon.is-complete { color: rgb(22 163 74); }
+.vd-section-icon.is-in_progress { color: rgb(217 119 6); }
+.vd-section-icon.is-not_started { color: rgb(209 213 219); }
+
+.vd-completion-rate {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.vd-completion-high { color: rgb(21 128 61); }
+.vd-completion-mid { color: rgb(180 83 9); }
+.vd-completion-low { color: rgb(180 83 9); }
+.vd-completion-critical { color: rgb(220 38 38); }
+.vd-completion-none { color: rgb(156 163 175); font-weight: 500; }
+
+#validationTrackerGrid.ag-theme-alpine .ag-header-cell .ag-header-cell-text,
+#validationIndicatorsGrid.ag-theme-alpine .ag-header-cell .ag-header-cell-text {
+    white-space: normal;
+    line-height: 1.25;
+}
+
+#validationTrackerGrid.ag-theme-alpine .ag-header-cell.compliance-header-center,
+#validationTrackerGrid.ag-theme-alpine .ag-cell.compliance-cell-center {
+    text-align: center !important;
+}
+
+#validationTrackerGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-wrapper,
+#validationTrackerGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-value {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+
+#validationTrackerGrid.ag-theme-alpine .ag-header-cell.compliance-header-center .ag-header-cell-label {
+    justify-content: center !important;
+}

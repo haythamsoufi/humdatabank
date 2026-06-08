@@ -23,17 +23,6 @@ logger = logging.getLogger(__name__)
 
 _WORKFLOW_KPI_SET = frozenset(fdrs_section_workflow_kpi_codes())
 
-_STATUS_RANK = {
-    "pending": 0,
-    "in_progress": 1,
-    "requires_revision": 1,
-    "sent_for_review": 2,
-    "submitted": 3,
-    "approved": 4,
-}
-
-_PROTECTED_STATUSES = frozenset({"requires_revision", "sent_for_review"})
-
 
 def _parse_fdrs_bool(value: Any) -> bool:
     if isinstance(value, bool):
@@ -284,16 +273,6 @@ def build_assignment_status_plan(
     return plan, summary
 
 
-def _should_apply_status(current_status: str, new_status: str) -> bool:
-    current_rank = _STATUS_RANK.get(current_status, 0)
-    new_rank = _STATUS_RANK.get(new_status, 0)
-    if current_status in _PROTECTED_STATUSES and new_status != "approved":
-        return False
-    if new_rank < current_rank:
-        return False
-    return True
-
-
 def upsert_assignment_status_from_plan(
     plan_rows: List[Dict[str, Any]],
     *,
@@ -324,16 +303,15 @@ def upsert_assignment_status_from_plan(
 
             new_status = AssignmentEntityStatusValue.normalize(row["status"])
             current_status = aes.status.value if hasattr(aes.status, "value") else str(aes.status)
-            if not _should_apply_status(current_status, new_status.value):
-                stats["skipped"] += 1
-                continue
-
-            changed = current_status != new_status.value
             new_ts = row.get("status_timestamp")
             new_submitted_at = row.get("submitted_at")
-            if new_ts and aes.status_timestamp != new_ts:
+
+            changed = current_status != new_status.value
+            if new_ts is not None and aes.status_timestamp != new_ts:
                 changed = True
-            if new_submitted_at and aes.submitted_at != new_submitted_at:
+            if new_submitted_at != aes.submitted_at:
+                changed = True
+            if new_status.value == "in_progress" and aes.submitted_at is not None:
                 changed = True
 
             if not changed:
@@ -347,8 +325,11 @@ def upsert_assignment_status_from_plan(
             aes.status = new_status
             if new_ts is not None:
                 aes.status_timestamp = new_ts
-            if new_submitted_at is not None and new_status.value in {"submitted", "approved"}:
-                aes.submitted_at = new_submitted_at
+            if new_status.value in {"submitted", "approved"}:
+                if new_submitted_at is not None:
+                    aes.submitted_at = new_submitted_at
+            else:
+                aes.submitted_at = None
             db.session.add(aes)
             stats["updated"] += 1
         except Exception as e:

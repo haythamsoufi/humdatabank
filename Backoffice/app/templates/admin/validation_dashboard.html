@@ -9,13 +9,14 @@
     {{ super() }}
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="{{ static_url('css/validation-dashboard.css') }}">
+    <link rel="stylesheet" href="{{ static_url('vendor/leaflet/leaflet.css') }}">
 {% endblock %}
 
 {% block content %}
 
 {{ page_header(
     title=_('Validation Dashboard'),
-    subtitle=_('Monitor automatic validation flags, compare historical values, and generate questions for focal points.'),
+    subtitle=_('Track FDRS submission progress across countries, monitor validation flags, and generate questions for focal points.'),
     icon='fas fa-chart-line',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
@@ -52,54 +53,122 @@
     <div class="p-6 text-sm text-ifrc-gray-600">{{ _('No templates with validation checks enabled.') }}</div>
     {% endif %}
 
-    <div class="p-6{% if not template_options %} hidden{% endif %}">
-        {# Toolbar: scope, view options, summary & actions #}
-        <div class="vd-toolbar mb-6 pb-6 border-b border-ifrc-gray-100">
-            <div class="vd-toolbar-row">
-                <div class="vd-field vd-field-period">
-                    <label for="vd-period" class="vd-field-label">{{ _('Reporting period') }}</label>
-                    <select id="vd-period" class="vd-select"{% if template_options %} disabled{% endif %}>
-                        <option value="">{{ _('Loading periods…') if template_options else _('Select template first') }}</option>
-                    </select>
-                </div>
-                <div class="vd-field vd-field-country">
-                    <label for="vd-country" class="vd-field-label">{{ _('Country') }}</label>
-                    <select id="vd-country" class="vd-select" disabled>
-                        <option value="">{{ _('Loading countries…') }}</option>
-                    </select>
-                </div>
-                <div class="vd-toolbar-options" role="group" aria-label="{{ _('View options') }}">
-                    <label class="vd-toggle">
-                        <input type="checkbox" id="vd-show-historical">
-                        <span>{{ _('Show last 3 years') }}</span>
-                    </label>
-                    <label class="vd-toggle">
-                        <input type="checkbox" id="vd-flagged-only">
-                        <span>{{ _('Flagged indicators only') }}</span>
-                    </label>
-                </div>
-                <div class="vd-flags-stat" aria-live="polite">
-                    <span class="vd-flags-stat-icon" aria-hidden="true"><i class="fas fa-flag"></i></span>
-                    <div class="vd-flags-stat-text">
-                        <span id="vd-kpi-flags" class="vd-flags-stat-value">—</span>
-                        <span class="vd-flags-stat-label">{{ _('Automatic flags') }}</span>
+    <div class="{% if not template_options %} hidden{% endif %}">
+        {% call scroll_tab_bar(inner_id='vd-main-tabs', aria_label=_('Validation dashboard views'), wrapper_class='px-4 sm:px-6') %}
+            <button type="button" role="tab" id="tab-vd-tracker" data-tab="tracker"
+                    aria-selected="true"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(true) }}">
+                <i class="fas fa-globe-africa mr-1.5" aria-hidden="true"></i>{{ _('Tracker') }}
+            </button>
+            <button type="button" role="tab" id="tab-vd-country-validation" data-tab="country-validation"
+                    aria-selected="false"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(false) }}">
+                <i class="fas fa-flag mr-1.5" aria-hidden="true"></i>{{ _('Country Validation') }}
+            </button>
+        {% endcall %}
+
+        {# ——— Tracker (default) ——— #}
+        <div id="panel-tracker" class="vd-panel p-6">
+            <div class="vd-toolbar mb-6 pb-6 border-b border-ifrc-gray-100">
+                <div class="vd-toolbar-row vd-tracker-toolbar-row">
+                    <div class="vd-field vd-field-period">
+                        <label for="vd-tracker-period" class="vd-field-label">{{ _('Reporting period') }}</label>
+                        <select id="vd-tracker-period" class="vd-select"{% if template_options %} disabled{% endif %}>
+                            <option value="">{{ _('Loading periods…') if template_options else _('Select template first') }}</option>
+                        </select>
+                    </div>
+                    <div class="vd-field vd-tracker-slicer-field">
+                        <label for="vd-tracker-country-slicer" class="vd-field-label">{{ _('Countries') }}</label>
+                        <select id="vd-tracker-country-slicer" class="vd-select" disabled>
+                            <option value="">{{ _('Load a reporting period to filter countries.') }}</option>
+                        </select>
                     </div>
                 </div>
-                <div class="vd-action-buttons">
-                    <button type="button" id="vd-generate-country" class="btn btn-primary" disabled>
-                        <i class="fas fa-magic mr-2" aria-hidden="true"></i>{{ _('Generate questions') }}
-                    </button>
+            </div>
+
+            <div class="vd-tracker-viz mb-6">
+                <div class="vd-tracker-viz-map">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+                        <h3 class="text-md font-semibold text-ifrc-navy">
+                            <i class="fas fa-map mr-1.5 text-blue-500" aria-hidden="true"></i>
+                            {{ _('Submission status map') }}
+                        </h3>
+                    </div>
+                    <div id="vd-tracker-map" class="vd-tracker-map" role="img" aria-label="{{ _('World map coloured by FDRS submission status') }}"></div>
+                    <p id="vd-tracker-map-hint" class="hidden mt-2 text-xs text-ifrc-gray-500"></p>
                 </div>
+                <div class="vd-tracker-viz-chart">
+                    <h3 class="text-md font-semibold text-ifrc-navy mb-2">
+                        <i class="fas fa-chart-bar mr-1.5 text-blue-500" aria-hidden="true"></i>
+                        {{ _('Countries by status') }}
+                    </h3>
+                    <div id="vd-tracker-status-chart" class="vd-tracker-chart" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex flex-wrap items-end justify-between gap-3 mb-2">
+                    <h3 class="text-md font-semibold text-ifrc-navy">
+                        <i class="fas fa-table mr-1.5 text-ifrc-gray-500" aria-hidden="true"></i>
+                        {{ _('Country assignments') }}
+                    </h3>
+                </div>
+                <div class="vd-tracker-legend-row mb-3">
+                    <div id="vd-tracker-legend" class="vd-tracker-legend" aria-label="{{ _('Legend') }}"></div>
+                    <div id="vd-tracker-col-vis" class="vd-tracker-col-vis"></div>
+                </div>
+                {{ ag_grid_container('validationTrackerGrid', loading_text=_('Loading tracker data…'), grid_height='520px', placeholder_id='vd-tracker-col-vis', include_card=false, show_placeholder=false) }}
             </div>
         </div>
 
-        {# Indicator flags grid #}
-        <div>
-            <h3 class="text-md font-semibold text-ifrc-navy mb-2">
-                <i class="fas fa-flag mr-1.5 text-red-400" aria-hidden="true"></i>
-                {{ _('Indicators & automatic flags') }}
-            </h3>
-            {{ ag_grid_container('validationIndicatorsGrid', loading_text=_('Loading indicator flags…'), grid_height='480px', placeholder_id='vd-indicators-col-vis', include_card=false) }}
+        {# ——— Country Validation (existing) ——— #}
+        <div id="panel-country-validation" class="vd-panel hidden p-6">
+            <div class="vd-toolbar mb-6 pb-6 border-b border-ifrc-gray-100">
+                <div class="vd-toolbar-row">
+                    <div class="vd-field vd-field-period">
+                        <label for="vd-period" class="vd-field-label">{{ _('Reporting period') }}</label>
+                        <select id="vd-period" class="vd-select"{% if template_options %} disabled{% endif %}>
+                            <option value="">{{ _('Loading periods…') if template_options else _('Select template first') }}</option>
+                        </select>
+                    </div>
+                    <div class="vd-field vd-field-country">
+                        <label for="vd-country" class="vd-field-label">{{ _('Country') }}</label>
+                        <select id="vd-country" class="vd-select" disabled>
+                            <option value="">{{ _('Loading countries…') }}</option>
+                        </select>
+                    </div>
+                    <div class="vd-toolbar-options" role="group" aria-label="{{ _('View options') }}">
+                        <label class="vd-toggle">
+                            <input type="checkbox" id="vd-show-historical">
+                            <span>{{ _('Show last 3 years') }}</span>
+                        </label>
+                        <label class="vd-toggle">
+                            <input type="checkbox" id="vd-flagged-only">
+                            <span>{{ _('Flagged indicators only') }}</span>
+                        </label>
+                    </div>
+                    <div class="vd-flags-stat" aria-live="polite">
+                        <span class="vd-flags-stat-icon" aria-hidden="true"><i class="fas fa-flag"></i></span>
+                        <div class="vd-flags-stat-text">
+                            <span id="vd-kpi-flags" class="vd-flags-stat-value">—</span>
+                            <span class="vd-flags-stat-label">{{ _('Automatic flags') }}</span>
+                        </div>
+                    </div>
+                    <div class="vd-action-buttons">
+                        <button type="button" id="vd-generate-country" class="btn btn-primary" disabled>
+                            <i class="fas fa-magic mr-2" aria-hidden="true"></i>{{ _('Generate questions') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-md font-semibold text-ifrc-navy mb-2">
+                    <i class="fas fa-flag mr-1.5 text-red-400" aria-hidden="true"></i>
+                    {{ _('Indicators & automatic flags') }}
+                </h3>
+                {{ ag_grid_container('validationIndicatorsGrid', loading_text=_('Loading indicator flags…'), grid_height='480px', placeholder_id='vd-indicators-col-vis', include_card=false) }}
+            </div>
         </div>
     </div>
 </div>
@@ -109,9 +178,14 @@
     'countriesUrl': url_for('admin.validation_dashboard_countries_api'),
     'previewUrl': url_for('admin.validation_dashboard_preview_api'),
     'runChecksUrl': url_for('admin.validation_dashboard_run_checks'),
+    'trackerUrl': url_for('admin.validation_dashboard_tracker_api'),
+    'mapboxAccessToken': mapbox_access_token,
+    'mapboxStyleId': mapbox_style_id,
     'translations': {
         'country': _('Country'),
         'period': _('Period'),
+        'region': _('Region'),
+        'status': _('Status'),
         'indicator': _('Indicator'),
         'value': _('Value'),
         'priorValue': _('Prior year'),
@@ -133,6 +207,34 @@
         'loadFailed': _('Failed to load dashboard data'),
         'previewFailed': _('Failed to load indicator preview'),
         'generateConfirm': _('Generate validation questions for the selected scope?'),
+        'trackerLoadFailed': _('Failed to load tracker data'),
+        'completionRate': _('Completion rate'),
+        'governance': _('Governance'),
+        'finance': _('Finance'),
+        'reach': _('Reach'),
+        'sections': _('Sections'),
+        'sectionNotStarted': _('Not started'),
+        'sectionInProgress': _('In progress'),
+        'sectionComplete': _('Complete'),
+        'uploaded': _('Uploaded'),
+        'missing': _('Missing'),
+        'mapNoToken': _('Set MAPBOX_ACCESS_TOKEN in environment secrets to enable the Mapbox basemap.'),
+        'statusChartTitle': _('Countries by status'),
+        'statusChartCountries': _('Countries'),
+        'statusApproved': _('Approved'),
+        'statusSubmitted': _('Submitted'),
+        'statusSentForReview': _('Sent for review'),
+        'statusRequiresRevision': _('Requires revision'),
+        'statusInProgress': _('In progress'),
+        'statusPending': _('Pending'),
+        'keyDocsUploaded': _('Key docs uploaded'),
+        'selectAll': _('Select all'),
+        'clearAll': _('Clear'),
+        'slicerEmpty': _('Load a reporting period to filter countries.'),
+        'allCountries': _('All countries'),
+        'regionOther': _('Other'),
+        'legendSections': _('Section progress'),
+        'legendDocuments': _('Documents'),
     }
 } %}
 {{ ag_grid_page_config('validationDashboardConfig', 'VD_GRID_TRANSLATIONS', vd_grid_bootstrap) }}
@@ -141,5 +243,8 @@
 
 {% block extra_js %}
 {{ ag_grid_js() }}
+<script src="{{ static_url('libs/apexcharts.min.js') }}"></script>
+<script src="{{ static_url('vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ static_url('js/admin/validation-dashboard-tracker.js') }}"></script>
 <script src="{{ static_url('js/admin/validation-dashboard.js') }}"></script>
 {% endblock %}

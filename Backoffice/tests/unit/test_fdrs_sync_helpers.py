@@ -213,6 +213,18 @@ def test_derive_assignment_status_all_validated():
     assert derive_assignment_status_from_sections(sections) == "approved"
 
 
+def test_derive_assignment_status_governance_started_only_is_in_progress():
+    sections = [
+        {"started": True, "submitted": False, "validated": False, "published": False,
+         "validation_date": None, "publish_date": None},
+        {"started": False, "submitted": False, "validated": False, "published": False,
+         "validation_date": None, "publish_date": None},
+        {"started": False, "submitted": False, "validated": False, "published": False,
+         "validation_date": None, "publish_date": None},
+    ]
+    assert derive_assignment_status_from_sections(sections) == "in_progress"
+
+
 def test_derive_assignment_status_partial_submitted():
     sections = [
         {"started": True, "submitted": True, "validated": False, "published": False,

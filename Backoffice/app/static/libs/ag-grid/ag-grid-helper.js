@@ -178,7 +178,8 @@
                 // Absolute minimum height (floor) to prevent grids from being too small
                 absoluteMinHeight: 300
             }, config.heightOptions || {}),
-            checkboxColumnWidth: typeof config.checkboxColumnWidth === 'number' ? config.checkboxColumnWidth : 56
+            checkboxColumnWidth: typeof config.checkboxColumnWidth === 'number' ? config.checkboxColumnWidth : 56,
+            showResultCount: config.showResultCount !== false,
         };
 
         this.gridApi = null;
@@ -606,7 +607,9 @@
             this.initializeClearFiltersButton();
 
             // Show live result count above the grid.
-            this.initializeResultCount();
+            if (this.config.showResultCount !== false) {
+                this.initializeResultCount();
+            }
 
             // Ensure cell alignment is applied after grid initialization
             this.ensureCellAlignment();
@@ -3665,6 +3668,7 @@
             options: mergedGridOptions,
             columnVisibilityOptions: mergedColumnVisibility,
             heightOptions: heightOptions,
+            showResultCount: options.showResultCount !== false,
             filterPersistence: options.filterPersistence !== false && options.persistFilters !== false,
             autoDetectFilters: options.autoDetectFilters,
             autoDetectFilterOptions: options.autoDetectFilterOptions

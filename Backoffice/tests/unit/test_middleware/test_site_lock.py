@@ -335,8 +335,8 @@ class TestRegisterSiteLockMiddleware:
     def test_bypass_cookie_skips_lock(self, app, client):
         app.config["MAINTENANCE_LOCK"] = True
         app.config["MAINTENANCE_BYPASS_SECRET"] = "s3cr3t"
-        resp = client.get("/dashboard",
-                           headers={"Cookie": "maintenance_bypass=s3cr3t"})
+        client.set_cookie("maintenance_bypass", "s3cr3t")
+        resp = client.get("/dashboard")
         # Should not show lock page
         assert b"Maintenance" not in resp.data
 

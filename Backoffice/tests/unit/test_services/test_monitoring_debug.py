@@ -2,6 +2,7 @@
 Comprehensive unit tests for app/services/monitoring/debug.py
 Targets 100% code coverage with no database required.
 """
+import io
 import logging
 import sys
 import time
@@ -1022,27 +1023,18 @@ class TestHandlerCleanup:
         mgr = _fresh_debug_manager()
         app = _make_mock_app({"LOG_TO_STDOUT": False, "APPLICATION_LOG_FILE_ENABLED": False})
 
-        # Simulate a pre-existing managed handler on the root logger
-        managed_handler = logging.StreamHandler(sys.stdout)
+        # Use a dedicated stream — never sys.stdout (pytest replaces it during runs).
+        managed_handler = logging.StreamHandler(io.StringIO())
         setattr(managed_handler, "_hdb_managed_logging_handler", True)
-        root_logger = logging.getLogger()
-        root_logger.addHandler(managed_handler)
 
-        try:
-            with (
-                patch("os.makedirs"),
-                patch("logging.getLogger", return_value=MagicMock(
-                    spec=logging.Logger,
-                    handlers=[managed_handler],
-                )),
-            ):
-                mgr.configure_logging(app)
-        finally:
-            # Cleanup
-            try:
-                root_logger.removeHandler(managed_handler)
-            except Exception:
-                pass
+        with (
+            patch("os.makedirs"),
+            patch("logging.getLogger", return_value=MagicMock(
+                spec=logging.Logger,
+                handlers=[managed_handler],
+            )),
+        ):
+            mgr.configure_logging(app)
 
     def test_handler_close_exception_suppressed(self):
         """Closing a broken handler does not propagate."""

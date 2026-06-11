@@ -121,8 +121,7 @@ class TestAddSecurityHeaders:
 
     def test_hsts_header_added_for_https(self, app):
         """HSTS should be set for secure (HTTPS) requests."""
-        with app.test_request_context("/dashboard",
-                                       environ_base={"wsgi.url_scheme": "https"}):
+        with app.test_request_context("/dashboard", base_url="https://localhost"):
             from flask import make_response
             result = add_security_headers(make_response("ok", 200))
             assert "Strict-Transport-Security" in result.headers
@@ -141,7 +140,7 @@ class TestAddSecurityHeaders:
     def test_csp_nonce_failure_falls_back_gracefully(self, app):
         """When get_csp_nonce() raises, CSP header is still set (without nonce)."""
         with app.test_request_context("/dashboard"):
-            with patch("app.middleware.security_headers.get_csp_nonce",
+            with patch("app.utils.csp_nonce.get_csp_nonce",
                        side_effect=Exception("nonce service down")):
                 from flask import make_response
                 result = add_security_headers(make_response("ok", 200))

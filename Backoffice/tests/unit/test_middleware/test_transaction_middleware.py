@@ -13,6 +13,11 @@ from app.middleware.transaction_middleware import (
 )
 
 
+def _hook(app, registry: str, name: str):
+    funcs = getattr(app, f"{registry}_funcs", {}).get(None, [])
+    return next((fn for fn in funcs if fn.__name__ == name), None)
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # _get_view_func
 # ────────────────────────────────────────────────────────────────────────────
@@ -20,9 +25,10 @@ from app.middleware.transaction_middleware import (
 class TestGetViewFunc:
     def test_no_endpoint_returns_none(self, app):
         with app.test_request_context("/"):
-            # No endpoint dispatched — endpoint is None
-            result = _get_view_func()
-            assert result is None
+            with patch("app.middleware.transaction_middleware.request") as mock_req:
+                mock_req.endpoint = None
+                result = _get_view_func()
+                assert result is None
 
     def test_valid_endpoint_returns_func(self, app):
         with app.test_request_context("/"):
@@ -44,14 +50,20 @@ class TestGetViewFunc:
                 result = _get_view_func()
                 assert result is None
 
-    def test_exception_in_lookup_returns_none(self, app):
+    def test_exception_in_lookup_returns_none(self, app, caplog):
+        import logging
+
         with app.test_request_context("/"):
             with patch("app.middleware.transaction_middleware.request") as mock_req, \
                  patch("app.middleware.transaction_middleware.current_app") as mock_app:
                 mock_req.endpoint = "some.endpoint"
+                mock_app.view_functions = MagicMock()
                 mock_app.view_functions.get.side_effect = Exception("lookup failed")
-                result = _get_view_func()
+                with caplog.at_level(logging.DEBUG,
+                                     logger="app.middleware.transaction_middleware"):
+                    result = _get_view_func()
                 assert result is None
+                assert "lookup failed" in caplog.text
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -294,16 +306,20 @@ class TestTransactionTeardownRequest:
 # ────────────────────────────────────────────────────────────────────────────
 
 class TestHandleExceptionWrapping:
-    def test_handle_exception_not_double_wrapped(self, app):
+    def test_handle_exception_not_double_wrapped(self):
         """Calling init_transaction_middleware twice does not double-wrap handle_exception."""
-        # Mark as already wrapped
-        app._auto_txn_handle_exception_wrapped = True
-        original = app.handle_exception
+        from flask import Flask
 
-        init_transaction_middleware(app)
+        test_app = Flask(__name__)
+        test_app._auto_txn_handle_exception_wrapped = True
 
-        # handle_exception should be the same after second call
-        assert app.handle_exception is original
+        with patch.object(test_app, "before_request"), \
+             patch.object(test_app, "after_request"), \
+             patch.object(test_app, "teardown_request"):
+            init_transaction_middleware(test_app)
+
+        # Guard flag set: handle_exception must remain Flask's default, not our wrapper.
+        assert test_app.handle_exception.__name__ == "handle_exception"
 
     def test_handle_exception_wraps_once(self):
         """First init wraps handle_exception; rollback is called on exception."""
@@ -338,3 +354,153 @@ class TestTransactionMiddlewareIntegration:
         resp = client.get("/static/nonexistent.js")
         # 404 is fine — important: no crash from transaction middleware
         assert resp is not None
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Registered hook execution (covers init_transaction_middleware bodies)
+# ────────────────────────────────────────────────────────────────────────────
+
+class TestTransactionRegisteredHooks:
+    def test_before_request_manages_dashboard(self, app):
+        with app.test_request_context("/dashboard"):
+            g.pop("_auto_txn_managed", None)
+            _hook(app, "before_request", "_txn_before_request")()
+            assert g._auto_txn_managed is True
+            assert g._auto_txn_streaming is False
+
+    def test_before_request_skips_static(self, app):
+        with app.test_request_context("/static/app.js"):
+            _hook(app, "before_request", "_txn_before_request")()
+            assert g._auto_txn_managed is False
+
+    def test_before_request_opted_out_view(self, app):
+        from app.utils.transactions import no_auto_transaction
+
+        @no_auto_transaction
+        def opted_out():
+            return "ok"
+
+        with app.test_request_context("/dashboard"):
+            with patch("app.middleware.transaction_middleware._get_view_func",
+                       return_value=opted_out), \
+                 patch("app.middleware.transaction_middleware.is_view_opted_out",
+                       return_value=True), \
+                 patch("app.middleware.transaction_middleware.is_view_forced",
+                       return_value=False):
+                _hook(app, "before_request", "_txn_before_request")()
+                assert g._auto_txn_managed is False
+
+    def test_after_request_commits_managed_2xx(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_managed = True
+            with patch("app.middleware.transaction_middleware.is_streaming_response",
+                       return_value=False), \
+                 patch("app.middleware.transaction_middleware.db") as mock_db, \
+                 patch("app.middleware.transaction_middleware.run_post_commit_callbacks") as mock_cb, \
+                 patch("app.middleware.transaction_middleware.safe_remove") as mock_remove:
+                from flask import make_response
+                resp = _hook(app, "after_request", "_txn_after_request")(make_response("ok", 200))
+                mock_db.session.commit.assert_called_once()
+                mock_cb.assert_called_once()
+                mock_remove.assert_called_once_with(reason="after_request")
+                assert resp.status_code == 200
+
+    def test_after_request_rolls_back_4xx(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_managed = True
+            with patch("app.middleware.transaction_middleware.is_streaming_response",
+                       return_value=False), \
+                 patch("app.middleware.transaction_middleware.safe_rollback") as mock_rb, \
+                 patch("app.middleware.transaction_middleware.safe_remove") as mock_remove:
+                from flask import make_response
+                _hook(app, "after_request", "_txn_after_request")(make_response("nope", 404))
+                mock_rb.assert_called_once_with(reason="response_status_404")
+                mock_remove.assert_called_once_with(reason="after_request")
+
+    def test_after_request_force_rollback(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_managed = True
+            g._auto_txn_force_rollback = True
+            with patch("app.middleware.transaction_middleware.is_streaming_response",
+                       return_value=False), \
+                 patch("app.middleware.transaction_middleware.safe_rollback") as mock_rb, \
+                 patch("app.middleware.transaction_middleware.safe_remove"):
+                from flask import make_response
+                _hook(app, "after_request", "_txn_after_request")(make_response("ok", 200))
+                mock_rb.assert_called_once_with(reason="manual_request")
+
+    def test_after_request_unmanaged_is_noop(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_managed = False
+            with patch("app.middleware.transaction_middleware.db") as mock_db:
+                from flask import make_response
+                _hook(app, "after_request", "_txn_after_request")(make_response("ok", 200))
+                mock_db.session.commit.assert_not_called()
+
+    def test_after_request_streaming_defers_cleanup(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_managed = True
+            with patch("app.middleware.transaction_middleware.is_streaming_response",
+                       return_value=True), \
+                 patch("app.middleware.transaction_middleware.safe_remove") as mock_remove:
+                from flask import make_response
+                resp = make_response("ok", 200)
+                out = _hook(app, "after_request", "_txn_after_request")(resp)
+                assert g._auto_txn_streaming is True
+                assert out is resp
+                mock_remove.assert_not_called()
+                for callback in getattr(resp, "_close_callbacks", []):
+                    callback()
+                mock_remove.assert_called_once_with(reason="stream_close")
+
+    def test_after_request_commit_failure_rolls_back_and_raises(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_managed = True
+            with patch("app.middleware.transaction_middleware.is_streaming_response",
+                       return_value=False), \
+                 patch("app.middleware.transaction_middleware.db") as mock_db, \
+                 patch("app.middleware.transaction_middleware.safe_rollback") as mock_rb, \
+                 patch("app.middleware.transaction_middleware.safe_remove"):
+                mock_db.session.commit.side_effect = RuntimeError("commit failed")
+                from flask import make_response
+                with pytest.raises(RuntimeError, match="commit failed"):
+                    _hook(app, "after_request", "_txn_after_request")(make_response("ok", 200))
+                mock_rb.assert_called_once_with(reason="commit_failed")
+
+    def test_teardown_request_rollbacks_on_exception(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_streaming = False
+            with patch("app.middleware.transaction_middleware.safe_rollback") as mock_rb, \
+                 patch("app.middleware.transaction_middleware.safe_remove") as mock_remove:
+                _hook(app, "teardown_request", "_txn_teardown_request")(ValueError("boom"))
+                mock_rb.assert_called_once_with(reason="teardown_exception")
+                mock_remove.assert_called_once_with(reason="teardown")
+
+    def test_teardown_request_skips_when_streaming(self, app):
+        with app.test_request_context("/dashboard"):
+            g._auto_txn_streaming = True
+            with patch("app.middleware.transaction_middleware.safe_rollback") as mock_rb, \
+                 patch("app.middleware.transaction_middleware.safe_remove") as mock_remove:
+                _hook(app, "teardown_request", "_txn_teardown_request")(None)
+                mock_rb.assert_not_called()
+                mock_remove.assert_not_called()
+
+    def test_handle_exception_wrapper_rolls_back(self):
+        from flask import Flask
+
+        test_app = Flask(__name__)
+        delegate = MagicMock(return_value=MagicMock(status_code=500))
+
+        with patch("app.middleware.transaction_middleware.safe_rollback") as mock_rb, \
+             patch("app.middleware.transaction_middleware.safe_remove") as mock_remove, \
+             patch.object(Flask, "handle_exception", delegate):
+            init_transaction_middleware(test_app)
+            wrapped = test_app.handle_exception
+
+            with test_app.test_request_context("/"):
+                result = wrapped(ValueError("boom"))
+
+            mock_rb.assert_called_once_with(reason="handle_exception")
+            mock_remove.assert_called_once_with(reason="handle_exception")
+            delegate.assert_called_once()
+            assert result.status_code == 500

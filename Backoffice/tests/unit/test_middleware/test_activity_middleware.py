@@ -28,6 +28,24 @@ from app.middleware.activity_middleware import (
 )
 
 
+def _activity_before(app):
+    funcs = app.before_request_funcs.get(None, [])
+    return next(
+        (fn for fn in funcs if fn.__module__ == "app.middleware.activity_middleware"
+         and fn.__name__ == "before_request"),
+        None,
+    )
+
+
+def _activity_after(app):
+    funcs = app.after_request_funcs.get(None, [])
+    return next(
+        (fn for fn in funcs if fn.__module__ == "app.middleware.activity_middleware"
+         and fn.__name__ == "after_request"),
+        None,
+    )
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────────────────────────────────
@@ -531,6 +549,50 @@ class TestExtractEntityIntoContext:
             # No entity_id added since AES was not found and no fallback country
             assert "entity_id" not in ctx
 
+    def test_post_with_aes_id_alias_in_form(self, app):
+        with app.app_context():
+            mock_aes = MagicMock()
+            mock_aes.entity_type = "country"
+            mock_aes.entity_id = 7
+            mock_aes.country = MagicMock(id=7, name="Alias Country")
+
+            class FakeForm:
+                def get(self, key, default=None):
+                    return {"aes_id": "7"}.get(key, default)
+
+            req = _req(method="POST", form=FakeForm())
+            ctx = {}
+
+            with patch("app.models.assignments.AssignmentEntityStatus") as mock_cls, \
+                 patch("app.services.entity_service.EntityService") as mock_svc:
+                mock_cls.query.get.return_value = mock_aes
+                mock_svc.get_entity_display_name.return_value = "Alias Country"
+                _extract_entity_into_context(app, req, ctx)
+
+            assert ctx.get("entity_id") == 7
+
+    def test_country_not_found_returns_false(self, app):
+        with app.app_context():
+            req = _req(method="GET", args={"country_id": "404"}, view_args={})
+            ctx = {}
+            with patch("app.models.Country") as mock_cls:
+                mock_cls.query.get.return_value = None
+                _extract_entity_into_context(app, req, ctx)
+            assert "entity_id" not in ctx
+
+    def test_outer_exception_logged(self, app):
+        with app.app_context():
+            req = MagicMock()
+            req.method = "POST"
+            req.form = MagicMock()
+            req.form.get.side_effect = RuntimeError("form broken")
+            req.view_args = {}
+            req.args = {}
+            ctx = {}
+            with patch.object(app.logger, "debug") as mock_debug:
+                _extract_entity_into_context(app, req, ctx)
+                mock_debug.assert_called_once()
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # track_activity decorator
@@ -583,6 +645,24 @@ class TestTrackActivityDecorator:
 
                 admin_view()
                 mock_admin_log.assert_called_once()
+
+    def test_admin_action_not_admin_logs_regular_activity(self, app):
+        with app.test_request_context("/admin/test"):
+            with patch("app.middleware.activity_middleware.current_user") as mock_user, \
+                 patch("app.middleware.activity_middleware.log_admin_action") as mock_admin_log, \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.services.authorization_service.AuthorizationService.is_admin",
+                       return_value=False):
+                mock_user.is_authenticated = True
+
+                @track_activity(activity_type="admin_action", admin_action=True)
+                def admin_view():
+                    from flask import jsonify
+                    return jsonify({"ok": True}), 200
+
+                admin_view()
+                mock_admin_log.assert_not_called()
+                mock_log.assert_called_once()
 
     def test_exception_reraises(self, app):
         with app.test_request_context("/test"):
@@ -926,3 +1006,234 @@ class TestInitActivityTracking:
                 )
                 if is_admin_route:
                     mock_log.assert_not_called()
+
+
+class TestActivityRegisteredHooks:
+    def test_before_request_captures_authenticated_user(self, app):
+        with app.test_request_context("/dashboard"):
+            g.pop("activity_user_id", None)
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.current_user") as mock_user:
+                mock_user.is_authenticated = True
+                mock_user.id = 99
+                _activity_before(app)()
+                assert g.activity_user_id == 99
+
+    def test_before_request_clears_user_when_anonymous(self, app):
+        with app.test_request_context("/dashboard"):
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.current_user") as mock_user:
+                mock_user.is_authenticated = False
+                _activity_before(app)()
+                assert g.activity_user_id is None
+
+    def test_before_request_user_snapshot_failure(self, app):
+        from unittest.mock import PropertyMock
+
+        with app.test_request_context("/dashboard"):
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.current_user") as mock_user:
+                type(mock_user).is_authenticated = PropertyMock(
+                    side_effect=RuntimeError("detached")
+                )
+                _activity_before(app)()
+                assert g.activity_user_id is None
+
+    def test_after_request_non_deferred_logs_activity(self, app):
+        with app.test_request_context("/dashboard", method="POST",
+                                       data={"action": "save"},
+                                       content_type="application/x-www-form-urlencoded"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time() - 0.05
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                mock_log.assert_called_once()
+                assert resp.status_code == 200
+
+    def test_after_request_non_deferred_page_view_increments_session(self, app):
+        with app.test_request_context("/dashboard", method="GET"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time() - 0.05
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.increment_session_page_views_without_activity_log") as mock_inc:
+                from flask import make_response
+                _activity_after(app)(make_response("ok", 200))
+                mock_inc.assert_called_once()
+
+    def test_after_request_uses_audit_activity_description(self, app):
+        with app.test_request_context("/dashboard", method="POST"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time()
+            g.audit_activity_description = "Custom audit text"
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                _activity_after(app)(make_response("ok", 200))
+                assert mock_log.call_args[1]["description"] == "Custom audit text"
+
+    def test_after_request_error_is_swallowed(self, app):
+        with app.test_request_context("/dashboard"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._determine_activity_type",
+                       side_effect=RuntimeError("tracking failed")), \
+                 patch.object(app.logger, "error") as mock_error:
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                mock_error.assert_called_once()
+                assert resp.status_code == 200
+
+    def test_after_request_deferred_page_view_on_close(self, app):
+        with app.test_request_context("/dashboard", method="GET"):
+            g.activity_user_id = 1
+            g.activity_session_id = "sess-abc"
+            g._auto_txn_managed = True
+            g.start_time = time.time() - 0.05
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.page_view_path_key_from_request",
+                       return_value="/dashboard"), \
+                 patch("app.middleware.activity_middleware.increment_session_page_views_without_activity_log_deferred") as mock_inc, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                for callback in getattr(resp, "_close_callbacks", []):
+                    callback()
+                mock_inc.assert_called_once_with("sess-abc", page_view_path_key="/dashboard")
+
+    def test_after_request_deferred_non_page_view_on_close(self, app):
+        with app.test_request_context("/dashboard", method="POST",
+                                       data={"action": "save"},
+                                       content_type="application/x-www-form-urlencoded"):
+            g.activity_user_id = 1
+            g.activity_session_id = "sess-abc"
+            g._auto_txn_managed = True
+            g.start_time = time.time() - 0.05
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.log_user_activity_explicit") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                for callback in getattr(resp, "_close_callbacks", []):
+                    callback()
+                mock_log.assert_called_once()
+
+    def test_after_request_deferred_dashboard_post_is_page_view(self, app):
+        with app.test_request_context("/dashboard", method="POST"):
+            g.activity_user_id = 1
+            g.activity_session_id = "sess-abc"
+            g._auto_txn_managed = True
+            g.start_time = time.time() - 0.05
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.page_view_path_key_from_request",
+                       return_value="/dashboard"), \
+                 patch("app.middleware.activity_middleware.increment_session_page_views_without_activity_log_deferred") as mock_inc, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                for callback in getattr(resp, "_close_callbacks", []):
+                    callback()
+                mock_inc.assert_called_once()
+
+    def test_after_request_deferred_skips_admin_form_builder_post(self, app):
+        mock_request = MagicMock()
+        mock_request.endpoint = "user_management.manage_users"
+        mock_request.method = "POST"
+        mock_request.path = "/admin/users"
+        mock_request.form = {}
+        mock_request.referrer = None
+        mock_request.headers.get.return_value = None
+        mock_request.args = {}
+
+        with app.test_request_context("/admin/users", method="POST"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = True
+            g.start_time = time.time()
+            with patch("app.middleware.activity_middleware.request", mock_request), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity_explicit") as mock_log:
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                assert not getattr(resp, "_close_callbacks", [])
+                mock_log.assert_not_called()
+
+    def test_after_request_deferred_setup_error_is_swallowed(self, app):
+        with app.test_request_context("/dashboard", method="GET"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = True
+            g.start_time = time.time()
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.page_view_path_key_from_request",
+                       side_effect=RuntimeError("setup failed")), \
+                 patch.object(app.logger, "warning") as mock_warn:
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                mock_warn.assert_called_once()
+                assert resp.status_code == 200
+
+    def test_after_request_deferred_on_close_failure_logged(self, app):
+        with app.test_request_context("/dashboard", method="POST"):
+            g.activity_user_id = 1
+            g.activity_session_id = "sess-abc"
+            g._auto_txn_managed = True
+            g.start_time = time.time()
+            with patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.log_user_activity_explicit",
+                       side_effect=RuntimeError("deferred failed")), \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"), \
+                 patch.object(app.logger, "warning") as mock_warn:
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                for callback in getattr(resp, "_close_callbacks", []):
+                    callback()
+                mock_warn.assert_called_once()

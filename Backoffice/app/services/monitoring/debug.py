@@ -75,22 +75,26 @@ class DebugManager:
             setattr(handler, managed_handler_attr, True)
             return handler
 
+        def _safe_close_handler(handler):
+            """Remove a handler without closing process stdio (pytest capture, terminals)."""
+            stream = getattr(handler, "stream", None)
+            if stream is not None and stream in (sys.stdout, sys.stderr):
+                handler.stream = None
+            try:
+                handler.close()
+            except Exception:
+                pass
+
         def _clear_managed_handlers(logger):
             for handler in list(logger.handlers):
                 if getattr(handler, managed_handler_attr, False):
                     logger.removeHandler(handler)
-                    try:
-                        handler.close()
-                    except Exception:
-                        pass
+                    _safe_close_handler(handler)
 
         def _clear_app_handlers():
             for handler in list(app.logger.handlers):
                 app.logger.removeHandler(handler)
-                try:
-                    handler.close()
-                except Exception:
-                    pass
+                _safe_close_handler(handler)
 
         log_to_stdout = app.config.get('LOG_TO_STDOUT', True)
 

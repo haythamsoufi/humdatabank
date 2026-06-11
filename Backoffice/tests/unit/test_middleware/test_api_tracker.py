@@ -155,24 +155,32 @@ class TestApiTrackerLogger:
 # ────────────────────────────────────────────────────────────────────────────
 
 class TestTrackApiRequest:
+    @staticmethod
+    def _clear_api_start_time():
+        """Drop stale api_start_time left on app-context g by prior client requests."""
+        g.pop("api_start_time", None)
+
     def test_non_api_path_does_nothing(self, app):
         with app.test_request_context("/dashboard"):
+            self._clear_api_start_time()
             track_api_request()
-            # g.api_start_time should NOT be set
-            assert not hasattr(g, "api_start_time")
+            assert getattr(g, "api_start_time", None) is None
 
     def test_api_path_sets_start_time(self, app):
         with app.test_request_context("/api/v1/users"):
             with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
                        return_value=False):
+                self._clear_api_start_time()
                 track_api_request()
-                assert hasattr(g, "api_start_time")
-                assert isinstance(g.api_start_time, float)
+                start = getattr(g, "api_start_time", None)
+                assert start is not None
+                assert isinstance(start, float)
 
     def test_skipped_api_path_no_start_time(self, app):
         with app.test_request_context("/api/notifications/list"):
+            self._clear_api_start_time()
             track_api_request()
-            assert not hasattr(g, "api_start_time")
+            assert getattr(g, "api_start_time", None) is None
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -213,7 +221,7 @@ class TestTrackApiResponse:
             with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
                        return_value=False), \
                  patch("app.middleware.api_tracker.get_json_safe", return_value=None), \
-                 patch("app.middleware.api_tracker.sessionmaker") as mock_sm:
+                 patch("sqlalchemy.orm.sessionmaker") as mock_sm:
 
                 mock_session = MagicMock()
                 mock_sm.return_value.return_value = mock_session
@@ -238,7 +246,7 @@ class TestTrackApiResponse:
                        return_value=False), \
                  patch("app.middleware.api_tracker.get_json_safe",
                        return_value=sensitive_data), \
-                 patch("app.middleware.api_tracker.sessionmaker") as mock_sm:
+                 patch("sqlalchemy.orm.sessionmaker") as mock_sm:
 
                 mock_session = MagicMock()
                 mock_sm.return_value.return_value = mock_session
@@ -263,7 +271,7 @@ class TestTrackApiResponse:
             with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
                        return_value=False), \
                  patch("app.middleware.api_tracker.get_json_safe", return_value=None), \
-                 patch("app.middleware.api_tracker.sessionmaker") as mock_sm:
+                 patch("sqlalchemy.orm.sessionmaker") as mock_sm:
 
                 mock_session = MagicMock()
                 mock_sm.return_value.return_value = mock_session
@@ -286,7 +294,7 @@ class TestTrackApiResponse:
             with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
                        return_value=False), \
                  patch("app.middleware.api_tracker.get_json_safe", return_value=None), \
-                 patch("app.middleware.api_tracker.sessionmaker") as mock_sm, \
+                 patch("sqlalchemy.orm.sessionmaker") as mock_sm, \
                  patch("sqlalchemy.inspect") as mock_insp:
 
                 insp_instance = MagicMock()
@@ -309,7 +317,7 @@ class TestTrackApiResponse:
             with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
                        return_value=False), \
                  patch("app.middleware.api_tracker.get_json_safe", return_value=None), \
-                 patch("app.middleware.api_tracker.sessionmaker") as mock_sm:
+                 patch("sqlalchemy.orm.sessionmaker") as mock_sm:
 
                 mock_session = MagicMock()
                 mock_session.commit.side_effect = Exception("DB connection lost")
@@ -332,7 +340,7 @@ class TestTrackApiResponse:
                        return_value=False), \
                  patch("app.middleware.api_tracker.get_json_safe",
                        side_effect=Exception("JSON parse error")), \
-                 patch("app.middleware.api_tracker.sessionmaker") as mock_sm:
+                 patch("sqlalchemy.orm.sessionmaker") as mock_sm:
 
                 mock_session = MagicMock()
                 mock_sm.return_value.return_value = mock_session
@@ -375,3 +383,56 @@ class TestTrackApiUsageDecorator:
 
                 with pytest.raises(RuntimeError, match="view failed"):
                     failing_view()
+
+    def test_decorator_logs_exception_without_mocking_internals(self, app):
+        with app.test_request_context("/api/v1/test"):
+            with patch("app.middleware.api_tracker.track_api_request"), \
+                 patch("app.middleware.api_tracker.track_api_response"), \
+                 patch.object(app.logger, "error") as mock_error:
+
+                @track_api_usage
+                def failing_view():
+                    raise RuntimeError("view failed")
+
+                with pytest.raises(RuntimeError, match="view failed"):
+                    failing_view()
+                mock_error.assert_called_once()
+
+
+class TestTrackApiRequestLogging:
+    def test_api_path_logs_start_message(self, app):
+        with app.test_request_context("/api/v1/users"):
+            g.pop("api_start_time", None)
+            with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
+                       return_value=False), \
+                 patch.object(app.logger, "log") as mock_log:
+                track_api_request()
+                mock_log.assert_called_once()
+                assert getattr(g, "api_start_time", None) is not None
+
+
+class TestApiKeyRecordIdentity:
+    def test_empty_identity_does_not_add_key_usage_row(self, app, db_session):
+        with app.test_request_context("/api/v1/data"):
+            g.pop("api_start_time", None)
+            g.api_start_time = time.time()
+            g.api_key_usage_id = None
+            g.api_key_record = MagicMock()
+
+            with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
+                       return_value=False), \
+                 patch("app.middleware.api_tracker.get_json_safe", return_value=None), \
+                 patch("sqlalchemy.orm.sessionmaker") as mock_sm, \
+                 patch("sqlalchemy.inspect") as mock_insp:
+
+                insp_instance = MagicMock()
+                insp_instance.identity = None
+                mock_insp.return_value = insp_instance
+
+                mock_session = MagicMock()
+                mock_sm.return_value.return_value = mock_session
+
+                from flask import make_response
+                track_api_response(make_response("ok", 200))
+
+                assert mock_session.add.call_count == 1

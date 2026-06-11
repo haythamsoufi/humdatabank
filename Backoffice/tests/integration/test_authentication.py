@@ -19,6 +19,7 @@ from app.models import User
 
 
 @pytest.mark.integration
+@pytest.mark.auth_security
 class TestAuthentication:
     """Test authentication functionality."""
 
@@ -69,13 +70,14 @@ class TestAuthentication:
         # Avoid hitting '/' (dashboard template can vary); just ensure logout clears session
         with patch("app.routes.auth.log_user_activity", return_value=None), patch(
             "app.routes.auth.log_logout", return_value=None
-        ):
+        ), patch("app.routes.auth._b2c_get_required_config", return_value=None):
             response = logged_in_client.get('/logout', follow_redirects=False)
         assert response.status_code in [200, 302, 303, 307, 308]
         assert "/login" in (response.headers.get("Location") or "")
 
 
 @pytest.mark.integration
+@pytest.mark.auth_security
 class TestAPIAuthentication:
     """Test API key authentication."""
 
@@ -179,6 +181,7 @@ class TestAuthorization:
 
 
 @pytest.mark.integration
+@pytest.mark.auth_security
 class TestPasswordResetFlow:
     def test_forgot_password_post_redirects_even_if_user_missing(self, client, app):
         with app.app_context():
@@ -287,3 +290,82 @@ class TestPasswordResetFlow:
             fresh_user = User.query.get(user_id)
             assert fresh_user is not None
             assert fresh_user.check_password("NewPass123!") is True
+
+
+@pytest.mark.integration
+@pytest.mark.auth_security
+class TestAuthRouteHelpers:
+    """Additional web auth route coverage."""
+
+    def test_check_register_email_available(self, client, db_session, app):
+        with app.app_context():
+            create_test_user(db_session, email='exists@example.com')
+        with patch('app.routes.auth.is_azure_b2c_configured', return_value=False):
+            resp = client.get('/register/check-email?email=newperson@example.com')
+        assert resp.status_code == 200
+        assert resp.get_json()['exists'] is False
+
+    def test_check_register_email_taken(self, client, db_session, app):
+        with app.app_context():
+            create_test_user(db_session, email='exists@example.com')
+        with patch('app.routes.auth.is_azure_b2c_configured', return_value=False):
+            resp = client.get('/register/check-email?email=exists@example.com')
+        assert resp.status_code == 200
+        assert resp.get_json()['exists'] is True
+
+    def test_register_get_redirects_to_login(self, client):
+        resp = client.get('/register', follow_redirects=False)
+        assert resp.status_code in (301, 302, 303, 307, 308)
+        assert '/login' in (resp.headers.get('Location') or '')
+
+    def test_login_already_authenticated_respects_next(self, client, logged_in_client):
+        resp = logged_in_client.get('/login?next=/admin/dashboard', follow_redirects=False)
+        assert resp.status_code in (301, 302, 303, 307, 308)
+        assert '/admin/dashboard' in (resp.headers.get('Location') or '')
+
+    def test_deactivated_account_correct_password(self, client, db_session, app):
+        with app.app_context():
+            create_test_user(
+                db_session,
+                email='deactivated@example.com',
+                password='TestPass123!',
+                active=False,
+            )
+        with patch('app.routes.auth.render_template', return_value=("", 200)), \
+             patch('app.routes.auth.create_security_event') as mock_event:
+            resp = client.post('/login', data={
+                'email': 'deactivated@example.com',
+                'password': 'TestPass123!',
+            })
+        assert resp.status_code == 200
+        mock_event.assert_called_once()
+
+    def test_forgot_password_unknown_email_still_redirects(self, client, app):
+        with patch('app.routes.auth.render_template', return_value=("", 200)):
+            resp = client.post('/forgot-password', data={'email': 'nobody@example.com'}, follow_redirects=False)
+        assert resp.status_code in (301, 302, 303, 307, 308)
+
+    def test_reset_password_weak_password_rejected(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, email='weak@example.com', password='OldPass123!', role='user')
+            sent_tokens: list[str] = []
+
+            def _capture(_email: str, token: str) -> bool:
+                sent_tokens.append(token)
+                return True
+
+            with patch('app.routes.auth._send_password_reset_email', side_effect=_capture):
+                client.post(
+                    '/forgot-password',
+                    data={'email': 'weak@example.com'},
+                    headers={'X-Forwarded-For': str(uuid4())},
+                    follow_redirects=False,
+                )
+            token = sent_tokens[0]
+
+        with patch('app.routes.auth.render_template', return_value=("", 200)):
+            resp = client.post(
+                f'/reset-password/{token}',
+                data={'password': '12345678', 'confirm_password': '12345678'},
+            )
+        assert resp.status_code == 200

@@ -6,9 +6,14 @@ direct database queries in route handlers.
 """
 
 from typing import Optional
-from app.models import Country
-from app import db
+
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
+
+from app.models import Country, User
+from app.models.core import UserEntityPermission
+from app.models.rbac import RbacRole, RbacUserRole
+from app import db
 
 
 class CountryService:
@@ -91,3 +96,95 @@ class CountryService:
             True if country exists, False otherwise
         """
         return Country.query.filter_by(id=country_id).first() is not None
+
+
+def fds_member_user_display_name(user: User | None) -> str:
+    """Human-readable label for a platform user assigned as FDS member."""
+    if not user:
+        return ''
+    name = (user.name or '').strip()
+    if name:
+        return name
+    return (user.email or '').strip() or f'User {user.id}'
+
+
+def get_fds_member_user_options_for_country(country_id: int) -> list[dict]:
+    """Org admins with entity coverage for this country — eligible FDS member pickers."""
+    rows = (
+        User.query.filter(User.active.is_(True))
+        .join(UserEntityPermission, UserEntityPermission.user_id == User.id)
+        .join(RbacUserRole, RbacUserRole.user_id == User.id)
+        .join(RbacRole, RbacRole.id == RbacUserRole.role_id)
+        .filter(
+            UserEntityPermission.entity_type == 'country',
+            UserEntityPermission.entity_id == int(country_id),
+            or_(
+                RbacRole.code == 'admin_core',
+                RbacRole.code.like('admin\\_%', escape='\\'),
+            ),
+        )
+        .order_by(User.name, User.email)
+        .distinct()
+        .all()
+    )
+    return [
+        {
+            'id': user.id,
+            'label': fds_member_user_display_name(user),
+            'email': user.email or '',
+        }
+        for user in rows
+    ]
+
+
+def parse_fds_member_user_id(raw_value) -> int | None:
+    if raw_value is None:
+        return None
+    text = str(raw_value).strip()
+    if not text:
+        return None
+    try:
+        user_id = int(float(text))
+    except (TypeError, ValueError):
+        return None
+    return user_id if user_id > 0 else None
+
+
+def resolve_fds_member_user_id_from_import(
+    raw_user_id=None,
+    raw_email=None,
+) -> int | None:
+    """Resolve FDS member from Excel import columns (user id preferred over email)."""
+    parsed_id = parse_fds_member_user_id(raw_user_id)
+    if parsed_id is not None:
+        return parsed_id
+
+    email = str(raw_email).strip() if raw_email is not None and str(raw_email).strip() else None
+    if not email:
+        return None
+
+    user = User.query.filter(
+        User.active.is_(True),
+        db.func.lower(User.email) == email.lower(),
+    ).first()
+    if not user:
+        raise ValueError(f'No active user found with email "{email}".')
+    return user.id
+
+
+def assign_country_fds_member_user(country: Country, user_id: int | None) -> None:
+    """Set the country's FDS member to an org admin covering that country."""
+    if user_id is None:
+        country.fds_member_user_id = None
+        return
+
+    eligible_ids = {option['id'] for option in get_fds_member_user_options_for_country(country.id)}
+    if user_id not in eligible_ids:
+        raise ValueError('Selected FDS member must be an org admin covering this country.')
+
+    country.fds_member_user_id = user_id
+
+
+def countries_with_fds_member_query():
+    """Countries query with FDS member user eager-loaded for admin tables."""
+    return Country.query.options(joinedload(Country.fds_member_user))

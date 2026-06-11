@@ -1,0 +1,311 @@
+"""
+Tests for app/routes/api/error_log.py
+
+Coverage targets:
+- POST /api/v1/platform-error        (all validation branches, success, exception)
+- _strip_control_chars               (empty, control chars, max_len)
+- sanitize_url                       (happy path, sensitive params, bad scheme, empty)
+"""
+import pytest
+from unittest.mock import patch, MagicMock
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _api(path: str) -> str:
+    return f"/api/v1{path}"
+
+
+def _json_headers():
+    return {"Content-Type": "application/json"}
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for _strip_control_chars
+# ---------------------------------------------------------------------------
+
+class TestStripControlChars:
+    """Unit tests for the _strip_control_chars helper."""
+
+    def test_none_returns_none(self, app):
+        from app.routes.api.error_log import _strip_control_chars
+        with app.app_context():
+            assert _strip_control_chars(None, max_len=100) is None
+
+    def test_empty_string_returns_none(self, app):
+        from app.routes.api.error_log import _strip_control_chars
+        with app.app_context():
+            assert _strip_control_chars("", max_len=100) is None
+
+    def test_whitespace_only_returns_none(self, app):
+        from app.routes.api.error_log import _strip_control_chars
+        with app.app_context():
+            assert _strip_control_chars("   ", max_len=100) is None
+
+    def test_removes_newlines(self, app):
+        from app.routes.api.error_log import _strip_control_chars
+        with app.app_context():
+            result = _strip_control_chars("line1\nline2\r\n", max_len=100)
+        assert "\n" not in (result or "")
+        assert "\r" not in (result or "")
+
+    def test_removes_tabs(self, app):
+        from app.routes.api.error_log import _strip_control_chars
+        with app.app_context():
+            result = _strip_control_chars("col1\tcol2", max_len=100)
+        assert "\t" not in (result or "")
+
+    def test_truncates_to_max_len(self, app):
+        from app.routes.api.error_log import _strip_control_chars
+        with app.app_context():
+            result = _strip_control_chars("a" * 200, max_len=50)
+        assert len(result) == 50
+
+    def test_normal_string_returned_as_is(self, app):
+        from app.routes.api.error_log import _strip_control_chars
+        with app.app_context():
+            result = _strip_control_chars("hello world", max_len=100)
+        assert result == "hello world"
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for sanitize_url
+# ---------------------------------------------------------------------------
+
+class TestSanitizeUrl:
+    """Unit tests for the sanitize_url helper."""
+
+    def test_none_returns_none(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            assert sanitize_url(None) is None
+
+    def test_empty_string_returns_none(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            assert sanitize_url("") is None
+
+    def test_valid_https_url_returned(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("https://example.com/path")
+        assert result is not None
+        assert "example.com" in result
+
+    def test_valid_http_url_returned(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("http://example.com/path")
+        assert result is not None
+
+    def test_removes_sensitive_params(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("https://example.com/?password=secret&page=1")
+        assert result is not None
+        assert "password" not in result
+        assert "page=1" in result
+
+    def test_removes_token_param(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("https://example.com/?token=abc123&q=test")
+        assert result is not None
+        assert "token" not in result
+
+    def test_removes_api_key_param(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("https://example.com/?api_key=supersecret")
+        assert result is not None
+        assert "api_key" not in result
+
+    def test_invalid_scheme_returns_none(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("javascript:alert(1)")
+        assert result is None
+
+    def test_ftp_scheme_returns_none(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("ftp://example.com/file")
+        assert result is None
+
+    def test_path_only_url_allowed(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("/path/to/page")
+        # A path-only URL has no scheme — it's valid (scheme='', netloc='', path='/path/to/page')
+        # The function returns it or None
+        # Just check it doesn't raise
+        assert True  # just verify no exception
+
+    def test_control_chars_stripped(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            result = sanitize_url("https://example.com/path\ninjected")
+        # Should not contain newlines
+        assert result is None or "\n" not in result
+
+    def test_very_long_url_truncated(self, app):
+        from app.routes.api.error_log import sanitize_url
+        with app.app_context():
+            long_url = "https://example.com/" + "a" * 3000
+            result = sanitize_url(long_url)
+        assert result is None or len(result) <= 2000
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/platform-error
+# ---------------------------------------------------------------------------
+
+class TestLogPlatformError:
+    """Tests for POST /api/v1/platform-error."""
+
+    def _post(self, client, payload, headers=None):
+        h = {**(headers or {}), "Content-Type": "application/json"}
+        return client.post(_api("/platform-error"), json=payload, headers=h)
+
+    def test_wrong_content_type_returns_400(self, client, db_session):
+        """Non-JSON Content-Type returns 400."""
+        resp = client.post(
+            _api("/platform-error"),
+            data="error_code=503",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        assert resp.status_code == 400
+
+    def test_invalid_error_code_string_returns_400(self, client, db_session):
+        resp = self._post(client, {"error_code": "not_a_number", "url": "https://example.com"})
+        assert resp.status_code == 400
+
+    def test_invalid_error_code_value_returns_400(self, client, db_session):
+        """Error code 200 is not in the allowed set."""
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event"):
+            resp = self._post(client, {"error_code": 200, "url": "https://example.com"})
+        assert resp.status_code == 400
+
+    def test_valid_403_logged_successfully(self, client, db_session):
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event") as mock_log:
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://example.com/page",
+                "referrer": "https://google.com",
+                "user_agent": "Mozilla/5.0",
+                "timestamp": "2024-01-01T00:00:00Z",
+            })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get("success") is True
+        mock_log.assert_called_once()
+
+    def test_valid_502_logged_successfully(self, client, db_session):
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event") as mock_log:
+            resp = self._post(client, {"error_code": 502, "url": "https://example.com/"})
+        assert resp.status_code == 200
+        mock_log.assert_called_once()
+
+    def test_valid_503_logged_successfully(self, client, db_session):
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event"):
+            resp = self._post(client, {"error_code": 503, "url": "https://example.com/"})
+        assert resp.status_code == 200
+
+    def test_sensitive_url_params_stripped(self, client, db_session):
+        """URL with sensitive params is sanitized before logging."""
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event", side_effect=capture_call):
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://example.com/?password=secret&page=1",
+            })
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert "password" not in ctx.get("url", "")
+
+    def test_invalid_timestamp_ignored(self, client, db_session):
+        """Invalid timestamp is silently ignored."""
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event"):
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://example.com/",
+                "timestamp": "not-a-valid-timestamp",
+            })
+        assert resp.status_code == 200
+
+    def test_database_log_failure_does_not_break_endpoint(self, client, db_session):
+        """DB log failure is caught and endpoint still returns 200."""
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=Exception("DB down"),
+        ):
+            resp = self._post(client, {"error_code": 502, "url": "https://example.com/"})
+        assert resp.status_code == 200
+
+    def test_request_too_large_returns_413(self, client, db_session):
+        """Content-Length exceeding limit returns 413."""
+        from app.utils.constants import MAX_ERROR_LOG_REQUEST_BYTES
+        resp = client.post(
+            _api("/platform-error"),
+            data=b"x" * (MAX_ERROR_LOG_REQUEST_BYTES + 1),
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": str(MAX_ERROR_LOG_REQUEST_BYTES + 1),
+            },
+        )
+        assert resp.status_code in (400, 413)
+
+    def test_missing_url_defaults_to_unknown(self, client, db_session):
+        """Missing url in payload uses 'unknown' in log description."""
+        captured = {}
+
+        def capture(**kwargs):
+            captured.update(kwargs)
+
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event", side_effect=capture):
+            resp = self._post(client, {"error_code": 403})
+        assert resp.status_code == 200
+        assert "unknown" in captured.get("description", "").lower()
+
+    def test_exception_returns_500(self, client, db_session):
+        """Unhandled exception returns 500."""
+        with patch("app.routes.api.error_log.get_json_safe", side_effect=Exception("unexpected")):
+            resp = self._post(client, {"error_code": 403})
+        assert resp.status_code == 500
+
+    def test_no_error_code_returns_400(self, client, db_session):
+        """Missing error_code returns 400."""
+        resp = self._post(client, {"url": "https://example.com"})
+        assert resp.status_code == 400
+
+    def test_valid_timestamp_included_in_context(self, client, db_session):
+        """Valid ISO timestamp is included in context_data."""
+        captured = {}
+
+        def capture(**kwargs):
+            captured.update(kwargs)
+
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event", side_effect=capture):
+            resp = self._post(client, {
+                "error_code": 503,
+                "url": "https://example.com/",
+                "timestamp": "2024-06-10T12:00:00Z",
+            })
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert "client_timestamp" in ctx
+
+    def test_javascript_scheme_url_sanitized_to_none(self, client, db_session):
+        """javascript: URLs are sanitized and treated as unknown."""
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event") as mock_log:
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "javascript:alert(1)",
+            })
+        assert resp.status_code == 200

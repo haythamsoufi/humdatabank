@@ -17,7 +17,13 @@ from fdrs_assignment_status_sync import (  # noqa: E402
     derive_assignment_status_from_sections,
     derive_assignment_timestamps,
 )
-from fdrs_documents_sync import build_document_import_plan  # noqa: E402
+from fdrs_documents_sync import (  # noqa: E402
+    build_document_import_plan,
+    encode_fdrs_document_url,
+    fetch_fdrs_document_bytes,
+    _resolve_download_outcome,
+    _should_attempt_download,
+)
 from fdrs_sync_constants import (  # noqa: E402
     FDRS_INCOME_SOURCES_MATRIX_ITEM_ID,
     FDRS_NETWORK_SUPPORT_GIVEN_ITEM_ID,
@@ -26,14 +32,21 @@ from fdrs_sync_constants import (  # noqa: E402
 )
 from fdrs_data_fetcher import (  # noqa: E402
     build_disability_by_key,
+    build_fdrs_combined,
+    build_fdrs_data,
+    _classify_fdrs_combined_row,
     _disability_combined_from_raw,
 )
+from fdrs_sync_constants import fdrs_kpi_data_availability_kind  # noqa: E402
 from import_fdrs_form_data import (  # noqa: E402
     build_income_sources_matrix_rows,
     build_network_support_matrix_rows,
     build_ready_to_import_from_new_pipeline,
+    _data_availability_from_group_rows,
     _merge_disability_into_disagg_data,
+    _parse_scalar_field,
     _parse_don_code_amount_pairs,
+    row_to_payload,
 )
 
 
@@ -79,7 +92,6 @@ def test_build_document_import_plan_maps_fdrs_types():
     assert summary["planned"] == 1
     assert plan[0]["form_item_id"] == 923
     assert plan[0]["source_url"].startswith("https://")
-    assert plan[0]["file_pending"] is True
     assert plan[0]["fdrs_import_key"]
     assert plan[0]["status"] == "approved"
 
@@ -90,6 +102,7 @@ def test_fdrs_document_status_from_approval_maps_validated_and_pending():
     assert fdrs_document_status_from_approval("Under Validation (Public)") == "pending"
     assert fdrs_document_status_from_approval("Under Validation (Private)") == "pending"
     assert fdrs_document_status_from_approval("Rejected (Public)") == "rejected"
+    assert fdrs_document_status_from_approval("Rejected (Private)") == "rejected"
     assert fdrs_document_status_from_approval(None) == "pending"
 
 
@@ -116,6 +129,73 @@ def test_build_document_import_plan_maps_under_validation_to_pending():
     plan, summary = build_document_import_plan(documents, assignment_rows)
     assert summary["planned"] == 1
     assert plan[0]["status"] == "pending"
+
+
+def test_build_document_import_plan_maps_rejected_status():
+    documents = [
+        {
+            "don_code": "DGA001",
+            "iso3": "GAB",
+            "document_type": "Our Audited Financial Statements",
+            "document_typeId": 2,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "audited Financial Statement_Gabon_2024.pdf",
+            "url": "https://data-api.ifrc.org/documents/GA/audited Financial Statement_Gabon_2024.pdf",
+            "LangCode": "fr",
+            "Public": 3,
+            "ApprovalStatus": "Rejected (Public)",
+            "ModifiedAt": "2025-01-01T00:00:00",
+        }
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "GAB", "assignment_entity_status_id": 77},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 1
+    assert summary["skipped_approval"] == 0
+    assert plan[0]["status"] == "rejected"
+    assert plan[0]["form_item_id"] == 933
+
+
+def test_build_document_import_plan_prefers_validated_over_rejected():
+    documents = [
+        {
+            "don_code": "DGA001",
+            "iso3": "GAB",
+            "document_type": "Our Audited Financial Statements",
+            "document_typeId": 2,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "audited Financial Statement_Gabon_2024_rejected.pdf",
+            "url": "https://data-api.ifrc.org/documents/GA/rejected.pdf",
+            "LangCode": "fr",
+            "Public": 3,
+            "ApprovalStatus": "Rejected (Public)",
+            "ModifiedAt": "2025-01-01T00:00:00",
+        },
+        {
+            "don_code": "DGA001",
+            "iso3": "GAB",
+            "document_type": "Our Audited Financial Statements",
+            "document_typeId": 2,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "audited Financial Statement_Gabon_2024.pdf",
+            "url": "https://data-api.ifrc.org/documents/GA/validated.pdf",
+            "LangCode": "fr",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+            "ModifiedAt": "2025-02-01T00:00:00",
+        },
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "GAB", "assignment_entity_status_id": 77},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 1
+    assert plan[0]["status"] == "approved"
+    assert plan[0]["source_url"].endswith("validated.pdf")
 
 
 def test_build_document_import_plan_maps_multi_year_annual_report_to_end_year():
@@ -359,6 +439,193 @@ def test_build_ready_to_import_merges_disability_into_disagg_data():
     }
 
 
+def test_fdrs_kpi_data_availability_kind_accepts_api_casing_variants():
+    assert fdrs_kpi_data_availability_kind("KPI_Climate_IsDataNotAvailable") == "data_not_available"
+    assert fdrs_kpi_data_availability_kind("KPI_Climate_isDataNotCollected") == "not_applicable"
+    assert fdrs_kpi_data_availability_kind("KPI_Climate_IsDataNotCollected") == "not_applicable"
+
+
+def test_data_availability_from_group_rows_maps_is_data_not_collected_to_not_applicable():
+    group_rows = [
+        {"KPI_code": "KPI_PeopleVol_IsDataNotCollected", "Value": True},
+    ]
+    data_na, not_applic = _data_availability_from_group_rows(group_rows)
+    assert data_na is False
+    assert not_applic is True
+
+
+def test_classify_fdrs_combined_row_keeps_is_data_not_collected_with_empty_value():
+    include, reason, _, _, base_kpi = _classify_fdrs_combined_row({
+        "KPI_code": "KPI_PeopleVol_isDataNotCollected",
+        "Value": None,
+        "year": 2024,
+    })
+    assert include is True
+    assert reason == ""
+    assert base_kpi == "KPI_PeopleVol"
+
+
+def test_build_fdrs_combined_keeps_reported_and_imputed_separate():
+    reported = [{
+        "KPI_code": "KPI_PeopleVol_Tot",
+        "DonCode": "DSK001",
+        "year": 2024,
+        "value": "1743",
+        "State": 100,
+        "SourceType": "Reported",
+    }]
+    imputed = [{
+        "KPI_code": "KPI_PeopleVol",
+        "DonCode": "DSK001",
+        "year": 2024,
+        "value": "1574",
+        "State": None,
+        "SourceType": "Imputed",
+    }]
+    combined = build_fdrs_combined(
+        reported,
+        imputed,
+        {"DSK001": "SVK"},
+        import_state_allowlist=frozenset({100, 200, 300, 400, 500}),
+    )
+    by_kpi = {(r["KPI_code"], r["DonCode"]): r for r in combined}
+    tot = by_kpi[("KPI_PeopleVol_Tot", "DSK001")]
+    base = by_kpi[("KPI_PeopleVol", "DSK001")]
+    assert tot["Value"] == "1743"
+    assert tot["ReportedValue"] == "1743"
+    assert tot["ImputedValue"] is None
+    assert base["Value"] is None
+    assert base["ReportedValue"] is None
+    assert base["ImputedValue"] == "1574"
+
+
+def test_build_ready_to_import_splits_reported_value_and_imputed_value():
+    fdrs_data = [
+        {
+            "ISO3": "SVK",
+            "year": "2024",
+            "BaseKPI": "KPI_PeopleVol",
+            "KPI_code": "KPI_PeopleVol_Tot",
+            "Value": "1743",
+            "ImputedValue": "",
+        },
+        {
+            "ISO3": "SVK",
+            "year": "2024",
+            "BaseKPI": "KPI_PeopleVol",
+            "KPI_code": "KPI_PeopleVol",
+            "Value": "",
+            "ImputedValue": "1574",
+        },
+    ]
+    assignment_rows = [{"period_name": "2024", "iso3": "SVK", "assignment_entity_status_id": 42}]
+    form_item_rows = [{"bank_id": 7, "item_id": 900}]
+    indicator_bank_rows = [{"id": 7, "fdrs_kpi_code": "KPI_PeopleVol"}]
+    rows = build_ready_to_import_from_new_pipeline(
+        fdrs_data,
+        {},
+        assignment_rows,
+        form_item_rows,
+        indicator_bank_rows,
+    )
+    assert len(rows) == 1
+    assert rows[0]["value"] == "1743"
+    assert rows[0]["imputed_value"] == "1574"
+
+
+def test_build_ready_to_import_imputed_only_populates_imputed_value_column():
+    fdrs_data = [
+        {
+            "ISO3": "SYR",
+            "year": "2024",
+            "BaseKPI": "KPI_PeopleVol",
+            "KPI_code": "KPI_PeopleVol",
+            "Value": "",
+            "ImputedValue": "1200",
+        },
+    ]
+    assignment_rows = [{"period_name": "2024", "iso3": "SYR", "assignment_entity_status_id": 42}]
+    form_item_rows = [{"bank_id": 7, "item_id": 900}]
+    indicator_bank_rows = [{"id": 7, "fdrs_kpi_code": "KPI_PeopleVol"}]
+    rows = build_ready_to_import_from_new_pipeline(
+        fdrs_data,
+        {},
+        assignment_rows,
+        form_item_rows,
+        indicator_bank_rows,
+    )
+    assert len(rows) == 1
+    assert rows[0]["value"] == ""
+    assert rows[0]["imputed_value"] == "1200"
+
+
+def test_parse_scalar_field_decodes_json_scalars_without_accepting_objects():
+    assert _parse_scalar_field('"CHF"') == "CHF"
+    assert _parse_scalar_field("1200") == "1200"
+    assert _parse_scalar_field('["A", "B"]') == '["A", "B"]'
+    assert _parse_scalar_field('{"mode": "total", "values": {"direct": 1}}') is None
+
+
+def test_row_to_payload_keeps_prefilled_and_imputed_values_as_strings():
+    _, _, _, payload = row_to_payload({
+        "assignment_entity_status_id": "42",
+        "item_id": "900",
+        "value": "",
+        "disagg_data": "",
+        "data_not_available": "",
+        "not_applicable": "",
+        "prefilled_value": '"CHF"',
+        "imputed_value": "1200",
+        "submitted_at": "",
+    })
+    assert payload["prefilled_value"] == "CHF"
+    assert payload["imputed_value"] == "1200"
+
+
+def test_build_fdrs_data_includes_imputed_only_rows():
+    combined = [{
+        "ISO3": "SYR",
+        "DonCode": "DSYR001",
+        "year": 2024,
+        "KPI_code": "KPI_PeopleVol",
+        "Value": None,
+        "ReportedValue": None,
+        "ImputedValue": "1200",
+        "ValueStatus": "Imputed",
+        "State": None,
+    }]
+    rows = build_fdrs_data(combined)
+    assert len(rows) == 1
+    assert rows[0]["Value"] == ""
+    assert rows[0]["ImputedValue"] == "1200"
+
+
+def test_build_ready_to_import_sets_not_applicable_from_is_data_not_collected():
+    fdrs_data = [
+        {
+            "ISO3": "SYR",
+            "year": "2024",
+            "BaseKPI": "KPI_PeopleVol",
+            "KPI_code": "KPI_PeopleVol_IsDataNotCollected",
+            "Value": "",
+        },
+    ]
+    assignment_rows = [{"period_name": "2024", "iso3": "SYR", "assignment_entity_status_id": 42}]
+    form_item_rows = [{"bank_id": 7, "item_id": 900}]
+    indicator_bank_rows = [{"id": 7, "fdrs_kpi_code": "KPI_PeopleVol"}]
+    rows = build_ready_to_import_from_new_pipeline(
+        fdrs_data,
+        {},
+        assignment_rows,
+        form_item_rows,
+        indicator_bank_rows,
+    )
+    assert len(rows) == 1
+    assert rows[0]["value"] == ""
+    assert rows[0]["not_applicable"] == "true"
+    assert rows[0]["data_not_available"] == ""
+
+
 def test_build_ready_to_import_emits_disability_only_row():
     disability_by_key = {
         ("SYR", "2024", "KPI_PeopleVol"): {"disaggregated_by_disability": False},
@@ -378,3 +645,70 @@ def test_build_ready_to_import_emits_disability_only_row():
     assert rows[0]["value"] == ""
     disagg = json.loads(rows[0]["disagg_data"])
     assert disagg == {"mode": "total", "values": {"disability": {"disaggregated_by_disability": False}}}
+
+
+def test_encode_fdrs_document_url_percent_encodes_spaces():
+    raw = "https://data-api.ifrc.org/documents/US/Annual Report_USA_2024_en.pdf"
+    enc = encode_fdrs_document_url(raw)
+    assert " " not in enc
+    assert "Annual%20Report_USA_2024_en.pdf" in enc
+
+
+def test_fetch_fdrs_document_bytes_success(monkeypatch):
+    class FakeResp:
+        status = 200
+
+        def read(self):
+            return b"%PDF-1.4"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(
+        "fdrs_documents_sync.urllib.request.urlopen",
+        lambda req, timeout=120: FakeResp(),
+    )
+    data, status = fetch_fdrs_document_bytes("https://example.test/doc/a b.pdf")
+    assert status == 200
+    assert data == b"%PDF-1.4"
+
+
+def test_fetch_fdrs_document_bytes_403(monkeypatch):
+    import urllib.error
+
+    def _raise(req, timeout=120):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", hdrs=None, fp=None)
+
+    monkeypatch.setattr("fdrs_documents_sync.urllib.request.urlopen", _raise)
+    data, status = fetch_fdrs_document_bytes("https://example.test/doc/forbidden.pdf")
+    assert status == 403
+    assert data is None
+
+
+def test_should_attempt_download_skips_when_already_stored():
+    class Doc:
+        file_pending = False
+        storage_path = "country/1/99/file.pdf"
+        source_url = "https://example.test/same.pdf"
+
+    row = {"source_url": "https://example.test/same.pdf"}
+    assert _should_attempt_download(row, Doc()) is False
+
+
+def test_resolve_download_outcome_keeps_existing_file_on_403():
+    class Doc:
+        storage_path = "country/1/99/file.pdf"
+        file_pending = False
+
+    data, pending = _resolve_download_outcome(Doc(), 403, None)
+    assert data is None
+    assert pending is False
+
+
+def test_resolve_download_outcome_pending_when_no_file_and_404():
+    data, pending = _resolve_download_outcome(None, 404, None)
+    assert data is None
+    assert pending is True

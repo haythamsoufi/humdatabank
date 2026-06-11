@@ -83,6 +83,13 @@
 
         /* Disaggregation sub-tab styling */
         .disagg-subtab.active { border-bottom-color: #2563eb; color: #2563eb; }
+        .disagg-subtabs-divider {
+            width: 1px;
+            height: 1.5rem;
+            background-color: #d1d5db;
+            margin: 0 0.5rem;
+            flex-shrink: 0;
+        }
         /* ApexCharts container styling */
         .chart-container { min-height: 0; overflow: visible; }
         .apexcharts-canvas { margin: 0 auto; }
@@ -102,15 +109,15 @@
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
         {'name': _('Data Exploration')}
     ],
-    info_tooltip=_('Explore and filter form data directly from the database. Use the parameters on the Data Table and Analysis tabs to narrow down data by template and assignment period.') if (can_access_data_table or can_access_analysis) else _('View FDRS document compliance by country.'),
+    info_tooltip=_('Explore and filter form data directly from the database. Use parameters on the Data Table tab to narrow down data by template and assignment period. Disaggregation Analysis uses the template selector in its sub-tabs bar (defaults to FDRS).') if (can_access_data_table or can_access_analysis) else _('View FDRS document compliance by country.'),
     actions=[]
 ) }}
 
     {% set explore_first_tab = 'data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else 'compliance') %}
 
     <div class="bg-white shadow-md border border-gray-200 mb-6">
-        {# ── Tab navigation (settings-style underline tabs) ──────────────────── #}
-        {% call scroll_tab_bar(inner_id='explore-data-tabs', aria_label=_('Explore Data tabs')) %}
+        {# ── Tab navigation ─────────────────────────────────────────────────── #}
+        {% call scroll_tab_bar(inner_id='explore-data-tabs', border_bottom=True, wrapper_class='min-w-0 w-full', aria_label=_('Explore Data tabs')) %}
             {% if can_access_data_table %}
             <button type="button" role="tab" id="tab-data-table"
                     data-tab="data-table"
@@ -124,7 +131,7 @@
                     data-tab="disaggregation"
                     aria-selected="{{ 'true' if explore_first_tab == 'disaggregation' else 'false' }}"
                     class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'disaggregation') }}">
-                <i class="fas fa-chart-pie mr-1.5"></i>{{ _('Analysis') }}
+                <i class="fas fa-chart-pie mr-1.5"></i>{{ _('Disaggregation Analysis') }}
             </button>
             {% endif %}
             {% if can_access_compliance %}
@@ -137,10 +144,10 @@
             {% endif %}
         {% endcall %}
 
-        {# Parameters: Data Table and Analysis only (hidden on Compliance tab) #}
-        {% if can_access_data_table or can_access_analysis %}
+        {# Parameters: Data Table only #}
+        {% if can_access_data_table %}
         <div id="explore-parameters-section"
-             class="p-4 sm:p-6 border-b border-gray-200{% if explore_first_tab == 'compliance' %} hidden{% endif %}">
+             class="p-4 sm:p-6 border-b border-gray-200{% if explore_first_tab != 'data-table' %} hidden{% endif %}">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Parameters') }}</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div class="space-y-2">
@@ -224,7 +231,7 @@
                             class="btn btn-purple"
                             style="border-right:1px solid rgba(168,85,247,0.4);"
                             disabled
-                            title="{{ _('Select one or more rows to run AI validation') }}">
+                            title="{{ _('Select one or more records to run AI validation') }}">
                         <i class="fas fa-magic mr-2"></i>{{ _('Run AI validation') }}
                     </button>
                     <div id="ai-validation-sources" class="relative flex">
@@ -290,12 +297,44 @@
     <!-- Tab panel: Analysis -->
     {% if can_access_analysis %}
     <div id="panel-disaggregation" class="explore-panel{% if explore_first_tab != 'disaggregation' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-disaggregation">
+        <!-- Sub-tabs for Disaggregation (template selector + analysis views) -->
+        <div class="bg-white shadow-md border border-gray-200 mb-6">
+            <div class="border-b border-gray-200 px-3 sm:px-4">
+                <div class="flex flex-wrap items-center gap-1 overflow-x-auto py-1" id="disagg-subtabs">
+                    <div id="disagg-template-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
+                        <label for="disagg-template-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Template') }}</label>
+                        <select id="disagg-template-filter"
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-28 max-w-[7rem] py-1.5 pl-2 pr-7 text-gray-700">
+                            {% for template in templates %}
+                            <option value="{{ template.id }}"{% if template.id == fdrs_template_id %} selected{% endif %}>{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="disagg-year-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
+                        <label for="disagg-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Year') }}</label>
+                        <select id="disagg-year-filter"
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-20 max-w-[5rem] py-1.5 pl-2 pr-7 text-gray-700"
+                                disabled>
+                            <option value="">{{ _('Loading...') }}</option>
+                        </select>
+                    </div>
+                    <div class="disagg-subtabs-divider" aria-hidden="true"></div>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-subtab="overview">{{ _('Overview') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-indicator">{{ _('By Indicator') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-country">{{ _('By Country') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="women-leadership">{{ _('Women Participation') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="sex-age">{{ _('Sex, Age & Sex & Age') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="country-coverage">{{ _('Country Disaggregation Coverage') }}</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Initial prompt message (shown when no data is loaded) -->
         <div id="disagg-initial-prompt" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
             <div class="text-center py-12 text-gray-500">
                 <i class="fas fa-chart-pie text-4xl mb-4"></i>
                 <p class="text-lg font-medium mb-2">{{ _('No data loaded yet') }}</p>
-                <p class="text-sm">{{ _('Please select parameters above and click "Load Data" to analyze data.') }}</p>
+                <p class="text-sm">{{ _('Select a template above to analyze eligible disaggregation indicators.') }}</p>
             </div>
         </div>
 
@@ -309,84 +348,111 @@
 
         <!-- Disaggregation content wrapper (hidden until data is loaded) -->
         <div id="disagg-content-wrapper" style="display: none;">
-        <!-- Sub-tabs for Disaggregation -->
-        <div class="border-b border-gray-200 mb-4">
-            <div class="flex flex-wrap gap-1 overflow-x-auto" id="disagg-subtabs">
-                <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-subtab="overview">{{ _('Overview') }}</button>
-                <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-indicator">{{ _('By Indicator') }}</button>
-                <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="women-leadership">{{ _('Women in Leadership') }}</button>
-                <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="sex-age">{{ _('Sex, Age & Sex & Age') }}</button>
-                <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-country">{{ _('By Country') }}</button>
-                <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="country-coverage">{{ _('Country Disaggregation Coverage') }}</button>
-            </div>
-        </div>
         <!-- Sub-tab content panels -->
         <div id="disagg-content-overview" class="disagg-content bg-white p-6 shadow border border-gray-200 mb-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Overview') }}</h3>
             <!-- Summary stats bar (5 cards) - Modern gradient design with inline styles for color compatibility -->
             <div id="disagg-stats-bar" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" style="display: none;">
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);">
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);"
+                     title="{{ _('Percentage of eligible indicators reported with sex, age, sex-and-age, matrix, or disability disaggregation. Based on all eligible indicators in the current filters.') }}"
+                     aria-label="{{ _('Disaggregation coverage: percentage of eligible indicators reported with disaggregation.') }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-chart-pie text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium" style="color: rgba(255,255,255,0.8);">{{ _('Overall') }}</span>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Disaggregation coverage') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
                     </div>
                     <div id="stat-avg-disagg" class="text-3xl font-bold">0%</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Avg. disaggregation') }}</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported with disaggregation') }}</div>
                 </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);">
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);"
+                     title="{{ _('Number of indicators included in this analysis. Eligible indicators have people-oriented units or configured disaggregation options.') }}"
+                     aria-label="{{ _('Eligible indicators: count of indicators included in this analysis.') }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-users text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium" style="color: rgba(255,255,255,0.8);">{{ _('Age') }}</span>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Eligible indicators') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
                     </div>
-                    <div id="stat-avg-age" class="text-3xl font-bold">0%</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Avg. age disaggregation') }}</div>
+                    <div id="stat-avg-age" class="text-3xl font-bold">0</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Indicators in scope') }}</div>
                 </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);">
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);"
+                     title="{{ _('Indicators with a single reported value but no disaggregation breakdown. These are reported, but not disaggregated.') }}"
+                     aria-label="{{ _('Total-only reporting: indicators with a value but without a disaggregation breakdown.') }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-crown text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium" style="color: rgba(255,255,255,0.8);">{{ _('Leadership') }}</span>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Total-only reporting') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
                     </div>
-                    <div id="stat-women-leadership" class="text-3xl font-bold">0%</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Women in leadership') }}</div>
+                    <div id="stat-women-leadership" class="text-3xl font-bold">0</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported, not disaggregated') }}</div>
                 </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"
+                     title="{{ _('Expected indicators with no saved reported value. These appear when non-reported items are included for a bounded template, period, and country scope.') }}"
+                     aria-label="{{ _('Not reported: expected indicators with no saved reported value.') }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-hand-holding-heart text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium" style="color: rgba(255,255,255,0.8);">{{ _('Volunteers') }}</span>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Not reported') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
                     </div>
-                    <div id="stat-women-volunteering" class="text-3xl font-bold">0%</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Women in volunteering') }}</div>
+                    <div id="stat-women-volunteering" class="text-3xl font-bold">0</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('No reported value saved') }}</div>
                 </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);">
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);"
+                     title="{{ _('Percentage of eligible indicators that include age information, either age-only or combined sex-and-age disaggregation. Based on all eligible indicators in the current filters.') }}"
+                     aria-label="{{ _('Age breakdown coverage: percentage of eligible indicators with age or sex-and-age disaggregation.') }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-briefcase text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium" style="color: rgba(255,255,255,0.8);">{{ _('Staff') }}</span>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Age breakdown coverage') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
                     </div>
                     <div id="stat-women-staff" class="text-3xl font-bold">0%</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Women in staff') }}</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('With age breakdown') }}</div>
                 </div>
             </div>
+            <p class="text-sm text-gray-600 mb-4">
+                {{ _('Analysis is limited to eligible indicators with people-oriented units or configured disaggregation options. Percentages reflect the current filters.') }}
+            </p>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-gray-50 rounded-xl p-4">
-                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Top Countries by Average Value') }}</h4>
+                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Top Countries by Disaggregation Coverage') }}</h4>
                     <div id="chart-overview-countries"></div>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-4">
-                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Distribution by Sex') }}</h4>
+                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Reporting Status') }}</h4>
                     <div id="chart-overview-sex"></div>
                 </div>
             </div>
-            <p id="overview-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No data. Load data from parameters above.') }}</p>
+            <p id="overview-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No eligible disaggregation indicators found for the current parameters.') }}</p>
         </div>
         <div id="disagg-content-by-indicator" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('By Indicator') }}</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Indicator') }}</h3>
+            <p class="text-sm text-gray-600 mb-4">{{ _('Shows disaggregation coverage by indicator, not summed values across mixed units.') }}</p>
             <div class="chart-container" style="min-height: 450px; position: relative;">
                 <div id="chart-by-indicator"></div>
             </div>
-            <p id="by-indicator-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No data.') }}</p>
+            <p id="by-indicator-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No eligible indicators found.') }}</p>
+        </div>
+        <div id="disagg-content-by-country" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Country') }}</h3>
+            <p class="text-sm text-gray-600 mb-4">{{ _('Shows country-level disaggregation coverage for eligible indicators in the current filters.') }}</p>
+            <div class="bg-gray-50 rounded-xl p-4" style="min-height: 500px;">
+                <div id="chart-by-country"></div>
+            </div>
+            <p id="by-country-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No country coverage data found for eligible indicators.') }}</p>
         </div>
         <div id="disagg-content-women-leadership" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Women in Leadership') }}</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('Women Participation') }}</h3>
+            <p class="text-sm text-gray-600 mb-4">{{ _('Based on FDRS governing board, volunteers, and staff indicators when available in the current filters.') }}</p>
             <div class="space-y-6">
                 <!-- First row: Two charts side by side -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -407,7 +473,7 @@
                 <!-- Third row: Leadership, Staff, Volunteering trends (moved from Trends tab) -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="rounded-xl p-4" style="background-color: #fdf2f8;">
-                        <h4 class="text-sm font-medium mb-3" style="color: #be185d;">{{ _('Women in Leadership') }}</h4>
+                        <h4 class="text-sm font-medium mb-3" style="color: #be185d;">{{ _('Women in Leadership Roles') }}</h4>
                         <div id="chart-trends-governing"></div>
                     </div>
                     <div class="rounded-xl p-4" style="background-color: #ecfeff;">
@@ -420,7 +486,7 @@
                     </div>
                 </div>
             </div>
-            <p id="women-leadership-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No data.') }}</p>
+            <p id="women-leadership-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No governing board, volunteer, or staff gender-disaggregated data found.') }}</p>
         </div>
         <div id="disagg-content-sex-age" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Sex, Age & Sex & Age') }}</h3>
@@ -438,29 +504,15 @@
                 <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Combined Sex & Age Distribution') }}</h4>
                 <div id="chart-by-sex-age"></div>
             </div>
-            <p id="sex-age-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No data.') }}</p>
-        </div>
-        <div id="disagg-content-by-country" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('By Country') }}</h3>
-            <div class="bg-gray-50 rounded-xl p-4" style="min-height: 500px;">
-                <div id="chart-by-country"></div>
-            </div>
-            <p id="by-country-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No data.') }}</p>
+            <p id="sex-age-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No sex or age disaggregation found for the current parameters.') }}</p>
         </div>
         <div id="disagg-content-country-coverage" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Country Disaggregation Coverage') }}</h3>
-            <div class="flex flex-wrap items-center gap-3 mb-4">
-                <label for="country-coverage-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Year(s):') }}</label>
-                <select id="country-coverage-year-filter"
-                        class="min-w-[260px] px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        data-placeholder="{{ _('Select year(s)') }}"
-                        multiple>
-                </select>
-                <span class="text-xs text-gray-500">{{ _('Default: latest year') }}</span>
-            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ _('Country Disaggregation Coverage') }}</h3>
+            <p class="text-sm text-gray-600 mb-2">{{ _('Shows country-level disaggregation coverage for eligible indicators in the current filters, including sex, age, and disability breakdowns where applicable.') }}</p>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Countries marked "No data" have no eligible indicator records for the selected view.') }}</p>
             <div id="coverage-regional-summary" class="mb-6"></div>
             <div id="coverage-countries-table" class="overflow-x-auto"></div>
-            <p id="country-coverage-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No data.') }}</p>
+            <p id="country-coverage-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No country coverage data found for eligible indicators.') }}</p>
         </div>
         </div><!-- End disagg-content-wrapper -->
     </div>
@@ -508,7 +560,7 @@
 
             <!-- Compliance summary -->
             <div id="compliance-summary" class="mb-6" style="display: none;">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                         <div class="flex items-center">
                             <i class="fas fa-check-circle text-green-600 text-2xl mr-3"></i>
@@ -527,16 +579,15 @@
                             </div>
                         </div>
                     </div>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div class="flex items-center">
-                            <i class="fas fa-globe text-blue-600 text-2xl mr-3"></i>
-                            <div>
-                                <div id="total-countries-count" class="text-2xl font-bold text-blue-700">0</div>
-                                <div class="text-sm text-blue-600">{{ _('Total Countries') }}</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
+            </div>
+
+            <div id="compliance-status-legend" class="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600" style="display: none;">
+                <span class="font-medium text-gray-700">{{ _('Document status:') }}</span>
+                <span class="inline-flex items-center gap-1"><i class="fas fa-check-circle text-green-500"></i>{{ _('Approved') }}</span>
+                <span class="inline-flex items-center gap-1"><i class="fas fa-clock text-amber-500"></i>{{ _('Pending validation') }}</span>
+                <span class="inline-flex items-center gap-1"><i class="fas fa-ban text-red-500"></i>{{ _('Rejected') }}</span>
+                <span class="inline-flex items-center gap-1"><i class="fas fa-times-circle text-red-400"></i>{{ _('Missing') }}</span>
             </div>
 
             <div id="compliance-pending-validation-notice" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" style="display: none;" role="status" aria-live="polite">
@@ -578,7 +629,8 @@
     <!-- AG Grid JS -->
     {% from "components/ag_grid_includes.html" import ag_grid_js %}
     {{ ag_grid_js() }}
-    <!-- Disaggregation Analysis (processing + ApexCharts rendering) -->
+    <!-- Disaggregation Analysis (pure processing + ApexCharts rendering) -->
+    <script src="{{ static_url('js/data-exploration-analysis-core.js') }}"></script>
     <script src="{{ static_url('js/data-exploration-disaggregation-apex.js') }}"></script>
 
     <script nonce="{{ csp_nonce() }}">
@@ -587,6 +639,7 @@
     const CAN_ACCESS_ANALYSIS = {{ can_access_analysis|tojson }};
     const CAN_ACCESS_COMPLIANCE = {{ can_access_compliance|tojson }};
     const CAN_USE_AI_VALIDATION = {{ user_has_ai_beta_access(current_user)|tojson }};
+    const FDRS_TEMPLATE_ID = {{ fdrs_template_id|tojson }};
 
     // URL param keys for persistence
     const URL_PARAM_TEMPLATE = 'template_id';
@@ -617,26 +670,127 @@
         return params;
     }
 
+    function getDisaggTemplateId() {
+        if (domCache.disaggTemplateFilter && domCache.disaggTemplateFilter.value) {
+            return domCache.disaggTemplateFilter.value;
+        }
+        return String(FDRS_TEMPLATE_ID);
+    }
+
+    function getDisaggYear() {
+        return (domCache.disaggYearFilter && domCache.disaggYearFilter.value) || '';
+    }
+
+    function extractYearsFromPeriods(periodNames) {
+        const yearSet = new Set();
+        const re = /20\d{2}/g;
+        for (const periodName of (periodNames || [])) {
+            const matches = String(periodName).match(re);
+            if (matches) {
+                matches.forEach(function(y) { yearSet.add(parseInt(y, 10)); });
+            }
+        }
+        return Array.from(yearSet).sort(function(a, b) { return b - a; });
+    }
+
+    function initDisaggTemplateFilter() {
+        if (!domCache.disaggTemplateFilter) return;
+        const fdrsId = String(FDRS_TEMPLATE_ID);
+        const hasFdrs = Array.prototype.some.call(domCache.disaggTemplateFilter.options, function(option) {
+            return option.value === fdrsId;
+        });
+        if (hasFdrs) {
+            domCache.disaggTemplateFilter.value = fdrsId;
+        }
+    }
+
+    async function loadDisaggYearOptions(templateId, selectedYear) {
+        const yearSelect = domCache.disaggYearFilter;
+        if (!yearSelect) return;
+
+        const requestedTemplateId = String(templateId || getDisaggTemplateId()).trim();
+        if (!requestedTemplateId) {
+            yearSelect.innerHTML = '<option value="">{{ _("No years") }}</option>';
+            yearSelect.disabled = true;
+            return;
+        }
+
+        yearSelect.disabled = true;
+        yearSelect.innerHTML = '<option value="">{{ _("Loading...") }}</option>';
+
+        try {
+            const response = await fetch(`/admin/data-exploration/assignment-filters?template_id=${encodeURIComponent(requestedTemplateId)}`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            if (String(getDisaggTemplateId()) !== requestedTemplateId) return;
+
+            const years = extractYearsFromPeriods(result.period_names || []);
+            yearSelect.innerHTML = '';
+            if (!years.length) {
+                yearSelect.innerHTML = '<option value="">{{ _("No years") }}</option>';
+                yearSelect.disabled = true;
+                return;
+            }
+
+            for (const year of years) {
+                const opt = document.createElement('option');
+                opt.value = String(year);
+                opt.textContent = String(year);
+                yearSelect.appendChild(opt);
+            }
+
+            const selected = selectedYear ? String(selectedYear) : '';
+            if (selected && years.indexOf(parseInt(selected, 10)) !== -1) {
+                yearSelect.value = selected;
+            } else {
+                yearSelect.value = String(years[0]);
+            }
+            yearSelect.disabled = false;
+        } catch (error) {
+            console.error('Error loading disaggregation years:', error);
+            yearSelect.innerHTML = '<option value="">{{ _("Error loading years") }}</option>';
+            yearSelect.disabled = true;
+        }
+    }
+
     // Update the browser URL with current form parameters (and optional tab) without reload
     function applyParamsToUrl(paramOverrides) {
-        const templateId = paramOverrides && paramOverrides[URL_PARAM_TEMPLATE] !== undefined
-            ? paramOverrides[URL_PARAM_TEMPLATE]
-            : (domCache.templateFilter && domCache.templateFilter.value) || '';
-        const periodName = paramOverrides && paramOverrides[URL_PARAM_PERIOD] !== undefined
-            ? paramOverrides[URL_PARAM_PERIOD]
-            : (domCache.assignmentFilter && domCache.assignmentFilter.value) || '';
-        const countryId = paramOverrides && paramOverrides[URL_PARAM_COUNTRY] !== undefined
-            ? paramOverrides[URL_PARAM_COUNTRY]
-            : (domCache.countryFilter && domCache.countryFilter.value) || '';
-        const itemId = paramOverrides && paramOverrides[URL_PARAM_ITEM] !== undefined
-            ? paramOverrides[URL_PARAM_ITEM]
-            : (domCache.formItemFilter && domCache.formItemFilter.value) || '';
         const tab = paramOverrides && paramOverrides[URL_PARAM_TAB] !== undefined
             ? paramOverrides[URL_PARAM_TAB]
             : getActiveMainTabId();
-        const includeNonReported = paramOverrides && paramOverrides[URL_PARAM_INCLUDE_NON_REPORTED] !== undefined
+        const disaggTab = tab === 'disaggregation';
+        const templateId = paramOverrides && paramOverrides[URL_PARAM_TEMPLATE] !== undefined
+            ? paramOverrides[URL_PARAM_TEMPLATE]
+            : (disaggTab ? getDisaggTemplateId() : (domCache.templateFilter && domCache.templateFilter.value) || '');
+        const periodName = disaggTab
+            ? (paramOverrides && paramOverrides[URL_PARAM_PERIOD] !== undefined
+                ? paramOverrides[URL_PARAM_PERIOD]
+                : getDisaggYear())
+            : (paramOverrides && paramOverrides[URL_PARAM_PERIOD] !== undefined
+                ? paramOverrides[URL_PARAM_PERIOD]
+                : (domCache.assignmentFilter && domCache.assignmentFilter.value) || '');
+        const countryId = disaggTab ? '' : (paramOverrides && paramOverrides[URL_PARAM_COUNTRY] !== undefined
+            ? paramOverrides[URL_PARAM_COUNTRY]
+            : (domCache.countryFilter && domCache.countryFilter.value) || '');
+        const itemId = disaggTab ? '' : (paramOverrides && paramOverrides[URL_PARAM_ITEM] !== undefined
+            ? paramOverrides[URL_PARAM_ITEM]
+            : (domCache.formItemFilter && domCache.formItemFilter.value) || '');
+        const includeNonReported = disaggTab ? '' : (paramOverrides && paramOverrides[URL_PARAM_INCLUDE_NON_REPORTED] !== undefined
             ? paramOverrides[URL_PARAM_INCLUDE_NON_REPORTED]
-            : ((domCache.includeNonReportedCheckbox && domCache.includeNonReportedCheckbox.checked) ? '1' : '');
+            : ((domCache.includeNonReportedCheckbox && domCache.includeNonReportedCheckbox.checked) ? '1' : ''));
 
         const usp = new URLSearchParams();
         if (templateId) usp.set(URL_PARAM_TEMPLATE, templateId);
@@ -675,7 +829,22 @@
             else if (tabId === 'disaggregation' && domCache.tabDisaggregation && CAN_ACCESS_ANALYSIS) switchMainTabFn(domCache.tabDisaggregation);
             else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
             const hasData = !!(urlParams[URL_PARAM_TEMPLATE] || urlParams[URL_PARAM_PERIOD] || urlParams[URL_PARAM_COUNTRY] || urlParams[URL_PARAM_ITEM]);
-            if (hasData) loadData();
+            if (hasData) {
+                if (tabId === 'disaggregation') {
+                    loadData({ disaggOnly: true });
+                } else {
+                    loadData();
+                }
+            }
+        }
+
+        if (urlParams[URL_PARAM_TAB] === 'disaggregation') {
+            if (urlParams[URL_PARAM_TEMPLATE] && domCache.disaggTemplateFilter) {
+                domCache.disaggTemplateFilter.value = urlParams[URL_PARAM_TEMPLATE];
+            }
+            const tid = urlParams[URL_PARAM_TEMPLATE] || getDisaggTemplateId();
+            loadDisaggYearOptions(tid, urlParams[URL_PARAM_PERIOD]).then(doRestore);
+            return;
         }
 
         if (urlParams[URL_PARAM_TEMPLATE] && domCache.templateFilter) {
@@ -725,6 +894,97 @@
     // Track loading state and abort controller for cancellation
     let currentAbortController = null;
     let isDataLoading = false;
+    let disaggDataLoaded = false;
+    let disaggLoadedTemplateId = null;
+    let disaggLoadedYear = null;
+
+    // ── Response-level cache ──────────────────────────────────────────────────
+    // Keyed by request URL. Prevents redundant network calls when the user
+    // switches tabs or re-triggers the same filter combination within a session.
+    const _apiCache = new Map();    // url → { result, ts }
+    const _apiInFlight = new Map(); // url → Promise<result>  (deduplicates concurrent requests)
+    const API_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
+
+    // Processed time-series cache keyed by template ID.
+    // The "all-years" second call in loadData (no period_name) only needs to
+    // be re-fetched when the template changes, NOT on every year change.
+    const _timeSeriesProcessedCache = new Map(); // templateId → { fullProcessed, ts }
+    const TIME_SERIES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
+
+    /**
+     * Fetch `url` with TTL-based caching and in-flight deduplication.
+     * If an identical request is already in progress, the same Promise is returned
+     * so the network call only happens once. Responses are cached for API_CACHE_TTL_MS.
+     */
+    function _cachedFetch(url, signal) {
+        if (signal && signal.aborted) {
+            return Promise.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+        }
+        const cached = _apiCache.get(url);
+        if (cached && (Date.now() - cached.ts) < API_CACHE_TTL_MS) {
+            return Promise.resolve(cached.result);
+        }
+        if (_apiInFlight.has(url)) {
+            return _apiInFlight.get(url);
+        }
+        const opts = {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            signal: signal
+        };
+        const promise = fetch(url, opts)
+            .then(async r => {
+                if (!r.ok) {
+                    const errData = await r.json().catch(() => ({}));
+                    const err = new Error(errData.error || `HTTP ${r.status}: ${r.statusText}`);
+                    err.httpStatus = r.status;
+                    err.errData = errData;
+                    throw err;
+                }
+                const data = await r.json();
+                _apiCache.set(url, { result: data, ts: Date.now() });
+                return data;
+            })
+            .finally(() => _apiInFlight.delete(url));
+        _apiInFlight.set(url, promise);
+        return promise;
+    }
+
+    /**
+     * Invalidate cached responses.
+     * Pass a templateId to only evict entries for that template;
+     * omit to clear the entire cache (e.g. after a full clear-filters action).
+     */
+    function _invalidateApiCache(templateId) {
+        if (templateId) {
+            const tid = String(templateId);
+            for (const key of _apiCache.keys()) {
+                if (key.includes(`template_id=${encodeURIComponent(tid)}`) ||
+                    key.includes(`template_id=${tid}`)) {
+                    _apiCache.delete(key);
+                }
+            }
+            _timeSeriesProcessedCache.delete(tid);
+        } else {
+            _apiCache.clear();
+            _timeSeriesProcessedCache.clear();
+        }
+    }
+
+    /** Simple trailing-edge debounce: fires `fn` after `wait` ms of inactivity. */
+    function _debounce(fn, wait) {
+        let timer = null;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Update Load Data button state
     function updateLoadButtonState(loading) {
@@ -805,6 +1065,10 @@
         domCache.panelDisaggregation = document.getElementById('panel-disaggregation');
         domCache.panelCompliance = document.getElementById('panel-compliance');
         domCache.exploreParametersSection = document.getElementById('explore-parameters-section');
+        domCache.disaggTemplateFilterWrap = document.getElementById('disagg-template-filter-wrap');
+        domCache.disaggTemplateFilter = document.getElementById('disagg-template-filter');
+        domCache.disaggYearFilterWrap = document.getElementById('disagg-year-filter-wrap');
+        domCache.disaggYearFilter = document.getElementById('disagg-year-filter');
         domCache.disaggStatsBar = document.getElementById('disagg-stats-bar');
         domCache.disaggInitialPrompt = document.getElementById('disagg-initial-prompt');
         domCache.disaggLoading = document.getElementById('disagg-loading');
@@ -815,6 +1079,7 @@
         domCache.complianceLoading = document.getElementById('compliance-loading');
         domCache.complianceInitial = document.getElementById('compliance-initial');
         domCache.complianceSummary = document.getElementById('compliance-summary');
+        domCache.complianceStatusLegend = document.getElementById('compliance-status-legend');
         domCache.compliancePendingValidationNotice = document.getElementById('compliance-pending-validation-notice');
         domCache.compliancePendingValidationTitle = document.getElementById('compliance-pending-validation-title');
         domCache.compliancePendingValidationBody = document.getElementById('compliance-pending-validation-body');
@@ -824,7 +1089,6 @@
         domCache.complianceErrorText = document.getElementById('compliance-error-text');
         domCache.compliantCount = document.getElementById('compliant-count');
         domCache.nonCompliantCount = document.getElementById('non-compliant-count');
-        domCache.totalCountriesCount = document.getElementById('total-countries-count');
     }
 
     // Track if compliance data has been loaded
@@ -1796,8 +2060,70 @@
         }
     }
 
+    function enrichTableApiResult(result) {
+        const data = (result && result.data) || [];
+        const formItemsMap = new Map();
+        const countriesMap = new Map();
+
+        if (result && result.form_items) {
+            for (const item of result.form_items) {
+                formItemsMap.set(item.id, item);
+            }
+        }
+        if (result && result.countries) {
+            for (const country of result.countries) {
+                countriesMap.set(country.id, country);
+            }
+        }
+
+        const matrixEntityLabels = (result && result.matrix_entity_labels) || {};
+        const enrichedData = data.map(row => {
+            const enriched = { ...row };
+            if (row.form_item_id && formItemsMap.has(row.form_item_id)) {
+                enriched.form_item_info = formItemsMap.get(row.form_item_id);
+                enriched.form_item_label = formItemsMap.get(row.form_item_id).label;
+            }
+            if (row.country_id && countriesMap.has(row.country_id)) {
+                enriched.country_info = countriesMap.get(row.country_id);
+                enriched.country_name = countriesMap.get(row.country_id).name;
+            }
+            enriched.matrix_entity_labels = matrixEntityLabels[row.form_item_id] || {};
+            if (row.template_id && result && result.form_items) {
+                const templateItem = result.form_items.find(item => item.template?.id === row.template_id);
+                if (templateItem?.template) {
+                    enriched.template_name = templateItem.template.name;
+                }
+            }
+            return enriched;
+        });
+
+        return {
+            enrichedData: enrichedData,
+            formItems: (result && result.form_items) || [],
+            countries: (result && result.countries) || [],
+            totalItems: Number.isFinite(result && result.total_items) ? result.total_items : enrichedData.length
+        };
+    }
+
+    function applyDisaggTimeSeriesSnapshots(processed, fullProcessed) {
+        if (!processed || !fullProcessed || !fullProcessed.womenInLeadership) {
+            window.disaggTimeSeriesData = null;
+            return processed;
+        }
+        processed.womenInLeadership = processed.womenInLeadership || {};
+        processed.womenInLeadership.trends = fullProcessed.womenInLeadership.trends || [];
+        window.disaggTimeSeriesData = {
+            womenInLeadership: {
+                trends: processed.womenInLeadership.trends
+            }
+        };
+        return processed;
+    }
+
     // Function to build API URL with parameters (optimized - using /data/tables for better performance)
-    function buildApiUrl() {
+    function buildApiUrl(options) {
+        options = options || {};
+        const disaggOnly = !!options.disaggOnly;
         // Session auth returns all accessible rows when per_page is omitted so Analysis
         // covers every period (including closed/deactivated assignments), not just the
         // most recently submitted slice.
@@ -1805,6 +2131,22 @@
             disagg: 'true',
             related: 'all'
         });
+        if (CAN_ACCESS_ANALYSIS) params.set('analysis', 'true');
+
+        if (disaggOnly) {
+            const templateId = getDisaggTemplateId();
+            const periodName = getDisaggYear();
+            if (templateId) params.set('template_id', templateId);
+            if (options.includePeriod !== false && periodName) params.set('period_name', periodName);
+            // Allow callers to inject extra query parameters (e.g. indicator_bank_ids for the
+            // time-series-only call, where we only need a subset of indicators).
+            if (options.extraParams && typeof options.extraParams === 'object') {
+                for (const [k, v] of Object.entries(options.extraParams)) {
+                    if (v !== null && v !== undefined && v !== '') params.set(k, String(v));
+                }
+            }
+            return `/api/v1/data/tables?${params.toString()}`;
+        }
 
         const templateId = domCache.templateFilter?.value;
         const periodName = domCache.assignmentFilter?.value;
@@ -1835,163 +2177,206 @@
         return `/api/v1/data/tables?${params.toString()}`;
     }
 
+    function loadDisaggDataIfNeeded(force) {
+        if (!CAN_ACCESS_ANALYSIS) return;
+        const templateId = getDisaggTemplateId();
+        const year = getDisaggYear();
+        if (!year) return;
+        if (force || !disaggDataLoaded || disaggLoadedTemplateId !== templateId || disaggLoadedYear !== year) {
+            loadData({ disaggOnly: true });
+        }
+    }
+
     // Function to load data from API (optimized)
-    async function loadData() {
+    async function loadData(options) {
+        options = options || {};
+        const disaggOnly = !!options.disaggOnly;
+
         // Persist current parameters to URL so refresh keeps them
         applyParamsToUrl();
 
-        const url = buildApiUrl();
+        const url = buildApiUrl({ disaggOnly: disaggOnly });
 
         // Create abort controller for this request
         currentAbortController = new AbortController();
-        updateLoadButtonState(true);
+        if (!disaggOnly) {
+            updateLoadButtonState(true);
+        }
 
         // Update UI state efficiently
-        if (domCache.initialPrompt) domCache.initialPrompt.style.display = 'none';
-        if (domCache.emptyGridMessage) domCache.emptyGridMessage.style.display = 'none';
-        if (domCache.gridCard) domCache.gridCard.style.display = 'block';
-        if (domCache.tableLoading) domCache.tableLoading.style.display = 'flex';
-        if (domCache.dataInfo) domCache.dataInfo.style.display = 'none';
-        if (domCache.noDataMessage) domCache.noDataMessage.style.display = 'none';
-        if (domCache.errorMessage) domCache.errorMessage.style.display = 'none';
+        if (!disaggOnly) {
+            if (domCache.initialPrompt) domCache.initialPrompt.style.display = 'none';
+            if (domCache.emptyGridMessage) domCache.emptyGridMessage.style.display = 'none';
+            if (domCache.gridCard) domCache.gridCard.style.display = 'block';
+            if (domCache.tableLoading) domCache.tableLoading.style.display = 'flex';
+            if (domCache.dataInfo) domCache.dataInfo.style.display = 'none';
+            if (domCache.noDataMessage) domCache.noDataMessage.style.display = 'none';
+            if (domCache.errorMessage) domCache.errorMessage.style.display = 'none';
+        }
 
         // Update Analysis tab UI - show loading state
-        if (domCache.disaggInitialPrompt) domCache.disaggInitialPrompt.style.display = 'none';
-        if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'block';
-        if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'none';
+        if (CAN_ACCESS_ANALYSIS) {
+            if (domCache.disaggInitialPrompt) domCache.disaggInitialPrompt.style.display = 'none';
+            if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'block';
+            if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'none';
+        }
 
         try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                credentials: 'same-origin',
-                signal: currentAbortController.signal
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                let errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-
-                // Provide user-friendly error messages for common errors
-                if (response.status === 403) {
+            // Use cached fetch: deduplicates concurrent calls and caches responses for API_CACHE_TTL_MS.
+            // If the result is served from cache the loading indicator will vanish immediately.
+            let result;
+            try {
+                result = await _cachedFetch(url, currentAbortController.signal);
+            } catch (fetchErr) {
+                if (fetchErr && fetchErr.name === 'AbortError') throw fetchErr;
+                let errorMessage = (fetchErr && fetchErr.message) || '{{ _("An error occurred while loading data") }}';
+                const httpStatus = fetchErr && fetchErr.httpStatus;
+                if (httpStatus === 403) {
                     if (errorMessage.includes('no access to requested template')) {
                         errorMessage = '{{ _("You do not have access to the selected template. Please select a different template.") }}';
-                        // Clear the template filter to prevent repeated errors
-                        if (domCache.templateFilter) {
+                        if (disaggOnly && domCache.disaggTemplateFilter) {
+                            domCache.disaggTemplateFilter.selectedIndex = 0;
+                        } else if (domCache.templateFilter) {
                             domCache.templateFilter.value = '';
                         }
                     } else {
                         errorMessage = '{{ _("Access denied. You do not have permission to access this resource.") }}';
                     }
-                } else if (response.status === 404) {
+                } else if (httpStatus === 404) {
                     errorMessage = '{{ _("The requested resource was not found.") }}';
-                } else if (response.status >= 500) {
+                } else if (httpStatus >= 500) {
                     errorMessage = '{{ _("A server error occurred. Please try again later.") }}';
                 }
-
                 throw new Error(errorMessage);
             }
+            const tablePayload = enrichTableApiResult(result);
+            const enrichedData = tablePayload.enrichedData;
 
-            const result = await response.json();
-            const data = result.data || [];
-
-            // Build lookup maps for form_items and countries (from /data/tables endpoint)
-            const formItemsMap = new Map();
-            const countriesMap = new Map();
-
-            if (result.form_items) {
-                for (const item of result.form_items) {
-                    formItemsMap.set(item.id, item);
-                }
+            if (!disaggOnly) {
+                // Update data count (total and filtered - initially the same)
+                const apiTotalItems = tablePayload.totalItems;
+                totalRowCount = apiTotalItems;
+                updateRecordCountDisplay(enrichedData.length, totalRowCount);
+                if (domCache.dataInfo) domCache.dataInfo.style.display = 'block';
             }
-            if (result.countries) {
-                for (const country of result.countries) {
-                    countriesMap.set(country.id, country);
-                }
-            }
-
-            // Enrich data with form_item, country info, and matrix entity labels (for compatibility with existing grid columns)
-            const matrixEntityLabels = result.matrix_entity_labels || {};
-            const enrichedData = data.map(row => {
-                const enriched = { ...row };
-                if (row.form_item_id && formItemsMap.has(row.form_item_id)) {
-                    enriched.form_item_info = formItemsMap.get(row.form_item_id);
-                    enriched.form_item_label = formItemsMap.get(row.form_item_id).label;
-                }
-                if (row.country_id && countriesMap.has(row.country_id)) {
-                    enriched.country_info = countriesMap.get(row.country_id);
-                    enriched.country_name = countriesMap.get(row.country_id).name;
-                }
-                // Matrix row entity IDs -> display names (from form item matrix config: national_society, country_map, etc.)
-                enriched.matrix_entity_labels = matrixEntityLabels[row.form_item_id] || {};
-                // Map template_id to template_name if available
-                if (row.template_id && result.form_items) {
-                    const templateItem = result.form_items.find(item => item.template?.id === row.template_id);
-                    if (templateItem?.template) {
-                        enriched.template_name = templateItem.template.name;
-                    }
-                }
-                return enriched;
-            });
-
-            // Update data count (total and filtered - initially the same)
-            const apiTotalItems = Number.isFinite(result.total_items) ? result.total_items : enrichedData.length;
-            totalRowCount = apiTotalItems;
-            updateRecordCountDisplay(enrichedData.length, totalRowCount);
-            if (domCache.dataInfo) domCache.dataInfo.style.display = 'block';
 
             if (enrichedData.length === 0) {
-                if (domCache.noDataMessage) domCache.noDataMessage.style.display = 'flex';
-                if (domCache.tableLoading) domCache.tableLoading.style.display = 'none';
-                if (gridHelper) {
-                    gridHelper.setRowData([]);
+                if (!disaggOnly) {
+                    if (domCache.noDataMessage) domCache.noDataMessage.style.display = 'flex';
+                    if (domCache.tableLoading) domCache.tableLoading.style.display = 'none';
+                    if (gridHelper) {
+                        gridHelper.setRowData([]);
+                    }
+                    updateLoadButtonState(false);
                 }
 
                 // Reset Disaggregation tab - show message for no data
-                if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
-                if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'none';
-                if (domCache.disaggInitialPrompt) {
-                    domCache.disaggInitialPrompt.innerHTML = `
-                        <div class="text-center py-12 text-gray-500">
-                            <i class="fas fa-inbox text-4xl mb-4"></i>
-                            <p class="text-lg font-medium mb-2">{{ _('No data found') }}</p>
-                            <p class="text-sm">{{ _('Try adjusting your parameters and click "Load Data" again.') }}</p>
-                        </div>
-                    `;
-                    domCache.disaggInitialPrompt.style.display = 'block';
+                if (CAN_ACCESS_ANALYSIS) {
+                    if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
+                    if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'none';
+                    if (domCache.disaggInitialPrompt) {
+                        domCache.disaggInitialPrompt.innerHTML = `
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-inbox text-4xl mb-4"></i>
+                                <p class="text-lg font-medium mb-2">{{ _('No data found') }}</p>
+                                <p class="text-sm">{{ _('Try selecting a different template.') }}</p>
+                            </div>
+                        `;
+                        domCache.disaggInitialPrompt.style.display = 'block';
+                    }
+                    disaggDataLoaded = false;
+                    disaggLoadedTemplateId = null;
+                    disaggLoadedYear = null;
+                    window.disaggTimeSeriesData = null;
                 }
-                // Reset button + request state for the empty result case
-                updateLoadButtonState(false);
                 currentAbortController = null;
                 return;
             }
 
             // Update grid data using helper
-            if (gridHelper) {
-                gridHelper.setRowData(enrichedData);
-                gridHelper.refresh();
-                // Customize page size selector after data is loaded (single attempt with observer)
-                customizePageSizeSelector();
-                // Load AI opinions for visible rows (batched)
-                if (CAN_USE_AI_VALIDATION) {
-                    loadAiOpinionsForRows(enrichedData);
+            if (!disaggOnly) {
+                if (gridHelper) {
+                    gridHelper.setRowData(enrichedData);
+                    gridHelper.refresh();
+                    // Customize page size selector after data is loaded (single attempt with observer)
+                    customizePageSizeSelector();
+                    // Load AI opinions for visible rows (batched)
+                    if (CAN_USE_AI_VALIDATION) {
+                        loadAiOpinionsForRows(enrichedData);
+                    }
+                } else {
+                    // Grid not initialized yet, store data for later
+                    window.pendingData = enrichedData;
                 }
-            } else {
-                // Grid not initialized yet, store data for later
-                window.pendingData = enrichedData;
+
+                // Hide loading indicator
+                if (domCache.tableLoading) domCache.tableLoading.style.display = 'none';
             }
 
-            // Hide loading indicator
-            if (domCache.tableLoading) domCache.tableLoading.style.display = 'none';
-
             // Process for Analysis tab (same data, aggregated for charts)
-            if (typeof processDisaggregationData === 'function') {
+            if (CAN_ACCESS_ANALYSIS && typeof processDisaggregationData === 'function') {
                 try {
-                    window.disaggProcessedData = processDisaggregationData(enrichedData, result.form_items || [], result.countries || []);
+                    let processedData = processDisaggregationData(
+                        enrichedData,
+                        tablePayload.formItems,
+                        tablePayload.countries
+                    );
+
+                    // Time-series visuals (e.g. Women Participation trends) need all years;
+                    // snapshot views still use the selected year from the tab bar.
+                    // Optimisation: the all-years payload only changes when the template changes,
+                    // not when the selected year changes.  We cache the *processed* result
+                    // in _timeSeriesProcessedCache (keyed by templateId) so switching years
+                    // skips the second network call entirely.
+                    if (disaggOnly && getDisaggYear()) {
+                        const _tsTemplateId = String(getDisaggTemplateId());
+                        const _tsEntry = _timeSeriesProcessedCache.get(_tsTemplateId);
+                        const _tsValid = _tsEntry && (Date.now() - _tsEntry.ts) < TIME_SERIES_CACHE_TTL_MS;
+
+                        if (_tsValid) {
+                            processedData = applyDisaggTimeSeriesSnapshots(processedData, _tsEntry.fullProcessed);
+                        } else {
+                            try {
+                                // Restrict the all-years call to only the Women-in-Leadership
+                                // indicator bank IDs (722=Leadership, 724=Volunteering, 727=Staff).
+                                // These are the only rows that contribute to womenInLeadership.trends,
+                                // which is the sole purpose of this second network call.
+                                // Reduces payload from ~35 MB to a few hundred KB.
+                                const _womenIds = (window.ExploreDataAnalysisCore && window.ExploreDataAnalysisCore.WOMEN_INDICATORS)
+                                    ? Object.values(window.ExploreDataAnalysisCore.WOMEN_INDICATORS)
+                                        .map(function(c) { return c.id; })
+                                        .filter(Boolean)
+                                        .join(',')
+                                    : '722,724,727';
+                                const timeSeriesUrl = buildApiUrl({
+                                    disaggOnly: true,
+                                    includePeriod: false,
+                                    extraParams: { indicator_bank_ids: _womenIds }
+                                });
+                                const timeSeriesResult = await _cachedFetch(
+                                    timeSeriesUrl,
+                                    currentAbortController && currentAbortController.signal
+                                );
+                                const timeSeriesPayload = enrichTableApiResult(timeSeriesResult);
+                                const fullProcessed = processDisaggregationData(
+                                    timeSeriesPayload.enrichedData,
+                                    timeSeriesPayload.formItems,
+                                    timeSeriesPayload.countries
+                                );
+                                _timeSeriesProcessedCache.set(_tsTemplateId, { fullProcessed, ts: Date.now() });
+                                processedData = applyDisaggTimeSeriesSnapshots(processedData, fullProcessed);
+                            } catch (timeSeriesError) {
+                                if (timeSeriesError.name !== 'AbortError') {
+                                    window.__clientWarn && window.__clientWarn('Time-series disaggregation load failed:', timeSeriesError);
+                                }
+                                window.disaggTimeSeriesData = null;
+                            }
+                        }
+                    } else {
+                        window.disaggTimeSeriesData = null;
+                    }
+
+                    window.disaggProcessedData = processedData;
                     // Hide loading, show content
                     if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
                     if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'block';
@@ -1999,21 +2384,34 @@
                         domCache.disaggStatsBar.style.display = 'grid';
                         if (window.updateDisaggregationUI) window.updateDisaggregationUI();
                     }
+                    disaggDataLoaded = true;
+                    disaggLoadedTemplateId = disaggOnly
+                        ? getDisaggTemplateId()
+                        : ((domCache.templateFilter && domCache.templateFilter.value) || getDisaggTemplateId());
+                    disaggLoadedYear = disaggOnly
+                        ? getDisaggYear()
+                        : ((domCache.assignmentFilter && domCache.assignmentFilter.value) || getDisaggYear());
                 } catch (e) {
                     window.__clientWarn && window.__clientWarn('Disaggregation processing failed:', e);
                     window.disaggProcessedData = null;
+                    window.disaggTimeSeriesData = null;
+                    disaggDataLoaded = false;
+                    disaggLoadedTemplateId = null;
+                    disaggLoadedYear = null;
                     // Hide loading, show initial prompt on error
                     if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
                     if (domCache.disaggInitialPrompt) domCache.disaggInitialPrompt.style.display = 'block';
                 }
-            } else {
+            } else if (CAN_ACCESS_ANALYSIS) {
                 // If processDisaggregationData is not available, hide loading
                 if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
                 if (domCache.disaggInitialPrompt) domCache.disaggInitialPrompt.style.display = 'block';
             }
 
             // Reset button state after successful load
-            updateLoadButtonState(false);
+            if (!disaggOnly) {
+                updateLoadButtonState(false);
+            }
             currentAbortController = null;
 
         } catch (error) {
@@ -2028,16 +2426,23 @@
             if (domCache.errorText) {
                 domCache.errorText.textContent = error.message || '{{ _("An error occurred while loading data") }}';
             }
-            if (domCache.errorMessage) domCache.errorMessage.style.display = 'block';
-            if (domCache.tableLoading) domCache.tableLoading.style.display = 'none';
+            if (!disaggOnly) {
+                if (domCache.errorMessage) domCache.errorMessage.style.display = 'block';
+                if (domCache.tableLoading) domCache.tableLoading.style.display = 'none';
+                updateLoadButtonState(false);
+            }
 
             // Reset Analysis tab to initial state on error
-            if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
-            if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'none';
-            if (domCache.disaggInitialPrompt) domCache.disaggInitialPrompt.style.display = 'block';
+            if (CAN_ACCESS_ANALYSIS) {
+                if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
+                if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'none';
+                if (domCache.disaggInitialPrompt) domCache.disaggInitialPrompt.style.display = 'block';
+                disaggDataLoaded = false;
+                disaggLoadedTemplateId = null;
+                disaggLoadedYear = null;
+                window.disaggTimeSeriesData = null;
+            }
 
-            // Reset button state on error
-            updateLoadButtonState(false);
             currentAbortController = null;
         }
     }
@@ -2282,6 +2687,7 @@
             templateId: 'compliance',
             columnDefs: buildComplianceColumnDefs([], DEFAULT_COMPLIANCE_DOC_TYPES),
             rowData: [],
+            showResultCount: false,
             options: {
                 pagination: false
             },
@@ -2328,6 +2734,7 @@
         if (domCache.complianceLoading) domCache.complianceLoading.style.display = 'block';
         if (domCache.complianceInitial) domCache.complianceInitial.style.display = 'none';
         if (domCache.complianceSummary) domCache.complianceSummary.style.display = 'none';
+        if (domCache.complianceStatusLegend) domCache.complianceStatusLegend.style.display = 'none';
         if (domCache.compliancePendingValidationNotice) domCache.compliancePendingValidationNotice.style.display = 'none';
         if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'none';
         if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'none';
@@ -2449,11 +2856,23 @@
         }
 
         const count = countries.length;
-        const names = countries.map(function(country) { return country.country_name; }).filter(Boolean);
-        const maxNames = 12;
-        let namesText = names.slice(0, maxNames).map(function(name) { return escapeHtml(name); }).join(', ');
-        if (names.length > maxNames) {
-            namesText += ` {{ _('and') }} ${names.length - maxNames} {{ _('more') }}`;
+        const countryLines = countries.map(function(country) {
+            const pendingDocs = (country.pending_documents || []).map(function(item) {
+                const label = COMPLIANCE_DOC_TYPE_LABELS[item.doc_type] || item.doc_type || '';
+                const period = item.period ? String(item.period) : '';
+                return period ? `${label} (${period})` : label;
+            }).filter(Boolean);
+            const name = escapeHtml(country.country_name || '');
+            if (!pendingDocs.length) {
+                return name;
+            }
+            return `${name}: ${pendingDocs.map(function(text) { return escapeHtml(text); }).join(', ')}`;
+        });
+
+        const maxLines = 12;
+        let bodyLines = countryLines.slice(0, maxLines).join('<br>');
+        if (countryLines.length > maxLines) {
+            bodyLines += `<br>{{ _('and') }} ${countryLines.length - maxLines} {{ _('more') }}`;
         }
 
         if (domCache.compliancePendingValidationTitle) {
@@ -2463,8 +2882,9 @@
         }
         if (domCache.compliancePendingValidationBody) {
             domCache.compliancePendingValidationBody.innerHTML = `
-                {{ _('These countries have uploaded Annual Reports or Audited Financial Statements that are still awaiting document approval.') }}
-                <span class="block mt-1"><span class="font-medium">{{ _('Countries:') }}</span> ${namesText}</span>
+                {{ _('These countries have uploaded Annual Reports or Audited Financial Statements that are still awaiting approval. Pending documents do not count toward compliance — validate or reject them as a priority.') }}
+                <span class="block mt-2 font-medium">{{ _('Countries and documents:') }}</span>
+                <span class="block mt-1">${bodyLines}</span>
             `;
         }
 
@@ -2481,6 +2901,7 @@
                 domCache.complianceInitial.style.display = 'block';
             }
             if (domCache.compliancePendingValidationNotice) domCache.compliancePendingValidationNotice.style.display = 'none';
+            if (domCache.complianceStatusLegend) domCache.complianceStatusLegend.style.display = 'none';
             if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'none';
             if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'none';
             return;
@@ -2489,12 +2910,11 @@
         // Calculate summary stats
         const compliantCount = data.filter(c => c.is_compliant).length;
         const nonCompliantCount = data.filter(c => !c.is_compliant).length;
-        const totalCount = data.length;
 
         if (domCache.compliantCount) domCache.compliantCount.textContent = compliantCount;
         if (domCache.nonCompliantCount) domCache.nonCompliantCount.textContent = nonCompliantCount;
-        if (domCache.totalCountriesCount) domCache.totalCountriesCount.textContent = totalCount;
         if (domCache.complianceSummary) domCache.complianceSummary.style.display = 'block';
+        if (domCache.complianceStatusLegend) domCache.complianceStatusLegend.style.display = 'flex';
         renderCompliancePendingValidationNotice(pendingValidationNotice);
 
         const columnDefs = buildComplianceColumnDefs(periods, docTypes);
@@ -2515,6 +2935,24 @@
     }
 
     // Initialize when DOM is ready (optimized)
+    function maybeAutoLoadDisaggData() {
+        if (!CAN_ACCESS_ANALYSIS) return;
+        const urlParams = getParamsFromUrl();
+        const hasDataParams = !!(urlParams[URL_PARAM_TEMPLATE] || urlParams[URL_PARAM_PERIOD] || urlParams[URL_PARAM_COUNTRY] || urlParams[URL_PARAM_ITEM]);
+        if (hasDataParams) return;
+        if (getActiveMainTabId() === 'disaggregation') {
+            loadDisaggDataIfNeeded(true);
+        }
+    }
+
+    async function bootstrapDisaggFilters() {
+        if (!CAN_ACCESS_ANALYSIS) return;
+        if (Object.keys(getParamsFromUrl()).length > 0) return;
+        initDisaggTemplateFilter();
+        await loadDisaggYearOptions(getDisaggTemplateId());
+        maybeAutoLoadDisaggData();
+    }
+
     function initApp() {
         initDOMCache();
         if (CAN_ACCESS_DATA_TABLE) {
@@ -2527,6 +2965,7 @@
         if (CAN_ACCESS_COMPLIANCE) {
             loadComplianceData();
         }
+        bootstrapDisaggFilters();
     }
 
     function setupEventHandlers() {
@@ -2820,6 +3259,9 @@
         if (domCache.templateFilter) {
             domCache.templateFilter.addEventListener('change', function() {
                 const templateId = this.value;
+                // Evict any cached responses for the newly-selected template so the next
+                // Load Data call always retrieves fresh data for the new selection.
+                if (templateId) _invalidateApiCache(templateId);
                 if (!templateId) resetAssignmentFilters();
                 loadAssignmentFilters(templateId);
                 loadFormItems(templateId);
@@ -2855,6 +3297,9 @@
                 // Clear parameters from URL
                 applyParamsToUrl({ template_id: '', period_name: '', country_id: '', item_id: '', tab: '', include_non_reported: '' });
 
+                // Clear the whole API response cache so next Load Data starts fresh
+                _invalidateApiCache();
+
                 // Clear the grid
                 if (gridHelper) {
                     gridHelper.setRowData([]);
@@ -2874,6 +3319,10 @@
 
                 // Reset Disaggregation tab to initial state
                 window.disaggProcessedData = null;
+                window.disaggTimeSeriesData = null;
+                disaggDataLoaded = false;
+                disaggLoadedTemplateId = null;
+                disaggLoadedYear = null;
                 if (domCache.disaggStatsBar) domCache.disaggStatsBar.style.display = 'none';
                 if (domCache.disaggLoading) domCache.disaggLoading.style.display = 'none';
                 if (domCache.disaggContentWrapper) domCache.disaggContentWrapper.style.display = 'none';
@@ -2883,11 +3332,13 @@
                         <div class="text-center py-12 text-gray-500">
                             <i class="fas fa-chart-pie text-4xl mb-4"></i>
                             <p class="text-lg font-medium mb-2">{{ _('No data loaded yet') }}</p>
-                            <p class="text-sm">{{ _('Please select parameters above and click "Load Data" to analyze data.') }}</p>
+                            <p class="text-sm">{{ _('Select a template above to analyze eligible disaggregation indicators.') }}</p>
                         </div>
                     `;
                     domCache.disaggInitialPrompt.style.display = 'block';
                 }
+                initDisaggTemplateFilter();
+                loadDisaggYearOptions(getDisaggTemplateId());
             });
         }
 
@@ -2908,8 +3359,7 @@
                 });
             }
             if (domCache.exploreParametersSection) {
-                const showParams = tabId === 'data-table' || tabId === 'disaggregation';
-                domCache.exploreParametersSection.classList.toggle('hidden', !showParams);
+                domCache.exploreParametersSection.classList.toggle('hidden', tabId !== 'data-table');
             }
         }
 
@@ -2921,12 +3371,47 @@
             });
         }
         if (domCache.tabDisaggregation) {
-            domCache.tabDisaggregation.addEventListener('click', function() {
+            domCache.tabDisaggregation.addEventListener('click', async function() {
                 switchMainTab(domCache.tabDisaggregation);
                 applyParamsToUrl();
+                if (!getDisaggYear()) {
+                    await loadDisaggYearOptions(getDisaggTemplateId());
+                }
+                loadDisaggDataIfNeeded(false);
                 if (!window.currentDisaggSubtab) window.currentDisaggSubtab = 'overview';
                 if (window.disaggProcessedData && window.updateDisaggregationUI) window.updateDisaggregationUI();
             });
+        }
+
+        if (domCache.disaggTemplateFilter) {
+            domCache.disaggTemplateFilter.addEventListener('change', async function() {
+                const newTemplateId = this.value;
+                // Clear cached API responses and the processed time-series data for the new
+                // template so the next load always fetches fresh data.
+                _invalidateApiCache(newTemplateId);
+                disaggDataLoaded = false;
+                disaggLoadedTemplateId = null;
+                disaggLoadedYear = null;
+                await loadDisaggYearOptions(newTemplateId);
+                if (getActiveMainTabId() === 'disaggregation') {
+                    loadDisaggDataIfNeeded(true);
+                }
+                applyParamsToUrl();
+            });
+        }
+
+        if (domCache.disaggYearFilter) {
+            // Debounce rapid year changes (e.g. keyboard navigation through the select)
+            // so we only fire a load after the user settles on a value.
+            const _onDisaggYearChange = _debounce(function() {
+                disaggDataLoaded = false;
+                disaggLoadedYear = null;
+                if (getActiveMainTabId() === 'disaggregation') {
+                    loadDisaggDataIfNeeded(true);
+                }
+                applyParamsToUrl();
+            }, 300);
+            domCache.disaggYearFilter.addEventListener('change', _onDisaggYearChange);
         }
         if (domCache.tabCompliance) {
             domCache.tabCompliance.addEventListener('click', function() {
@@ -2969,6 +3454,9 @@
                 window.location.href = downloadUrl;
             });
         }
+        // Default Analysis sub-tab so Overview charts render on first data load.
+        window.currentDisaggSubtab = 'overview';
+
         // Disaggregation sub-tabs
         document.querySelectorAll('.disagg-subtab').forEach(function(btn) {
             btn.addEventListener('click', function() {

@@ -53,6 +53,7 @@ from config import Config
 
 from .helpers import (
     _load_existing_data_for_assignment,
+    calculate_assignment_completion_rate,
     calculate_section_completion_status,
     process_existing_data_for_template,
 )
@@ -976,9 +977,16 @@ def handle_assignment_form(aes_id):
         except Exception:
             open_validation_questions = []
 
+    completion_rate = calculate_assignment_completion_rate(
+        assignment_entity_status.id,
+        form_template.id,
+        form_template.published_version_id,
+    )
+
     return render_template(
         "forms/entry_form/entry_form.html",
         open_validation_questions=open_validation_questions,
+        completion_rate=completion_rate,
         template_structure=template_structure,
         sections=db_sections,
         all_sections=all_sections,

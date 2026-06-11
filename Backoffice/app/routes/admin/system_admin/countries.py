@@ -7,7 +7,13 @@ from app.forms.system import CountryForm
 from app.routes.admin.shared import permission_required
 from app.utils.request_utils import is_json_request
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error, json_form_errors
+from app.utils.api_responses import json_ok, json_server_error, json_form_errors, json_bad_request
+from app.services.country_service import (
+    assign_country_fds_member_user,
+    fds_member_user_display_name,
+    get_fds_member_user_options_for_country,
+    parse_fds_member_user_id,
+)
 
 from app.routes.admin.system_admin import bp
 
@@ -63,6 +69,7 @@ def new_country():
 def get_country_data_json(country_id):
     """API endpoint to get full country data for edit modal (used by AJAX)."""
     country = Country.query.get_or_404(country_id)
+    fds_member_user = country.fds_member_user
     return json_ok(
         id=country.id,
         name=country.name,
@@ -71,6 +78,9 @@ def get_country_data_json(country_id):
         status=country.status,
         preferred_language=country.preferred_language_code,
         currency_code=country.currency_code,
+        fds_member_user_id=country.fds_member_user_id,
+        fds_member_name=fds_member_user_display_name(fds_member_user),
+        fds_member_user_options=get_fds_member_user_options_for_country(country.id),
         name_translations=country.name_translations or {},
     )
 
@@ -96,6 +106,19 @@ def edit_country(country_id):
             country.status = form.status.data
             country.preferred_language = Country.normalize_language_code(form.preferred_language.data)
             country.currency_code = form.currency_code.data
+            try:
+                assign_country_fds_member_user(
+                    country,
+                    parse_fds_member_user_id(request.form.get('fds_member_user_id')),
+                )
+            except ValueError as exc:
+                if is_json_request():
+                    return json_bad_request(str(exc))
+                flash(str(exc), 'danger')
+                return render_template("admin/countries/manage_country.html",
+                                     form=form,
+                                     country=country,
+                                     title=f"Edit Country: {country.name}")
 
             translatable_langs = current_app.config.get("TRANSLATABLE_LANGUAGES", []) or []
             for code in translatable_langs:
@@ -115,6 +138,8 @@ def edit_country(country_id):
                         'status': country.status,
                         'preferred_language': country.preferred_language_code,
                         'currency_code': country.currency_code,
+                        'fds_member_user_id': country.fds_member_user_id,
+                        'fds_member_name': fds_member_user_display_name(country.fds_member_user),
                         'name_translations': country.name_translations or {},
                     },
                 )

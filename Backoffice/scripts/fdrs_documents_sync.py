@@ -1,7 +1,11 @@
 """
-FDRS documents API → SubmittedDocument metadata import (files deferred until IFRC fixes URLs).
+FDRS documents API → SubmittedDocument import (metadata + file bytes when URL is reachable).
 
 GET https://data-api.ifrc.org/api/documents?apiKey=...&showunpublished=true&force=true[&year=YYYY]
+
+Public document URLs must be percent-encoded (spaces in paths). Use GET (HEAD is unreliable).
+HTTP 200/206 → save to submission storage and clear ``file_pending``.
+HTTP 403/404 → keep ``file_pending=True`` (retried on later syncs).
 """
 
 from __future__ import annotations
@@ -10,23 +14,127 @@ import hashlib
 import json
 import logging
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
+from io import BytesIO
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from werkzeug.datastructures import FileStorage
 
 from fdrs_sync_constants import (
     FDRS_DOCUMENT_APPROVAL_OK,
     FDRS_DOCUMENT_PUBLIC_OK,
     FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL,
     FDRS_DOCUMENT_TYPE_TO_ITEM,
+    fdrs_document_approval_rank,
     fdrs_document_status_from_approval,
 )
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_DOCUMENTS_PATH = "/api/documents"
+_FDRS_DOC_USER_AGENT = "HumanitarianDatabank-FDRS-sync/1.0"
+_DEFAULT_DOWNLOAD_TIMEOUT = 120
 _YEAR_IN_TEXT_RE = re.compile(r"\b(20\d{2})\b")
+
+
+def encode_fdrs_document_url(url: str) -> str:
+    """Percent-encode FDRS document URL paths (API returns unencoded spaces)."""
+    parts = urllib.parse.urlsplit((url or "").strip())
+    path = urllib.parse.quote(parts.path, safe="/")
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
+
+
+def fetch_fdrs_document_bytes(
+    url: str,
+    *,
+    timeout: int = _DEFAULT_DOWNLOAD_TIMEOUT,
+    dry_run: bool = False,
+) -> Tuple[Optional[bytes], int]:
+    """
+    Download FDRS document content via GET.
+
+    Returns ``(data, http_status)``. *data* is set for 200/206 when not *dry_run*
+    (dry_run uses a Range probe and returns ``(None, status)``).
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return None, 0
+    enc = encode_fdrs_document_url(raw)
+    headers = {"User-Agent": _FDRS_DOC_USER_AGENT}
+    if dry_run:
+        headers["Range"] = "bytes=0-0"
+    req = urllib.request.Request(enc, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status = resp.status
+            if status in (200, 206):
+                if dry_run:
+                    return None, status
+                return resp.read(), status
+            return None, status
+    except urllib.error.HTTPError as e:
+        return None, e.code
+    except Exception as e:
+        logger.warning("FDRS document download failed for %s: %s", raw[:120], e)
+        return None, -1
+
+
+def _save_fdrs_document_bytes(
+    *,
+    data: bytes,
+    filename: str,
+    assignment_entity_status_id: int,
+    entity_type: str,
+    entity_id: int,
+) -> str:
+    """Persist downloaded bytes using the same layout as manual submission uploads."""
+    from app.utils.file_paths import save_submission_document
+
+    file_storage = FileStorage(stream=BytesIO(data), filename=filename)
+    return save_submission_document(
+        file_storage=file_storage,
+        assignment_id=assignment_entity_status_id,
+        filename=filename,
+        is_public=False,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+
+
+def _should_attempt_download(
+    row: Dict[str, Any],
+    existing: Optional[Any],
+) -> bool:
+    source_url = (row.get("source_url") or "").strip()
+    if not source_url:
+        return False
+    if existing is None:
+        return True
+    if existing.file_pending or not existing.storage_path:
+        return True
+    if (existing.source_url or "").strip() != source_url:
+        return True
+    return False
+
+
+def _resolve_download_outcome(
+    existing: Optional[Any],
+    http_status: int,
+    data: Optional[bytes],
+) -> Tuple[Optional[bytes], bool]:
+    """
+    Return ``(bytes_to_save, file_pending)``.
+
+    Keeps an already-stored file when a re-fetch returns 403/404.
+    """
+    if http_status in (200, 206) and data:
+        return data, False
+    if existing is not None and existing.storage_path and not existing.file_pending:
+        return None, False
+    return None, True
 
 
 def _parse_year_text_bounds(year_text: Any) -> Tuple[Optional[int], Optional[int]]:
@@ -122,7 +230,7 @@ def _doc_score(doc: Dict[str, Any]) -> Tuple[int, str]:
         public_i = int(public) if public is not None else -1
     except (TypeError, ValueError):
         public_i = -1
-    approval_rank = 2 if approval == "Validated (Public)" else 1 if approval in FDRS_DOCUMENT_APPROVAL_OK else 0
+    approval_rank = fdrs_document_approval_rank(approval)
     public_rank = 2 if public_i == 1 else 1 if public_i in FDRS_DOCUMENT_PUBLIC_OK else 0
     lang_rank = 1 if (doc.get("LangCode") or "").strip().lower() == "en" else 0
     modified = (doc.get("ModifiedAt") or "")[:19]
@@ -240,7 +348,6 @@ def build_document_import_plan(
                 "approval_status": approval_status,
                 "status": fdrs_document_status_from_approval(approval_status),
                 "modified_at": doc.get("ModifiedAt"),
-                "file_pending": True,
             }
         )
     summary["planned"] = len(plan)
@@ -266,13 +373,24 @@ def upsert_fdrs_document_metadata(
     uploaded_by_user_id: int,
     dry_run: bool = False,
     batch_size: int = 500,
+    download_timeout: int = _DEFAULT_DOWNLOAD_TIMEOUT,
 ) -> Dict[str, int]:
-    """Insert or update SubmittedDocument rows (metadata + source_url; no file bytes)."""
+    """Insert or update SubmittedDocument rows; download file bytes when the FDRS URL responds 200/206."""
     from app.extensions import db
+    from app.models.assignments import AssignmentEntityStatus
     from app.models.documents import SubmittedDocument
     from app.models.enums import DocumentStatusValue
 
-    stats = {"loaded": len(plan_rows), "inserted": 0, "updated": 0, "skipped": 0, "errors": 0}
+    stats = {
+        "loaded": len(plan_rows),
+        "inserted": 0,
+        "updated": 0,
+        "skipped": 0,
+        "errors": 0,
+        "downloaded": 0,
+        "pending": 0,
+        "download_errors": 0,
+    }
     if not plan_rows:
         return stats
 
@@ -282,6 +400,16 @@ def upsert_fdrs_document_metadata(
         for doc in SubmittedDocument.query.filter(SubmittedDocument.fdrs_import_key.in_(keys)).all():
             if doc.fdrs_import_key:
                 existing_by_key[doc.fdrs_import_key] = doc
+
+    aes_ids = {
+        int(r["assignment_entity_status_id"])
+        for r in plan_rows
+        if r.get("assignment_entity_status_id") is not None
+    }
+    aes_by_id: Dict[int, AssignmentEntityStatus] = {}
+    if aes_ids:
+        for aes in AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all():
+            aes_by_id[aes.id] = aes
 
     for i, row in enumerate(plan_rows, start=1):
         import_key = row.get("fdrs_import_key")
@@ -294,17 +422,66 @@ def upsert_fdrs_document_metadata(
             from app.utils.datetime_helpers import utcnow
 
             uploaded_at = modified_at or utcnow()
+            doc_status = DocumentStatusValue.normalize(
+                row.get("status")
+                or fdrs_document_status_from_approval(row.get("approval_status"))
+            )
+
+            storage_path = existing.storage_path if existing else None
+            file_pending = True
+            source_url = (row.get("source_url") or "").strip()
+
+            if not source_url:
+                if existing and existing.storage_path and not existing.file_pending:
+                    file_pending = False
+            elif _should_attempt_download(row, existing):
+                data, download_status = fetch_fdrs_document_bytes(
+                    source_url,
+                    timeout=download_timeout,
+                    dry_run=dry_run,
+                )
+                save_bytes, file_pending = _resolve_download_outcome(existing, download_status, data)
+                if save_bytes and not dry_run:
+                    aes = aes_by_id.get(int(row["assignment_entity_status_id"]))
+                    if aes is None:
+                        stats["download_errors"] += 1
+                        logger.error(
+                            "FDRS document missing assignment_entity_status_id=%s for import_key=%s",
+                            row.get("assignment_entity_status_id"),
+                            import_key,
+                        )
+                        file_pending = True
+                        storage_path = existing.storage_path if existing else None
+                    else:
+                        storage_path = _save_fdrs_document_bytes(
+                            data=save_bytes,
+                            filename=row["filename"],
+                            assignment_entity_status_id=aes.id,
+                            entity_type=aes.entity_type,
+                            entity_id=aes.entity_id,
+                        )
+                        stats["downloaded"] += 1
+                elif dry_run and download_status in (200, 206):
+                    stats["downloaded"] += 1
+                elif download_status in (403, 404):
+                    stats["pending"] += 1
+                    storage_path = existing.storage_path if existing else None
+                elif download_status not in (200, 206):
+                    stats["download_errors"] += 1
+                    storage_path = existing.storage_path if existing else None
+                else:
+                    stats["pending"] += 1
+                    storage_path = existing.storage_path if existing else None
+            elif existing is not None:
+                file_pending = False
+                storage_path = existing.storage_path
+
             if dry_run:
                 if existing:
                     stats["updated"] += 1
                 else:
                     stats["inserted"] += 1
                 continue
-
-            doc_status = DocumentStatusValue.normalize(
-                row.get("status")
-                or fdrs_document_status_from_approval(row.get("approval_status"))
-            )
 
             if existing:
                 existing.filename = row["filename"]
@@ -315,7 +492,8 @@ def upsert_fdrs_document_metadata(
                 existing.period = row.get("period")
                 existing.is_public = bool(row.get("is_public"))
                 existing.status = doc_status
-                existing.file_pending = True
+                existing.file_pending = file_pending
+                existing.storage_path = storage_path
                 if modified_at:
                     existing.uploaded_at = modified_at
                 db.session.add(existing)
@@ -325,7 +503,7 @@ def upsert_fdrs_document_metadata(
                     assignment_entity_status_id=int(row["assignment_entity_status_id"]),
                     form_item_id=int(row["form_item_id"]),
                     filename=row["filename"],
-                    storage_path=None,
+                    storage_path=storage_path,
                     source_url=row.get("source_url"),
                     thumbnail_source_url=row.get("thumbnail_url"),
                     uploaded_at=uploaded_at,
@@ -335,7 +513,7 @@ def upsert_fdrs_document_metadata(
                     period=row.get("period"),
                     is_public=bool(row.get("is_public")),
                     fdrs_import_key=import_key,
-                    file_pending=True,
+                    file_pending=file_pending,
                     status=doc_status,
                 )
                 db.session.add(entry)
@@ -385,5 +563,15 @@ def run_fdrs_documents_sync(
         uploaded_by_user_id=uploaded_by_user_id,
         dry_run=dry_run,
         batch_size=batch_size,
+    )
+    _progress(
+        stage="documents_done",
+        message=(
+            f"FDRS documents: downloaded={doc_stats.get('downloaded', 0)} "
+            f"pending={doc_stats.get('pending', 0)} "
+            f"errors={doc_stats.get('download_errors', 0)}"
+        ),
+        percent=95.0,
+        extra={"documents_stats": doc_stats},
     )
     return {"documents_summary": summary, "documents_stats": doc_stats}

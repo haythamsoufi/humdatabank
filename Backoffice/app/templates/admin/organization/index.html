@@ -410,6 +410,8 @@ try {
             {% for code in TRANSLATABLE_LANGUAGES %}
             name_{{ code }}: {{ ((_cn.get(code) if _cn else '') or '')|tojson|safe }},
             {% endfor %}
+            fds_member_user_id: {{ country.fds_member_user_id|tojson|safe }},
+            fds_member_name: {{ ((country.fds_member_user.name or country.fds_member_user.email) if country.fds_member_user else '')|tojson|safe }},
             edit_url: {{ ('/admin/countries/' ~ country.id ~ '/data')|tojson|safe if can_manage_countries else '""' }},
             delete_url: {{ (url_for(delete_endpoint_name if delete_endpoint_name is defined else 'system_admin.delete_country', country_id=country.id))|tojson|safe if can_manage_countries else '""' }},
             delete_confirm: "{{ _('Are you sure you want to delete this country? This action cannot be undone and may fail if the country is in use.') }}"
@@ -555,6 +557,21 @@ try {
             }
         },
         {
+            field: 'fds_member_name',
+            headerName: {{ _("FDS Member") | tojson }},
+            width: 180,
+            minWidth: 150,
+            maxWidth: 240,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            valueGetter: function(params) {
+                return params.data && params.data.fds_member_name ? params.data.fds_member_name : '';
+            },
+            cellRenderer: function(params) {
+                return params.value ? params.value : '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
             field: 'actions',
             headerName: {{ _("Actions") | tojson }},
             width: 120,
@@ -588,6 +605,16 @@ try {
             }
         }
     ];
+
+    function populateFdsMemberSelect(options, selectedId) {
+        var selectEl = $('#edit_fds_member_user_id');
+        var html = '<option value="">' + {{ _('Not assigned')|tojson }} + '</option>';
+        (options || []).forEach(function(option) {
+            html += '<option value="' + option.id + '">' + option.label + '</option>';
+        });
+        selectEl.html(html);
+        selectEl.val(selectedId ? String(selectedId) : '');
+    }
 
     // Initialize countries grid
     function initializeCountriesGrid() {
@@ -628,7 +655,7 @@ try {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const desiredOrder = ['id', 'name']
                     .concat(nameColumns)
-                    .concat(['iso3', 'status', 'preferred_language', 'currency_code'])
+                    .concat(['iso3', 'status', 'preferred_language', 'currency_code', 'fds_member_name'])
                     .concat(['actions']);
                 AgGridHelper.pinActionsColumn(gridApi, desiredOrder, countriesGridHelper.columnVisibilityManager);
             }
@@ -646,7 +673,7 @@ try {
                     var editModal = $('#editCountryModal');
                     var editForm = $('#editCountryForm');
 
-                    $.get('/admin/countries/' + countryId + '/data')
+                        $.get('/admin/countries/' + countryId + '/data')
                         .done(function(data) {
                             $('#edit_name').val(data.name);
                             $('#edit_short_name').val(data.short_name || '');
@@ -654,6 +681,7 @@ try {
                             $('#edit_status').val(data.status);
                             $('#edit_preferred_language').val(data.preferred_language);
                             $('#edit_currency_code').val(data.currency_code);
+                            populateFdsMemberSelect(data.fds_member_user_options, data.fds_member_user_id);
                             var trans = (data && data.name_translations) ? data.name_translations : {};
                             {% for code in TRANSLATABLE_LANGUAGES %}
                             $('#edit_name_{{ code }}').val(trans['{{ code }}'] || '');
@@ -2359,7 +2387,7 @@ try {
             // Ensure initial tab is shown
             switchTab(activeTab || 'countries');
 
-            // Initialize countries grid if countries tab is active
+        // Initialize countries grid if countries tab is active
             if ((activeTab || 'countries') === 'countries') {
                 setTimeout(function() {
                     if (typeof initializeCountriesGrid === 'function') {

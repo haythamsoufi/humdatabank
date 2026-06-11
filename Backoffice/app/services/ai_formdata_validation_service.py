@@ -3424,9 +3424,9 @@ class AIFormDataValidationService:
 
         # 1) Prefer explicit LLM suggestion when present.
         #
-        # NOTE: suggestions are stored into FormData.imputed_value (JSON). Many FormItems are numeric,
+        # NOTE: scalar suggestions are stored into FormData.imputed_value. Many FormItems are numeric,
         # but some are categorical/textual (e.g., currency codes). So we must support non-numeric
-        # suggestions (strings) as well.
+        # suggestions (strings) as well. Matrix/disaggregation suggestions use imputed_disagg_data.
         try:
             if isinstance(llm_json, dict):
                 llm_val = _normalize_llm_value(llm_json.get("suggested_value"))

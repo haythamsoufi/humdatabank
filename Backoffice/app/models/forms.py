@@ -582,6 +582,32 @@ class DataEntryMixin:
     submitted_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     @staticmethod
+    def _coerce_scalar_text_value(value):
+        """Normalize auxiliary scalar values to the same storage shape as ``value``."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            text = value.strip()
+            if not text or text.lower() in ('none', 'null', 'undefined'):
+                return None
+            if len(text) > 255:
+                raise ValueError("Scalar form value exceeds 255 characters")
+            return text
+        if isinstance(value, bool):
+            text = 'true' if value else 'false'
+        elif isinstance(value, (int, float)):
+            text = str(value)
+        elif isinstance(value, list):
+            text = json.dumps(value, ensure_ascii=False)
+        elif isinstance(value, dict):
+            raise ValueError("Structured form payloads must use a disaggregation data column")
+        else:
+            text = str(value)
+        if len(text) > 255:
+            raise ValueError("Scalar form value exceeds 255 characters")
+        return text
+
+    @staticmethod
     def _parse_numeric_string(value):
         """Return float when value is a numeric string, else None."""
         if value is None:
@@ -620,14 +646,12 @@ class DataEntryMixin:
     @classmethod
     def sync_imputed_numeric_value(cls, entry, imputed_value):
         """Set imputed_numeric_value alongside imputed_value when imputed_value is numeric."""
-        entry.imputed_value = imputed_value
-        if imputed_value is None:
+        scalar_value = cls._coerce_scalar_text_value(imputed_value)
+        entry.imputed_value = scalar_value
+        if scalar_value is None:
             entry.imputed_numeric_value = None
             return
-        if isinstance(imputed_value, (int, float)):
-            entry.imputed_numeric_value = float(imputed_value)
-            return
-        entry.imputed_numeric_value = cls._parse_numeric_string(imputed_value)
+        entry.imputed_numeric_value = cls._parse_numeric_string(scalar_value)
 
     @property
     def has_disaggregation(self):
@@ -731,10 +755,10 @@ class FormData(DataEntryMixin, db.Model):
     assignment_entity_status_id = db.Column(db.Integer, db.ForeignKey('assignment_entity_status.id'), nullable=True)
     public_submission_id = db.Column(db.Integer, db.ForeignKey('public_submission.id'), nullable=True)
     form_item_id = db.Column(db.Integer, db.ForeignKey('form_item.id'), nullable=False)
-    prefilled_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    prefilled_value = db.Column(db.String(255), nullable=True)
     # Prefilled values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    imputed_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_value = db.Column(db.String(255), nullable=True)
     # Imputed values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
@@ -765,14 +789,12 @@ class FormData(DataEntryMixin, db.Model):
     @classmethod
     def sync_imputed_numeric_value(cls, entry, imputed_value):
         """Set imputed_numeric_value alongside imputed_value when imputed_value is numeric."""
-        entry.imputed_value = imputed_value
-        if imputed_value is None:
+        scalar_value = cls._coerce_scalar_text_value(imputed_value)
+        entry.imputed_value = scalar_value
+        if scalar_value is None:
             entry.imputed_numeric_value = None
             return
-        if isinstance(imputed_value, (int, float)):
-            entry.imputed_numeric_value = float(imputed_value)
-            return
-        entry.imputed_numeric_value = cls._parse_numeric_string(imputed_value)
+        entry.imputed_numeric_value = cls._parse_numeric_string(scalar_value)
 
     # Helper methods for prefilled values
     def get_display_value(self):
@@ -857,9 +879,9 @@ class DynamicIndicatorData(DataEntryMixin, db.Model):
     order = db.Column(db.Float, nullable=False, default=0)
     added_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     added_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    prefilled_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    prefilled_value = db.Column(db.String(255), nullable=True)
     prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    imputed_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_value = db.Column(db.String(255), nullable=True)
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, nullable=True)
@@ -966,9 +988,9 @@ class RepeatGroupData(DataEntryMixin, db.Model):
     # Unified relationship - primary approach
     form_item = db.relationship('FormItem', foreign_keys=[form_item_id], overlaps="repeat_data_entries")
     repeat_instance = relationship('RepeatGroupInstance', overlaps="data_entries")
-    prefilled_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    prefilled_value = db.Column(db.String(255), nullable=True)
     prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    imputed_value = db.Column(db.JSON(none_as_null=True), nullable=True)
+    imputed_value = db.Column(db.String(255), nullable=True)
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, nullable=True)

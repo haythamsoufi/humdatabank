@@ -124,16 +124,6 @@ from .rbac import (
     RbacAccessGrant,
 )
 
-from .embeddings import (
-    AIDocument,
-    AIDocumentChunk,
-    AIEmbedding,
-    IndicatorBankEmbedding,
-    AIReasoningTrace,
-    AIToolUsage,
-    AITraceReview,
-)
-
 from .ai_jobs import (
     AIJob,
     AIJobItem,
@@ -153,11 +143,33 @@ from .validation import (
     CountryAttribute,
 )
 
-from .ai_terminology import (
-    AITermConcept,
-    AITermGlossary,
-    AITermConceptEmbedding,
-)
+# pgvector (and numpy 2.4+) are loaded lazily — see ``__getattr__`` below.
+# Eager imports here break pytest-cov narrow ``--cov=app.module`` runs because
+# coverage re-imports modules and numpy rejects double extension init.
+_LAZY_MODEL_MODULES = {
+    'AIDocument': 'embeddings',
+    'AIDocumentChunk': 'embeddings',
+    'AIEmbedding': 'embeddings',
+    'IndicatorBankEmbedding': 'embeddings',
+    'AIReasoningTrace': 'embeddings',
+    'AIToolUsage': 'embeddings',
+    'AITraceReview': 'embeddings',
+    'AITermConcept': 'ai_terminology',
+    'AITermGlossary': 'ai_terminology',
+    'AITermConceptEmbedding': 'ai_terminology',
+}
+
+
+def __getattr__(name: str):
+    module_name = _LAZY_MODEL_MODULES.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from importlib import import_module
+
+    module = import_module(f'.{module_name}', __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
 
 from .enums import (
     AssignmentEntityStatusValue,

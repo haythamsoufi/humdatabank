@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, after_this_request
 from flask_login import current_user
 import tempfile
-from app.models import db, FormTemplate, FormItem, FormSection, AssignedForm, FormData, Country, TemplateShare
+from app.models import db, FormTemplate, FormItem, FormSection, FormPage, AssignedForm, FormData, Country, TemplateShare
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_permission_required, check_template_access
 from app.services.imputation_service import ImputationService
@@ -113,6 +113,124 @@ def _clear_fdrs_sync_cancel_event(job_id: str) -> None:
         _FDRS_SYNC_CANCEL_EVENTS.pop(job_id, None)
 
 
+def _published_sections_query(template: FormTemplate):
+    """Sections for the published template version only (avoids duplicate rows across versions)."""
+    query = FormSection.query.filter(
+        FormSection.template_id == template.id,
+        FormSection.archived == False,
+    )
+    if template.published_version_id:
+        query = query.filter(FormSection.version_id == template.published_version_id)
+    return query.order_by(FormSection.order)
+
+
+def _published_items_query(template: FormTemplate):
+    """Form items for the published template version only."""
+    query = FormItem.query.filter(
+        FormItem.template_id == template.id,
+        FormItem.archived == False,
+    )
+    if template.published_version_id:
+        query = query.filter(FormItem.version_id == template.published_version_id)
+    return query.order_by(FormItem.order)
+
+
+def _sort_sections_by_order(sections: List[FormSection]) -> List[FormSection]:
+    return sorted(sections, key=lambda s: (float(s.order or 0), s.id))
+
+
+def _build_ordered_sections_with_items(
+    template: FormTemplate,
+    all_sections: List[FormSection],
+    items_by_section_id: Dict[int, List[FormItem]],
+) -> List[Dict[str, Any]]:
+    """Sections-with-items in form-builder order: pages, main sections, then subsections."""
+    sections_with_items: List[Dict[str, Any]] = []
+    handled_section_ids: set[int] = set()
+
+    def _append_if_has_items(section: FormSection) -> None:
+        section_items = items_by_section_id.get(section.id, [])
+        if not section_items:
+            return
+        sections_with_items.append({
+            'section': section,
+            'section_items': list(section_items),
+        })
+        handled_section_ids.add(section.id)
+
+    main_sections: List[FormSection] = []
+    sub_sections_by_parent: Dict[int, List[FormSection]] = {}
+    for section in all_sections:
+        if section.parent_section_id is None:
+            main_sections.append(section)
+        else:
+            sub_sections_by_parent.setdefault(section.parent_section_id, []).append(section)
+
+    def _emit_main_section_block(section: FormSection) -> None:
+        _append_if_has_items(section)
+        for subsection in _sort_sections_by_order(sub_sections_by_parent.get(section.id, [])):
+            _append_if_has_items(subsection)
+
+    is_paginated = template.is_paginated
+    if is_paginated and template.published_version_id:
+        pages = (
+            FormPage.query
+            .filter_by(template_id=template.id, version_id=template.published_version_id)
+            .order_by(FormPage.order)
+            .all()
+        )
+        sections_by_page: Dict[Any, List[FormSection]] = {}
+        for section in main_sections:
+            page_key = section.page_id if section.page_id else 'default'
+            sections_by_page.setdefault(page_key, []).append(section)
+
+        for page in pages:
+            for section in _sort_sections_by_order(sections_by_page.get(page.id, [])):
+                _emit_main_section_block(section)
+
+        for section in _sort_sections_by_order(sections_by_page.get('default', [])):
+            _emit_main_section_block(section)
+    else:
+        for section in _sort_sections_by_order(main_sections):
+            _emit_main_section_block(section)
+
+    # Subsections whose parent is not in the published set (edge case)
+    orphan_subsections = [
+        section for section in all_sections
+        if section.parent_section_id and section.id not in handled_section_ids
+        and items_by_section_id.get(section.id)
+    ]
+    for section in _sort_sections_by_order(orphan_subsections):
+        _append_if_has_items(section)
+
+    return sections_with_items
+
+
+def _imputable_items_for_template(
+    template: FormTemplate,
+    *,
+    item_filter: Optional[str] = None,
+    type_filter: Optional[str] = None,
+) -> List[FormItem]:
+    """Published-version items that participate in imputation, in template section order."""
+    all_sections = _published_sections_query(template).all()
+    items_by_section_id: Dict[int, List[FormItem]] = {}
+    for item in _published_items_query(template).all():
+        imputation_method = item.config.get('imputation_method', 'last_year') if item.config else 'last_year'
+        if imputation_method == 'no_imputation':
+            continue
+        if item_filter and item.label != item_filter:
+            continue
+        if type_filter and item.type != type_filter:
+            continue
+        items_by_section_id.setdefault(item.section_id, []).append(item)
+
+    items: List[FormItem] = []
+    for section_block in _build_ordered_sections_with_items(template, all_sections, items_by_section_id):
+        items.extend(section_block['section_items'])
+    return items
+
+
 @bp.route("/<int:template_id>", methods=["GET"])
 @admin_permission_required('admin.templates.view')
 def special_template_view(template_id: int):
@@ -123,23 +241,18 @@ def special_template_view(template_id: int):
         flash("Access denied. You don't have permission to access this template.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
 
-    # Get all template sections ordered by their order field
-    template_sections = FormSection.query.filter_by(template_id=template_id).order_by(FormSection.order).all()
+    # Published version only — querying all versions duplicates sections/items after template edits
+    template_sections = _published_sections_query(template).all()
+    published_items = _published_items_query(template).all()
+    items_by_section_id: Dict[int, List[FormItem]] = {}
+    for item in published_items:
+        items_by_section_id.setdefault(item.section_id, []).append(item)
 
-    # Group items by section
-    sections_with_items = []
-    for section in template_sections:
-        # Get items for this section, ordered by their order field
-        section_items = FormItem.query.filter_by(
-            template_id=template_id,
-            section_id=section.id
-        ).order_by(FormItem.order).all()
-
-        if section_items:  # Only include sections that have items
-            sections_with_items.append({
-                'section': section,
-                'section_items': list(section_items)  # Convert to list to ensure proper length calculation
-            })
+    sections_with_items = _build_ordered_sections_with_items(
+        template,
+        template_sections,
+        items_by_section_id,
+    )
 
     return render_template(
         "admin/templates/special_template.html",
@@ -263,14 +376,7 @@ def preview_data(template_id: int):
             period_name=year
         ).all()
 
-        # Get all form items for this template (exclude items with no_imputation method)
-        all_form_items = FormItem.query.filter_by(template_id=template_id).order_by(FormItem.order).all()
-        form_items = []
-        for item in all_form_items:
-            # Skip items that are set to no_imputation
-            imputation_method = item.config.get('imputation_method', 'last_year') if item.config else 'last_year'
-            if imputation_method != 'no_imputation':
-                form_items.append(item)
+        form_items = _imputable_items_for_template(template)
 
         preview_data = []
         total_operations = 0
@@ -357,14 +463,7 @@ def preview_imputation(template_id: int):
                 if aes.country_id not in prev_assignments_by_country:
                     prev_assignments_by_country[aes.country_id] = af
 
-        # Get all form items (exclude items with no_imputation method)
-        all_form_items = FormItem.query.filter_by(template_id=template_id).order_by(FormItem.order).all()
-        form_items = []
-        for item in all_form_items:
-            # Skip items that are set to no_imputation
-            imputation_method = item.config.get('imputation_method', 'last_year') if item.config else 'last_year'
-            if imputation_method != 'no_imputation':
-                form_items.append(item)
+        form_items = _imputable_items_for_template(template)
 
         preview_data = []
 
@@ -490,8 +589,7 @@ def preview_data_chunked(template_id: int):
         if not year:
             return json_bad_request('Year parameter required')
 
-        # Validate template
-        _ = FormTemplate.query.get_or_404(template_id)
+        template = FormTemplate.query.get_or_404(template_id)
 
         # Gather filtered ACS (with country) for the target year
         assignments = AssignedForm.query.filter_by(template_id=template_id, period_name=year).all()
@@ -505,21 +603,11 @@ def preview_data_chunked(template_id: int):
                     continue
                 filtered_aess.append((aes, country))
 
-        # Gather filtered items (exclude items with no_imputation method)
-        items_query = FormItem.query.filter_by(template_id=template_id).order_by(FormItem.order)
-        items = items_query.all()
-        filtered_items = []
-        for item in items:
-            # Skip items that are set to no_imputation
-            imputation_method = item.config.get('imputation_method', 'last_year') if item.config else 'last_year'
-            if imputation_method == 'no_imputation':
-                continue
-
-            if item_filter and item.label != item_filter:
-                continue
-            if type_filter and item.type != type_filter:
-                continue
-            filtered_items.append(item)
+        filtered_items = _imputable_items_for_template(
+            template,
+            item_filter=item_filter,
+            type_filter=type_filter,
+        )
 
         num_aess = len(filtered_aess)
         num_items = len(filtered_items)
@@ -627,8 +715,7 @@ def preview_imputation_chunked(template_id: int):
         if not year:
             return json_bad_request('Year parameter required')
 
-        # Validate template and compute previous year
-        _ = FormTemplate.query.get_or_404(template_id)
+        template = FormTemplate.query.get_or_404(template_id)
         try:
             prev_year = str(int(year) - 1)
         except Exception as e:
@@ -647,21 +734,11 @@ def preview_imputation_chunked(template_id: int):
                     continue
                 filtered_aess.append((aes, country))
 
-        # Items (filtered, exclude items with no_imputation method)
-        items_query = FormItem.query.filter_by(template_id=template_id).order_by(FormItem.order)
-        items = items_query.all()
-        filtered_items = []
-        for item in items:
-            # Skip items that are set to no_imputation
-            imputation_method = item.config.get('imputation_method', 'last_year') if item.config else 'last_year'
-            if imputation_method == 'no_imputation':
-                continue
-
-            if item_filter and item.label != item_filter:
-                continue
-            if type_filter and item.type != type_filter:
-                continue
-            filtered_items.append(item)
+        filtered_items = _imputable_items_for_template(
+            template,
+            item_filter=item_filter,
+            type_filter=type_filter,
+        )
 
         num_aess = len(filtered_aess)
         num_items = len(filtered_items)
@@ -870,9 +947,6 @@ def get_filter_options(template_id: int):
             period_name=year
         ).all()
 
-        # Get all form items for this template
-        form_items = FormItem.query.filter_by(template_id=template_id).order_by(FormItem.order).all()
-
         # Get unique countries from assignments
         countries = []
         for assignment in assignments:
@@ -887,19 +961,14 @@ def get_filter_options(template_id: int):
         # Sort countries by name
         countries.sort(key=lambda x: x['name'])
 
-        # Get all items (exclude items with no_imputation method)
-        items = []
-        for item in form_items:
-            # Skip items that are set to no_imputation
-            imputation_method = item.config.get('imputation_method', 'last_year') if item.config else 'last_year'
-            if imputation_method == 'no_imputation':
-                continue
-
-            items.append({
+        items = [
+            {
                 'id': item.id,
                 'label': item.label,
-                'unit': item.unit
-            })
+                'unit': item.unit,
+            }
+            for item in _imputable_items_for_template(template)
+        ]
 
         return json_ok(success=True, countries=countries, items=items)
 

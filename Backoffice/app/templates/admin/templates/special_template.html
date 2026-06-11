@@ -35,8 +35,166 @@
             transform-origin: center !important;
         }
 
+        .imputation-meta-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            max-width: 100%;
+            line-height: 1.25;
+            border-width: 1px;
+            border-style: solid;
+        }
+
+        .imputation-meta-badge--empty {
+            border-style: dashed;
+            font-style: italic;
+        }
+
+        .imputation-meta-badge__label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
     </style>
 {% endblock %}
+
+{% macro imputation_type_badge(item) %}
+    {% set raw_type = (item.type or item.field_type_for_js or '')|string %}
+    {% set type_key = raw_type|lower|replace(' ', '_') %}
+    {% if item.is_document_field and not raw_type %}
+        {% set type_key = 'document' %}
+    {% elif item.item_type == 'matrix' %}
+        {% set type_key = 'matrix' %}
+    {% elif item.item_type and item.item_type.startswith('plugin_') %}
+        {% set type_key = 'plugin' %}
+    {% endif %}
+    {% if item.is_indicator and item.type_display %}
+        {% set type_label = item.type_display %}
+    {% elif raw_type %}
+        {% set type_label = raw_type|replace('_', ' ')|title %}
+    {% elif item.is_document_field %}
+        {% set type_label = _('Document') %}
+    {% elif item.item_type == 'matrix' %}
+        {% set type_label = _('Matrix') %}
+    {% elif item.item_type and item.item_type.startswith('plugin_') %}
+        {% set type_label = _('Plugin') %}
+    {% elif item.is_question %}
+        {% set type_label = _('Question') %}
+        {% set type_key = 'question' %}
+    {% else %}
+        {% set type_label = _('Unknown') %}
+        {% set type_key = 'unknown' %}
+    {% endif %}
+    {% if type_key in ['number', 'count'] %}
+        {% set type_classes = 'bg-emerald-50 text-emerald-800 border-emerald-200' %}
+        {% set type_icon = 'fas fa-hashtag' %}
+    {% elif type_key == 'percentage' %}
+        {% set type_classes = 'bg-purple-50 text-purple-800 border-purple-200' %}
+        {% set type_icon = 'fas fa-percent' %}
+    {% elif type_key in ['text', 'string', 'textarea'] %}
+        {% set type_classes = 'bg-slate-50 text-slate-700 border-slate-200' %}
+        {% set type_icon = 'fas fa-font' %}
+    {% elif type_key in ['yesno', 'boolean'] %}
+        {% set type_classes = 'bg-amber-50 text-amber-800 border-amber-200' %}
+        {% set type_icon = 'fas fa-toggle-on' %}
+    {% elif type_key in ['single_choice', 'choice', 'multiple_choice'] %}
+        {% set type_classes = 'bg-indigo-50 text-indigo-800 border-indigo-200' %}
+        {% set type_icon = 'fas fa-list-ul' %}
+    {% elif type_key == 'date' %}
+        {% set type_classes = 'bg-sky-50 text-sky-800 border-sky-200' %}
+        {% set type_icon = 'fas fa-calendar-day' %}
+    {% elif type_key == 'datetime' %}
+        {% set type_classes = 'bg-sky-50 text-sky-800 border-sky-200' %}
+        {% set type_icon = 'fas fa-clock' %}
+    {% elif type_key == 'currency' %}
+        {% set type_classes = 'bg-orange-50 text-orange-800 border-orange-200' %}
+        {% set type_icon = 'fas fa-coins' %}
+    {% elif type_key in ['document', 'document_field'] %}
+        {% set type_classes = 'bg-stone-50 text-stone-700 border-stone-200' %}
+        {% set type_icon = 'fas fa-file-alt' %}
+    {% elif type_key == 'matrix' %}
+        {% set type_classes = 'bg-cyan-50 text-cyan-800 border-cyan-200' %}
+        {% set type_icon = 'fas fa-table' %}
+    {% elif type_key == 'blank' %}
+        {% set type_classes = 'bg-gray-50 text-gray-500 border-gray-200' %}
+        {% set type_icon = 'fas fa-minus' %}
+    {% elif type_key == 'plugin' %}
+        {% set type_classes = 'bg-violet-50 text-violet-800 border-violet-200' %}
+        {% set type_icon = 'fas fa-puzzle-piece' %}
+    {% elif type_key == 'question' %}
+        {% set type_classes = 'bg-blue-50 text-blue-800 border-blue-200' %}
+        {% set type_icon = 'fas fa-question-circle' %}
+    {% elif type_key == 'unknown' %}
+        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('Type not set on this item') }}">
+            <i class="fas fa-question text-[10px]" aria-hidden="true"></i>
+            <span class="imputation-meta-badge__label">{{ type_label }}</span>
+        </span>
+    {% else %}
+        {% set type_classes = 'bg-blue-50 text-blue-800 border-blue-200' %}
+        {% set type_icon = 'fas fa-tag' %}
+    {% endif %}
+    {% if type_key != 'unknown' %}
+        <span class="imputation-meta-badge px-2.5 py-0.5 rounded-full text-xs font-medium {{ type_classes }}" title="{{ type_label }}">
+            <i class="{{ type_icon }} text-[10px] opacity-80" aria-hidden="true"></i>
+            <span class="imputation-meta-badge__label">{{ type_label }}</span>
+        </span>
+    {% endif %}
+{% endmacro %}
+
+{% macro imputation_unit_badge(item) %}
+    {% set raw_unit = (item.unit or '')|string|trim %}
+    {% set unit_key = raw_unit|lower|replace(' ', '_')|replace('-', '_') %}
+    {% if item.unit_display %}
+        {% set unit_label = item.unit_display %}
+    {% elif raw_unit %}
+        {% set unit_label = raw_unit|replace('_', ' ')|title %}
+    {% else %}
+        {% set unit_label = _('No unit') %}
+    {% endif %}
+    {% if not raw_unit %}
+        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('No measurement unit') }}">
+            <i class="fas fa-ban text-[10px]" aria-hidden="true"></i>
+            <span class="imputation-meta-badge__label">{{ unit_label }}</span>
+        </span>
+    {% elif unit_key in ['people', 'person', 'persons', 'beneficiaries', 'beneficiary'] %}
+        {% set unit_classes = 'bg-emerald-50 text-emerald-800 border-emerald-200' %}
+        {% set unit_icon = 'fas fa-users' %}
+    {% elif unit_key in ['volunteers', 'volunteer'] %}
+        {% set unit_classes = 'bg-teal-50 text-teal-800 border-teal-200' %}
+        {% set unit_icon = 'fas fa-hands-helping' %}
+    {% elif unit_key in ['staff', 'employees', 'employee'] %}
+        {% set unit_classes = 'bg-blue-50 text-blue-800 border-blue-200' %}
+        {% set unit_icon = 'fas fa-id-badge' %}
+    {% elif unit_key in ['households', 'household', 'families', 'family'] %}
+        {% set unit_classes = 'bg-amber-50 text-amber-800 border-amber-200' %}
+        {% set unit_icon = 'fas fa-home' %}
+    {% elif unit_key in ['communities', 'community'] %}
+        {% set unit_classes = 'bg-lime-50 text-lime-800 border-lime-200' %}
+        {% set unit_icon = 'fas fa-building' %}
+    {% elif unit_key in ['ns', 'national_society', 'national_societies'] %}
+        {% set unit_classes = 'bg-violet-50 text-violet-800 border-violet-200' %}
+        {% set unit_icon = 'fas fa-globe' %}
+    {% elif unit_key in ['usd', 'eur', 'chf', 'gbp', 'currency', 'money'] %}
+        {% set unit_classes = 'bg-orange-50 text-orange-800 border-orange-200' %}
+        {% set unit_icon = 'fas fa-coins' %}
+    {% elif unit_key in ['percent', 'percentage', '%'] %}
+        {% set unit_classes = 'bg-purple-50 text-purple-800 border-purple-200' %}
+        {% set unit_icon = 'fas fa-percent' %}
+    {% elif unit_key in ['year', 'years', 'month', 'months', 'day', 'days'] %}
+        {% set unit_classes = 'bg-sky-50 text-sky-800 border-sky-200' %}
+        {% set unit_icon = 'fas fa-calendar-alt' %}
+    {% else %}
+        {% set unit_classes = 'bg-slate-50 text-slate-700 border-slate-200' %}
+        {% set unit_icon = 'fas fa-ruler' %}
+    {% endif %}
+    {% if raw_unit %}
+        <span class="imputation-meta-badge px-2.5 py-0.5 rounded-full text-xs font-medium {{ unit_classes }}" title="{{ unit_label }}">
+            <i class="{{ unit_icon }} text-[10px] opacity-80" aria-hidden="true"></i>
+            <span class="imputation-meta-badge__label">{{ unit_label }}</span>
+        </span>
+    {% endif %}
+{% endmacro %}
 
 {% block content %}
 <div class="sharp-ui">
@@ -60,8 +218,6 @@
 ) }}
 
 <div class="max-w-7xl mx-auto py-6">
-  <p class="text-gray-600 mb-6">Configure imputation methods for template items and run imputation.</p>
-
   <!-- FDRS Sync Settings Modal -->
   {% from "macros/modal_shell.html" import modal_shell %}
   {% call modal_shell('fdrs-sync-modal', _('FDRS Data Sync Settings'), max_width='max-w-lg', close_id='fdrs-sync-modal-close') %}
@@ -256,30 +412,11 @@
                 <div class="text-gray-500 text-xs">{{ item.description }}</div>
                 {% endif %}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {% if item.type %}
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                    {% if item.type == 'Number' %}bg-green-100 text-green-800
-                    {% elif item.type == 'Percentage' %}bg-purple-100 text-purple-800
-                    {% elif item.type == 'Text' %}bg-gray-100 text-gray-800
-                    {% elif item.type == 'YesNo' %}bg-yellow-100 text-yellow-800
-                    {% elif item.type == 'Choice' %}bg-indigo-100 text-indigo-800
-                    {% elif item.type == 'Currency' %}bg-orange-100 text-orange-800
-                    {% else %}bg-blue-100 text-blue-800{% endif %}">
-                    {{ item.type }}
-                  </span>
-                {% else %}
-                  <span class="text-gray-400 italic">Unknown</span>
-                {% endif %}
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[10rem]">
+                {{ imputation_type_badge(item) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {% if item.unit %}
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {{ item.unit }}
-                  </span>
-                {% else %}
-                  <span class="text-gray-400 italic">No unit</span>
-                {% endif %}
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[10rem]">
+                {{ imputation_unit_badge(item) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 <div class="relative">

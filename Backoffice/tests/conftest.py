@@ -74,10 +74,12 @@ def app():
     app.config['TESTING'] = True
     app.config['WTF_CSRF_ENABLED'] = False
     app.config['DEBUG'] = False
-    app.config['SECRET_KEY'] = 'test-secret-key'
-    app.config['MOBILE_JWT_SECRET'] = 'test-secret-key'
+    app.config['SECRET_KEY'] = 'test-secret-key-for-pytest-suite-32b!'
+    app.config['MOBILE_JWT_SECRET'] = 'test-mobile-jwt-secret-for-pytest-32b!'
     app.config['API_KEY'] = os.environ.get('API_KEY') or 'test-api-key'
     app.config['SCHEDULER_ENABLED'] = False
+    # Keep logout redirects on the local login route during tests (avoid B2C end_session URLs).
+    app.config['AZURE_B2C_POST_LOGOUT_REDIRECT_URI'] = 'http://127.0.0.1/login'
 
     # Plugin manager is initialized during create_app(); ensure field types are
     # registered even if DEBUG was True at config import time (before FLASK_CONFIG=testing).
@@ -147,7 +149,7 @@ def db_session(app):
             User, Country, FormTemplate, FormTemplateVersion, FormSection,
             FormItem, FormData, DynamicIndicatorData, AssignedForm,
             AssignmentEntityStatus, PublicSubmission, IndicatorBank,
-            SubmittedDocument, APIKey, AIReasoningTrace,
+            SubmittedDocument, APIKey, AIReasoningTrace, AITermConcept,
         )
         from app.models.api_usage import APIUsage  # noqa: F401 — ensures api_usage table is created
 
@@ -160,6 +162,24 @@ def db_session(app):
             raise RuntimeError("No tables found in metadata! Models may not be imported correctly.")
 
         try:
+            # Ensure no stale session or connection state leaks in from a previous
+            # test.  An aborted psycopg2 transaction on a pooled connection will
+            # cause every subsequent engine.begin() call to fail silently (the
+            # whole nuclear-drop block is swallowed by its try/except), leaving
+            # schema remnants that trip up _ensure_role and friends.
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            try:
+                db.session.remove()
+            except Exception:
+                pass
+            try:
+                db.engine.dispose()
+            except Exception:
+                pass
+
             # Drop all tables first to ensure clean state
             # Wrap in try-except to ignore errors about missing constraints/indexes
             try:
@@ -194,6 +214,18 @@ BEGIN
   -- Drop sequences
   FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = current_schema()) LOOP
     EXECUTE 'DROP SEQUENCE IF EXISTS ' || quote_ident(r.sequence_name) || ' CASCADE';
+  END LOOP;
+
+  -- Drop enum types (SQLAlchemy creates named ENUM types in PostgreSQL; they
+  -- survive DROP TABLE and prevent a clean create_all on the next test run,
+  -- causing "type already exists" errors that partially fail the DDL batch).
+  FOR r IN (
+    SELECT t.typname
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typtype = 'e' AND n.nspname = current_schema()
+  ) LOOP
+    EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.typname) || ' CASCADE';
   END LOOP;
 END $$;
                     """))
@@ -257,7 +289,7 @@ END $$;
                     ), {"t": name})
                     return bool(result.scalar())
 
-                missing = [t for t in ("form_template", "api_keys", "form_data") if not _table_exists(t)]
+                missing = [t for t in ("user", "form_template", "api_keys", "form_data") if not _table_exists(t)]
                 if missing:
                     raise RuntimeError(
                         "CRITICAL: expected tables were not created: "
@@ -273,8 +305,16 @@ END $$;
 
         yield db.session
 
-        # Clean up
-        db.session.remove()
+        # Clean up: rollback first so an aborted transaction does not poison the
+        # connection that is returned to the pool, then drop the schema.
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            db.session.remove()
+        except Exception:
+            pass
         try:
             db.drop_all()
         except Exception:
@@ -396,6 +436,9 @@ def admin_user(db_session, app):
             name='Test Admin',
             password='admin_password',
         )
+        user_id = user.id
+        db.session.expunge(user)
+        user.id = user_id
         yield user
 
 
@@ -418,6 +461,9 @@ def test_user(db_session, app):
             password='user_password',
             role='user',
         )
+        user_id = user.id
+        db.session.expunge(user)
+        user.id = user_id
         yield user
 
 
@@ -470,6 +516,9 @@ def system_manager_user(db_session, app):
             email='test_sm@example.com',
             role='system_manager',
         )
+        user_id = user.id
+        db.session.expunge(user)
+        user.id = user_id
         yield user
 
 

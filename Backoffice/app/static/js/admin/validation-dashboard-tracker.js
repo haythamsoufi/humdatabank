@@ -432,6 +432,48 @@
         return el('vd-tracker-country-slicer');
     }
 
+    function fdsMemberSlicerEl() {
+        return el('vd-tracker-fds-member-slicer');
+    }
+
+    function buildFdsMemberSlicer(rows) {
+        var fdsMemberEl = fdsMemberSlicerEl();
+        if (!fdsMemberEl) return;
+
+        if (!rows || !rows.length) {
+            fdsMemberEl.innerHTML = '<option value="">' + esc(t.fdsMemberAll || 'All FDS members') + '</option>';
+            fdsMemberEl.disabled = true;
+            return;
+        }
+
+        var members = {};
+        rows.forEach(function (row) {
+            if (row.fds_member_user_id) {
+                members[row.fds_member_user_id] = row.fds_member_name || ('User ' + row.fds_member_user_id);
+            }
+        });
+
+        var memberOptions = Object.keys(members).map(function (userId) {
+            return {
+                id: userId,
+                label: members[userId],
+            };
+        }).sort(function (a, b) {
+            return String(a.label).localeCompare(String(b.label));
+        });
+
+        var optionsHtml = memberOptions.map(function (member) {
+            return '<option value="' + esc(String(member.id)) + '">' + esc(member.label) + '</option>';
+        }).join('');
+
+        fdsMemberEl.innerHTML =
+            '<option value="">' + esc(t.fdsMemberAll || 'All FDS members') + '</option>' +
+            '<option value="__unassigned__">' + esc(t.fdsMemberUnassigned || 'Not assigned') + '</option>' +
+            optionsHtml;
+        fdsMemberEl.value = '';
+        fdsMemberEl.disabled = false;
+    }
+
     function buildCountrySlicer(rows) {
         var selectEl = countrySlicerEl();
         if (!selectEl) return;
@@ -439,6 +481,7 @@
         if (!rows || !rows.length) {
             selectEl.innerHTML = '<option value="">' + esc(t.slicerEmpty || 'Load a reporting period to filter countries.') + '</option>';
             selectEl.disabled = true;
+            buildFdsMemberSlicer([]);
             return;
         }
 
@@ -452,6 +495,7 @@
         selectEl.innerHTML = '<option value="">' + esc(t.allCountries || 'All countries') + '</option>' + groupsHtml;
         selectEl.value = '';
         selectEl.disabled = false;
+        buildFdsMemberSlicer(rows);
     }
 
     function computeStatsFromRows(rows) {
@@ -501,9 +545,15 @@
         if (!state.allRows.length) return [];
         var selectEl = countrySlicerEl();
         var countryId = selectEl && selectEl.value;
-        if (!countryId) return state.allRows.slice();
+        var fdsMemberEl = fdsMemberSlicerEl();
+        var fdsMemberVal = fdsMemberEl && fdsMemberEl.value;
+
         return state.allRows.filter(function (row) {
-            return String(row.country_id) === String(countryId);
+            if (countryId && String(row.country_id) !== String(countryId)) return false;
+            if (fdsMemberVal === '__unassigned__' && row.fds_member_user_id) return false;
+            if (fdsMemberVal && fdsMemberVal !== '__unassigned__' &&
+                String(row.fds_member_user_id) !== String(fdsMemberVal)) return false;
+            return true;
         });
     }
 
@@ -764,6 +814,10 @@
         });
 
         countrySlicerEl()?.addEventListener('change', function () {
+            applyTrackerView();
+        });
+
+        fdsMemberSlicerEl()?.addEventListener('change', function () {
             applyTrackerView();
         });
 

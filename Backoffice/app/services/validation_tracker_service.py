@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 
 from app import db
 from app.models import FormData, FormItem, SubmittedDocument
+from app.models.core import Country
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.enums import status_display_label
 from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
@@ -21,6 +22,7 @@ from app.services.data_quality.helpers import (
     parse_period_year,
     resolve_assignment_aes,
 )
+from app.services.country_service import fds_member_user_display_name
 from app.services.validation_dashboard_service import global_periods_for_template
 
 # Document types shown as upload columns (FDRS template 21).
@@ -187,7 +189,11 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         ).first()
     )
 
-    countries = active_country_map_query().all()
+    countries = (
+        active_country_map_query()
+        .options(joinedload(Country.fds_member_user))
+        .all()
+    )
 
     doc_field_map = _document_field_map(template_id)
     all_doc_item_ids = [iid for ids in doc_field_map.values() for iid in ids]
@@ -277,11 +283,14 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         if has_ar and has_afs:
             docs_both_required += 1
 
+        fds_user = country.fds_member_user
         row = {
             "country_id": country.id,
             "country_name": country.name,
             "country_iso3": country.iso3,
             "region": country.region,
+            "fds_member_user_id": country.fds_member_user_id,
+            "fds_member_name": fds_member_user_display_name(fds_user) or None,
             "period_name": resolved_period_by_country.get(country.id),
             "assignment_id": aes.assigned_form_id,
             "status": status,

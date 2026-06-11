@@ -70,7 +70,12 @@ def test_build_tracker_data_shapes(
     country.iso3 = "TST"
     country.region = "Europe"
     country.status = "Active"
-    mock_active_countries.return_value.all.return_value = [country]
+    country.fds_member_user_id = None
+    country.fds_member_user = None
+    countries_query = MagicMock()
+    countries_query.all.return_value = [country]
+    countries_query.options.return_value = countries_query
+    mock_active_countries.return_value = countries_query
 
     aes = MagicMock()
     aes.id = 99

@@ -91,6 +91,13 @@
                                             <label for="edit_currency_code" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Currency Code') }}</label>
                                             <input type="text" id="edit_currency_code" name="currency_code" maxlength="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
                                         </div>
+                                        <div>
+                                            <label for="edit_fds_member_user_id" class="block text-sm font-medium text-gray-700 mb-1">{{ _('FDS Member') }}</label>
+                                            <select id="edit_fds_member_user_id" name="fds_member_user_id" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                                <option value="">{{ _('Not assigned') }}</option>
+                                            </select>
+                                            <p class="mt-1 text-xs text-gray-500">{{ _('Org admin covering this country.') }}</p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -223,6 +230,7 @@
                     $('#edit_status').val(data.status);
                     $('#edit_preferred_language').val(data.preferred_language);
                     $('#edit_currency_code').val(data.currency_code);
+                    populateFdsMemberSelect(data.fds_member_user_options, data.fds_member_user_id);
                     // Populate dynamic name translations
                     var trans = (data && data.name_translations) ? data.name_translations : {};
                     {% for code in TRANSLATABLE_LANGUAGES %}

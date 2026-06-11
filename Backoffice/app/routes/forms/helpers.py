@@ -15,6 +15,7 @@ from app.models import (
     FormData, FormItem, DynamicIndicatorData,
     SubmittedDocument,
 )
+from app.services.assignment_completion_service import AssignmentCompletionService
 from app.services.form_processing_service import get_form_items_for_section
 
 
@@ -276,6 +277,13 @@ def map_unified_item_to_original(item_id, item_type):
     except Exception as e:  # SQLAlchemy/DB errors - keep broad for DB layer
         current_app.logger.warning("_resolve_form_item_from_request DB error: %s", e, exc_info=True)
         return (None, None)
+
+
+def calculate_assignment_completion_rate(assignment_entity_status_id, template_id, version_id):
+    """Calculate assignment completion rate for the published template version."""
+    return AssignmentCompletionService.compute_for_assignment(
+        assignment_entity_status_id, template_id, version_id
+    ).completion_rate
 
 
 def calculate_section_completion_status(all_sections, existing_data_processed, existing_submitted_documents_dict):

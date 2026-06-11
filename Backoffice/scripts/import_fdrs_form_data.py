@@ -16,7 +16,8 @@ Remote databank: set databank_base_url and FDRS_DATABANK_API_KEY (or DATABANK_AP
 
 Expects records with: assignment_entity_status_id, item_id (or form_item_id),
 value, disagg_data, data_not_available, not_applicable, prefilled_value,
-imputed_value, submitted_at. Inserts new rows or updates existing ones keyed by
+imputed_value, submitted_at. Scalar prefilled/imputed values are stored like
+form_data.value; JSON payloads belong in disagg_data. Inserts new rows or updates existing ones keyed by
 (assignment_entity_status_id, form_item_id).
 
 Usage:
@@ -158,6 +159,9 @@ from fdrs_sync_constants import (
     FDRS_NETWORK_SUPPORT_RECEIVED_ITEM_ID,
     FDRS_NETWORK_SUPPORT_SLOT_COUNT,
     FDRS_QUESTION_KPI_TO_ITEM,
+    fdrs_kpi_availability_value_truthy,
+    fdrs_kpi_data_availability_kind,
+    fdrs_kpi_has_data_availability_suffix,
 )
 
 SNAPSHOT_EXCEL_COLUMNS = (
@@ -167,6 +171,8 @@ SNAPSHOT_EXCEL_COLUMNS = (
     "KPI_code",
     "BaseKPI",
     "Value",
+    "ReportedValue",
+    "ImputedValue",
     "ValueStatus",
     "State",
     "in_fdrs_data_stage",
@@ -199,7 +205,7 @@ def _parse_submitted_at(raw: Optional[str]) -> Optional[datetime]:
 
 
 def _parse_json_field(raw: Optional[str]) -> Optional[Any]:
-    """Parse a JSON field (disagg_data, prefilled_value, imputed_value)."""
+    """Parse a structured JSON field such as disagg_data."""
     if raw is None or (isinstance(raw, str) and not raw.strip()):
         return None
     s = str(raw).strip()
@@ -209,6 +215,30 @@ def _parse_json_field(raw: Optional[str]) -> Optional[Any]:
         return json.loads(s)
     except json.JSONDecodeError:
         return None
+
+
+def _parse_scalar_field(raw: Optional[str]) -> Optional[str]:
+    """Parse scalar auxiliary values into the same text shape as form_data.value."""
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return None
+    s = str(raw).strip()
+    if s.lower() in ("null", "none", "undefined", ""):
+        return None
+    try:
+        parsed = json.loads(s)
+    except json.JSONDecodeError:
+        return s
+
+    parsed = _normalize_json_numbers_to_ints(parsed)
+    if parsed is None:
+        return None
+    if isinstance(parsed, dict):
+        return None
+    if isinstance(parsed, list):
+        return json.dumps(parsed, ensure_ascii=False)
+    if isinstance(parsed, bool):
+        return "true" if parsed else "false"
+    return str(parsed)
 
 
 def _disagg_data_for_db(val: Any) -> Optional[Any]:
@@ -770,6 +800,8 @@ def _pick_total_row_for_base(rows: List[Dict[str, Any]], base_kpi: str) -> Dict[
     # 2. No aggregate total row: use first row that is not Tot_M/Tot_F, but with value cleared so we don't put sex subtotals in main value
     for r in rows:
         kpi = (r.get("KPI_code") or "").strip()
+        if fdrs_kpi_has_data_availability_suffix(kpi):
+            continue
         if not (kpi.endswith("_Tot_M") or kpi.endswith("_Tot_F")):
             out = dict(r)
             out["Value"] = None  # main value stays empty; disagg_data has the breakdown
@@ -778,6 +810,38 @@ def _pick_total_row_for_base(rows: List[Dict[str, Any]], base_kpi: str) -> Dict[
     out = dict(rows[0])
     out["Value"] = None
     return out
+
+
+def _pick_imputed_value_for_base(rows: List[Dict[str, Any]], base_kpi: str) -> Any:
+    """Pick imputed value for (iso3, year, BaseKPI) from fdrs_data group rows."""
+    if not rows:
+        return None
+    for kpi_target in (base_kpi, base_kpi + "_Tot", base_kpi + "_CPD"):
+        for r in rows:
+            kpi = (r.get("KPI_code") or "").strip()
+            if kpi != kpi_target:
+                continue
+            imp = r.get("ImputedValue")
+            if imp is not None and str(imp).strip() != "":
+                return imp
+    for r in rows:
+        imp = r.get("ImputedValue")
+        if imp is not None and str(imp).strip() != "":
+            return imp
+    return None
+
+
+def _format_imputed_for_import(val: Any) -> str:
+    """Format scalar imputed value for ready-to-import imputed_value column (JSON-parseable)."""
+    if val is None or (isinstance(val, str) and not val.strip()):
+        return ""
+    try:
+        num = float(str(val).strip())
+        if num == int(num):
+            return json.dumps(int(num))
+        return json.dumps(num)
+    except (ValueError, TypeError):
+        return json.dumps(str(val).strip())
 
 
 # Max items to keep per exclusion list (avoid huge payloads)
@@ -882,28 +946,20 @@ def _data_availability_from_group_rows(group_rows: List[Dict[str, Any]]) -> tupl
     """
     Check FDRS group_rows for data availability KPIs. Map to databank flags (data_not_available, not_applicable).
     Returns (data_not_available: bool, not_applicable: bool).
-    For _IsDataNotAvailable / _isDataNotCollected, null or empty Value is treated as true (row presence = flag set).
+    Accepts IFRC suffix variants (_IsDataNotAvailable, _isDataNotCollected, _IsDataNotCollected, etc.).
+    Null or empty Value is treated as true (row presence = flag set).
     """
     data_not_available = False
     not_applicable = False
     for r in group_rows or []:
         kpi = (r.get("KPI_code") or "").strip()
-        val = r.get("Value")
-        if kpi.endswith("_IsDataNotAvailable"):
-            truthy = val is True or (isinstance(val, (int, float)) and val != 0)
-            if not truthy and val is not None and str(val).strip():
-                truthy = str(val).strip().lower() in ("1", "true", "yes", "on")
-            if not truthy and (val is None or (isinstance(val, str) and not val.strip())):
-                truthy = True  # presence of row with no value = treat as set
-            if truthy:
+        kind = fdrs_kpi_data_availability_kind(kpi)
+        if kind is None:
+            continue
+        if fdrs_kpi_availability_value_truthy(r.get("Value")):
+            if kind == "data_not_available":
                 data_not_available = True
-        elif kpi.endswith("_isDataNotCollected"):
-            truthy = val is True or (isinstance(val, (int, float)) and val != 0)
-            if not truthy and val is not None and str(val).strip():
-                truthy = str(val).strip().lower() in ("1", "true", "yes", "on")
-            if not truthy and (val is None or (isinstance(val, str) and not val.strip())):
-                truthy = True
-            if truthy:
+            else:
                 not_applicable = True
     return (data_not_available, not_applicable)
 
@@ -1086,6 +1142,7 @@ def build_ready_to_import_from_new_pipeline(
             disagg_data = ""
             data_not_available_flag = False
             not_applicable_flag = False
+            imputed_value = ""
         else:
             indicator_id = base_to_indicator_id[base_kpi]
             item_id = bank_to_item_id[indicator_id]
@@ -1093,16 +1150,20 @@ def build_ready_to_import_from_new_pipeline(
             data_not_available_flag, not_applicable_flag = _data_availability_from_group_rows(group_rows)
             r = _pick_total_row_for_base(group_rows, base_kpi) if group_rows else {}
             value = r.get("Value") if group_rows else None
-            # Emit row when value present OR when data_not_available/not_applicable set OR disability answers exist
-            if not (data_not_available_flag or not_applicable_flag or disability_meta) and _main_value_empty_or_zero(value):
+            imputed_value = _pick_imputed_value_for_base(group_rows, base_kpi)
+            # Emit row when reported, imputed, flags, or disability answers exist
+            has_scalar = not _main_value_empty_or_zero(value) or not _main_value_empty_or_zero(imputed_value)
+            if not (data_not_available_flag or not_applicable_flag or disability_meta or has_scalar):
                 if rti_excl is not None and isinstance(rti_excl, dict):
                     rti_excl["main_value_empty_or_zero_count"] = rti_excl.get("main_value_empty_or_zero_count", 0) + 1
                     main_value_empty_or_zero_set.add((iso3, year, base_kpi))
                 continue
             if data_not_available_flag or not_applicable_flag:
                 value = ""  # UI shows checkbox only; no value
+                imputed_value = None
             else:
-                value = str(value) if value is not None else ""
+                value = str(value) if value is not None and str(value).strip() else ""
+                imputed_value = _format_imputed_for_import(imputed_value)
             disagg_data = disagg_by_key.get((iso3, year, base_kpi)) or ""
             if disability_meta:
                 disagg_data = _merge_disability_into_disagg_data(disagg_data, disability_meta)
@@ -1148,7 +1209,7 @@ def build_ready_to_import_from_new_pipeline(
             COL_DATA_NA: "true" if data_not_available_flag else "",
             COL_NA: "true" if not_applicable_flag else "",
             COL_PREFILLED: "",
-            COL_IMPUTED: "",
+            COL_IMPUTED: imputed_value or "",
             COL_SUBMITTED: sub_at,
         }))
     if rti_excl is not None and isinstance(rti_excl, dict):
@@ -1696,6 +1757,8 @@ def build_fdrs_snapshot_export_rows(
             "KPI_code": (r.get("KPI_code") or "").strip(),
             "BaseKPI": base,
             "Value": r.get("Value"),
+            "ReportedValue": r.get("ReportedValue"),
+            "ImputedValue": r.get("ImputedValue"),
             "ValueStatus": r.get("ValueStatus"),
             "State": r.get("State"),
             "in_fdrs_data_stage": r.get("in_fdrs_data_stage") or "",
@@ -2138,17 +2201,17 @@ def row_to_payload(row: Dict[str, str]) -> Tuple[Optional[int], Optional[int], O
         return None, None, None, {}
 
     disagg_data = _parse_json_field(row.get(COL_DISAGG))
-    prefilled_value = _parse_json_field(row.get(COL_PREFILLED))
-    imputed_value = _parse_json_field(row.get(COL_IMPUTED))
+    prefilled_value = _parse_scalar_field(row.get(COL_PREFILLED))
+    imputed_value = _parse_scalar_field(row.get(COL_IMPUTED))
 
     payload = {
         "value": _coerce_value(row.get(COL_VALUE)),
-        # Ensure any numeric values inside JSON payloads are whole numbers too.
+        # Ensure any numeric values inside structured JSON payloads are whole numbers too.
         "disagg_data": _normalize_json_numbers_to_ints(disagg_data),
         "data_not_available": _parse_bool(row.get(COL_DATA_NA)),
         "not_applicable": _parse_bool(row.get(COL_NA)),
-        "prefilled_value": _normalize_json_numbers_to_ints(prefilled_value),
-        "imputed_value": _normalize_json_numbers_to_ints(imputed_value),
+        "prefilled_value": prefilled_value,
+        "imputed_value": imputed_value,
         "submitted_at": _parse_submitted_at(row.get(COL_SUBMITTED)),
         "disagg_type": (row.get("_debug_disagg_type") or "").strip() or None,
     }
@@ -2616,13 +2679,8 @@ def run_import(
                     disagg_for_db = _disagg_data_for_db(payload["disagg_data"])
                     if disagg_for_db is None:
                         disagg_for_db = db.null()
-                    # Same rule for other JSON columns: store SQL NULL (not JSON null) when empty.
-                    prefilled_for_db = payload["prefilled_value"]
-                    if prefilled_for_db is None or prefilled_for_db == {} or prefilled_for_db == []:
-                        prefilled_for_db = db.null()
-                    imputed_for_db = payload["imputed_value"]
-                    if imputed_for_db is None or imputed_for_db == {} or imputed_for_db == []:
-                        imputed_for_db = db.null()
+                    prefilled_for_db = FormData._coerce_scalar_text_value(payload["prefilled_value"])
+                    imputed_for_db = FormData._coerce_scalar_text_value(payload["imputed_value"])
                     disagg_type = payload.get("disagg_type")
                     if not disagg_type:
                         if isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"].get("mode"):
@@ -2639,7 +2697,7 @@ def run_import(
                         existing.data_not_available = payload["data_not_available"]
                         existing.not_applicable = payload["not_applicable"]
                         existing.prefilled_value = prefilled_for_db
-                        FormData.sync_imputed_numeric_value(existing, imputed_for_db if imputed_for_db is not db.null() else None)
+                        FormData.sync_imputed_numeric_value(existing, imputed_for_db)
                         if payload["submitted_at"] is not None:
                             existing.submitted_at = payload["submitted_at"]
                         db.session.add(existing)
@@ -2660,7 +2718,7 @@ def run_import(
                         entry._sync_numeric_value_from_string()
                         FormData.sync_imputed_numeric_value(
                             entry,
-                            imputed_for_db if imputed_for_db is not db.null() else None,
+                            imputed_for_db,
                         )
                         db.session.add(entry)
                         stats["inserted"] += 1
@@ -2701,11 +2759,15 @@ def run_import(
                 stats["documents_inserted"] = ds.get("inserted", 0)
                 stats["documents_updated"] = ds.get("updated", 0)
                 stats["documents_errors"] = ds.get("errors", 0)
+                stats["documents_downloaded"] = ds.get("downloaded", 0)
+                stats["documents_pending"] = ds.get("pending", 0)
                 stats["documents_summary"] = doc_result.get("documents_summary")
                 logger.info(
-                    "FDRS documents metadata: inserted=%s updated=%s errors=%s planned=%s",
+                    "FDRS documents: inserted=%s updated=%s downloaded=%s pending=%s errors=%s planned=%s",
                     stats["documents_inserted"],
                     stats["documents_updated"],
+                    stats["documents_downloaded"],
+                    stats["documents_pending"],
                     stats["documents_errors"],
                     (doc_result.get("documents_summary") or {}).get("planned"),
                 )

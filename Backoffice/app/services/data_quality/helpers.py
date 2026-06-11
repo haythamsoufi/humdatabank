@@ -460,8 +460,8 @@ def build_compliance_document_lookups(submitted_docs, item_id_to_doc_type):
 
 
 def compliance_doc_status_counts_toward_requirement(status: str | None) -> bool:
-    """True when an uploaded document should count toward the compliance requirement."""
-    return status in ("approved", "pending")
+    """True when an approved document counts toward the compliance requirement."""
+    return status == "approved"
 
 
 def active_country_map_query():

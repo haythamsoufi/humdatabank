@@ -17,7 +17,7 @@ from app.models import (
 )
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.routes.admin.shared import admin_required, permission_required
+from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.utils.datetime_helpers import utcnow
 from app.services.authorization_service import AuthorizationService
@@ -35,6 +35,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("data_exploration", __name__, url_prefix="/admin")
+
+# FDRS template ID — default for Disaggregation Analysis and compliance checks
+FDRS_TEMPLATE_ID = 21
 
 # Data Explorer permission codes (granular per tab)
 DATA_EXPLORER_PERMISSIONS = [
@@ -142,6 +145,7 @@ def explore_data():
                              can_access_data_table=can_access_data_table,
                              can_access_analysis=can_access_analysis,
                              can_access_compliance=can_access_compliance,
+                             fdrs_template_id=FDRS_TEMPLATE_ID,
                              title=_("Explore Data"))
     except Exception as e:
         logger.error(f"Error loading data exploration page: {str(e)}", exc_info=True)
@@ -153,6 +157,7 @@ def explore_data():
                              can_access_data_table=True,
                              can_access_analysis=True,
                              can_access_compliance=True,
+                             fdrs_template_id=FDRS_TEMPLATE_ID,
                              title=_("Explore Data"),
                              error="Failed to load filter options. Please refresh the page.")
 
@@ -291,7 +296,7 @@ def get_form_items_for_template():
 
 
 @bp.route("/data-exploration/assignment-filters", methods=["GET"])
-@permission_required('admin.data_explore.data_table')
+@permission_required_any('admin.data_explore.data_table', 'admin.data_explore.analysis')
 def get_assignment_filters_for_template():
     """Get assignment periods and countries for a specific template (for filter dropdowns)."""
     try:
@@ -627,7 +632,7 @@ def apply_imputed_value():
     """
     Apply an accepted AI-suggested value into FormData.imputed_value.
     Body:
-      - { form_data_id: 123, imputed_value: <any JSON-serializable> }
+      - { form_data_id: 123, imputed_value: <scalar or list for multi-choice> }
       - { form_data_id: 123, imputed_disagg_data: <any JSON-serializable> }
       - { submission_id: 398, form_item_id: 915, imputed_value: ..., ... }  # creates FormData row if missing
       - or both
@@ -683,9 +688,9 @@ def apply_imputed_value():
                 # Ensure a clean "empty reported value" baseline.
                 fd.value = None
                 fd.disagg_data = db.null()
-                fd.prefilled_value = db.null()
+                fd.prefilled_value = None
                 fd.prefilled_disagg_data = db.null()
-                fd.imputed_value = db.null()
+                fd.imputed_value = None
                 fd.imputed_disagg_data = db.null()
                 fd.data_not_available = False
                 fd.not_applicable = False
@@ -696,9 +701,18 @@ def apply_imputed_value():
         imputed_value = payload.get("imputed_value", None)
         imputed_disagg_data = payload.get("imputed_disagg_data", None)
 
+        def _has_payload_value(value):
+            if value is None:
+                return False
+            if isinstance(value, str):
+                return bool(value.strip())
+            if isinstance(value, (list, dict)):
+                return bool(value)
+            return True
+
         # Require at least one of the two payloads
-        has_scalar = not (imputed_value is None or (isinstance(imputed_value, str) and not imputed_value.strip()))
-        has_disagg = not (imputed_disagg_data is None or (isinstance(imputed_disagg_data, str) and not imputed_disagg_data.strip()))
+        has_scalar = _has_payload_value(imputed_value)
+        has_disagg = _has_payload_value(imputed_disagg_data)
         if not has_scalar and not has_disagg:
             return json_bad_request("imputed_value or imputed_disagg_data is required")
 
@@ -729,6 +743,15 @@ def apply_imputed_value():
         except Exception as e:
             logger.debug("imputed_value parse failed: %s", e)
 
+        if isinstance(imputed_value, str):
+            s = imputed_value.strip()
+            if s.startswith("{") and s.endswith("}"):
+                return json_bad_request("JSON object imputed payloads must be sent as imputed_disagg_data")
+        if isinstance(imputed_value, dict):
+            return json_bad_request("JSON object imputed payloads must be sent as imputed_disagg_data")
+        if isinstance(imputed_value, list) and any(isinstance(item, (dict, list)) for item in imputed_value):
+            return json_bad_request("Nested JSON imputed payloads must be sent as imputed_disagg_data")
+
         # Normalize imputed_disagg_data if sent as a JSON string
         try:
             if isinstance(imputed_disagg_data, str):
@@ -742,7 +765,10 @@ def apply_imputed_value():
 
         # Only set fields that were actually provided (allows scalar-only or disagg-only applies).
         if "imputed_value" in payload:
-            FormData.sync_imputed_numeric_value(fd, imputed_value)
+            try:
+                FormData.sync_imputed_numeric_value(fd, imputed_value)
+            except ValueError as e:
+                return json_bad_request(str(e))
         if "imputed_disagg_data" in payload:
             fd.imputed_disagg_data = imputed_disagg_data
 
@@ -791,9 +817,6 @@ def apply_imputed_value():
         return json_server_error(GENERIC_ERROR_MESSAGE)
 
 
-# FDRS Template ID for compliance check
-FDRS_TEMPLATE_ID = 21
-
 @bp.route("/data-exploration/compliance", methods=["GET"])
 @permission_required('admin.data_explore.compliance')
 def get_compliance_data():
@@ -805,8 +828,9 @@ def get_compliance_data():
 
     Returns document upload status for each country across the last 3 periods,
     and determines compliance based on:
-    - At least one Annual Report in the past 3 years
-    - At least one Audited Financial Statement in the past 3 years
+    - At least one approved Annual Report in the past 3 years
+    - At least one approved Audited Financial Statement in the past 3 years
+    Pending or rejected documents are shown in the grid but do not count as compliant.
     """
     try:
         # Get reference year from query params (optional)
@@ -1127,11 +1151,9 @@ def download_compliance_excel():
                 .all()
             )
 
-        doc_lookup = {}
-        for doc in submitted_docs:
-            doc_type = item_id_to_doc_type.get(doc.form_item_id)
-            if doc_type:
-                doc_lookup[(doc.assignment_entity_status_id, doc_type)] = True
+        _, _, doc_status_lookup = build_compliance_document_lookups(
+            submitted_docs, item_id_to_doc_type
+        )
 
         # Create workbook
         wb = openpyxl.Workbook()
@@ -1216,14 +1238,15 @@ def download_compliance_excel():
             # Build period_docs data and determine compliance
             period_docs_map = {}
             for period in periods:
-                period_docs = {doc_type: False for doc_type in COMPLIANCE_DOC_TYPES}
+                period_docs = {doc_type: "missing" for doc_type in COMPLIANCE_DOC_TYPES}
                 assignment = assignment_map.get(period)
                 if assignment:
                     aes = aes_lookup.get((assignment.id, country.id))
                     if aes:
                         for doc_type in COMPLIANCE_DOC_TYPES:
-                            if doc_lookup.get((aes.id, doc_type)):
-                                period_docs[doc_type] = True
+                            doc_status = doc_status_lookup.get((aes.id, doc_type), "missing")
+                            period_docs[doc_type] = doc_status
+                            if compliance_doc_status_counts_toward_requirement(doc_status):
                                 if doc_type == "Annual Report":
                                     has_annual_report = True
                                 elif doc_type == "Audited Financial Statement":
@@ -1240,11 +1263,18 @@ def download_compliance_excel():
                 period_start_col = data_start_col + (idx * num_doc_types)
                 for doc_idx, doc_type in enumerate(COMPLIANCE_DOC_TYPES):
                     cell = ws.cell(row=row_num, column=period_start_col + doc_idx)
-                    if period_docs_map.get(period, {}).get(doc_type, False):
-                        cell.value = "Yes"
+                    doc_status = period_docs_map.get(period, {}).get(doc_type, "missing")
+                    if doc_status == "approved":
+                        cell.value = "Approved"
                         cell.font = yes_font
+                    elif doc_status == "pending":
+                        cell.value = "Pending"
+                        cell.font = Font(color="D97706")
+                    elif doc_status == "rejected":
+                        cell.value = "Rejected"
+                        cell.font = Font(color="DC2626")
                     else:
-                        cell.value = "No"
+                        cell.value = "Missing"
                         cell.font = no_font
                     cell.alignment = center_align
                     cell.border = thin_border
@@ -1278,7 +1308,7 @@ def download_compliance_excel():
         ws_summary.cell(row=6, column=1, value="Total Countries:").font = Font(bold=True)
         ws_summary.cell(row=6, column=2, value=len(countries))
         ws_summary.cell(row=7, column=1, value="Compliance Rule:").font = Font(bold=True)
-        ws_summary.cell(row=7, column=2, value="At least 1 Annual Report AND 1 Audited Financial Statement in the past 3 years")
+        ws_summary.cell(row=7, column=2, value="At least 1 approved Annual Report AND 1 approved Audited Financial Statement in the past 3 years")
 
         # Save to BytesIO
         output = BytesIO()

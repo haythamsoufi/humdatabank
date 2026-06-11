@@ -4,7 +4,64 @@ Shared FDRS sync mappings for import_fdrs_form_data.py (template 21).
 KPI / document type → form_item_id links that are not resolved via indicator bank.
 """
 
+from typing import Any, Optional
+
 from app.services.data_quality.catalogs.fdrs_v1_catalog import INCOME_SOURCE_KPI_CODES
+
+# IFRC data-availability logical KPI suffixes (API uses mixed casing).
+_FDRS_DATA_AVAILABILITY_SUFFIXES = (
+    "_IsDataNotAvailable",
+    "_isDataNotAvailable",
+    "_IsDataNotCollected",
+    "_isDataNotCollected",
+)
+
+
+def fdrs_kpi_data_availability_kind(kpi: str) -> Optional[str]:
+    """
+    Classify FDRS availability KPI suffix.
+    Returns ``data_not_available``, ``not_applicable``, or None.
+    """
+    k = (kpi or "").strip()
+    if not k:
+        return None
+    kl = k.lower()
+    if kl.endswith("isdatanotavailable"):
+        return "data_not_available"
+    if kl.endswith("isdatanotcollected"):
+        return "not_applicable"
+    return None
+
+
+def fdrs_kpi_has_data_availability_suffix(kpi: str) -> bool:
+    return fdrs_kpi_data_availability_kind(kpi) is not None
+
+
+def fdrs_kpi_strip_data_availability_suffix(kpi: str) -> str:
+    """Remove availability suffix so BaseKPI resolves to the parent indicator KPI."""
+    k = (kpi or "").strip()
+    if not k:
+        return k
+    kl = k.lower()
+    for pattern in ("_isdatanotavailable", "_isdatanotcollected"):
+        if kl.endswith(pattern):
+            return k[: len(k) - len(pattern)]
+    return k
+
+
+def fdrs_kpi_availability_value_truthy(val: Any) -> bool:
+    """
+    Whether an FDRS availability KPI Value means the flag is set.
+    Null/empty value with a present row is treated as set (IFRC convention).
+    """
+    if val is True or (isinstance(val, (int, float)) and val != 0):
+        return True
+    if val is not None and str(val).strip():
+        s = str(val).strip().lower()
+        if s in ("1", "true", "yes", "on"):
+            return True
+        return False
+    return True
 
 # Template 21 form items (published)
 FDRS_INCOME_SOURCES_MATRIX_ITEM_ID = 943
@@ -56,15 +113,37 @@ FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL = {
     "Our Unaudited Financial Statement": "Unaudited Financial Statement",
 }
 
-# ApprovalStatus / Public values treated as importable (metadata-only until file URLs work)
+# ApprovalStatus / Public values treated as importable.
+# FDRS ``Public`` codes (observed on GET /api/documents):
+#   0 = Validated (Private)
+#   1 = Validated (Public)
+#   2 = Under Validation (Public)
+#   3 = Rejected (Public)
+#   4 = Under Validation (Private) — not imported yet (pending-only; separate Public code)
 FDRS_DOCUMENT_APPROVAL_OK = frozenset(
     {
         "Validated (Public)",
         "Validated (Private)",
         "Under Validation (Public)",
+        "Rejected (Public)",
+        "Rejected (Private)",
     }
 )
-FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2})
+FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2, 3})
+
+
+def fdrs_document_approval_rank(approval_status: str | None) -> int:
+    """Higher rank wins dedupe within (iso3, year, document_type)."""
+    approval = (approval_status or "").strip()
+    if approval == "Validated (Public)":
+        return 4
+    if approval == "Validated (Private)":
+        return 3
+    if approval in ("Under Validation (Public)", "Under Validation (Private)"):
+        return 2
+    if approval.lower().startswith("reject"):
+        return 1
+    return 0
 
 
 def fdrs_document_status_from_approval(approval_status: str | None) -> str:
@@ -74,7 +153,7 @@ def fdrs_document_status_from_approval(approval_status: str | None) -> str:
         return "approved"
     if approval in ("Under Validation (Public)", "Under Validation (Private)"):
         return "pending"
-    if approval.lower().startswith("reject"):
+    if approval in ("Rejected (Public)", "Rejected (Private)") or approval.lower().startswith("reject"):
         return "rejected"
     return "pending"
 

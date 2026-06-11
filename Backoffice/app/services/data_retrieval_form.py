@@ -551,6 +551,7 @@ def query_form_data(
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
     indicator_bank_id: Optional[int] = None,
+    indicator_bank_ids: Optional[List[int]] = None,
     submission_type: Optional[str] = None,
     preload: bool = False,
 ) -> Dict[str, Any]:
@@ -623,6 +624,16 @@ def query_form_data(
         if indicator_bank_id:
             assigned_q = assigned_q.join(FormItem, FormData.form_item).join(IndicatorBank, FormItem.indicator_bank).filter(IndicatorBank.id == indicator_bank_id)
             public_q = public_q.join(FormItem, FormData.form_item).join(IndicatorBank, FormItem.indicator_bank).filter(IndicatorBank.id == indicator_bank_id)
+
+        if indicator_bank_ids:
+            # Filter to rows whose FormItem.indicator_bank_id is in the given list.
+            # Uses a subquery on FormItem to avoid extra joins and join-duplication with
+            # existing item_type / indicator_bank_id filters.
+            _fi_ids_sq = db.session.query(FormItem.id).filter(
+                FormItem.indicator_bank_id.in_(indicator_bank_ids)
+            ).subquery()
+            assigned_q = assigned_q.filter(FormData.form_item_id.in_(_fi_ids_sq))
+            public_q = public_q.filter(FormData.form_item_id.in_(_fi_ids_sq))
 
         if preload:
             # Eager-load common relationships to avoid N+1 during serialization

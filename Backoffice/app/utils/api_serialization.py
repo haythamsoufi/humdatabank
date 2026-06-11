@@ -138,6 +138,7 @@ def format_form_item_info(form_item, section=None, template=None, assignment=Non
             'validation_message': form_item.validation_message,
             'allow_data_not_available': form_item.allow_data_not_available,
             'allow_not_applicable': form_item.allow_not_applicable,
+            'allow_disability_questions': form_item.allow_disability_questions,
             'bank_details': {
                 'id': indicator_bank.id if indicator_bank else None,
                 'name': get_localized_indicator_name(indicator_bank) if indicator_bank else None,

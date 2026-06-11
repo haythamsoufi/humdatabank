@@ -417,7 +417,7 @@ def load_user(id):
         if 'user' not in inspect(db.engine).get_table_names():
             return None
         _user_table_exists = True
-    return User.query.get(int(id))
+    return db.session.get(User, int(id))
 
 
 class Country(db.Model):
@@ -435,9 +435,12 @@ class Country(db.Model):
     # Store ISO code (e.g. "en", "fr"). Keep backward-compat with legacy values like "English".
     preferred_language = Column(String(10), nullable=True, default='en')
     currency_code = Column(String(3), nullable=True)
+    fds_member_user_id = Column(Integer, ForeignKey('user.id'), nullable=True)
 
     # Multilingual Country Name fields
     name_translations = Column(JSONB, nullable=True)
+
+    fds_member_user = relationship('User', foreign_keys=[fds_member_user_id])
 
     # Relationship to AssignmentEntityStatus for country entities
     assignment_statuses = relationship(

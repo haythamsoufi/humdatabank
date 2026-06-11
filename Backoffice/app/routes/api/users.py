@@ -25,6 +25,7 @@ from app.models.assignments import AssignmentEntityStatus, PublicSubmission
 from app.models.core import UserEntityPermission
 from app.models.enums import EntityType
 from app.models.documents import SubmittedDocument
+from app.services.assignment_completion_service import AssignmentCompletionService
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
 from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
@@ -633,101 +634,8 @@ def get_dashboard():
                 if aes.assigned_form and aes.assigned_form.template
             }
 
-            countable_item_counts_by_template = {}
-            document_counts_by_template = {}
-
-            if template_ids:
-                counts_rows = (
-                    db.session.query(
-                        FormSection.template_id,
-                        func.sum(case((FormItem.item_type != 'document_field', 1), else_=0)).label('countable_count')
-                    )
-                    .join(FormItem, FormItem.section_id == FormSection.id)
-                    .filter(FormSection.template_id.in_(template_ids))
-                    .group_by(FormSection.template_id)
-                    .all()
-                )
-                for tpl_id, cnt in counts_rows:
-                    countable_item_counts_by_template[tpl_id] = int(cnt or 0)
-
-                document_counts_by_template = dict(
-                    db.session.query(FormSection.template_id, func.count())
-                    .join(FormItem, FormItem.section_id == FormSection.id)
-                    .filter(
-                        FormSection.template_id.in_(template_ids),
-                        FormItem.item_type == 'document_field'
-                    )
-                    .group_by(FormSection.template_id)
-                    .all()
-                )
-
-            # Pre-compute filled counts.
-            # Non-matrix items: count if value is set or marked not-applicable.
-            # Matrix items are counted separately so that the entire matrix table
-            # counts as ONE filled item when ANY cell contains meaningful data.
             aes_ids = [aes.id for aes in assigned_forms_statuses]
-            filled_non_matrix_counts = dict(
-                db.session.query(FormData.assignment_entity_status_id, func.count(FormData.id))
-                .join(FormItem, FormData.form_item_id == FormItem.id)
-                .filter(
-                    FormData.assignment_entity_status_id.in_(aes_ids),
-                    FormItem.item_type != 'matrix',
-                    or_(
-                        FormData.value.isnot(None),
-                        FormData.disagg_data.isnot(None),
-                        FormData.not_applicable == True
-                    )
-                )
-                .group_by(FormData.assignment_entity_status_id)
-                .all()
-            )
-
-            # Matrix items: each matrix counts as 1 filled item if ANY cell has data
-            matrix_entries = (
-                db.session.query(
-                    FormData.assignment_entity_status_id,
-                    FormData.disagg_data,
-                    FormData.not_applicable,
-                )
-                .join(FormItem, FormData.form_item_id == FormItem.id)
-                .filter(
-                    FormData.assignment_entity_status_id.in_(aes_ids),
-                    FormItem.item_type == 'matrix',
-                    or_(
-                        FormData.disagg_data.isnot(None),
-                        FormData.not_applicable == True,
-                    )
-                )
-                .all()
-            )
-            matrix_filled_counts = {}
-            for aes_id, disagg, na in matrix_entries:
-                is_filled = False
-                if na:
-                    is_filled = True
-                elif disagg and isinstance(disagg, dict):
-                    is_filled = any(
-                        v is not None and str(v).strip() != ''
-                        for k, v in disagg.items()
-                        if not k.startswith('_')
-                    )
-                if is_filled:
-                    matrix_filled_counts[aes_id] = matrix_filled_counts.get(aes_id, 0) + 1
-
-            filled_data_counts = dict(filled_non_matrix_counts)
-            for aes_id, cnt in matrix_filled_counts.items():
-                filled_data_counts[aes_id] = filled_data_counts.get(aes_id, 0) + cnt
-
-            filled_document_counts = dict(
-                db.session.query(SubmittedDocument.assignment_entity_status_id, func.count(SubmittedDocument.id))
-                .join(FormItem, SubmittedDocument.form_item_id == FormItem.id)
-                .filter(
-                    SubmittedDocument.assignment_entity_status_id.in_(aes_ids),
-                    FormItem.item_type == 'document_field'
-                )
-                .group_by(SubmittedDocument.assignment_entity_status_id)
-                .all()
-            )
+            completion_prefetch = AssignmentCompletionService.prefetch(template_ids, aes_ids)
 
             last_modified_user_by_assignment = {}
             contributors_by_assignment = {}
@@ -841,18 +749,10 @@ def get_dashboard():
                 template = assigned_form.template if assigned_form and assigned_form.template else None
                 template_id = template.id if template else None
 
-                total_countable_items = countable_item_counts_by_template.get(template_id, 0) if template_id else 0
-                total_document_fields = document_counts_by_template.get(template_id, 0) if template_id else 0
-                total_possible_items = total_countable_items + total_document_fields
-
-                filled_data_entries_count = filled_data_counts.get(aes.id, 0)
-                filled_documents_count = filled_document_counts.get(aes.id, 0)
-                filled_items = filled_data_entries_count + filled_documents_count
-
-                if total_possible_items > 0:
-                    completion_rate = (filled_items / total_possible_items) * 100
-                else:
-                    completion_rate = 0.0
+                completion_metrics = completion_prefetch.metrics_for(aes.id, template_id)
+                completion_rate = completion_metrics.completion_rate
+                filled_items = completion_metrics.filled_items
+                total_possible_items = completion_metrics.total_items
 
                 # Get localized template name
                 localized_template_name = get_localized_template_name(template) if template else None

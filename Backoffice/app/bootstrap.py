@@ -171,6 +171,31 @@ def init_flask_extensions(app, config_class, startup_start):
     ext_start = time.time()
     migrate.init_app(app, db)
     login.init_app(app)
+
+    @app.before_request
+    def _refresh_login_user_on_request():
+        """Re-bind Flask-Login user to the current SQLAlchemy session.
+
+        Transaction middleware commits and removes the scoped session at the end
+        of each request. When the test client (or rare edge cases) reuses a
+        cached User instance across requests, attribute access can raise
+        DetachedInstanceError — reload from session['_user_id'] each time.
+        """
+        from flask import g, session
+
+        from app.models import User
+
+        raw_user_id = session.get("_user_id")
+        if not raw_user_id:
+            return
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            return
+        user = db.session.get(User, user_id)
+        if user is not None:
+            g._login_user = user
+
     configure_babel(app)
     babel.init_app(app, locale_selector=get_locale)
     limiter.init_app(app)

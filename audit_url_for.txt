@@ -1,6 +1,0 @@
-ENDPOINTS_TOTAL=724
-REFS_TOTAL=1319
-BROKEN_TOTAL=1
-BROKEN_FILES=1
-FILE: utils/rate_limiting.py
-  L136: url_for('main.index') | return redirect(url_for('main.index'))

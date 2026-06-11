@@ -33,6 +33,13 @@ from app.models.organization import (
     SecretariatClusterOffice,
 )
 from app.models.enums import EntityType
+from app.services.country_service import (
+    assign_country_fds_member_user,
+    countries_with_fds_member_query,
+    fds_member_user_display_name,
+    parse_fds_member_user_id,
+    resolve_fds_member_user_id_from_import,
+)
 from app.services.entity_service import EntityService
 from app.routes.admin.shared import admin_required, admin_permission_required, admin_permission_required_any, permission_required, permission_required_any, rbac_guard_audit_exempt
 from app.utils.request_utils import is_json_request
@@ -458,7 +465,7 @@ def index():
 
     # Load all data for tabs
     # Countries data
-    countries = Country.query.order_by(Country.name).all() if countries_enabled else []
+    countries = countries_with_fds_member_query().order_by(Country.name).all() if countries_enabled else []
     # National Societies data
     nss = (
         NationalSociety.query
@@ -726,6 +733,20 @@ def edit_country(country_id):
         country.status = form.status.data
         country.preferred_language = form.preferred_language.data
         country.currency_code = form.currency_code.data
+        try:
+            assign_country_fds_member_user(
+                country,
+                parse_fds_member_user_id(request.form.get('fds_member_user_id')),
+            )
+        except ValueError as exc:
+            flash(str(exc), 'danger')
+            return render_template('admin/organization/edit_entity.html',
+                                 form=form,
+                                 is_edit=True,
+                                 entity=country,
+                                 entity_label='Country',
+                                 icon='fas fa-flag',
+                                 cancel_url=url_for('organization.index', tab='countries'))
         country.name_translations = _collect_translations(form, 'name')
 
         db.session.flush()
@@ -763,6 +784,11 @@ def delete_country(country_id):
 
 # ==================== Countries Excel Export/Import ====================
 
+FDS_MEMBER_USER_ID_COL = 'FDS Member User ID'
+FDS_MEMBER_EMAIL_COL = 'FDS Member Email'
+FDS_MEMBER_NAME_COL = 'FDS Member Name'
+
+
 @bp.route('/countries/export', methods=['GET'])
 @permission_required_any('admin.countries.view', 'admin.countries.edit', 'admin.organization.manage')
 def export_countries():
@@ -770,9 +796,10 @@ def export_countries():
     try:
         translatable = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
         display_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
-        countries = Country.query.order_by(Country.name).all()
+        countries = countries_with_fds_member_query().order_by(Country.name).all()
         data = []
         for c in countries:
+            fds_user = c.fds_member_user
             row = {
                 'ID': c.id,
                 'Name': c.name or '',
@@ -783,6 +810,9 @@ def export_countries():
                 'Status': c.status or 'Active',
                 'Preferred Language': c.preferred_language_code or 'en',
                 'Currency Code': c.currency_code or '',
+                FDS_MEMBER_USER_ID_COL: c.fds_member_user_id or '',
+                FDS_MEMBER_EMAIL_COL: (fds_user.email if fds_user else '') or '',
+                FDS_MEMBER_NAME_COL: fds_member_user_display_name(fds_user) or '',
             }
             for code in translatable:
                 header = display_names.get(code, code.upper())
@@ -818,7 +848,11 @@ def countries_template():
     try:
         translatable = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
         display_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
-        base_cols = ['Name', 'Short Name', 'ISO3', 'ISO2', 'Region', 'Status', 'Preferred Language', 'Currency Code']
+        base_cols = [
+            'Name', 'Short Name', 'ISO3', 'ISO2', 'Region', 'Status',
+            'Preferred Language', 'Currency Code',
+            FDS_MEMBER_USER_ID_COL, FDS_MEMBER_EMAIL_COL, FDS_MEMBER_NAME_COL,
+        ]
         sample = [{
             'Name': 'Sample Country',
             'Short Name': 'Sample',
@@ -828,6 +862,9 @@ def countries_template():
             'Status': 'Active',
             'Preferred Language': 'en',
             'Currency Code': 'USD',
+            FDS_MEMBER_USER_ID_COL: '',
+            FDS_MEMBER_EMAIL_COL: '',
+            FDS_MEMBER_NAME_COL: '',
         }]
         for code in translatable:
             base_cols.append(display_names.get(code, code.upper()))
@@ -904,6 +941,9 @@ def import_countries():
         translatable = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
         display_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
         overwrite = request.form.get('overwrite_existing') == 'on'
+        has_fds_member_cols = (
+            FDS_MEMBER_USER_ID_COL in df.columns or FDS_MEMBER_EMAIL_COL in df.columns
+        )
         imported = 0
         updated = 0
         errors = []
@@ -936,6 +976,7 @@ def import_countries():
                 pref_lang = Country.normalize_language_code(pref_lang) if pref_lang else 'en'
                 currency = str(row['Currency Code']).strip().upper() if 'Currency Code' in df.columns and pd.notna(row.get('Currency Code')) else None
                 currency = currency or None
+                target_country = existing
                 if existing and overwrite:
                     existing.name = name
                     existing.short_name = short_name
@@ -947,7 +988,7 @@ def import_countries():
                     existing.name_translations = trans
                     updated += 1
                 else:
-                    country = Country(
+                    target_country = Country(
                         name=name,
                         short_name=short_name,
                         iso3=iso3,
@@ -958,8 +999,22 @@ def import_countries():
                         currency_code=currency,
                         name_translations=trans,
                     )
-                    db.session.add(country)
+                    db.session.add(target_country)
                     imported += 1
+
+                if has_fds_member_cols:
+                    raw_user_id = row.get(FDS_MEMBER_USER_ID_COL) if FDS_MEMBER_USER_ID_COL in df.columns else None
+                    raw_email = row.get(FDS_MEMBER_EMAIL_COL) if FDS_MEMBER_EMAIL_COL in df.columns else None
+                    if pd.isna(raw_user_id):
+                        raw_user_id = None
+                    if pd.isna(raw_email):
+                        raw_email = None
+                    db.session.flush()
+                    try:
+                        fds_user_id = resolve_fds_member_user_id_from_import(raw_user_id, raw_email)
+                        assign_country_fds_member_user(target_country, fds_user_id)
+                    except ValueError as exc:
+                        errors.append(f'Row {idx + 2}: {exc}')
             except Exception as e:
                 errors.append(f'Row {idx + 2}: error.')
         db.session.flush()

@@ -80,7 +80,17 @@ def create_test_user(db_session, **kwargs):
             return int(role.id)
         role = RbacRole(code=code, name=name)
         db_session.add(role)
-        db_session.flush()
+        sp = db_session.begin_nested()
+        try:
+            db_session.flush()
+            sp.commit()
+        except Exception:
+            sp.rollback()
+            db_session.expunge(role)
+            role = db_session.query(RbacRole).filter_by(code=code).first()
+            if role:
+                return int(role.id)
+            raise
         return int(role.id)
 
     role_codes = []
@@ -137,7 +147,17 @@ def create_test_admin(db_session, **kwargs):
             return int(role.id)
         role = RbacRole(code=code, name=name)
         db_session.add(role)
-        db_session.flush()
+        sp = db_session.begin_nested()
+        try:
+            db_session.flush()
+            sp.commit()
+        except Exception:
+            sp.rollback()
+            db_session.expunge(role)
+            role = db_session.query(RbacRole).filter_by(code=code).first()
+            if role:
+                return int(role.id)
+            raise
         return int(role.id)
 
     def _ensure_permission(code: str) -> int:
@@ -146,7 +166,17 @@ def create_test_admin(db_session, **kwargs):
             return int(perm.id)
         perm = RbacPermission(code=code, name=code, description=code)
         db_session.add(perm)
-        db_session.flush()
+        sp = db_session.begin_nested()
+        try:
+            db_session.flush()
+            sp.commit()
+        except Exception:
+            sp.rollback()
+            db_session.expunge(perm)
+            perm = db_session.query(RbacPermission).filter_by(code=code).first()
+            if perm:
+                return int(perm.id)
+            raise
         return int(perm.id)
 
     def _grant(role_id: int, perm_code: str) -> None:
@@ -159,13 +189,14 @@ def create_test_admin(db_session, **kwargs):
     # Always give the admin *some* admin permission so AuthorizationService.is_admin() is True.
     role_id = _ensure_role("admin_core", "Admin (Core)")
     db_session.add(RbacUserRole(user_id=user.id, role_id=role_id))
-    _grant(role_id, "admin.analytics.view")
 
     # Optional granular toggles (backward compatible with legacy kwargs names)
     if kwargs.get("can_manage_users", True):
         _grant(role_id, "admin.users.view")
         _grant(role_id, "admin.users.edit")
         _grant(role_id, "admin.users.create")
+        _grant(role_id, "admin.users.deactivate")
+        _grant(role_id, "admin.users.delete")
     if kwargs.get("can_manage_templates", True):
         _grant(role_id, "admin.templates.view")
         _grant(role_id, "admin.templates.edit")

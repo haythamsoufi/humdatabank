@@ -83,6 +83,12 @@
                             <option value="">{{ _('Load a reporting period to filter countries.') }}</option>
                         </select>
                     </div>
+                    <div class="vd-field">
+                        <label for="vd-tracker-fds-member-slicer" class="vd-field-label">{{ _('FDS Member') }}</label>
+                        <select id="vd-tracker-fds-member-slicer" class="vd-select" disabled>
+                            <option value="">{{ _('All FDS members') }}</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -232,6 +238,9 @@
         'clearAll': _('Clear'),
         'slicerEmpty': _('Load a reporting period to filter countries.'),
         'allCountries': _('All countries'),
+        'fdsMember': _('FDS Member'),
+        'fdsMemberAll': _('All FDS members'),
+        'fdsMemberUnassigned': _('Not assigned'),
         'regionOther': _('Other'),
         'legendSections': _('Section progress'),
         'legendDocuments': _('Documents'),

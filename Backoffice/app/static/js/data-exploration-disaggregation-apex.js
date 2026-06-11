@@ -262,7 +262,7 @@
             if (isGoverningBoard && !result.womenInLeadership.leadership[country]) result.womenInLeadership.leadership[country] = { female: 0, male: 0, total: 0 };
             if (isVolunteering && !result.womenInLeadership.volunteering[country]) result.womenInLeadership.volunteering[country] = { female: 0, male: 0, total: 0 };
             if (isStaff && !result.womenInLeadership.staff[country]) result.womenInLeadership.staff[country] = { female: 0, male: 0, total: 0 };
-            if (!result.womenInLeadership.trends[period]) result.womenInLeadership.trends[period] = { leadershipFemale: 0, leadershipTotal: 0, volunteeringFemale: 0, volunteeringTotal: 0, staffFemale: 0, staffTotal: 0 };
+            if (!result.womenInLeadership.trends[period]) result.womenInLeadership.trends[period] = { leadershipFemale: 0, leadershipMale: 0, leadershipTotal: 0, volunteeringFemale: 0, volunteeringMale: 0, volunteeringTotal: 0, staffFemale: 0, staffMale: 0, staffTotal: 0 };
 
             result.countryDisaggregation[country].totalItems += 1;
             result.trends[period].totalItems += 1;
@@ -329,19 +329,19 @@
                     addToResult(sexFormatted, null, null, val);
                     if (isGoverningBoard) {
                         if (sexFormatted === 'Female') { result.womenInLeadership.leadership[country].female += parseFloat(val) || 0; result.womenInLeadership.trends[period].leadershipFemale += parseFloat(val) || 0; }
-                        else if (sexFormatted === 'Male') result.womenInLeadership.leadership[country].male += parseFloat(val) || 0;
+                        else if (sexFormatted === 'Male') { result.womenInLeadership.leadership[country].male += parseFloat(val) || 0; result.womenInLeadership.trends[period].leadershipMale += parseFloat(val) || 0; }
                         result.womenInLeadership.leadership[country].total += parseFloat(val) || 0;
                         result.womenInLeadership.trends[period].leadershipTotal += parseFloat(val) || 0;
                     }
                     if (isVolunteering && canProcessGender) {
                         if (sexFormatted === 'Female') { result.womenInLeadership.volunteering[country].female += parseFloat(val) || 0; result.womenInLeadership.trends[period].volunteeringFemale += parseFloat(val) || 0; }
-                        else if (sexFormatted === 'Male') result.womenInLeadership.volunteering[country].male += parseFloat(val) || 0;
+                        else if (sexFormatted === 'Male') { result.womenInLeadership.volunteering[country].male += parseFloat(val) || 0; result.womenInLeadership.trends[period].volunteeringMale += parseFloat(val) || 0; }
                         result.womenInLeadership.volunteering[country].total += parseFloat(val) || 0;
                         result.womenInLeadership.trends[period].volunteeringTotal += parseFloat(val) || 0;
                     }
                     if (isStaff && canProcessGender) {
                         if (sexFormatted === 'Female') { result.womenInLeadership.staff[country].female += parseFloat(val) || 0; result.womenInLeadership.trends[period].staffFemale += parseFloat(val) || 0; }
-                        else if (sexFormatted === 'Male') result.womenInLeadership.staff[country].male += parseFloat(val) || 0;
+                        else if (sexFormatted === 'Male') { result.womenInLeadership.staff[country].male += parseFloat(val) || 0; result.womenInLeadership.trends[period].staffMale += parseFloat(val) || 0; }
                         result.womenInLeadership.staff[country].total += parseFloat(val) || 0;
                         result.womenInLeadership.trends[period].staffTotal += parseFloat(val) || 0;
                     }
@@ -362,19 +362,19 @@
                     addToResult(sexPart, agePart, sexAgePart, actualValues[k]);
                     if (isGoverningBoard) {
                         if (sexPart === 'Female') { result.womenInLeadership.leadership[country].female += v; result.womenInLeadership.trends[period].leadershipFemale += v; }
-                        else if (sexPart === 'Male') result.womenInLeadership.leadership[country].male += v;
+                        else if (sexPart === 'Male') { result.womenInLeadership.leadership[country].male += v; result.womenInLeadership.trends[period].leadershipMale += v; }
                         result.womenInLeadership.leadership[country].total += v;
                         result.womenInLeadership.trends[period].leadershipTotal += v;
                     }
                     if (isVolunteering && canProcessGender) {
                         if (sexPart === 'Female') { result.womenInLeadership.volunteering[country].female += v; result.womenInLeadership.trends[period].volunteeringFemale += v; }
-                        else if (sexPart === 'Male') result.womenInLeadership.volunteering[country].male += v;
+                        else if (sexPart === 'Male') { result.womenInLeadership.volunteering[country].male += v; result.womenInLeadership.trends[period].volunteeringMale += v; }
                         result.womenInLeadership.volunteering[country].total += v;
                         result.womenInLeadership.trends[period].volunteeringTotal += v;
                     }
                     if (isStaff && canProcessGender) {
                         if (sexPart === 'Female') { result.womenInLeadership.staff[country].female += v; result.womenInLeadership.trends[period].staffFemale += v; }
-                        else if (sexPart === 'Male') result.womenInLeadership.staff[country].male += v;
+                        else if (sexPart === 'Male') { result.womenInLeadership.staff[country].male += v; result.womenInLeadership.trends[period].staffMale += v; }
                         result.womenInLeadership.staff[country].total += v;
                         result.womenInLeadership.trends[period].staffTotal += v;
                     }
@@ -434,15 +434,15 @@
         }).sort((a, b) => b.overallDisaggregation - a.overallDisaggregation);
 
         const leadershipArr = Object.entries(result.womenInLeadership.leadership).map(([label, d]) => ({
-            label, female: d.female, male: d.male, total: d.total, femalePercentage: d.total > 0 ? Math.round((d.female / d.total) * 100) : 0
+            label, female: d.female, male: d.male, total: d.total, femalePercentage: (d.female + d.male) > 0 ? Math.round((d.female / (d.female + d.male)) * 100) : 0
         })).sort((a, b) => b.femalePercentage - a.femalePercentage);
 
         const volunteeringArr = Object.entries(result.womenInLeadership.volunteering).map(([label, d]) => ({
-            label, female: d.female, male: d.male, total: d.total, femalePercentage: d.total > 0 ? Math.round((d.female / d.total) * 100) : 0
+            label, female: d.female, male: d.male, total: d.total, femalePercentage: (d.female + d.male) > 0 ? Math.round((d.female / (d.female + d.male)) * 100) : 0
         })).sort((a, b) => b.femalePercentage - a.femalePercentage);
 
         const staffArr = Object.entries(result.womenInLeadership.staff).map(([label, d]) => ({
-            label, female: d.female, male: d.male, total: d.total, femalePercentage: d.total > 0 ? Math.round((d.female / d.total) * 100) : 0
+            label, female: d.female, male: d.male, total: d.total, femalePercentage: (d.female + d.male) > 0 ? Math.round((d.female / (d.female + d.male)) * 100) : 0
         })).sort((a, b) => b.femalePercentage - a.femalePercentage);
 
         // Women in Leadership was not collected before 2017; use chart-specific year range
@@ -451,17 +451,17 @@
             .filter(([label, d]) => (label >= WOMEN_LEADERSHIP_MIN_YEAR) && (d.leadershipTotal > 0 || d.volunteeringTotal > 0 || d.staffTotal > 0))
             .map(([label, d]) => ({
                 label,
-                leadershipPercentage: d.leadershipTotal > 0 ? Math.round((d.leadershipFemale / d.leadershipTotal) * 100) : 0,
-                volunteeringPercentage: d.volunteeringTotal > 0 ? Math.round((d.volunteeringFemale / d.volunteeringTotal) * 100) : 0,
-                staffPercentage: d.staffTotal > 0 ? Math.round((d.staffFemale / d.staffTotal) * 100) : 0
+                leadershipPercentage: (d.leadershipFemale + d.leadershipMale) > 0 ? Math.round((d.leadershipFemale / (d.leadershipFemale + d.leadershipMale)) * 100) : 0,
+                volunteeringPercentage: (d.volunteeringFemale + d.volunteeringMale) > 0 ? Math.round((d.volunteeringFemale / (d.volunteeringFemale + d.volunteeringMale)) * 100) : 0,
+                staffPercentage: (d.staffFemale + d.staffMale) > 0 ? Math.round((d.staffFemale / (d.staffFemale + d.staffMale)) * 100) : 0
             }))
             .sort((a, b) => a.label.localeCompare(b.label));
 
         const comparison = [
-            { label: 'Leadership Roles', value: Object.values(result.womenInLeadership.leadership).reduce((s, d) => s + d.female, 0), total: Object.values(result.womenInLeadership.leadership).reduce((s, d) => s + d.total, 0) },
-            { label: 'Volunteering', value: Object.values(result.womenInLeadership.volunteering).reduce((s, d) => s + d.female, 0), total: Object.values(result.womenInLeadership.volunteering).reduce((s, d) => s + d.total, 0) },
-            { label: 'Staff', value: Object.values(result.womenInLeadership.staff).reduce((s, d) => s + d.female, 0), total: Object.values(result.womenInLeadership.staff).reduce((s, d) => s + d.total, 0) }
-        ].map(item => ({ label: item.label, value: item.value, total: item.total, percentage: item.total > 0 ? Math.round((item.value / item.total) * 100) : 0 }));
+            { label: 'Leadership Roles', value: Object.values(result.womenInLeadership.leadership).reduce((s, d) => s + d.female, 0), knownTotal: Object.values(result.womenInLeadership.leadership).reduce((s, d) => s + d.female + d.male, 0), total: Object.values(result.womenInLeadership.leadership).reduce((s, d) => s + d.total, 0) },
+            { label: 'Volunteering', value: Object.values(result.womenInLeadership.volunteering).reduce((s, d) => s + d.female, 0), knownTotal: Object.values(result.womenInLeadership.volunteering).reduce((s, d) => s + d.female + d.male, 0), total: Object.values(result.womenInLeadership.volunteering).reduce((s, d) => s + d.total, 0) },
+            { label: 'Staff', value: Object.values(result.womenInLeadership.staff).reduce((s, d) => s + d.female, 0), knownTotal: Object.values(result.womenInLeadership.staff).reduce((s, d) => s + d.female + d.male, 0), total: Object.values(result.womenInLeadership.staff).reduce((s, d) => s + d.total, 0) }
+        ].map(item => ({ label: item.label, value: item.value, knownTotal: item.knownTotal, total: item.total, percentage: item.knownTotal > 0 ? Math.round((item.value / item.knownTotal) * 100) : 0 }));
 
         return {
             totalReached: result.totalReached,
@@ -516,6 +516,10 @@
     function getApexCharts() {
         return (typeof globalThis !== 'undefined' && globalThis.ApexCharts) ||
                (typeof window !== 'undefined' && window.ApexCharts);
+    }
+
+    function percentage(numerator, denominator) {
+        return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
     }
 
     // Modern bar chart with gradient
@@ -1020,7 +1024,7 @@
         return chart;
     }
 
-    // Grouped bar chart for comparisons
+    // Horizontal bar chart for female/male comparisons (grouped or 100% stacked)
     function createGroupedBarChart(containerId, data, options = {}) {
         const container = document.getElementById(containerId);
         if (!container) return null;
@@ -1038,6 +1042,8 @@
 
         container.innerHTML = '';
 
+        const stacked100 = options.stacked100 === true;
+
         // Extract categories (countries) and prepare series
         const categories = data.map(d => d.label);
         const femaleData = data.map(d => d.female || 0);
@@ -1049,15 +1055,16 @@
                 ...commonOptions.chart,
                 type: 'bar',
                 height: options.height || 400,
-                stacked: false
+                stacked: stacked100,
+                stackType: stacked100 ? '100%' : undefined
             },
             plotOptions: {
                 bar: {
                     horizontal: true,
-                    borderRadius: 4,
+                    borderRadius: stacked100 ? 0 : 4,
                     barHeight: '70%',
                     dataLabels: {
-                        position: 'top'
+                        position: stacked100 ? 'center' : 'top'
                     }
                 }
             },
@@ -1068,10 +1075,14 @@
             colors: [CHART_COLORS.female, CHART_COLORS.male],
             xaxis: {
                 categories: categories,
+                max: stacked100 ? 100 : undefined,
                 labels: {
                     style: {
                         fontSize: '11px'
-                    }
+                    },
+                    formatter: stacked100 ? function(val) {
+                        return Math.round(val) + '%';
+                    } : undefined
                 }
             },
             yaxis: {
@@ -1085,8 +1096,21 @@
                 position: 'top'
             },
             dataLabels: {
-                enabled: false
-            }
+                enabled: stacked100,
+                formatter: stacked100 ? function(val) {
+                    return val >= 8 ? Math.round(val) + '%' : '';
+                } : undefined
+            },
+            tooltip: stacked100 ? {
+                ...commonOptions.tooltip,
+                y: {
+                    formatter: function(val, opts) {
+                        const idx = opts.dataPointIndex;
+                        const raw = opts.seriesIndex === 0 ? femaleData[idx] : maleData[idx];
+                        return Math.round(val) + '% (' + (raw || 0).toLocaleString() + ')';
+                    }
+                }
+            } : commonOptions.tooltip
         };
 
         const chart = new ApexCharts(container, chartOptions);
@@ -1099,12 +1123,7 @@
         const p = window.disaggProcessedData;
         if (!p) return;
 
-        // Initialize/update the year multiselect for "Country Disaggregation Coverage"
-        try {
-            initOrUpdateCoverageYearFilter(p);
-        } catch (e) {
-            // non-fatal
-        }
+        syncSelectedCoverageYearFromTabBar();
 
         const statAvgDisagg = document.getElementById('stat-avg-disagg');
         const statAvgAge = document.getElementById('stat-avg-age');
@@ -1112,144 +1131,104 @@
         const statWomenVol = document.getElementById('stat-women-volunteering');
         const statWomenStaff = document.getElementById('stat-women-staff');
 
-        let avgDisagg = 0;
-        let avgAge = 0;
-        if (p.countryDisaggregation && p.countryDisaggregation.length > 0) {
-            avgDisagg = Math.round(p.countryDisaggregation.reduce((s, c) => s + c.overallDisaggregation, 0) / p.countryDisaggregation.length);
-            avgAge = p.trends && p.trends.length > 0 ? Math.round(p.trends.reduce((s, t) => s + (t.ageDisaggregationPercentage || 0), 0) / p.trends.length) : 0;
-        }
+        const summary = p.coverageSummary || {};
+        if (statAvgDisagg) statAvgDisagg.textContent = (summary.overallDisaggregationPercentage || 0) + '%';
+        if (statAvgAge) statAvgAge.textContent = (summary.eligibleRows || 0).toLocaleString();
+        if (statWomenLead) statWomenLead.textContent = (summary.totalOnlyRows || 0).toLocaleString();
+        if (statWomenVol) statWomenVol.textContent = (summary.missingRows || 0).toLocaleString();
+        if (statWomenStaff) statWomenStaff.textContent = (summary.ageCoveragePercentage || 0) + '%';
 
-        let leadPct = 0, volPct = 0, staffPct = 0;
-        if (p.womenInLeadership && p.womenInLeadership.comparison && p.womenInLeadership.comparison.length > 0) {
-            const comp = p.womenInLeadership.comparison;
-            leadPct = (comp[0] && comp[0].percentage) || 0;
-            volPct = (comp[1] && comp[1].percentage) || 0;
-            staffPct = (comp[2] && comp[2].percentage) || 0;
-        }
-
-        if (statAvgDisagg) statAvgDisagg.textContent = avgDisagg + '%';
-        if (statAvgAge) statAvgAge.textContent = avgAge + '%';
-        if (statWomenLead) statWomenLead.textContent = leadPct + '%';
-        if (statWomenVol) statWomenVol.textContent = volPct + '%';
-        if (statWomenStaff) statWomenStaff.textContent = staffPct + '%';
-
-        if (window.currentDisaggSubtab && window.renderDisaggSubtabCharts) {
-            window.renderDisaggSubtabCharts(window.currentDisaggSubtab);
+        const subtab = window.currentDisaggSubtab || 'overview';
+        window.currentDisaggSubtab = subtab;
+        if (window.renderDisaggSubtabCharts) {
+            // Defer one frame so ApexCharts measures visible containers after the wrapper is shown.
+            requestAnimationFrame(function() {
+                window.renderDisaggSubtabCharts(subtab);
+            });
         }
     }
 
-    function _getCoverageYearsFromSelect(el) {
-        if (!el) return [];
-        try {
-            const vals = (window.jQuery && window.jQuery(el).val) ? window.jQuery(el).val() : Array.from(el.selectedOptions || []).map(o => o.value);
-            const out = (vals || []).map(v => parseInt(v, 10)).filter(v => Number.isFinite(v) && v > 0);
-            // De-dupe
-            return Array.from(new Set(out));
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function initOrUpdateCoverageYearFilter(p) {
-        const el = document.getElementById('country-coverage-year-filter');
-        if (!el) return;
-        const years = (p && Array.isArray(p.availableYears)) ? p.availableYears.slice() : [];
-        if (years.length === 0) {
-            el.innerHTML = '';
-            return;
-        }
-
-        // If current selection is empty/invalid, default to latest year
-        const latest = years[0];
-        const prev = Array.isArray(window.selectedCoverageYears) ? window.selectedCoverageYears.slice() : [];
-        const validPrev = prev.filter(y => years.indexOf(y) !== -1);
-        if (!validPrev.length) {
-            window.selectedCoverageYears = [latest];
-        } else {
-            window.selectedCoverageYears = validPrev;
-        }
-
-        // Rebuild options (preserve selection)
-        const selectedSet = new Set(window.selectedCoverageYears);
-        el.innerHTML = years.map(y => { const n = parseInt(y, 10) || 0; return `<option value="${n}"${selectedSet.has(y) ? ' selected' : ''}>${n}</option>`; }).join('');
-
-        // Attach change handler once
-        if (!el.dataset.boundChange) {
-            el.addEventListener('change', function() {
-                window.selectedCoverageYears = _getCoverageYearsFromSelect(el);
-                if (!window.selectedCoverageYears.length && years.length) window.selectedCoverageYears = [years[0]];
-                // Re-render the current subtab only
-                if (window.currentDisaggSubtab === 'country-coverage' && window.renderDisaggSubtabCharts) {
-                    window.renderDisaggSubtabCharts('country-coverage');
-                }
-            });
-            el.dataset.boundChange = '1';
-        }
-
-        // Enhance with Select2 (if available). Select2 is loaded with defer, so retry briefly if needed.
-        const tryInitSelect2 = () => {
-            if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return false;
-            const $el = window.jQuery(el);
-            if ($el.hasClass('select2-hidden-accessible')) {
-                // Keep it but refresh options/selection
-                $el.trigger('change.select2');
-                return true;
-            }
-            $el.select2({
-                width: 'style',
-                placeholder: el.dataset && el.dataset.placeholder ? el.dataset.placeholder : 'Select year(s)',
-                closeOnSelect: false,
-                allowClear: false
-            });
-            // Ensure correct selection is reflected
-            $el.val((window.selectedCoverageYears || []).map(String)).trigger('change.select2');
-            return true;
-        };
-
-        if (!tryInitSelect2()) {
-            // Defer timing race: Select2 script loads after layout; retry a few times.
-            let attempts = 0;
-            const t = setInterval(() => {
-                attempts += 1;
-                if (tryInitSelect2() || attempts >= 10) clearInterval(t);
-            }, 150);
-        }
+    function syncSelectedCoverageYearFromTabBar() {
+        const el = document.getElementById('disagg-year-filter');
+        const rawYear = el && el.value ? String(el.value).trim() : '';
+        const year = parseInt(rawYear, 10);
+        window.selectedCoverageYears = Number.isFinite(year) && year > 0 ? [year] : [];
     }
 
     function getCountryCoverageListForSelectedYears(p) {
         const selectedYears = Array.isArray(window.selectedCoverageYears) ? window.selectedCoverageYears : [];
         if (!selectedYears.length || !p || !p.countryDisaggregationByYear) return (p && p.countryDisaggregation) ? p.countryDisaggregation : [];
 
-        // Build region lookup from overall (all-years) data
+        // Build against the full country set available to this analysis so changing
+        // the year does not make countries appear to vanish from the loaded data.
         const regionByCountry = {};
+        const baseCountries = [];
+        (p.countryUniverse || []).forEach(c => {
+            if (!c || !c.label) return;
+            regionByCountry[c.label] = c.region || 'Other';
+            baseCountries.push(c.label);
+        });
         (p.countryDisaggregation || []).forEach(c => {
-            if (c && c.label) regionByCountry[c.label] = c.region || 'Other';
+            if (!c || !c.label) return;
+            regionByCountry[c.label] = c.region || regionByCountry[c.label] || 'Other';
+            if (baseCountries.indexOf(c.label) === -1) baseCountries.push(c.label);
         });
 
         const agg = {};
+        baseCountries.forEach(country => {
+            agg[country] = {
+                totalItems: 0,
+                disaggregatedItems: 0,
+                onlyTotal: 0,
+                totalOnly: 0,
+                missingItems: 0,
+                hasSelectedYearData: false
+            };
+        });
         selectedYears.forEach(y => {
             const yr = p.countryDisaggregationByYear[y] || p.countryDisaggregationByYear[String(y)];
             if (!yr) return;
             Object.keys(yr).forEach(country => {
                 const d = yr[country] || {};
-                if (!agg[country]) agg[country] = { totalItems: 0, onlyTotal: 0 };
+                if (!agg[country]) {
+                    agg[country] = {
+                        totalItems: 0,
+                        disaggregatedItems: 0,
+                        onlyTotal: 0,
+                        totalOnly: 0,
+                        missingItems: 0,
+                        hasSelectedYearData: false
+                    };
+                }
                 agg[country].totalItems += (d.totalItems || 0);
-                agg[country].onlyTotal += (d.onlyTotal || 0);
+                agg[country].disaggregatedItems += (d.disaggregatedItems || 0);
+                agg[country].onlyTotal += (d.onlyTotal || d.totalOnly || 0);
+                agg[country].totalOnly += (d.totalOnly || d.onlyTotal || 0);
+                agg[country].missingItems += (d.missingItems || 0);
+                if ((d.totalItems || 0) > 0) agg[country].hasSelectedYearData = true;
             });
         });
 
         return Object.keys(agg).map(country => {
             const d = agg[country];
             const itemsWithAny = (d.totalItems || 0) - (d.onlyTotal || 0);
+            const disaggregatedItems = d.disaggregatedItems !== undefined ? (d.disaggregatedItems || 0) : itemsWithAny;
             return {
                 label: country,
                 region: regionByCountry[country] || 'Other',
                 totalItems: d.totalItems || 0,
-                onlyTotal: d.onlyTotal || 0,
+                disaggregatedItems,
+                onlyTotal: d.onlyTotal || d.totalOnly || 0,
+                totalOnly: d.totalOnly || d.onlyTotal || 0,
+                missingItems: d.missingItems || 0,
+                hasSelectedYearData: !!d.hasSelectedYearData,
                 totalValue: 0,
-                overallDisaggregation: (d.totalItems || 0) > 0 ? Math.round((itemsWithAny / d.totalItems) * 100) : 0
+                overallDisaggregation: (d.totalItems || 0) > 0 ? Math.round((disaggregatedItems / d.totalItems) * 100) : 0
             };
-        }).sort((a, b) => b.overallDisaggregation - a.overallDisaggregation);
+        }).sort((a, b) => {
+            if (a.hasSelectedYearData !== b.hasSelectedYearData) return a.hasSelectedYearData ? -1 : 1;
+            return b.overallDisaggregation - a.overallDisaggregation || b.totalItems - a.totalItems || a.label.localeCompare(b.label);
+        });
     }
 
     function renderDisaggSubtabCharts(subtab) {
@@ -1259,18 +1238,18 @@
         if (subtab === 'overview') {
             destroyCharts(['chart-overview-countries', 'chart-overview-sex']);
 
-            // Countries bar chart - horizontal with gradient
+            // Countries coverage chart - horizontal with gradient
             createBarChart('chart-overview-countries', (p.byCountry || []).slice(0, 10), {
                 height: 350,
                 horizontal: true,
-                seriesName: 'Average Value',
+                seriesName: 'Coverage %',
                 showDataLabels: true,
                 colors: [CHART_COLORS.primary],
                 gradientTo: ['#60a5fa']
             });
 
-            // Sex donut chart with custom colors
-            createDonutChart('chart-overview-sex', (p.bySex || []).slice(0, 10), {
+            // Reporting status donut
+            createDonutChart('chart-overview-sex', (p.coverageStatus || []).slice(0, 10), {
                 height: 350,
                 type: 'donut',
                 donutSize: '60%',
@@ -1279,7 +1258,7 @@
 
             const noData = document.getElementById('overview-no-data');
             if (noData) {
-                noData.classList.toggle('hidden', (p.byCountry && p.byCountry.length > 0) || (p.bySex && p.bySex.length > 0));
+                noData.classList.toggle('hidden', (p.byCountry && p.byCountry.length > 0) || (p.coverageStatus && p.coverageStatus.length > 0));
             }
 
         } else if (subtab === 'by-indicator') {
@@ -1287,13 +1266,13 @@
 
             const indData = (p.byIndicator || []).slice(0, 12).map(i => ({
                 label: i.label.length > 35 ? i.label.substring(0, 32) + '...' : i.label,
-                value: i.value
+                value: i.overallDisaggregation || i.value || 0
             }));
 
             createBarChart('chart-by-indicator', indData, {
                 height: 450,
                 horizontal: true,
-                seriesName: 'Total Value',
+                seriesName: 'Coverage %',
                 showDataLabels: true,
                 colors: [CHART_COLORS.secondary],
                 gradientTo: ['#c084fc']
@@ -1313,14 +1292,17 @@
                 colors: [CHART_COLORS.female, CHART_COLORS.success, CHART_COLORS.info]
             });
 
-            // Grouped bar chart for countries showing female vs male
+            // 100% stacked bar chart for gender distribution by country
             const lead = (p.womenInLeadership && p.womenInLeadership.leadership) ? p.womenInLeadership.leadership.slice(0, 12) : [];
             createGroupedBarChart('chart-women-by-country', lead, {
-                height: 400
+                height: 400,
+                stacked100: true
             });
 
-            // Multi-line trends chart (Trends Over Time - kept as the single combined view)
-            const trends = (p.womenInLeadership && p.womenInLeadership.trends) ? p.womenInLeadership.trends : [];
+            // Multi-line trends chart (Trends Over Time - uses all years, not the tab-bar year filter)
+            const trends = (window.disaggTimeSeriesData && window.disaggTimeSeriesData.womenInLeadership && window.disaggTimeSeriesData.womenInLeadership.trends)
+                ? window.disaggTimeSeriesData.womenInLeadership.trends
+                : ((p.womenInLeadership && p.womenInLeadership.trends) ? p.womenInLeadership.trends : []);
             if (trends.length > 0) {
                 createMultiLineChart('chart-women-trends', [
                     { name: 'Leadership', data: trends.map(t => t.leadershipPercentage) },
@@ -1391,7 +1373,7 @@
             createBarChart('chart-by-country', (p.byCountry || []).slice(0, 20), {
                 height: 500,
                 horizontal: true,
-                seriesName: 'Average Value',
+                seriesName: 'Coverage %',
                 showDataLabels: true,
                 colors: [CHART_COLORS.info],
                 gradientTo: ['#67e8f9']
@@ -1401,6 +1383,7 @@
             if (noData) noData.classList.toggle('hidden', (p.byCountry && p.byCountry.length > 0));
 
         } else if (subtab === 'country-coverage') {
+            syncSelectedCoverageYearFromTabBar();
             const regionalDiv = document.getElementById('coverage-regional-summary');
             const tableDiv = document.getElementById('coverage-countries-table');
             const noData = document.getElementById('country-coverage-no-data');
@@ -1479,7 +1462,10 @@
             let cardsHtml = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">';
             Object.keys(byRegion).sort().forEach(region => {
                 const countries = byRegion[region];
-                const avg = Math.round(countries.reduce((s, c) => s + c.overallDisaggregation, 0) / countries.length);
+                const totalEligible = countries.reduce((s, c) => s + (c.totalItems || 0), 0);
+                const totalDisaggregated = countries.reduce((s, c) => s + (c.disaggregatedItems || 0), 0);
+                const countriesWithData = countries.filter(c => c.hasSelectedYearData !== false).length;
+                const avg = percentage(totalDisaggregated, totalEligible);
                 // Use inline gradient styles for color compatibility
                 const headerGradient = avg >= 75 ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' :
                                        avg >= 50 ? 'linear-gradient(90deg, #eab308 0%, #ca8a04 100%)' :
@@ -1494,12 +1480,12 @@
                          style="${selectedStyle}">
                         <div class="px-3 py-2" style="background: ${headerGradient};">
                             <h4 class="font-bold text-sm truncate" style="color: #ffffff;" title="${escapeHtml(region)}">${escapeHtml(region)}</h4>
-                            <p class="text-xs" style="color: rgba(255,255,255,0.8);">${countries.length} countries</p>
+                            <p class="text-xs" style="color: rgba(255,255,255,0.8);">${countriesWithData}/${countries.length} countries - ${totalEligible.toLocaleString()} indicators</p>
                         </div>
                         <div class="p-3">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xl font-bold text-gray-900">${avg}%</span>
-                                <span class="text-xs text-gray-500">Avg</span>
+                                <span class="text-xs text-gray-500">Coverage</span>
                             </div>
                             <div class="w-full bg-gray-100 rounded-full h-1.5">
                                 <div class="h-1.5 rounded-full transition-all duration-500" style="width: ${avg}%; background-color: ${barColor};"></div>
@@ -1547,7 +1533,9 @@
 
             Object.keys(byRegion).sort().forEach(region => {
                 const regionCountries = byRegion[region].sort((a, b) => b.overallDisaggregation - a.overallDisaggregation);
-                const regionAvg = Math.round(regionCountries.reduce((s, c) => s + c.overallDisaggregation, 0) / regionCountries.length);
+                const regionTotalEligible = regionCountries.reduce((s, c) => s + (c.totalItems || 0), 0);
+                const regionTotalDisaggregated = regionCountries.reduce((s, c) => s + (c.disaggregatedItems || 0), 0);
+                const regionAvg = percentage(regionTotalDisaggregated, regionTotalEligible);
                 const headerGradient = regionAvg >= 75 ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' :
                                        regionAvg >= 50 ? 'linear-gradient(90deg, #eab308 0%, #ca8a04 100%)' :
                                                          'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)';
@@ -1572,7 +1560,7 @@
                                 </span>
                             </div>
                             <div class="flex items-center gap-3">
-                                <span class="text-sm font-bold" style="color: #ffffff;">${regionAvg}% avg</span>
+                                <span class="text-sm font-bold" style="color: #ffffff;">${regionAvg}% coverage</span>
                                 <i class="fas fa-chevron-down chevron-icon transition-transform duration-200 ${chevronRotated}" style="color: #ffffff;"></i>
                             </div>
                         </button>
@@ -1582,6 +1570,10 @@
                                     <tr>
                                         <th class="px-6 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Country</th>
                                         <th class="px-6 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Coverage</th>
+                                        <th class="px-6 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Eligible</th>
+                                        <th class="px-6 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Disagg.</th>
+                                        <th class="px-6 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total-only</th>
+                                        <th class="px-6 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Missing</th>
                                         <th class="px-6 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-40">Progress</th>
                                     </tr>
                                 </thead>
@@ -1589,9 +1581,10 @@
                 `;
 
                 regionCountries.forEach((c, idx) => {
-                    const badgeBg = c.overallDisaggregation >= 75 ? '#dcfce7' : c.overallDisaggregation >= 50 ? '#fef9c3' : '#fee2e2';
-                    const badgeText = c.overallDisaggregation >= 75 ? '#166534' : c.overallDisaggregation >= 50 ? '#854d0e' : '#991b1b';
-                    const barColor = c.overallDisaggregation >= 75 ? '#22c55e' : c.overallDisaggregation >= 50 ? '#eab308' : '#ef4444';
+                    const hasSelectedYearData = c.hasSelectedYearData !== false;
+                    const badgeBg = !hasSelectedYearData ? '#f3f4f6' : c.overallDisaggregation >= 75 ? '#dcfce7' : c.overallDisaggregation >= 50 ? '#fef9c3' : '#fee2e2';
+                    const badgeText = !hasSelectedYearData ? '#4b5563' : c.overallDisaggregation >= 75 ? '#166534' : c.overallDisaggregation >= 50 ? '#854d0e' : '#991b1b';
+                    const barColor = !hasSelectedYearData ? '#d1d5db' : c.overallDisaggregation >= 75 ? '#22c55e' : c.overallDisaggregation >= 50 ? '#eab308' : '#ef4444';
                     const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
                     const pct = Math.round(Number(c.overallDisaggregation) || 0);
                     tableHtml += `
@@ -1599,9 +1592,13 @@
                             <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${escapeHtml(c.label)}</td>
                             <td class="px-6 py-3 whitespace-nowrap">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background-color: ${badgeBg}; color: ${badgeText};">
-                                    ${pct}%
+                                    ${hasSelectedYearData ? pct + '%' : 'No data'}
                                 </span>
                             </td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700">${(c.totalItems || 0).toLocaleString()}</td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700">${(c.disaggregatedItems || 0).toLocaleString()}</td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700">${(c.totalOnly || c.onlyTotal || 0).toLocaleString()}</td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700">${(c.missingItems || 0).toLocaleString()}</td>
                             <td class="px-6 py-3 whitespace-nowrap">
                                 <div class="w-32 bg-gray-200 rounded-full h-2">
                                     <div class="h-2 rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${barColor};"></div>
@@ -1647,7 +1644,7 @@
     }
 
     // Expose functions globally
-    global.processDisaggregationData = processDisaggregationData;
+    global.processDisaggregationData = (global.ExploreDataAnalysisCore && global.ExploreDataAnalysisCore.processDisaggregationData) || processDisaggregationData;
     global.updateDisaggregationUI = updateDisaggregationUI;
     global.renderDisaggSubtabCharts = renderDisaggSubtabCharts;
 

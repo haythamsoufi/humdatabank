@@ -82,7 +82,7 @@ def delete_template(template_id):
     """Delete a form template."""
     from app.models import FormTemplate
 
-    template = FormTemplate.query.get(template_id)
+    template = db.session.get(FormTemplate, template_id)
     if not template:
         return mobile_not_found('Template not found')
 
@@ -220,7 +220,7 @@ def delete_assignment(assignment_id):
     """Delete a form assignment."""
     from app.models import AssignedForm
 
-    assignment = AssignedForm.query.get(assignment_id)
+    assignment = db.session.get(AssignedForm, assignment_id)
     if not assignment:
         return mobile_not_found('Assignment not found')
 
@@ -251,7 +251,7 @@ def toggle_public_access(assignment_id):
     """Toggle public access for an assignment."""
     from app.models import AssignedForm
 
-    assignment = AssignedForm.query.get(assignment_id)
+    assignment = db.session.get(AssignedForm, assignment_id)
     if not assignment:
         return mobile_not_found('Assignment not found')
 
@@ -278,7 +278,7 @@ def generate_public_url(assignment_id):
     """Generate a public URL for an assignment."""
     from app.models import AssignedForm
 
-    assignment = AssignedForm.query.get(assignment_id)
+    assignment = db.session.get(AssignedForm, assignment_id)
     if not assignment:
         return mobile_not_found('Assignment not found')
 
@@ -350,7 +350,7 @@ def get_submitted_document_file(document_id):
     )
     from app.services import storage_service as storage
 
-    document = SubmittedDocument.query.get(document_id)
+    document = db.session.get(SubmittedDocument, document_id)
     if not document:
         return mobile_not_found('Document not found')
 
@@ -385,7 +385,7 @@ def delete_document(document_id):
     """Delete a submitted document."""
     from app.models import SubmittedDocument
 
-    doc = SubmittedDocument.query.get(document_id)
+    doc = db.session.get(SubmittedDocument, document_id)
     if not doc:
         return mobile_not_found('Document not found')
 
@@ -469,7 +469,7 @@ def get_resource_file(resource_id):
     from app.models import Resource, ResourceTranslation
     from app.services import storage_service as storage
 
-    resource = Resource.query.get(resource_id)
+    resource = db.session.get(Resource, resource_id)
     if not resource:
         return mobile_not_found('Resource not found')
 
@@ -518,7 +518,7 @@ def delete_resource(resource_id):
     """Delete a resource."""
     from app.models import Resource
 
-    resource = Resource.query.get(resource_id)
+    resource = db.session.get(Resource, resource_id)
     if not resource:
         return mobile_not_found('Resource not found')
 
@@ -578,12 +578,12 @@ def _apply_indicator_edit_from_mobile_json(indicator, data, can_archive):
     def _ok_sector_id(sid):
         if not sid:
             return False
-        return Sector.query.get(sid) is not None
+        return db.session.get(Sector, sid) is not None
 
     def _ok_subsector_id(sid):
         if not sid:
             return False
-        return SubSector.query.get(sid) is not None
+        return db.session.get(SubSector, sid) is not None
 
     if 'name' in data:
         indicator.name = (data.get('name') or '').strip()
@@ -741,7 +741,7 @@ def get_indicator(indicator_id):
     """Get indicator detail."""
     from app.models import IndicatorBank
 
-    indicator = IndicatorBank.query.get(indicator_id)
+    indicator = db.session.get(IndicatorBank, indicator_id)
     if not indicator:
         return mobile_not_found('Indicator not found')
 
@@ -789,7 +789,7 @@ def edit_indicator(indicator_id):
     from app.models import IndicatorBank
     from app.services.authorization_service import AuthorizationService
 
-    indicator = IndicatorBank.query.get(indicator_id)
+    indicator = db.session.get(IndicatorBank, indicator_id)
     if not indicator:
         return mobile_not_found('Indicator not found')
 
@@ -833,7 +833,7 @@ def delete_indicator(indicator_id):
     """Delete an indicator from the bank."""
     from app.models import IndicatorBank
 
-    indicator = IndicatorBank.query.get(indicator_id)
+    indicator = db.session.get(IndicatorBank, indicator_id)
     if not indicator:
         return mobile_not_found('Indicator not found')
 
@@ -864,7 +864,7 @@ def archive_indicator(indicator_id):
     """Toggle archive status of an indicator."""
     from app.models import IndicatorBank
 
-    indicator = IndicatorBank.query.get(indicator_id)
+    indicator = db.session.get(IndicatorBank, indicator_id)
     if not indicator:
         return mobile_not_found('Indicator not found')
 

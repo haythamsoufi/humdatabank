@@ -8,7 +8,7 @@ from flask import request, current_app, g
 from sqlalchemy import desc, literal, or_
 import uuid
 from contextlib import suppress
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
@@ -736,6 +736,15 @@ def get_data_tables():
             return auth_result  # Return error response
         elevated_access, auth_user, api_key_record = auth_result
 
+        analysis_requested = str(request.args.get('analysis', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
+        if analysis_requested and not elevated_access and auth_user is not None:
+            from app.services.authorization_service import AuthorizationService
+            if not (
+                AuthorizationService.is_system_manager(auth_user)
+                or AuthorizationService.has_rbac_permission(auth_user, 'admin.data_explore.analysis')
+            ):
+                return api_error('Forbidden: analysis access is required', 403)
+
         template_id = request.args.get('template_id', type=int)
         submission_id = request.args.get('submission_id', type=int)
         item_id = request.args.get('item_id', type=int)
@@ -744,6 +753,17 @@ def get_data_tables():
         submission_type = request.args.get('submission_type')
         period_name = request.args.get('period_name', type=str)
         indicator_bank_id = request.args.get('indicator_bank_id', type=int)
+        # Comma-separated indicator bank IDs for multi-indicator filtering.
+        # Used by the disaggregation time-series call to fetch only the required
+        # indicators (e.g. "722,724,727") instead of the full template dataset.
+        _raw_ibids = (request.args.get('indicator_bank_ids') or '').strip()
+        indicator_bank_ids: Optional[List[int]] = None
+        if _raw_ibids:
+            try:
+                indicator_bank_ids = [int(x) for x in _raw_ibids.split(',') if x.strip().lstrip('-').isdigit()]
+                indicator_bank_ids = [x for x in indicator_bank_ids if x > 0] or None
+            except Exception:
+                indicator_bank_ids = None
         include_non_reported = str(request.args.get('include_non_reported', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
 
         def _is_blankish_scalar(v: Any) -> bool:
@@ -877,6 +897,7 @@ def get_data_tables():
             country_id=country_id,
             period_name=period_name,
             indicator_bank_id=indicator_bank_id,
+            indicator_bank_ids=indicator_bank_ids,
             submission_type=submission_type,
             preload=True,
         )

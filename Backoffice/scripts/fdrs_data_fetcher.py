@@ -6,7 +6,7 @@ Fetch and merge FDRS data following the Power Query pipeline:
 - FDRS - ImputedValue API (fdrsdata or imputed source)
 - Country Map (entities/ns or optional Excel URL)
 - FDRS: combine reported + imputed, group by (KPI_code, DonCode, year), merge Country Map -> ISO3
-- FDRS Data: filter Value not null/empty, add Tokens/BaseKPI, year as text
+- FDRS Data: keep ReportedValue and ImputedValue separate; add Tokens/BaseKPI, year as text
 - NewAgeGroups: age group mapping (embedded base64 table)
 - disagg: Sex/AgeGroup from Tokens, merge NewAgeGroups, group by (ISO3, year, BaseKPI) -> JSON values
 
@@ -25,7 +25,7 @@ Valid KPI list (get_valid_kpi_codes):
   - Rows where KPI_Section.Type == "IP" (imputed-only section) — not in valid list (imputed values still fetched separately).
 
 FDRS Data (build_fdrs_data):
-  - Rows with Value null or empty.
+  - Rows with both Value (reported) and ImputedValue null or empty.
   - KPI_code containing _D_Tot (direct-total aggregations discarded; we use detailed numbers).
   - KPI_code ending with _Validated (true/false KPI level status; excluded as "KPI level status").
   - KPI_code ending with _IP, _Public, _ddd, _wgq. (_IsDataNotAvailable and _isDataNotCollected are included and mapped to data_not_available / not_applicable in import.)
@@ -50,6 +50,11 @@ import urllib.parse
 import urllib.request
 import urllib.error
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
+
+from fdrs_sync_constants import (
+    fdrs_kpi_has_data_availability_suffix,
+    fdrs_kpi_strip_data_availability_suffix,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -716,8 +721,10 @@ def build_fdrs_combined(
 ) -> List[Dict[str, Any]]:
     """
     Combine Reported + Imputed: group by (KPI_code, DonCode, year).
-    ReportedValue = first value where SourceType=Reported; ImputedValue = first where SourceType=Imputed.
-    ValueStatus / Value: imputed wins; else reported value when State is in import_state_allowlist.
+    ReportedValue = reported value when State is in import_state_allowlist (else None).
+    ImputedValue = imputed value when present.
+    Value = ReportedValue only (imputed is kept separate for import into imputed_value).
+    ValueStatus: reported workflow state when reported is importable; else Imputed when imputed-only.
     Merge Country Map: DonCode -> ISO3.
     """
     import_states = import_state_allowlist
@@ -747,17 +754,22 @@ def build_fdrs_combined(
         imputed_val = key_to_imputed.get(key)
         state = key_to_state.get(key)
         state_i = _fdrs_state_as_int(state)
-        if imputed_val is not None:
-            value_status = "Imputed"
-            value = imputed_val
-        elif reported_val is not None and state_i is not None and state_i in import_states:
+        if reported_val is not None and state_i is not None and state_i in import_states:
+            reported_out = reported_val
             value_status = _value_status_for_reported_state(state_i)
-            value = reported_val
         elif reported_val is not None:
+            reported_out = None
             value_status = "Unpublished Reported"
-            value = None
         else:
+            reported_out = None
             value_status = "Missing"
+        imputed_out = imputed_val
+        if reported_out is not None:
+            value = reported_out
+        elif imputed_out is not None:
+            value = None
+            value_status = "Imputed"
+        else:
             value = None
         iso3 = country_map.get(don, "")
         out.append({
@@ -766,6 +778,8 @@ def build_fdrs_combined(
             "year": year,
             "KPI_code": kpi,
             "Value": value,
+            "ReportedValue": reported_out,
+            "ImputedValue": imputed_out,
             "ValueStatus": value_status,
             "State": state,
         })
@@ -780,8 +794,8 @@ def build_fdrs_data(
     exclusion_summary: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
-    From FDRS combined: exclude KPIs ending with _IP, _Public, _ddd, _wgq (include _IsDataNotAvailable and _isDataNotCollected for import); filter Value not null/empty;
-    select ISO3, year, KPI_code, Value. Add Tokens, BaseKPI, year as text.
+    From FDRS combined: exclude KPIs ending with _IP, _Public, _ddd, _wgq (include _IsDataNotAvailable and _isDataNotCollected for import);
+    keep rows with reported Value and/or ImputedValue. Add Tokens, BaseKPI, year as text.
     """
     out = []
     fdrs_excl = (exclusion_summary or {}).get("fdrs_data")
@@ -798,11 +812,21 @@ def build_fdrs_data(
         iso3 = (r.get("ISO3") or "").strip()
         kpi = (r.get("KPI_code") or "").strip()
         val = r.get("Value")
+        imp = r.get("ImputedValue")
+        if val is None:
+            value_out = ""
+        else:
+            value_out = str(val).strip()
+        if imp is None:
+            imputed_out = ""
+        else:
+            imputed_out = str(imp).strip()
         out.append({
             "ISO3": iso3,
             "year": year_text,
             "KPI_code": kpi,
-            "Value": str(val).strip(),
+            "Value": value_out,
+            "ImputedValue": imputed_out,
             "Tokens": tokens,
             "BaseKPI": base_kpi,
         })
@@ -821,11 +845,14 @@ def _classify_fdrs_combined_row(
       (included_in_fdrs_data, reason, year_text, tokens, base_kpi)
     """
     val = row.get("Value")
+    imp = row.get("ImputedValue")
     kpi = (row.get("KPI_code") or "").strip()
     reason = ""
     # Allow null/empty value for data-availability KPIs (import maps them to data_not_available/not_applicable)
-    if not (kpi.endswith("_IsDataNotAvailable") or kpi.endswith("_isDataNotCollected")):
-        if val is None or (isinstance(val, str) and not val.strip()):
+    if not fdrs_kpi_has_data_availability_suffix(kpi):
+        has_val = val is not None and (not isinstance(val, str) or val.strip())
+        has_imp = imp is not None and (not isinstance(imp, str) or imp.strip())
+        if not has_val and not has_imp:
             reason = "null_or_empty_value"
     if reason == "" and "_D_Tot" in kpi:
         # D_Tot rows are direct-total aggregations; we use detailed numbers and discard these.
@@ -851,11 +878,12 @@ def _classify_fdrs_combined_row(
             year_text = year[:4]
         else:
             year_text = str(year)
-    tokens = kpi.split("_") if kpi else []
-    base_kpi = "_".join(tokens[:2]) if len(tokens) >= 2 else kpi
+    parent_kpi = fdrs_kpi_strip_data_availability_suffix(kpi)
+    tokens = parent_kpi.split("_") if parent_kpi else []
+    base_kpi = "_".join(tokens[:2]) if len(tokens) >= 2 else parent_kpi
     # Keep full code as BaseKPI for specific KPIs (indicator bank uses full code)
     for full in _BASE_KPI_FULL_CODES:
-        if kpi == full or kpi.startswith(full + "_"):
+        if parent_kpi == full or parent_kpi.startswith(full + "_"):
             base_kpi = full
             break
     return (reason == ""), reason, year_text, tokens, base_kpi
@@ -951,6 +979,8 @@ def build_fdrs_snapshot_rows(
             "KPI_code": (r.get("KPI_code") or "").strip(),
             "BaseKPI": base_kpi,
             "Value": r.get("Value"),
+            "ReportedValue": r.get("ReportedValue"),
+            "ImputedValue": r.get("ImputedValue"),
             "ValueStatus": r.get("ValueStatus"),
             "State": r.get("State"),
             "in_fdrs_data_stage": "yes" if include else "no",

@@ -54,11 +54,28 @@ def test_build_compliance_document_lookups_tracks_pending_status():
     assert status[(6, "Audited Financial Statement")] == "approved"
 
 
+def test_build_compliance_document_lookups_tracks_rejected_status():
+    submitted_docs = [
+        type("Doc", (), {
+            "form_item_id": 10,
+            "assignment_entity_status_id": 7,
+            "status": DocumentStatus.REJECTED,
+        })(),
+    ]
+    item_id_to_doc_type = {10: "Annual Report"}
+
+    present, pending, status = build_compliance_document_lookups(submitted_docs, item_id_to_doc_type)
+
+    assert present[(7, "Annual Report")] is True
+    assert pending.get((7, "Annual Report")) is None
+    assert status[(7, "Annual Report")] == "rejected"
+
+
 @pytest.mark.parametrize(
     "status,expected",
     [
         ("approved", True),
-        ("pending", True),
+        ("pending", False),
         ("rejected", False),
         ("missing", False),
         (None, False),

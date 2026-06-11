@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import MagicMock, patch
 
 from tests.factories import create_test_template, create_test_country
 
@@ -39,6 +40,18 @@ class TestApiData:
         assert "countries" in data
         assert "matrix_entity_labels" in data
         assert "total_items" in data
+
+    def test_get_data_tables_analysis_flag_requires_analysis_permission_for_session_user(self, client):
+        auth_user = MagicMock()
+        auth_user.id = 123
+        with patch("app.routes.api.data.authenticate_api_request", return_value=(False, auth_user, None)), \
+             patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False):
+            resp = client.get("/api/v1/data/tables?analysis=true")
+
+        assert resp.status_code == 403
+        payload = resp.get_json()
+        assert (payload or {}).get("error") == "Forbidden: analysis access is required"
 
     def test_get_data_tables_star_layout_contract(self, client, auth_headers):
         resp = client.get("/api/v1/data/tables?layout=star", headers=auth_headers)

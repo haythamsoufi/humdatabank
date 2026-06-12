@@ -189,6 +189,100 @@ def manage_templates():
     )
 
 
+def _build_template_grid_row_dict(template, *, template_data_counts=None, template_version_counts=None):
+    """Build one AG Grid row dict (same shape as templates.html ``templatesData``)."""
+    from app.utils.form_localization import get_localized_template_name
+    from app.services.authorization_service import AuthorizationService
+    from flask_babel import gettext as _gettext, ngettext as _ngettext
+
+    template_data_counts = template_data_counts or {}
+    template_version_counts = template_version_counts or {}
+
+    version = template.published_version
+    if not version:
+        version = template.versions.order_by("created_at").first()
+    version_count = int(template_version_counts.get(template.id, template.versions.count()))
+    is_deployed = template.published_version is not None
+    localized_name = get_localized_template_name(template)
+    owner = template.owned_by_user
+    shared_users = _shared_users_for_template_list(template)
+
+    is_sm = AuthorizationService.is_system_manager(current_user)
+    can_edit = is_sm or AuthorizationService.has_rbac_permission(current_user, "admin.templates.edit")
+    can_create = is_sm or AuthorizationService.has_rbac_permission(current_user, "admin.templates.create")
+    can_delete = is_sm or AuthorizationService.has_rbac_permission(current_user, "admin.templates.delete")
+    can_duplicate = is_sm or AuthorizationService.has_rbac_permission(current_user, "admin.templates.duplicate")
+
+    data_count = int(template_data_counts.get(template.id, 0))
+    if data_count > 0:
+        delete_confirm = _ngettext(
+            "This template has %(count)s saved data entry that will be permanently deleted. Continue?",
+            "This template has %(count)s saved data entries that will be permanently deleted. Continue?",
+            data_count,
+            count=data_count,
+        )
+    else:
+        delete_confirm = _gettext("Are you sure you want to delete this template?")
+
+    def _user_dict(u):
+        if not u:
+            return None
+        profile_color = u.profile_color
+        if not profile_color or profile_color == "#3B82F6":
+            profile_color = u.generate_profile_color()
+        return {
+            "id": u.id,
+            "name": u.name or "",
+            "email": u.email or "",
+            "title": u.title or "",
+            "active": bool(getattr(u, "active", True)),
+            "profile_color": profile_color,
+        }
+
+    return {
+        "id": template.id,
+        "name": localized_name,
+        "add_to_self_report": bool(version.add_to_self_report) if version else False,
+        "version_count": version_count,
+        "status": _gettext("Deployed") if is_deployed else _gettext("Not Yet"),
+        "is_deployed": is_deployed,
+        "owner": _user_dict(owner),
+        "shared_with_users": [_user_dict(u) for u in shared_users if u],
+        "created_at": template.created_at.isoformat() if getattr(template, "created_at", None) else None,
+        "edit_url": url_for("form_builder.edit_template", template_id=template.id) if can_edit else "",
+        "duplicate_url": url_for("form_builder.duplicate_template", template_id=template.id) if can_duplicate else "",
+        "preview_url": url_for("forms.preview_template", template_id=template.id),
+        "special_url": url_for("template_special.special_template_view", template_id=template.id) if template.id == 21 else "",
+        "delete_url": url_for("form_builder.delete_template", template_id=template.id) if can_delete else "",
+        "delete_info_url": url_for("form_builder.get_template_delete_info", template_id=template.id) if can_delete else "",
+        "data_count": data_count,
+        "delete_confirm": delete_confirm,
+        "duplicate_confirm": _gettext("Duplicate this template?"),
+    }
+
+
+@bp.route("/templates/<int:template_id>/grid-row", methods=["GET"])
+@permission_required("admin.templates.view")
+def template_grid_row(template_id):
+    """Return a single templates-list AG Grid row (for live refresh after AI create)."""
+    from app.services.authorization_service import AuthorizationService
+
+    template = FormTemplate.query.options(
+        db.joinedload(FormTemplate.owned_by_user),
+        db.joinedload(FormTemplate.shared_with).joinedload(TemplateShare.shared_with_user),
+        db.joinedload(FormTemplate.published_version),
+    ).filter_by(id=int(template_id)).first()
+    if not template:
+        return json_not_found(message="Template not found.")
+
+    if not AuthorizationService.is_system_manager(current_user):
+        allowed_ids = get_user_allowed_template_ids(current_user.id)
+        if int(template_id) not in allowed_ids:
+            return json_forbidden(message="You do not have access to this template.")
+
+    return json_ok(row=_build_template_grid_row_dict(template))
+
+
 @bp.route("/templates/import_kobo_xls", methods=["POST"])
 @permission_required('admin.templates.create')
 def import_kobo_xls():

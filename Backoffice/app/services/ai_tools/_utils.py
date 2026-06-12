@@ -277,6 +277,117 @@ def resolve_source_config():
         return None
 
 
+def resolve_form_builder_context() -> Optional[Dict[str, Any]]:
+    """
+    Read the form-builder assistant context from Flask ``g``.
+
+    Set by AIAgentExecutor.execute() from ``page_context.formBuilder`` when the
+    chat request originates from the form-builder AI panel. Returns a dict like
+    ``{"enabled": True, "template_id": 12, "version_id": 34}`` or ``None``.
+    """
+    if not has_request_context():
+        return None
+    try:
+        raw = getattr(g, "ai_form_builder_ctx", None)
+    except Exception:
+        return None
+    if not isinstance(raw, dict) or not raw.get("enabled"):
+        return None
+    return raw
+
+
+_FORM_TEMPLATE_WRITE_TOOLS = frozenset({
+    "create_form_template",
+    "edit_form_template",
+    "translate_form_template",
+    "discard_template_draft",
+})
+
+
+def extract_form_builder_result_from_steps(steps: Any) -> Optional[Dict[str, Any]]:
+    """
+    Return structured create/edit metadata from the latest successful form-template
+    write tool in an agent run (for SSE clients and grid refresh).
+    """
+    if not isinstance(steps, list):
+        return None
+    for step in reversed(steps):
+        if not isinstance(step, dict):
+            continue
+        action = str(step.get("action") or "").strip()
+        if action not in _FORM_TEMPLATE_WRITE_TOOLS:
+            continue
+        obs = step.get("observation")
+        if not isinstance(obs, dict) or not obs.get("success"):
+            continue
+        inner = obs.get("result")
+        if not isinstance(inner, dict):
+            continue
+        template_id = inner.get("template_id")
+        edit_url = inner.get("edit_url")
+        if template_id is None and not edit_url:
+            continue
+        refs = inner.get("refs")
+        return {
+            "action": action,
+            "template_id": int(template_id) if template_id is not None else None,
+            "version_id": int(inner["version_id"]) if inner.get("version_id") is not None else None,
+            "name": inner.get("name"),
+            "edit_url": edit_url,
+            "version_status": inner.get("version_status"),
+            "warnings": list(inner.get("warnings") or []),
+            "changes": list(inner.get("changes") or []),
+            "refs": refs if isinstance(refs, dict) else {},
+        }
+    return None
+
+
+def resolve_form_builder_user():
+    """
+    Return the User for form-builder tool execution.
+
+    Prefer Flask-Login ``current_user``; fall back to ``g.ai_user_id`` in SSE/WS
+    worker threads where the agent propagates identity without a browser session.
+    """
+    from flask_login import current_user as _cu
+
+    if getattr(_cu, "is_authenticated", False):
+        return _cu
+    if not has_request_context():
+        return None
+    try:
+        uid = getattr(g, "ai_user_id", None)
+        if uid is not None:
+            from app.models import User
+
+            return User.query.get(int(uid))
+    except Exception as exc:
+        logger.debug("resolve_form_builder_user failed: %s", exc)
+    return None
+
+
+def resolve_form_template_permissions() -> Dict[str, bool]:
+    """Resolve form template RBAC permissions for the current AI request user."""
+    from app.services.authorization_service import AuthorizationService
+
+    user = resolve_form_builder_user()
+    if not user:
+        return {"view": False, "create": False, "edit": False}
+
+    def _has(code: str) -> bool:
+        try:
+            return bool(AuthorizationService.has_rbac_permission(user, code))
+        except Exception as exc:
+            logger.debug("resolve_form_template_permissions %s failed: %s", code, exc)
+            return False
+
+    return {
+        "view": _has("admin.templates.view"),
+        "create": _has("admin.templates.create"),
+        "edit": _has("admin.templates.edit"),
+    }
+
+
 def resolve_indicator_bank_permissions() -> Dict[str, bool]:
     """
     Resolve Indicator Bank RBAC permissions for the current AI request user.

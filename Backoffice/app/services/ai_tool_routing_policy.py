@@ -265,6 +265,14 @@ def is_value_question(query: str) -> bool:
     """
     if not query or not isinstance(query, str):
         return False
+    # Form-builder requests often mention "staffing", "budget", etc. — not databank lookups.
+    try:
+        from app.services.ai_tools._utils import resolve_form_builder_context
+
+        if resolve_form_builder_context():
+            return False
+    except Exception:
+        pass
     q = query.strip().lower()
     if len(q) < 10:
         return False

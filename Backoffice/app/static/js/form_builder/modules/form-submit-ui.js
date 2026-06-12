@@ -203,6 +203,8 @@ export const FormSubmitUI = {
       if (!doc) return;
 
       const idsToReplace = [
+        // Version status banners (draft / published / archived notices)
+        'form-builder-status-banners',
         // Main builder list
         'sections-container',
         // Template details + pages editor
@@ -545,7 +547,9 @@ export const FormSubmitUI = {
       submit: (form) => submitViaAjax(form),
       showSaving: (t, d) => this.showSaving(t, d),
       showSuccess: (t, d) => this.showSuccess(t, d),
-      showError: (t, d, r) => this.showError(t, d, r)
+      showError: (t, d, r) => this.showError(t, d, r),
+      // Expose for external callers (e.g. the AI assistant after it updates the template).
+      refreshFromHtml: (html) => refreshFromHtml(html),
     };
 
     // Global submit interception (bubble) for POST forms in builder UI.

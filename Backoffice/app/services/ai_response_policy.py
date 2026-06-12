@@ -104,10 +104,21 @@ def wants_reasoning_evidence(query: str) -> bool:
     True when user asks for explanations/causes/evidence (or a findings-style
     follow-up), so we should look for contextual evidence in documents before
     finishing.
+
+    Only the user's own question is inspected — any imported/pasted document
+    text appended after the "--- Imported" separator is excluded to avoid
+    false positives from words like "evidence" that appear in form content.
     """
     if not query or not isinstance(query, str):
         return False
-    return is_findings_followup_query(query) or bool(_REASONING_EVIDENCE_RE.search(query))
+    # Restrict pattern matching to the user's intent portion of the query.
+    check_text = query
+    sep_idx = query.find("--- Imported")
+    if sep_idx > 0:
+        check_text = query[:sep_idx]
+    elif len(query) > 500:
+        check_text = query[:500]
+    return is_findings_followup_query(check_text) or bool(_REASONING_EVIDENCE_RE.search(check_text))
 
 
 _MD_TABLE_LINE_RE = re.compile(r"^\s*\|.+\|\s*$")

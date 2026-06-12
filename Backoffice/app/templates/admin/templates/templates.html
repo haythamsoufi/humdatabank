@@ -32,6 +32,13 @@
         'classes': 'professional-action-btn professional-action-btn-green',
         'attributes': {'title': _('Create a new template')}
     }) %}
+    {% set __ = header_actions.items.append({
+        'type': 'button',
+        'text': _('Create with AI'),
+        'icon': 'fas fa-wand-magic-sparkles',
+        'classes': 'professional-action-btn professional-action-btn-purple',
+        'attributes': {'id': 'ai-assistant-btn', 'title': _('Describe the form you need and the AI assistant will create a draft template')}
+    }) %}
 {% endif %}
 {% if can_manage_lists %}
     {% set __ = header_actions.items.append({
@@ -58,12 +65,16 @@
     {% from "components/ag_grid_includes.html" import ag_grid_container %}
     <!-- Main Table Card -->
     <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
-        {% if templates %}
-            {{ ag_grid_container('templatesGrid', loading_text=_('Loading templates data...'), include_card=false) }}
-        {% else %}
-            <p class="text-gray-700">{{ _('No form templates found.') }}</p>
-        {% endif %}
+        {{ ag_grid_container('templatesGrid', loading_text=_('Loading templates data...'), include_card=false) }}
+        <p id="templates-empty-hint" class="text-gray-700{% if templates %} hidden{% endif %}">{{ _('No form templates found.') }}</p>
     </div>
+
+    {% if can_create_template %}
+        {# AI Form Assistant panel (create-new mode: no template context) #}
+        {% with fb_ai_template_id = none, fb_ai_version_id = none %}
+            {% include "components/form_builder_ai_panel.html" with context %}
+        {% endwith %}
+    {% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -292,11 +303,10 @@
         }
     ];
 
-    // Initialize grid using helper
-    function initializeGrid() {
-        if (!templatesData || templatesData.length === 0) return;
-
-        var result = AgGridHelper.create('templatesGrid', 'templates', columnDefs, templatesData, {
+    // Initialize grid using helper (empty list still renders an empty grid for live AI refresh)
+    function initializeGrid(initialRows) {
+        var rows = Array.isArray(initialRows) ? initialRows : (templatesData || []);
+        var result = AgGridHelper.create('templatesGrid', 'templates', columnDefs, rows, {
             onReady: function(api, helper) {
                 AgGridHelper.pinActionsColumn(api, ['name', 'type', 'add_to_self_report', 'version_count', 'status', 'template_access', 'created_at', 'actions'], helper && helper.columnVisibilityManager);
             }
@@ -305,14 +315,63 @@
         gridApi = result.api;
         window.gridApi = gridApi;
         window.gridHelper = gridHelper;
+        updateTemplatesEmptyHint(rows.length);
     }
+
+    function updateTemplatesEmptyHint(count) {
+        var hint = document.getElementById('templates-empty-hint');
+        if (!hint) return;
+        hint.classList.toggle('hidden', count > 0);
+    }
+
+    function upsertTemplateGridRow(row) {
+        if (!row || !row.id) return;
+        if (!gridApi) {
+            initializeGrid([row]);
+            return;
+        }
+        var existing = null;
+        gridApi.forEachNode(function(node) {
+            if (node.data && node.data.id === row.id) existing = node;
+        });
+        if (existing) {
+            gridApi.applyTransaction({ update: [row] });
+        } else {
+            gridApi.applyTransaction({ add: [row], addIndex: 0 });
+        }
+        var total = 0;
+        gridApi.forEachNode(function() { total += 1; });
+        updateTemplatesEmptyHint(total);
+    }
+
+    async function refreshTemplateGridRow(templateId) {
+        if (!templateId) return;
+        try {
+            var resp = await fetch('/admin/templates/' + templateId + '/grid-row', {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            var data = await resp.json().catch(function() { return {}; });
+            if (!resp.ok || !data || !data.row) return;
+            upsertTemplateGridRow(data.row);
+        } catch (e) {
+            console.warn('[templates] grid-row refresh failed', e);
+        }
+    }
+
+    window.addEventListener('humdb:template-created', function(ev) {
+        var detail = ev && ev.detail ? ev.detail : {};
+        if (detail.template_id) {
+            refreshTemplateGridRow(detail.template_id);
+        }
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(initializeGrid, 100);
+            setTimeout(function() { initializeGrid(); }, 100);
         });
     } else {
-        setTimeout(initializeGrid, 100);
+        setTimeout(function() { initializeGrid(); }, 100);
     }
     </script>
 

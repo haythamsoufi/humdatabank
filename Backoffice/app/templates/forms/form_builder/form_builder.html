@@ -45,6 +45,13 @@
         'icon': 'fas fa-magic',
         'classes': 'professional-action-btn professional-action-btn-orange',
         'attributes': {'id': 'auto-translate-all-btn', 'title': _('Auto-translate all blank template names, section names, questions, document fields, and page names to all languages')}
+    },
+    {
+        'type': 'button',
+        'text': _('AI Assistant'),
+        'icon': 'fas fa-wand-magic-sparkles',
+        'classes': 'professional-action-btn professional-action-btn-purple',
+        'attributes': {'id': 'ai-assistant-btn', 'title': _('Create or edit this template with the AI assistant (changes go to a draft)')}
     }
 ] %}
 
@@ -134,6 +141,9 @@
     </script>
     {% endif %}
 
+    {# Version status banner area – replaced as a unit on AJAX reload so banners stay in sync #}
+    <div id="form-builder-status-banners">
+
     {# Notice: Draft version - prompt to deploy #}
     {% if selected_version_is_draft %}
     <div class="mb-6 rounded-lg border border-blue-300 bg-blue-50 text-blue-800 p-4 flex items-start justify-between">
@@ -204,6 +214,7 @@
                     doSubmit();
                 }
             });
+            deployBtn.dataset.fbWired = '1';
         }
     });
     </script>
@@ -240,6 +251,7 @@
                     trigger.click();
                 }
             });
+            openBtn.dataset.fbWired = '1';
         }
 
         // Only disable and grey out common edit/add controls for archived versions
@@ -294,6 +306,8 @@
     });
     </script>
     {% endif %}
+
+    </div>{# /form-builder-status-banners #}
 
 {# Template Details Section #}
 {% include 'forms/form_builder/partials/_template_details.html' %}
@@ -601,6 +615,11 @@
 
 {# Include centralized auto-translate modal JavaScript #}
 {% include "components/auto_translate_modal_js.html" with context %}
+
+{# AI Form Assistant panel #}
+{% with fb_ai_template_id = template.id, fb_ai_version_id = active_version_id %}
+    {% include "components/form_builder_ai_panel.html" with context %}
+{% endwith %}
 
 {# Template data for JavaScript #}
 <script type="application/json" id="template-data">

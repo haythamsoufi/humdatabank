@@ -313,6 +313,7 @@ class AIDocumentProcessingStatusValue(str, enum.Enum):
 
 
 class AIReasoningTraceStatusValue(str, enum.Enum):
+    running = 'running'
     completed = 'completed'
     timeout = 'timeout'
     error = 'error'

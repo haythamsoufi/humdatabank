@@ -619,15 +619,15 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     """Automatically mark tests based on their location."""
     for item in items:
-        # Mark tests in unit/ directory as unit tests
-        if 'unit' in str(item.fspath):
+        norm = str(item.fspath).replace('\\', '/')
+        if '/tests/unit/' in norm:
             item.add_marker(pytest.mark.unit)
-        # Mark tests in integration/ directory as integration tests
-        elif 'integration' in str(item.fspath):
+        elif '/tests/integration/' in norm:
             item.add_marker(pytest.mark.integration)
-        # Mark tests with 'api' in name as api tests
-        elif 'api' in str(item.fspath) or 'api' in item.name:
+            item.add_marker(pytest.mark.slow)
+        elif '/tests/api/' in norm:
             item.add_marker(pytest.mark.api)
+            item.add_marker(pytest.mark.slow)
 
 
 # ---------------------------------------------------------------------------

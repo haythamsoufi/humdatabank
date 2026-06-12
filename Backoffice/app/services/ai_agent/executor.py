@@ -992,6 +992,16 @@ class AIAgentExecutor:
                     g.ai_user_role = user_context.get("role") if user_context else None
                 except Exception as e:
                     logger.debug("Request context attributes failed: %s", e)
+                # Form-builder assistant context (gates form template tools).
+                try:
+                    page_ctx = user_context.get("page_context") if user_context else None
+                    fb_ctx = page_ctx.get("formBuilder") if isinstance(page_ctx, dict) else None
+                    if isinstance(fb_ctx, dict):
+                        g.ai_form_builder_ctx = {**fb_ctx, "enabled": True}
+                    else:
+                        g.ai_form_builder_ctx = None
+                except Exception as e:
+                    logger.debug("ai_form_builder_ctx assignment failed: %s", e)
 
             # Check if agent is enabled (still log a trace even when disabled)
             if not current_app.config.get('AI_AGENT_ENABLED', True):
@@ -1000,56 +1010,24 @@ class AIAgentExecutor:
                 result['status'] = 'agent_disabled'
                 result['execution_path'] = 'agent_disabled'
             else:
-                # Generic fast path first (one/few tool calls + light transform), then ReAct fallback.
+                _fb_assistant = False
                 try:
-                    tool_defs = self.tools_registry.get_tool_definitions_openai() or []
-                    tool_names = {
-                        str((t.get("function") or {}).get("name") or "").strip()
-                        for t in tool_defs
-                        if isinstance(t, dict)
-                    }
+                    from app.services.ai_tools._utils import resolve_form_builder_context
+
+                    _fb_assistant = bool(resolve_form_builder_context())
                 except Exception as e:
-                    logger.debug("Get tool definitions failed: %s", e)
-                    tool_names = set()
+                    logger.debug("resolve_form_builder_context failed: %s", e)
 
-                plan = self.query_planner.plan_simple(query=query, tool_names=tool_names)
-                if plan is None:
-                    logger.info("Query planner: no simple plan; using full ReAct (no simple plan).")
-                if callable(on_step_callback):
-                    try:
-                        plan_detail = _format_plan_for_step(plan, query=query)
-                        on_step_callback(_plan_step_message(plan, query=query), plan_detail or None)
-                    except TypeError:
-                        on_step_callback(_plan_step_message(plan, query=query))
-                    except Exception as e:
-                        logger.debug("Planning step callback failed: %s", e)
-                fast = None
-                if plan is not None:
-                    fast = self._execute_simple_plan(
-                        plan=plan,
-                        query=query,
-                        language=language,
-                        on_step_callback=on_step_callback,
-                    )
-                    if isinstance(fast, dict) and fast.get("success"):
-                        logger.info("Generic fast-path succeeded: kind=%s", plan.kind)
-                    else:
-                        logger.info("Generic fast-path did not return a final answer; falling back to ReAct")
-
-                if isinstance(fast, dict) and fast.get("success"):
-                    result = fast
-                    result["execution_path"] = "fast_path"
-                    result["plan_kind"] = plan.kind if plan is not None else None
-                else:
-                    # Emit a bridging step so the user sees progress when fast-path fails and
-                    # full reasoning is about to start (which begins with a blocking LLM call).
-                    if fast is not None and callable(on_step_callback):
+                if _fb_assistant:
+                    # Form-builder panel: every request is template create/edit/review/translate.
+                    # Skip databank/document fast paths and go straight to ReAct with form-only tools.
+                    logger.info("Form-builder assistant mode: skipping generic fast path")
+                    if callable(on_step_callback):
                         try:
-                            on_step_callback(_("Reviewing what I found…"))
+                            on_step_callback(_("This needs multiple steps — starting…"))
                         except Exception as e:
-                            logger.debug("ReAct fallback step callback failed: %s", e)
-                    # Execute based on provider
-                    if self.use_native and self.provider == 'openai':
+                            logger.debug("Form-builder step callback failed: %s", e)
+                    if self.use_native and self.provider == "openai":
                         result = self._execute_openai_native(
                             query,
                             conversation_history,
@@ -1058,7 +1036,7 @@ class AIAgentExecutor:
                             on_step_callback,
                             original_message=original_message,
                         )
-                        result["execution_path"] = "openai_native"
+                        result["execution_path"] = "form_builder_react"
                     else:
                         result = self._execute_custom_react(
                             query,
@@ -1068,27 +1046,104 @@ class AIAgentExecutor:
                             on_step_callback,
                             original_message=original_message,
                         )
-                        result["execution_path"] = "react"
+                        result["execution_path"] = "form_builder_react"
+                else:
+                    # Generic fast path first (one/few tool calls + light transform), then ReAct fallback.
+                    try:
+                        tool_defs = self.tools_registry.get_tool_definitions_openai() or []
+                        tool_names = {
+                            str((t.get("function") or {}).get("name") or "").strip()
+                            for t in tool_defs
+                            if isinstance(t, dict)
+                        }
+                    except Exception as e:
+                        logger.debug("Get tool definitions failed: %s", e)
+                        tool_names = set()
 
-                    # When the full LLM path fails (timeout, API error), try the
-                    # deterministic fast path as a last resort. Produces real data
-                    # (even if less detailed) instead of a tool-less hallucination.
-                    if (
-                        not (isinstance(result, dict) and result.get("success"))
-                        and result.get("status") in ("llm_error", "timeout", "error", "circuit_breaker")
-                        and "analyze_unified_plans_focus_areas" in tool_names
-                    ):
-                        result = self._try_fast_path_after_llm_failure(
+                    plan = self.query_planner.plan_simple(query=query, tool_names=tool_names)
+                    if plan is None:
+                        logger.info("Query planner: no simple plan; using full ReAct (no simple plan).")
+                    if callable(on_step_callback):
+                        try:
+                            plan_detail = _format_plan_for_step(plan, query=query)
+                            on_step_callback(_plan_step_message(plan, query=query), plan_detail or None)
+                        except TypeError:
+                            on_step_callback(_plan_step_message(plan, query=query))
+                        except Exception as e:
+                            logger.debug("Planning step callback failed: %s", e)
+                    fast = None
+                    if plan is not None:
+                        fast = self._execute_simple_plan(
+                            plan=plan,
                             query=query,
                             language=language,
-                            tool_names=tool_names,
                             on_step_callback=on_step_callback,
-                            original_result=result,
                         )
+                        if isinstance(fast, dict) and fast.get("success"):
+                            logger.info("Generic fast-path succeeded: kind=%s", plan.kind)
+                        else:
+                            logger.info("Generic fast-path did not return a final answer; falling back to ReAct")
+
+                    if isinstance(fast, dict) and fast.get("success"):
+                        result = fast
+                        result["execution_path"] = "fast_path"
+                        result["plan_kind"] = plan.kind if plan is not None else None
+                    else:
+                        # Emit a bridging step so the user sees progress when fast-path fails and
+                        # full reasoning is about to start (which begins with a blocking LLM call).
+                        if fast is not None and callable(on_step_callback):
+                            try:
+                                on_step_callback(_("Reviewing what I found…"))
+                            except Exception as e:
+                                logger.debug("ReAct fallback step callback failed: %s", e)
+                        # Execute based on provider
+                        if self.use_native and self.provider == 'openai':
+                            result = self._execute_openai_native(
+                                query,
+                                conversation_history,
+                                user_context,
+                                language,
+                                on_step_callback,
+                                original_message=original_message,
+                            )
+                            result["execution_path"] = "openai_native"
+                        else:
+                            result = self._execute_custom_react(
+                                query,
+                                conversation_history,
+                                user_context,
+                                language,
+                                on_step_callback,
+                                original_message=original_message,
+                            )
+                            result["execution_path"] = "react"
+
+                        # When the full LLM path fails (timeout, API error), try the
+                        # deterministic fast path as a last resort. Produces real data
+                        # (even if less detailed) instead of a tool-less hallucination.
+                        if (
+                            not (isinstance(result, dict) and result.get("success"))
+                            and result.get("status") in ("llm_error", "timeout", "error", "circuit_breaker")
+                            and "analyze_unified_plans_focus_areas" in tool_names
+                        ):
+                            result = self._try_fast_path_after_llm_failure(
+                                query=query,
+                                language=language,
+                                tool_names=tool_names,
+                                on_step_callback=on_step_callback,
+                                original_result=result,
+                            )
 
             # Skip payload inference for platform usage/navigation help
             # questions — they don't produce data that should be visualized.
-            _skip_payload_inference = (
+            _fb_skip_payload = False
+            try:
+                from app.services.ai_tools._utils import resolve_form_builder_context
+
+                _fb_skip_payload = bool(resolve_form_builder_context())
+            except Exception:
+                pass
+            _skip_payload_inference = _fb_skip_payload or (
                 _is_platform_usage_help_question(query)
                 and not _is_assignment_form_question(query)
             )
@@ -1115,6 +1170,16 @@ class AIAgentExecutor:
                     has_table_payload=True,
                     table_kind=str(_tp.get("table_kind") or ""),
                 )
+
+            # Form-builder panel: expose structured create/edit metadata for the UI.
+            try:
+                from app.services.ai_tools._utils import extract_form_builder_result_from_steps
+
+                fb_result = extract_form_builder_result_from_steps(result.get("steps"))
+                if fb_result:
+                    result["form_builder_result"] = fb_result
+            except Exception as e:
+                logger.debug("extract_form_builder_result_from_steps failed: %s", e)
 
             # Calculate execution time
             execution_time = int((time.time() - start_time) * 1000)
@@ -1198,9 +1263,10 @@ class AIAgentExecutor:
                 platform_context=user_context if isinstance(user_context, dict) else None,
             )
 
-            # Build structured sources from inline citations (non-blocking)
+            # Build structured sources from inline citations (non-blocking).
+            # Form-builder assistant: tool actions are not databank/document evidence.
             try:
-                if final_answer_for_trace:
+                if final_answer_for_trace and not _fb_skip_payload:
                     from app.utils.ai_citation_parser import build_sources_array
                     result['sources'] = build_sources_array(
                         final_answer_for_trace,
@@ -1252,8 +1318,9 @@ class AIAgentExecutor:
             # Evaluate overall response quality via LLM judge (non-blocking).
             # This runs even when no retrieved document chunks are present
             # (e.g., indicator/tool-only answers), so quality is still captured.
+            # Skipped for form-builder: quality is structural (tool result), not textual.
             try:
-                if final_answer_for_trace:
+                if final_answer_for_trace and not _fb_assistant:
                     from app.services.ai_grounding_evaluator import evaluate_quality_and_persist
                     _judge_output_ctx = _build_judge_output_context(result)
                     _q_result = evaluate_quality_and_persist(
@@ -1433,7 +1500,24 @@ class AIAgentExecutor:
             # Call LLM: force tool use on first turn for value questions so model cannot ask for period/year first
             tool_choice = "auto"
             if iterations == 1:
-                if _is_value_question(query):
+                _fb_ctx_active = False
+                _fb_ctx: Dict[str, Any] = {}
+                try:
+                    from app.services.ai_tools._utils import resolve_form_builder_context
+                    _fb_ctx = resolve_form_builder_context() or {}
+                    _fb_ctx_active = bool(_fb_ctx)
+                except Exception:
+                    pass
+                if _fb_ctx_active:
+                    # Create-from-list / new template: force create_form_template immediately.
+                    if not _fb_ctx.get("template_id"):
+                        tool_choice = {
+                            "type": "function",
+                            "function": {"name": "create_form_template"},
+                        }
+                    else:
+                        tool_choice = "required"
+                elif _is_value_question(query):
                     tool_choice = "required"
                 elif (
                     _docs_only_sources_enabled()
@@ -1565,13 +1649,15 @@ class AIAgentExecutor:
                         continue
 
                     # For explanation/insights questions: try to ground plausible causes with document evidence.
-                    # If no doc sources are enabled, or the user explicitly forbids documents, skip.
+                    # If no doc sources are enabled, the user explicitly forbids documents, or we are in
+                    # form-builder mode (where document search tools are blocked), skip.
                     if (
                         _wants_reasoning_evidence(query)
                         and not _user_forbids_documents(query)
                         and _docs_sources_enabled()
                         and (not used_search_docs)
                         and _reasoning_evidence_force_count < 1
+                        and not _fb_assistant
                         and iterations < self.max_iterations
                         and tool_call_count < self.max_tools_per_query
                         and elapsed < (self.timeout_seconds * TIMEOUT_SAFETY_FRACTION)

@@ -1801,6 +1801,14 @@ def chat_stream():
                         g.ai_sources_cfg = sources_cfg
                     except Exception as e:
                         logger.debug("g.ai_sources_cfg failed in worker: %s", e)
+                    try:
+                        fb_ctx = (page_context or {}).get("formBuilder") if isinstance(page_context, dict) else None
+                        if isinstance(fb_ctx, dict):
+                            g.ai_form_builder_ctx = {**fb_ctx, "enabled": True}
+                        else:
+                            g.ai_form_builder_ctx = None
+                    except Exception as e:
+                        logger.debug("g.ai_form_builder_ctx failed in worker: %s", e)
                     # Pass conversation_id so agent traces can log it (do not mutate cached platform_context)
                     run_platform_context = {**platform_context, "conversation_id": conversation_id} if conversation_id else platform_context
                     current_app.logger.info(
@@ -1880,6 +1888,7 @@ def chat_stream():
                             "trace_id": trace_id_for_feedback,
                             "confidence": getattr(result, "confidence", None),
                             "grounding_score": getattr(result, "grounding_score", None),
+                            "form_builder_result": getattr(result, "form_builder_result", None),
                         }
                     )
 
@@ -2102,6 +2111,8 @@ def chat_stream():
                         done_payload["confidence"] = item.get("confidence")
                     if item.get("grounding_score") is not None:
                         done_payload["grounding_score"] = item.get("grounding_score")
+                    if item.get("form_builder_result"):
+                        done_payload["form_builder_result"] = item.get("form_builder_result")
                     yield f"data: {json.dumps(done_payload)}\n\n"
                     break
 

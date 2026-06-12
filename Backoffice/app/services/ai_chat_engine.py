@@ -20,6 +20,42 @@ from app.services.chatbot_helpers import (
 
 logger = logging.getLogger(__name__)
 
+
+def _strip_markdown_sources_section(text: str) -> str:
+    """Remove a trailing ## Sources block (not used in form-builder assistant answers)."""
+    if not text:
+        return text
+    cleaned = re.sub(
+        r"(?ms)^#{1,3}\s*Sources\s*:?\s*\n.*\Z",
+        "",
+        str(text).rstrip(),
+    ).rstrip()
+    return cleaned
+
+
+def _strip_form_builder_boilerplate(text: str, *, edit_mode: bool) -> str:
+    """Remove repetitive draft/warning boilerplate from form-builder assistant answers."""
+    if not text:
+        return text
+    cleaned = str(text)
+    for pat in (
+        r"(?im)^\s*warnings?\s*:\s*none\.?\s*$",
+        r"(?im)^\s*no warnings were produced\.?\s*$",
+    ):
+        cleaned = re.sub(pat, "", cleaned)
+    if edit_mode:
+        for pat in (
+            r"(?im)^.*\ball changes (?:are|were) (?:in|applied to) the draft\b.*$",
+            r"(?im)^.*\bplease review (?:the draft and )?deploy\b.*$",
+            r"(?im)^.*\breview the draft and deploy\b.*$",
+            r"(?im)\[open the draft in the form builder\]\(/admin/templates/edit/[^)]+\)\s*",
+            r"(?im)\[open the template in the form builder\]\(/admin/templates/edit/[^)]+\)\s*",
+        ):
+            cleaned = re.sub(pat, "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return cleaned
+
+
 def _ai_debug_enabled() -> bool:
     try:
         v = current_app.config.get("AI_CHAT_DEBUG_LOGS", None)
@@ -844,6 +880,7 @@ class ChatResult:
     confidence: Optional[str] = None   # 'high' | 'medium' | 'low'
     grounding_score: Optional[float] = None
     sources: Optional[List[Dict[str, Any]]] = None
+    form_builder_result: Optional[Dict[str, Any]] = None
 
 
 def _record_fallback_trace(
@@ -951,6 +988,10 @@ class AIChatEngine:
 
         safe_message = scrub_pii_text((message or "").strip())
         safe_page_context = scrub_pii_context(page_context or {})
+        fb_page = safe_page_context.get("formBuilder") if isinstance(safe_page_context, dict) else None
+        form_builder_assistant = bool(
+            isinstance(fb_page, dict) and fb_page.get("enabled")
+        )
         locale_code = (preferred_language or "en").split("-")[0]
 
         def _is_cancelled() -> bool:
@@ -1015,8 +1056,12 @@ class AIChatEngine:
         if not (query_used and query_used.strip()):
             query_used = (message or "").strip() or ""
         safe_query_used = scrub_pii_text((query_used or "").strip())
-        worldmap_requested = _wants_worldmap_payload(message) or _wants_worldmap_payload(query_used)
-        chart_requested = _wants_timeseries_chart(message) or _wants_timeseries_chart(query_used)
+        # Form-builder panel: never treat prompts as map/chart/databank visualizations.
+        worldmap_requested = False
+        chart_requested = False
+        if not form_builder_assistant:
+            worldmap_requested = _wants_worldmap_payload(message) or _wants_worldmap_payload(query_used)
+            chart_requested = _wants_timeseries_chart(message) or _wants_timeseries_chart(query_used)
         safe_query_for_model = safe_query_used or safe_message
 
         if _ai_debug_enabled():
@@ -1041,7 +1086,7 @@ class AIChatEngine:
             system_prompt = f"{system_prompt}\n\n{_WORLDMAP_PAYLOAD_INSTRUCTION}"
 
         # Greeting-only: short LLM reply, no agent (rewritten query equals user's exact words for traces)
-        if is_greeting and not _is_cancelled():
+        if is_greeting and not form_builder_assistant and not _is_cancelled():
             try:
                 reply_text, greeting_model = _generate_greeting_reply_llm(
                     user_message=(message or "").strip(),
@@ -1072,8 +1117,13 @@ class AIChatEngine:
             except Exception as e:
                 logger.warning("AIChatEngine: greeting reply failed, using normal path: %s", e)
 
-        # Out-of-scope (general chat / unrelated coding, etc.): refusal before agent — same gate as platform scope classifier
-        if current_app.config.get("AI_PLATFORM_SCOPE_ENFORCE_ENABLED", True) and not _is_cancelled():
+        # Out-of-scope (general chat / unrelated coding, etc.): refusal before agent — same gate as platform scope classifier.
+        # Form-builder panel requests always go to the template agent (never databank scope rules).
+        if (
+            current_app.config.get("AI_PLATFORM_SCOPE_ENFORCE_ENABLED", True)
+            and not form_builder_assistant
+            and not _is_cancelled()
+        ):
             try:
                 if not in_platform_scope:
                     reply_text, oos_model = _generate_out_of_scope_reply_llm(
@@ -1150,6 +1200,14 @@ class AIChatEngine:
                 from app.services.ai_chat_integration import get_ai_chat_integration
 
                 with force_locale(locale_code):
+                    # Form-builder panel: propagate context before agent/tool gating runs.
+                    if form_builder_assistant:
+                        try:
+                            from flask import g
+
+                            g.ai_form_builder_ctx = {**fb_page, "enabled": True}
+                        except Exception as e:
+                            logger.debug("g.ai_form_builder_ctx pre-agent failed: %s", e)
                     # Planning step (with plan detail) is emitted by the executor after plan_simple()
                     ai = get_ai_chat_integration()
                     if ai is None:
@@ -1171,42 +1229,43 @@ class AIChatEngine:
                 answer_content = meta.get("answer_content") if isinstance(meta, dict) else None
                 output_hint = meta.get("output_hint") if isinstance(meta, dict) else None
                 with force_locale(locale_code):
-                    # Always honor explicit structured payload from agent metadata when present,
-                    # even if the user phrasing didn't match worldmap trigger heuristics.
-                    if isinstance(meta, dict) and isinstance(meta.get("map_payload"), dict):
-                        _raw_mp = meta.get("map_payload")
-                        _mp_countries = _raw_mp.get("countries") if isinstance(_raw_mp, dict) else []
-                        _mp_sample = (_mp_countries or [])[:2]
-                        logger.debug(
-                            "ai_chat_engine: coercing map_payload — %d countries, sample regions: %s",
-                            len(_mp_countries or []),
-                            [c.get("region") for c in _mp_sample],
-                        )
-                        map_payload = _coerce_map_payload(_raw_mp)
-                        _cp_countries = map_payload.get("countries") if isinstance(map_payload, dict) else []
-                        logger.debug(
-                            "ai_chat_engine: after _coerce_map_payload — %d countries, sample regions: %s",
-                            len(_cp_countries or []),
-                            [c.get("region") for c in (_cp_countries or [])[:2]],
-                        )
-                    if isinstance(meta, dict) and isinstance(meta.get("chart_payload"), dict):
-                        chart_payload = _coerce_chart_payload(meta.get("chart_payload"))
-                    # Generic output-type layer: infer map/chart from normalized answer content
-                    # when the agent did not explicitly provide payloads.
-                    if not map_payload:
-                        map_payload = _map_payload_from_answer_content(answer_content, output_hint=output_hint)
-                    if not chart_payload:
-                        chart_payload = _chart_payload_from_answer_content(answer_content, output_hint=output_hint)
-                # table_payload is passed through as-is (already structured by the executor).
-                if isinstance(meta, dict) and isinstance(meta.get("table_payload"), dict):
-                    table_payload = meta.get("table_payload")
-                if worldmap_requested and not map_payload and response_text:
-                    response_text, map_payload = _extract_map_payload_and_clean_text(response_text)
-                if chart_requested and not chart_payload and response_text:
-                    response_text, chart_payload = _extract_chart_payload_and_clean_text(response_text)
-                # When we have a map, strip the map payload JSON block from the response so we don't show raw JSON
-                if map_payload and response_text:
-                    response_text = _strip_map_payload_block_from_text(response_text)
+                    if not form_builder_assistant:
+                        # Always honor explicit structured payload from agent metadata when present,
+                        # even if the user phrasing didn't match worldmap trigger heuristics.
+                        if isinstance(meta, dict) and isinstance(meta.get("map_payload"), dict):
+                            _raw_mp = meta.get("map_payload")
+                            _mp_countries = _raw_mp.get("countries") if isinstance(_raw_mp, dict) else []
+                            _mp_sample = (_mp_countries or [])[:2]
+                            logger.debug(
+                                "ai_chat_engine: coercing map_payload — %d countries, sample regions: %s",
+                                len(_mp_countries or []),
+                                [c.get("region") for c in _mp_sample],
+                            )
+                            map_payload = _coerce_map_payload(_raw_mp)
+                            _cp_countries = map_payload.get("countries") if isinstance(map_payload, dict) else []
+                            logger.debug(
+                                "ai_chat_engine: after _coerce_map_payload — %d countries, sample regions: %s",
+                                len(_cp_countries or []),
+                                [c.get("region") for c in (_cp_countries or [])[:2]],
+                            )
+                        if isinstance(meta, dict) and isinstance(meta.get("chart_payload"), dict):
+                            chart_payload = _coerce_chart_payload(meta.get("chart_payload"))
+                        # Generic output-type layer: infer map/chart from normalized answer content
+                        # when the agent did not explicitly provide payloads.
+                        if not map_payload:
+                            map_payload = _map_payload_from_answer_content(answer_content, output_hint=output_hint)
+                        if not chart_payload:
+                            chart_payload = _chart_payload_from_answer_content(answer_content, output_hint=output_hint)
+                        # table_payload is passed through as-is (already structured by the executor).
+                        if isinstance(meta, dict) and isinstance(meta.get("table_payload"), dict):
+                            table_payload = meta.get("table_payload")
+                        if worldmap_requested and not map_payload and response_text:
+                            response_text, map_payload = _extract_map_payload_and_clean_text(response_text)
+                        if chart_requested and not chart_payload and response_text:
+                            response_text, chart_payload = _extract_chart_payload_and_clean_text(response_text)
+                        # When we have a map, strip the map payload JSON block from the response so we don't show raw JSON
+                        if map_payload and response_text:
+                            response_text = _strip_map_payload_block_from_text(response_text)
 
                 # Accept map-only successful responses (no textual bubble needed).
                 if response_text or map_payload or chart_payload or table_payload:
@@ -1218,6 +1277,31 @@ class AIChatEngine:
                             language=preferred_language or "en",
                             confidence=meta.get("confidence") if isinstance(meta, dict) else None,
                         )
+                    fb_result = meta.get("form_builder_result") if isinstance(meta, dict) else None
+                    fb_edit_mode = bool(
+                        isinstance(fb_page, dict) and fb_page.get("template_id")
+                    )
+                    if form_builder_assistant and cleaned_response_text:
+                        cleaned_response_text = _strip_markdown_sources_section(
+                            cleaned_response_text
+                        )
+                        cleaned_response_text = _strip_form_builder_boilerplate(
+                            cleaned_response_text,
+                            edit_mode=fb_edit_mode,
+                        )
+                    if (
+                        isinstance(fb_result, dict)
+                        and fb_result.get("edit_url")
+                        and not fb_edit_mode
+                    ):
+                        edit_url = str(fb_result["edit_url"])
+                        if edit_url not in (cleaned_response_text or ""):
+                            with force_locale(locale_code):
+                                link_label = _("Open the template in the form builder")
+                            cleaned_response_text = (
+                                (cleaned_response_text or "").rstrip()
+                                + f"\n\n[{link_label}]({edit_url})"
+                            )
                     html = format_ai_response_for_html(cleaned_response_text) if cleaned_response_text else ""
                     if html:
                         _stream_html(html)
@@ -1237,7 +1321,8 @@ class AIChatEngine:
                         trace_id=meta.get("trace_id"),
                         confidence=meta.get("confidence"),
                         grounding_score=meta.get("grounding_score"),
-                        sources=meta.get("sources"),
+                        sources=None if form_builder_assistant else meta.get("sources"),
+                        form_builder_result=fb_result if isinstance(fb_result, dict) else None,
                     )
             except Exception as e:
                 logger.warning("AIChatEngine: agent failed, falling back: %s", e)

@@ -474,6 +474,7 @@ class TestAIReasoningTraceStatusValue:
 
     def test_values(self):
         vals = AIReasoningTraceStatusValue.values()
+        assert 'running' in vals
         assert 'completed' in vals
         assert 'timeout' in vals
         assert 'error' in vals

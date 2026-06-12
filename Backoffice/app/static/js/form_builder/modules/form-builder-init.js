@@ -571,6 +571,45 @@ function enhance() {
             if (btn) btn.click();
         });
     });
+
+    // Re-wire banner action buttons after AJAX replacement of form-builder-status-banners.
+    // On first page load these are already wired by inline DOMContentLoaded scripts
+    // (which also set dataset.fbWired = '1'), so this block is a no-op on initial load.
+
+    const deployFromBanner = document.getElementById('deploy-version-from-banner');
+    if (deployFromBanner && !deployFromBanner.dataset.fbWired) {
+        deployFromBanner.dataset.fbWired = '1';
+        deployFromBanner.addEventListener('click', function() {
+            const form = this.closest('form');
+            if (!form) return;
+            const message = (window.formBuilderMessages && window.formBuilderMessages.deployVersion)
+                || 'Deploy this version? This will publish it as the live version.';
+            const doSubmit = () => {
+                form.dataset.confirmed = 'true';
+                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                    window.FormBuilderAjax.submit(form);
+                } else if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            };
+            if (window.showConfirmation) {
+                window.showConfirmation(message, doSubmit, null, 'Deploy', 'Cancel', 'Deploy Version?');
+            } else {
+                doSubmit();
+            }
+        });
+    }
+
+    const openVersionsFromBanner = document.getElementById('open-versions-from-banner');
+    if (openVersionsFromBanner && !openVersionsFromBanner.dataset.fbWired) {
+        openVersionsFromBanner.dataset.fbWired = '1';
+        openVersionsFromBanner.addEventListener('click', function() {
+            const trigger = document.getElementById('versions-modal-btn');
+            if (trigger) trigger.click();
+        });
+    }
 }
 
 // Expose for AJAX refresh calls

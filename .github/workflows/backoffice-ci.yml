@@ -111,7 +111,7 @@ jobs:
         working-directory: Backoffice
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run tests
         working-directory: Backoffice
@@ -121,7 +121,11 @@ jobs:
           FLASK_CONFIG: testing
           SECRET_KEY: test-secret-key-for-ci
           WTF_CSRF_ENABLED: 'false'
-        run: pytest
+        run: >-
+          pytest -n auto
+          --cov=app
+          --cov-report=xml:coverage.xml
+          --cov-report=term-missing
 
       - name: Upload test results and coverage
         uses: actions/upload-artifact@v6

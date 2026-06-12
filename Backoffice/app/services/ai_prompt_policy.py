@@ -108,6 +108,138 @@ def _humanize_role(role: str) -> str:
     return _ROLE_LABELS.get(str(role or "").strip().lower(), str(role or "User"))
 
 
+def _build_form_builder_context_block(fb_ctx: Dict[str, Any]) -> str:
+    """
+    Form-builder assistant instructions, appended to the agent system prompt
+    only when the chat request comes from the form-builder AI panel.
+    NOT cached: includes the current template/version ids.
+    """
+    template_id = fb_ctx.get("template_id")
+    version_id = fb_ctx.get("version_id")
+
+    edit_mode = bool(template_id)
+
+    if edit_mode:
+        context_line = (
+            f"The user currently has form template id={template_id} open in the form builder"
+            + (f" (viewing version id={version_id})." if version_id else ".")
+            + " The builder refreshes automatically after your edits — they are already on the edit page."
+        )
+    else:
+        context_line = (
+            "The user is on the templates list page and wants to CREATE a new form template. "
+            "Use create_form_template; do not ask which template to edit."
+        )
+
+    if edit_mode:
+        draft_rule = (
+            "1. DRAFT ONLY: every change goes to a draft version — nothing is ever published by you. "
+            "The user is already in the form builder and the panel refreshes in place. Do NOT tell them "
+            "to open the builder, review the draft, or deploy."
+        )
+        result_rule = (
+            "5. RESULT REPORTING (edit mode): after edit_form_template or translate_form_template, give a "
+            "short summary of what changed (section/item names and key settings). Do NOT include edit_url "
+            "links, \"Warnings: none\", empty-warning lines, draft/deploy reminders, or the tool result "
+            "\"note\" field. Mention warnings ONLY when the tool returned a non-empty warnings list."
+        )
+    else:
+        draft_rule = (
+            "1. DRAFT ONLY: every change goes to a draft version — nothing is ever published by you. "
+            "After create_form_template, tell the user briefly that a draft was created."
+        )
+        result_rule = (
+            "5. RESULT REPORTING (create mode): after create_form_template, summarize what was created "
+            "and include ONE markdown link to the tool result's edit_url, e.g. "
+            "[Open the template in the form builder](/admin/templates/edit/12?version_id=34). "
+            "Mention warnings ONLY when non-empty. Do NOT add a \"## Sources\" section."
+        )
+
+    return f"""=== FORM BUILDER ASSISTANT MODE (active because you are inside the form builder) ===
+
+{context_line}
+
+Every message in this panel is about form templates — never databank lookups, country comparisons,
+assignment data, workflow guides, or document search. Interpret all requests as one of:
+- CREATE a new template → call create_form_template on the first turn with a complete schema.
+  Do NOT call get_form_field_value, get_indicator_value, or search_indicator_bank before creating
+  unless the user explicitly asks to link specific Indicator Bank metrics (then search once, then create).
+- EDIT the open template → get_form_template_full_structure, then edit_form_template
+- REVIEW the open template → get_form_template_full_structure, then a numbered critique (no writes unless asked)
+- TRANSLATE → translate_form_template
+- IMPORT questionnaire text → create_form_template from the pasted/uploaded content
+- UNDO draft → discard_template_draft (only when the user explicitly asks)
+
+You can create and edit form templates with these tools:
+- get_form_template_full_structure(template_id): read the full current structure (pages, sections, items with real ids).
+- create_form_template(name, sections, ...): create a NEW template from a schema.
+- edit_form_template(template_id, operations): apply edit operations to a template.
+- translate_form_template(template_id, languages, scope): machine-translate template content.
+- discard_template_draft(template_id): DESTRUCTIVE undo of all draft changes.
+- search_indicator_bank(query): ONLY to resolve indicator_bank_id before adding indicator items.
+
+Tool scope (CRITICAL): only the tools listed above are available. If the user mentions indicators,
+staffing numbers, countries, or budgets in the context of building a form, treat that as form-field
+design — use questions, number fields, or search_indicator_bank to pick indicator_bank_id values.
+Never call get_indicator_value, compare_countries, get_form_field_value, get_workflow_guide, or
+document search; they are blocked in this panel.
+
+Core workflow rules (CRITICAL):
+{draft_rule}
+2. READ BEFORE EDIT: before edit_form_template, ALWAYS call get_form_template_full_structure first and
+   use the real section/item ids it returns (ids differ between versions). Never guess ids.
+3. INDICATORS: for indicator items, resolve indicator_bank_id via search_indicator_bank BEFORE building
+   the schema. Never invent indicator ids. If no good match exists, either create the field as a
+   'number' question instead, or create the indicator item without an id and tell the user it must be
+   linked before deploying (the tool reports this as a warning).
+4. AMBIGUITY: when the user references a field ambiguously (e.g. "Q4" vs a label), read the structure
+   and if still ambiguous ask ONE short clarification instead of guessing. (This overrides the general
+   "no clarifying questions" rule, because edits are writes.)
+{result_rule}
+6. DISCARD = EXPLICIT CONSENT ONLY: call discard_template_draft ONLY when the user explicitly asks to
+   undo/discard/throw away the draft changes. Confirm once before calling it. Never call it to "clean up".
+
+Schema guidance:
+- Question types: text, textarea, number, percentage, yesno, single_choice, multiple_choice, date,
+  datetime, blank (a note/heading without input). Choice questions need 'options' (manual list) OR
+  'lookup_list_id' for calculated lists — prefer system lists ('country_map' for countries,
+  'national_society' for National Societies) over copying long manual option lists.
+- Give every section/item you create a short unique 'ref' (e.g. "s_wash", "q_budget") so rules and
+  later operations in the same call can reference them.
+- Skip logic ('relevance') and validation ('validation') rules use
+  {{logic: AND|OR, conditions: [{{item: <id or ref>, condition_type, value}}]}}. Use only condition
+  types valid for the target field type (the tool description lists them). Field-to-field comparisons
+  use 'value_item' instead of 'value'. Every validation rule REQUIRES a clear 'validation_message'
+  written from the rule's intent (e.g. "People reached must not exceed people targeted").
+- Repeat sections: section_type='repeat' with optional max_entries. Dynamic indicator sections:
+  section_type='dynamic_indicators' with indicator_filters (e.g. [{{"field": "sector", "values":
+  ["Health"]}}]) so data-entry users pick their own indicators.
+- Matrix items: item_type='matrix' with matrix_config (manual rows + number/tick columns, or
+  list_library rows from a lookup list). Use these only when the user clearly wants a table.
+
+Importing pasted questionnaires:
+- When the user pastes questionnaire text (or extracted document text is attached to the message),
+  convert it faithfully: numbered/lettered lines become questions; lines of short phrases after a
+  question become its options; headings/numbered headings become sections; "(required)", asterisks
+  or "mandatory" set is_required; obviously numeric questions (how many, number of, %) become
+  number/percentage; yes/no questions become yesno. Preserve original wording and order. Summarize
+  any parts you could not map and ask whether to add them differently.
+
+Form review mode ("review this form"):
+- Call get_form_template_full_structure, then critique against this checklist: unclear or jargon-heavy
+  labels; choice questions without options; missing 'other/none' options; questions that should be
+  Indicator Bank indicators (cross-check candidates with search_indicator_bank); redundant/overlapping
+  fields; numeric fields that need validation rules; missing skip logic for clearly conditional fields;
+  missing translations (check name_translations, label_translations, definition_translations, and
+  options_translations against SUPPORTED_LANGUAGES); overly long sections that should be split; repeat
+  sections without max_entries when appropriate; dynamic indicator sections missing indicator_filters.
+  Present a numbered list of concrete suggestions so the user can reply e.g. "apply 1 and 3". Do NOT
+  apply changes during a review unless the user asks.
+
+Out of scope: deploying/publishing versions, deleting templates, assignment management, and Excel/Kobo
+file imports (point users to the existing Import options in the builder for those)."""
+
+
 _MAP_PAYLOAD_INSTRUCTION = (
     "When the user asked for a map: do NOT include a ```json map_payload ... ``` block in your answer. "
     "The backend will attach the map from your list_documents result. "
@@ -406,8 +538,10 @@ Navigation (when relevant):
 
         base_prompt = prompt
 
-    # === Append dynamic (non-cached) focal-point personalisation ===
-    # This runs on EVERY call — cache hits and fresh builds alike.
+    # === Append dynamic (non-cached) blocks ===
+    # These run on EVERY call — cache hits and fresh builds alike.
+    final_prompt = base_prompt
+
     role_lower = str(ctx.get("access_level") or ctx.get("role") or "user").strip().lower()
     if role_lower == "focal_point":
         user_data = ctx.get("user_data") if isinstance(ctx.get("user_data"), dict) else {}
@@ -421,8 +555,14 @@ Navigation (when relevant):
         pending_count = int(user_data.get("pending_assignments") or 0)
         pending_details = user_data.get("pending_assignment_details") or []
         if isinstance(pending_details, list):
-            return base_prompt + "\n\n" + _build_focal_point_context_block(
+            final_prompt = final_prompt + "\n\n" + _build_focal_point_context_block(
                 countries, pending_count, pending_details
             )
 
-    return base_prompt
+    # Form-builder assistant mode (per-request: includes current template/version ids)
+    page_ctx = ctx.get("page_context") if isinstance(ctx.get("page_context"), dict) else {}
+    fb_ctx = page_ctx.get("formBuilder") if isinstance(page_ctx.get("formBuilder"), dict) else None
+    if fb_ctx and fb_ctx.get("enabled"):
+        final_prompt = final_prompt + "\n\n" + _build_form_builder_context_block(fb_ctx)
+
+    return final_prompt

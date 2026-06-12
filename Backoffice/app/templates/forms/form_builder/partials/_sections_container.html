@@ -395,7 +395,7 @@
                     </script>
                     {% endif %}
                     {% set is_archived = item_instance.archived if hasattr(item_instance, 'archived') and item_instance.archived else False %}
-                    <tr class="{{ 'bg-gray-50' if is_sub_item or is_subsection_item else '' }} {{ 'opacity-60 bg-gray-100' if is_archived else '' }} archived-item-row {% if is_subsection_item %}subsection-content-row{% endif %}" {% if is_archived %}data-archived="true"{% endif %}{% if is_subsection_item %} data-parent-subsection-id="{{ item_data.parent_subsection_id }}"{% endif %}>
+                    <tr class="{{ 'bg-gray-50' if is_sub_item or is_subsection_item else '' }} {{ 'opacity-60 bg-gray-100' if is_archived else '' }} archived-item-row {% if is_subsection_item %}subsection-content-row{% endif %}" data-item-id="{{ item_instance.id }}" {% if is_archived %}data-archived="true"{% endif %}{% if is_subsection_item %} data-parent-subsection-id="{{ item_data.parent_subsection_id }}"{% endif %}>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 w-1/16">
                                 {% if is_sub_item %}
                                     <span class="ml-6">&#8627; {{ item_instance.display_order }}</span>

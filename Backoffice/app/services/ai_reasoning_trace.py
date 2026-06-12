@@ -12,6 +12,27 @@ from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Runtime statuses emitted by the agent executor that are not stored verbatim in
+# ``aireasoningtracestatus`` (map them to the closest persisted enum value).
+_TRACE_STATUS_ALIASES = {
+    "llm_error": "error",
+    "agent_disabled": "completed",
+    "completed_without_tools": "completed",
+    "completed_no_tools": "completed",
+    "max_tools_exceeded": "max_iterations_exceeded",
+    "circuit_breaker": "error",
+}
+
+
+def _normalize_trace_status(status: Optional[str]) -> str:
+    """Map agent/runtime status strings to a valid ``aireasoningtracestatus`` value."""
+    from app.models.enums import AIReasoningTraceStatusValue
+
+    raw = (status or "completed").strip().lower()
+    if raw in AIReasoningTraceStatusValue.values():
+        return raw
+    return _TRACE_STATUS_ALIASES.get(raw, "completed")
+
 
 def _has_app_context() -> bool:
     """True if we're inside a Flask application context (required for db.session)."""
@@ -63,6 +84,7 @@ class AIReasoningTraceService:
             return None
         try:
             from app.models import AIReasoningTrace
+            from app.models.enums import AIReasoningTraceStatusValue
             from app.extensions import db
             from app.utils.ai_trace_user_attribution import merge_trace_diagnostics_user_attribution
 
@@ -78,7 +100,7 @@ class AIReasoningTraceService:
                 agent_mode=agent_mode,
                 max_iterations=max_iterations or 10,
                 actual_iterations=0,
-                status="running",
+                status=AIReasoningTraceStatusValue.running.value,
                 steps=[],
                 tools_used=[],
                 tool_call_count=0,
@@ -167,7 +189,7 @@ class AIReasoningTraceService:
                     agent_mode=agent_mode,
                     max_iterations=max_iterations or 10,
                     actual_iterations=0,
-                    status="running",
+                    status=_normalize_trace_status(status),
                     steps=[],
                     tools_used=[],
                     tool_call_count=0,
@@ -191,7 +213,7 @@ class AIReasoningTraceService:
                 trace.original_query = (original_query or "").strip() or None
             trace.steps = normalized_steps
             trace.actual_iterations = len(normalized_steps)
-            trace.status = status or "completed"
+            trace.status = _normalize_trace_status(status)
             trace.error_message = error_message
             trace.tools_used = tools_used
             trace.tool_call_count = tool_call_count
@@ -262,7 +284,7 @@ class AIReasoningTraceService:
                 query=query,
                 agent_mode='react',
                 actual_iterations=len(steps),
-                status=status,
+                status=_normalize_trace_status(status),
                 steps=steps,
                 tools_used=tools_used,
                 tool_call_count=len([s for s in steps if s.get('action') != 'finish']),

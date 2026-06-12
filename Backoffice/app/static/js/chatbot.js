@@ -1041,6 +1041,17 @@ class HumDatabankChatbot {
         }
     }
 
+    _syncFormBuilderAiPanelFab(forceHidden) {
+        if (!this.elements.fab || this._isImmersive()) return;
+        const hidden = typeof forceHidden === 'boolean'
+            ? forceHidden
+            : !!(document.body && document.body.classList.contains('fb-ai-panel-open'));
+        this.elements.fab.hidden = hidden;
+        try {
+            this.elements.fab.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+        } catch (_) { /* ignore */ }
+    }
+
     _syncFloatingMobileBodyLock(isOpen) {
         try {
             if (this._isImmersive() || !document.body) return;
@@ -1284,6 +1295,10 @@ class HumDatabankChatbot {
         // Toggle chat widget (floating FAB only)
         if (this.elements.fab) {
             this.elements.fab.addEventListener('click', () => this.toggleChat());
+            this._syncFormBuilderAiPanelFab();
+            window.addEventListener('fb-ai-panel-visibility', (e) => {
+                this._syncFormBuilderAiPanelFab(!!(e.detail && e.detail.open));
+            });
         }
 
         // Close / Back: in widget close; in immersive closeBtn is a link, no handler

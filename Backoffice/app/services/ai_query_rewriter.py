@@ -464,16 +464,26 @@ def is_message_in_platform_scope(
     )
 
 
+def _is_form_builder_assistant_page(page_context: Optional[Dict[str, Any]]) -> bool:
+    fb = page_context.get("formBuilder") if isinstance(page_context, dict) else None
+    return isinstance(fb, dict) and bool(fb.get("enabled"))
+
+
 def _minimal_page_context_for_rewriter(page_context: Optional[Dict[str, Any]]) -> str:
     """Build a short, safe string describing current page for the rewriter (no PII)."""
     if not page_context or not isinstance(page_context, dict):
         return ""
+    parts: List[str] = []
+    if _is_form_builder_assistant_page(page_context):
+        parts.append(
+            "Form-builder AI assistant panel: user is creating or editing form templates "
+            "(create_form_template / edit_form_template) — always in platform scope"
+        )
     page_data = page_context.get("pageData") or {}
     page_type = (page_data.get("pageType") or "").strip() or "unknown"
     current_page = (page_context.get("currentPage") or "").strip() or ""
-    if not page_type and not current_page:
-        return ""
-    parts = [f"Page type: {page_type}"]
+    if page_type and page_type != "unknown":
+        parts.append(f"Page type: {page_type}")
     if current_page:
         parts.append(f"Path: {current_page}")
     return "; ".join(parts)
@@ -680,10 +690,13 @@ def _unified_preflight_llm(
         scope_rules = (
             "You classify whether this message relates to humanitarian/country data, databank indicators, Unified Plans/documents "
             "in this platform, RCRC/National Societies usage, navigation of this product, "
+            "form template design/creation in the form builder, "
             "or short follow-ups to such a conversation.\n"
             "ALWAYS in scope (use data_query): orientation/onboarding questions such as 'what is this platform', "
             "'what should I do here', 'what am I supposed to do', 'get started', 'what is my role', "
-            "'my pending tasks', 'my assignments', 'introduce yourself', 'help me get started'.\n"
+            "'my pending tasks', 'my assignments', 'introduce yourself', 'help me get started'; "
+            "and ANY request to create, edit, review, translate, or import a form template or questionnaire "
+            "(including from pasted images or attached documents).\n"
             '- intent MUST be \"out_of_platform_scope\" ONLY for clearly unrelated general requests '
             '(e.g. unrelated programming tutorials, celebrity trivia, unrelated homework) '
             'with NO plausible databank linkage.\n'
@@ -784,6 +797,10 @@ def classify_and_rewrite_user_message(
     """
     raw = (message or "").strip()
     if not raw:
+        return raw, False, True
+
+    # Form-builder panel: skip greeting/scope classifiers — always route to the template agent.
+    if _is_form_builder_assistant_page(page_context):
         return raw, False, True
 
     last_user = _last_user_message(conversation_history)

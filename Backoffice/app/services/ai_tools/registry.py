@@ -55,6 +55,12 @@ from app.services.ai_tools._utils import (
     require_indicator_bank_permission,
     INDICATOR_BANK_MGMT_TOOL_NAMES,
 )
+from app.services.ai_tools._utils import (
+    resolve_form_builder_context,
+    resolve_form_builder_user,
+    resolve_form_template_permissions,
+)
+from app.services.ai_tools.form_template_specs import FORM_TEMPLATE_TOOL_SPECS
 from app.services.ai_tools._query_utils import (
     infer_country_identifier_from_query,
     rewrite_document_search_query,
@@ -136,6 +142,27 @@ def _filter_indicator_bank_mgmt_tools(tool_defs: List[Dict[str, Any]]) -> List[D
     return filtered
 
 
+def _form_template_allowed_tools() -> Set[str]:
+    """
+    Form-builder assistant tools: only exposed when the request carries the
+    form-builder panel context AND the user holds the matching RBAC permissions.
+    """
+    ctx = resolve_form_builder_context()
+    if not ctx:
+        return set()
+    perms = resolve_form_template_permissions()
+    allowed: Set[str] = set()
+    if perms.get("view"):
+        allowed.add("get_form_template_full_structure")
+    if perms.get("create"):
+        allowed.add("create_form_template")
+    if perms.get("edit"):
+        allowed.update(
+            {"edit_form_template", "translate_form_template", "discard_template_draft"}
+        )
+    return allowed
+
+
 def _indicator_bank_mgmt_allowed_tools() -> Set[str]:
     ib_perms = resolve_indicator_bank_permissions()
     allowed: Set[str] = set()
@@ -165,8 +192,14 @@ def tool_wrapper(func: Callable) -> Callable:
         start_time = time.time()
         user_id, user_role, _ = resolve_ai_user_context()
         sources_norm = resolve_source_config()
+        fb_active = bool(resolve_form_builder_context())
 
         try:
+            # Form-builder panel: only template tools + indicator search may run.
+            if fb_active and tool_name not in _form_template_allowed_tools() and tool_name != "search_indicator_bank":
+                raise ToolExecutionError(
+                    f"Tool '{tool_name}' is not available in the form-builder assistant."
+                )
             cache_enabled = str(current_app.config.get("AI_TOOL_CACHE_ENABLED", True)).lower() == "true"
             ttl_seconds = int(current_app.config.get("AI_TOOL_CACHE_TTL_SECONDS", 300))
             try:
@@ -185,7 +218,13 @@ def tool_wrapper(func: Callable) -> Callable:
                     "get_form_field_value",
                 }
                 upr_tools = UPR_KPI_TOOL_NAMES
-                if tool_name in databank_tools and not sources_norm.get("historical", False):
+                # Inside the form-builder panel, indicator resolution must keep working
+                # regardless of the user's source toggles.
+                if (
+                    tool_name in databank_tools
+                    and not sources_norm.get("historical", False)
+                    and not (fb_active and tool_name == "search_indicator_bank")
+                ):
                     raise ToolExecutionError("Databank source is disabled for this chat request.")
                 if tool_name in upr_tools and not sources_norm.get("upr_documents", False):
                     raise ToolExecutionError("UPR documents source is disabled for this chat request.")
@@ -1733,6 +1772,88 @@ class AIToolsRegistry:
             ]
         }
 
+    # ==================== FORM BUILDER ASSISTANT TOOLS ====================
+    # Only exposed inside the form-builder AI panel (context + RBAC gated).
+    # All writes go to draft versions; the service enforces the invariants.
+
+    @staticmethod
+    def _form_template_service():
+        from app.services.form_template_ai_service import FormTemplateAIService
+
+        return FormTemplateAIService()
+
+    @staticmethod
+    def _require_form_builder_user():
+        user = resolve_form_builder_user()
+        if user is None:
+            raise ToolExecutionError("Authentication required for form template tools.")
+        return user
+
+    @tool_wrapper
+    def get_form_template_full_structure(
+        self, template_id: int, version_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Read the full version-scoped structure of a form template."""
+        from app.services.form_template_ai_service import FormTemplateAIError
+
+        user = self._require_form_builder_user()
+        try:
+            return self._form_template_service().get_full_structure(
+                int(template_id), user, version_id=int(version_id) if version_id else None
+            )
+        except FormTemplateAIError as e:
+            raise ToolExecutionError(str(e))
+
+    @tool_wrapper
+    def create_form_template(self, **schema) -> Dict[str, Any]:
+        """Create a new form template (as a draft) from a canonical schema."""
+        from app.services.form_template_ai_service import FormTemplateAIError
+
+        user = self._require_form_builder_user()
+        try:
+            return self._form_template_service().create_template(schema, user)
+        except FormTemplateAIError as e:
+            raise ToolExecutionError(str(e))
+
+    @tool_wrapper
+    def edit_form_template(
+        self, template_id: int, operations: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Apply edit operations to a template's draft version."""
+        from app.services.form_template_ai_service import FormTemplateAIError
+
+        user = self._require_form_builder_user()
+        try:
+            return self._form_template_service().apply_edits(int(template_id), operations, user)
+        except FormTemplateAIError as e:
+            raise ToolExecutionError(str(e))
+
+    @tool_wrapper
+    def translate_form_template(
+        self, template_id: int, languages: List[str], scope: str = "untranslated"
+    ) -> Dict[str, Any]:
+        """Machine-translate draft template content into the requested languages."""
+        from app.services.form_template_ai_service import FormTemplateAIError
+
+        user = self._require_form_builder_user()
+        try:
+            return self._form_template_service().translate_template(
+                int(template_id), languages, user, scope=scope
+            )
+        except FormTemplateAIError as e:
+            raise ToolExecutionError(str(e))
+
+    @tool_wrapper
+    def discard_template_draft(self, template_id: int) -> Dict[str, Any]:
+        """Discard the draft version of a template (explicit user request only)."""
+        from app.services.form_template_ai_service import FormTemplateAIError
+
+        user = self._require_form_builder_user()
+        try:
+            return self._form_template_service().discard_draft(int(template_id), user)
+        except FormTemplateAIError as e:
+            raise ToolExecutionError(str(e))
+
     # ==================== TOOL DEFINITIONS FOR LLM ====================
 
     def get_tool_definitions_openai(self) -> List[Dict[str, Any]]:
@@ -2258,6 +2379,27 @@ class AIToolsRegistry:
         tool_defs.extend(UPR_TOOL_SPECS)
         tool_defs = _filter_indicator_bank_mgmt_tools(tool_defs)
 
+        # Form-builder assistant: when panel context is active, NEVER expose the full catalog.
+        fb_ctx = resolve_form_builder_context()
+        if fb_ctx:
+            fb_allowed = _form_template_allowed_tools()
+            tool_defs.extend(
+                td for td in FORM_TEMPLATE_TOOL_SPECS
+                if openapi_function_name(td) in fb_allowed
+            )
+            fb_tool_names = set(fb_allowed) | {"search_indicator_bank"}
+            filtered = [
+                td for td in tool_defs
+                if openapi_function_name(td) in fb_tool_names
+            ]
+            logger.info(
+                "Form-builder tool filter: %d tools exposed (%s)",
+                len(filtered),
+                ", ".join(sorted(fb_tool_names)) or "none",
+            )
+            return filtered
+        fb_allowed = set()
+
         sources_norm = resolve_source_config()
         ib_mgmt_allowed = _indicator_bank_mgmt_allowed_tools()
 
@@ -2284,6 +2426,11 @@ class AIToolsRegistry:
             )
 
         allowed.update(ib_mgmt_allowed)
+        allowed.update(fb_allowed)
+        # The agent must be able to resolve indicator ids while building forms,
+        # even when the user disabled the databank source in the panel.
+        if fb_allowed:
+            allowed.add("search_indicator_bank")
 
         if docs_enabled:
             allowed.update({"list_documents", "search_documents", "analyze_unified_plans_focus_areas"})

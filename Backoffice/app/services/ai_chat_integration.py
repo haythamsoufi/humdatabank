@@ -195,6 +195,7 @@ class AIChatIntegration:
                 )
             except Exception as e:
                 logger.debug("sanitize_agent_answer failed: %s", e)
+            form_builder_result = result.get("form_builder_result")
             metadata = {
                 'used_agent': True,
                 'provider': getattr(self.agent, 'provider', 'agent'),
@@ -215,6 +216,7 @@ class AIChatIntegration:
                 'confidence': result.get('confidence'),
                 'grounding_score': result.get('grounding_score'),
                 'sources': result.get('sources'),
+                'form_builder_result': form_builder_result,
             }
 
             # Extract function calls from steps

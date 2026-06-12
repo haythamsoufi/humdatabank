@@ -60,6 +60,19 @@ def sanitize_page_context(value: Any) -> Dict[str, Any]:
         if pd:
             out["pageData"] = pd
 
+    # Form-builder assistant context: small, typed shape only (ints + bool).
+    form_builder = value.get("formBuilder")
+    if isinstance(form_builder, dict):
+        fb: Dict[str, Any] = {"enabled": True}
+        for k in ("template_id", "version_id"):
+            raw = form_builder.get(k)
+            try:
+                if raw is not None and str(raw).strip():
+                    fb[k] = int(raw)
+            except (TypeError, ValueError):
+                pass
+        out["formBuilder"] = fb
+
     return out
 
 

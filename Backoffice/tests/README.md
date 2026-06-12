@@ -22,63 +22,74 @@ tests/
 ### Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 ```
 
-### Run All Tests
+`requirements-dev.txt` includes `pytest-xdist` for parallel runs.
 
-```bash
-pytest
+### Interactive wizard (Windows, recommended)
+
+From the `Backoffice/` directory:
+
+```bat
+tests\run_tests.bat
 ```
 
-### Run Specific Test Categories
+The wizard loads `Backoffice/.env` automatically (same as the app: existing shell variables take precedence).
 
-```bash
-# Unit tests only
-pytest tests/unit/ -m unit
+The wizard lets you choose:
 
-# Integration tests only
-pytest tests/integration/ -m integration
+- **Scope** — all, unit, integration, API, fast (`not slow`), custom path, or marker menu (critical, transaction, auth_security, etc.)
+- **Parallelism** — sequential, `-n auto`, or a fixed worker count
+- **Coverage** — off (default fast), full refresh (`coverage erase` + HTML + XML), append (merge into existing `htmlcov/`), or reports-only overwrite
+- **Extras** — fail-fast (`-x`), slowest-test report (`--durations=20`)
 
-# API tests only
-pytest tests/api/ -m api
+### Quick commands
 
-# Transaction middleware tests
-pytest -m transaction
+```powershell
+# Fast default (no coverage, parallel)
+.\tests\run_tests.ps1
 
-# Static file tests
-pytest -m static
+# One file, merge coverage into existing report
+.\tests\run_tests.ps1 -Path tests\unit\test_middleware\test_api_tracker.py -Coverage -Append -NoParallel
 
-# Email tests
-pytest -m email
+# Full-suite coverage refresh (CI-equivalent reports)
+.\tests\run_full_coverage.ps1 -Parallel
 ```
 
-### Run with Coverage
+### Run without the wizard
 
 ```bash
-# Generate coverage report
-pytest --cov=app --cov-report=html
+# Fast — no coverage, parallel
+pytest -m "not slow" --no-cov -n auto
 
-# View coverage report
-# Open htmlcov/index.html in your browser
+# Unit only
+pytest -m unit --no-cov -n auto
+
+# Integration / API (marked slow automatically)
+pytest -m integration --no-cov
+
+# Full coverage refresh
+coverage erase && pytest --cov=app --cov-report=html:htmlcov --cov-report=xml:coverage.xml -n auto
+
+# Partial run — merge into existing coverage (does not wipe htmlcov totals)
+pytest tests/unit/test_middleware/ --cov=app --cov-append --cov-report=html:htmlcov
 ```
 
-### Run Specific Test File
+### Run Specific Test File / Test
 
 ```bash
-pytest tests/integration/test_transaction_middleware.py
+pytest tests/integration/test_transaction_middleware.py --no-cov
+pytest tests/integration/test_transaction_middleware.py::TestTransactionMiddleware::test_managed_success_commits_and_removes --no-cov
 ```
 
-### Run Specific Test
+### Other markers
 
 ```bash
-pytest tests/integration/test_transaction_middleware.py::TestTransactionMiddleware::test_managed_success_commits_and_removes
-```
-
-### Run in Parallel (faster)
-
-```bash
-pytest -n auto
+pytest -m transaction --no-cov
+pytest -m static --no-cov
+pytest -m email --no-cov
+pytest -m critical --no-cov
 ```
 
 ## Test Markers
@@ -88,7 +99,7 @@ Tests are categorized using pytest markers:
 - `@pytest.mark.unit` - Unit tests (fast, no database)
 - `@pytest.mark.integration` - Integration tests (require database)
 - `@pytest.mark.api` - API endpoint tests
-- `@pytest.mark.slow` - Slow running tests
+- `@pytest.mark.slow` - Slow running tests (auto-applied to `tests/integration/` and `tests/api/`)
 - `@pytest.mark.db` - Tests that require database connection
 - `@pytest.mark.email` - Email functionality tests
 - `@pytest.mark.static` - Static file tests
@@ -179,22 +190,24 @@ Current test coverage is tracked and reported. Aim for:
 - **Target**: 70%+ coverage
 - **Critical paths**: 90%+ coverage
 
-View coverage report:
+View coverage report (after a coverage run):
 
 ```bash
-pytest --cov=app --cov-report=html
+# Windows
+start htmlcov\index.html
+
+# macOS / Linux
 open htmlcov/index.html
 ```
 
+Partial local runs should use `--cov-append` so `htmlcov/` reflects cumulative coverage, not only the last subset. Run `coverage erase` before a full refresh.
+
 ## Continuous Integration
 
-Tests should be run in CI/CD pipeline:
+CI runs the full suite with parallelism and coverage (see `.github/workflows/backoffice-ci.yml`):
 
 ```yaml
-# Example GitHub Actions
-- name: Run tests
-  run: |
-    pytest --cov=app --cov-report=xml
+pytest -n auto --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing
 ```
 
 ## Migration from Old Tests

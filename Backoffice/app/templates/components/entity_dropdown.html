@@ -106,7 +106,7 @@
                         {% set entity = entity_item.entity %}
                         {% set entity_type = entity_item.entity_type %}
                         {% set entity_id = entity_item.entity_id %}
-                        {% set entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
+                        {% set entity_name = entity_item.display_name|default('', true) or EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
                         {% set country_ns_name = get_localized_national_society_name(entity) if entity_type == 'country' else '' %}
                         {% set __ = sorted_entities.append({
                             'entity': entity,
@@ -181,7 +181,7 @@
                         {% set entity = entity_item.entity %}
                         {% set entity_type = entity_item.entity_type %}
                         {% set entity_id = entity_item.entity_id %}
-                        {% set entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
+                        {% set entity_name = entity_item.display_name|default('', true) or EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
                         {% set country_ns_name = get_localized_national_society_name(entity) if entity_type == 'country' else '' %}
                         {% set __ = sorted_entities.append({
                             'entity': entity,
@@ -254,7 +254,11 @@
     let highlightedIndex = -1; // For keyboard navigation
 
     // Set initial value if entity is selected
-    {% if selected_entity_type and selected_entity_id %}
+    {% if selected_entity_display_name is defined and selected_entity_display_name %}
+        selectedEntityId = '{{ selected_entity_type }}:{{ selected_entity_id }}';
+        selectedEntityName = {{ selected_entity_display_name | tojson }};
+        searchInput.value = {{ selected_entity_display_name | tojson }};
+    {% elif selected_entity_type and selected_entity_id %}
         {% set selected_display_name = EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) %}
         selectedEntityId = '{{ selected_entity_type }}:{{ selected_entity_id }}';
         selectedEntityName = {{ selected_display_name | tojson }};

@@ -499,21 +499,22 @@ function setupIndicatorSelection(rowId, sectionId, indicators, filterData, displ
         const filterSelect = document.querySelector(`select[data-row-id="${rowId}"][data-filter-key="${filterKey}"]`);
         if (filterSelect) {
             filterSelect.addEventListener('change', function() {
-                const selectedValue = this.value;
-                currentFilters[filterKey] = selectedValue;
+                currentFilters[filterKey] = this.value;
 
-                debugLog('dynamic-indicators', `Filter ${filterKey} changed to: ${selectedValue}`);
+                debugLog('dynamic-indicators', `Filter ${filterKey} changed to: ${this.value}`);
 
-                // Apply all current filters to get filtered indicators
+                // Update all filter dropdowns first — this may auto-clear stale selections
+                // in other filters whose previously selected value is no longer valid.
+                updateAllFilterOptions();
+
+                // Recompute filtered indicators AFTER filter options are finalised so that
+                // any auto-cleared filters are already reflected in currentFilters.
                 currentIndicators = indicators.filter(indicator => {
                     return Object.entries(currentFilters).every(([key, value]) => {
                         if (!value) return true;
                         return indicator[key] === value;
                     });
                 });
-
-                // Update all other filter options based on the new filtered indicators
-                updateAllFilterOptions();
 
                 searchInput.value = "";
                 updateIndicatorOptions(currentIndicators);
@@ -548,11 +549,19 @@ function setupIndicatorSelection(rowId, sectionId, indicators, filterData, displ
             const filterSelect = document.querySelector(`select[data-row-id="${rowId}"][data-filter-key="${filterKey}"]`);
             if (!filterSelect) return;
 
-            const currentValue = currentFilters[filterKey] || '';
+            // Compute options for this filter based on ALL OTHER active filters only.
+            // A filter must never restrict its own option list — otherwise selecting a value
+            // collapses that dropdown to a single choice the next time it is opened.
+            const indicatorsForThisFilter = indicators.filter(indicator => {
+                return Object.entries(currentFilters).every(([key, value]) => {
+                    if (key === filterKey) return true; // exclude this filter's own constraint
+                    if (!value) return true;
+                    return indicator[key] === value;
+                });
+            });
 
-            // Get all unique values for this filter from currently filtered indicators
             const availableValues = [...new Set(
-                currentIndicators
+                indicatorsForThisFilter
                     .map(indicator => indicator[filterKey])
                     .filter(value => value && typeof value === 'string' && value.trim())
             )].sort();

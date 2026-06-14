@@ -283,6 +283,57 @@ def template_grid_row(template_id):
     return json_ok(row=_build_template_grid_row_dict(template))
 
 
+@bp.route("/templates/validate_excel_import", methods=["POST"])
+@permission_required('admin.templates.create')
+def validate_excel_import():
+    """Validate a Humanitarian Databank Excel export before creating a template."""
+    if 'excel_file' not in request.files:
+        return json_bad_request(message=_('No file provided.'))
+
+    excel_file = request.files['excel_file']
+    if not excel_file or excel_file.filename == '':
+        return json_bad_request(message=_('No file selected.'))
+
+    valid, error_msg, ext = validate_upload_extension_and_mime(excel_file, EXCEL_EXTENSIONS)
+    if not valid:
+        return json_ok(
+            valid=False,
+            message=error_msg or _('Invalid file type. Please upload an Excel file (.xlsx or .xls).'),
+            errors=[error_msg or _('Invalid file type.')],
+            preview={'name': None, 'pages': 0, 'sections': 0, 'items': 0},
+        )
+
+    try:
+        result = TemplateExcelService.validate_import_file(excel_file)
+        return json_ok(**result)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/templates/validate_kobo_import", methods=["POST"])
+@permission_required('admin.templates.create')
+def validate_kobo_import():
+    """Validate a Kobo XLSForm file before creating a template."""
+    kobo_file = request.files.get('kobo_file') or request.files.get('excel_file')
+    if not kobo_file or kobo_file.filename == '':
+        return json_bad_request(message=_('No file selected.'))
+
+    valid, error_msg, ext = validate_upload_extension_and_mime(kobo_file, EXCEL_EXTENSIONS)
+    if not valid:
+        return json_ok(
+            valid=False,
+            message=error_msg or _('Invalid file type. Please upload an Excel file (.xlsx or .xls) in Kobo XLSForm format.'),
+            errors=[error_msg or _('Invalid file type.')],
+            preview={'name': None, 'sections': 0, 'items': 0, 'warnings': []},
+        )
+
+    try:
+        result = KoboXlsImportService.validate_kobo_xls(kobo_file)
+        return json_ok(**result)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
 @bp.route("/templates/import_kobo_xls", methods=["POST"])
 @permission_required('admin.templates.create')
 def import_kobo_xls():
@@ -376,7 +427,10 @@ def new_template():
     # Note: Can't order by FormTemplate.name in SQL since it's a property
     # Will sort in Python after loading
 
-    available_templates = templates_query.all()
+    available_templates = sorted(
+        templates_query.all(),
+        key=lambda t: (get_localized_template_name(t) or '').casefold(),
+    )
 
     # Preselect current user as template owner for new templates
     if request.method == 'GET':

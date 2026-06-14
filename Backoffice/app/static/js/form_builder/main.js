@@ -107,6 +107,9 @@ document.addEventListener('DOMContentLoaded', function() {
             defaultTabSuffix: 'labels',
             autoTranslateType: 'form_item',
             onModalOpen: () => {
+                if (window.ItemModal && typeof window.ItemModal.updateItemTranslationTabLabels === 'function') {
+                    window.ItemModal.updateItemTranslationTabLabels('indicator');
+                }
                 const labelTr = document.getElementById('item-modal-shared-label-translations');
                 const defTr = document.getElementById('item-modal-definition-translations');
                 let lt = {}; let dt = {};
@@ -147,6 +150,11 @@ document.addEventListener('DOMContentLoaded', function() {
             defaultTabSuffix: 'labels',
             autoTranslateType: 'form_item',
             onModalOpen: () => {
+                const questionTypeSelect = document.getElementById('item-question-type-select');
+                const questionType = questionTypeSelect ? questionTypeSelect.value : '';
+                if (window.ItemModal && typeof window.ItemModal.updateItemTranslationTabLabels === 'function') {
+                    window.ItemModal.updateItemTranslationTabLabels('question', questionType);
+                }
                 const labelTr = document.getElementById('item-modal-shared-label-translations');
                 const defTr = document.getElementById('item-modal-definition-translations');
                 let lt = {}; let dt = {};

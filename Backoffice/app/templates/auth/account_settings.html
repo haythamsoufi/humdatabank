@@ -23,34 +23,36 @@
     ]
 ) }}
 
-<div class="container mx-auto px-4 py-8">
+<div class="max-w-5xl mx-auto">
+    <div class="bg-white shadow-md border border-gray-200 mb-6">
+        {% call scroll_tab_bar(inner_id='account-settings-tabs', aria_label=_('Account settings sections')) %}
+            <button type="button" role="tab" id="account-tab-profile" data-tab="profile"
+                    class="{{ admin_underline_tab_btn_classes(true) }}"
+                    aria-controls="panel-profile" aria-selected="true">
+                <i class="fas fa-user-cog mr-1.5"></i>{{ _('Profile') }}
+            </button>
+            <button type="button" role="tab" id="account-tab-entity-access" data-tab="entity-access"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-entity-access" aria-selected="false">
+                <i class="fas fa-key mr-1.5"></i>{{ _('Entity Access') }}
+            </button>
+            <button type="button" role="tab" id="account-tab-notifications" data-tab="notifications"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-notifications" aria-selected="false">
+                <i class="fas fa-bell mr-1.5"></i>{{ _('Notifications') }}
+            </button>
+            <button type="button" role="tab" id="account-tab-devices" data-tab="devices"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-devices" aria-selected="false">
+                <i class="fas fa-mobile-alt mr-1.5"></i>{{ _('Registered Devices') }}
+            </button>
+        {% endcall %}
 
-    <div class="max-w-5xl mx-auto">
-        <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
-            {% call scroll_tab_bar(inner_id='account-settings-tabs', aria_label=_('Account settings sections')) %}
-                    <button type="button" role="tab" data-tab="profile"
-                            class="{{ admin_underline_tab_btn_classes(true) }}">
-                        <i class="fas fa-user-cog mr-1.5"></i>Profile
-                    </button>
-                    <button type="button" role="tab" data-tab="entity-access"
-                            class="{{ admin_underline_tab_btn_classes(false) }}">
-                        <i class="fas fa-key mr-1.5"></i>Entity Access
-                    </button>
-                    <button type="button" role="tab" data-tab="notifications"
-                            class="{{ admin_underline_tab_btn_classes(false) }}">
-                        <i class="fas fa-bell mr-1.5"></i>{{ _('Notifications') }}
-                    </button>
-                    <button type="button" role="tab" data-tab="devices"
-                            class="{{ admin_underline_tab_btn_classes(false) }}">
-                        <i class="fas fa-mobile-alt mr-1.5"></i>Registered Devices
-                    </button>
-            {% endcall %}
-        </div>
-        <div class="account-panel" id="panel-profile">
-        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <div class="p-6">
+        <div class="account-panel" id="panel-profile" role="tabpanel" aria-labelledby="account-tab-profile">
             <div class="mb-6">
-                <h2 class="text-xl font-semibold text-gray-700 mb-2">Personal Information</h2>
-                <p class="text-gray-600 text-sm">Update your personal information below. Your email address cannot be changed.</p>
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">{{ _('Personal Information') }}</h2>
+                <p class="text-gray-600 text-sm">{{ _('Update your personal information below. Your email address cannot be changed.') }}</p>
             </div>
 
             <form method="POST" action="{{ url_for('auth.account_settings') }}">
@@ -141,17 +143,15 @@
                 </div>
             </form>
         </div>
-        </div>
 
-        <div class="account-panel hidden" id="panel-entity-access">
-            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                <div class="mb-6">
-                    <h2 class="text-xl font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-key mr-2 text-blue-600"></i>
-                        Entity Access
-                    </h2>
-                    <p class="text-gray-600 text-sm">View your current entity access and request additional country access.</p>
-                </div>
+        <div class="account-panel hidden" id="panel-entity-access" role="tabpanel" aria-labelledby="account-tab-entity-access">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-key mr-2 text-blue-600"></i>
+                    {{ _('Entity Access') }}
+                </h2>
+                <p class="text-gray-600 text-sm">{{ _('View your current entity access and request additional country access.') }}</p>
+            </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
@@ -161,12 +161,7 @@
                             <div class="max-h-72 overflow-y-auto divide-y divide-gray-200">
                                 {% for item in entity_access_list %}
                                 <div class="px-4 py-3 bg-white">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm text-gray-900">{{ item.entity_name }}</span>
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                                            {{ item.entity_type|replace('_', ' ')|title }}
-                                        </span>
-                                    </div>
+                                    <span class="text-sm text-gray-900">{{ item.entity_name }}</span>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -267,34 +262,29 @@
                     </div>
                     {% endif %}
                 </div>
-            </div>
         </div>
 
-        <div class="account-panel hidden" id="panel-notifications">
-            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                <div class="mb-6">
-                    <h2 class="text-xl font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-bell mr-2 text-blue-600"></i>
-                        {{ _('Notification Preferences') }}
-                    </h2>
-                    <p class="text-gray-600 text-sm">{{ _('Configure email, push, and sound settings for your notifications.') }}</p>
-                </div>
+        <div class="account-panel hidden" id="panel-notifications" role="tabpanel" aria-labelledby="account-tab-notifications">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-bell mr-2 text-blue-600"></i>
+                    {{ _('Notification Preferences') }}
+                </h2>
+                <p class="text-gray-600 text-sm">{{ _('Configure email, push, and sound settings for your notifications.') }}</p>
+            </div>
 
                 {% with preferences=notification_preferences %}
                 {% include "notifications/_preferences_form.html" %}
                 {% endwith %}
-            </div>
         </div>
 
-        <!-- Registered Devices Section -->
-        <div class="account-panel hidden" id="panel-devices">
-        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <div class="account-panel hidden" id="panel-devices" role="tabpanel" aria-labelledby="account-tab-devices">
             <div class="mb-6">
                 <h2 class="text-xl font-semibold text-gray-700 mb-2">
                     <i class="fas fa-mobile-alt mr-2 text-blue-600"></i>
-                    Registered Devices
+                    {{ _('Registered Devices') }}
                 </h2>
-                <p class="text-gray-600 text-sm">Manage your registered mobile devices for push notifications.</p>
+                <p class="text-gray-600 text-sm">{{ _('Manage your registered mobile devices for push notifications.') }}</p>
             </div>
 
             {% if registered_devices %}
@@ -437,8 +427,8 @@
             </div>
             {% endif %}
         </div>
-        </div>
 
+        </div>{# /p-6 #}
     </div>
 </div>
 

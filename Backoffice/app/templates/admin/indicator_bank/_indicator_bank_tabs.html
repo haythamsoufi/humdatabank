@@ -1,0 +1,46 @@
+{# Client-side tab strip — buttons toggle .ib-tab-panel panels (see indicator_bank.html extra_js). #}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+{% set tab = active_tab|default('indicators') %}
+{% call scroll_tab_bar(inner_id='indicator-bank-tabs', aria_label=_('Indicator bank sections'), wrapper_class='px-4 sm:px-6') %}
+    <button type="button" role="tab" data-tab="indicators" id="tab-btn-indicators"
+            aria-controls="panel-indicators"
+            aria-selected="{{ 'true' if tab == 'indicators' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(tab == 'indicators') }}">
+        <i class="fas fa-list mr-1.5"></i>{{ _('Indicators') }}
+    </button>
+    {% if can_manage_org %}
+    <button type="button" role="tab" data-tab="sectors" id="tab-btn-sectors"
+            aria-controls="panel-sectors"
+            aria-selected="{{ 'true' if tab == 'sectors' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(tab == 'sectors') }}">
+        <i class="fas fa-layer-group mr-1.5"></i>{{ _('Sectors & Subsectors') }}
+    </button>
+    {% endif %}
+    {% if can_edit_indicators %}
+    <button type="button" role="tab" data-tab="common_words" id="tab-btn-common_words"
+            aria-controls="panel-common_words"
+            aria-selected="{{ 'true' if tab == 'common_words' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(tab == 'common_words') }}">
+        <i class="fas fa-book mr-1.5"></i>{{ _('Common words') }}
+    </button>
+    <button type="button" role="tab" data-tab="types" id="tab-btn-types"
+            aria-controls="panel-types"
+            aria-selected="{{ 'true' if tab == 'types' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(tab == 'types') }}">
+        <i class="fas fa-shapes mr-1.5"></i>{{ _('Types') }}
+    </button>
+    <button type="button" role="tab" data-tab="units" id="tab-btn-units"
+            aria-controls="panel-units"
+            aria-selected="{{ 'true' if tab == 'units' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(tab == 'units') }}">
+        <i class="fas fa-balance-scale mr-1.5"></i>{{ _('Units') }}
+    </button>
+    <button type="button" role="tab" data-tab="spef" id="tab-btn-spef"
+            aria-controls="panel-spef"
+            aria-selected="{{ 'true' if tab == 'spef' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(tab == 'spef') }}">
+        <i class="fas fa-bullseye mr-1.5"></i>{{ _('SPs & EFs') }}
+    </button>
+    {% endif %}
+{% endcall %}

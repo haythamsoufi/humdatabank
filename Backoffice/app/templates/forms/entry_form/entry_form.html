@@ -154,7 +154,7 @@
                                     {{ get_localized_country_name(assignment_status.country) }}
                                 {% endif %}
                             </p>
-                            <div class="text-sm text-gray-600 mt-2">
+                            <div class="text-sm text-gray-600 mt-2 inline-flex flex-wrap items-center gap-x-0">
                                 <span class="font-medium">{{ _('Due Date:') }}</span> {{ assignment_status.due_date|datetime_local('date') if assignment_status.due_date else _('N/A') }}
                                 <span class="mx-2">•</span>
                                 <span class="font-medium">{{ _('Status:') }}</span>
@@ -175,17 +175,13 @@
                                     {% endif %}">
                                     {{ localize_status(assignment_status.status) }}
                                 </span>
+                                {% if completion_rate is defined %}
+                                {# Completion tiers match dashboard.html / MobileApp AssignmentCard._getCompletionColor #}
+                                {% set cr = completion_rate|default(0)|float %}
+                                <span class="mx-2">•</span>
+                                <span class="font-medium">{{ _('Completion:') }}</span>&nbsp;<span class="font-medium {% if cr >= 80 %}text-green-700 font-semibold{% elif cr >= 50 %}text-amber-600 font-semibold{% elif cr >= 25 %}text-amber-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}">{{ "{:.1f}%".format(completion_rate) }}</span>
+                                {% endif %}
                             </div>
-                            {% if completion_rate is defined %}
-                            {# Display Completion Rate — tiers match dashboard.html / MobileApp AssignmentCard._getCompletionColor #}
-                            {% set cr = completion_rate|default(0)|float %}
-                            <p class="text-sm text-gray-600 mt-1 relative inline-flex items-center group">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 align-middle {% if cr >= 80 %}text-green-600{% elif cr >= 50 %}text-amber-500{% elif cr >= 25 %}text-amber-500{% else %}text-red-500{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {{ _('Completion') }}:&nbsp;<span class="font-medium {% if cr >= 80 %}text-green-700 font-semibold{% elif cr >= 50 %}text-amber-600 font-semibold{% elif cr >= 25 %}text-amber-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}">{{ "{:.1f}%".format(completion_rate) }}</span>
-                            </p>
-                            {% endif %}
                         </div>
                     </div>
 
@@ -751,15 +747,21 @@
                                                 {% set is_blank_block = field.field_type_for_js|lower == 'blank' %}
 
                                                 {% if is_blank_block %}
-                                                    {# Render a Blank/Note block. If the label is empty it acts as spacer; otherwise, show the text as a note #}
-                                                    <div class="form-item-block px-2 flex items-center min-h-[2rem]"
+                                                    {# Blank/Note: Question Text (label) in bold, Definition as normal text below #}
+                                                    {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
+                                                    {% set field_display_definition = field._display_definition if hasattr(field, '_display_definition') and field._display_definition else field.definition %}
+                                                    {% set blank_has_label = field_display_label and field_display_label|trim %}
+                                                    {% set blank_has_definition = field_display_definition and field_display_definition|trim %}
+                                                    <div class="form-item-block px-2 flex flex-col justify-center min-h-[2rem]"
                                                          data-item-id="{{ field.id }}"
                                                          data-item-type="blank"
                                                          data-layout-width="{{ field.layout_column_width or 12 }}"
                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}">
-                                                        {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-                                                        {% if field_display_label %}
-<p class="text-gray-700 text-sm whitespace-pre-wrap text-left">{{ field_display_label }}</p>
+                                                        {% if blank_has_label %}
+                                                            <p class="text-gray-800 text-sm font-semibold whitespace-pre-wrap text-left">{{ field_display_label }}</p>
+                                                        {% endif %}
+                                                        {% if blank_has_definition %}
+                                                            <p class="text-gray-700 text-sm whitespace-pre-wrap text-left{% if blank_has_label %} mt-1{% endif %}">{{ field_display_definition }}</p>
                                                         {% endif %}
                                                     </div>
                                                 {% elif field.item_type and field.item_type.startswith('plugin_') %}
@@ -2617,52 +2619,48 @@
         </div> {# End of container #}
 
 
-        {# Excel Options Modal Structure - uses shared modal_shell #}
+        {# Excel Options Modal — shared excel_io_modal #}
+        {% from "macros/excel_io_modal.html" import excel_io_modal %}
         {% from "macros/modal_shell.html" import modal_shell %}
         {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}
+        {% if not is_preview_mode and not is_public_submission %}
+            {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
+            {% set aes_id = assignment_status.id if assignment_status and assignment_status.id is not none else 0 %}
+            {% set _show_export = tmpl and tmpl.enable_export_excel %}
+            {% set _show_import = tmpl and tmpl.enable_import_excel %}
+            {% set _csrf_field %}{{ form.csrf_token if form else '' }}{% endset %}
+            {% call excel_io_modal(
+                'excel-options-modal',
+                modal_title=excel_title,
+                aria_label=_('Excel Options'),
+                max_width='max-w-sm',
+                close_class='close-modal-btn',
+                layout='simple',
+                show_export=_show_export,
+                show_import=_show_import,
+                export_url=url_for('excel.export_assignment_excel', aes_id=aes_id) if _show_export else none,
+                export_label=_('Export Data Template (.xlsx)'),
+                import_form_id='modalImportExcelForm',
+                import_action=url_for('excel.import_assignment_excel', aes_id=aes_id) if _show_import else none,
+                dropzone_id='entry-excel-dropzone',
+                dropzone_input_id='modal_excel_file',
+                dropzone_accept='.xlsx',
+                dropzone_max_size_bytes=10485760,
+                dropzone_title=_('Click or drag Excel file here to import'),
+                import_submit_label=_('Import Data'),
+                import_submit_disabled=not can_edit,
+                import_hidden_fields=_csrf_field,
+                import_note=_('Supported formats: .xlsx') ~ ' • ' ~ _('Maximum file size: 10MB')
+            ) %}{% endcall %}
+        {% else %}
         {% call modal_shell('excel-options-modal', excel_title, aria_label=_('Excel Options'), max_width='max-w-sm', title_safe=true, close_class='close-modal-btn') %}
-                <div class="flex flex-col space-y-4">
-                    {% if not is_preview_mode and not is_public_submission %}
-                        {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
-                        {% set aes_id = assignment_status.id if assignment_status and assignment_status.id is not none else 0 %}
-                        {% if tmpl and tmpl.enable_export_excel %}
-                        <a href="{{ url_for('excel.export_assignment_excel', aes_id=aes_id) }}"
-                           class="btn btn-success">
-                            <i class="fas fa-download mr-2"></i> {{ _('Export Data Template (.xlsx)') }}
-                        </a>
-                        {% endif %}
-                        {% if tmpl and tmpl.enable_import_excel %}
-                        <form id="modalImportExcelForm" method="POST" action="{{ url_for('excel.import_assignment_excel', aes_id=aes_id) }}" enctype="multipart/form-data" class="flex flex-col space-y-3">
-                            {{ form.csrf_token if form else '' }}
-                            <label for="modal_excel_file" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Excel file to Import:') }}</label>
-                            <div class="file-upload-wrapper relative h-40 border-2 border-dashed border-gray-300 rounded-lg">
-                                <input type="file" name="excel_file" id="modal_excel_file" accept=".xlsx" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" required/>
-                                <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
-                                    <div class="text-center">
-                                        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
-                                        <p class="text-sm text-gray-500">{{ _('Click or drag Excel file here to import') }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <p class="mt-2 text-sm text-gray-500">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                {{ _('Supported formats: .xlsx') }} • {{ _('Maximum file size: 10MB') }}
-                            </p>
-                            <button type="submit" class="btn btn-success"
-                                      {% if not can_edit %}disabled{% endif %}>
-                                <i class="fas fa-upload mr-2"></i> {{ _('Import Data') }}
-                            </button>
-                         </form>
-                        {% endif %}
-                    {% else %}
-                        <div class="text-center py-8">
-                            <i class="fas fa-eye text-gray-400 text-3xl mb-3"></i>
-                            <p class="text-gray-600 font-medium">{{ _('Excel Import/Export Not Available') }}</p>
-                            <p class="text-gray-500 text-sm mt-1">{% if is_preview_mode %}{{ _('This functionality is only available when working with actual assignments.') }}{% else %}{{ _('Excel operations are not available for public submissions.') }}{% endif %}</p>
-                        </div>
-                    {% endif %}
+                <div class="text-center py-8">
+                    <i class="fas fa-eye text-gray-400 text-3xl mb-3"></i>
+                    <p class="text-gray-600 font-medium">{{ _('Excel Import/Export Not Available') }}</p>
+                    <p class="text-gray-500 text-sm mt-1">{% if is_preview_mode %}{{ _('This functionality is only available when working with actual assignments.') }}{% else %}{{ _('Excel operations are not available for public submissions.') }}{% endif %}</p>
                 </div>
         {% endcall %}
+        {% endif %}
 
         {# Document upload modal: modal_shell data_attrs for document-upload.js.
            For messages that contain %(max)s or %(filename)s, pass max='%(max)s' / filename='%(filename)s'
@@ -2951,11 +2949,41 @@
              class="presence-floating-bar"
              data-aes-id="{{ assignment_status.id }}"
              data-current-user-id="{{ current_user.id if current_user and current_user.is_authenticated else 0 }}"
+             data-teams-icon-url="{{ static_url('images/teams-icon.svg') }}"
+             data-teams-chat-label="{{ _('Chat') }}"
              aria-live="polite"
              style="display:none;">
-            <i class="fas fa-users text-gray-500 flex-shrink-0"></i>
-            <span class="text-sm text-gray-600 whitespace-nowrap">{{ _('Currently with you editing this form:') }}</span>
-            <div id="presence-users" class="flex -space-x-2"></div>
+            {# Collapsed row: icons only (default) #}
+            <div id="presence-collapsed-view" class="presence-bar-row">
+                <i class="fas fa-users flex-shrink-0"></i>
+                <div id="presence-users"></div>
+                <button type="button"
+                        id="presence-expand-btn"
+                        class="presence-chevron-btn"
+                        title="{{ _('Show editors') }}"
+                        aria-label="{{ _('Expand editors list') }}"
+                        aria-expanded="false"
+                        aria-controls="presence-expanded-view">
+                    <i class="fas fa-chevron-up text-xs"></i>
+                </button>
+            </div>
+            {# Expanded panel: names + Teams links #}
+            <div id="presence-expanded-view">
+                <div class="presence-bar-row presence-bar-header">
+                    <i class="fas fa-users flex-shrink-0"></i>
+                    <span class="presence-label">{{ _('Currently with you editing this form:') }}</span>
+                    <button type="button"
+                            id="presence-collapse-btn"
+                            class="presence-chevron-btn"
+                            title="{{ _('Collapse') }}"
+                            aria-label="{{ _('Collapse editors list') }}"
+                            aria-expanded="true"
+                            aria-controls="presence-expanded-view">
+                        <i class="fas fa-chevron-down text-xs"></i>
+                    </button>
+                </div>
+                <div id="presence-users-list" class="presence-users-list"></div>
+            </div>
         </div>
     </div>
     {% endif %}

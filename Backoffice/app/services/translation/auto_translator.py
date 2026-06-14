@@ -12,6 +12,7 @@ import json
 import logging
 import requests
 import re
+import urllib.parse
 from typing import Dict, List, Optional, Union, Tuple
 from flask import current_app
 import time
@@ -311,6 +312,14 @@ class LibreTranslateService(TranslationService):
             self.base_url,
         )
 
+    def _is_localhost(self) -> bool:
+        """Return True if base_url points to localhost or 127.0.0.1 (any port)."""
+        try:
+            host = urllib.parse.urlparse(self.base_url).hostname or ""
+            return host in ("localhost", "127.0.0.1", "::1")
+        except Exception:
+            return False
+
     def _get_supported_languages(self) -> Optional[set[str]]:
         """
         Best-effort fetch of supported languages from LibreTranslate (/languages).
@@ -319,8 +328,8 @@ class LibreTranslateService(TranslationService):
         - set({...}) of language codes when available
         - None if unknown/unavailable (we then assume "maybe supported" and try anyway)
         """
-        # Don't even try to fetch languages when running against known-disabled localhost defaults.
-        if self.base_url in ("http://localhost:5000", "http://127.0.0.1:5000"):
+        # Don't probe localhost — it's a dev/Docker setup that may not be running.
+        if self._is_localhost():
             return None
 
         now = time.time()
@@ -332,7 +341,7 @@ class LibreTranslateService(TranslationService):
             return self._supported_languages
 
         try:
-            resp = requests.get(f"{self.base_url}/languages", timeout=10)
+            resp = requests.get(f"{self.base_url}/languages", timeout=2)
             resp.raise_for_status()
             data = resp.json()
             # Common response: [{"code":"en","name":"English"}, ...]
@@ -367,9 +376,9 @@ class LibreTranslateService(TranslationService):
 
     def translate_text(self, text: str, target_language: str, source_language: str = 'en') -> Optional[str]:
         """Translate text using LibreTranslate"""
-        # Skip if pointing to localhost:5000 (default port, likely not available)
-        # Allow other localhost ports (e.g., 5001 for Docker-mapped port)
-        if self.base_url == 'http://localhost:5000' or self.base_url == 'http://127.0.0.1:5000':
+        # Skip localhost entirely — a locally-running LibreTranslate instance will use the
+        # circuit breaker after the first failure; short-circuiting here avoids the initial probe.
+        if self._is_localhost():
             return None
 
         # Circuit breaker: don't retry a host that just refused connections.

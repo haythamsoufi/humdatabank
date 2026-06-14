@@ -155,6 +155,9 @@ def build_form_context_lookups_from_activity_logs(
             )
             .all()
         )
+        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+
+        aes_countries = batch_countries_for_aes_list(rows)
         for aes in rows:
             template_name = assignment_name = country_name = None
             try:
@@ -163,7 +166,7 @@ def build_form_context_lookups_from_activity_logs(
                     template_name = af.template.name
                 if af:
                     assignment_name = af.period_name
-                c = aes.country
+                c = _country_for_aes(aes, aes_countries)
                 if c and hasattr(c, "name"):
                     country_name = c.name
             except Exception:
@@ -218,8 +221,16 @@ def _resolve_form_context(
                 if aes.assigned_form and aes.assigned_form.template:
                     template_name = aes.assigned_form.template.name
                 assignment_name = aes.assigned_form.period_name if aes.assigned_form else None
-                if aes.country:
-                    country_name = aes.country.name
+                if aes.entity_type == 'country':
+                    from app.models.core import Country
+                    country = Country.query.get(aes.entity_id)
+                    if country:
+                        country_name = country.name
+                else:
+                    from app.utils.api_serialization import _country_for_aes
+                    country = _country_for_aes(aes)
+                    if country:
+                        country_name = country.name
         elif template_id is not None:
             from app.models import FormTemplate
 

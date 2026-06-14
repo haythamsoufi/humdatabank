@@ -51,14 +51,24 @@ def _extract_form_image_with_vision(image_bytes: bytes, mime_type: str, filename
     prompt = (
         "The user pasted a screenshot of a form, questionnaire, or table they want recreated "
         "as a humanitarian data-collection template.\n\n"
-        "Extract ALL visible structure in plain text:\n"
-        "- Form title and section headings\n"
-        "- Every question/field label\n"
-        "- Inferred field types (text, textarea, number, date, yes/no, single choice, "
-        "multiple choice, matrix/table)\n"
-        "- Choice options, table rows/columns, required markers, instructions, and notes\n\n"
-        "Use clear headings and bullet lists. Preserve wording from the image where readable. "
-        "If the image is not a form, say so briefly and describe what you see."
+        "Extract EVERY question/field using this exact format for each one:\n\n"
+        "FIELD: <clean label — no leading numbers, letters, or bullets; no trailing asterisks>\n"
+        "TYPE: <text | textarea | number | percentage | date | datetime | yes/no | "
+        "single_choice | multiple_choice | matrix>\n"
+        "REQUIRED: <yes | no>\n"
+        "HELP: <any explanatory text, guidance, examples, or instructions shown beneath the "
+        "field — omit this line if none>\n"
+        "OPTIONS: <comma-separated choices for single_choice or multiple_choice — omit if none>\n\n"
+        "Before listing fields, output:\n"
+        "FORM TITLE: <title>\n"
+        "SECTION: <name> (only for genuine section headings that group multiple questions; "
+        "skip form preamble banners, footer notes, and submit buttons — those are not sections)\n\n"
+        "Rules:\n"
+        "- Extract ALL visible fields without exception.\n"
+        "- Strip question numbers (1., Q2., a)) and required markers (* ∗) from FIELD labels.\n"
+        "- Put all helper text / guidance / examples under HELP, never in FIELD.\n"
+        "- Preserve original wording in labels and help text.\n"
+        "- If the image is not a form, say so briefly and describe what you see."
     )
 
     from openai import OpenAI
@@ -76,7 +86,7 @@ def _extract_form_image_with_vision(image_bytes: bytes, mime_type: str, filename
                 ],
             },
         ],
-        max_completion_tokens=2500,
+        max_completion_tokens=4000,
     )
     msg = resp.choices[0].message if (resp and resp.choices) else None
     text = (getattr(msg, "content", None) or "").strip()
@@ -86,13 +96,25 @@ def _extract_form_image_with_vision(image_bytes: bytes, mime_type: str, filename
 
 
 def _guess_sections_from_text(text: str) -> list:
-    """Lightweight section heading detection for vision-extracted plain text."""
+    """Lightweight section heading detection for vision-extracted plain text.
+
+    Recognises both the structured ``SECTION: <name>`` format produced by the
+    vision prompt and the legacy heuristic (ALL-CAPS / markdown headings) used
+    for plain document extractions.
+    """
     sections = []
     for line in (text or "").splitlines():
         raw = line.strip()
-        if not raw or len(raw) > 200:
+        if not raw or len(raw) > 300:
             continue
-        if re.match(r"^(?:#{1,3}\s+|[A-Z][A-Za-z0-9 ,/&()-]{2,80}:?\s*)$", raw):
+        # Structured format produced by the updated vision prompt
+        m = re.match(r"^SECTION:\s*(.+)$", raw, re.IGNORECASE)
+        if m:
+            title = m.group(1).strip()[:300]
+            if title:
+                sections.append({"title": title})
+        # Legacy heuristic: markdown headings or ALL-CAPS title-case lines
+        elif re.match(r"^(?:#{1,3}\s+|[A-Z][A-Za-z0-9 ,/&()-]{2,80}:?\s*)$", raw):
             if not re.match(r"^\d+[\.)]\s", raw):
                 sections.append({"title": raw.lstrip("# ").strip()[:300]})
         if len(sections) >= 100:

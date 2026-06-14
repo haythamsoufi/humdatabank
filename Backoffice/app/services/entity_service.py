@@ -4,6 +4,10 @@ Entity Service - Centralized service for multi-level organizational entity opera
 This service provides a unified interface for working with different entity types
 (countries, NS branches/sub-branches/local units, secretariat divisions/departments).
 """
+from collections import defaultdict
+
+from sqlalchemy.orm import joinedload
+
 from app.models import db
 from app.models.core import Country
 from app.models.organization import NationalSociety, NSBranch, NSSubBranch, NSLocalUnit, SecretariatDivision, SecretariatDepartment, SecretariatRegionalOffice, SecretariatClusterOffice
@@ -50,6 +54,268 @@ class EntityService:
 
         rows.sort(key=_key)
         return rows
+
+    # Eager-load options for hierarchy display (avoids lazy loads on parent relations).
+    _HIERARCHY_LOAD_OPTIONS = {
+        EntityType.ns_branch.value: (joinedload(NSBranch.country),),
+        EntityType.ns_subbranch.value: (
+            joinedload(NSSubBranch.branch).joinedload(NSBranch.country),
+        ),
+        EntityType.ns_localunit.value: (
+            joinedload(NSLocalUnit.branch).joinedload(NSBranch.country),
+            joinedload(NSLocalUnit.subbranch),
+        ),
+        EntityType.department.value: (joinedload(SecretariatDepartment.division),),
+        EntityType.cluster_office.value: (joinedload(SecretariatClusterOffice.regional_office),),
+    }
+
+    @staticmethod
+    def _normalize_entity_pair(entity_type, entity_id):
+        """Return (entity_type, int_id) or None if invalid."""
+        if not entity_type or entity_id is None:
+            return None
+        try:
+            return (str(entity_type), int(entity_id))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def prefetch_entities(pairs, include_hierarchy=True):
+        """Batch-fetch entities grouped by type.
+
+        Args:
+            pairs: Iterable of (entity_type, entity_id) tuples.
+            include_hierarchy (bool): Eager-load parent relations needed for hierarchy names.
+
+        Returns:
+            dict: Mapping of (entity_type, entity_id) -> model instance.
+        """
+        ids_by_type = defaultdict(set)
+        for entity_type, entity_id in pairs or []:
+            normalized = EntityService._normalize_entity_pair(entity_type, entity_id)
+            if normalized:
+                ids_by_type[normalized[0]].add(normalized[1])
+
+        result = {}
+        for entity_type, entity_ids in ids_by_type.items():
+            model_class = EntityService.ENTITY_MODEL_MAP.get(entity_type)
+            if not model_class or not entity_ids:
+                continue
+
+            query = model_class.query.filter(model_class.id.in_(entity_ids))
+            if include_hierarchy:
+                for option in EntityService._HIERARCHY_LOAD_OPTIONS.get(entity_type, ()):
+                    query = query.options(option)
+
+            for entity in query.all():
+                result[(entity_type, entity.id)] = entity
+
+        return result
+
+    @staticmethod
+    def _display_name_from_entity(entity_type, entity):
+        """Plain display name from a loaded entity object."""
+        if not entity:
+            return None
+        return entity.name
+
+    @staticmethod
+    def _localized_display_name_from_entity(entity_type, entity):
+        """Localized plain display name from a loaded entity object."""
+        if not entity:
+            return None
+        if entity_type == EntityType.country.value:
+            from app.utils.form_localization import get_localized_country_name
+            return get_localized_country_name(entity)
+        return entity.name
+
+    @staticmethod
+    def _hierarchy_from_entity(entity_type, entity):
+        """Hierarchy path from a loaded entity object (non-localized)."""
+        if not entity:
+            return f"Unknown {entity_type}"
+
+        hierarchy_parts = []
+
+        if entity_type == EntityType.country.value:
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.ns_branch.value:
+            if hasattr(entity, 'country') and entity.country:
+                hierarchy_parts.append(entity.country.name)
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.ns_subbranch.value:
+            if hasattr(entity, 'branch') and entity.branch:
+                if entity.branch.country:
+                    hierarchy_parts.append(entity.branch.country.name)
+                hierarchy_parts.append(entity.branch.name)
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.ns_localunit.value:
+            if hasattr(entity, 'branch') and entity.branch:
+                if entity.branch.country:
+                    hierarchy_parts.append(entity.branch.country.name)
+                hierarchy_parts.append(entity.branch.name)
+                if hasattr(entity, 'subbranch') and entity.subbranch:
+                    hierarchy_parts.append(entity.subbranch.name)
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.division.value:
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.department.value:
+            if hasattr(entity, 'division') and entity.division:
+                hierarchy_parts.append(entity.division.name)
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.regional_office.value:
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.cluster_office.value:
+            if hasattr(entity, 'regional_office') and entity.regional_office:
+                hierarchy_parts.append(entity.regional_office.name)
+            hierarchy_parts.append(entity.name)
+
+        return " > ".join(hierarchy_parts) if hierarchy_parts else entity.name
+
+    @staticmethod
+    def _localized_hierarchy_from_entity(entity_type, entity):
+        """Localized hierarchy path from a loaded entity object."""
+        if not entity:
+            return f"Unknown {entity_type}"
+
+        from app.utils.form_localization import get_localized_country_name
+        hierarchy_parts = []
+
+        if entity_type == EntityType.country.value:
+            hierarchy_parts.append(get_localized_country_name(entity))
+
+        elif entity_type == EntityType.ns_branch.value:
+            if hasattr(entity, 'country') and entity.country:
+                hierarchy_parts.append(get_localized_country_name(entity.country))
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.ns_subbranch.value:
+            if hasattr(entity, 'branch') and entity.branch:
+                if entity.branch.country:
+                    hierarchy_parts.append(get_localized_country_name(entity.branch.country))
+                hierarchy_parts.append(entity.branch.name)
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.ns_localunit.value:
+            if hasattr(entity, 'branch') and entity.branch:
+                if entity.branch.country:
+                    hierarchy_parts.append(get_localized_country_name(entity.branch.country))
+                hierarchy_parts.append(entity.branch.name)
+                if hasattr(entity, 'subbranch') and entity.subbranch:
+                    hierarchy_parts.append(entity.subbranch.name)
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.division.value:
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.department.value:
+            if hasattr(entity, 'division') and entity.division:
+                hierarchy_parts.append(entity.division.name)
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.regional_office.value:
+            hierarchy_parts.append(entity.name)
+
+        elif entity_type == EntityType.cluster_office.value:
+            if hasattr(entity, 'regional_office') and entity.regional_office:
+                hierarchy_parts.append(entity.regional_office.name)
+            hierarchy_parts.append(entity.name)
+
+        return " > ".join(hierarchy_parts) if hierarchy_parts else entity.name
+
+    @staticmethod
+    def _name_from_entity(entity_type, entity, include_hierarchy=False, localized=False):
+        """Resolve display or hierarchy name from a loaded entity."""
+        if not entity:
+            if localized:
+                return f"Unknown {entity_type} (ID: unknown)"
+            return f"Unknown {entity_type}"
+
+        if include_hierarchy:
+            if localized:
+                return EntityService._localized_hierarchy_from_entity(entity_type, entity)
+            return EntityService._hierarchy_from_entity(entity_type, entity)
+
+        if localized:
+            return EntityService._localized_display_name_from_entity(entity_type, entity)
+        return EntityService._display_name_from_entity(entity_type, entity)
+
+    @staticmethod
+    def batch_entity_names(pairs, include_hierarchy=False, localized=False, prefetched=None):
+        """Batch-resolve entity display names using prefetched objects.
+
+        Args:
+            pairs: Iterable of (entity_type, entity_id) tuples.
+            include_hierarchy (bool): Return full hierarchy path when True.
+            localized (bool): Use localized country names when True.
+            prefetched (dict, optional): Pre-loaded {(entity_type, entity_id): model} map.
+
+        Returns:
+            dict: Mapping of (entity_type, entity_id) -> name string.
+        """
+        normalized_pairs = []
+        for entity_type, entity_id in pairs or []:
+            normalized = EntityService._normalize_entity_pair(entity_type, entity_id)
+            if normalized:
+                normalized_pairs.append(normalized)
+
+        if prefetched is None:
+            prefetched = EntityService.prefetch_entities(
+                normalized_pairs,
+                include_hierarchy=include_hierarchy,
+            )
+
+        names = {}
+        for pair in normalized_pairs:
+            entity = prefetched.get(pair)
+            if entity:
+                names[pair] = EntityService._name_from_entity(
+                    pair[0], entity, include_hierarchy=include_hierarchy, localized=localized,
+                )
+            else:
+                entity_type, entity_id = pair
+                if include_hierarchy:
+                    names[pair] = f"Unknown {entity_type}"
+                else:
+                    names[pair] = f"Unknown {entity_type} (ID: {entity_id})"
+        return names
+
+    @staticmethod
+    def attach_display_names(
+        entity_rows,
+        *,
+        include_hierarchy=True,
+        localized=True,
+        key="display_name",
+    ):
+        """Add display names to dicts that include ``entity_type`` and ``entity_id`` keys."""
+        if not entity_rows:
+            return {}
+        pairs = [
+            (row.get("entity_type"), row.get("entity_id"))
+            for row in entity_rows
+            if row.get("entity_type") is not None and row.get("entity_id") is not None
+        ]
+        names = EntityService.batch_entity_names(
+            pairs,
+            include_hierarchy=include_hierarchy,
+            localized=localized,
+        )
+        for row in entity_rows:
+            et = row.get("entity_type")
+            eid = row.get("entity_id")
+            if et is None or eid is None:
+                continue
+            normalized = EntityService._normalize_entity_pair(et, eid)
+            row[key] = names.get(normalized, "") if normalized else ""
+        return names
 
     @staticmethod
     def get_entity(entity_type, entity_id):
@@ -155,61 +421,7 @@ class EntityService:
             str: Localized hierarchy path (e.g., 'Kenya > Nairobi Branch > Downtown Sub-branch')
         """
         entity = EntityService.get_entity(entity_type, entity_id)
-        if not entity:
-            return f"Unknown {entity_type}"
-
-        from app.utils.form_localization import get_localized_country_name
-        hierarchy_parts = []
-
-        if entity_type == EntityType.country.value:
-            # Country is top level
-            hierarchy_parts.append(get_localized_country_name(entity))
-
-        elif entity_type == EntityType.ns_branch.value:
-            # Branch: Country > Branch
-            if hasattr(entity, 'country') and entity.country:
-                hierarchy_parts.append(get_localized_country_name(entity.country))
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.ns_subbranch.value:
-            # Sub-branch: Country > Branch > Sub-branch
-            if hasattr(entity, 'branch') and entity.branch:
-                if entity.branch.country:
-                    hierarchy_parts.append(get_localized_country_name(entity.branch.country))
-                hierarchy_parts.append(entity.branch.name)
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.ns_localunit.value:
-            # Local Unit: Country > Branch > [Sub-branch] > Local Unit
-            if hasattr(entity, 'branch') and entity.branch:
-                if entity.branch.country:
-                    hierarchy_parts.append(get_localized_country_name(entity.branch.country))
-                hierarchy_parts.append(entity.branch.name)
-                if hasattr(entity, 'subbranch') and entity.subbranch:
-                    hierarchy_parts.append(entity.subbranch.name)
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.division.value:
-            # Division is top level for Secretariat
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.department.value:
-            # Department: Division > Department
-            if hasattr(entity, 'division') and entity.division:
-                hierarchy_parts.append(entity.division.name)
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.regional_office.value:
-            # Regional Office
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.cluster_office.value:
-            # Cluster Office: Regional Office > Cluster Office
-            if hasattr(entity, 'regional_office') and entity.regional_office:
-                hierarchy_parts.append(entity.regional_office.name)
-            hierarchy_parts.append(entity.name)
-
-        return " > ".join(hierarchy_parts) if hierarchy_parts else entity.name
+        return EntityService._localized_hierarchy_from_entity(entity_type, entity)
 
     @staticmethod
     def get_entity_hierarchy(entity_type, entity_id):
@@ -223,60 +435,33 @@ class EntityService:
             str: Hierarchy path (e.g., 'Kenya > Nairobi Branch > Downtown Sub-branch')
         """
         entity = EntityService.get_entity(entity_type, entity_id)
-        if not entity:
-            return f"Unknown {entity_type}"
+        return EntityService._hierarchy_from_entity(entity_type, entity)
 
-        hierarchy_parts = []
+    @staticmethod
+    def get_country_from_entity(entity_type, entity):
+        """Get the related country from an already-loaded entity object."""
+        if not entity:
+            return None
 
         if entity_type == EntityType.country.value:
-            # Country is top level
-            hierarchy_parts.append(entity.name)
+            return entity
 
-        elif entity_type == EntityType.ns_branch.value:
-            # Branch: Country > Branch
-            if hasattr(entity, 'country') and entity.country:
-                hierarchy_parts.append(entity.country.name)
-            hierarchy_parts.append(entity.name)
+        if entity_type == EntityType.ns_branch.value:
+            return entity.country if hasattr(entity, 'country') else None
+        if entity_type == EntityType.ns_subbranch.value:
+            return entity.branch.country if (hasattr(entity, 'branch') and entity.branch) else None
+        if entity_type == EntityType.ns_localunit.value:
+            return entity.branch.country if (hasattr(entity, 'branch') and entity.branch) else None
 
-        elif entity_type == EntityType.ns_subbranch.value:
-            # Sub-branch: Country > Branch > Sub-branch
-            if hasattr(entity, 'branch') and entity.branch:
-                if entity.branch.country:
-                    hierarchy_parts.append(entity.branch.country.name)
-                hierarchy_parts.append(entity.branch.name)
-            hierarchy_parts.append(entity.name)
+        if entity_type in [
+            EntityType.division.value,
+            EntityType.department.value,
+            EntityType.regional_office.value,
+            EntityType.cluster_office.value,
+        ]:
+            return None
 
-        elif entity_type == EntityType.ns_localunit.value:
-            # Local Unit: Country > Branch > [Sub-branch] > Local Unit
-            if hasattr(entity, 'branch') and entity.branch:
-                if entity.branch.country:
-                    hierarchy_parts.append(entity.branch.country.name)
-                hierarchy_parts.append(entity.branch.name)
-                if hasattr(entity, 'subbranch') and entity.subbranch:
-                    hierarchy_parts.append(entity.subbranch.name)
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.division.value:
-            # Division is top level for Secretariat (no 'Secretariat - ' prefix in display)
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.department.value:
-            # Department: Division > Department (without 'Secretariat - ' prefix)
-            if hasattr(entity, 'division') and entity.division:
-                hierarchy_parts.append(entity.division.name)
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.regional_office.value:
-            # Regional Office (without 'Secretariat - ' prefix)
-            hierarchy_parts.append(entity.name)
-
-        elif entity_type == EntityType.cluster_office.value:
-            # Cluster Office: Regional Office > Cluster Office (without 'Secretariat - ' prefix)
-            if hasattr(entity, 'regional_office') and entity.regional_office:
-                hierarchy_parts.append(entity.regional_office.name)
-            hierarchy_parts.append(entity.name)
-
-        return " > ".join(hierarchy_parts) if hierarchy_parts else entity.name
+        return None
 
     @staticmethod
     def get_country_for_entity(entity_type, entity_id):
@@ -290,27 +475,7 @@ class EntityService:
             Country object or None
         """
         entity = EntityService.get_entity(entity_type, entity_id)
-        if not entity:
-            return None
-
-        if entity_type == EntityType.country.value:
-            # Entity is already a country
-            return entity
-
-        elif entity_type in [EntityType.ns_branch.value, EntityType.ns_subbranch.value, EntityType.ns_localunit.value]:
-            # NS entities - trace back to country
-            if entity_type == EntityType.ns_branch.value:
-                return entity.country if hasattr(entity, 'country') else None
-            elif entity_type == EntityType.ns_subbranch.value:
-                return entity.branch.country if (hasattr(entity, 'branch') and entity.branch) else None
-            elif entity_type == EntityType.ns_localunit.value:
-                return entity.branch.country if (hasattr(entity, 'branch') and entity.branch) else None
-
-        elif entity_type in [EntityType.division.value, EntityType.department.value, EntityType.regional_office.value, EntityType.cluster_office.value]:
-            # Secretariat entities don't have a specific country
-            return None
-
-        return None
+        return EntityService.get_country_from_entity(entity_type, entity)
 
     @staticmethod
     def get_entities_for_user(user, entity_type=None):
@@ -347,9 +512,12 @@ class EntityService:
 
         permissions = query.all()
 
+        pairs = [(perm.entity_type, perm.entity_id) for perm in permissions]
+        prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
+
         entities = []
         for perm in permissions:
-            entity = EntityService.get_entity(perm.entity_type, perm.entity_id)
+            entity = prefetched.get((perm.entity_type, perm.entity_id))
             if entity:
                 entities.append(entity)
 

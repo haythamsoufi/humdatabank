@@ -1,8 +1,8 @@
-{# Shared RBAC tabs (Roles / Permissions / Access Rules) #}
+{# Shared RBAC tabs (Roles / Permissions / Access Rules) — match System Configuration underline tabs #}
 {# Expected variables:
    - active_tab: 'roles' | 'permissions' | 'access_rules'
  #}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set can_manage_roles = current_is_system_manager or has_permission('admin.users.roles.assign') %}
@@ -15,20 +15,17 @@
   {'key': 'access_rules', 'label': _('Access Rules'), 'url': url_for('rbac_management.manage_grants'), 'icon': 'fas fa-user-lock', 'visible': can_manage_grants},
 ] %}
 
-{# Match Organization tab styling (underline tabs) #}
-<div class="mt-4 mb-4">
-    {% call scroll_tab_bar(aria_label=_('Access management sections')) %}
-        {% for tab in tabs if tab.visible %}
-            {% set is_active = active_tab == tab.key %}
-            <a
-                href="{{ tab.url }}"
-                role="tab"
-                class="{% if is_active %}border-red-500 text-red-600{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %} whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm inline-flex items-center"
-                {% if is_active %}aria-current="page" aria-selected="true"{% else %}aria-selected="false"{% endif %}
-            >
-                <i class="{{ tab.icon }} mr-2" aria-hidden="true"></i>
-                {{ tab.label }}
-            </a>
-        {% endfor %}
-    {% endcall %}
-</div>
+{% call scroll_tab_bar(inner_id='rbac-tabs', aria_label=_('Access management sections')) %}
+    {% for tab in tabs if tab.visible %}
+        {% set is_active = active_tab == tab.key %}
+        <a
+            href="{{ tab.url }}"
+            role="tab"
+            class="{{ admin_underline_tab_btn_classes(is_active) }}"
+            {% if is_active %}aria-current="page" aria-selected="true"{% else %}aria-selected="false"{% endif %}
+        >
+            <i class="{{ tab.icon }} mr-1.5" aria-hidden="true"></i>
+            {{ tab.label }}
+        </a>
+    {% endfor %}
+{% endcall %}

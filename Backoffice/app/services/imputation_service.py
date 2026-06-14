@@ -178,10 +178,18 @@ class ImputationService:
         prev_assignments_by_country: Dict[int, AssignedForm] = {}
         prev_assignments = AssignedForm.query.filter_by(template_id=template_id, period_name=prev_year_str).all()
         for af in prev_assignments:
-            # Map country_id -> prev assignment via its AES entries
             for aes in af.country_statuses.all():
-                if aes.country_id not in prev_assignments_by_country:
-                    prev_assignments_by_country[aes.country_id] = af
+                if aes.entity_id not in prev_assignments_by_country:
+                    prev_assignments_by_country[aes.entity_id] = af
+
+        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+        all_target_aes = []
+        for assignment in target_assignments:
+            all_target_aes.extend(assignment.country_statuses.all())
+        country_by_aes = {}
+        if all_target_aes:
+            batch = batch_countries_for_aes_list(all_target_aes)
+            country_by_aes = {aes.id: _country_for_aes(aes, batch) for aes in all_target_aes}
 
         total_countries_processed = 0
         total_items_imputed = 0
@@ -189,10 +197,12 @@ class ImputationService:
         total_rows_updated = 0
 
         for assignment in target_assignments:
-            # For each country assignment in the target year
             for aes in assignment.country_statuses.all():
-                country_id = aes.country_id
-                country_name = aes.country.name if aes.country else f"country_id_{country_id}"
+                country_id = aes.entity_id if aes.entity_type == 'country' else None
+                country = country_by_aes.get(aes.id)
+                country_name = country.name if country else f"country_id_{country_id}"
+                if not country_id:
+                    continue
                 prev_af = prev_assignments_by_country.get(country_id)
                 if not prev_af:
                     continue
@@ -496,22 +506,29 @@ class ImputationService:
             }
 
         for af in prev_assignments:
-            # Map country_id -> prev assignment via its AES entries
             for aes in af.country_statuses.all():
-                if aes.country_id not in prev_assignments_by_country:
-                    prev_assignments_by_country[aes.country_id] = af
+                if aes.entity_id not in prev_assignments_by_country:
+                    prev_assignments_by_country[aes.entity_id] = af
 
         total_countries_processed = 0
         total_items_imputed = 0
         total_rows_created = 0
         total_rows_updated = 0
 
+        country_by_aes = {}
+        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+        all_target_aes = []
+        for assignment in target_assignments:
+            all_target_aes.extend(assignment.country_statuses.all())
+        if all_target_aes:
+            batch = batch_countries_for_aes_list(all_target_aes)
+            country_by_aes = {aes.id: _country_for_aes(aes, batch) for aes in all_target_aes}
+
         # Check if there are any countries that can be imputed
         target_country_ids = set()
-        for assignment in target_assignments:
-            for aes in assignment.country_statuses.all():
-                if aes.country:
-                    target_country_ids.add(aes.country_id)
+        for aes in all_target_aes:
+            if aes.entity_type == 'country' and aes.entity_id:
+                target_country_ids.add(aes.entity_id)
 
         prev_country_ids = set(prev_assignments_by_country.keys())
         overlapping_countries = target_country_ids.intersection(prev_country_ids)
@@ -523,11 +540,10 @@ class ImputationService:
             }
 
         for assignment in target_assignments:
-            # For each country assignment in the target year
             for aes in assignment.country_statuses.all():
-                country_id = aes.country_id
-                country = aes.country
-                if not country:
+                country_id = aes.entity_id if aes.entity_type == 'country' else None
+                country = country_by_aes.get(aes.id)
+                if not country_id or not country:
                     continue
 
                 country_name = country.name

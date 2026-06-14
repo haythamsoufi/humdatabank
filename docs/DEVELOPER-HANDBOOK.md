@@ -550,6 +550,11 @@ All system buttons use `border-radius: 0`. Do **not** add `rounded-*` Tailwind c
 | `app/templates/macros/delete_confirm_modal.html` | Delete confirmation modal (uses `btn btn-danger` / `btn btn-secondary`) |
 | `app/templates/macros/translation_modal.html` | Translation modals (uses `btn btn-warning` / `btn btn-success` / etc.) |
 | `app/templates/macros/modal_shell.html` | Generic modal shell |
+| `app/templates/macros/excel_import_dropzone.html` | Shared two-state Excel file dropzone (drag/drop, optional validation status panel). Configure via macro params (`variant`, `validate_url`, copy) and `{% call %}` for hidden fields. JS: `initExcelImportDropzone()` in `app/static/js/components/excel-import-dropzone.js`. |
+| `app/templates/macros/excel_io_modal.html` | Excel import/export modal layouts (`simple`, `split`, `tabs`). Passthrough `modal_shell` params plus `export_body` / `import_body` slots for page-specific actions. JS: `initExcelIoModal()` in `app/static/js/components/excel-io-modal.js`. |
+| `app/templates/macros/excel_import_review_modal.html` | Second-step import review/confirm dialog (indicator bank pattern). |
+| `app/templates/macros/excel_io_toolbar.html` | Bulk export link + import button bar (common words). |
+| `app/static/css/excel-io.css` | Global styles for `.excel-io-dropzone` and modal layouts (linked from `core/layout.html`). |
 
 ### Template migration status (partial)
 

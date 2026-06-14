@@ -1,0 +1,13 @@
+{% from "macros/modal_shell.html" import modal_shell %}
+{% from "components/ag_grid_includes.html" import ag_grid_container %}
+<div class="flex flex-wrap items-center justify-end gap-3 mb-4">
+    <button type="button" class="btn btn-sm btn-success" id="spefAddBtn">
+        <i class="fas fa-plus mr-1"></i>{{ _('Add SP/EF') }}
+    </button>
+    <div id="spefLookupsGrid-colvis" class="flex-shrink-0"></div>
+</div>
+{{ ag_grid_container('spefLookupsGrid', loading_text=_('Loading...'), placeholder_id='spefLookupsGrid-colvis', include_card=false, show_placeholder=False, empty_message=_('No SP/EF codes defined yet.')) }}
+
+{% call modal_shell('spefLookupModal', _('SP/EF code'), max_width='max-w-2xl', z_index=60) %}
+<div id="spefLookupModalBody" class="max-h-[min(80vh,720px)] overflow-y-auto"></div>
+{% endcall %}

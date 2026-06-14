@@ -34,18 +34,7 @@ from app.routes.admin.organization import (
 @bp.route("/sectors_subsectors", methods=["GET"])
 @permission_required('admin.organization.manage')
 def manage_sectors_subsectors():
-    sectors = Sector.query.order_by(Sector.name).all()
-    subsectors = SubSector.query.order_by(SubSector.sector_id, SubSector.name).all()
-    subsectors_by_sector = defaultdict(list)
-    for s in subsectors:
-        subsectors_by_sector[s.sector_id].append(s)
-    return render_template(
-        "admin/indicator_bank/sectors_subsectors.html",
-        sectors=sectors,
-        subsectors=subsectors,
-        subsectors_by_sector=dict(subsectors_by_sector),
-        title="Manage Sectors & Sub-Sectors",
-    )
+    return redirect(url_for("system_admin.manage_indicator_bank", tab="sectors"))
 
 @bp.route("/sectors/new", methods=["POST"])
 @permission_required('admin.organization.manage')

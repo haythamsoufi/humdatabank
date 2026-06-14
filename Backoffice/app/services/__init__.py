@@ -35,6 +35,8 @@ _LAZY_EXPORT_MODULES = {
     'get_user_country_ids': 'data_retrieval_service',
     'query_form_data': 'data_retrieval_service',
     'get_form_data_queries': 'data_retrieval_service',
+    'query_dynamic_indicator_data': 'data_retrieval_service',
+    'query_repeat_group_data': 'data_retrieval_service',
 }
 
 __all__ = list(_LAZY_EXPORT_MODULES.keys())

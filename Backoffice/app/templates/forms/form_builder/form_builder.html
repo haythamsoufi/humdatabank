@@ -501,8 +501,20 @@
     modal_title=_('Item Translations'),
     context='form_item',
     tabs=[
-        {'id': 'labels', 'name': _('Labels')},
-        {'id': 'definitions', 'name': _('Definitions')}
+        {
+            'id': 'labels',
+            'name': _('Labels'),
+            'indicator_name': _('Labels'),
+            'question_default_name': _('Question Text'),
+            'question_blank_name': _('Heading'),
+        },
+        {
+            'id': 'definitions',
+            'name': _('Definitions'),
+            'indicator_name': _('Definitions'),
+            'question_default_name': _('Definition'),
+            'question_blank_name': _('Body text'),
+        },
     ],
     show_auto_translate=true,
     css_prefix='translation',

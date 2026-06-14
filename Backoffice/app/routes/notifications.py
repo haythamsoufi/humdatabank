@@ -2186,9 +2186,13 @@ def api_admin_get_all_notifications():
 
         # Format notifications
         from app.models import User
+        user_ids = {notification.user_id for notification in notifications if notification.user_id}
+        users_by_id = {}
+        if user_ids:
+            users_by_id = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
         notifications_data = []
         for notification in notifications:
-            user = User.query.get(notification.user_id)
+            user = users_by_id.get(notification.user_id)
             notifications_data.append({
                 'id': notification.id,
                 'user_id': notification.user_id,

@@ -157,7 +157,7 @@ def format_form_data_response(data_item) -> Dict[str, Any]:
     }
 
 
-def serialize_form_data_item(data_item, submission_type: str) -> Dict[str, Any]:
+def serialize_form_data_item(data_item, submission_type: str, aes_countries=None) -> Dict[str, Any]:
     """
     Serialize a form data item into the API response format.
     Handles both 'assigned' and 'public' submission types.
@@ -189,7 +189,8 @@ def serialize_form_data_item(data_item, submission_type: str) -> Dict[str, Any]:
     if submission_type == 'assigned':
         status_info = data_item.assignment_entity_status
         assigned_form = status_info.assigned_form if status_info else None
-        country = status_info.country if status_info else None
+        from app.utils.api_serialization import _country_for_aes
+        country = _country_for_aes(status_info, aes_countries) if status_info else None
         submitted_at = data_item.submitted_at.isoformat() if data_item.submitted_at is not None else None
 
         # Build form_item_info safely

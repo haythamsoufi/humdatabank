@@ -521,6 +521,41 @@ class TestParseFieldValueForDisplay:
             result = self._call({"_matrix_change": True, "r1_c1": None})
         assert result == ""
 
+    def test_disability_metadata_nested_dict_shows_yes_no(self, app):
+        with app.app_context():
+            result = self._call({
+                "disability": {
+                    "disaggregated_by_disability": True,
+                    "washington_group_compliant": True,
+                }
+            })
+        assert "Yes" in result
+        assert "1" not in result
+        assert "Disaggregated by disability" in result
+        assert "Washington Group compliant" in result
+
+    def test_disability_metadata_flat_dict_shows_yes_no(self, app):
+        with app.app_context():
+            result = self._call({
+                "disaggregated_by_disability": False,
+                "washington_group_compliant": True,
+            })
+        assert "Disaggregated by disability: No" in result
+        assert "Washington Group compliant: Yes" in result
+
+    def test_direct_with_disability_metadata_ignores_disability(self, app):
+        with app.app_context():
+            result = self._call({
+                "direct": {"female_5": 234, "female_50_": 645},
+                "disability": {
+                    "disaggregated_by_disability": True,
+                    "washington_group_compliant": True,
+                },
+            })
+        assert "234" in result
+        assert "645" in result
+        assert "Disaggregated by disability" not in result
+
 
 # ---------------------------------------------------------------------------
 # _extract_changed_matrix_values

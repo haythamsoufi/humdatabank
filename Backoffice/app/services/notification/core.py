@@ -1723,15 +1723,23 @@ def create_notification(
                 try:
                     from app.services.notification.emails import send_instant_notification_email
 
+                    user_ids_list = list({n.user_id for n in notifications if n.user_id})
+                    user_map = {}
+                    preferences_map = {}
+                    if user_ids_list:
+                        users = User.query.filter(User.id.in_(user_ids_list)).all()
+                        user_map = {u.id: u for u in users}
+                        preferences_list = NotificationPreferences.query.filter(
+                            NotificationPreferences.user_id.in_(user_ids_list)
+                        ).all()
+                        preferences_map = {p.user_id: p for p in preferences_list}
+
                     for notification in notifications:
-                        user = User.query.get(notification.user_id)
+                        user = user_map.get(notification.user_id)
                         if not user or not user.email:
                             continue
 
-                        # Get user preferences
-                        preferences = NotificationPreferences.query.filter_by(
-                            user_id=user.id
-                        ).first()
+                        preferences = preferences_map.get(user.id)
 
                         # Determine if email should be sent
                         should_send = False

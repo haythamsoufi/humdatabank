@@ -1093,6 +1093,123 @@ class TemplateExcelService:
             sheet.column_dimensions[column_letter].width = adjusted_width
 
     @classmethod
+    def _count_nonempty_data_rows(cls, sheet) -> int:
+        """Count non-empty data rows (row 2 onward) in a worksheet."""
+        count = 0
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            if row and not all(cell is None for cell in row):
+                count += 1
+        return count
+
+    @classmethod
+    def _validate_template_sheet_headers(cls, headers: List[Any]) -> List[str]:
+        """Validate Template sheet headers (required columns must be present)."""
+        required_headers = cls.REQUIRED_COLUMNS.get('Template', ['name'])
+        header_set = {h for h in headers if isinstance(h, str) and h}
+        required_set = set(required_headers)
+        if not required_set.issubset(header_set):
+            missing = required_set - header_set
+            return [
+                f"Template sheet headers missing required columns. "
+                f"Required: {required_headers}, Missing: {list(missing)}, Got: {headers}"
+            ]
+        return []
+
+    @classmethod
+    def _validate_strict_sheet_headers(
+        cls, sheet_name: str, headers: List[Any], expected_headers: List[str]
+    ) -> List[str]:
+        """Validate sheet headers match expected export columns exactly."""
+        if headers != expected_headers:
+            return [
+                f"{sheet_name} sheet headers don't match expected columns. "
+                f"Expected: {expected_headers}, Got: {headers}"
+            ]
+        return []
+
+    @classmethod
+    def validate_import_file(cls, excel_file) -> Dict[str, Any]:
+        """
+        Validate a Humanitarian Databank Excel export before import.
+
+        Returns dict with keys: valid, message, errors, preview
+        (preview: name, pages, sections, items).
+        """
+        errors: List[str] = []
+        preview = {'name': None, 'pages': 0, 'sections': 0, 'items': 0}
+
+        try:
+            workbook = openpyxl.load_workbook(io.BytesIO(excel_file.read()), data_only=True)
+        except Exception as e:
+            current_app.logger.error(f"Failed to load Excel file for validation: {e}", exc_info=True)
+            return {
+                'valid': False,
+                'message': 'Invalid Excel file. Check the file format and try again.',
+                'errors': ['Failed to load Excel file.'],
+                'preview': preview,
+            }
+
+        required_sheets = ['Template', 'Pages', 'Sections', 'Items']
+        missing_sheets = [s for s in required_sheets if s not in workbook.sheetnames]
+        if missing_sheets:
+            msg = f"Missing required sheets: {', '.join(missing_sheets)}"
+            return {
+                'valid': False,
+                'message': msg,
+                'errors': [msg],
+                'preview': preview,
+            }
+
+        template_sheet = workbook['Template']
+        template_headers = [cell.value for cell in template_sheet[1]]
+        errors.extend(cls._validate_template_sheet_headers(template_headers))
+        if not errors:
+            row = next(template_sheet.iter_rows(min_row=2, values_only=True), None)
+            if not row or all(cell is None for cell in row):
+                errors.append('Template sheet has no data row.')
+            else:
+                row_data = dict(zip(template_headers, row))
+                template_name = row_data.get('name')
+                if template_name is None or str(template_name).strip() == '':
+                    errors.append('Template sheet data row is missing a template name.')
+                else:
+                    preview['name'] = str(template_name).strip()
+
+        pages_sheet = workbook['Pages']
+        pages_headers = [cell.value for cell in pages_sheet[1]]
+        errors.extend(cls._validate_strict_sheet_headers('Pages', pages_headers, cls.PAGE_COLUMNS))
+        if not any(e.startswith('Pages sheet') for e in errors):
+            preview['pages'] = cls._count_nonempty_data_rows(pages_sheet)
+
+        sections_sheet = workbook['Sections']
+        sections_headers = [cell.value for cell in sections_sheet[1]]
+        errors.extend(cls._validate_strict_sheet_headers('Sections', sections_headers, cls.SECTION_COLUMNS))
+        if not any(e.startswith('Sections sheet') for e in errors):
+            preview['sections'] = cls._count_nonempty_data_rows(sections_sheet)
+
+        items_sheet = workbook['Items']
+        items_headers = [cell.value for cell in items_sheet[1]]
+        errors.extend(cls._validate_strict_sheet_headers('Items', items_headers, cls.ITEM_COLUMNS))
+        if not any(e.startswith('Items sheet') for e in errors):
+            preview['items'] = cls._count_nonempty_data_rows(items_sheet)
+
+        valid = len(errors) == 0
+        if valid:
+            message = (
+                f"Valid export: {preview['pages']} pages, "
+                f"{preview['sections']} sections, {preview['items']} items."
+            )
+        else:
+            message = errors[0] if len(errors) == 1 else f"Found {len(errors)} validation errors."
+
+        return {
+            'valid': valid,
+            'message': message,
+            'errors': errors,
+            'preview': preview,
+        }
+
+    @classmethod
     @memory_tracker("Template Excel Import", log_top_allocations=True)
     def import_template(cls, template_id: int, excel_file, version_id: Optional[int] = None) -> Dict[str, Any]:
         """

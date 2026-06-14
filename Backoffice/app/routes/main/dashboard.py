@@ -26,6 +26,7 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
 from app.services.app_settings_service import is_organization_email
+from app.services.authorization_service import AuthorizationService
 
 from app.routes.main import bp
 from app.utils.data_quality_constants import is_data_quality_dashboard_enabled
@@ -61,8 +62,10 @@ def dashboard():
     # for users that have none configured yet (e.g. system managers).
     entity_permissions = UserEntityPermission.query.filter_by(user_id=current_user.id).all()
     if entity_permissions:
+        pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+        prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
         for perm in entity_permissions:
-            entity = EntityService.get_entity(perm.entity_type, perm.entity_id)
+            entity = prefetched.get((perm.entity_type, perm.entity_id))
             if entity:
                 user_entities.append({
                     'entity_type': perm.entity_type,
@@ -103,6 +106,17 @@ def dashboard():
         e['entity'] for e in user_entities
         if e['entity_type'] == EntityType.country.value and isinstance(e['entity'], Country)
     ]
+    user_entity_hierarchy_names = EntityService.batch_entity_names(
+        [(e['entity_type'], e['entity_id']) for e in user_entities],
+        include_hierarchy=True,
+        localized=True,
+    ) if user_entities else {}
+    if user_entities:
+        for e in user_entities:
+            e['display_name'] = user_entity_hierarchy_names.get(
+                (e['entity_type'], e['entity_id']), '',
+            )
+    selected_entity_display_name = None
     countries_group_enabled = 'countries' in enabled_entity_groups
 
     selected_entity = None
@@ -161,16 +175,14 @@ def dashboard():
             .all()
         )
 
+        entity_permission_keys = {(p.entity_type, p.entity_id) for p in entity_permissions}
+        user_is_system_manager = AuthorizationService.is_system_manager(current_user)
+
         # Check if approved requests still have access (may have been revoked by admin)
         for req in all_access_requests:
-            if not req.country and req.country_id:
-                req.country = Country.query.get(req.country_id)
-
-            # For approved requests, check if user still has access
             if req.status == CountryAccessRequestStatus.APPROVED and req.country_id:
-                # Check if user still has entity permission for this country
-                has_access = current_user.has_entity_access(EntityType.country.value, req.country_id)
-                # Add a computed attribute to indicate if access was revoked
+                country_key = (EntityType.country.value, req.country_id)
+                has_access = user_is_system_manager or country_key in entity_permission_keys
                 req._access_revoked = not has_access
             else:
                 req._access_revoked = False
@@ -406,13 +418,8 @@ def dashboard():
 
         # If selected_entity is still None, default to first entity (alphabetically sorted)
         if selected_entity is None and user_entities:
-            # Sort entities alphabetically by display name before selecting the first one
             def get_sort_key(e):
-                display_name = EntityService.get_entity_name(
-                    e['entity_type'],
-                    e['entity_id'],
-                    include_hierarchy=True
-                )
+                display_name = user_entity_hierarchy_names.get((e['entity_type'], e['entity_id']))
                 return (display_name or '').lower()
 
             sorted_entities = sorted(user_entities, key=get_sort_key)
@@ -431,12 +438,19 @@ def dashboard():
         # Fetch data for the selected entity if available
         if selected_entity and selected_entity_type and selected_entity_id:
             # Get country for the entity (needed for activities and some other features)
-            entity_country = EntityService.get_country_for_entity(selected_entity_type, selected_entity_id)
+            entity_country = EntityService.get_country_from_entity(selected_entity_type, selected_entity)
             if entity_country:
                 selected_country = entity_country  # Ensure selected_country is set for compatibility
 
-            entity_display_name = EntityService.get_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True)
-            current_app.logger.debug(f"Fetching assigned forms statuses for selected entity {entity_display_name} ({selected_entity_type}:{selected_entity_id}).")
+            selected_entity_display_name = user_entity_hierarchy_names.get(
+                (selected_entity_type, selected_entity_id),
+            ) or EntityService.get_entity_name(
+                selected_entity_type, selected_entity_id, include_hierarchy=True,
+            )
+            current_app.logger.debug(
+                f"Fetching assigned forms statuses for selected entity "
+                f"{selected_entity_display_name} ({selected_entity_type}:{selected_entity_id})."
+            )
 
             # Query AssignmentEntityStatus for the selected entity (supports all entity types)
             AF = aliased(AssignedForm)
@@ -462,7 +476,7 @@ def dashboard():
                 .all()
             )
 
-            current_app.logger.debug(f"Found {len(assigned_forms_statuses)} assigned form statuses for {entity_display_name}.")
+            current_app.logger.debug(f"Found {len(assigned_forms_statuses)} assigned form statuses for {selected_entity_display_name}.")
 
             # Pre-compute per-template item counts to avoid repeated queries inside the loop
             template_ids = {
@@ -771,7 +785,7 @@ def dashboard():
             self_report_templates.sort(key=lambda t: t.name if t.name else "")
 
             current_app.logger.debug(
-                f"Found {len(self_report_templates)} templates available for self-reporting (including already assigned ones) for {entity_display_name}."
+                f"Found {len(self_report_templates)} templates available for self-reporting (including already assigned ones) for {selected_entity_display_name}."
             )
 
 
@@ -901,7 +915,8 @@ def dashboard():
                        non_org_has_counting_request=non_org_has_counting_request,
                        enabled_entity_types=enabled_entity_groups,
                        get_localized_country_name=get_localized_country_name,
-                       get_localized_national_society_name=_get_localized_national_society_name)
+                       get_localized_national_society_name=_get_localized_national_society_name,
+                       selected_entity_display_name=selected_entity_display_name)
 
 
 @bp.route("/load_more_activities", methods=["POST"])

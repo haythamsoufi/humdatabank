@@ -1,0 +1,37 @@
+{#
+    Bulk export/import toolbar (common words pattern).
+#}
+{% macro excel_io_toolbar(
+    export_url,
+    export_label=none,
+    import_open_target=none,
+    import_label=none,
+    title=none,
+    description=none
+) -%}
+{% set _export_label = export_label if export_label is not none else _('Export to Excel') %}
+{% set _import_label = import_label if import_label is not none else _('Import from Excel') %}
+<div class="excel-io-toolbar">
+    <div class="excel-io-toolbar__inner">
+        <div>
+            {% if title %}<h3 class="text-lg font-medium text-gray-900 mb-2">{{ title }}</h3>{% endif %}
+            {% if description %}<p class="text-sm text-gray-600">{{ description }}</p>{% endif %}
+        </div>
+        <div class="excel-io-toolbar__actions">
+            <a href="{{ export_url }}" class="btn btn-success">
+                <i class="fas fa-download"></i>
+                {{ _export_label }}
+            </a>
+            {% if import_open_target %}
+            <button type="button"
+                    class="btn btn-primary excel-io-toolbar__import-btn"
+                    data-excel-io-open="{{ import_open_target }}">
+                <i class="fas fa-upload"></i>
+                {{ _import_label }}
+            </button>
+            {% endif %}
+            {{ caller() if caller else '' }}
+        </div>
+    </div>
+</div>
+{%- endmacro %}

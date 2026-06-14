@@ -515,13 +515,6 @@ def handle_assignment_form(aes_id):
                                     except (ValueError, TypeError):
                                         continue
 
-    repeat_data_entries = RepeatGroupData.query.join(
-        RepeatGroupInstance,
-        RepeatGroupData.repeat_instance_id == RepeatGroupInstance.id
-    ).filter(
-        RepeatGroupInstance.assignment_entity_status_id == assignment_entity_status.id
-    ).all()
-
     repeat_instances = RepeatGroupInstance.query.filter_by(
         assignment_entity_status_id=assignment_entity_status.id,
         is_hidden=False
@@ -641,10 +634,6 @@ def handle_assignment_form(aes_id):
 
     entity_repo_document_ids = merge_carryover_into_submitted_documents_dict(
         existing_submitted_documents_dict, assignment_entity_status, all_sections
-    )
-
-    section_statuses = calculate_section_completion_status(
-        all_sections, existing_data_processed, existing_submitted_documents_dict
     )
 
     if request.method == "POST":
@@ -1107,16 +1096,22 @@ def _preview_template_impl(template_id):
 
         seen = set()
         enriched = []
+        name_map = EntityService.batch_entity_names(
+            option_rows, include_hierarchy=True, localized=True,
+        ) if option_rows else {}
+        type_labels = {}
         for et, eid in option_rows:
             key = (et, eid)
             if key in seen:
                 continue
             seen.add(key)
             try:
-                name = EntityService.get_localized_entity_name(et, eid, include_hierarchy=True)
-                label = f"{EntityService.get_entity_type_label(et)}: {name}"
+                if et not in type_labels:
+                    type_labels[et] = EntityService.get_entity_type_label(et)
+                name = name_map.get(key) or f"{et}:{eid}"
+                label = f"{type_labels[et]}: {name}"
             except Exception as e:
-                current_app.logger.debug("get_localized_entity_name failed: %s", e)
+                current_app.logger.debug("entity preview label failed: %s", e)
                 label = f"{et}:{eid}"
             enriched.append((label, et, eid))
 

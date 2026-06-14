@@ -3,6 +3,9 @@
  * Handles initialization of various UI components in the form builder
  */
 
+import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
+import { initExcelIoModal } from '../../components/excel-io-modal.js';
+
 // Submit a builder form in the most reliable way:
 // - Prefer the AJAX helper when available (covers cases where form.submit() bypasses submit events)
 // - Fall back to requestSubmit (fires submit events + native validation)
@@ -211,76 +214,21 @@ export function initExcelModal() {
         const importForm = document.getElementById('import-excel-form');
 
         if (excelBtn && excelModal) {
-            // Open modal
-            excelBtn.addEventListener('click', function() {
-                excelModal.classList.remove('hidden');
+            initExcelIoModal(excelModal, {
+                openTrigger: excelBtn,
+                onClose: function() {
+                    if (importForm) importForm.reset();
+                },
             });
 
-            // Close modal handlers
-            const closeButtons = excelModal.querySelectorAll('.close-modal');
-            closeButtons.forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    excelModal.classList.add('hidden');
-                    if (importForm) {
-                        importForm.reset();
-                    }
-                });
+            initExcelImportDropzone('#excel-import-dropzone', {
+                autoSubmitOnSelect: true,
+                acceptExtensions: ['.xlsx', '.xls'],
+                onFileSelected: function() {
+                    if (importForm) submitBuilderForm(importForm);
+                },
+                resetOnModalClose: excelModal,
             });
-
-            // Close on background click
-            excelModal.addEventListener('click', function(e) {
-                if (e.target === excelModal) {
-                    excelModal.classList.add('hidden');
-                    if (importForm) {
-                        importForm.reset();
-                    }
-                }
-            });
-
-            // Auto-submit form when file is selected
-            const excelFileInput = document.getElementById('excel_file');
-            if (excelFileInput && importForm) {
-                excelFileInput.addEventListener('change', function() {
-                    if (this.files.length > 0) {
-                        submitBuilderForm(importForm);
-                    }
-                });
-            }
-
-            // Drag and drop handling
-            const dropZone = excelModal.querySelector('.file-upload-wrapper');
-            if (dropZone && excelFileInput) {
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }, false);
-                });
-
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, function() {
-                        dropZone.classList.add('border-blue-500', 'bg-blue-50');
-                    }, false);
-                });
-
-                ['dragleave', 'drop'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, function() {
-                        dropZone.classList.remove('border-blue-500', 'bg-blue-50');
-                    }, false);
-                });
-
-                dropZone.addEventListener('drop', function(e) {
-                    const dt = e.dataTransfer;
-                    const file = dt.files[0];
-
-                    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(file);
-                        excelFileInput.files = dataTransfer.files;
-                        excelFileInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }, false);
-            }
         }
     });
 }

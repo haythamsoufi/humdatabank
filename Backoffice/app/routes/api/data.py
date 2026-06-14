@@ -28,6 +28,8 @@ from app.utils.api_serialization import (
     build_star_schema_tables,
     STAR_SCHEMA_VERSION,
     STAR_SCHEMA_GRAIN,
+    serialize_dynamic_data_item,
+    serialize_repeat_data_item,
 )
 from app.services.security.api_authentication import (
     authenticate_api_request,
@@ -44,7 +46,7 @@ from app.utils.api_pagination import (
 from app.utils.form_localization import get_translation_key
 from app.utils.api_formatting import format_answer_value, format_form_data_response, serialize_form_data_item
 from app.utils.sql_utils import safe_ilike_pattern
-from app.services import query_form_data, get_form_data_queries, TemplateService
+from app.services import query_form_data, get_form_data_queries, TemplateService, query_dynamic_indicator_data, query_repeat_group_data
 from app.services.data_retrieval_shared import (
     get_effective_request_user,
     can_view_non_public_form_items,
@@ -177,6 +179,175 @@ def _resolve_entity_ids_for_lookup(lookup_list_id, display_column, prefix_ids, c
         return labels
 
     return labels
+
+
+def _parse_include_flags(args):
+    """Return (include_dynamic, include_repeat) booleans from query-string args."""
+    def _truthy(v):
+        return str(v or '').strip().lower() in ('1', 'true', 'yes', 'y')
+    return _truthy(args.get('include_dynamic')), _truthy(args.get('include_repeat'))
+
+
+def _fetch_extended_data(
+    *,
+    template_id, submission_id, item_id, country_id, period_name,
+    indicator_bank_id, submission_type,
+    include_dynamic, include_repeat,
+    include_disagg, minimal_country_info,
+    elevated_access, auth_user,
+    date_from=None, date_to=None,
+):
+    """
+    Fetch DynamicIndicatorData and/or RepeatGroupData rows for the current request filters.
+
+    Returns a dict ``{'dynamic_data': [...], 'repeat_data': [...]}``.
+    Both keys are always present; the lists are empty when the corresponding flag is False.
+
+    RBAC:
+    - API-key (elevated_access): no template restriction, fetch all matching rows.
+    - User auth (not elevated_access): restrict to templates the user owns/shares, and to
+      countries the user has permission for.  Uses the same ``get_user_allowed_template_ids``
+      logic as the main /data query.
+    """
+    from app.services.security.api_authentication import (
+        get_user_allowed_template_ids,
+        _get_user_allowed_country_ids,
+    )
+    from app.services.authorization_service import AuthorizationService
+    from app.models import AssignedForm, PublicSubmission
+    from app.models.assignments import AssignmentEntityStatus
+    from sqlalchemy import literal
+
+    dynamic_rows = []
+    repeat_rows = []
+
+    def _apply_user_scoping(q_dict, needs_af_join):
+        """Apply user-level template + country RBAC to a dynamic/repeat query dict."""
+        if elevated_access or auth_user is None:
+            return q_dict
+
+        is_sys_mgr = AuthorizationService.is_system_manager(auth_user)
+        if is_sys_mgr:
+            return q_dict
+
+        allowed_tids = get_user_allowed_template_ids(auth_user.id)
+        if not allowed_tids:
+            return {'assigned': None, 'public': None}
+
+        a_q = q_dict.get('assigned')
+        p_q = q_dict.get('public')
+
+        if a_q is not None:
+            if needs_af_join:
+                a_q = a_q.filter(AssignedForm.template_id.in_(allowed_tids))
+            else:
+                a_q = a_q.filter(AssignedForm.template_id.in_(allowed_tids))
+
+        if p_q is not None:
+            p_q = p_q.filter(AssignedForm.template_id.in_(allowed_tids))
+
+        allowed_cids = _get_user_allowed_country_ids(auth_user)
+        if allowed_cids is not None:
+            if not allowed_cids:
+                return {'assigned': None, 'public': None}
+            if a_q is not None:
+                a_q = a_q.filter(
+                    AssignmentEntityStatus.entity_type == 'country',
+                    AssignmentEntityStatus.entity_id.in_(allowed_cids),
+                )
+            if p_q is not None:
+                p_q = p_q.filter(PublicSubmission.country_id.in_(allowed_cids))
+
+        return {'assigned': a_q, 'public': p_q}
+
+    if include_dynamic:
+        try:
+            dq = query_dynamic_indicator_data(
+                template_id=template_id,
+                submission_id=submission_id,
+                country_id=country_id,
+                period_name=period_name,
+                indicator_bank_id=indicator_bank_id,
+                submission_type=submission_type,
+                preload=True,
+            )
+            needs_join = bool(template_id or country_id or period_name or submission_id)
+            dq = _apply_user_scoping(dq, needs_join)
+
+            for stype, q in [('assigned', dq.get('assigned')), ('public', dq.get('public'))]:
+                if q is None:
+                    continue
+                if date_from:
+                    from app.models.forms import DynamicIndicatorData
+                    q = q.filter(DynamicIndicatorData.submitted_at >= date_from)
+                if date_to:
+                    from app.models.forms import DynamicIndicatorData
+                    q = q.filter(DynamicIndicatorData.submitted_at <= date_to)
+                rows = q.all()
+                assigned_aes = [
+                    row.assignment_entity_status
+                    for row in rows
+                    if getattr(row, 'assignment_entity_status', None)
+                ]
+                from app.utils.api_serialization import batch_countries_for_aes_list
+                aes_countries = batch_countries_for_aes_list(assigned_aes)
+                for row in rows:
+                    dynamic_rows.append(
+                        serialize_dynamic_data_item(
+                            row,
+                            include_disagg=include_disagg,
+                            minimal_country_info=minimal_country_info,
+                            aes_countries=aes_countries,
+                        )
+                    )
+        except Exception as e:
+            current_app.logger.warning("_fetch_extended_data: dynamic query failed: %s", e, exc_info=True)
+
+    if include_repeat:
+        try:
+            rq = query_repeat_group_data(
+                template_id=template_id,
+                submission_id=submission_id,
+                item_id=item_id,
+                country_id=country_id,
+                period_name=period_name,
+                submission_type=submission_type,
+                preload=True,
+            )
+            needs_join = bool(template_id or country_id or period_name or submission_id)
+            rq = _apply_user_scoping(rq, needs_join)
+
+            for stype, q in [('assigned', rq.get('assigned')), ('public', rq.get('public'))]:
+                if q is None:
+                    continue
+                if date_from:
+                    from app.models.forms import RepeatGroupData
+                    q = q.filter(RepeatGroupData.submitted_at >= date_from)
+                if date_to:
+                    from app.models.forms import RepeatGroupData
+                    q = q.filter(RepeatGroupData.submitted_at <= date_to)
+                rows = q.all()
+                assigned_aes = []
+                for row in rows:
+                    instance = getattr(row, 'repeat_instance', None)
+                    aes = getattr(instance, 'assignment_entity_status', None) if instance else None
+                    if aes:
+                        assigned_aes.append(aes)
+                from app.utils.api_serialization import batch_countries_for_aes_list
+                aes_countries = batch_countries_for_aes_list(assigned_aes)
+                for row in rows:
+                    repeat_rows.append(
+                        serialize_repeat_data_item(
+                            row,
+                            include_disagg=include_disagg,
+                            minimal_country_info=minimal_country_info,
+                            aes_countries=aes_countries,
+                        )
+                    )
+        except Exception as e:
+            current_app.logger.warning("_fetch_extended_data: repeat query failed: %s", e, exc_info=True)
+
+    return {'dynamic_data': dynamic_rows, 'repeat_data': repeat_rows}
 
 
 @api_bp.route('/templates/<int:template_id>/data', methods=['GET'])
@@ -313,12 +484,18 @@ def get_all_data():
         - indicator_bank_id: Filter by indicator bank ID
         - disagg: Include disaggregation data (true/false)
         - include_full_info: Include detailed form item info (true/false, default: false for performance)
+        - include_dynamic: Include DynamicIndicatorData rows (true/false). Adds ``dynamic_data`` array.
+        - include_repeat: Include RepeatGroupData rows (true/false). Adds ``repeat_data`` array.
         - page: Page number (default: 1, only used with API key auth)
         - per_page: Items per page (default: 20, max 100000, only used with API key auth)
 
     Response format:
         - API key auth: Returns paginated response with total_pages, current_page, per_page
         - User auth: Returns all accessible data with total_pages=None, current_page=None, per_page=None
+        - ``dynamic_data`` array (only present when include_dynamic=true): DynamicIndicatorData rows.
+          Each row has data_type="dynamic", section_id, indicator_bank_id, custom_label.
+        - ``repeat_data`` array (only present when include_repeat=true): RepeatGroupData rows.
+          Each row has data_type="repeat", section_id, repeat_instance_id, instance_number, instance_label.
     """
     try:
         # Authenticate request
@@ -551,7 +728,19 @@ def get_all_data():
         use_minimal_country_info = (per_page and per_page > 1000) or (not should_paginate)
 
         # Serialize in the exact DB order using helper functions
-        from app.utils.api_serialization import serialize_assigned_data_item, serialize_public_data_item
+        from app.utils.api_serialization import (
+            batch_countries_for_aes_list,
+            serialize_assigned_data_item,
+            serialize_public_data_item,
+        )
+        assigned_aes = [
+            assigned_map[row.id].assignment_entity_status
+            for row in page_rows
+            if row.submission_type == 'assigned' and assigned_map.get(row.id)
+        ]
+        aes_countries = batch_countries_for_aes_list(
+            [aes for aes in assigned_aes if aes]
+        )
         paginated_data = []
         for row in page_rows:
             if row.submission_type == 'assigned':
@@ -562,7 +751,8 @@ def get_all_data():
                     data_item,
                     include_disagg=include_disagg,
                     include_full_info=include_full_info,
-                    minimal_country_info=use_minimal_country_info
+                    minimal_country_info=use_minimal_country_info,
+                    aes_countries=aes_countries,
                 )
                 paginated_data.append(item_payload)
             else:
@@ -577,26 +767,53 @@ def get_all_data():
                 )
                 paginated_data.append(item_payload)
 
+        # Optionally fetch dynamic indicator and repeat section data
+        include_dynamic, include_repeat = _parse_include_flags(request.args)
+        extended = _fetch_extended_data(
+            template_id=template_id,
+            submission_id=submission_id,
+            item_id=item_id,
+            country_id=country_id,
+            period_name=period_name,
+            indicator_bank_id=indicator_bank_id,
+            submission_type=submission_type,
+            include_dynamic=include_dynamic,
+            include_repeat=include_repeat,
+            include_disagg=include_disagg,
+            minimal_country_info=use_minimal_country_info,
+            elevated_access=elevated_access,
+            auth_user=auth_user,
+            date_from=date_from,
+            date_to=date_to,
+        ) if (include_dynamic or include_repeat) else {'dynamic_data': [], 'repeat_data': []}
+
         # Build response based on authentication type
         if should_paginate:
             # API key auth: return paginated response
             total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
-            return json_response({
+            response_body = {
                 'data': paginated_data,
                 'total_items': total_items,
                 'total_pages': total_pages,
                 'current_page': page,
-                'per_page': per_page
-            })
+                'per_page': per_page,
+            }
         else:
             # User auth: return all accessible data (no pagination)
-            return json_response({
+            response_body = {
                 'data': paginated_data,
                 'total_items': total_items,
                 'total_pages': None,
                 'current_page': None,
-                'per_page': None
-            })
+                'per_page': None,
+            }
+
+        if include_dynamic:
+            response_body['dynamic_data'] = extended['dynamic_data']
+        if include_repeat:
+            response_body['repeat_data'] = extended['repeat_data']
+
+        return json_response(response_body)
 
     except Exception as e:
         error_id = str(uuid.uuid4())
@@ -627,6 +844,7 @@ def _build_flat_tables_response(
     page,
     per_page,
     expansion_failed=False,
+    extra=None,
 ):
     """Legacy multi-table bundle (backward compatible)."""
     if should_paginate:
@@ -655,6 +873,8 @@ def _build_flat_tables_response(
     if expansion_failed:
         response_data['warning'] = 'Related tables expansion failed, showing page-scoped results only'
         response_data['partial'] = True
+    if extra:
+        response_data.update(extra)
     return json_response(response_data)
 
 
@@ -669,6 +889,7 @@ def _build_star_tables_response(
     page,
     per_page,
     expansion_failed=False,
+    extra=None,
 ):
     """Star-schema dimensional tables for BI / integrator consumers."""
     tables = build_star_schema_tables(
@@ -695,14 +916,14 @@ def _build_star_tables_response(
     if expansion_failed:
         meta['warning'] = 'Related tables expansion failed, showing page-scoped results only'
         meta['partial'] = True
-    return json_data_response(
-        {
-            'schema_version': STAR_SCHEMA_VERSION,
-            'grain': STAR_SCHEMA_GRAIN,
-            'tables': tables,
-        },
-        meta=meta,
-    )
+    body = {
+        'schema_version': STAR_SCHEMA_VERSION,
+        'grain': STAR_SCHEMA_GRAIN,
+        'tables': tables,
+    }
+    if extra:
+        body.update(extra)
+    return json_data_response(body, meta=meta)
 
 
 @api_bp.route('/data/tables', methods=['GET'])
@@ -725,6 +946,12 @@ def get_data_tables():
                    'all' returns form_items and countries for the full filtered dataset (not paginated).
         - layout: response shape — ``flat`` (default, backward compatible) or ``star``
                   (dimensional tables: fact_form_values, dim_*, bridge_disagg_values).
+        - include_dynamic: Include DynamicIndicatorData rows (true/false). Adds ``dynamic_data`` array
+                           to the response. Each row has ``data_type="dynamic"``, ``section_id``,
+                           ``indicator_bank_id``, ``custom_label`` instead of ``form_item_id``.
+        - include_repeat: Include RepeatGroupData rows (true/false). Adds ``repeat_data`` array to
+                          the response. Each row has ``data_type="repeat"``, ``section_id``,
+                          ``repeat_instance_id``, ``instance_number``, ``instance_label``.
     """
     try:
         layout = _parse_tables_layout_param()
@@ -1447,6 +1674,38 @@ def get_data_tables():
                 )
                 expansion_failed = True
 
+        # Optionally fetch dynamic indicator and repeat section data, folding their
+        # form_item_ids and country_ids into the related-tables sets.
+        include_dynamic, include_repeat = _parse_include_flags(request.args)
+        extended = _fetch_extended_data(
+            template_id=template_id,
+            submission_id=submission_id,
+            item_id=item_id,
+            country_id=country_id,
+            period_name=period_name,
+            indicator_bank_id=indicator_bank_id,
+            submission_type=submission_type,
+            include_dynamic=include_dynamic,
+            include_repeat=include_repeat,
+            include_disagg=include_disagg,
+            minimal_country_info=(per_page and per_page > 1000) or (not should_paginate),
+            elevated_access=elevated_access,
+            auth_user=auth_user,
+            date_from=date_from,
+            date_to=date_to,
+        ) if (include_dynamic or include_repeat) else {'dynamic_data': [], 'repeat_data': []}
+
+        # Collect form_item_ids and country_ids referenced by extended rows so they appear
+        # in the related form_items / countries tables.
+        for drow in extended.get('dynamic_data', []):
+            if drow.get('country_id'):
+                country_ids.add(drow['country_id'])
+        for rrow in extended.get('repeat_data', []):
+            if rrow.get('form_item_id'):
+                form_item_ids.add(rrow['form_item_id'])
+            if rrow.get('country_id'):
+                country_ids.add(rrow['country_id'])
+
         # Build related tables from the collected id sets (optimized with eager loading)
         form_items_table = []
         if form_item_ids:
@@ -1488,6 +1747,12 @@ def get_data_tables():
             for country in countries_sorted:
                 countries_table.append(format_country_info(country))
 
+        extra_keys = {}
+        if include_dynamic:
+            extra_keys['dynamic_data'] = extended['dynamic_data']
+        if include_repeat:
+            extra_keys['repeat_data'] = extended['repeat_data']
+
         if layout == 'star':
             return _build_star_tables_response(
                 data_rows,
@@ -1499,6 +1764,7 @@ def get_data_tables():
                 page=page,
                 per_page=per_page,
                 expansion_failed=expansion_failed,
+                extra=extra_keys or None,
             )
 
         return _build_flat_tables_response(
@@ -1511,6 +1777,7 @@ def get_data_tables():
             page=page,
             per_page=per_page,
             expansion_failed=expansion_failed,
+            extra=extra_keys or None,
         )
     except Exception as e:
         error_id = str(uuid.uuid4())

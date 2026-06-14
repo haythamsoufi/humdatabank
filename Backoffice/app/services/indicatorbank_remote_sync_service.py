@@ -162,7 +162,25 @@ def sync_remote_indicator_bank(
         return questions or None
 
     def _apply_remote_metadata(existing: IndicatorBank, item: dict) -> None:
-        existing.area = _first_text(item, "spef", "SPEF", "area")
+        from app.models import IndicatorBankSpef
+
+        area_code = _first_text(item, "spef", "SPEF", "area")
+        if area_code:
+            code = area_code.strip().upper()
+            existing.area = code
+            spef_row = IndicatorBankSpef.query.filter(
+                db.func.upper(IndicatorBankSpef.code) == code
+            ).first()
+            if spef_row:
+                existing.indicator_spef_id = spef_row.id
+                existing.area_label = spef_row.name
+            else:
+                existing.indicator_spef_id = None
+                existing.area_label = None
+        else:
+            existing.area = None
+            existing.indicator_spef_id = None
+            existing.area_label = None
         existing.data_source = _first_text(
             item, "indicatorSource", "indicator_source", "dataSource"
         )

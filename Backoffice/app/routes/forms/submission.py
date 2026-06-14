@@ -216,11 +216,9 @@ def register_submission_routes(bp):
                     if assignment_entity_status.assigned_form and assignment_entity_status.assigned_form.template
                     else "Template"
                 )
-                country_name = (
-                    assignment_entity_status.country.name
-                    if assignment_entity_status.country
-                    else "Unknown"
-                )
+                from app.utils.api_serialization import _country_for_aes
+                _sub_country = _country_for_aes(assignment_entity_status)
+                country_name = _sub_country.name if _sub_country else "Unknown"
 
                 db.session.delete(assignment_entity_status)
                 db.session.flush()

@@ -49,7 +49,10 @@
                         id="{{ css_prefix }}-tab-{{ tab.id }}"
                         class="{{ admin_underline_tab_btn_classes(loop.first, size='compact', extra_classes=('cursor-pointer active-tab' if loop.first else 'cursor-pointer')) }}"
                         aria-selected="{{ 'true' if loop.first else 'false' }}"
-                        aria-controls="{{ css_prefix }}-{{ tab.id }}-tab-content">{{ tab.name }}</button>
+                        aria-controls="{{ css_prefix }}-{{ tab.id }}-tab-content"
+                        {% if tab.get('indicator_name') %}data-indicator-text="{{ tab.indicator_name }}"{% endif %}
+                        {% if tab.get('question_default_name') %}data-question-default-text="{{ tab.question_default_name }}"{% endif %}
+                        {% if tab.get('question_blank_name') %}data-question-blank-text="{{ tab.question_blank_name }}"{% endif %}>{{ tab.name }}</button>
                 {% endfor %}
             {% endcall %}
         </div>

@@ -1212,6 +1212,7 @@ export const ItemModal = {
         // Setup indicator-specific fields (delegated)
     setupIndicatorFields: function() {
         IndicatorItem.setup(this.modalElement);
+        this.updateItemTranslationTabLabels('indicator');
         // Setup listener to update allow over 100 checkbox when indicator changes
         this.setupAllowOver100Listener();
         // Update checkbox visibility after setup
@@ -1222,6 +1223,8 @@ export const ItemModal = {
     setupQuestionFields: function() {
 
         QuestionItem.setup(this.modalElement);
+        const questionTypeSelect = this.modalElement.querySelector('#item-question-type-select');
+        this.updateQuestionFieldLabels(questionTypeSelect ? questionTypeSelect.value : '');
         // Setup listener to update allow over 100 checkbox when question type/unit changes
         this.setupAllowOver100Listener();
         // Update checkbox visibility after setup
@@ -1246,6 +1249,9 @@ export const ItemModal = {
                 targetId === 'item-indicator-unit-select' ||
                 targetId === 'item-question-type-select' ||
                 targetId === 'item-question-unit') {
+                if (targetId === 'item-question-type-select') {
+                    this.updateQuestionFieldLabels(e.target.value);
+                }
                 // Update checkbox visibility based on current type
                 this.ensureAllowOver100Field(this.currentItemType);
             }
@@ -1934,12 +1940,65 @@ export const ItemModal = {
         QuestionItem.updateIndirectReachVisibility(this.modalElement);
     },
 
+    // Switch question field captions/placeholders between standard questions and Blank/Note items
+    updateQuestionFieldLabels: function(questionType) {
+        if (!this.modalElement) return;
+
+        const isBlank = questionType === 'blank';
+        const mode = isBlank ? 'blank' : 'default';
+
+        const labelCaption = this.modalElement.querySelector('#item-question-label-caption');
+        const definitionCaption = this.modalElement.querySelector('#item-question-definition-caption');
+        const labelInput = this.modalElement.querySelector('#item-question-label');
+        const definitionInput = this.modalElement.querySelector('#item-question-definition');
+
+        const applyCaption = (el) => {
+            if (!el) return;
+            const text = el.dataset[`${mode}Text`] || el.dataset.defaultText;
+            if (text) el.textContent = text;
+        };
+
+        const applyPlaceholder = (el) => {
+            if (!el) return;
+            const placeholder = el.dataset[`${mode}Placeholder`] || el.dataset.defaultPlaceholder;
+            if (placeholder) el.placeholder = placeholder;
+        };
+
+        applyCaption(labelCaption);
+        applyCaption(definitionCaption);
+        applyPlaceholder(labelInput);
+        applyPlaceholder(definitionInput);
+
+        this.updateQuestionLabelRequired(questionType);
+        this.updateItemTranslationTabLabels('question', questionType);
+    },
+
+    // Align Item Translations modal tab titles with the active item field labels
+    updateItemTranslationTabLabels: function(itemContext, questionType) {
+        const suffixes = ['labels', 'definitions'];
+        suffixes.forEach((suffix) => {
+            const tabBtn = document.getElementById(`translation-tab-${suffix}`);
+            if (!tabBtn) return;
+
+            let text;
+            if (itemContext === 'indicator') {
+                text = tabBtn.dataset.indicatorText;
+            } else if (questionType === 'blank') {
+                text = tabBtn.dataset.questionBlankText || tabBtn.dataset.questionDefaultText;
+            } else {
+                text = tabBtn.dataset.questionDefaultText;
+            }
+
+            if (text) tabBtn.textContent = text;
+        });
+    },
+
     // Update question label required attribute based on question type
     updateQuestionLabelRequired: function(questionType) {
         const questionLabel = Utils.getElementById('item-question-label');
         if (!questionLabel) return;
 
-        // Question text is not required for 'blank' (Blank/Note) type
+        // Heading is optional for Blank/Note items
         if (questionType === 'blank') {
             questionLabel.removeAttribute('required');
 
@@ -2493,6 +2552,8 @@ export const ItemModal = {
         }
         this.syncSharedToUI();
         QuestionItem.populateForm(this.modalElement, itemData);
+        const questionTypeSelect = this.modalElement.querySelector('#item-question-type-select');
+        this.updateQuestionFieldLabels(questionTypeSelect ? questionTypeSelect.value : (itemData.question_type || ''));
         // Ensure checkbox exists after question type is populated (so isPercentageItem can check the question type)
         (window.__clientLog || console.debug)('[ItemModal:AllowOver100] populateQuestionForm: calling ensureAllowOver100Field after populating question');
         this.ensureAllowOver100Field('question');

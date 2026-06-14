@@ -163,7 +163,7 @@ class TestTemplateCreate:
 
             resp = logged_in_sm_client.get("/admin/templates/new")
             assert resp.status_code == 200
-            assert "Create New Form Template" in resp.get_data(as_text=True)
+            assert "Create New Template" in resp.get_data(as_text=True)
 
     def test_create_template_post(self, logged_in_sm_client, db_session, app):
         with app.app_context():

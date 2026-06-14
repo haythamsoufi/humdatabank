@@ -1,6 +1,6 @@
-{# Form Builder AI Assistant panel (shared by form_builder.html and templates list).
+{# Form Builder AI Assistant panel (shared by form_builder.html and new_template.html).
    Set before include:
-     - fb_ai_template_id: current template id (none on the templates list page)
+     - fb_ai_template_id: current template id (none on the new template page)
      - fb_ai_version_id: currently viewed version id (optional)
    A trigger element with id="ai-assistant-btn" must exist on the page. #}
 
@@ -13,7 +13,7 @@
     "chatStreamUrl": "/api/ai/v2/chat/stream",
     "extractUrl": {{ url_for('form_builder.ai_extract_document') | tojson }},
     "extractImageUrl": {{ url_for('form_builder.ai_extract_image') | tojson }},
-    "maxMessageChars": {{ config.get('AI_MAX_MESSAGE_CHARS', 4000) | int }},
+    "maxMessageChars": {{ config.get('AI_FORM_BUILDER_MAX_MESSAGE_CHARS', 16000) | int }},
     "labels": {
         "thinking": {{ _('Working…') | tojson }},
         "send": {{ _('Send') | tojson }},

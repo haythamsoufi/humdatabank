@@ -376,7 +376,9 @@ def api_remove_dynamic_indicator(assignment_id):
         assignment = DynamicIndicatorData.query.get_or_404(assignment_id)
 
         # Check user access
-        if not check_country_access(assignment.assignment_entity_status.country.id):
+        from app.utils.api_serialization import _country_for_aes
+        aes_country = _country_for_aes(assignment.assignment_entity_status)
+        if not check_country_access(aes_country.id if aes_country else None):
             return json_forbidden('Access denied')
 
         # Delete the assignment (data is now stored directly in the assignment)
@@ -398,7 +400,9 @@ def api_update_dynamic_indicator(assignment_id):
         assignment = DynamicIndicatorData.query.get_or_404(assignment_id)
 
         # Check user access
-        if not check_country_access(assignment.assignment_entity_status.country.id):
+        from app.utils.api_serialization import _country_for_aes
+        aes_country = _country_for_aes(assignment.assignment_entity_status)
+        if not check_country_access(aes_country.id if aes_country else None):
             return json_forbidden('Access denied')
 
         # Get update data
@@ -572,8 +576,11 @@ def _detect_country_context_from_request():
 
         if aes_id:
             aes = AssignmentEntityStatus.query.get(aes_id)
-            if aes and aes.country:
-                return aes.country, aes.country.iso2, aes.country.iso3
+            if aes:
+                from app.utils.api_serialization import _country_for_aes
+                country = _country_for_aes(aes)
+                if country:
+                    return country, country.iso2, country.iso3
 
         if iso:
             country = Country.query.filter(or_(Country.iso3 == iso, Country.iso2 == iso)).first()
@@ -588,8 +595,11 @@ def _detect_country_context_from_request():
             with suppress(Exception):
                 aes_id_ref = int(m.group(1))
                 aes = AssignmentEntityStatus.query.get(aes_id_ref)
-                if aes and aes.country:
-                    return aes.country, aes.country.iso2, aes.country.iso3
+                if aes:
+                    from app.utils.api_serialization import _country_for_aes
+                    country = _country_for_aes(aes)
+                    if country:
+                        return country, country.iso2, country.iso3
 
         return None, None, None
     except Exception as e:
@@ -965,7 +975,8 @@ def api_presence_heartbeat(aes_id):
         aes = access_result['aes']
 
         # Keep live presence out of user_activity_log; store in cache/memory.
-        record_presence(aes_id=aes_id, user_id=current_user.id, ttl_seconds=75)
+        # TTL must match PRESENCE_TTL_MS in presence.js (120 000 ms).
+        record_presence(aes_id=aes_id, user_id=current_user.id, ttl_seconds=120)
 
         return json_ok()
     except Exception as e:
@@ -976,7 +987,7 @@ def api_presence_heartbeat(aes_id):
 @login_required
 @limiter.limit("30 per minute", key_func=_presence_rate_limit_key, override_defaults=True)
 def api_presence_active_users(aes_id):
-    """Return users active in this assignment in the last 75 seconds."""
+    """Return users active in this assignment in the last 120 seconds."""
     try:
         # Verify access to assignment
         access_result = ensure_aes_access(aes_id)
@@ -984,7 +995,8 @@ def api_presence_active_users(aes_id):
             return json_forbidden(access_result['error'])
         aes = access_result['aes']
 
-        presence_map = get_active_presence(aes_id=aes_id, ttl_seconds=75)
+        # TTL must match record_presence call above and PRESENCE_TTL_MS in presence.js.
+        presence_map = get_active_presence(aes_id=aes_id, ttl_seconds=120)
         if not presence_map:
             return json_ok(users=[])
 
@@ -1005,6 +1017,7 @@ def api_presence_active_users(aes_id):
             users.append({
                 'id': user_obj.id,
                 'name': (user_obj.name or ''),
+                'email': (user_obj.email or ''),
                 'profile_color': (user_obj.profile_color or '#3B82F6'),
                 'last_seen': presence_map[uid].isoformat() if presence_map.get(uid) else None,
             })

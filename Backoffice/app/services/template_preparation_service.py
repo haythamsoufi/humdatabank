@@ -9,7 +9,9 @@ from app.models import FormSection, DynamicIndicatorData, Config, FormItem, Form
 from app import db
 from app.utils.form_localization import (
     get_localized_page_name, get_localized_section_name, get_localized_indicator_name,
-    get_localized_sector_name, get_localized_subsector_name, get_indicator_bank_unit_display,
+    get_localized_sector_name, get_localized_subsector_name, get_indicator_bank_type_display,
+    get_indicator_bank_unit_display, get_localized_indicator_type, get_localized_indicator_unit,
+    get_translation_key,
 )
 from app.services.form_processing_service import get_form_items_for_section, FormItemProcessor, _process_dynamic_indicators_for_section
 from typing import List, Dict, Any, Optional
@@ -190,56 +192,134 @@ class TemplatePreparationService:
 
     @classmethod
     def _prepare_available_indicators(cls, all_sections: List[FormSection]) -> Dict[int, List]:
-        """Prepare available indicators by section for dynamic sections"""
-        from app.models import IndicatorBank
-        from sqlalchemy import func
+        """Prepare available indicators by section for dynamic sections."""
+        from app.models import IndicatorBank, IndicatorBankType, IndicatorBankUnit, Sector, SubSector
+        from sqlalchemy.orm import joinedload
 
         available_indicators_by_section = {}
 
+        # Fast-path: if no dynamic_indicators sections exist, skip all DB work.
+        if not any(s.section_type == 'dynamic_indicators' for s in all_sections):
+            return {s.id: [] for s in all_sections}
+
+        # Pre-build type/unit code → display-label caches so legacy string columns resolve
+        # the same way as indicator bank grids (get_indicator_bank_*_display).
+        _loc = get_translation_key()
+        _type_cache: Dict[str, str] = {}
+        for _tr in IndicatorBankType.query.filter_by(is_active=True).all():
+            for _key in filter(None, [((_tr.code or '').strip().lower()),
+                                      ((_tr.name or '').strip().lower())]):
+                if _key and _key not in _type_cache:
+                    raw_lab = (_tr.get_name_translation(_loc) or _tr.name or '').strip()
+                    _type_cache[_key] = raw_lab or get_localized_indicator_type(_tr.code or '')
+
+        _unit_cache: Dict[str, str] = {}
+        for _ur in IndicatorBankUnit.query.filter_by(is_active=True).all():
+            for _key in filter(None, [((_ur.code or '').strip().lower()),
+                                      ((_ur.name or '').strip().lower())]):
+                if _key and _key not in _unit_cache:
+                    raw_lab = (_ur.get_name_translation(_loc) or _ur.name or '').strip()
+                    _unit_cache[_key] = get_localized_indicator_unit(raw_lab) if raw_lab else ''
+
+        def _fast_type_display(ind) -> str:
+            """Type display aligned with get_indicator_bank_type_display."""
+            if getattr(ind, 'measurement_type', None) is not None:
+                return get_indicator_bank_type_display(ind)
+            raw = (getattr(ind, 'type', None) or '').strip()
+            if not raw:
+                return ''
+            key = raw.strip().lower()
+            if key not in _type_cache:
+                _type_cache[key] = get_indicator_bank_type_display(ind)
+            return _type_cache[key]
+
+        def _fast_unit_display(ind) -> str:
+            """Unit display aligned with get_indicator_bank_unit_display."""
+            if getattr(ind, 'measurement_unit', None) is not None:
+                return get_indicator_bank_unit_display(ind)
+            raw = (getattr(ind, 'unit', None) or '').strip()
+            if not raw:
+                return ''
+            key = raw.strip().lower()
+            if key not in _unit_cache:
+                _unit_cache[key] = get_indicator_bank_unit_display(ind)
+            return _unit_cache[key]
+
+        # First pass: load indicators per dynamic section, collecting IDs for batch lookups.
+        indicators_per_section: Dict[int, list] = {}
+        all_sector_ids: set = set()
+        all_subsector_ids: set = set()
+
         for section in all_sections:
-            if section.section_type == 'dynamic_indicators':
-                # Get available indicators based on section filters
-                query = IndicatorBank.query.filter(IndicatorBank.archived == False)
-
-                # Apply section filters if they exist
-                if hasattr(section, 'indicator_filters_list') and section.indicator_filters_list:
-                    for filter_obj in section.indicator_filters_list:
-                        field = filter_obj.get('field')
-                        values = filter_obj.get('values', [])
-
-                        if not field or not values:
-                            continue
-
-                        if field == 'type':
-                            query = query.filter(IndicatorBank.type.in_(values))
-                        elif field == 'unit':
-                            query = query.filter(IndicatorBank.unit.in_(values))
-                        elif field == 'emergency':
-                            bool_values = [v.lower() == 'true' for v in values]
-                            query = query.filter(IndicatorBank.emergency.in_(bool_values))
-                        elif field == 'archived':
-                            bool_values = [v.lower() == 'true' for v in values]
-                            query = query.filter(IndicatorBank.archived.in_(bool_values))
-
-                # Get the indicators and format for JSON response
-                indicators = query.order_by(IndicatorBank.name).all()
-                available_indicators_by_section[section.id] = [
-                    {
-                        'id': indicator.id,
-                        'name': get_localized_indicator_name(indicator),
-                        'type': indicator.type,
-                        'unit': get_indicator_bank_unit_display(indicator) or indicator.unit,
-                        'emergency': str(indicator.emergency).lower() if indicator.emergency is not None else None,
-                        # Add sector and subsector information for filtering
-                        'sector': cls._get_indicator_sector_name(indicator),
-                        'subsector': cls._get_indicator_subsector_name(indicator),
-                        # Add related_programs for filtering (processed like in form_builder.py)
-                        'related_programs': cls._process_related_programs(indicator.related_programs)
-                    }
-                    for indicator in indicators
-                ]
-            else:
+            if section.section_type != 'dynamic_indicators':
                 available_indicators_by_section[section.id] = []
+                continue
+
+            # Eager-load measurement lookups to avoid N+1 (lazy='select' on the relationships).
+            query = (
+                IndicatorBank.query
+                .filter(IndicatorBank.archived == False)
+                .options(
+                    joinedload(IndicatorBank.measurement_type),
+                    joinedload(IndicatorBank.measurement_unit),
+                )
+            )
+
+            if hasattr(section, 'indicator_filters_list') and section.indicator_filters_list:
+                for filter_obj in section.indicator_filters_list:
+                    field = filter_obj.get('field')
+                    values = filter_obj.get('values', [])
+                    if not field or not values:
+                        continue
+                    if field == 'type':
+                        query = query.filter(IndicatorBank.type.in_(values))
+                    elif field == 'unit':
+                        query = query.filter(IndicatorBank.unit.in_(values))
+                    elif field == 'emergency':
+                        bool_values = [v.lower() == 'true' for v in values]
+                        query = query.filter(IndicatorBank.emergency.in_(bool_values))
+                    elif field == 'archived':
+                        bool_values = [v.lower() == 'true' for v in values]
+                        query = query.filter(IndicatorBank.archived.in_(bool_values))
+
+            indicators = query.order_by(IndicatorBank.name).all()
+            indicators_per_section[section.id] = indicators
+
+            for ind in indicators:
+                if ind.sector and ind.sector.get('primary'):
+                    all_sector_ids.add(ind.sector['primary'])
+                if ind.sub_sector and ind.sub_sector.get('primary'):
+                    all_subsector_ids.add(ind.sub_sector['primary'])
+
+        # Batch-load all needed sectors and subsectors in two queries (replaces N+1).
+        sector_cache: Dict[int, Any] = {}
+        if all_sector_ids:
+            for s in Sector.query.filter(Sector.id.in_(all_sector_ids)).all():
+                sector_cache[s.id] = s
+
+        subsector_cache: Dict[int, Any] = {}
+        if all_subsector_ids:
+            for ss in SubSector.query.filter(SubSector.id.in_(all_subsector_ids)).all():
+                subsector_cache[ss.id] = ss
+
+        # Second pass: build result dicts using the cached lookups.
+        for section in all_sections:
+            if section.section_type != 'dynamic_indicators':
+                continue
+            indicators = indicators_per_section[section.id]
+            available_indicators_by_section[section.id] = [
+                {
+                    'id': indicator.id,
+                    'name': get_localized_indicator_name(indicator),
+                    'type': _fast_type_display(indicator),
+                    'unit': _fast_unit_display(indicator),
+                    'emergency': str(indicator.emergency).lower() if indicator.emergency is not None else None,
+                    'sector': cls._get_indicator_sector_name_cached(indicator, sector_cache),
+                    'subsector': cls._get_indicator_subsector_name_cached(indicator, subsector_cache),
+                    'related_programs': cls._process_related_programs(indicator.related_programs),
+                }
+                for indicator in indicators
+            ]
 
         return available_indicators_by_section
 
@@ -325,7 +405,7 @@ class TemplatePreparationService:
 
     @classmethod
     def _get_indicator_sector_name(cls, indicator):
-        """Get the primary sector name for an indicator"""
+        """Get the primary sector name for an indicator (single-row lookup; prefer _cached variant in loops)."""
         from app.models import Sector
 
         if not indicator.sector or not indicator.sector.get('primary'):
@@ -338,7 +418,7 @@ class TemplatePreparationService:
 
     @classmethod
     def _get_indicator_subsector_name(cls, indicator):
-        """Get the primary subsector name for an indicator"""
+        """Get the primary subsector name for an indicator (single-row lookup; prefer _cached variant in loops)."""
         from app.models import SubSector
 
         if not indicator.sub_sector or not indicator.sub_sector.get('primary'):
@@ -348,6 +428,22 @@ class TemplatePreparationService:
         if subsector:
             return get_localized_subsector_name(subsector)
         return None
+
+    @classmethod
+    def _get_indicator_sector_name_cached(cls, indicator, sector_cache: Dict[int, Any]):
+        """Resolve sector name from a pre-loaded dict (no extra DB query)."""
+        if not indicator.sector or not indicator.sector.get('primary'):
+            return None
+        sector = sector_cache.get(indicator.sector['primary'])
+        return get_localized_sector_name(sector) if sector else None
+
+    @classmethod
+    def _get_indicator_subsector_name_cached(cls, indicator, subsector_cache: Dict[int, Any]):
+        """Resolve subsector name from a pre-loaded dict (no extra DB query)."""
+        if not indicator.sub_sector or not indicator.sub_sector.get('primary'):
+            return None
+        subsector = subsector_cache.get(indicator.sub_sector['primary'])
+        return get_localized_subsector_name(subsector) if subsector else None
 
     @classmethod
     def _process_related_programs(cls, related_programs_str):

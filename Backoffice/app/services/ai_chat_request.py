@@ -296,7 +296,21 @@ def parse_chat_request(
     """
     if max_message_chars is None:
         try:
-            max_message_chars = int(current_app.config.get("AI_MAX_MESSAGE_CHARS", 4000))
+            # Form-builder requests embed extracted document/image text and legitimately
+            # need a much higher limit than the general chat UI.  Use a dedicated config
+            # key (AI_FORM_BUILDER_MAX_MESSAGE_CHARS) when the request comes from the
+            # form-builder panel; fall back to the general limit otherwise.
+            raw_page_ctx = data.get("page_context") or {}
+            is_form_builder = bool(
+                isinstance(raw_page_ctx, dict)
+                and raw_page_ctx.get("formBuilder", {}).get("enabled")
+            )
+            if is_form_builder:
+                max_message_chars = int(
+                    current_app.config.get("AI_FORM_BUILDER_MAX_MESSAGE_CHARS", 16000)
+                )
+            else:
+                max_message_chars = int(current_app.config.get("AI_MAX_MESSAGE_CHARS", 4000))
         except Exception as e:
             logger.debug("AI_MAX_MESSAGE_CHARS config invalid, using default: %s", e)
             max_message_chars = 4000

@@ -190,7 +190,8 @@ html, body {
     color: #9ca3af;
 }
 
-.admin-sidebar.collapsed .sidebar-footer {
+.admin-sidebar.collapsed .sidebar-footer,
+.sidebar-initially-collapsed .admin-sidebar .sidebar-footer {
     display: none;
 }
 
@@ -619,6 +620,69 @@ nav[class*="nav-"] {
     opacity: 1;
 }
 
+/* Top nav — assignment / focal-point menu: inverted active tab for clear contrast */
+.nav-focal-point .nav-menu-button {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.nav-focal-point .nav-menu-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.nav-focal-point .nav-menu-button.active {
+    background: #ffffff;
+    color: #0a1f44;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.nav-focal-point .nav-menu-button.active:hover {
+    background: #ffffff;
+    color: #0a1f44;
+}
+
+.nav-focal-point .nav-menu-button.active svg {
+    color: #0a1f44;
+}
+
+.nav-system-manager .nav-menu-button.active {
+    background: #ffffff;
+    color: #1f2937;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.nav-system-manager .nav-menu-button.active:hover {
+    background: #ffffff;
+    color: #1f2937;
+}
+
+.nav-system-manager .nav-menu-button.active svg {
+    color: #1f2937;
+}
+
+#appTopNav.bg-red-700 .nav-menu-button {
+    background: transparent;
+}
+
+#appTopNav.bg-red-700 .nav-menu-button.active {
+    background: #ffffff;
+    color: #b91c1c;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+#appTopNav.bg-red-700 .nav-menu-button.active:hover {
+    background: #ffffff;
+    color: #b91c1c;
+}
+
+#appTopNav.bg-red-700 .nav-menu-button.active svg {
+    color: #b91c1c;
+}
+
 /* Organization Logo */
 .org-logo-img {
     height: 2.25rem;
@@ -934,7 +998,7 @@ nav .relative {
     padding-right: 1rem;
 }
 
-.sidebar-initially-collapsed [data-category]:not(:last-child)::after {
+.sidebar-initially-collapsed .admin-sidebar [data-category]:not(:last-child)::after {
     content: '';
     display: block;
     width: 60%;
@@ -945,15 +1009,15 @@ nav .relative {
 }
 
 /* Hide divider if category group is collapsed (hidden in expanded mode) */
-.sidebar-initially-collapsed [data-category]:has(.collapsable-content.hidden-collapse)::after {
+.sidebar-initially-collapsed .admin-sidebar [data-category]:has(.collapsable-content.hidden-collapse)::after {
     display: none;
 }
 
-.sidebar-initially-collapsed [data-category]:has(.collapsable-content.hidden-collapse) {
+.sidebar-initially-collapsed .admin-sidebar [data-category]:has(.collapsable-content.hidden-collapse) {
     display: none;
 }
 
-.sidebar-initially-collapsed [data-category]:last-child::after {
+.sidebar-initially-collapsed .admin-sidebar [data-category]:last-child::after {
     display: none;
 }
 
@@ -983,4 +1047,84 @@ nav .relative {
     width: 100% !important;
     height: 100% !important;
     border: 0;
+}
+
+/* Main scroll area below sticky top nav */
+.admin-scroll-main {
+    max-height: calc(100vh - 3.5rem);
+    overflow-y: auto;
+}
+
+/* Notification bell badge anchor */
+.notification-badge-anchor {
+    left: -4px !important;
+    top: -4px !important;
+    right: auto !important;
+}
+
+/* Hide mobile menu FAB when in Flutter mobile app - multiple selectors for maximum coverage */
+html[data-mobile-app="true"] #mobileMenuFAB,
+html.mobile-app #mobileMenuFAB,
+html[data-mobile-app="true"] #mobileMenuScrim,
+html.mobile-app #mobileMenuScrim,
+html[data-mobile-app="true"] #mobileFloatingMenu,
+html.mobile-app #mobileFloatingMenu,
+/* Main sticky top bar + AI launcher: redundant inside the Flutter app shell */
+html[data-mobile-app="true"] #appTopNav,
+html.mobile-app #appTopNav,
+html[data-mobile-app="true"] #aiChatbotFAB,
+html.mobile-app #aiChatbotFAB,
+html[data-mobile-app="true"] #aiChatWidget,
+html.mobile-app #aiChatWidget {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Embedded mobile WebView: backoffice top nav is hidden — drop reserved height + tighten top padding */
+html[data-mobile-app="true"] #mainContent > main.admin-scroll-main,
+html.mobile-app #mainContent > main.admin-scroll-main {
+    max-height: none !important;
+}
+html[data-mobile-app="true"] #flashMessagesContainer:not(:has(.flash-messages)),
+html.mobile-app #flashMessagesContainer:not(:has(.flash-messages)) {
+    margin-top: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+html[data-mobile-app="true"] #flashMessagesContainer:has(.flash-messages),
+html.mobile-app #flashMessagesContainer:has(.flash-messages) {
+    margin-top: 0.5rem !important;
+}
+html[data-mobile-app="true"] #pageContentContainer,
+html.mobile-app #pageContentContainer {
+    padding-top: 0.375rem !important;
+    padding-bottom: 1rem !important;
+}
+
+/* CSS class for hiding mobile menu elements - used instead of inline styles for CSP compliance */
+.mobile-menu-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* System Manager badge + top nav (Dashboard/Documentation): full labels only at xl+ so icon-only frees brand title space in the lg band */
+.system-manager-label {
+    display: none;
+}
+
+@media (min-width: 1280px) {
+    .system-manager-label {
+        display: inline;
+    }
+
+    .system-manager-icon {
+        margin-inline-end: 0.375rem;
+    }
 }

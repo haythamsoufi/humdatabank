@@ -1,4 +1,4 @@
-from flask import session, current_app
+from flask import session, current_app, g
 from flask_login import current_user
 from app.models import Country, FormItem
 from app.models.core import UserEntityPermission
@@ -38,8 +38,10 @@ def _build_user_nav_entities(current_user):
     user_entities = []
     entity_permissions = UserEntityPermission.query.filter_by(user_id=current_user.id).all()
     if entity_permissions:
+        pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+        prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
         for perm in entity_permissions:
-            entity = EntityService.get_entity(perm.entity_type, perm.entity_id)
+            entity = prefetched.get((perm.entity_type, perm.entity_id))
             if entity:
                 user_entities.append(
                     {
@@ -82,19 +84,30 @@ def _build_user_nav_entities(current_user):
         for e in user_entities
         if e["entity_type"] == EntityType.country.value and isinstance(e["entity"], Country)
     ]
+    if user_entities:
+        EntityService.attach_display_names(
+            user_entities, include_hierarchy=True, localized=True,
+        )
     return user_entities, user_countries, allowed_entity_types
 
 
 def _document_modal_entity_choice_rows(user_entities):
     """Rows for document modal entity <select> (focal users: assigned entities only)."""
-    rows = []
+    pairs = []
     for e in user_entities or []:
         et = e.get("entity_type")
         eid = e.get("entity_id")
-        if not et or eid is None:
-            continue
+        if et and eid is not None:
+            pairs.append((et, eid))
+
+    name_map = EntityService.batch_entity_names(
+        pairs, include_hierarchy=True, localized=True,
+    )
+
+    rows = []
+    for et, eid in pairs:
         try:
-            label = EntityService.get_localized_entity_name(et, int(eid), include_hierarchy=True)
+            label = name_map.get((et, int(eid))) or f"{et} #{eid}"
         except Exception:
             label = f"{et} #{eid}"
         rows.append({"entity_type": et, "entity_id": int(eid), "label": label})
@@ -153,13 +166,11 @@ def _resolve_selected_entity_for_focal_nav(
                 session.pop(SELECTED_COUNTRY_ID_SESSION_KEY, None)
 
     if selected_entity is None and user_entities:
+        pairs = [(e["entity_type"], e["entity_id"]) for e in user_entities]
+        hierarchy_names = EntityService.batch_entity_names(pairs, include_hierarchy=True)
 
         def get_sort_key(e):
-            display_name = EntityService.get_entity_name(
-                e["entity_type"],
-                e["entity_id"],
-                include_hierarchy=True,
-            )
+            display_name = hierarchy_names.get((e["entity_type"], e["entity_id"]))
             return (display_name or "").lower()
 
         sorted_entities = sorted(user_entities, key=get_sort_key)
@@ -174,7 +185,7 @@ def _resolve_selected_entity_for_focal_nav(
         session[SELECTED_ENTITY_ID_SESSION_KEY] = selected_entity_id
 
     if selected_entity and selected_entity_type and selected_entity_id:
-        entity_country = EntityService.get_country_for_entity(selected_entity_type, selected_entity_id)
+        entity_country = EntityService.get_country_from_entity(selected_entity_type, selected_entity)
         if entity_country:
             selected_country = entity_country
 
@@ -243,6 +254,54 @@ def _format_age_group_breakdown(age_groups, fmt_number_func):
     elif total:
         return total
     return detail
+
+
+def _is_numeric_scalar(value):
+    """Return True for numeric scalars, excluding bool (bool is a subclass of int)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _format_boolean_for_display(value):
+    """Format boolean-like values as localized Yes/No."""
+    if value is True or (isinstance(value, str) and value.strip().lower() in ('true', 'yes', '1')):
+        return _("Yes")
+    if value is False or (isinstance(value, str) and value.strip().lower() in ('false', 'no', '0')):
+        return _("No")
+    return str(value)
+
+
+def _format_metadata_label(key):
+    """Map known metadata keys to human-readable labels."""
+    labels = {
+        'disaggregated_by_disability': _('Disaggregated by disability'),
+        'washington_group_compliant': _('Washington Group compliant'),
+    }
+    return labels.get(key, key.replace('_', ' ').title())
+
+
+def _format_metadata_dict(metadata):
+    """Format metadata dicts (e.g. disability flags) as labeled Yes/No pairs."""
+    if not isinstance(metadata, dict):
+        return ""
+
+    parts = []
+    preferred = ['disaggregated_by_disability', 'washington_group_compliant']
+    keys = list(metadata.keys())
+    ordered = [k for k in preferred if k in keys] + [k for k in keys if k not in preferred]
+    for key in ordered:
+        val = metadata.get(key)
+        if isinstance(val, bool):
+            parts.append(f"{_format_metadata_label(key)}: {_format_boolean_for_display(val)}")
+        elif val is not None and val != '':
+            parts.append(f"{_format_metadata_label(key)}: {val}")
+    return ", ".join(parts)
+
+
+def _is_metadata_only_dict(data):
+    """Return True when a dict contains only booleans and empty values."""
+    if not isinstance(data, dict) or not data:
+        return False
+    return all(isinstance(v, bool) or v is None or v == '' for v in data.values())
 
 def _parse_field_value_for_display(value, data_not_available=None, not_applicable=None, form_item_id=None):
     """Parse field value to extract meaningful information for display in activity summaries."""
@@ -405,46 +464,74 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
             # Handle other value structures
             return str(value['values'])
         else:
-            # Try to delegate to plugins for better formatting - but only if we know the field type
-            # This prevents plugin formatting from being applied to non-plugin fields
-            with suppress(Exception):
-                if hasattr(current_app, 'plugin_manager') and isinstance(value, dict):
-                    # Only try plugin formatting if we have context about the field type
-                    # This is a safety check to prevent plugin formatting on regular indicator fields
-                    pass  # Skip plugin formatting for now - would need field context to implement properly
-            # Handle simple dictionaries like {'direct': 89} for non-disaggregated fields
-            if 'direct' in value and len(value) == 1:
+            # Handle 'direct' key with or without sibling keys (e.g. disability metadata)
+            if 'direct' in value:
                 direct_value = value['direct']
-                # Check if direct_value is a nested dictionary (age group breakdown)
                 if isinstance(direct_value, dict):
-                    # Format age group breakdown with better visual hierarchy
                     return _format_age_group_breakdown(direct_value, _fmt_number)
-                else:
+                if direct_value is not None:
                     return str(direct_value)
-            elif 'total' in value and len(value) == 1:
+                return ""
+            elif 'total' in value:
                 total_value = value['total']
-                # Check if total_value is a nested dictionary (age group breakdown)
                 if isinstance(total_value, dict):
-                    # Format age group breakdown with better visual hierarchy
                     return _format_age_group_breakdown(total_value, _fmt_number)
-                else:
+                if total_value is not None:
                     return str(total_value)
-            # Handle flat maps like {'direct': 10, 'indirect': 20} or other category->number
-            elif all(isinstance(v, (int, float, str, type(None))) for v in value.values()):
+                return ""
+            # Handle flat maps where all values are scalars, e.g. {'female': 234, 'male': 645}
+            elif _is_metadata_only_dict(value):
+                return _format_metadata_dict(value)
+            elif all(
+                isinstance(v, bool)
+                or isinstance(v, str)
+                or v is None
+                or _is_numeric_scalar(v)
+                for v in value.values()
+            ):
                 preferred = ['total', 'direct', 'indirect']
                 keys = list(value.keys())
                 ordered = [k for k in preferred if k in keys] + [k for k in keys if k not in preferred]
                 parts = []
                 for k in ordered:
                     v = value.get(k)
-                    if v is None or v == 0:
+                    if v is None or v == '' or v == 0:
                         continue
-                    label = k.replace('_', ' ').title()
-                    parts.append(f"{label}: {_fmt_number(v)}")
+                    label = _format_metadata_label(k)
+                    if isinstance(v, bool):
+                        parts.append(f"{label}: {_format_boolean_for_display(v)}")
+                    else:
+                        parts.append(f"{label}: {_fmt_number(v)}")
                 if parts:
                     return ", ".join(parts)
-            # Fallback
-            return str(value)
+                return ""
+            else:
+                # Complex nested dict: extract numeric breakdowns and boolean metadata separately.
+                numeric_parts = []
+                metadata_parts = []
+                for k, v in value.items():
+                    if isinstance(v, bool):
+                        metadata_parts.append(f"{_format_metadata_label(k)}: {_format_boolean_for_display(v)}")
+                    elif _is_numeric_scalar(v) and v != 0:
+                        numeric_parts.append(f"{_format_metadata_label(k)}: {_fmt_number(v)}")
+                    elif isinstance(v, dict):
+                        if _is_metadata_only_dict(v):
+                            formatted = _format_metadata_dict(v)
+                            if formatted:
+                                metadata_parts.append(formatted)
+                        else:
+                            sub_nums = {
+                                sk: sv for sk, sv in v.items()
+                                if _is_numeric_scalar(sv) and sv != 0
+                            }
+                            if sub_nums:
+                                breakdown = _format_age_group_breakdown(sub_nums, _fmt_number)
+                                if breakdown:
+                                    numeric_parts.append(breakdown)
+                parts = numeric_parts + metadata_parts
+                if parts:
+                    return ", ".join(parts)
+                return ""
     elif isinstance(value, str):
         return value
     else:
@@ -851,42 +938,36 @@ def _get_localized_indicator_bank_name_by_id(indicator_bank_id, fallback_name=No
         return fallback_name or "Unknown Indicator"
 
 
+def _get_form_item_cached(form_item_id):
+    """Return FormItem by id using a per-request cache stored in flask.g."""
+    cache = g.get('_form_item_cache')
+    if cache is None:
+        g._form_item_cache = {}
+        cache = g._form_item_cache
+    if form_item_id not in cache:
+        cache[form_item_id] = FormItem.query.get(form_item_id)
+    return cache[form_item_id]
+
+
 def get_localized_field_name_by_id(form_item_id, fallback_name=None):
     """Get localized field name by FormItem id for activity display."""
     if not form_item_id:
-        current_app.logger.debug(f"DEBUG get_localized_field_name_by_id: No form_item_id provided, returning fallback: {fallback_name}")
         return fallback_name or "Unknown Field"
 
     try:
         from flask_babel import get_locale
         from app.utils.form_localization import get_translation_key, get_localized_indicator_name
 
-        # ISO locale code for JSON translations
-        translation_key = get_translation_key()  # ISO (e.g., 'fr')
+        translation_key = get_translation_key()
         locale_code = (str(get_locale()) if get_locale() else 'en').split('_', 1)[0]
-        current_app.logger.debug(
-            f"DEBUG get_localized_field_name_by_id: form_item_id={form_item_id}, translation_key={translation_key}, locale_code={locale_code}, fallback_name={fallback_name}"
-        )
 
-        form_item = FormItem.query.get(form_item_id)
+        form_item = _get_form_item_cached(form_item_id)
         if not form_item:
-            current_app.logger.debug(f"DEBUG get_localized_field_name_by_id: FormItem {form_item_id} not found, using fallback")
             return fallback_name or "Deleted Field"
-
-        current_app.logger.debug(
-            f"DEBUG get_localized_field_name_by_id: FormItem found - is_indicator={form_item.is_indicator}, label='{form_item.label}', item_type='{form_item.item_type}'"
-        )
 
         # For indicators with indicator_bank, use the proper localization function
         if form_item.is_indicator and form_item.indicator_bank:
-            current_app.logger.debug(
-                f"DEBUG get_localized_field_name_by_id: Using indicator_bank localization for indicator_bank_id={form_item.indicator_bank_id}"
-            )
-            localized_name = get_localized_indicator_name(form_item.indicator_bank)
-            current_app.logger.debug(
-                f"DEBUG get_localized_field_name_by_id: indicator_bank localized name='{localized_name}'"
-            )
-            return localized_name
+            return get_localized_indicator_name(form_item.indicator_bank)
 
         # For other item types, read label_translations directly
         raw_trans = getattr(form_item, 'label_translations', None)
@@ -899,26 +980,13 @@ def get_localized_field_name_by_id(form_item_id, fallback_name=None):
             except json.JSONDecodeError:
                 translations_dict = {}
 
-        current_app.logger.debug(
-            f"DEBUG get_localized_field_name_by_id: label_translations keys={list(translations_dict.keys()) if translations_dict else []}"
-        )
-
         if translations_dict:
-            # Try keys in order of preference
             for key in [locale_code, translation_key, 'en']:
                 val = translations_dict.get(key)
                 if isinstance(val, str) and val.strip():
-                    current_app.logger.debug(
-                        f"DEBUG get_localized_field_name_by_id: Using translation for key '{key}': '{val}'"
-                    )
                     return val
-        else:
-            current_app.logger.debug("DEBUG get_localized_field_name_by_id: No label_translations available")
 
-        # Fallback to default label or provided fallback
-        result = fallback_name or form_item.label
-        current_app.logger.debug(f"DEBUG get_localized_field_name_by_id: Using fallback result='{result}'")
-        return result
+        return fallback_name or form_item.label
 
     except Exception as e:
         current_app.logger.error(f"Error getting localized field name for ID {form_item_id}: {e}")
@@ -1099,7 +1167,6 @@ def render_activity_summary(activity):
     from flask_babel import get_locale
 
     current_locale = str(get_locale()) if get_locale() else 'en'
-    current_app.logger.debug(f"DEBUG render_activity_summary: Starting render, current_locale={current_locale}")
 
     # Extract context
     ctx = {}
@@ -1114,7 +1181,6 @@ def render_activity_summary(activity):
         params = {}
 
     key = getattr(activity, 'summary_key', None)
-    current_app.logger.debug(f"DEBUG render_activity_summary: key='{key}', params={params}")
 
     # Get field_id for matrix formatting
     field_id = params.get('field_id')
@@ -1127,15 +1193,12 @@ def render_activity_summary(activity):
 
     # Get localized field name for single field updates
     if 'field_id' in params and 'field' in params:
-        current_app.logger.debug(f"DEBUG render_activity_summary: Before localization - field_id={params['field_id']}, field='{params['field']}'")
-        localized_name = localized_field_name(
+        params['field'] = localized_field_name(
             params.get('field_id'),
             fallback_name=params.get('field'),
             field_id_kind=params.get('field_id_kind'),
             assignment_id=getattr(activity, 'assignment_id', None)
         )
-        current_app.logger.debug(f"DEBUG render_activity_summary: After localization - localized_field_name='{localized_name}'")
-        params['field'] = localized_name
 
     # Determine specialized formatting for data change activities
     change_type = (params.get('change_type') or 'updated').lower()
@@ -1149,11 +1212,9 @@ def render_activity_summary(activity):
         else:
             template_str = babel_("%(field)s: %(old)s → %(new)s")
         try:
-            result = template_str % params
-            current_app.logger.debug(f"DEBUG render_activity_summary: Final result='{result}'")
-            return result
+            return template_str % params
         except Exception as e:
-            current_app.logger.error(f"DEBUG render_activity_summary: Error formatting single-change message: {e}")
+            current_app.logger.error(f"render_activity_summary: Error formatting single-change message: {e}")
             return template_str
 
     if key == 'activity.form_data_updated.multiple':
@@ -1194,12 +1255,7 @@ def render_activity_summary(activity):
                 template=template_name
             )
 
-        try:
-            current_app.logger.debug(f"DEBUG render_activity_summary: Final result='{template_str}'")
-            return template_str
-        except Exception as e:
-            current_app.logger.error(f"DEBUG render_activity_summary: Error formatting multi-change message: {e}")
-            return template_str
+        return template_str
 
     messages = {
         'activity.assignment_created': babel_("Assignment created: %(template)s"),
@@ -1217,12 +1273,9 @@ def render_activity_summary(activity):
 
     if key in messages:
         try:
-            result = messages[key] % params
-            current_app.logger.debug(f"DEBUG render_activity_summary: Final result='{result}'")
-            return result
+            return messages[key] % params
         except Exception as e:
-            current_app.logger.error(f"DEBUG render_activity_summary: Error formatting message: {e}")
+            current_app.logger.error(f"render_activity_summary: Error formatting message for key '{key}': {e}")
             return messages[key]
 
-    current_app.logger.debug(f"DEBUG render_activity_summary: No message found for key '{key}', returning empty string")
     return ""

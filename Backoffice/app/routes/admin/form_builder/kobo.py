@@ -195,12 +195,24 @@ def kobo_data_import_template_structure():
         template_id=template.id, version_id=version.id
     ).order_by(FormSection.order).all()
 
+    section_ids = [sec.id for sec in sections]
+    items_by_section_id = {}
+    if section_ids:
+        for item in (
+            FormItem.query.filter(
+                FormItem.template_id == template.id,
+                FormItem.version_id == version.id,
+                FormItem.section_id.in_(section_ids),
+            )
+            .order_by(FormItem.section_id, FormItem.order)
+            .all()
+        ):
+            items_by_section_id.setdefault(item.section_id, []).append(item)
+
     result_sections = []
     all_items = []
     for sec in sections:
-        items = FormItem.query.filter_by(
-            section_id=sec.id, template_id=template.id, version_id=version.id
-        ).order_by(FormItem.order).all()
+        items = items_by_section_id.get(sec.id, [])
         item_list = []
         for item in items:
             opts = list(item.allowed_disaggregation_options or [])

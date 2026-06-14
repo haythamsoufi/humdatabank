@@ -1852,8 +1852,13 @@ class AIFormDataValidationService:
 
         country = None
         try:
-            if aes and aes.country:
-                country = aes.country
+            if aes:
+                if not hasattr(self, "_aes_country_cache"):
+                    self._aes_country_cache = {}
+                if aes.id not in self._aes_country_cache:
+                    from app.utils.api_serialization import _country_for_aes
+                    self._aes_country_cache[aes.id] = _country_for_aes(aes)
+                country = self._aes_country_cache[aes.id]
             elif ps and getattr(ps, "country", None):
                 country = ps.country
         except Exception as e:

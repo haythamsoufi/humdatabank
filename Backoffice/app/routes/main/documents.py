@@ -178,12 +178,16 @@ def documents_submit():
 
     show_entity_select = len(user_entities) > 1
     documents_entity_repo_label = None
+    selected_entity_display_name = next(
+        (e.get("display_name") for e in user_entities if e.get("entity_type") == sel_type and e.get("entity_id") == sel_id),
+        None,
+    )
     if not show_entity_select:
         try:
-            documents_entity_repo_label = "{} — {}".format(
-                EntityService.get_localized_entity_name(sel_type, sel_id, include_hierarchy=True),
-                _("Document repository"),
+            label = selected_entity_display_name or EntityService.get_localized_entity_name(
+                sel_type, sel_id, include_hierarchy=True,
             )
+            documents_entity_repo_label = "{} — {}".format(label, _("Document repository"))
         except Exception:
             documents_entity_repo_label = None
     log_pfx = "[documents_submit]"
@@ -235,6 +239,7 @@ def documents_submit():
         selected_entity=selected_entity,
         selected_entity_type=selected_entity_type,
         selected_entity_id=selected_entity_id,
+        selected_entity_display_name=selected_entity_display_name,
         document_entity_types=document_entity_types,
         standalone_entity_options_url=url_for("content_management.standalone_document_entity_options"),
         documents_repo_team_pending_edit=True,

@@ -4,6 +4,14 @@ Pytest configuration and fixtures for Humanitarian Databank Backoffice tests.
 This module provides shared fixtures and utilities for all tests.
 """
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load Backoffice/.env before app imports (override=False).
+load_dotenv(Path(__file__).resolve().parent.parent / '.env', override=False)
+os.environ.setdefault('FLASK_CONFIG', 'testing')
+
 import pytest
 import tempfile
 import shutil
@@ -281,20 +289,77 @@ END $$;
                     # Non-duplicate error - this is serious, re-raise
                     raise
 
-            # Verify critical tables exist
-            with db.engine.connect() as conn:
-                def _table_exists(name: str) -> bool:
-                    result = conn.execute(text(
-                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema=current_schema() AND table_name = :t)"
-                    ), {"t": name})
-                    return bool(result.scalar())
+            # Verify critical tables exist (retry once if schema cleanup was partial)
+            _critical_tables = (
+                "user",
+                "country",
+                "user_entity_permissions",
+                "form_template",
+                "api_keys",
+                "form_data",
+                "dynamic_indicator_data",
+                "indicator_bank",
+                "rbac_role",
+            )
 
-                missing = [t for t in ("user", "form_template", "api_keys", "form_data") if not _table_exists(t)]
-                if missing:
-                    raise RuntimeError(
-                        "CRITICAL: expected tables were not created: "
-                        + ", ".join(missing)
-                    )
+            def _missing_critical_tables():
+                with db.engine.connect() as conn:
+                    missing = []
+                    for table_name in _critical_tables:
+                        exists = conn.execute(text(
+                            "SELECT EXISTS (SELECT FROM information_schema.tables "
+                            "WHERE table_schema=current_schema() AND table_name = :t)"
+                        ), {"t": table_name}).scalar()
+                        if not exists:
+                            missing.append(table_name)
+                    return missing
+
+            missing = _missing_critical_tables()
+            if missing:
+                # A poisoned pooled connection can cause the nuclear-drop block above
+                # to fail silently; dispose and rebuild the schema once more.
+                try:
+                    db.engine.dispose()
+                except Exception:
+                    pass
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(text("""
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN (SELECT table_name FROM information_schema.views WHERE table_schema = current_schema()) LOOP
+    EXECUTE 'DROP VIEW IF EXISTS ' || quote_ident(r.table_name) || ' CASCADE';
+  END LOOP;
+  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
+    EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+  END LOOP;
+  FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = current_schema()) LOOP
+    EXECUTE 'DROP SEQUENCE IF EXISTS ' || quote_ident(r.sequence_name) || ' CASCADE';
+  END LOOP;
+  FOR r IN (
+    SELECT t.typname
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typtype = 'e' AND n.nspname = current_schema()
+  ) LOOP
+    EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.typname) || ' CASCADE';
+  END LOOP;
+END $$;
+                        """))
+                except Exception:
+                    pass
+                if db.engine.dialect.name == "postgresql":
+                    with db.engine.begin() as conn:
+                        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                db.metadata.create_all(bind=db.engine, checkfirst=True)
+                missing = _missing_critical_tables()
+
+            if missing:
+                raise RuntimeError(
+                    "CRITICAL: expected tables were not created: "
+                    + ", ".join(missing)
+                )
 
         except RuntimeError:
             raise
@@ -596,9 +661,74 @@ def transaction_test_table(db_session, app):
             pass
 
 
-# Pytest hooks
+# ---------------------------------------------------------------------------
+# Per-worker database isolation for pytest-xdist
+# ---------------------------------------------------------------------------
+
+def _ensure_worker_database(base_url: str, db_name: str) -> None:
+    """Create the per-worker database if it does not already exist.
+
+    Connects to the PostgreSQL 'postgres' maintenance database using the same
+    host/port/user/password as the test URL, then issues CREATE DATABASE if the
+    target DB is absent.  Silently no-ops for non-PostgreSQL URLs or when the
+    DB already exists.
+    """
+    import re
+    try:
+        from urllib.parse import urlparse
+        import psycopg2
+
+        # Strip SQLAlchemy driver suffix (e.g. +psycopg2) for psycopg2 connection
+        clean_url = re.sub(r'\+\w+', '', base_url, count=1)
+        parsed = urlparse(clean_url)
+        if not parsed.scheme.startswith('postgresql') and not parsed.scheme.startswith('postgres'):
+            return
+
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            user=parsed.username,
+            password=parsed.password or '',
+            dbname='postgres',
+            connect_timeout=5,
+        )
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute('SELECT 1 FROM pg_database WHERE datname = %s', (db_name,))
+        if not cur.fetchone():
+            cur.execute(f'CREATE DATABASE "{db_name}"')
+        cur.close()
+        conn.close()
+    except Exception:
+        pass  # If creation fails, let the test fixture surface the real error
+
+
 def pytest_configure(config):
-    """Configure pytest markers."""
+    """Configure pytest markers and (for xdist workers) isolate test databases."""
+
+    # ── per-worker DB isolation ──────────────────────────────────────────────
+    # Each xdist worker gets its own database so parallel workers do not fight
+    # over DDL locks when db_session drops/recreates the full schema.
+    # PYTEST_XDIST_WORKER is set to e.g. "gw0", "gw1", … by pytest-xdist.
+    worker_id = os.environ.get('PYTEST_XDIST_WORKER', '')
+    if worker_id:
+        from urllib.parse import urlparse, urlunparse
+        import re
+
+        base_url = os.environ.get('TEST_DATABASE_URL') or os.environ.get('DATABASE_URL', '')
+        if base_url and not base_url.startswith('sqlite'):
+            parsed = urlparse(base_url)
+            # Append worker suffix to the DB name path: /ngo_databank_test -> /ngo_databank_test_gw0
+            original_db = parsed.path.lstrip('/')
+            worker_db = f'{original_db}_{worker_id}'
+            new_url = urlunparse(parsed._replace(path=f'/{worker_db}'))
+
+            _ensure_worker_database(base_url, worker_db)
+
+            os.environ['TEST_DATABASE_URL'] = new_url
+            os.environ['DATABASE_URL'] = new_url
+
+    # ── markers ─────────────────────────────────────────────────────────────
     config.addinivalue_line(
         "markers", "unit: Unit tests (fast, no database)"
     )
@@ -647,12 +777,29 @@ _session_start_time = None   # set in pytest_sessionstart
 def pytest_sessionstart(session):
     global _session_start_time
     _session_start_time = _time.time()
+    # Live progress file (updated per test on the controller process).
+    with open(_results_log_path, 'w', encoding='utf-8') as f:
+        f.write("=" * 120 + " test session starts " + "=" * 10 + "\n")
+        f.write(f"platform {_sys.platform} -- Python {_platform.python_version()}, "
+                f"pytest-{pytest.__version__}\n")
+        f.write("collected ... (waiting for collection to finish)\n\n")
 
 
 def pytest_report_collectionfinish(config, start_path, items):
     """Record number of collected items for progress percentages."""
     global _total_collected
     _total_collected = len(items)
+    with open(_results_log_path, 'a', encoding='utf-8') as f:
+        f.write(f"collected {_total_collected} items\n\n")
+
+
+def _append_live_progress(outcome, nodeid, duration):
+    """Append one completed test line so tail -f shows real progress."""
+    total = _total_collected or 1
+    idx = len(_test_outcomes)
+    pct = int(100 * idx / total)
+    with open(_results_log_path, 'a', encoding='utf-8') as f:
+        f.write(f"{nodeid} {outcome} [{pct:3d}%] ({duration:.2f}s)\n")
 
 
 def pytest_runtest_logreport(report):
@@ -661,11 +808,12 @@ def pytest_runtest_logreport(report):
         outcome = report.outcome.upper()          # PASSED / FAILED / SKIPPED
         longrepr = report.longreprtext if report.failed else None
         _test_outcomes.append((outcome, report.nodeid, longrepr, report.duration))
+        _append_live_progress(outcome, report.nodeid, report.duration)
     elif report.when in ('setup', 'teardown') and report.failed:
         longrepr = report.longreprtext or None
-        _test_outcomes.append(
-            (f"ERROR ({report.when})", report.nodeid, longrepr, report.duration)
-        )
+        entry = (f"ERROR ({report.when})", report.nodeid, longrepr, report.duration)
+        _test_outcomes.append(entry)
+        _append_live_progress(entry[0], report.nodeid, report.duration)
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):

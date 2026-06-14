@@ -20,7 +20,7 @@
         <div class="meta">
             <div><strong>{{ _('Country:') }}</strong> {{ _country_name if _country_name else '-' }}</div>
             <div><strong>{{ _('Period:') }}</strong> {{ assignment.period_name if assignment else '-' }}</div>
-            <div><strong>{{ _('Status:') }}</strong> {{ _(aes.status) if aes else '-' }}</div>
+            <div><strong>{{ _('Status:') }}</strong> {{ localize_status(aes.status) if aes else '-' }}</div>
             <div><strong>{{ _('Generated:') }}</strong> {{ generated_at|datetime_local('datetime') if generated_at else '' }}</div>
         </div>
     </header>

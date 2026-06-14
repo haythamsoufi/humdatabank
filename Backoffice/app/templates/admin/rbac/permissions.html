@@ -15,10 +15,11 @@
     subtitle=_('Manage roles, permissions, and access rules.')
 ) }}
 
+<div class="bg-white shadow-md border border-gray-200">
 {% set active_tab = 'permissions' %}
 {% include "admin/rbac/_rbac_tabs.html" %}
 
-<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+<div class="p-4 sm:p-6">
     {% for module, perms in permissions_by_module.items() %}
         <div class="{% if not loop.first %}mt-8{% endif %}">
             <div class="flex items-center justify-between border-b border-gray-200 pb-2 mb-4">
@@ -42,5 +43,6 @@
             </div>
         </div>
     {% endfor %}
+</div>
 </div>
 {% endblock %}

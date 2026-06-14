@@ -106,6 +106,18 @@ class TestManageUsers:
         resp = logged_in_client.get("/admin/users")
         assert resp.status_code == 200
 
+    def test_manage_users_includes_edit_denied_message_for_other_admins(
+        self, logged_in_client, db_session
+    ):
+        """Non–system-manager admins see why they cannot open another admin's edit form."""
+        create_test_user(
+            db_session, email="other_admin_list@example.com", role="admin"
+        )
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        assert "edit_denied_message" in resp.text
+        assert "Only a System Manager can modify an admin user." in resp.text
+
 
 # ---------------------------------------------------------------------------
 # access_requests (GET /admin/access-requests)

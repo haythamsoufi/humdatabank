@@ -76,6 +76,87 @@ def format_country_info_minimal(country):
     }
 
 
+def batch_countries_for_aes_list(aes_list):
+    """Batch-resolve related Country objects for AssignmentEntityStatus rows.
+
+    Returns a map keyed by ``(entity_type, entity_id)`` to avoid per-row
+    ``AssignmentEntityStatus.country`` property lookups (EntityService N+1).
+    """
+    if not aes_list:
+        return {}
+
+    from app.models.core import Country
+    from app.models.organization import NSBranch, NSSubBranch, NSLocalUnit
+    from sqlalchemy.orm import joinedload
+
+    result = {}
+
+    country_ids = {
+        aes.entity_id for aes in aes_list
+        if aes.entity_type == 'country' and aes.entity_id
+    }
+    if country_ids:
+        for country in Country.query.filter(Country.id.in_(country_ids)).all():
+            result[('country', country.id)] = country
+
+    branch_ids = {
+        aes.entity_id for aes in aes_list
+        if aes.entity_type == 'ns_branch' and aes.entity_id
+    }
+    if branch_ids:
+        for branch in (
+            NSBranch.query.options(joinedload(NSBranch.country))
+            .filter(NSBranch.id.in_(branch_ids))
+            .all()
+        ):
+            if branch.country:
+                result[('ns_branch', branch.id)] = branch.country
+
+    subbranch_ids = {
+        aes.entity_id for aes in aes_list
+        if aes.entity_type == 'ns_subbranch' and aes.entity_id
+    }
+    if subbranch_ids:
+        for subbranch in (
+            NSSubBranch.query.options(joinedload(NSSubBranch.branch).joinedload(NSBranch.country))
+            .filter(NSSubBranch.id.in_(subbranch_ids))
+            .all()
+        ):
+            parent_country = subbranch.branch.country if subbranch.branch else None
+            if parent_country:
+                result[('ns_subbranch', subbranch.id)] = parent_country
+
+    localunit_ids = {
+        aes.entity_id for aes in aes_list
+        if aes.entity_type == 'ns_localunit' and aes.entity_id
+    }
+    if localunit_ids:
+        for local_unit in (
+            NSLocalUnit.query.options(joinedload(NSLocalUnit.branch).joinedload(NSBranch.country))
+            .filter(NSLocalUnit.id.in_(localunit_ids))
+            .all()
+        ):
+            parent_country = local_unit.branch.country if local_unit.branch else None
+            if parent_country:
+                result[('ns_localunit', local_unit.id)] = parent_country
+
+    return result
+
+
+def _country_for_aes(aes, aes_countries=None):
+    """Resolve Country for an AES row without hitting the ``.country`` property when possible."""
+    if not aes:
+        return None
+    if aes_countries is not None:
+        return aes_countries.get((aes.entity_type, aes.entity_id))
+    if aes.entity_type == 'country':
+        from app.models.core import Country
+        return Country.query.get(aes.entity_id)
+    if hasattr(aes, 'country'):
+        return aes.country
+    return None
+
+
 def format_form_item_info(form_item, section=None, template=None, assignment=None, public_assignment=None):
     """Helper function to format comprehensive form item information, including section, template, and assignment info."""
     if not form_item:
@@ -198,11 +279,17 @@ def format_indicator_details(form_item):
     }
 
 
-def serialize_assigned_data_item(data_item, include_disagg=False, include_full_info=True, minimal_country_info=False):
+def serialize_assigned_data_item(
+    data_item,
+    include_disagg=False,
+    include_full_info=True,
+    minimal_country_info=False,
+    aes_countries=None,
+):
     """Serialize an assigned FormData item."""
     status_info = data_item.assignment_entity_status
     assigned_form = status_info.assigned_form if status_info else None
-    country = status_info.country if status_info else None
+    country = _country_for_aes(status_info, aes_countries)
 
     # Use inline formatting to avoid function call overhead
     data_not_avail = data_item.data_not_available
@@ -378,6 +465,190 @@ def serialize_public_data_item(data_item, include_disagg=False, include_full_inf
         item_payload['imputed_disaggregation_data'] = _wrap_disagg(imputed_disagg)
 
     return item_payload
+
+
+def _wrap_disagg_dict(dd):
+    """Normalize a raw disagg_data dict for API output, returning None when empty."""
+    if not dd or not isinstance(dd, dict):
+        return None
+    return {
+        'mode': dd.get('mode'),
+        'values': dd.get('values', {}) if isinstance(dd.get('values', {}), dict) else {},
+    }
+
+
+def serialize_dynamic_data_item(
+    data_item,
+    include_disagg=False,
+    minimal_country_info=False,
+    aes_countries=None,
+):
+    """
+    Serialize a DynamicIndicatorData row for API output.
+
+    Shape differences from regular FormData rows:
+    - ``data_type`` is always ``"dynamic"``
+    - ``form_item_id`` is always ``None`` (no FormItem; indicator referenced via ``indicator_bank_id``)
+    - Adds ``section_id``, ``indicator_bank_id``, ``custom_label``
+    """
+    aes = data_item.assignment_entity_status
+    pub = data_item.public_submission
+
+    if aes is not None:
+        submission_type = 'assigned'
+        submission_id = aes.id
+        assigned_form = aes.assigned_form
+        template_id = assigned_form.template_id if assigned_form else None
+        period_name = assigned_form.period_name if assigned_form else None
+        country_id = aes.entity_id if aes.entity_type == 'country' else None
+        country = _country_for_aes(aes, aes_countries)
+    else:
+        submission_type = 'public'
+        submission_id = pub.id if pub else None
+        assigned_form = pub.assigned_form if pub else None
+        template_id = assigned_form.template_id if assigned_form else None
+        period_name = assigned_form.period_name if assigned_form else None
+        country_id = pub.country_id if pub else None
+        country = pub.country if pub and hasattr(pub, 'country') else None
+
+    data_not_avail = data_item.data_not_available
+    not_applic = data_item.not_applicable
+
+    if data_not_avail:
+        value = None
+        data_status = "data_not_available"
+    elif not_applic:
+        value = None
+        data_status = "not_applicable"
+    else:
+        value = format_answer_value(data_item.value)
+        data_status = "available"
+
+    num_value = extract_numeric_value(value)
+    submitted_at = data_item.submitted_at.isoformat() if data_item.submitted_at else None
+
+    payload = {
+        'id': data_item.id,
+        'data_type': 'dynamic',
+        'submission_type': submission_type,
+        'submission_id': submission_id,
+        'template_id': template_id,
+        'period_name': period_name,
+        'country_id': country_id,
+        'section_id': data_item.section_id,
+        'indicator_bank_id': data_item.indicator_bank_id,
+        'custom_label': data_item.custom_label,
+        'form_item_id': None,
+        'value': value,
+        'num_value': num_value,
+        'data_status': data_status,
+        'data_not_available': data_not_avail,
+        'not_applicable': not_applic,
+        'prefilled_value': getattr(data_item, 'prefilled_value', None),
+        'imputed_value': getattr(data_item, 'imputed_value', None),
+        'date_collected': submitted_at,
+        'submitted_at': submitted_at,
+    }
+
+    if minimal_country_info:
+        payload['country_info'] = format_country_info_minimal(country)
+    else:
+        payload['country_info'] = format_country_info(country)
+
+    if include_disagg:
+        payload['disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'disagg_data', None))
+        payload['prefilled_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'prefilled_disagg_data', None))
+        payload['imputed_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'imputed_disagg_data', None))
+
+    return payload
+
+
+def serialize_repeat_data_item(
+    data_item,
+    include_disagg=False,
+    minimal_country_info=False,
+    aes_countries=None,
+):
+    """
+    Serialize a RepeatGroupData row for API output.
+
+    Shape differences from regular FormData rows:
+    - ``data_type`` is always ``"repeat"``
+    - Adds ``repeat_instance_id``, ``section_id``, ``instance_number``, ``instance_label``
+    - ``form_item_id`` is present (same semantics as regular FormData)
+    """
+    instance = data_item.repeat_instance
+    aes = instance.assignment_entity_status if instance else None
+    pub = instance.public_submission if instance else None
+
+    if aes is not None:
+        submission_type = 'assigned'
+        submission_id = aes.id
+        assigned_form = aes.assigned_form
+        template_id = assigned_form.template_id if assigned_form else None
+        period_name = assigned_form.period_name if assigned_form else None
+        country_id = aes.entity_id if aes.entity_type == 'country' else None
+        country = _country_for_aes(aes, aes_countries)
+    else:
+        submission_type = 'public'
+        submission_id = pub.id if pub else None
+        assigned_form = pub.assigned_form if pub else None
+        template_id = assigned_form.template_id if assigned_form else None
+        period_name = assigned_form.period_name if assigned_form else None
+        country_id = pub.country_id if pub else None
+        country = pub.country if pub and hasattr(pub, 'country') else None
+
+    data_not_avail = data_item.data_not_available
+    not_applic = data_item.not_applicable
+
+    if data_not_avail:
+        value = None
+        data_status = "data_not_available"
+    elif not_applic:
+        value = None
+        data_status = "not_applicable"
+    else:
+        value = format_answer_value(data_item.value)
+        data_status = "available"
+
+    num_value = extract_numeric_value(value)
+    submitted_at = data_item.submitted_at.isoformat() if data_item.submitted_at else None
+
+    payload = {
+        'id': data_item.id,
+        'data_type': 'repeat',
+        'submission_type': submission_type,
+        'submission_id': submission_id,
+        'template_id': template_id,
+        'period_name': period_name,
+        'country_id': country_id,
+        'section_id': instance.section_id if instance else None,
+        'form_item_id': data_item.form_item_id,
+        'repeat_instance_id': data_item.repeat_instance_id,
+        'instance_number': instance.instance_number if instance else None,
+        'instance_label': instance.instance_label if instance else None,
+        'value': value,
+        'num_value': num_value,
+        'data_status': data_status,
+        'data_not_available': data_not_avail,
+        'not_applicable': not_applic,
+        'prefilled_value': getattr(data_item, 'prefilled_value', None),
+        'imputed_value': getattr(data_item, 'imputed_value', None),
+        'date_collected': submitted_at,
+        'submitted_at': submitted_at,
+    }
+
+    if minimal_country_info:
+        payload['country_info'] = format_country_info_minimal(country)
+    else:
+        payload['country_info'] = format_country_info(country)
+
+    if include_disagg:
+        payload['disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'disagg_data', None))
+        payload['prefilled_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'prefilled_disagg_data', None))
+        payload['imputed_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'imputed_disagg_data', None))
+
+    return payload
 
 
 # ---------------------------------------------------------------------------

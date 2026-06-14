@@ -28,10 +28,11 @@
     subtitle=_('Manage roles, permissions, and access rules.')
 ) }}
 
+<div class="bg-white shadow-md border border-gray-200">
 {% set active_tab = 'roles' %}
 {% include "admin/rbac/_rbac_tabs.html" %}
 
-<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+<div class="p-4 sm:p-6">
     {% if roles %}
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -123,5 +124,6 @@
             <p class="text-sm mt-1">{{ _('Create one to get started.') }}</p>
         </div>
     {% endif %}
+</div>
 </div>
 {% endblock %}

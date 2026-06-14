@@ -216,6 +216,9 @@ class DebugManager:
         apscheduler_logger = logging.getLogger('apscheduler')
         apscheduler_logger.setLevel(logging.WARNING)
 
+        # Python-Markdown logs every extension load at DEBUG when the root logger is DEBUG.
+        logging.getLogger('MARKDOWN').setLevel(logging.WARNING)
+
         # variable_resolution_service is called once per form item that has a variable, so at
         # LOG_MODE=debug a single form load generates 20-50+ messages. Cap at INFO so debug
         # mode remains usable; the WARNING-level messages (missing config, unknown scope) are
@@ -264,6 +267,8 @@ class DebugManager:
         werkzeug_logger = logging.getLogger('werkzeug')
         werkzeug_logger.setLevel(logging.WARNING)
         werkzeug_logger.handlers.clear()
+
+        logging.getLogger('MARKDOWN').setLevel(logging.WARNING)
 
         # Update root logger
         logging.getLogger().setLevel(level)

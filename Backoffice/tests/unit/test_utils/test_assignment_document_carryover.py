@@ -432,27 +432,57 @@ class TestMergeCarryoverIntoSubmittedDocumentsDict:
         result = merge_carryover_into_submitted_documents_dict({}, aes, [section])
         assert result == set()
 
-    @patch('app.utils.assignment_document_carryover.find_carryover_documents_for_field')
-    def test_document_field_with_no_carryover(self, mock_find):
-        mock_find.return_value = []
+    def test_document_field_with_no_carryover(self):
+        # Field has cross_assignment_period_reuse disabled → skipped, returns empty set.
         aes = MagicMock()
         field = MagicMock()
         field.is_document_field = True
+        field.config = {}  # no cross_assignment_period_reuse
         field.id = 5
         section = MagicMock()
         section.fields_ordered = [field]
         result = merge_carryover_into_submitted_documents_dict({}, aes, [section])
         assert result == set()
 
-    @patch('app.utils.assignment_document_carryover.find_carryover_documents_for_field')
-    def test_document_field_with_carryover(self, mock_find):
+    @patch('app.utils.assignment_document_carryover.joinedload')
+    @patch('app.utils.assignment_document_carryover.FormItem')
+    @patch('app.utils.assignment_document_carryover.SubmittedDocument')
+    def test_document_field_with_carryover(self, MockSD, MockFI, mock_joinedload):
+        # Field with carryover enabled; DB query returns a matching document.
         doc = MagicMock()
         doc.id = 99
-        mock_find.return_value = [doc]
+        doc.form_item_id = 5
+        doc.period = '2022'
+        doc.document_type = None
+
         aes = MagicMock()
+        aes.id = 1
+        aes.entity_type = 'country'
+        aes.entity_id = 5
+        af = MagicMock()
+        af.period_name = 'Annual Report 2022'
+        af.template_id = 3
+        aes.assigned_form = af
+
         field = MagicMock()
         field.is_document_field = True
         field.id = 5
+        field.config = {'cross_assignment_period_reuse': True}
+
+        query_mock = MagicMock()
+        query_mock.options.return_value = query_mock
+        query_mock.join.return_value = query_mock
+        query_mock.filter.return_value = query_mock
+        query_mock.order_by.return_value = query_mock
+        query_mock.all.return_value = [doc]
+        MockSD.query = query_mock
+
+        fi_mock = MagicMock()
+        fi_mock.all.return_value = []
+        fi_query_chain = MagicMock()
+        fi_query_chain.filter.return_value = fi_mock
+        MockFI.query = fi_query_chain
+
         section = MagicMock()
         section.fields_ordered = [field]
         existing = {}

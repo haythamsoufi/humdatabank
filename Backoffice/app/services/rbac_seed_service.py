@@ -108,6 +108,10 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.data_explore.data_table", "Data Explorer: Data Table", "Access the Data Table tab in Data Explorer"),
         ("admin.data_explore.analysis", "Data Explorer: Analysis", "Access the Analysis tab in Data Explorer"),
         ("admin.data_explore.compliance", "Data Explorer: Compliance", "Access the Compliance tab in Data Explorer"),
+        # Validation admin
+        ("admin.validation.dashboard", "Validation: Dashboard", "Access the Validation Dashboard (tracker, checks, dispatch)"),
+        ("admin.validation.questions", "Validation: Questions", "Manage validation questions (list, edit, import/export)"),
+        ("admin.validation.rules", "Validation: Rules", "Manage the Validation Rules Registry (thresholds, check types, templates)"),
         # Governance
         ("admin.governance.view", "View governance dashboard", "Access the Governance dashboard (focal point coverage, access control, quality, compliance, metadata)"),
     ]
@@ -300,6 +304,24 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "name": "Admin: Data Explorer (Compliance)",
             "description": "Access the Compliance tab in Data Explorer.",
             "permission_codes": ["admin.data_explore.compliance"],
+        },
+        {
+            "code": "admin_validation_dashboard",
+            "name": "Admin: Validation Dashboard (Access)",
+            "description": "Access the Validation Dashboard (tracker, checks, dispatch).",
+            "permission_codes": ["admin.validation.dashboard"],
+        },
+        {
+            "code": "admin_validation_questions",
+            "name": "Admin: Validation Questions (Manage)",
+            "description": "Manage validation questions (list, edit, import/export).",
+            "permission_codes": ["admin.validation.questions"],
+        },
+        {
+            "code": "admin_validation_rules",
+            "name": "Admin: Validation Rules (Manage)",
+            "description": "Manage the Validation Rules Registry (thresholds, check types, templates).",
+            "permission_codes": ["admin.validation.rules"],
         },
         {
             "code": "admin_notifications_manager",

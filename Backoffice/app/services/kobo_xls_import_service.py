@@ -149,6 +149,136 @@ class KoboXlsImportService:
     """Import Kobo XLSForm files into IFRC form templates."""
 
     @classmethod
+    def validate_kobo_xls(cls, excel_file) -> Dict[str, Any]:
+        """
+        Validate a Kobo XLSForm file before import.
+
+        Returns dict with keys: valid, message, errors, preview
+        (preview: name, sections, items, warnings).
+        """
+        errors: List[str] = []
+        warnings: List[str] = []
+        preview = {'name': None, 'sections': 0, 'items': 0, 'warnings': []}
+
+        if openpyxl is None:
+            return {
+                'valid': False,
+                'message': 'openpyxl is required for Kobo import',
+                'errors': ['openpyxl package not installed'],
+                'preview': preview,
+            }
+
+        try:
+            workbook = openpyxl.load_workbook(
+                io.BytesIO(excel_file.read()),
+                data_only=True,
+                read_only=False,
+            )
+        except Exception as e:
+            current_app.logger.error(f"Failed to load Kobo XLS file for validation: {e}", exc_info=True)
+            return {
+                'valid': False,
+                'message': 'Invalid Excel file. Check the file format and try again.',
+                'errors': ['Failed to load Excel file.'],
+                'preview': preview,
+            }
+
+        sheet_names_lower = {name.lower(): name for name in workbook.sheetnames}
+        survey_sheet_name = sheet_names_lower.get('survey')
+        if not survey_sheet_name:
+            msg = 'Kobo XLSForm must contain a "survey" worksheet'
+            return {
+                'valid': False,
+                'message': msg,
+                'errors': ['Missing survey worksheet'],
+                'preview': preview,
+            }
+
+        settings_sheet_name = sheet_names_lower.get('settings')
+        form_title = None
+        if settings_sheet_name:
+            form_title = cls._read_form_title(workbook[settings_sheet_name])
+        preview['name'] = form_title or 'Imported from Kobo'
+
+        choices_sheet_name = sheet_names_lower.get('choices')
+        choices_by_list: Dict[str, List] = {}
+        if choices_sheet_name:
+            choices_by_list = cls._load_choices(workbook[choices_sheet_name])
+
+        survey_rows = cls._parse_survey_sheet(workbook[survey_sheet_name])
+        if not survey_rows:
+            msg = 'Survey worksheet is empty or has no valid rows'
+            return {
+                'valid': False,
+                'message': msg,
+                'errors': ['No valid survey rows'],
+                'preview': preview,
+            }
+
+        stack: List[Dict[str, Any]] = []
+        root_sections: List[Dict] = []
+        root_items: List[Dict] = []
+        section_count = 0
+        item_count = 0
+
+        for row in survey_rows:
+            type_val = _get_type_from_row(row)
+            kobo_type_norm = type_val.replace(' ', '_').strip().lower()
+
+            if kobo_type_norm in ('begin_group', 'begin_repeat'):
+                stack.append({'children': []})
+                section_count += 1
+            elif kobo_type_norm in ('end_group', 'end_repeat'):
+                if stack:
+                    closed = stack.pop()
+                    parent = stack[-1] if stack else None
+                    node = {'type': 'section', 'children': closed['children']}
+                    if parent:
+                        parent['children'].append(node)
+                    else:
+                        root_sections.append(node)
+            else:
+                item_info = cls._map_kobo_row_to_item(row, choices_by_list, warnings)
+                if item_info is None:
+                    continue
+                item_count += 1
+                node = {'type': 'item'}
+                if stack:
+                    stack[-1]['children'].append(node)
+                else:
+                    root_items.append(node)
+
+        while stack:
+            closed = stack.pop()
+            root_sections.append({'type': 'section', 'children': closed['children']})
+
+        preview['sections'] = section_count
+        preview['items'] = item_count
+        preview['warnings'] = warnings[:5]
+
+        if section_count == 0 and item_count == 0:
+            msg = 'Survey worksheet has no importable sections or questions'
+            return {
+                'valid': False,
+                'message': msg,
+                'errors': [msg],
+                'preview': preview,
+            }
+
+        message = (
+            f"Valid XLSForm: {section_count} section(s), {item_count} question(s)."
+        )
+        if warnings:
+            message += f" {len(warnings)} unsupported row(s) will be skipped."
+
+        return {
+            'valid': True,
+            'message': message,
+            'errors': errors,
+            'preview': preview,
+        }
+
+    @classmethod
     def import_kobo_xls(
         cls,
         excel_file,

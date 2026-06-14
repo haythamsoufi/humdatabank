@@ -57,7 +57,7 @@
 
                         // Show/hide admin sections
                         if (adminSectionsContainer) {
-                          adminSectionsContainer.style.display = isFocalPoint ? 'none' : 'block';
+                          adminSectionsContainer.classList.toggle('hidden', isFocalPoint);
                         }
 
                         // If switching to Focal Point, clear ALL admin roles (including Full/Core/System Manager presets).
@@ -80,7 +80,7 @@
                         if (assignmentGroup) {
                           const approverRoles = assignmentGroup.querySelectorAll('.assignment-approver-role');
                           approverRoles.forEach(function(role) {
-                            role.style.display = isFocalPoint ? 'none' : 'flex';
+                            role.classList.toggle('hidden', isFocalPoint);
                             // Uncheck Approver roles when switching to Focal Point
                             if (isFocalPoint) {
                               const checkbox = role.querySelector('input[type="checkbox"]');
@@ -910,94 +910,137 @@
         });
 
         // Main tab switching + URL query sync (?tab=…&entity_tab=…&secretariat_tab=…)
+        const underlineTabs = window.AdminUnderlineTabs;
         const USER_FORM_TAB = {
             PARAM_TO_MAIN: {
-                details: 'user-details-panel',
-                user_details: 'user-details-panel',
-                entity: 'entity-permissions-panel',
-                entity_permissions: 'entity-permissions-panel',
-                notifications: 'notification-preferences-panel',
-                notification_preferences: 'notification-preferences-panel',
-                devices: 'registered-devices-panel',
-                registered_devices: 'registered-devices-panel',
-                analytics: 'analytics-panel'
+                details: 'user-details',
+                user_details: 'user-details',
+                entity: 'entity',
+                entity_permissions: 'entity',
+                notifications: 'notifications',
+                notification_preferences: 'notifications',
+                devices: 'devices',
+                registered_devices: 'devices',
+                analytics: 'analytics'
             },
             MAIN_TO_PARAM: {
-                'user-details-panel': 'details',
-                'entity-permissions-panel': 'entity',
-                'notification-preferences-panel': 'notifications',
-                'registered-devices-panel': 'devices',
-                'analytics-panel': 'analytics'
+                'user-details': 'details',
+                entity: 'entity',
+                notifications: 'notifications',
+                devices: 'devices',
+                analytics: 'analytics'
             },
             PARAM_TO_ENTITY: {
-                countries: 'countries-panel',
-                ns: 'ns-structure-panel',
-                ns_structure: 'ns-structure-panel',
-                secretariat: 'secretariat-panel'
+                countries: 'countries',
+                ns: 'ns-structure',
+                ns_structure: 'ns-structure',
+                secretariat: 'secretariat'
             },
             ENTITY_TO_PARAM: {
-                'countries-panel': 'countries',
-                'ns-structure-panel': 'ns_structure',
-                'secretariat-panel': 'secretariat'
+                countries: 'countries',
+                'ns-structure': 'ns_structure',
+                secretariat: 'secretariat'
             },
             PARAM_TO_SEC: {
-                divisions: 'secretariat-divisions-panel',
-                departments: 'secretariat-divisions-panel',
-                regions: 'secretariat-regions-panel'
+                divisions: 'divisions',
+                departments: 'divisions',
+                regions: 'regions'
             },
             SEC_TO_PARAM: {
-                'secretariat-divisions-panel': 'divisions',
-                'secretariat-regions-panel': 'regions'
+                divisions: 'divisions',
+                regions: 'regions'
             }
         };
 
-        const KNOWN_MAIN_PANEL_IDS = [
-            'user-details-panel',
-            'entity-permissions-panel',
-            'notification-preferences-panel',
-            'registered-devices-panel',
-            'analytics-panel'
+        const LEGACY_MAIN_TAB_MAP = {
+            'user-details-panel': 'user-details',
+            'entity-permissions-panel': 'entity',
+            'notification-preferences-panel': 'notifications',
+            'registered-devices-panel': 'devices',
+            'analytics-panel': 'analytics'
+        };
+
+        const LEGACY_ENTITY_TAB_MAP = {
+            'countries-panel': 'countries',
+            'ns-structure-panel': 'ns-structure',
+            'secretariat-panel': 'secretariat'
+        };
+
+        const LEGACY_SEC_TAB_MAP = {
+            'secretariat-divisions-panel': 'divisions',
+            'secretariat-regions-panel': 'regions'
+        };
+
+        const KNOWN_MAIN_TAB_IDS = [
+            'user-details',
+            'entity',
+            'notifications',
+            'devices',
+            'analytics'
         ];
 
-        function getActiveMainPanelId() {
-            for (let i = 0; i < KNOWN_MAIN_PANEL_IDS.length; i++) {
-                const id = KNOWN_MAIN_PANEL_IDS[i];
-                const el = document.getElementById(id);
-                if (el && !el.classList.contains('hidden')) return id;
-            }
-            return 'user-details-panel';
+        function mainPanelIdForTab(tabId) {
+            return 'panel-' + tabId;
         }
 
-        function getActiveEntityPanelId() {
-            const panels = document.querySelectorAll('#entity-tabs-content > div[role="tabpanel"]');
+        function normalizeMainTabId(raw) {
+            if (!raw) return null;
+            return LEGACY_MAIN_TAB_MAP[raw] || raw;
+        }
+
+        function normalizeEntityTabId(raw) {
+            if (!raw) return null;
+            return LEGACY_ENTITY_TAB_MAP[raw] || raw;
+        }
+
+        function normalizeSecretariatTabId(raw) {
+            if (!raw) return null;
+            return LEGACY_SEC_TAB_MAP[raw] || raw;
+        }
+
+        function getActiveMainTabId() {
+            for (let i = 0; i < KNOWN_MAIN_TAB_IDS.length; i++) {
+                const tabId = KNOWN_MAIN_TAB_IDS[i];
+                const el = document.getElementById(mainPanelIdForTab(tabId));
+                if (el && !el.classList.contains('hidden')) return tabId;
+            }
+            return 'user-details';
+        }
+
+        function getActiveEntityTabId() {
+            const panels = document.querySelectorAll('.entity-form-panel');
             for (let i = 0; i < panels.length; i++) {
                 const p = panels[i];
-                if (p && !p.classList.contains('hidden')) return p.id;
+                if (p && !p.classList.contains('hidden') && p.id && p.id.indexOf('panel-') === 0) {
+                    return p.id.slice('panel-'.length);
+                }
             }
             return null;
         }
 
-        function getActiveSecretariatPanelId() {
-            const panels = document.querySelectorAll('#secretariat-subtabs-content > div[role="tabpanel"]');
+        function getActiveSecretariatTabId() {
+            const panels = document.querySelectorAll('.secretariat-form-panel');
             for (let i = 0; i < panels.length; i++) {
                 const p = panels[i];
-                if (p && !p.classList.contains('hidden')) return p.id;
+                if (p && !p.classList.contains('hidden') && p.id && p.id.indexOf('panel-secretariat-') === 0) {
+                    return p.id.slice('panel-secretariat-'.length);
+                }
             }
-            return 'secretariat-divisions-panel';
+            return 'divisions';
         }
 
         function syncUserFormTabUrl() {
-            const mainId = getActiveMainPanelId();
+            const mainId = getActiveMainTabId();
             const mainKey = USER_FORM_TAB.MAIN_TO_PARAM[mainId] || 'details';
             const params = new URLSearchParams();
             params.set('tab', mainKey);
 
-            if (mainId === 'entity-permissions-panel') {
-                const eid = getActiveEntityPanelId();
+            if (mainId === 'entity') {
+                const eid = getActiveEntityTabId();
                 if (eid && USER_FORM_TAB.ENTITY_TO_PARAM[eid]) {
                     params.set('entity_tab', USER_FORM_TAB.ENTITY_TO_PARAM[eid]);
-                    if (eid === 'secretariat-panel') {
-                        const sid = getActiveSecretariatPanelId();
+                    if (eid === 'secretariat') {
+                        const sid = getActiveSecretariatTabId();
                         if (sid && USER_FORM_TAB.SEC_TO_PARAM[sid]) {
                             params.set('secretariat_tab', USER_FORM_TAB.SEC_TO_PARAM[sid]);
                         }
@@ -1019,7 +1062,7 @@
             if (raw === null || raw === '') return null;
             const key = String(raw).toLowerCase().replace(/-/g, '_');
             const id = USER_FORM_TAB.PARAM_TO_MAIN[key];
-            if (!id || !document.getElementById(id)) return null;
+            if (!id || !document.getElementById(mainPanelIdForTab(id))) return null;
             return id;
         }
 
@@ -1029,7 +1072,7 @@
             if (raw === null || raw === '') return null;
             const key = String(raw).toLowerCase().replace(/-/g, '_');
             const id = USER_FORM_TAB.PARAM_TO_ENTITY[key];
-            if (!id || !document.getElementById(id)) return null;
+            if (!id || !document.getElementById('panel-' + id)) return null;
             return id;
         }
 
@@ -1039,7 +1082,7 @@
             if (raw === null || raw === '') return null;
             const key = String(raw).toLowerCase().replace(/-/g, '_');
             const id = USER_FORM_TAB.PARAM_TO_SEC[key];
-            if (!id || !document.getElementById(id)) return null;
+            if (!id || !document.getElementById('panel-secretariat-' + id)) return null;
             return id;
         }
 
@@ -1047,59 +1090,34 @@
             const fromUrl = parseMainTabIdFromUrl();
             if (fromUrl) return fromUrl;
             try {
-                const ls = localStorage.getItem('selectedMainTab');
-                if (ls && document.getElementById(ls)) return ls;
+                const ls = normalizeMainTabId(localStorage.getItem('selectedMainTab'));
+                if (ls && document.getElementById(mainPanelIdForTab(ls))) return ls;
             } catch (e) { /* ignore */ }
-            return 'user-details-panel';
+            return 'user-details';
         }
 
         // Main tab switching functionality
-        const mainTabButtons = document.querySelectorAll('#main-tabs button[role="tab"]');
-        const mainTabPanels = document.querySelectorAll('#main-tabs-content > div[role="tabpanel"]');
+        const mainTabButtons = document.querySelectorAll('#main-tabs .settings-tab');
 
         function activateMainTab(tabId, options) {
             options = options || {};
-            // Re-query panels each time to ensure we get all of them (including conditionally rendered ones)
-            const allTabPanels = document.querySelectorAll('#main-tabs-content > div[role="tabpanel"]');
+            tabId = normalizeMainTabId(tabId) || 'user-details';
 
-            // Also get all panels by known IDs as a fallback
-            const knownPanelIds = ['user-details-panel', 'entity-permissions-panel', 'notification-preferences-panel', 'registered-devices-panel', 'analytics-panel'];
-            const allPanelsById = knownPanelIds.map(id => document.getElementById(id)).filter(p => p !== null);
+            if (underlineTabs) {
+                underlineTabs.activateStripTab('#main-tabs', tabId, {
+                    panelSelector: '.user-form-panel',
+                    panelIdPrefix: 'panel-'
+                });
+            } else {
+                document.querySelectorAll('.user-form-panel').forEach(function (panel) {
+                    panel.classList.toggle('hidden', panel.id !== mainPanelIdForTab(tabId));
+                });
+            }
 
-            // Update tab buttons
-            mainTabButtons.forEach(btn => {
-                const targetPanelId = btn.getAttribute('data-tabs-target');
-                if (targetPanelId === '#' + tabId) {
-                    btn.classList.add('text-blue-600', 'border-blue-600');
-                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'true');
-                } else {
-                    btn.classList.remove('text-blue-600', 'border-blue-600');
-                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'false');
-                }
-            });
-
-            // Combine both lists to ensure we have all panels
-            const allPanelsSet = new Set([...Array.from(allTabPanels), ...allPanelsById]);
-            const allPanelsCombined = Array.from(allPanelsSet);
-
-            // Update tab panels - use the combined list
-            allPanelsCombined.forEach(panel => {
-                if (panel.id === tabId) {
-                    panel.classList.remove('hidden');
-                } else {
-                    panel.classList.add('hidden');
-                }
-            });
-
-            // Final verification - ensure target panel is visible
-            const targetPanel = document.getElementById(tabId);
+            const targetPanel = document.getElementById(mainPanelIdForTab(tabId));
             if (targetPanel) {
-                // Double-check visibility
                 const hasHidden = targetPanel.classList.contains('hidden');
                 const computedDisplay = window.getComputedStyle(targetPanel).display;
-
                 if (hasHidden || computedDisplay === 'none') {
                     targetPanel.classList.remove('hidden');
                     if (computedDisplay === 'none') {
@@ -1108,27 +1126,20 @@
                 }
             }
 
-            // Store selected tab in localStorage
             try {
                 localStorage.setItem('selectedMainTab', tabId);
-            } catch (e) {
-                // Ignore localStorage errors
-            }
+            } catch (e) { /* ignore */ }
 
             if (!options.skipUrl) {
                 syncUserFormTabUrl();
             }
         }
 
-        // Add click handlers to main tabs
-        mainTabButtons.forEach(btn => {
-            btn.addEventListener('click', function(e) {
+        mainTabButtons.forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
                 e.preventDefault();
-                const targetPanelId = this.getAttribute('data-tabs-target');
-                if (targetPanelId) {
-                    const tabId = targetPanelId.substring(1); // Remove the #
-                    activateMainTab(tabId);
-                }
+                const tabId = this.getAttribute('data-tab');
+                if (tabId) activateMainTab(tabId);
             });
         });
 
@@ -1138,7 +1149,7 @@
         // Lazy-load Analytics tab content on first activation
         (function() {
             var analyticsTab = document.getElementById('analytics-tab');
-            var analyticsPanel = document.getElementById('analytics-panel');
+            var analyticsPanel = document.getElementById('panel-analytics');
             if (!analyticsTab || !analyticsPanel) return;
 
             var analyticsUrl = analyticsPanel.dataset.analyticsUrl;
@@ -1207,35 +1218,24 @@
         })();
 
         // Initialize entity sub-tab switching functionality (within Entity Permissions tab)
-        const entityTabButtons = document.querySelectorAll('#entity-tabs button[role="tab"]');
-        const entityTabPanels = document.querySelectorAll('#entity-tabs-content > div[role="tabpanel"]');
+        const entityTabButtons = document.querySelectorAll('#entity-tabs .tab-button');
 
         function activateEntityTab(tabId, options) {
             options = options || {};
-            // Update tab buttons
-            entityTabButtons.forEach(btn => {
-                const targetPanelId = btn.getAttribute('data-tabs-target');
-                if (targetPanelId === '#' + tabId) {
-                    btn.classList.add('text-blue-600', 'border-blue-600');
-                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'true');
-                } else {
-                    btn.classList.remove('text-blue-600', 'border-blue-600');
-                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'false');
-                }
-            });
+            tabId = normalizeEntityTabId(tabId);
+            if (!tabId) return;
 
-            // Update tab panels
-            entityTabPanels.forEach(panel => {
-                if (panel.id === tabId) {
-                    panel.classList.remove('hidden');
-                } else {
-                    panel.classList.add('hidden');
-                }
-            });
+            if (underlineTabs) {
+                entityTabButtons.forEach(function (btn) {
+                    var isActive = btn.getAttribute('data-tab') === tabId;
+                    underlineTabs.setSubTabButton(btn, isActive);
+                    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                });
+                document.querySelectorAll('.entity-form-panel').forEach(function (panel) {
+                    panel.classList.toggle('hidden', panel.id !== 'panel-' + tabId);
+                });
+            }
 
-            // Store selected tab in localStorage
             try {
                 localStorage.setItem('selectedEntityTab', tabId);
             } catch (e) { /* ignore */ }
@@ -1245,21 +1245,17 @@
             }
         }
 
-        // Add click handlers to entity tabs
-        entityTabButtons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const targetPanelId = this.getAttribute('data-tabs-target').substring(1);
-                activateEntityTab(targetPanelId);
+        entityTabButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const tabId = this.getAttribute('data-tab');
+                if (tabId) activateEntityTab(tabId);
             });
         });
 
         function getDefaultEntityTab() {
-            const firstTabButton = document.querySelector('#entity-tabs button[role="tab"]');
+            const firstTabButton = document.querySelector('#entity-tabs .tab-button');
             if (firstTabButton) {
-                const target = firstTabButton.getAttribute('data-tabs-target');
-                if (target) {
-                    return target.substring(1);
-                }
+                return firstTabButton.getAttribute('data-tab');
             }
             return null;
         }
@@ -1270,8 +1266,8 @@
             let tabId = parseEntityTabIdFromUrl();
             if (!tabId) {
                 try {
-                    const ls = localStorage.getItem('selectedEntityTab');
-                    if (ls && document.getElementById(ls)) tabId = ls;
+                    const ls = normalizeEntityTabId(localStorage.getItem('selectedEntityTab'));
+                    if (ls && document.getElementById('panel-' + ls)) tabId = ls;
                 } catch (e) { /* ignore */ }
             }
             if (!tabId) tabId = getDefaultEntityTab();
@@ -1463,41 +1459,34 @@
         }
 
         // Secretariat sub-tabs behavior
-        const secretariatSubtabButtons = document.querySelectorAll('#secretariat-subtabs button[role="tab"]');
-        const secretariatSubtabPanels = document.querySelectorAll('#secretariat-subtabs-content > div[role="tabpanel"]');
-        function activateSecretariatSubtab(panelId, options) {
+        const secretariatSubtabButtons = document.querySelectorAll('#secretariat-subtabs .tab-button');
+        function activateSecretariatSubtab(tabId, options) {
             options = options || {};
-            secretariatSubtabButtons.forEach(btn => {
-                const target = btn.getAttribute('data-tabs-target');
-                if (target === '#' + panelId) {
-                    btn.classList.add('text-blue-600', 'border-blue-600');
-                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'true');
-                } else {
-                    btn.classList.remove('text-blue-600', 'border-blue-600');
-                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'false');
-                }
-            });
-            secretariatSubtabPanels.forEach(panel => {
-                if (panel.id === panelId) {
-                    panel.classList.remove('hidden');
-                } else {
-                    panel.classList.add('hidden');
-                }
-            });
+            tabId = normalizeSecretariatTabId(tabId) || 'divisions';
+
+            if (underlineTabs) {
+                secretariatSubtabButtons.forEach(function (btn) {
+                    var isActive = btn.getAttribute('data-tab') === tabId;
+                    underlineTabs.setSubTabButton(btn, isActive);
+                    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                });
+                document.querySelectorAll('.secretariat-form-panel').forEach(function (panel) {
+                    panel.classList.toggle('hidden', panel.id !== 'panel-secretariat-' + tabId);
+                });
+            }
+
             try {
-                localStorage.setItem('selectedSecretariatSubtab', panelId);
+                localStorage.setItem('selectedSecretariatSubtab', tabId);
             } catch (e) { /* ignore */ }
 
             if (!options.skipUrl) {
                 syncUserFormTabUrl();
             }
         }
-        secretariatSubtabButtons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const targetPanelId = this.getAttribute('data-tabs-target').substring(1);
-                activateSecretariatSubtab(targetPanelId);
+        secretariatSubtabButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const tabId = this.getAttribute('data-tab');
+                if (tabId) activateSecretariatSubtab(tabId);
             });
         });
         (function initSecretariatSubTab() {
@@ -1505,15 +1494,15 @@
             let sid = parseSecretariatTabIdFromUrl();
             if (!sid) {
                 try {
-                    const ls = localStorage.getItem('selectedSecretariatSubtab');
-                    if (ls && document.getElementById(ls)) sid = ls;
+                    const ls = normalizeSecretariatTabId(localStorage.getItem('selectedSecretariatSubtab'));
+                    if (ls && document.getElementById('panel-secretariat-' + ls)) sid = ls;
                 } catch (e) { /* ignore */ }
             }
-            if (!sid) sid = 'secretariat-divisions-panel';
-            if (document.getElementById(sid)) {
+            if (!sid) sid = 'divisions';
+            if (document.getElementById('panel-secretariat-' + sid)) {
                 activateSecretariatSubtab(sid, { skipUrl: true });
             } else {
-                activateSecretariatSubtab('secretariat-divisions-panel', { skipUrl: true });
+                activateSecretariatSubtab('divisions', { skipUrl: true });
             }
         })();
 
@@ -1521,7 +1510,7 @@
         syncUserFormTabUrl();
 
         if (typeof window.ensureUserFormAnalyticsLoaded === 'function') {
-            var ap = document.getElementById('analytics-panel');
+            var ap = document.getElementById('panel-analytics');
             if (ap && !ap.classList.contains('hidden')) {
                 window.ensureUserFormAnalyticsLoaded();
             }
@@ -1767,7 +1756,7 @@
                             row.remove();
 
                             // Check if table is now empty
-                            const tbody = document.querySelector('#registered-devices-panel tbody');
+                            const tbody = document.querySelector('#panel-devices tbody');
                             if (tbody && tbody.children.length === 0) {
                                 // Reload page to show empty state
                                 location.reload();

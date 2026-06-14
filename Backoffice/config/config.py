@@ -1152,6 +1152,20 @@ class TestingConfig(Config):
     # Use TEST_DATABASE_URL or fallback to DATABASE_URL. No SQLite allowed.
     SQLALCHEMY_DATABASE_URI = _normalize_database_uri(os.environ.get('TEST_DATABASE_URL') or os.environ.get('DATABASE_URL'))
     WTF_CSRF_ENABLED = False
+    MEMORY_MONITORING_ENABLED = False
+    SYSTEM_MONITORING_ENABLED = False
+    # Smaller pool + statement timeout so stuck DDL/locks fail fast instead of hanging.
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": int(os.environ.get("SQLALCHEMY_POOL_RECYCLE", "300")),
+        "pool_size": 2,
+        "max_overflow": 2,
+        "pool_timeout": 10,
+        "connect_args": {
+            "connect_timeout": 10,
+            "options": "-c statement_timeout=120000",
+        },
+    }
 
 config = {
     'development': DevelopmentConfig,

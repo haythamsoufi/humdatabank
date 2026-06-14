@@ -46,7 +46,13 @@ class DocumentService:
 
         user_country_ids = [country.id for country in current_user.countries.all()]
         from app.services.authorization_service import AuthorizationService
-        if aes.country_id not in user_country_ids and not AuthorizationService.is_admin(current_user):
+        from app.utils.api_serialization import _country_for_aes
+        if aes.entity_type == 'country':
+            aes_country_id = aes.entity_id
+        else:
+            resolved = _country_for_aes(aes)
+            aes_country_id = resolved.id if resolved else None
+        if aes_country_id not in user_country_ids and not AuthorizationService.is_admin(current_user):
             raise PermissionError("Not authorized to download this document")
 
         abs_path = cls._resolve_storage_path(submitted_document.storage_path)
@@ -74,7 +80,13 @@ class DocumentService:
 
         user_country_ids = [country.id for country in current_user.countries.all()]
         from app.services.authorization_service import AuthorizationService
-        if aes.country_id not in user_country_ids and not AuthorizationService.is_admin(current_user):
+        from app.utils.api_serialization import _country_for_aes
+        if aes.entity_type == 'country':
+            aes_country_id = aes.entity_id
+        else:
+            resolved = _country_for_aes(aes)
+            aes_country_id = resolved.id if resolved else None
+        if aes_country_id not in user_country_ids and not AuthorizationService.is_admin(current_user):
             raise PermissionError("Not authorized to download this document")
 
         if getattr(submitted_document, "file_pending", False) and submitted_document.source_url:
@@ -118,7 +130,13 @@ class DocumentService:
             raise FileNotFoundError("Document not associated with an assignment")
 
         user_country_ids = [country.id for country in current_user.countries.all()]
-        is_valid_user_for_country_status = aes.country_id in user_country_ids
+        from app.utils.api_serialization import _country_for_aes
+        if aes.entity_type == 'country':
+            aes_country_id = aes.entity_id
+        else:
+            resolved = _country_for_aes(aes)
+            aes_country_id = resolved.id if resolved else None
+        is_valid_user_for_country_status = aes_country_id in user_country_ids
         from app.services.authorization_service import AuthorizationService
         can_edit = aes.status not in ["submitted", "approved"] or AuthorizationService.is_admin(current_user)
 

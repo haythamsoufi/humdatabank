@@ -384,9 +384,16 @@ def _extract_entity_into_context(app, req, context_data):
             context_data['entity_id'] = aes.entity_id
             context_data['entity_name'] = entity_name
             # Backward compat — resolve the associated country too
-            country = aes.country
+            if aes.entity_type == 'country':
+                from app.models import Country
+                context_data['country_id'] = aes.entity_id
+                country = Country.query.get(aes.entity_id)
+            else:
+                from app.utils.api_serialization import _country_for_aes
+                country = _country_for_aes(aes)
+                if country:
+                    context_data['country_id'] = country.id
             if country:
-                context_data['country_id'] = country.id
                 context_data['country_name'] = country.name
             return True
         except Exception:

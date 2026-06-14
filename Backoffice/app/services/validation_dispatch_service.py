@@ -64,13 +64,17 @@ def preview_dispatch(
     for q in questions:
         entity_keys.add((q.entity_type, q.entity_id))
 
+    entity_name_map = EntityService.batch_entity_names(
+        list(entity_keys), include_hierarchy=False, localized=True,
+    ) if entity_keys else {}
+
     entities_out = []
     total_recipients = 0
     for et, eid in sorted(entity_keys):
         user_ids = get_assignment_editor_submitter_user_ids_for_entity(et, eid)
         users = User.query.filter(User.id.in_(user_ids)).all() if user_ids else []
         total_recipients += len(users)
-        name = EntityService.get_localized_entity_name(et, eid) if hasattr(EntityService, "get_localized_entity_name") else f"{et}:{eid}"
+        name = entity_name_map.get((et, eid)) or f"{et}:{eid}"
         entities_out.append(
             {
                 "entity_type": et,
@@ -175,6 +179,10 @@ def send_dispatch(
     for q in questions:
         by_entity.setdefault((q.entity_type, q.entity_id), []).append(q)
 
+    dispatch_entity_names = EntityService.batch_entity_names(
+        list(by_entity.keys()), include_hierarchy=True, localized=True,
+    ) if by_entity else {}
+
     sent_count = 0
     failed_count = 0
     now = utcnow()
@@ -195,11 +203,7 @@ def send_dispatch(
             except Exception:
                 entry_url = entry_path
 
-        entity_name = str(eid)
-        try:
-            entity_name = EntityService.get_localized_entity_name(et, eid, include_hierarchy=True)
-        except Exception:
-            pass
+        entity_name = dispatch_entity_names.get((et, eid)) or str(eid)
 
         if "in_app" in channels:
             n = len(entity_questions)

@@ -106,6 +106,94 @@ class TestSortDocumentModalEntityChoiceRows:
 
 
 # ---------------------------------------------------------------------------
+# prefetch_entities / batch_entity_names
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestPrefetchEntities:
+    def test_empty_pairs_returns_empty_dict(self, db_session, app):
+        with app.app_context():
+            assert EntityService.prefetch_entities([]) == {}
+
+    def test_batch_fetch_countries(self, db_session, app):
+        with app.app_context():
+            c1 = create_test_country(db_session, name="Alpha Country")
+            c2 = create_test_country(db_session, name="Beta Country")
+            pairs = [
+                (EntityType.country.value, c1.id),
+                (EntityType.country.value, c2.id),
+            ]
+            result = EntityService.prefetch_entities(pairs)
+            assert result[(EntityType.country.value, c1.id)].name == "Alpha Country"
+            assert result[(EntityType.country.value, c2.id)].name == "Beta Country"
+
+    def test_skips_unknown_entity_type(self, db_session, app):
+        with app.app_context():
+            result = EntityService.prefetch_entities([("ghost_type", 1)])
+            assert result == {}
+
+
+@pytest.mark.unit
+class TestBatchEntityNames:
+    def test_plain_names_for_countries(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            pair = (EntityType.country.value, country.id)
+            names = EntityService.batch_entity_names([pair], include_hierarchy=False)
+            assert names[pair] == country.name
+
+    def test_hierarchy_names_for_countries(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            pair = (EntityType.country.value, country.id)
+            names = EntityService.batch_entity_names([pair], include_hierarchy=True)
+            assert names[pair] == country.name
+
+    def test_missing_entity_unknown_plain_name(self, db_session, app):
+        with app.app_context():
+            pair = (EntityType.country.value, 9_999_999)
+            names = EntityService.batch_entity_names([pair], include_hierarchy=False)
+            assert "Unknown" in names[pair]
+            assert "9999999" in names[pair]
+
+    def test_missing_entity_unknown_hierarchy_name(self, db_session, app):
+        with app.app_context():
+            pair = (EntityType.country.value, 9_999_999)
+            names = EntityService.batch_entity_names([pair], include_hierarchy=True)
+            assert names[pair] == "Unknown country"
+
+
+@pytest.mark.unit
+class TestAttachDisplayNames:
+    def test_empty_rows_returns_empty_dict(self, db_session, app):
+        with app.app_context():
+            assert EntityService.attach_display_names([]) == {}
+
+    def test_mutates_rows_with_display_name(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session, name="Attach Test Country")
+            rows = [{"entity_type": EntityType.country.value, "entity_id": country.id}]
+            name_map = EntityService.attach_display_names(rows)
+            assert rows[0]["display_name"] == country.name
+            assert name_map[(EntityType.country.value, country.id)] == country.name
+
+    def test_custom_key(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            rows = [{"entity_type": EntityType.country.value, "entity_id": country.id}]
+            EntityService.attach_display_names(rows, key="label")
+            assert rows[0]["label"] == country.name
+            assert "display_name" not in rows[0]
+
+    def test_skips_rows_missing_entity_id(self, db_session, app):
+        with app.app_context():
+            rows = [{"entity_type": EntityType.country.value}, {"entity_id": 1}]
+            EntityService.attach_display_names(rows)
+            assert rows[0].get("display_name") is None
+            assert rows[1].get("display_name") is None
+
+
+# ---------------------------------------------------------------------------
 # get_entity
 # ---------------------------------------------------------------------------
 

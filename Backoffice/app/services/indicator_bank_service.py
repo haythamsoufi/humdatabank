@@ -208,6 +208,8 @@ def serialize_indicator(
         'aggregated_label': getattr(indicator, 'aggregated_label', None),
         'aggregated_label_translations': getattr(indicator, 'aggregated_label_translations', None),
         'area': getattr(indicator, 'area', None),
+        'area_label': getattr(indicator, 'area_label', None),
+        'spef_label': getattr(indicator, 'area_label', None),
         'data_source': getattr(indicator, 'data_source', None),
         'disaggregation_guidance': getattr(indicator, 'disaggregation_guidance', None),
         'monitoring_questions': indicator.monitoring_questions_list,

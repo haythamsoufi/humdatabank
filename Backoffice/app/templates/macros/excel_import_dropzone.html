@@ -1,0 +1,88 @@
+{#
+    Reusable Excel import dropzone — two-state UI with optional validation status panel.
+
+    Configuration contract (see docs/DEVELOPER-HANDBOOK.md):
+    - Macro parameters for IDs, copy, variant, and data-* JS wiring
+    - caller() slot: hidden fields / CSRF inside dropzone wrapper (before file input)
+    - overlay: optional HTML for progress overlays (kobo wizard)
+    - after_dropzone: optional HTML after the dropzone (notes, submit row)
+
+    Usage:
+    {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+    {% call excel_import_dropzone('my-dropzone', validate_url=url_for(...)) %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    {% endcall %}
+#}
+{% macro excel_import_dropzone(
+    dropzone_id,
+    input_id=none,
+    input_name='excel_file',
+    form_id=none,
+    variant='excel',
+    accept='.xlsx,.xls',
+    title=none,
+    hint=none,
+    change_hint=none,
+    empty_icon='fa-cloud-upload-alt',
+    selected_icon=none,
+    wrapper_class='',
+    min_height=none,
+    required=true,
+    disabled=false,
+    show_status_panel=true,
+    show_filename=true,
+    validate_url=none,
+    file_field_name=none,
+    max_size_bytes=none,
+    auto_submit=false,
+    filename_id=none,
+    overlay=none,
+    after_dropzone=none
+) -%}
+{% set _input_id = input_id or (dropzone_id ~ '-file') %}
+{% set _filename_id = filename_id or (dropzone_id ~ '-filename') %}
+{% set _title = title if title is not none else _('Click or drag Excel file here') %}
+{% set _hint = hint if hint is not none else _('Supported formats: .xlsx, .xls') %}
+{% set _change_hint = change_hint if change_hint is not none else _('Click to change file') %}
+{% set _selected_icon = selected_icon if selected_icon is not none else ('fa-file-alt' if variant == 'kobo' else 'fa-file-excel') %}
+{% set _file_field = file_field_name if file_field_name is not none else input_name %}
+<div id="{{ dropzone_id }}"
+     class="excel-io-dropzone excel-io-dropzone--{{ variant }} file-upload-wrapper {{ wrapper_class }}"
+     {% if min_height %}style="min-height: {{ min_height }};"{% endif %}
+     {% if validate_url %}data-validate-url="{{ validate_url }}"{% endif %}
+     {% if _file_field %}data-file-field-name="{{ _file_field }}"{% endif %}
+     {% if max_size_bytes %}data-max-size-bytes="{{ max_size_bytes }}"{% endif %}
+     {% if auto_submit %}data-auto-submit="true"{% endif %}
+     data-variant="{{ variant }}">
+    {{ caller() if caller else '' }}
+    <input type="file"
+           name="{{ input_name }}"
+           id="{{ _input_id }}"
+           accept="{{ accept }}"
+           class="excel-io-file-input"
+           aria-label="{{ _title }}"
+           {% if form_id %}form="{{ form_id }}"{% endif %}
+           {% if required %}required{% endif %}
+           {% if disabled %}disabled{% endif %}>
+    {% if overlay %}{{ overlay|safe }}{% endif %}
+    <div class="excel-io-dropzone__content excel-io-dropzone__content--empty file-upload-box">
+        <i class="fas {{ empty_icon }}" aria-hidden="true"></i>
+        <p class="excel-io-dropzone__title">{{ _title }}</p>
+        {% if _hint %}<p class="excel-io-dropzone__hint">{{ _hint }}</p>{% endif %}
+    </div>
+    <div class="excel-io-dropzone__content excel-io-dropzone__content--selected file-upload-box" hidden>
+        <div class="excel-io-dropzone__file-panel">
+            <i class="fas {{ _selected_icon }} excel-io-dropzone__file-icon" aria-hidden="true"></i>
+            {% if show_filename %}
+            <p class="excel-io-dropzone__filename" id="{{ _filename_id }}"></p>
+            {% endif %}
+            <p class="excel-io-dropzone__change-hint">{{ _change_hint }}</p>
+        </div>
+        {% if show_status_panel %}
+        <div class="excel-io-dropzone__divider" aria-hidden="true"></div>
+        <div class="excel-io-dropzone__status" role="status" aria-live="polite"></div>
+        {% endif %}
+    </div>
+</div>
+{% if after_dropzone %}{{ after_dropzone|safe }}{% endif %}
+{%- endmacro %}

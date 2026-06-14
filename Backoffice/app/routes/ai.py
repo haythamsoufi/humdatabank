@@ -541,6 +541,9 @@ def _build_access_context(identity) -> Dict[str, Any]:
         "admin.data_explore.data_table": AuthorizationService.has_rbac_permission(user, "admin.data_explore.data_table"),
         "admin.data_explore.analysis": AuthorizationService.has_rbac_permission(user, "admin.data_explore.analysis"),
         "admin.data_explore.compliance": AuthorizationService.has_rbac_permission(user, "admin.data_explore.compliance"),
+        "admin.validation.dashboard": AuthorizationService.has_rbac_permission(user, "admin.validation.dashboard"),
+        "admin.validation.questions": AuthorizationService.has_rbac_permission(user, "admin.validation.questions"),
+        "admin.validation.rules": AuthorizationService.has_rbac_permission(user, "admin.validation.rules"),
         "admin.documents.manage": AuthorizationService.has_rbac_permission(user, "admin.documents.manage"),
         # Assignment participation
         "assignment.view": AuthorizationService.has_rbac_permission(user, "assignment.view"),

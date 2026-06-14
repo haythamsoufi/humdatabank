@@ -489,8 +489,10 @@ def get_dashboard():
 
         entity_permissions = UserEntityPermission.query.filter_by(user_id=user.id).all()
         if entity_permissions:
+            pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+            prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
             for perm in entity_permissions:
-                entity = EntityService.get_entity(perm.entity_type, perm.entity_id)
+                entity = prefetched.get((perm.entity_type, perm.entity_id))
                 if entity:
                     user_entities.append({
                         'entity_type': perm.entity_type,
@@ -529,16 +531,29 @@ def get_dashboard():
             user_entities = []
 
         # Format entities for JSON response
+        entity_pairs = [(e['entity_type'], e['entity_id']) for e in user_entities]
+        plain_names = EntityService.batch_entity_names(
+            entity_pairs, include_hierarchy=False, localized=True,
+        )
+        hierarchy_names = EntityService.batch_entity_names(
+            entity_pairs, include_hierarchy=True, localized=True,
+        )
+
         entities_json = []
         for e in user_entities:
-            entity_name = EntityService.get_localized_entity_name(e['entity_type'], e['entity_id'], include_hierarchy=False)
-            display_name = EntityService.get_localized_entity_name(e['entity_type'], e['entity_id'], include_hierarchy=True)
+            pair = (e['entity_type'], e['entity_id'])
+            entity_name = plain_names.get(pair) or ''
+            display_name = hierarchy_names.get(pair) or entity_name or ''
             entities_json.append({
                 'entity_type': e['entity_type'],
                 'entity_id': e['entity_id'],
-                'name': entity_name or '',
-                'display_name': display_name or entity_name or ''
+                'name': entity_name,
+                'display_name': display_name,
             })
+
+        entities_by_pair = {
+            (item['entity_type'], item['entity_id']): item for item in entities_json
+        }
 
         # Get selected entity from query parameters (preferred) or session
         selected_entity = None
@@ -556,20 +571,31 @@ def get_dashboard():
                 temp_entity = EntityService.get_entity(entity_type_param, entity_id_param)
                 if temp_entity and entity_type_param in allowed_entity_types:
                     if user.has_entity_access(entity_type_param, entity_id_param):
-                        entity_name = EntityService.get_localized_entity_name(entity_type_param, entity_id_param, include_hierarchy=False)
-                        display_name = EntityService.get_localized_entity_name(entity_type_param, entity_id_param, include_hierarchy=True)
-                        selected_entity = {
-                            'entity_type': entity_type_param,
-                            'entity_id': entity_id_param,
-                            'name': entity_name or '',
-                            'display_name': display_name or entity_name or ''
-                        }
+                        selected_entity = entities_by_pair.get(
+                            (entity_type_param, entity_id_param),
+                        )
+                        if selected_entity is None:
+                            pair = (entity_type_param, entity_id_param)
+                            entity_name = EntityService.batch_entity_names(
+                                [pair], include_hierarchy=False, localized=True,
+                            ).get(pair) or ''
+                            display_name = EntityService.batch_entity_names(
+                                [pair], include_hierarchy=True, localized=True,
+                            ).get(pair) or entity_name or ''
+                            selected_entity = {
+                                'entity_type': entity_type_param,
+                                'entity_id': entity_id_param,
+                                'name': entity_name,
+                                'display_name': display_name,
+                            }
                         # Update session with the selected entity for future requests
                         session[SELECTED_ENTITY_TYPE_SESSION_KEY] = entity_type_param
                         session[SELECTED_ENTITY_ID_SESSION_KEY] = entity_id_param
                         # Set legacy country session for compatibility
                         with suppress(Exception):
-                            related_country = EntityService.get_country_for_entity(entity_type_param, entity_id_param)
+                            related_country = EntityService.get_country_from_entity(
+                                entity_type_param, temp_entity,
+                            )
                             if related_country:
                                 session[SELECTED_COUNTRY_ID_SESSION_KEY] = related_country.id
 
@@ -581,14 +607,23 @@ def get_dashboard():
                 temp_entity = EntityService.get_entity(retrieved_entity_type, retrieved_entity_id)
                 if temp_entity and retrieved_entity_type in allowed_entity_types:
                     if user.has_entity_access(retrieved_entity_type, retrieved_entity_id):
-                        entity_name = EntityService.get_localized_entity_name(retrieved_entity_type, retrieved_entity_id, include_hierarchy=False)
-                        display_name = EntityService.get_localized_entity_name(retrieved_entity_type, retrieved_entity_id, include_hierarchy=True)
-                        selected_entity = {
-                            'entity_type': retrieved_entity_type,
-                            'entity_id': retrieved_entity_id,
-                            'name': entity_name or '',
-                            'display_name': display_name or entity_name or ''
-                        }
+                        selected_entity = entities_by_pair.get(
+                            (retrieved_entity_type, retrieved_entity_id),
+                        )
+                        if selected_entity is None:
+                            pair = (retrieved_entity_type, retrieved_entity_id)
+                            entity_name = EntityService.batch_entity_names(
+                                [pair], include_hierarchy=False, localized=True,
+                            ).get(pair) or ''
+                            display_name = EntityService.batch_entity_names(
+                                [pair], include_hierarchy=True, localized=True,
+                            ).get(pair) or entity_name or ''
+                            selected_entity = {
+                                'entity_type': retrieved_entity_type,
+                                'entity_id': retrieved_entity_id,
+                                'name': entity_name,
+                                'display_name': display_name,
+                            }
 
         # Default to first entity if none selected
         if selected_entity is None and entities_json:

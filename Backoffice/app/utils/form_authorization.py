@@ -124,7 +124,9 @@ def check_assignment_edit_access(f):
 
             # Check edit permissions
             if not can_edit_assignment(aes, current_user):
-                entity_display = aes.country.name if aes.country else f"entity {aes.entity_id}"
+                from app.utils.api_serialization import _country_for_aes
+                aes_country = _country_for_aes(aes)
+                entity_display = aes_country.name if aes_country else f"entity {aes.entity_id}"
                 flash(
                     f"This assignment for {entity_display} is in '{aes.status}' status and cannot be edited by you at this time.",
                     "warning"
@@ -185,8 +187,11 @@ def check_document_access(f):
                     return redirect(url_for("main.dashboard"))
 
                 if not can_edit_assignment(aes, current_user):
+                    from app.utils.api_serialization import _country_for_aes
+                    doc_country = _country_for_aes(aes)
+                    entity_label = doc_country.name if doc_country else f"entity {aes.entity_id}"
                     flash(
-                        f"This assignment for {aes.country.name} is in '{aes.status}' status and documents cannot be modified at this time.",
+                        f"This assignment for {entity_label} is in '{aes.status}' status and documents cannot be modified at this time.",
                         "warning"
                     )
                     return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))

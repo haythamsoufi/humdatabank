@@ -4,6 +4,7 @@
  */
 
 import { debugLog } from './debug.js';
+import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
 
 export class ExcelExportManager {
     constructor() {
@@ -127,11 +128,14 @@ export class ExcelExportManager {
             document.body.style.overflow = '';
 
             // Reset file input and UI
-            const fileInput = document.getElementById('modal_excel_file');
-            if (fileInput) {
-                fileInput.value = '';
-                this.updateFileUploadBox(null);
+            if (this._dropzoneController?.reset) {
+                this._dropzoneController.reset();
+            } else {
+                const fileInput = document.getElementById('modal_excel_file');
+                if (fileInput) fileInput.value = '';
             }
+            const existingInfo = this.modal?.querySelector('.file-info');
+            if (existingInfo) existingInfo.remove();
 
             // Return focus to the button that opened the modal
             if (this.exportButton) {
@@ -522,148 +526,27 @@ export class ExcelExportManager {
         }, 5000);
     }
 
-    // Update file upload box UI when file is selected
-    updateFileUploadBox(file) {
-        const fileUploadBox = this.modal?.querySelector('.file-upload-box');
-        if (!fileUploadBox) return;
-
-        const icon = fileUploadBox.querySelector('i');
-        const text = fileUploadBox.querySelector('p');
-        const dropZone = this.modal?.querySelector('.file-upload-wrapper');
-
-        if (file) {
-            // Update icon to file icon
-            if (icon) {
-                icon.classList.remove('fa-cloud-upload-alt', 'text-gray-400');
-                icon.classList.add('fa-file-excel', 'text-green-600');
-            }
-
-            // Update text to show filename
-            if (text) {
-                text.textContent = file.name;
-                text.classList.remove('text-gray-500');
-                text.classList.add('text-green-700', 'font-medium');
-            }
-
-            // Update border to indicate file selected
-            if (dropZone) {
-                dropZone.classList.remove('border-gray-300');
-                dropZone.classList.add('border-green-500', 'bg-green-50');
-            }
-        } else {
-            // Reset to default state
-            if (icon) {
-                icon.classList.remove('fa-file-excel', 'text-green-600');
-                icon.classList.add('fa-cloud-upload-alt', 'text-gray-400');
-            }
-
-            if (text) {
-                // Restore original text
-                const originalText = text.dataset.originalText || 'Click or drag Excel file here to import';
-                text.textContent = originalText;
-                text.classList.remove('text-green-700', 'font-medium');
-                text.classList.add('text-gray-500');
-            }
-
-            if (dropZone) {
-                dropZone.classList.remove('border-green-500', 'bg-green-50');
-                dropZone.classList.add('border-gray-300');
-            }
-        }
-    }
-
     setupFormValidation() {
-        const fileInput = document.getElementById('modal_excel_file');
-        if (!fileInput) return;
+        const dropzoneEl = this.modal?.querySelector('.excel-io-dropzone');
+        if (!dropzoneEl) return;
 
-        // Store original text on initialization
-        const fileUploadBox = this.modal?.querySelector('.file-upload-box');
-        const originalTextElement = fileUploadBox?.querySelector('p');
-        if (originalTextElement && !originalTextElement.dataset.originalText) {
-            originalTextElement.dataset.originalText = originalTextElement.textContent;
-        }
-
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-
-            // Reset UI if no file
-            if (!file) {
-                this.updateFileUploadBox(null);
-                return;
-            }
-
-            // Clear previous errors
-            const errorElement = this.modal.querySelector('.excel-error-message');
-            if (errorElement) {
-                errorElement.remove();
-            }
-
-            // Validate file type
-            if (!this.isValidExcelFile(file)) {
-                this.showError('Please select a valid Excel file (.xlsx).');
-                fileInput.value = '';
-                this.updateFileUploadBox(null);
-                return;
-            }
-
-            // Validate file size
-            const maxSize = 10 * 1024 * 1024; // 10MB
-            if (file.size > maxSize) {
-                this.showError('File size must be less than 10MB.');
-                fileInput.value = '';
-                this.updateFileUploadBox(null);
-                return;
-            }
-
-            // Update UI to show selected file
-            this.updateFileUploadBox(file);
-
-            // Show file info
-            this.showFileInfo(file);
-        });
-
-        // Drag and drop handling
-        const dropZone = this.modal?.querySelector('.file-upload-wrapper');
-        if (dropZone) {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }, false);
-            });
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, function() {
-                    dropZone.classList.add('border-blue-500', 'bg-blue-50');
-                }, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, function() {
-                    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
-                }, false);
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                const dt = e.dataTransfer;
-                const file = dt.files[0];
-
-                if (file) {
-                    const allowedExtensions = ['.xlsx'];
-                    const fileName = file.name.toLowerCase();
-                    const isValidFile = allowedExtensions.some(ext => fileName.endsWith(ext));
-
-                    if (isValidFile) {
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(file);
-                        fileInput.files = dataTransfer.files;
-                        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    } else {
-                        this.showError('Please select a valid Excel file (.xlsx).');
-                    }
+        this._dropzoneController = initExcelImportDropzone(dropzoneEl, {
+            acceptExtensions: ['.xlsx'],
+            maxSizeBytes: 10 * 1024 * 1024,
+            invalidFileTypeLabel: 'Please select a valid Excel file (.xlsx).',
+            maxSizeLabel: 'File size must be less than 10MB.',
+            resetOnModalClose: this.modal,
+            onFileSelected: (file) => {
+                const errorElement = this.modal.querySelector('.excel-error-message');
+                if (errorElement) errorElement.remove();
+                if (file) this.showFileInfo(file);
+            },
+            onValidated: (data) => {
+                if (data && data.valid === false) {
+                    this.showError(data.message || 'Invalid file');
                 }
-            }, false);
-        }
+            },
+        });
     }
 
     showFileInfo(file) {

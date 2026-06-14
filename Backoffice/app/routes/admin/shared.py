@@ -11,6 +11,14 @@ from app.utils.redirect_utils import get_current_relative_url
 from app.utils.api_responses import json_auth_required, json_error, json_forbidden
 from app.utils.request_utils import is_json_request
 
+VALIDATION_DASHBOARD_PERMISSION = "admin.validation.dashboard"
+VALIDATION_QUESTIONS_PERMISSION = "admin.validation.questions"
+VALIDATION_RULES_PERMISSION = "admin.validation.rules"
+VALIDATION_DISPATCH_PERMISSIONS = (
+    VALIDATION_DASHBOARD_PERMISSION,
+    VALIDATION_QUESTIONS_PERMISSION,
+)
+
 
 def _is_json_request():
     """Alias for is_json_request; prefer importing from app.utils.request_utils."""

@@ -486,6 +486,46 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   background-color: #64748b;
 }
 
+/* Active section in side navigation (scroll spy) */
+#section-navigation-sidebar .section-link.is-active {
+  background-color: #dbeafe;
+  color: #1e40af;
+  font-weight: 700;
+  border-left: 4px solid #2563eb;
+  padding-left: calc(0.75rem - 4px);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
+}
+
+#section-navigation-sidebar .section-link.is-active:hover {
+  background-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
+#section-navigation-sidebar .section-link.is-active .fa-layer-group,
+#section-navigation-sidebar .section-link.is-active .fa-user,
+#section-navigation-sidebar .section-link.is-active span {
+  color: #1e40af;
+}
+
+#section-navigation-sidebar ul ul .section-link.is-active {
+  background-color: #ccfbf1;
+  color: #0f766e;
+  font-weight: 700;
+  border-left: 4px solid #0d9488;
+  padding-left: calc(0.5rem - 4px);
+  box-shadow: 0 1px 3px rgba(13, 148, 136, 0.15);
+}
+
+#section-navigation-sidebar ul ul .section-link.is-active:hover {
+  background-color: #99f6e4;
+  color: #115e59;
+}
+
+#section-navigation-sidebar ul ul .section-link.is-active .fa-indent,
+#section-navigation-sidebar ul ul .section-link.is-active span {
+  color: #0f766e;
+}
+
 /* Large screens (≥1100px): Static pane with collapse functionality */
 @media (min-width: 1100px) {
   /* Pane collapse animation */

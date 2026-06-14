@@ -149,8 +149,11 @@ def register_matrix_api_routes(bp):
                     if assignment_entity_status_id:
                         with suppress((ValueError, TypeError)):
                             aes = AssignmentEntityStatus.query.get(int(assignment_entity_status_id))
-                            if aes and aes.country:
-                                return aes.country.iso2 or aes.country.iso3
+                            if aes:
+                                from app.utils.api_serialization import _country_for_aes
+                                country = _country_for_aes(aes)
+                                if country:
+                                    return country.iso2 or country.iso3
 
                     referer = request.headers.get('Referer') or ''
                     m = re.search(r"/forms/(?:assignment|entry)/(\d+)", referer)
@@ -158,8 +161,11 @@ def register_matrix_api_routes(bp):
                         with suppress((ValueError, TypeError)):
                             aes_id = int(m.group(1))
                             aes = AssignmentEntityStatus.query.get(aes_id)
-                            if aes and aes.country:
-                                return aes.country.iso2 or aes.country.iso3
+                            if aes:
+                                from app.utils.api_serialization import _country_for_aes
+                                country = _country_for_aes(aes)
+                                if country:
+                                    return country.iso2 or country.iso3
 
                     iso = request.args.get('iso') or request.args.get('country')
                     if iso:

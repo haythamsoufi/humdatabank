@@ -223,19 +223,86 @@ def merge_carryover_into_submitted_documents_dict(
     """Mutate *existing_submitted_documents_dict* with qualifying repository documents.
 
     Returns IDs of documents linked to a different assignment row (read-only in this AES UI).
+
+    Performance note: collects all document fields with carryover enabled first, then
+    executes one SubmittedDocument query and one FormItem batch query for the whole
+    function instead of repeating them once per field.
     """
     carryover_ids: set[int] = set()
+
+    # Collect document fields that have carryover enabled — skip the rest upfront.
+    doc_fields = []
     for section in all_sections:
         if not hasattr(section, "fields_ordered"):
             continue
         for field in section.fields_ordered:
             if not getattr(field, "is_document_field", False):
                 continue
-            key = f"field_value[{field.id}]"
-            carry = find_carryover_documents_for_field(field, assignment_entity_status)
-            if not carry:
+            cfg = field.config or {}
+            if _config_bool_true(cfg.get("cross_assignment_period_reuse")):
+                doc_fields.append(field)
+
+    if not doc_fields:
+        return carryover_ids
+
+    aes = assignment_entity_status
+    current_af = aes.assigned_form
+    if not current_af:
+        return carryover_ids
+
+    target_years = assignment_target_years(current_af.period_name)
+    if not target_years:
+        return carryover_ids
+
+    template_id = current_af.template_id
+
+    # Single query for all candidate documents across all document fields.
+    candidates = (
+        SubmittedDocument.query.options(joinedload(SubmittedDocument.uploaded_by_user))
+        .join(AssignmentEntityStatus, SubmittedDocument.assignment_entity_status_id == AssignmentEntityStatus.id)
+        .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+        .filter(
+            AssignmentEntityStatus.entity_type == aes.entity_type,
+            AssignmentEntityStatus.entity_id == aes.entity_id,
+            AssignmentEntityStatus.id != aes.id,
+            AssignedForm.template_id == template_id,
+            SubmittedDocument.form_item_id.isnot(None),
+        )
+        .order_by(SubmittedDocument.uploaded_at.desc())
+        .all()
+    )
+
+    if not candidates:
+        return carryover_ids
+
+    # Batch-load all FormItems referenced by candidates in one query.
+    fi_ids = {d.form_item_id for d in candidates if d.form_item_id}
+    source_items: dict[int, FormItem] = {}
+    if fi_ids:
+        for fi in FormItem.query.filter(FormItem.id.in_(fi_ids)).all():
+            source_items[fi.id] = fi
+
+    # Per-field filtering is now pure Python — no additional DB queries.
+    for field in doc_fields:
+        cfg = field.config or {}
+        key = f"field_value[{field.id}]"
+
+        carry: list[SubmittedDocument] = []
+        seen: set[int] = set()
+        for doc in candidates:
+            if doc.id in seen:
                 continue
-            for c in carry:
-                carryover_ids.add(c.id)
-            _merge_docs_for_key(key, carry, existing_submitted_documents_dict)
+            if not _document_matches_carryover_field(doc, field, cfg, source_items):
+                continue
+            if not document_covers_assignment_years(doc.period, target_years):
+                continue
+            carry.append(doc)
+            seen.add(doc.id)
+
+        if not carry:
+            continue
+        for c in carry:
+            carryover_ids.add(c.id)
+        _merge_docs_for_key(key, carry, existing_submitted_documents_dict)
+
     return carryover_ids

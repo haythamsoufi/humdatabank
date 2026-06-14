@@ -3,13 +3,12 @@
 {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_css %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
-{% from "components/_page_header.html" import page_header %}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 {% block title %}Import KoBo Data{% endblock %}
 
 {% block head %}
 {{ super() }}
 {{ ag_grid_css() }}
-<meta name="csrf-token" content="{{ csrf_token() }}">
 <style nonce="{{ csp_nonce() }}">
 .wizard-step { transition: all 0.2s ease; }
 .wizard-step.active { color: #2563eb; border-color: #2563eb; }
@@ -141,19 +140,21 @@
             </div>
         </div>
 
-        {# min-height: abs-positioned children do not expand the box; h-48 may be missing if Tailwind was not rebuilt #}
-        <div class="file-upload-wrapper relative border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors" id="upload-zone" style="min-height: 12rem;">
-            <input type="file" id="kobo-data-file" accept=".xlsx,.xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="Select KoBo Excel file">
-            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" id="upload-placeholder">
-                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
-                <p class="text-sm text-gray-600 font-medium">Click or drag an Excel file here</p>
-                <p class="text-xs text-gray-400 mt-1">.xlsx or .xls (max 50 MB)</p>
-            </div>
-            <div class="absolute inset-0 flex flex-col items-center justify-center hidden" id="upload-progress">
-                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
-                <p class="text-sm text-gray-600">Analyzing file structure...</p>
-            </div>
+        {% set _kobo_progress_overlay %}
+        <div class="excel-io-dropzone__overlay" id="upload-progress" hidden>
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+            <p class="text-sm text-gray-600">Analyzing file structure...</p>
         </div>
+        {% endset %}
+        {% call excel_import_dropzone(
+            'kobo-upload-dropzone',
+            input_id='kobo-data-file',
+            input_name='file',
+            variant='neutral',
+            title=_('Click or drag an Excel file here'),
+            hint=_('.xlsx or .xls (max 50 MB)'),
+            overlay=_kobo_progress_overlay
+        ) %}{% endcall %}
         <div id="upload-error" class="mt-3 text-sm text-red-600 hidden"></div>
     </div>
 
@@ -1131,25 +1132,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ── Step 1: Upload & Analyze ────────────────────────────────────────
     var fileInput = document.getElementById('kobo-data-file');
-    var uploadZone = document.getElementById('upload-zone');
-    var uploadPlaceholder = document.getElementById('upload-placeholder');
     var uploadProgress = document.getElementById('upload-progress');
     var uploadError = document.getElementById('upload-error');
+    var koboDropzoneReset = null;
 
-    ['dragenter', 'dragover'].forEach(function(e) {
-        uploadZone.addEventListener(e, function(ev) { ev.preventDefault(); uploadZone.classList.add('border-blue-500', 'bg-blue-50'); });
+    import('{{ static_url('js/components/excel-import-dropzone.js') }}').then(function(mod) {
+        var ctrl = mod.initExcelImportDropzone('#kobo-upload-dropzone', {
+            variant: 'neutral',
+            maxSizeBytes: 50 * 1024 * 1024,
+            onFileSelected: function(file) {
+                if (file) analyzeFile(file);
+            },
+        });
+        koboDropzoneReset = ctrl.reset;
     });
-    ['dragleave', 'drop'].forEach(function(e) {
-        uploadZone.addEventListener(e, function(ev) { ev.preventDefault(); uploadZone.classList.remove('border-blue-500', 'bg-blue-50'); });
-    });
-    uploadZone.addEventListener('drop', function(e) {
-        var file = e.dataTransfer.files[0];
-        if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
-            var dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files;
-            analyzeFile(file);
-        }
-    });
-    fileInput.addEventListener('change', function() { if (this.files.length > 0) analyzeFile(this.files[0]); });
 
     function analyzeFile(file) {
         if (templateMode === 'existing' && !existingTemplateId) {
@@ -1157,8 +1153,7 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadError.classList.remove('hidden');
             return;
         }
-        uploadPlaceholder.classList.add('hidden');
-        uploadProgress.classList.remove('hidden');
+        if (uploadProgress) uploadProgress.hidden = false;
         uploadError.classList.add('hidden');
 
         var fd = new FormData(); fd.append('file', file);
@@ -1166,9 +1161,9 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(ANALYZE_URL, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            uploadProgress.classList.add('hidden');
+            if (uploadProgress) uploadProgress.hidden = true;
             if (!data.success) {
-                uploadPlaceholder.classList.remove('hidden');
+                if (koboDropzoneReset) koboDropzoneReset();
                 uploadError.textContent = data.message || 'Analysis failed';
                 uploadError.classList.remove('hidden');
                 return;
@@ -1189,8 +1184,8 @@ document.addEventListener('DOMContentLoaded', function() {
             setStep(2);
         })
         .catch(function(err) {
-            uploadProgress.classList.add('hidden');
-            uploadPlaceholder.classList.remove('hidden');
+            if (uploadProgress) uploadProgress.hidden = true;
+            if (koboDropzoneReset) koboDropzoneReset();
             uploadError.textContent = 'Upload failed: ' + err.message;
             uploadError.classList.remove('hidden');
         });

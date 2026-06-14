@@ -53,6 +53,44 @@ class IndicatorBankType(db.Model):
         return f"<IndicatorBankType {self.code}>"
 
 
+class IndicatorBankSpef(db.Model):
+    """Central catalog: Strategy 2030 SP/EF (SPEF) area codes (e.g. EF2, SP3)."""
+
+    __tablename__ = "indicator_bank_spef"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(16), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    name_translations = db.Column(JSONB, nullable=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    def get_name_translation(self, language: str):
+        lang = (language or "").strip().lower().split("_", 1)[0].split("-", 1)[0]
+        if self.name_translations and isinstance(self.name_translations, dict):
+            val = self.name_translations.get(lang)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return self.name
+
+    def set_name_translation(self, language: str, text: str):
+        lang = (language or "").strip().lower().split("_", 1)[0].split("-", 1)[0]
+        if not lang or lang == "en":
+            return
+        if not self.name_translations or not isinstance(self.name_translations, dict):
+            self.name_translations = {}
+        value = (text or "").strip()
+        if value:
+            self.name_translations[lang] = value
+        else:
+            self.name_translations.pop(lang, None)
+
+    def __repr__(self):
+        return f"<IndicatorBankSpef {self.code}>"
+
+
 class IndicatorBankUnit(db.Model):
     """Central catalog: units of measure; indicators reference rows here."""
 
@@ -117,6 +155,10 @@ class IndicatorBank(db.Model):
 
     # IFRC indicator bank metadata (area = remote SPEF code, e.g. EF2 / SP3)
     area = db.Column(db.String(16), nullable=True)
+    indicator_spef_id = db.Column(
+        db.Integer, db.ForeignKey("indicator_bank_spef.id"), nullable=True, index=True
+    )
+    area_label = db.Column(db.Text, nullable=True)
     data_source = db.Column(db.Text, nullable=True)
     disaggregation_guidance = db.Column(db.Text, nullable=True)
     monitoring_questions = db.Column(JSONB, nullable=True)  # ordered list of question strings
@@ -142,6 +184,7 @@ class IndicatorBank(db.Model):
     history = db.relationship('IndicatorBankHistory', backref='indicator', lazy='dynamic', order_by='desc(IndicatorBankHistory.created_at)')
     measurement_type = db.relationship('IndicatorBankType', foreign_keys=[indicator_type_id], lazy='select')
     measurement_unit = db.relationship('IndicatorBankUnit', foreign_keys=[indicator_unit_id], lazy='select')
+    spef_area = db.relationship('IndicatorBankSpef', foreign_keys=[indicator_spef_id], lazy='select')
 
     __table_args__ = (
         db.Index('ix_indicator_bank_type_unit', 'type', 'unit'),
@@ -310,6 +353,12 @@ class IndicatorBank(db.Model):
         # If there is no unit FK, keep ``self.unit`` (e.g. IFRC free text) so we do not
         # wipe values that failed to resolve before backfill runs.
 
+    def sync_spef_columns(self):
+        """Keep denormalized area / area_label aligned with the central SPEF lookup row."""
+        if self.spef_area is not None:
+            self.area = (self.spef_area.code or "")[:16]
+            self.area_label = self.spef_area.name
+
     @property
     def template_instances(self):
         """Return a SQLAlchemy *query* of ``FormItem`` objects that reference this
@@ -422,6 +471,7 @@ class IndicatorBankHistory(db.Model):
     aggregated_label = db.Column(db.Text, nullable=True)
     aggregated_label_translations = db.Column(JSONB, nullable=True)
     area = db.Column(db.String(16), nullable=True)
+    area_label = db.Column(db.Text, nullable=True)
     data_source = db.Column(db.Text, nullable=True)
     disaggregation_guidance = db.Column(db.Text, nullable=True)
     monitoring_questions = db.Column(JSONB, nullable=True)
@@ -624,6 +674,11 @@ class Sector(db.Model):
             self.updated_at = utcnow()
 
     @property
+    def has_logo(self):
+        """True when a logo file is stored (upload uses logo_filename)."""
+        return bool(self.logo_filename or self.logo_path)
+
+    @property
     def logo_url(self):
         """Returns the URL path for the logo if it exists."""
         if self.logo_path:
@@ -699,6 +754,11 @@ class SubSector(db.Model):
             self.created_at = utcnow()
         if self.updated_at is None:
             self.updated_at = utcnow()
+
+    @property
+    def has_logo(self):
+        """True when a logo file is stored (upload uses logo_filename)."""
+        return bool(self.logo_filename or self.logo_path)
 
     @property
     def logo_url(self):

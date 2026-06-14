@@ -7,26 +7,6 @@
 (function initGlobalFlashMessages() {
     const pending = [];
 
-    function getScrollableContainer() {
-        // Backoffice layout uses <main> with overflow-y:auto as the scroll container.
-        // Scrolling the window in that layout can cause the "content disappears / blank space" bug.
-        const mainElement =
-            document.querySelector('main[style*="overflow-y"]') ||
-            document.querySelector('main');
-
-        if (mainElement) {
-            const computed = window.getComputedStyle(mainElement);
-            const overflowY = (computed.overflowY || '').toLowerCase();
-            const canScroll = mainElement.scrollHeight > mainElement.clientHeight;
-            const isScrollable = (overflowY === 'auto' || overflowY === 'scroll') && canScroll;
-
-            // Even if computed style is inconclusive, fall back to measuring.
-            if (isScrollable || canScroll) return mainElement;
-        }
-
-        return window;
-    }
-
     function normalizeCategory(category) {
         const c = (category || '').toString().toLowerCase().trim();
         if (c === 'error') return 'danger';
@@ -163,18 +143,6 @@
         const alertEl = buildAlertElement(message, category);
         wrapper.appendChild(alertEl);
 
-        // Ensure user sees it
-        try {
-            const scrollContainer = getScrollableContainer();
-            if (scrollContainer !== window) {
-                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-            } else {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        } catch (_) {
-            // no-op
-        }
-
         // Auto-dismiss after 5s (matches global flash behavior)
         setTimeout(() => {
             if (alertEl && alertEl.parentElement) {
@@ -219,15 +187,6 @@
         const wrapper = ensureFlashWrapper();
         const alertEl = buildAlertElement(message, category);
         wrapper.appendChild(alertEl);
-
-        try {
-            const scrollContainer = getScrollableContainer();
-            if (scrollContainer !== window) {
-                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-            } else {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        } catch (_) { /* no-op */ }
 
         if (window.adjustFABPosition) {
             setTimeout(() => window.adjustFABPosition(), 50);

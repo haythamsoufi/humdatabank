@@ -77,7 +77,15 @@ _ITEM_SCHEMA: Dict[str, Any] = {
             ],
             "description": "Required for item_type=question.",
         },
-        "definition": {"type": "string", "description": "Question help text / definition."},
+        "definition": {
+            "type": "string",
+            "description": (
+                "Help text shown beneath the field label — e.g. instructions, examples, guidance, "
+                "SharePoint links, or ROI formulas visible in the source form. Always populate this "
+                "instead of embedding instructions inside the label. Never leave useful guidance text "
+                "out of the form just because it was below the label in the source."
+            ),
+        },
         "options": {
             "type": "array",
             "items": {"type": "string"},

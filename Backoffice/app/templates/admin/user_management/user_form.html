@@ -5,7 +5,7 @@
 
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_subtab_btn_classes %}
 {% set azure_sso_enabled = azure_sso_enabled | default(false) %}
 
 {# Permission gates for deactivate / delete actions (only meaningful when editing) #}
@@ -79,9 +79,44 @@
 {# The form for editing or adding a user #}
 <form id="userForm" method="POST" action="{{ url_for('user_management.edit_user', user_id=user.id) if user else url_for('user_management.new_user') }}">
     {{ form.csrf_token }}
-    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-24">
+    <div class="bg-white shadow-md border border-gray-200 mb-24">
         {# Ensure `read_only` is always a real boolean (not Jinja Undefined) #}
         {% set read_only = (((user is defined and user) and user_has_role(user, 'system_manager') and (not current_user.is_authenticated or not current_user_has_role('system_manager'))) or false) %}
+
+        {# ── Tab navigation (same pattern as System Configuration) ── #}
+        {% call scroll_tab_bar(inner_id='main-tabs', aria_label=_('User form sections')) %}
+            <button type="button" role="tab" id="user-details-tab" data-tab="user-details"
+                    class="{{ admin_underline_tab_btn_classes(true) }}"
+                    aria-controls="panel-user-details" aria-selected="true">
+                <i class="fas fa-user mr-1.5"></i>{{ _('User Details') }}
+            </button>
+            <button type="button" role="tab" id="entity-permissions-tab" data-tab="entity"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-entity" aria-selected="false">
+                <i class="fas fa-sitemap mr-1.5"></i>{{ _('Entity Permissions') }}
+            </button>
+            {% if user %}
+            <button type="button" role="tab" id="notification-preferences-tab" data-tab="notifications"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-notifications" aria-selected="false">
+                <i class="fas fa-bell mr-1.5"></i>{{ _('Notification Preferences') }}
+            </button>
+            <button type="button" role="tab" id="registered-devices-tab" data-tab="devices"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-devices" aria-selected="false">
+                <i class="fas fa-mobile-alt mr-1.5"></i>{{ _('Registered Devices') }}
+            </button>
+            {% if can_view_user_analytics %}
+            <button type="button" role="tab" id="analytics-tab" data-tab="analytics"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-analytics" aria-selected="false">
+                <i class="fas fa-chart-line mr-1.5"></i>{{ _('Analytics') }}
+            </button>
+            {% endif %}
+            {% endif %}
+        {% endcall %}
+
+        <div class="p-6">
         {% if user and not user.active %}
         <div class="mb-4 p-3 rounded border border-red-300 bg-red-50 text-red-800 text-sm flex items-start">
             <i class="fas fa-user-slash mr-2 mt-0.5"></i>
@@ -98,73 +133,8 @@
         </div>
         {% endif %}
 
-        {# Main Tab Navigation #}
-        {% call scroll_tab_bar(inner_tag='ul', inner_id='main-tabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-6', aria_label=_('User form sections')) %}
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
-                            id="user-details-tab"
-                            data-tabs-target="#user-details-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="user-details-panel"
-                            aria-selected="true">
-                        <i class="fas fa-user mr-2"></i>User Details
-                    </button>
-                </li>
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
-                            id="entity-permissions-tab"
-                            data-tabs-target="#entity-permissions-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="entity-permissions-panel"
-                            aria-selected="false">
-                        <i class="fas fa-sitemap mr-2"></i>Entity Permissions
-                    </button>
-                </li>
-                {% if user %}
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
-                            id="notification-preferences-tab"
-                            data-tabs-target="#notification-preferences-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="notification-preferences-panel"
-                            aria-selected="false">
-                        <i class="fas fa-bell mr-2"></i>Notification Preferences
-                    </button>
-                </li>
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
-                            id="registered-devices-tab"
-                            data-tabs-target="#registered-devices-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="registered-devices-panel"
-                            aria-selected="false">
-                        <i class="fas fa-mobile-alt mr-2"></i>Registered Devices
-                    </button>
-                </li>
-                {% if can_view_user_analytics %}
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
-                            id="analytics-tab"
-                            data-tabs-target="#analytics-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="analytics-panel"
-                            aria-selected="false">
-                        <i class="fas fa-chart-line mr-2"></i>{{ _('Analytics') }}
-                    </button>
-                </li>
-                {% endif %}
-                {% endif %}
-        {% endcall %}
-
-        {# Main Tab Panels #}
-        <div id="main-tabs-content">
             {# User Details Tab #}
-            <div id="user-details-panel" role="tabpanel" aria-labelledby="user-details-tab">
+            <div class="user-form-panel" id="panel-user-details" role="tabpanel" aria-labelledby="user-details-tab">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="mb-4">
                         {{ form.email.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
@@ -292,13 +262,15 @@
                             {% endif %}
                         {% endfor %}
 
+                        {# New users default to Focal Point; existing users use the backend-computed value #}
+                        {% set default_role_type = computed_role_type if (computed_role_type is defined and computed_role_type) else ('focal_point' if not (user is defined and user) else 'admin') %}
+                        {% set show_admin_sections = default_role_type != 'focal_point' %}
+
                         <div class="space-y-4">
 
                             {# Role Type Selector #}
                             <div id="role-type-and-assignments" class="{% if roles_disabled %}opacity-70{% endif %}">
                                 <label for="role_type_select" class="block text-sm font-semibold text-gray-700 mb-2">{{ _('Role Type') }}</label>
-                                {# New users default to Focal Point; existing users use the backend-computed value #}
-                                {% set default_role_type = computed_role_type if (computed_role_type is defined and computed_role_type) else ('focal_point' if not (user is defined and user) else 'admin') %}
                                 <select
                                     id="role_type_select"
                                     name="role_type"
@@ -328,7 +300,7 @@
                                             {% set display_label = raw_label[11:] %}
                                         {% endif %}
                                         {% set is_approver = 'approver' in raw_label.lower() %}
-                                        <label class="flex items-center min-w-0 assignment-role-item {% if is_approver %}assignment-approver-role{% endif %} {% if roles_disabled %}cursor-not-allowed{% endif %}" {% if is_approver %}data-role-type="approver"{% endif %}>
+                                        <label class="flex items-center min-w-0 assignment-role-item {% if is_approver %}assignment-approver-role{% if not show_admin_sections %} hidden{% endif %}{% endif %} {% if roles_disabled %}cursor-not-allowed{% endif %}" {% if is_approver %}data-role-type="approver"{% endif %}>
                                             {% if roles_disabled %}
                                                 {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
                                             {% else %}
@@ -342,7 +314,7 @@
                             {% endif %}
 
                             {# Admin sections - hidden when Focal Point is selected #}
-                            <div id="admin-sections" class="admin-sections-container">
+                            <div id="admin-sections" class="admin-sections-container{% if not show_admin_sections %} hidden{% endif %}">
 
                             {# Admin Roles: Presets + Categorized Admin Roles #}
                             {% if (rbac_groups.system|length or rbac_groups.core_roles|length) or rbac_groups.admin|length %}
@@ -475,7 +447,7 @@
                                         {% endif %}
                                     {% elif feature in ['Users'] %}
                                         {% set __ = admin_cats.user_management.append(feature) %}
-                                    {% elif feature in ['Templates', 'Assignments', 'Data Explorer'] %}
+                                    {% elif feature in ['Templates', 'Assignments', 'Data Explorer', 'Validation Dashboard', 'Validation Questions', 'Validation Rules'] %}
                                         {% set __ = admin_cats.form_data.append(feature) %}
                                     {% elif feature in ['Content'] %}
                                         {% set __ = admin_cats.website.append(feature) %}
@@ -491,7 +463,7 @@
                                 {# Helper: render a category block using a preferred feature order (sidebar-ish) #}
                                 {% set ordered_general = ['Docs', 'Settings', 'Documents', 'Plugins'] %}
                                 {% set ordered_user_mgmt = ['Users'] %}
-                                {% set ordered_form_data = ['Templates', 'Assignments', 'Data Explorer'] %}
+                                {% set ordered_form_data = ['Templates', 'Assignments', 'Data Explorer', 'Validation Dashboard', 'Validation Questions', 'Validation Rules'] %}
                                 {% set ordered_website = ['Content'] %}
                                 {% set ordered_reference = ['Countries & Organization', 'Indicator Bank'] %}
                                 {% set ordered_analytics = ['Analytics', 'Audit Trail', 'Governance', 'AI', 'API', 'Security'] %}
@@ -713,7 +685,7 @@ window.userFormConfig = {
 
             {# Entity Permissions Tab #}
             {% if entity_tabs.order %}
-            <div id="entity-permissions-panel" class="hidden space-y-6" role="tabpanel" aria-labelledby="entity-permissions-tab">
+            <div id="panel-entity" class="user-form-panel hidden space-y-6" role="tabpanel" aria-labelledby="entity-permissions-tab">
                 <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5">
                     <p class="text-sm text-gray-600">
                         {{ _('Assign this user to specific organizational entities. Users will have access to data at the level they are assigned.') }}
@@ -722,58 +694,41 @@ window.userFormConfig = {
 
                 <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
                     {# Entity Sub-Tab Navigation #}
-                    <div class="border-b border-gray-200 bg-gray-50 px-2 sm:px-3">
-                        {% call scroll_tab_bar(border_bottom=False, inner_tag='ul', inner_id='entity-tabs', inner_class='list-none text-sm font-medium text-center', aria_label=_('Entity assignment type')) %}
+                    {% call scroll_tab_bar(border_bottom=False, inner_id='entity-tabs', aria_label=_('Entity assignment type')) %}
                             {% if has_countries %}
                             {% set is_countries_active = default_entity_tab == 'countries' %}
-                            <li class="me-2" role="presentation">
-                                <button class="inline-block px-3 py-3 border-b-2 rounded-t-lg {% if is_countries_active %}text-blue-600 border-blue-600{% else %}border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300{% endif %}"
-                                        id="countries-tab"
-                                        data-tabs-target="#countries-panel"
-                                        type="button"
-                                        role="tab"
-                                        aria-controls="countries-panel"
-                                        aria-selected="{{ 'true' if is_countries_active else 'false' }}">
-                                    <i class="fas fa-flag mr-2"></i>{{ _('Countries') }}
-                                </button>
-                            </li>
+                            <button type="button" role="tab" id="countries-tab" data-tab="countries"
+                                    class="{{ admin_underline_subtab_btn_classes(is_countries_active) }}"
+                                    aria-controls="panel-countries"
+                                    aria-selected="{{ 'true' if is_countries_active else 'false' }}">
+                                <i class="fas fa-flag mr-1.5"></i>{{ _('Countries') }}
+                            </button>
                             {% endif %}
                             {% if has_ns_structure %}
                             {% set is_ns_active = default_entity_tab == 'ns_structure' %}
-                            <li class="me-2" role="presentation">
-                                <button class="inline-block px-3 py-3 border-b-2 rounded-t-lg {% if is_ns_active %}text-blue-600 border-blue-600{% else %}border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300{% endif %}"
-                                        id="ns-structure-tab"
-                                        data-tabs-target="#ns-structure-panel"
-                                        type="button"
-                                        role="tab"
-                                        aria-controls="ns-structure-panel"
-                                        aria-selected="{{ 'true' if is_ns_active else 'false' }}">
-                                    <i class="fas fa-sitemap mr-2"></i>{{ _('NS Structure') }}
-                                </button>
-                            </li>
+                            <button type="button" role="tab" id="ns-structure-tab" data-tab="ns-structure"
+                                    class="{{ admin_underline_subtab_btn_classes(is_ns_active) }}"
+                                    aria-controls="panel-ns-structure"
+                                    aria-selected="{{ 'true' if is_ns_active else 'false' }}">
+                                <i class="fas fa-sitemap mr-1.5"></i>{{ _('NS Structure') }}
+                            </button>
                             {% endif %}
                             {% if has_secretariat %}
                             {% set is_secretariat_active = default_entity_tab == 'secretariat' %}
-                            <li class="me-2" role="presentation">
-                                <button class="inline-block px-3 py-3 border-b-2 rounded-t-lg {% if is_secretariat_active %}text-blue-600 border-blue-600{% else %}border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300{% endif %}"
-                                        id="secretariat-tab"
-                                        data-tabs-target="#secretariat-panel"
-                                        type="button"
-                                        role="tab"
-                                        aria-controls="secretariat-panel"
-                                        aria-selected="{{ 'true' if is_secretariat_active else 'false' }}">
-                                    <i class="fas fa-building mr-2"></i>{{ _('Secretariat') }}
-                                </button>
-                            </li>
+                            <button type="button" role="tab" id="secretariat-tab" data-tab="secretariat"
+                                    class="{{ admin_underline_subtab_btn_classes(is_secretariat_active) }}"
+                                    aria-controls="panel-secretariat"
+                                    aria-selected="{{ 'true' if is_secretariat_active else 'false' }}">
+                                <i class="fas fa-building mr-1.5"></i>{{ _('Secretariat') }}
+                            </button>
                             {% endif %}
-                        {% endcall %}
-                    </div>
+                    {% endcall %}
 
                     {# Tab Panels #}
                     <div id="entity-tabs-content" class="p-4 sm:p-5 bg-gray-50">
                 {# Countries Tab #}
                 {% if has_countries %}
-                <div class="{% if default_entity_tab != 'countries' %}hidden{% endif %}" id="countries-panel" role="tabpanel" aria-labelledby="countries-tab">
+                <div class="{% if default_entity_tab != 'countries' %}hidden{% endif %} entity-form-panel" id="panel-countries" role="tabpanel" aria-labelledby="countries-tab">
                     <label class="block text-gray-700 text-sm font-semibold mb-2">{{ form.countries.label.text }}</label>
                     <div class="p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
                         {# Global Select All Checkbox #}
@@ -811,14 +766,14 @@ window.userFormConfig = {
                 {# NS Structure Tab - Hierarchical view of Branches > Sub-branches > Local Units #}
                 {% endif %}
                 {% if has_ns_structure %}
-                <div class="{% if default_entity_tab != 'ns_structure' %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
+                <div class="{% if default_entity_tab != 'ns_structure' %}hidden{% endif %} entity-form-panel" id="panel-ns-structure" role="tabpanel" aria-labelledby="ns-structure-tab">
                     <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-gray-700 text-sm font-semibold mb-2" for="ns-structure-search">{{ _('Search NS structure') }}</label>
                             <input type="text"
                                    id="ns-structure-search"
                                    class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="{{ _('Search branches, sub-branches, or local unitsΓÇª') }}">
+                                   placeholder="{{ _('Search branches, sub-branches, or local units…') }}">
                         </div>
                         <div>
                             <label class="block text-gray-700 text-sm font-semibold mb-2" for="ns-country-select">{{ _('Country') }}</label>
@@ -847,64 +802,50 @@ window.userFormConfig = {
                 {# Secretariat Tab - with sub-tabs: Divisions & Departments, Regions #}
                 {% endif %}
                 {% if has_secretariat %}
-                <div class="{% if default_entity_tab != 'secretariat' %}hidden{% endif %}" id="secretariat-panel" role="tabpanel" aria-labelledby="secretariat-tab">
+                <div class="{% if default_entity_tab != 'secretariat' %}hidden{% endif %} entity-form-panel" id="panel-secretariat" role="tabpanel" aria-labelledby="secretariat-tab">
                     <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
                         {# Sub-tab navigation #}
-                        <div class="border-b border-gray-200 bg-gray-50 px-2 sm:px-3">
-                            {% call scroll_tab_bar(border_bottom=False, inner_tag='ul', inner_id='secretariat-subtabs', inner_class='list-none text-sm font-medium text-center', aria_label=_('Secretariat assignment')) %}
-                                <li class="me-2" role="presentation">
-                                    <button class="inline-block px-3 py-2.5 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
-                                            id="secretariat-divisions-tab"
-                                            data-tabs-target="#secretariat-divisions-panel"
-                                            type="button"
-                                            role="tab"
-                                            aria-controls="secretariat-divisions-panel"
-                                            aria-selected="true">
-                                        <i class="fas fa-building mr-2"></i>{{ _('Divisions & Departments') }}
-                                    </button>
-                                </li>
-                                <li class="me-2" role="presentation">
-                                    <button class="inline-block px-3 py-2.5 border-b-2 border-transparent rounded-t-lg text-gray-600 hover:text-gray-800 hover:border-gray-300"
-                                            id="secretariat-regions-tab"
-                                            data-tabs-target="#secretariat-regions-panel"
-                                            type="button"
-                                            role="tab"
-                                            aria-controls="secretariat-regions-panel"
-                                            aria-selected="false">
-                                        <i class="fas fa-globe-europe mr-2"></i>{{ _('Regions') }}
-                                    </button>
-                                </li>
-                            {% endcall %}
-                        </div>
+                        {% call scroll_tab_bar(border_bottom=False, inner_id='secretariat-subtabs', aria_label=_('Secretariat assignment')) %}
+                            <button type="button" role="tab" id="secretariat-divisions-tab" data-tab="divisions"
+                                    class="{{ admin_underline_subtab_btn_classes(true) }}"
+                                    aria-controls="panel-secretariat-divisions" aria-selected="true">
+                                <i class="fas fa-building mr-1.5"></i>{{ _('Divisions & Departments') }}
+                            </button>
+                            <button type="button" role="tab" id="secretariat-regions-tab" data-tab="regions"
+                                    class="{{ admin_underline_subtab_btn_classes(false) }}"
+                                    aria-controls="panel-secretariat-regions" aria-selected="false">
+                                <i class="fas fa-globe-europe mr-1.5"></i>{{ _('Regions') }}
+                            </button>
+                        {% endcall %}
 
                         {# Sub-tab panels #}
                         <div id="secretariat-subtabs-content" class="p-4 sm:p-5 bg-gray-50">
                             {# Divisions & Departments panel #}
-                            <div id="secretariat-divisions-panel" role="tabpanel" aria-labelledby="secretariat-divisions-tab">
+                            <div id="panel-secretariat-divisions" class="secretariat-form-panel" role="tabpanel" aria-labelledby="secretariat-divisions-tab">
                                 <div class="mb-4">
                                     <label class="block text-gray-700 text-sm font-semibold mb-2" for="secretariat-divisions-search">{{ _('Search secretariat') }}</label>
                                     <input type="text"
                                            id="secretariat-divisions-search"
                                            class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                           placeholder="{{ _('Search divisions or departmentsΓÇª') }}">
+                                           placeholder="{{ _('Search divisions or departments…') }}">
                                 </div>
                                 <div id="secretariat-divisions-container" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Secretariat structure will be loaded here by JavaScript -->
                                     <div class="text-center py-6 px-4">
                                         <i class="fas fa-spinner fa-spin text-blue-600 text-xl mb-2"></i>
-                                        <p class="text-sm text-gray-600">{{ _('Loading secretariat structureΓÇª') }}</p>
+                                        <p class="text-sm text-gray-600">{{ _('Loading secretariat structure…') }}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {# Regions panel #}
-                            <div class="hidden" id="secretariat-regions-panel" role="tabpanel" aria-labelledby="secretariat-regions-tab">
+                            <div class="hidden secretariat-form-panel" id="panel-secretariat-regions" role="tabpanel" aria-labelledby="secretariat-regions-tab">
                                 <div class="mb-4">
                                     <label class="block text-gray-700 text-sm font-semibold mb-2" for="secretariat-regions-search">{{ _('Search regions') }}</label>
                                     <input type="text"
                                            id="secretariat-regions-search"
                                            class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                           placeholder="{{ _('Search regional or cluster officesΓÇª') }}">
+                                           placeholder="{{ _('Search regional or cluster offices…') }}">
                                 </div>
                                 <div id="secretariat-regions-container" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Regions structure will be loaded here by JavaScript -->
@@ -925,7 +866,7 @@ window.userFormConfig = {
 
             {# Notification Preferences Tab #}
             {% if user %}
-            <div id="notification-preferences-panel" class="hidden space-y-6" role="tabpanel" aria-labelledby="notification-preferences-tab">
+            <div id="panel-notifications" class="user-form-panel hidden space-y-6" role="tabpanel" aria-labelledby="notification-preferences-tab">
                 <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5">
                     <p class="text-sm text-gray-600 mb-4">
                         {{ _('Configure notification preferences for this user. These settings control how and when the user receives notifications.') }}
@@ -1059,7 +1000,7 @@ window.userFormConfig = {
 
             {# Registered Devices Tab #}
             {% if user %}
-            <div id="registered-devices-panel" class="hidden" role="tabpanel" aria-labelledby="registered-devices-tab">
+            <div id="panel-devices" class="user-form-panel hidden" role="tabpanel" aria-labelledby="registered-devices-tab">
                 <div class="mb-4">
                     <p class="text-sm text-gray-600">
                         View all mobile devices registered for push notifications for this user.
@@ -1228,7 +1169,7 @@ window.userFormConfig = {
 
             {# Analytics Tab (lazy-loaded) #}
             {% if user and can_view_user_analytics %}
-            <div id="analytics-panel" class="hidden" role="tabpanel" aria-labelledby="analytics-tab"
+            <div id="panel-analytics" class="user-form-panel hidden" role="tabpanel" aria-labelledby="analytics-tab"
                  data-analytics-url="{{ url_for('analytics.user_analytics', user_id=user.id, partial=1) }}">
                 <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center py-14 px-4" id="analytics-loading">
                     <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mb-3"></i>
@@ -1237,9 +1178,8 @@ window.userFormConfig = {
             </div>
             {% endif %}
 
-        </div>
+        </div>{# /p-6 #}
     </div>
-
 </form>
 
 {% if can_archive_target %}

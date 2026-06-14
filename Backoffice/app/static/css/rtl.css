@@ -489,8 +489,10 @@ html[dir="rtl"] .sidebar-icon.ml-12 { margin-right: 3rem !important; }
 }
 
 /* RTL Navigation header text */
-.docs-container[dir="rtl"] .docs-sidebar-inner > div:first-child,
-.docs-container.docs-rtl .docs-sidebar-inner > div:first-child {
+.docs-container[dir="rtl"] .docs-sidebar-header,
+.docs-container.docs-rtl .docs-sidebar-header,
+.docs-container[dir="rtl"] .docs-sidebar-title,
+.docs-container.docs-rtl .docs-sidebar-title {
     direction: rtl;
     text-align: right;
 }
@@ -875,13 +877,30 @@ html[dir="rtl"] #excel-options-modal .inline-flex.items-center i {
     margin-left: 0.5rem !important;
 }
 
-html[dir="rtl"] #excel-options-modal .file-upload-wrapper {
+html[dir="rtl"] #excel-options-modal .file-upload-wrapper,
+html[dir="rtl"] #excel-options-modal .excel-io-dropzone,
+html[dir="rtl"] .excel-io-dropzone {
     direction: rtl;
 }
 
-html[dir="rtl"] #excel-options-modal .file-upload-box {
+html[dir="rtl"] #excel-options-modal .file-upload-box,
+html[dir="rtl"] .excel-io-dropzone__content--empty {
     direction: rtl;
     text-align: center;
+}
+
+html[dir="rtl"] .excel-io-dropzone__content--selected {
+    text-align: right;
+}
+
+html[dir="rtl"] .excel-io-dropzone__file-panel {
+    padding-right: 0;
+    padding-left: 1.5rem;
+}
+
+html[dir="rtl"] .excel-io-dropzone__status {
+    padding-left: 0;
+    padding-right: 1.5rem;
 }
 
 html[dir="rtl"] #excel-options-modal .flex.items-start {

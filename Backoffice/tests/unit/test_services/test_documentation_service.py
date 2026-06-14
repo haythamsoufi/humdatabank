@@ -238,6 +238,26 @@ class TestUserGuidesCommonDocRequiresAdmin:
         assert self._call("user-guides/admin/data-governance.md") is False
 
 
+class TestUserGuidesAiDocRequiresBetaAccess:
+    def _call(self, base_rel):
+        from app.services.documentation_service import user_guides_ai_doc_requires_beta_access
+        return user_guides_ai_doc_requires_beta_access(base_rel)
+
+    def test_common_ai_docs(self):
+        assert self._call("user-guides/common/ai-chatbot.md") is True
+        assert self._call("user-guides/common/ai-use-policy.md") is True
+
+    def test_admin_ai_docs(self):
+        assert self._call("user-guides/admin/ai-document-library-and-embeddings.md") is True
+        assert self._call("user-guides/admin/ai-system-security-and-privacy.md") is True
+
+    def test_non_ai_doc(self):
+        assert self._call("user-guides/common/start-here.md") is False
+
+    def test_focal_point_not_ai_topic(self):
+        assert self._call("user-guides/focal-point/view-assignments.md") is False
+
+
 class TestIsRootReadmeRequest:
     def _call(self, raw):
         from app.services.documentation_service import _is_root_readme_request
@@ -735,6 +755,25 @@ class TestEnsureDocPageAccess:
                     # readme.md at root level with admin
                     ensure_doc_page_access(user, "README.md", visible_top_level_dirs={"user-guides"})
 
+    def test_ai_doc_forbidden_without_beta_access(self, app):
+        user = MagicMock()
+        user.is_authenticated = True
+        with app.app_context():
+            with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=False):
+                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
+                    from app.services.documentation_service import ensure_doc_page_access
+                    with pytest.raises(Exception):
+                        ensure_doc_page_access(user, "user-guides/common/ai-chatbot.md")
+
+    def test_ai_doc_allowed_with_beta_access(self, app):
+        user = MagicMock()
+        user.is_authenticated = True
+        with app.app_context():
+            with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=True):
+                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                    from app.services.documentation_service import ensure_doc_page_access
+                    ensure_doc_page_access(user, "user-guides/common/ai-chatbot.md")
+
 
 class TestEnsureDocsAssetAccess:
     def test_allowed_asset(self, app):
@@ -961,6 +1000,58 @@ class TestBuildHierarchicalNav:
                         # Should only have one entry for guide (not both .md and .fr.md)
                         guide_items = [r for r in rel_paths if "guide" in r]
                         assert len(guide_items) == len(set(guide_items))
+
+    def test_ai_docs_hidden_without_beta_access(self, app):
+        with app.app_context():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                common_dir = root / "user-guides" / "common"
+                common_dir.mkdir(parents=True)
+                (common_dir / "start-here.md").write_text("# Start", encoding="utf-8")
+                (common_dir / "ai-chatbot.md").write_text("# AI Chatbot", encoding="utf-8")
+                with patch("app.services.documentation_service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                        with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=False):
+                            from app.services.documentation_service import build_hierarchical_nav
+                            nav = build_hierarchical_nav(
+                                root=root,
+                                doc_url_builder=lambda r: f"/docs/{r}",
+                                visible_top_level_dirs={"user-guides"},
+                                user=MagicMock(is_authenticated=True),
+                            )
+                            rel_paths = [
+                                item.rel_path
+                                for cat in nav
+                                for grp in cat.groups
+                                for item in grp.items
+                            ]
+                            assert "user-guides/common/start-here.md" in rel_paths
+                            assert "user-guides/common/ai-chatbot.md" not in rel_paths
+
+    def test_ai_docs_shown_with_beta_access(self, app):
+        with app.app_context():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                common_dir = root / "user-guides" / "common"
+                common_dir.mkdir(parents=True)
+                (common_dir / "ai-chatbot.md").write_text("# AI Chatbot", encoding="utf-8")
+                with patch("app.services.documentation_service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                        with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=True):
+                            from app.services.documentation_service import build_hierarchical_nav
+                            nav = build_hierarchical_nav(
+                                root=root,
+                                doc_url_builder=lambda r: f"/docs/{r}",
+                                visible_top_level_dirs={"user-guides"},
+                                user=MagicMock(is_authenticated=True),
+                            )
+                            rel_paths = [
+                                item.rel_path
+                                for cat in nav
+                                for grp in cat.groups
+                                for item in grp.items
+                            ]
+                            assert "user-guides/common/ai-chatbot.md" in rel_paths
 
 
 class TestGetWorkflowIdForDoc:

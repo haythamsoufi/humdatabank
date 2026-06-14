@@ -906,27 +906,41 @@ class NotificationService:
 
             assignment_status_cache, assigned_form_cache = cls._build_assignment_caches_for_notifications(notifications)
 
+            aes_entity_name_cache = {}
+            try:
+                from app.models.assignments import AssignmentEntityStatus
+                from app.services.entity_service import EntityService
+
+                aes_pairs = set()
+                for cached in assignment_status_cache.values():
+                    if isinstance(cached, AssignmentEntityStatus) and cached.entity_type and cached.entity_id:
+                        aes_pairs.add((cached.entity_type, cached.entity_id))
+                if aes_pairs:
+                    raw = EntityService.batch_entity_names(
+                        list(aes_pairs), include_hierarchy=True, localized=True,
+                    )
+                    for key, name in raw.items():
+                        if name and not str(name).startswith('Unknown'):
+                            aes_entity_name_cache[key] = name
+            except Exception as e:
+                logger.debug("aes_entity_name_cache build failed: %s", e)
+
             # Batch lookup all entities from message_params
             entity_cache = {}  # {(entity_type, entity_id): entity_name}
             if entity_lookups:
                 try:
                     from app.services.entity_service import EntityService
-                    for (entity_type, entity_id), notif_ids in entity_lookups.items():
-                        try:
-                            entity_name = EntityService.get_localized_entity_name(
-                                entity_type,
-                                entity_id,
-                                include_hierarchy=True
-                            )
-                            if entity_name and not entity_name.startswith('Unknown'):
-                                entity_cache[(entity_type, entity_id)] = entity_name
-                            else:
-                                entity_cache[(entity_type, entity_id)] = None
-                        except Exception as e:
-                            logger.warning(f"Error batch-loading entity {entity_type}:{entity_id}: {e}")
-                            entity_cache[(entity_type, entity_id)] = None
+                    entity_cache = EntityService.batch_entity_names(
+                        list(entity_lookups.keys()),
+                        include_hierarchy=True,
+                        localized=True,
+                    )
+                    for key, name in list(entity_cache.items()):
+                        if not name or str(name).startswith('Unknown'):
+                            entity_cache[key] = None
                 except Exception as e:
                     logger.error(f"Error in batch entity lookup: {e}", exc_info=True)
+                    entity_cache = {}
 
             actor_fields_by_id = cls.build_actor_display_fields_map(notifications, assignment_status_cache)
 
@@ -1043,11 +1057,7 @@ class NotificationService:
                             if aes.entity_type != EntityType.country.value:
                                 found_non_country_entity = True
 
-                            entity_name = EntityService.get_localized_entity_name(
-                                aes.entity_type,
-                                aes.entity_id,
-                                include_hierarchy=True
-                            )
+                            entity_name = aes_entity_name_cache.get((aes.entity_type, aes.entity_id))
                             entity_type = aes.entity_type
 
                             if entity_name and not entity_name.startswith('Unknown'):

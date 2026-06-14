@@ -93,8 +93,9 @@ class SubmittedDocument(db.Model):
         3. From country_id (for standalone documents only)
         4. From linked_entity (e.g. NS branch → parent country) for standalone docs
         """
-        if self.assignment_entity_status and self.assignment_entity_status.country:
-            return self.assignment_entity_status.country
+        if self.assignment_entity_status:
+            from app.utils.api_serialization import _country_for_aes
+            return _country_for_aes(self.assignment_entity_status)
         if self.public_submission and self.public_submission.country:
             return self.public_submission.country
         if self.country:

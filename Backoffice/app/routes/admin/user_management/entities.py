@@ -3,6 +3,7 @@
 from collections import defaultdict
 
 from flask import request, current_app
+from sqlalchemy.orm import contains_eager
 
 from app import db
 from app.models import User, Country, UserEntityPermission, NSBranch, NSSubBranch, NSLocalUnit, SecretariatDivision, SecretariatDepartment
@@ -18,6 +19,38 @@ from app.utils.sql_utils import safe_ilike_pattern
 from . import bp
 
 
+def _search_hierarchy_display_name(entity_type, entity):
+    """Build hierarchy display path from an already-loaded entity (matches EntityService.get_entity_hierarchy)."""
+    hierarchy_parts = []
+
+    if entity_type == EntityType.ns_branch.value:
+        if entity.country:
+            hierarchy_parts.append(entity.country.name)
+        hierarchy_parts.append(entity.name)
+
+    elif entity_type == EntityType.ns_subbranch.value:
+        if entity.branch:
+            if entity.branch.country:
+                hierarchy_parts.append(entity.branch.country.name)
+            hierarchy_parts.append(entity.branch.name)
+        hierarchy_parts.append(entity.name)
+
+    elif entity_type == EntityType.department.value:
+        if entity.division:
+            hierarchy_parts.append(entity.division.name)
+        hierarchy_parts.append(entity.name)
+
+    elif entity_type == EntityType.cluster_office.value:
+        if entity.regional_office:
+            hierarchy_parts.append(entity.regional_office.name)
+        hierarchy_parts.append(entity.name)
+
+    else:
+        hierarchy_parts.append(entity.name)
+
+    return " > ".join(hierarchy_parts) if hierarchy_parts else entity.name
+
+
 # === Entity Permission Management Routes ===
 
 @bp.route("/users/<int:user_id>/entities", methods=["GET"])
@@ -30,14 +63,19 @@ def get_user_entities(user_id):
     entity_permissions = UserEntityPermission.query.filter_by(user_id=user_id).all()
 
     entities_data = []
+    pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+    prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=True)
+    hierarchy_names = EntityService.batch_entity_names(
+        pairs, include_hierarchy=True, prefetched=prefetched,
+    )
     for perm in entity_permissions:
-        entity = EntityService.get_entity(perm.entity_type, perm.entity_id)
+        entity = prefetched.get((perm.entity_type, perm.entity_id))
         if entity:
             entities_data.append({
                 'permission_id': perm.id,
                 'entity_type': perm.entity_type,
                 'entity_id': perm.entity_id,
-                'entity_name': EntityService.get_entity_name(perm.entity_type, perm.entity_id, include_hierarchy=True)
+                'entity_name': hierarchy_names.get((perm.entity_type, perm.entity_id), entity.name),
             })
 
     return json_ok(entities=entities_data)
@@ -168,29 +206,46 @@ def search_entities():
                 })
 
         elif entity_type == EntityType.ns_branch.value:
-            entities = NSBranch.query.join(Country).filter(
-                db.or_(
-                    NSBranch.name.ilike(safe_pattern),
-                    Country.name.ilike(safe_pattern)
+            entities = (
+                NSBranch.query
+                .join(Country)
+                .options(contains_eager(NSBranch.country))
+                .filter(
+                    db.or_(
+                        NSBranch.name.ilike(safe_pattern),
+                        Country.name.ilike(safe_pattern)
+                    )
                 )
-            ).order_by(Country.name, NSBranch.name).limit(20).all()
+                .order_by(Country.name, NSBranch.name)
+                .limit(20)
+                .all()
+            )
             for entity in entities:
                 results.append({
                     'id': entity.id,
                     'name': entity.name,
-                    'display_name': EntityService.get_entity_name(entity_type, entity.id, include_hierarchy=True),
+                    'display_name': _search_hierarchy_display_name(entity_type, entity),
                     'entity_type': entity_type
                 })
 
         elif entity_type == EntityType.ns_subbranch.value:
-            entities = NSSubBranch.query.join(NSBranch).join(Country).filter(
-                NSSubBranch.name.ilike(safe_pattern)
-            ).order_by(Country.name, NSBranch.name, NSSubBranch.name).limit(20).all()
+            entities = (
+                NSSubBranch.query
+                .join(NSBranch)
+                .join(Country)
+                .options(
+                    contains_eager(NSSubBranch.branch).contains_eager(NSBranch.country)
+                )
+                .filter(NSSubBranch.name.ilike(safe_pattern))
+                .order_by(Country.name, NSBranch.name, NSSubBranch.name)
+                .limit(20)
+                .all()
+            )
             for entity in entities:
                 results.append({
                     'id': entity.id,
                     'name': entity.name,
-                    'display_name': EntityService.get_entity_name(entity_type, entity.id, include_hierarchy=True),
+                    'display_name': _search_hierarchy_display_name(entity_type, entity),
                     'entity_type': entity_type
                 })
 
@@ -207,17 +262,25 @@ def search_entities():
                 })
 
         elif entity_type == EntityType.department.value:
-            entities = SecretariatDepartment.query.join(SecretariatDivision).filter(
-                db.or_(
-                    SecretariatDepartment.name.ilike(safe_pattern),
-                    SecretariatDivision.name.ilike(safe_pattern)
+            entities = (
+                SecretariatDepartment.query
+                .join(SecretariatDivision)
+                .options(contains_eager(SecretariatDepartment.division))
+                .filter(
+                    db.or_(
+                        SecretariatDepartment.name.ilike(safe_pattern),
+                        SecretariatDivision.name.ilike(safe_pattern)
+                    )
                 )
-            ).order_by(SecretariatDivision.name, SecretariatDepartment.name).limit(20).all()
+                .order_by(SecretariatDivision.name, SecretariatDepartment.name)
+                .limit(20)
+                .all()
+            )
             for entity in entities:
                 results.append({
                     'id': entity.id,
                     'name': entity.name,
-                    'display_name': EntityService.get_entity_name(entity_type, entity.id, include_hierarchy=True),
+                    'display_name': _search_hierarchy_display_name(entity_type, entity),
                     'entity_type': entity_type
                 })
 
@@ -234,17 +297,25 @@ def search_entities():
                 })
 
         elif entity_type == EntityType.cluster_office.value:
-            entities = SecretariatClusterOffice.query.join(SecretariatRegionalOffice).filter(
-                db.or_(
-                    SecretariatClusterOffice.name.ilike(safe_pattern),
-                    SecretariatRegionalOffice.name.ilike(safe_pattern)
+            entities = (
+                SecretariatClusterOffice.query
+                .join(SecretariatRegionalOffice)
+                .options(contains_eager(SecretariatClusterOffice.regional_office))
+                .filter(
+                    db.or_(
+                        SecretariatClusterOffice.name.ilike(safe_pattern),
+                        SecretariatRegionalOffice.name.ilike(safe_pattern)
+                    )
                 )
-            ).order_by(SecretariatRegionalOffice.name, SecretariatClusterOffice.name).limit(20).all()
+                .order_by(SecretariatRegionalOffice.name, SecretariatClusterOffice.name)
+                .limit(20)
+                .all()
+            )
             for entity in entities:
                 results.append({
                     'id': entity.id,
                     'name': entity.name,
-                    'display_name': EntityService.get_entity_name(entity_type, entity.id, include_hierarchy=True),
+                    'display_name': _search_hierarchy_display_name(entity_type, entity),
                     'entity_type': entity_type
                 })
 

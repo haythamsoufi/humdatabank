@@ -13,7 +13,8 @@ from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_ok, require_json_data
 from app.utils.request_utils import is_json_request
 from app.forms.system.indicator_lookup_forms import IndicatorBankTypeForm, IndicatorBankUnitForm
-from app.models import FormItem, IndicatorBank, IndicatorBankType, IndicatorBankUnit
+from app.forms.system.indicator_spef_forms import IndicatorBankSpefForm
+from app.models import FormItem, IndicatorBank, IndicatorBankSpef, IndicatorBankType, IndicatorBankUnit
 from app.routes.admin.shared import permission_required
 from app.routes.admin.system_admin import bp
 from app.utils.transactions import request_transaction_rollback
@@ -37,6 +38,31 @@ def _type_usage_count(tid: int) -> int:
     return int(b or 0) + int(f or 0)
 
 
+def batch_type_usage_counts(ids: list[int]) -> dict[int, int]:
+    """Return IndicatorBank + FormItem usage counts for many type IDs (2 queries)."""
+    if not ids:
+        return {}
+    counts = {i: 0 for i in ids}
+    for tid, cnt in (
+        db.session.query(IndicatorBank.indicator_type_id, func.count(IndicatorBank.id))
+        .filter(IndicatorBank.indicator_type_id.in_(ids))
+        .group_by(IndicatorBank.indicator_type_id)
+        .all()
+    ):
+        counts[tid] = counts.get(tid, 0) + int(cnt or 0)
+    for tid, cnt in (
+        db.session.query(FormItem.indicator_type_id, func.count(FormItem.id))
+        .filter(
+            FormItem.item_type == "indicator",
+            FormItem.indicator_type_id.in_(ids),
+        )
+        .group_by(FormItem.indicator_type_id)
+        .all()
+    ):
+        counts[tid] = counts.get(tid, 0) + int(cnt or 0)
+    return counts
+
+
 def _unit_usage_count(uid: int) -> int:
     b = (
         db.session.query(func.count(IndicatorBank.id))
@@ -52,6 +78,31 @@ def _unit_usage_count(uid: int) -> int:
         .scalar()
     )
     return int(b or 0) + int(f or 0)
+
+
+def batch_unit_usage_counts(ids: list[int]) -> dict[int, int]:
+    """Return IndicatorBank + FormItem usage counts for many unit IDs (2 queries)."""
+    if not ids:
+        return {}
+    counts = {i: 0 for i in ids}
+    for uid, cnt in (
+        db.session.query(IndicatorBank.indicator_unit_id, func.count(IndicatorBank.id))
+        .filter(IndicatorBank.indicator_unit_id.in_(ids))
+        .group_by(IndicatorBank.indicator_unit_id)
+        .all()
+    ):
+        counts[uid] = counts.get(uid, 0) + int(cnt or 0)
+    for uid, cnt in (
+        db.session.query(FormItem.indicator_unit_id, func.count(FormItem.id))
+        .filter(
+            FormItem.item_type == "indicator",
+            FormItem.indicator_unit_id.in_(ids),
+        )
+        .group_by(FormItem.indicator_unit_id)
+        .all()
+    ):
+        counts[uid] = counts.get(uid, 0) + int(cnt or 0)
+    return counts
 
 
 def _wants_json_post() -> bool:
@@ -92,22 +143,7 @@ def manage_measurement_lookups():
             _("Added missing unit: National Society (code %(code)s).", code="ns"),
             "info",
         )
-    types = (
-        IndicatorBankType.query.order_by(IndicatorBankType.sort_order, IndicatorBankType.name).all()
-    )
-    units = (
-        IndicatorBankUnit.query.order_by(IndicatorBankUnit.sort_order, IndicatorBankUnit.name).all()
-    )
-    ucount = {t.id: _type_usage_count(t.id) for t in types}
-    vcount = {u.id: _unit_usage_count(u.id) for u in units}
-    return render_template(
-        "admin/indicator_bank/measurement_lookups.html",
-        title="Indicator types & units",
-        types=types,
-        units=units,
-        type_usage=ucount,
-        unit_usage=vcount,
-    )
+    return redirect(url_for("system_admin.manage_indicator_bank", tab="types"))
 
 
 @bp.route(
@@ -232,7 +268,7 @@ def new_measurement_type():
                 form_action_url=new_url,
                 usage_count=0,
             )
-        return redirect(url_for("system_admin.manage_measurement_lookups", new_type=1))
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="types", new_type=1))
     if not form.validate_on_submit():
         if _wants_json_post():
             return (
@@ -277,7 +313,7 @@ def new_measurement_type():
         if _wants_json_post():
             return json_ok(message=_("Measurement type created."))
         flash("Measurement type created.", "success")
-        return redirect(url_for("system_admin.manage_measurement_lookups"))
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="types"))
     except Exception as e:
         request_transaction_rollback()
         current_app.logger.error("new_measurement_type: %s", e, exc_info=True)
@@ -302,7 +338,7 @@ def edit_measurement_type(tid: int):
     ucount = _type_usage_count(tid)
     if request.method == "GET":
         if request.args.get("partial") != "1":
-            return redirect(url_for("system_admin.manage_measurement_lookups", edit_type=tid))
+            return redirect(url_for("system_admin.manage_indicator_bank", tab="types", edit_type=tid))
         form.code.data = row.code
         form.name.data = row.name
         form.sort_order.data = row.sort_order
@@ -384,7 +420,7 @@ def edit_measurement_type(tid: int):
             if _wants_json_post():
                 return json_ok(message=_("Measurement type saved."))
             flash("Measurement type saved.", "success")
-            return redirect(url_for("system_admin.manage_measurement_lookups"))
+            return redirect(url_for("system_admin.manage_indicator_bank", tab="types"))
         except Exception as e:
             request_transaction_rollback()
             current_app.logger.error("edit_measurement_type: %s", e, exc_info=True)
@@ -417,7 +453,7 @@ def new_measurement_unit():
                 delete_url=None,
                 usage_count=0,
             )
-        return redirect(url_for("system_admin.manage_measurement_lookups", new_unit=1))
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="units", new_unit=1))
     if not form.validate_on_submit():
         if _wants_json_post():
             return (
@@ -464,7 +500,7 @@ def new_measurement_unit():
         if _wants_json_post():
             return json_ok(message=_("Unit created."))
         flash("Unit created.", "success")
-        return redirect(url_for("system_admin.manage_measurement_lookups"))
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="units"))
     except Exception as e:
         request_transaction_rollback()
         current_app.logger.error("new_measurement_unit: %s", e, exc_info=True)
@@ -490,7 +526,7 @@ def edit_measurement_unit(uid: int):
     ucount = _unit_usage_count(uid)
     if request.method == "GET":
         if request.args.get("partial") != "1":
-            return redirect(url_for("system_admin.manage_measurement_lookups", edit_unit=uid))
+            return redirect(url_for("system_admin.manage_indicator_bank", tab="units", edit_unit=uid))
         form.code.data = row.code
         form.name.data = row.name
         form.sort_order.data = row.sort_order
@@ -578,7 +614,7 @@ def edit_measurement_unit(uid: int):
             if _wants_json_post():
                 return json_ok(message=_("Unit saved."))
             flash("Unit saved.", "success")
-            return redirect(url_for("system_admin.manage_measurement_lookups"))
+            return redirect(url_for("system_admin.manage_indicator_bank", tab="units"))
         except Exception as e:
             request_transaction_rollback()
             current_app.logger.error("edit_measurement_unit: %s", e, exc_info=True)
@@ -606,7 +642,7 @@ def delete_measurement_unit(uid: int):
                 _("This unit is still used by one or more indicators and cannot be deleted.")
             )
         flash(_("This unit is still used by one or more indicators and cannot be deleted."), "danger")
-        return redirect(url_for("system_admin.manage_measurement_lookups", edit_unit=uid))
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="units", edit_unit=uid))
     try:
         db.session.delete(row)
         db.session.commit()
@@ -619,5 +655,256 @@ def delete_measurement_unit(uid: int):
         if is_json_request():
             return json_bad_request(_("Could not delete unit."))
         flash(_("Could not delete unit."), "danger")
-        return redirect(url_for("system_admin.manage_measurement_lookups", edit_unit=uid))
-    return redirect(url_for("system_admin.manage_measurement_lookups"))
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="units", edit_unit=uid))
+    return redirect(url_for("system_admin.manage_indicator_bank", tab="units"))
+
+
+def _spef_usage_count(sid: int) -> int:
+    return int(
+        db.session.query(func.count(IndicatorBank.id))
+        .filter(IndicatorBank.indicator_spef_id == sid)
+        .scalar()
+        or 0
+    )
+
+
+def batch_spef_usage_counts(ids: list[int]) -> dict[int, int]:
+    """Return IndicatorBank usage counts for many SP/EF IDs (1 query)."""
+    if not ids:
+        return {}
+    counts = {i: 0 for i in ids}
+    for sid, cnt in (
+        db.session.query(IndicatorBank.indicator_spef_id, func.count(IndicatorBank.id))
+        .filter(IndicatorBank.indicator_spef_id.in_(ids))
+        .group_by(IndicatorBank.indicator_spef_id)
+        .all()
+    ):
+        counts[sid] = int(cnt or 0)
+    return counts
+
+
+def _spef_partial(
+    form,
+    *,
+    is_edit: bool,
+    row,
+    form_action_url: str,
+    delete_url: Optional[str] = None,
+    usage_count: int = 0,
+) -> str:
+    return render_template(
+        "admin/indicator_bank/measurement_lookup_spef_form_partial.html",
+        form=form,
+        is_edit=is_edit,
+        row=row,
+        usage_count=usage_count,
+        modal=True,
+        form_action_url=form_action_url,
+        delete_url=delete_url,
+    )
+
+
+@bp.route(
+    "/indicator-bank/spef-lookups/<int:sid>/translations",
+    methods=["POST"],
+)
+@permission_required("admin.indicator_bank.edit")
+def api_patch_spef_translations(sid: int):
+    if not is_json_request():
+        return json_bad_request("JSON body required")
+    data = get_json_safe() or {}
+    err = require_json_data(data)
+    if err:
+        return err
+    row = IndicatorBankSpef.query.get_or_404(sid)
+    incoming = data.get("translations")
+    if not isinstance(incoming, dict):
+        return json_bad_request("Expected object with key `translations` (map of language code to string).")
+    allowed = {
+        str(c).strip().lower().split("_", 1)[0].split("-", 1)[0]
+        for c in (current_app.config.get("TRANSLATABLE_LANGUAGES") or getattr(Config, "TRANSLATABLE_LANGUAGES", []) or [])
+    }
+    for lang, val in incoming.items():
+        if not isinstance(lang, str) or not lang:
+            continue
+        lc = lang.strip().lower().split("_", 1)[0].split("-", 1)[0]
+        if lc not in allowed or lc == "en":
+            continue
+        row.set_name_translation(lc, (val or "") if isinstance(val, str) else str(val or ""))
+    flag_modified(row, "name_translations")
+    db.session.add(row)
+    db.session.commit()
+    return json_ok(message="ok")
+
+
+@bp.route("/indicator-bank/spef-lookups/new", methods=["GET", "POST"])
+@permission_required("admin.indicator_bank.edit")
+def new_spef_lookup():
+    form = IndicatorBankSpefForm()
+    new_url = url_for("system_admin.new_spef_lookup")
+    if request.method == "GET":
+        if request.args.get("partial") == "1":
+            return _spef_partial(
+                form,
+                is_edit=False,
+                row=None,
+                form_action_url=new_url,
+                usage_count=0,
+            )
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", new_spef=1))
+    if not form.validate_on_submit():
+        if _wants_json_post():
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "errors": form.errors,
+                        "form_html": _spef_partial(
+                            form,
+                            is_edit=False,
+                            row=None,
+                            form_action_url=new_url,
+                            usage_count=0,
+                        ),
+                    }
+                ),
+                400,
+            )
+        flash("Could not create SP/EF entry.", "danger")
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="spef"))
+    try:
+        code = (form.code.data or "").strip().upper()
+        row = IndicatorBankSpef(
+            code=code,
+            name=(form.name.data or "").strip(),
+            sort_order=form.sort_order.data or 0,
+            is_active=form.is_active.data,
+        )
+        langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or getattr(
+            Config, "TRANSLATABLE_LANGUAGES", []
+        ) or []
+        for lang in langs:
+            field = getattr(form, f"name_{lang}", None)
+            if field is not None:
+                row.set_name_translation(lang, field.data or "")
+        db.session.add(row)
+        db.session.commit()
+        if _wants_json_post():
+            return json_ok(message=_("SP/EF entry created."))
+        flash(_("SP/EF entry created."), "success")
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="spef"))
+    except Exception as e:
+        request_transaction_rollback()
+        current_app.logger.error("new_spef_lookup: %s", e, exc_info=True)
+        if _wants_json_post():
+            return json_bad_request(_("Could not create SP/EF entry."))
+        flash(_("Could not create SP/EF entry."), "danger")
+    return redirect(url_for("system_admin.manage_indicator_bank", tab="spef"))
+
+
+@bp.route("/indicator-bank/spef-lookups/<int:sid>/edit", methods=["GET", "POST"])
+@permission_required("admin.indicator_bank.edit")
+def edit_spef_lookup(sid: int):
+    row = IndicatorBankSpef.query.get_or_404(sid)
+    form = IndicatorBankSpefForm(editing_id=sid)
+    p_url = url_for("system_admin.edit_spef_lookup", sid=sid)
+    d_url = url_for("system_admin.delete_spef_lookup", sid=sid)
+    ucount = _spef_usage_count(sid)
+    if request.method == "GET":
+        if request.args.get("partial") != "1":
+            return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", edit_spef=sid))
+        form.code.data = row.code
+        form.name.data = row.name
+        form.sort_order.data = row.sort_order
+        form.is_active.data = row.is_active
+        translations = row.name_translations if isinstance(row.name_translations, dict) else {}
+        for lang in current_app.config.get("TRANSLATABLE_LANGUAGES") or []:
+            f = getattr(form, f"name_{lang}", None)
+            if f is not None:
+                f.data = translations.get(lang, "")
+        return _spef_partial(
+            form,
+            is_edit=True,
+            row=row,
+            form_action_url=p_url,
+            delete_url=d_url,
+            usage_count=ucount,
+        )
+    if not form.validate_on_submit():
+        if _wants_json_post():
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "errors": form.errors,
+                        "form_html": _spef_partial(
+                            form,
+                            is_edit=True,
+                            row=row,
+                            form_action_url=p_url,
+                            delete_url=d_url,
+                            usage_count=ucount,
+                        ),
+                    }
+                ),
+                400,
+            )
+        flash(_("Could not save SP/EF entry."), "danger")
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", edit_spef=sid))
+    try:
+        if ucount == 0:
+            row.code = (form.code.data or "").strip().upper()
+        row.name = (form.name.data or "").strip()
+        row.sort_order = form.sort_order.data or 0
+        row.is_active = form.is_active.data
+        langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or getattr(
+            Config, "TRANSLATABLE_LANGUAGES", []
+        ) or []
+        for lang in langs:
+            field = getattr(form, f"name_{lang}", None)
+            if field is not None:
+                row.set_name_translation(lang, field.data or "")
+        db.session.add(row)
+        db.session.flush()
+        for ind in IndicatorBank.query.filter_by(indicator_spef_id=sid).all():
+            ind.sync_spef_columns()
+            db.session.add(ind)
+        db.session.commit()
+        if _wants_json_post():
+            return json_ok(message=_("SP/EF entry saved."))
+        flash(_("SP/EF entry saved."), "success")
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="spef"))
+    except Exception as e:
+        request_transaction_rollback()
+        current_app.logger.error("edit_spef_lookup: %s", e, exc_info=True)
+        if _wants_json_post():
+            return json_bad_request(_("Could not save SP/EF entry."))
+        flash(_("Could not save SP/EF entry."), "danger")
+    return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", edit_spef=sid))
+
+
+@bp.route("/indicator-bank/spef-lookups/<int:sid>/delete", methods=["POST"])
+@permission_required("admin.indicator_bank.edit")
+def delete_spef_lookup(sid: int):
+    row = IndicatorBankSpef.query.get_or_404(sid)
+    if _spef_usage_count(sid) > 0:
+        if is_json_request():
+            return json_bad_request(
+                _("This SP/EF code is still used by one or more indicators and cannot be deleted.")
+            )
+        flash(_("This SP/EF code is still used by one or more indicators and cannot be deleted."), "danger")
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", edit_spef=sid))
+    try:
+        db.session.delete(row)
+        db.session.commit()
+        if is_json_request():
+            return json_ok(message=_("SP/EF entry deleted."))
+        flash(_("SP/EF entry deleted."), "success")
+    except Exception as e:
+        request_transaction_rollback()
+        current_app.logger.error("delete_spef_lookup: %s", e, exc_info=True)
+        if is_json_request():
+            return json_bad_request(_("Could not delete SP/EF entry."))
+        flash(_("Could not delete SP/EF entry."), "danger")
+        return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", edit_spef=sid))
+    return redirect(url_for("system_admin.manage_indicator_bank", tab="spef"))

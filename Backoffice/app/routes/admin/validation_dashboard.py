@@ -5,7 +5,12 @@ from flask_login import login_required, current_user
 
 from app import db
 from app.routes.admin import bp
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import (
+    VALIDATION_DASHBOARD_PERMISSION,
+    VALIDATION_DISPATCH_PERMISSIONS,
+    permission_required,
+    permission_required_any,
+)
 from app.services.validation_check_service import run_validation_checks
 from app.services.validation_dispatch_service import preview_dispatch, send_dispatch
 from app.services.validation_dashboard_service import (
@@ -23,7 +28,7 @@ from app.utils.request_validation import enforce_csrf_json
 
 @bp.route("/validation-dashboard", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard():
     return render_template(
         "admin/validation_dashboard.html",
@@ -35,7 +40,7 @@ def validation_dashboard():
 
 @bp.route("/validation-dashboard/api/periods", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_periods_api():
     template_id = request.args.get("template_id", type=int)
     if not template_id:
@@ -45,7 +50,7 @@ def validation_dashboard_periods_api():
 
 @bp.route("/validation-dashboard/api/countries", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_countries_api():
     template_id = request.args.get("template_id", type=int)
     period = request.args.get("period", type=str)
@@ -56,7 +61,7 @@ def validation_dashboard_countries_api():
 
 @bp.route("/validation-dashboard/api/tracker", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_tracker_api():
     template_id = request.args.get("template_id", type=int)
     period = request.args.get("period", type=str)
@@ -67,7 +72,7 @@ def validation_dashboard_tracker_api():
 
 @bp.route("/validation-dashboard/api/summary", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_summary_api():
     template_id = request.args.get("template_id", type=int)
     period = request.args.get("period", type=str)
@@ -78,7 +83,7 @@ def validation_dashboard_summary_api():
 
 @bp.route("/validation-dashboard/api/preview", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_preview_api():
     template_id = request.args.get("template_id", type=int)
     period = request.args.get("period", type=str)
@@ -96,7 +101,7 @@ def validation_dashboard_preview_api():
 
 @bp.route("/validation-dashboard/run-checks", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_run_checks():
     csrf_error = enforce_csrf_json()
     if csrf_error:
@@ -142,7 +147,7 @@ def validation_dashboard_run_checks():
 
 @bp.route("/validation-dashboard/dispatch/send", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required_any(*VALIDATION_DISPATCH_PERMISSIONS)
 def validation_dashboard_dispatch_send():
     csrf_error = enforce_csrf_json()
     if csrf_error:
@@ -168,7 +173,7 @@ def validation_dashboard_dispatch_send():
 
 @bp.route("/validation-dashboard/dispatch/preview", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required_any(*VALIDATION_DISPATCH_PERMISSIONS)
 def validation_dashboard_dispatch_preview():
     csrf_error = enforce_csrf_json()
     if csrf_error:

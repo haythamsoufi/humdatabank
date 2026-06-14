@@ -297,11 +297,14 @@ class User(UserMixin, db.Model):
 
         permissions = query.all()
 
-        # Import entity service to fetch actual objects
         from app.services.entity_service import EntityService
+
+        pairs = [(perm.entity_type, perm.entity_id) for perm in permissions]
+        prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
+
         entities = []
         for perm in permissions:
-            entity = EntityService.get_entity(perm.entity_type, perm.entity_id)
+            entity = prefetched.get((perm.entity_type, perm.entity_id))
             if entity:
                 entities.append(entity)
 

@@ -271,6 +271,38 @@ USER_GUIDES_COMMON_ADMIN_ONLY_STEMS: frozenset[str] = frozenset(
     }
 )
 
+# User-guide stems that describe AI features; hidden when AI beta access is restricted
+# and the viewer is not on the allow-list (see manage_settings AI Beta Access).
+USER_GUIDES_AI_DOC_STEMS: frozenset[str] = frozenset(
+    {
+        "ai-use-policy",
+        "ai-chatbot",
+        "ai-document-library-and-embeddings",
+        "ai-system-security-and-privacy",
+    }
+)
+
+
+def user_guides_ai_doc_requires_beta_access(base_rel: str) -> bool:
+    """True if base_rel (language-agnostic, ends with .md) is an AI feature guide."""
+    parts = Path(base_rel).parts
+    if len(parts) < 3:
+        return False
+    if parts[0] != "user-guides" or parts[1] not in ("common", "admin"):
+        return False
+    return Path(base_rel).stem in USER_GUIDES_AI_DOC_STEMS
+
+
+def _user_can_view_ai_docs(user) -> bool:
+    """Return whether AI documentation topics may be shown to this user."""
+    try:
+        from app.services.app_settings_service import user_has_ai_beta_access
+
+        return bool(user_has_ai_beta_access(user))
+    except Exception as e:
+        current_app.logger.debug("_user_can_view_ai_docs failed: %s", e)
+        return True
+
 
 def _user_is_admin_or_system_manager(user) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
@@ -354,6 +386,9 @@ def ensure_doc_page_access(
         abort(403)
 
     if user_guides_common_doc_requires_admin(base_rel) and not _user_is_admin_or_system_manager(user):
+        abort(403)
+
+    if user_guides_ai_doc_requires_beta_access(base_rel) and not _user_can_view_ai_docs(user):
         abort(403)
 
 
@@ -489,6 +524,9 @@ def build_hierarchical_nav(
                 continue
 
         if user_guides_common_doc_requires_admin(base_rel) and not _user_is_admin_or_system_manager(user):
+            continue
+
+        if user_guides_ai_doc_requires_beta_access(base_rel) and not _user_can_view_ai_docs(user):
             continue
 
         chosen_path = _pick_variant(paths_by_lang, lang=lang)

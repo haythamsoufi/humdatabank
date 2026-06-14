@@ -119,11 +119,20 @@ def approve_all_access_requests():
     if not pending:
         return mobile_ok(message='No pending requests to approve', data={'approved_count': 0})
 
+    user_ids = {req.user_id for req in pending}
+    country_ids = {req.country_id for req in pending}
+    users_by_id = {
+        u.id: u for u in UserModel.query.filter(UserModel.id.in_(user_ids)).all()
+    } if user_ids else {}
+    countries_by_id = {
+        c.id: c for c in Country.query.filter(Country.id.in_(country_ids)).all()
+    } if country_ids else {}
+
     approved_count = 0
     try:
         for req in pending:
-            user = UserModel.query.get(req.user_id)
-            country = Country.query.get(req.country_id)
+            user = users_by_id.get(req.user_id)
+            country = countries_by_id.get(req.country_id)
             if user and country:
                 user.add_entity_permission(entity_type='country', entity_id=country.id)
                 req.status = 'approved'

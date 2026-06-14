@@ -124,7 +124,10 @@ class ExcelService:
         output = io.BytesIO()
         workbook.save(output)
         output.seek(0)
-        filename = f"data_entry_{aes.country.iso3}_{aes.assigned_form.period_name.replace(' ', '_')}.xlsx"
+        from app.utils.api_serialization import _country_for_aes
+        country = _country_for_aes(aes)
+        iso3 = country.iso3 if country else "unknown"
+        filename = f"data_entry_{iso3}_{aes.assigned_form.period_name.replace(' ', '_')}.xlsx"
         return output, filename
 
     @staticmethod

@@ -1,0 +1,180 @@
+{% from "macros/excel_io_modal.html" import excel_io_modal %}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+{% from "components/ag_grid_includes.html" import ag_grid_container %}
+
+<div class="relative">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <form method="GET" action="{{ url_for('system_admin.manage_indicator_bank') }}" class="flex-1 min-w-[12rem] max-w-sm">
+            <input type="hidden" name="tab" value="common_words">
+            <input type="text"
+                   name="search"
+                   value="{{ search }}"
+                   placeholder="{{ _('Search terms or meanings…') }}"
+                   class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
+        </form>
+        <div class="flex flex-wrap items-center justify-end gap-3">
+            <button type="button"
+                    class="btn btn-sm btn-secondary"
+                    data-excel-io-open="common-words-excel-modal"
+                    title="{{ _('Export or import common words from Excel') }}">
+                <i class="fas fa-file-excel mr-1"></i>{{ _('Export/Import') }}
+            </button>
+            <button type="button" id="cwAddBtn" class="btn btn-sm btn-success">
+                <i class="fas fa-plus mr-1"></i>{{ _('Add common word') }}
+            </button>
+            <div id="commonWordsGrid-colvis" class="flex-shrink-0"></div>
+        </div>
+    </div>
+    {{ ag_grid_container(
+        'commonWordsGrid',
+        loading_text=_('Loading common words...'),
+        grid_height='600px',
+        placeholder_id='commonWordsGrid-colvis',
+        include_card=false,
+        show_placeholder=False,
+        empty_message=_('No common words found.')
+    ) }}
+</div>
+
+{% set _cw_export_tab %}
+<div class="space-y-4">
+    <p class="text-sm text-gray-600">
+        {{ _('Download all common words as an Excel spreadsheet, or use the template to prepare a new import file.') }}
+    </p>
+    <a href="{{ url_for('system_admin.export_common_words') }}"
+       class="btn btn-success w-full">
+        <i class="fas fa-download mr-2"></i>{{ _('Export to Excel') }}
+    </a>
+    <a href="{{ url_for('system_admin.download_common_words_template') }}"
+       class="btn btn-secondary w-full">
+        <i class="fas fa-file-download mr-2"></i>{{ _('Download Excel Template') }}
+    </a>
+</div>
+{% endset %}
+
+{% set _cw_import_tab %}
+<div class="mb-4">
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <ul class="text-sm text-blue-800 space-y-2">
+            <li><strong>{{ _('Format') }}:</strong> {{ _('Excel file (.xlsx) with columns: Term, Meaning, French, Spanish, Arabic, Chinese, Russian, Hindi, Active') }}</li>
+            <li><strong>{{ _('Term') }}:</strong> {{ _('Required — the word or phrase to highlight') }}</li>
+            <li><strong>{{ _('Meaning') }}:</strong> {{ _('Required — English definition') }}</li>
+            <li><strong>{{ _('Language columns') }}:</strong> {{ _('Optional translations in different languages') }}</li>
+            <li><strong>{{ _('Active') }}:</strong> {{ _('Optional — TRUE/FALSE (default: TRUE)') }}</li>
+        </ul>
+    </div>
+</div>
+
+<form id="importForm" method="POST" action="{{ url_for('system_admin.import_common_words') }}" enctype="multipart/form-data" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% call excel_import_dropzone(
+        'common-words-import-dropzone',
+        input_id='excel_file',
+        input_name='excel_file',
+        show_status_panel=false
+    ) %}{% endcall %}
+
+    <label class="flex items-center">
+        <input type="checkbox"
+               id="overwrite_existing"
+               name="overwrite_existing"
+               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+        <span class="ml-2 text-sm text-gray-700">{{ _('Overwrite existing terms if they already exist') }}</span>
+    </label>
+
+    <button type="submit" class="btn btn-success w-full">
+        <i class="fas fa-upload mr-2"></i>{{ _('Import Common Words') }}
+    </button>
+</form>
+{% endset %}
+
+{% call excel_io_modal(
+    'common-words-excel-modal',
+    modal_title=_('Common Words — Excel'),
+    max_width='max-w-2xl',
+    close_id='close-common-words-excel-modal-btn',
+    layout='tabs',
+    show_export=true,
+    show_import=true,
+    tab_export=_cw_export_tab,
+    tab_import=_cw_import_tab
+) %}{% endcall %}
+
+{% from "macros/modal_shell.html" import modal_shell %}
+{% call modal_shell('editModal', _('Edit Common Word'), max_width='max-w-4xl', close_id='close-edit-modal-btn') %}
+    <p id="modalSubtitle" class="text-sm text-gray-600 mb-4">{{ _('Editing') }}: <span id="editTermDisplay" class="font-medium"></span></p>
+    <form id="editForm" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" id="edit_id" name="id">
+
+        <div class="mb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Basic Information') }}</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="edit_term" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ _('Term') }} *
+                    </label>
+                    <input type="text"
+                           id="edit_term"
+                           name="term"
+                           required
+                           placeholder="{{ _('Enter the term or phrase') }}"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div class="flex items-end pb-2">
+                    <label class="flex items-center">
+                        <input type="checkbox"
+                               id="edit_is_active"
+                               name="is_active"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <span class="ml-2 text-sm text-gray-700">{{ _('Active') }}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <label for="edit_meaning" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Meaning') }} *
+                </label>
+                <textarea id="edit_meaning"
+                          name="meaning"
+                          required
+                          rows="4"
+                          placeholder="{{ _('Enter the meaning or definition') }}"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Multilingual Meanings') }}</h3>
+            <p class="text-sm text-gray-600 mb-4">{{ _('Provide translations of the meaning in different languages (optional)') }}</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                <div class="{% if code in ['ar','fa','he','ur'] %}md:col-span-2{% endif %}">
+                    <label for="edit_meaning_{{ code }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                    </label>
+                    <textarea id="edit_meaning_{{ code }}"
+                              name="meaning_{{ code }}"
+                              rows="3"
+                              placeholder="{{ _('Enter translation') }}"
+                              {% if code in ['ar','fa','he','ur'] %}dir="rtl"{% endif %}
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button type="button" id="cancel-edit-modal-btn" class="btn btn-secondary">
+                {{ _('Cancel') }}
+            </button>
+            <button type="submit" id="submitButton" class="btn btn-primary">
+                {{ _('Update') }}
+            </button>
+        </div>
+    </form>
+{% endcall %}

@@ -1,0 +1,885 @@
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    const configEl = document.getElementById('auto-translate-config-json');
+    if (!configEl) return;
+    try {
+        const config = JSON.parse(configEl.textContent);
+        window.autoTranslateConfigSectors = {
+            title: config.title || null,
+            description: config.description || null,
+            endpoint: config.endpoint || null,
+            itemType: config.item_type || config.itemType || 'items',
+            permission_context: config.permission_context || config.permissionContext || null,
+            permission_code: config.permission_code || config.permissionCode || null
+        };
+    } catch (e) {
+        console.error('Failed to parse sectors auto-translate config:', e);
+    }
+})();
+</script>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    window.SECTORS_SUBSECTORS_AT_DATA = {
+        sectors: [
+            {% for s in sectors %}
+            {
+                id: {{ s.id }},
+                kind: 'sector',
+                name: {{ (s.name or '')|tojson|safe }},
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                {{ ('name_' ~ code)|tojson|safe }}: {{ ((s.name_translations or {}).get(code) or '')|tojson|safe }}{{ ',' if not loop.last else '' }}
+                {% endfor %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        subsectors: [
+            {% for s in subsectors %}
+            {
+                id: {{ s.id }},
+                kind: 'subsector',
+                name: {{ (s.name or '')|tojson|safe }},
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                {{ ('name_' ~ code)|tojson|safe }}: {{ ((s.name_translations or {}).get(code) or '')|tojson|safe }}{{ ',' if not loop.last else '' }}
+                {% endfor %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
+    };
+
+    const sectorEditUrlTpl = {{ url_for('system_admin.edit_sector', sector_id=0)|tojson|safe }};
+    const subsectorEditUrlTpl = {{ url_for('system_admin.edit_subsector', subsector_id=0)|tojson|safe }};
+
+    function sectorEditUrl(id) {
+        return sectorEditUrlTpl.replace(/\d+$/, String(id));
+    }
+    function subsectorEditUrl(id) {
+        return subsectorEditUrlTpl.replace(/\d+$/, String(id));
+    }
+
+    function getSectorsSubsectorsRows() {
+        const d = window.SECTORS_SUBSECTORS_AT_DATA || { sectors: [], subsectors: [] };
+        const out = [];
+        (d.sectors || []).forEach(function(r) { out.push(r); });
+        (d.subsectors || []).forEach(function(r) { out.push(r); });
+        return out;
+    }
+
+    function nameFieldForLang(lang) {
+        return lang ? ('name_' + lang) : null;
+    }
+
+    function patchRowNameFields(job, saveBody) {
+        const rows = getSectorsSubsectorsRows();
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].id === job.id && rows[i].kind === job.kind) {
+                Object.keys(saveBody).forEach(function(k) {
+                    if (k.indexOf('name_') === 0) {
+                        rows[i][k] = saveBody[k];
+                    }
+                });
+                break;
+            }
+        }
+    }
+
+    window.indicatorBankAutoTranslate = window.indicatorBankAutoTranslate || {};
+    window.indicatorBankAutoTranslate.sectors = {
+        getCounts: function(overwriteExisting, selectedMsgids) {
+        overwriteExisting = !!overwriteExisting;
+        const counts = {};
+        {% for lang_code in TRANSLATABLE_LANGUAGES %}
+        counts[{{ lang_code|tojson|safe }}] = 0;
+        {% endfor %}
+        try {
+            getSectorsSubsectorsRows().forEach(function(row) {
+                if (!row || !row.id) return;
+                const englishName = (row.name || '').trim();
+                const hasEnglishName = !!englishName;
+                if (!hasEnglishName) return;
+                Object.keys(counts).forEach(function(lang) {
+                    if (lang === 'en') return;
+                    const nf = nameFieldForLang(lang);
+                    if (!nf || !Object.prototype.hasOwnProperty.call(row, nf)) return;
+                    const nameValue = (row[nf] || '').trim();
+                    const hasNameTranslation = !!nameValue;
+                    if (overwriteExisting) {
+                        counts[lang]++;
+                    } else if (!hasNameTranslation) {
+                        counts[lang]++;
+                    }
+                });
+            });
+        } catch (err) {
+            console.error('Error calculating sector/sub-sector translation counts:', err);
+        }
+        return counts;
+        },
+
+        perform: function(selectedLanguages, selectedService) {
+        const overwriteExisting = typeof jQuery !== 'undefined' && jQuery('#overwrite-existing-translations').is(':checked');
+        const counts = window.getPageSpecificTranslationCounts(overwriteExisting);
+        const languagesNeedingTranslation = overwriteExisting
+            ? selectedLanguages
+            : selectedLanguages.filter(function(lang) { return counts[lang] > 0; });
+
+        const jobs = [];
+        getSectorsSubsectorsRows().forEach(function(row) {
+            if (!row || !row.id) return;
+            const englishName = (row.name || '').trim();
+            if (!englishName) return;
+            const langsForRow = [];
+            languagesNeedingTranslation.forEach(function(lang) {
+                if (lang === 'en') return;
+                const nf = nameFieldForLang(lang);
+                if (!nf || !Object.prototype.hasOwnProperty.call(row, nf)) return;
+                const cur = (row[nf] || '').trim();
+                const need = overwriteExisting ? true : !cur;
+                if (need) {
+                    langsForRow.push(lang);
+                }
+            });
+            if (langsForRow.length) {
+                jobs.push({
+                    id: row.id,
+                    kind: row.kind,
+                    text: englishName,
+                    languages: langsForRow
+                });
+            }
+        });
+
+        if (!jobs.length) {
+            if (window.autoTranslateModal) {
+                window.autoTranslateModal.logProgress({{ _('No sectors or sub-sectors found that need translation')|tojson|safe }}, 'info');
+                window.autoTranslateModal.translationState.isRunning = false;
+            }
+            if (typeof jQuery !== 'undefined') {
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+            }
+            return;
+        }
+
+        if (window.autoTranslateModal) {
+            window.autoTranslateModal.translationState.totalItems = jobs.length;
+            window.autoTranslateModal.updateProgress();
+            window.autoTranslateModal.logProgress(
+                {{ _('Starting')|tojson|safe }} + ' ' + jobs.length + ' ' + {{ _('sector/sub-sector batch(es), all selected languages per item...')|tojson|safe }},
+                'info'
+            );
+        }
+
+        processNextSectorsSubsectorJob(jobs, 0, languagesNeedingTranslation, selectedService || 'ifrc');
+        }
+    };
+
+    function processNextSectorsSubsectorJob(jobs, index, selectedLanguages, selectedService) {
+        const state = (window.autoTranslateModal && window.autoTranslateModal.translationState) || null;
+        if (index >= jobs.length || (state && state.shouldStop)) {
+            if (window.autoTranslateModal) {
+                window.autoTranslateModal.translationState.isRunning = false;
+                if (state && state.shouldStop) {
+                    window.autoTranslateModal.logProgress({{ _('Translation stopped by user.')|tojson|safe }}, 'info');
+                } else {
+                    window.autoTranslateModal.logProgress({{ _('Translation completed!')|tojson|safe }}, 'success');
+                }
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                if (window.autoTranslateModal.notifyCompletion) {
+                    window.autoTranslateModal.notifyCompletion();
+                }
+            }
+            return;
+        }
+
+        if (state && state.isPaused) {
+            setTimeout(function() {
+                processNextSectorsSubsectorJob(jobs, index, selectedLanguages, selectedService);
+            }, 500);
+            return;
+        }
+
+        const job = jobs[index];
+        const service = selectedService || 'ifrc';
+        const translationPayload = {
+            type: 'section_name',
+            permission_context: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_context)
+                ? window.autoTranslateModal.config.permission_context
+                : 'organization',
+            permission_code: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_code)
+                ? window.autoTranslateModal.config.permission_code
+                : 'admin.organization.manage',
+            text: job.text,
+            target_languages: job.languages,
+            translation_service: service
+        };
+
+        const _payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(translationPayload))));
+        ((window.getFetch && window.getFetch()) || fetch)(window.autoTranslateModal.config.endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': (typeof jQuery !== 'undefined' && jQuery('meta[name=csrf-token]').attr('content')) || ''
+            },
+            body: JSON.stringify({ payload: _payloadB64 })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            window.autoTranslateModal.translationState.processedItems++;
+            window.autoTranslateModal.updateProgress();
+
+            if (data.success && data.translations && typeof data.translations === 'object') {
+                const saveBody = {};
+                job.languages.forEach(function(lang) {
+                    const t = data.translations[lang];
+                    if (t != null && String(t).trim() !== '') {
+                        saveBody['name_' + lang] = String(t).trim();
+                    }
+                });
+                if (!Object.keys(saveBody).length) {
+                    window.autoTranslateModal.translationState.errorCount++;
+                    window.autoTranslateModal.logProgress(
+                        {{ _('Failed to translate')|tojson|safe }} + ' ' + job.kind + ' ' + job.id + ' (' + job.languages.join(', ') + ')',
+                        'error'
+                    );
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function() {
+                        processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                    }, 80);
+                    return;
+                }
+
+                const saveUrl = job.kind === 'sector' ? sectorEditUrl(job.id) : subsectorEditUrl(job.id);
+
+                ((window.getFetch && window.getFetch()) || fetch)(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': (typeof jQuery !== 'undefined' && jQuery('meta[name=csrf-token]').attr('content')) || ''
+                    },
+                    body: JSON.stringify(saveBody)
+                })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(function(saveData) {
+                    if (saveData && saveData.success !== false) {
+                        window.autoTranslateModal.translationState.successCount++;
+                        patchRowNameFields(job, saveBody);
+                        window.autoTranslateModal.logProgress(
+                            {{ _('✓')|tojson|safe }} + ' ' + job.kind + ' ' + job.id + ' → ' + Object.keys(saveBody).map(function(k) { return k.replace(/^name_/, ''); }).join(', '),
+                            'success'
+                        );
+                    } else {
+                        window.autoTranslateModal.translationState.errorCount++;
+                        window.autoTranslateModal.logProgress(
+                            {{ _('Failed to save')|tojson|safe }} + ' ' + job.kind + ' ' + job.id,
+                            'error'
+                        );
+                    }
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function() {
+                        processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                    }, 80);
+                })
+                .catch(function(saveErr) {
+                    window.autoTranslateModal.translationState.errorCount++;
+                    window.autoTranslateModal.logProgress(
+                        (saveErr && saveErr.message ? saveErr.message : {{ _('Save failed')|tojson|safe }}) + ' (' + job.kind + ' ' + job.id + ')',
+                        'error'
+                    );
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function() {
+                        processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                    }, 80);
+                });
+            } else {
+                window.autoTranslateModal.translationState.errorCount++;
+                window.autoTranslateModal.logProgress(
+                    (data && data.message ? data.message : {{ _('Translation failed')|tojson|safe }}) + ' (' + job.kind + ' ' + job.id + ')',
+                    'error'
+                );
+                window.autoTranslateModal.updateProgress();
+                setTimeout(function() {
+                    processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+                }, 80);
+            }
+        })
+        .catch(function(err) {
+            window.autoTranslateModal.translationState.processedItems++;
+            window.autoTranslateModal.translationState.errorCount++;
+            window.autoTranslateModal.logProgress(
+                (err && err.message ? err.message : {{ _('Network error')|tojson|safe }}) + ' (' + job.kind + ' ' + job.id + ')',
+                'error'
+            );
+            window.autoTranslateModal.updateProgress();
+            setTimeout(function() {
+                processNextSectorsSubsectorJob(jobs, index + 1, selectedLanguages, selectedService);
+            }, 80);
+        });
+    }
+
+    function waitForJQueryAndHookNotify() {
+        if (typeof jQuery === 'undefined' || !window.autoTranslateModal) {
+            setTimeout(waitForJQueryAndHookNotify, 30);
+            return;
+        }
+        jQuery(document).ready(function() {
+            var _origNotify = window.autoTranslateModal.notifyCompletion;
+            window.autoTranslateModal.notifyCompletion = function() {
+                if (typeof _origNotify === 'function') {
+                    _origNotify.call(window.autoTranslateModal);
+                }
+                window.location.reload();
+            };
+        });
+    }
+    waitForJQueryAndHookNotify();
+})();
+</script>
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function() {
+    if (!document.getElementById('panel-sectors')) return;
+
+    // View mode toggle: grouped tree vs separate lists
+    (function initSectorsViewToggle() {
+        var A = window.AdminUnderlineTabs;
+        var viewTabs = document.getElementById('sectors-view-tabs');
+        if (!viewTabs || !A) return;
+
+        var STORAGE_KEY = 'indicatorBankSectorsView';
+
+        function activateView(viewId) {
+            if (viewId !== 'grouped' && viewId !== 'split') viewId = 'grouped';
+            A.activateStripTab('#sectors-view-tabs', viewId, {
+                panelSelector: '#panel-sectors .sectors-view-panel',
+                panelIdPrefix: 'sectors-view-'
+            });
+            var searchWrap = document.getElementById('sectorsCardSearchWrap');
+            if (searchWrap) {
+                searchWrap.classList.toggle('hidden', viewId !== 'grouped');
+            }
+            try {
+                localStorage.setItem(STORAGE_KEY, viewId);
+            } catch (e) { /* ignore */ }
+        }
+
+        viewTabs.querySelectorAll('.settings-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = btn.getAttribute('data-tab');
+                if (id) activateView(id);
+            });
+        });
+
+        var saved = 'grouped';
+        try {
+            saved = localStorage.getItem(STORAGE_KEY) || 'grouped';
+        } catch (e) { /* ignore */ }
+        activateView(saved);
+    })();
+
+    // List view: click sector to filter sub-sectors
+    (function initSectorsSplitFilter() {
+        var sectorList = document.getElementById('sectors-split-sector-list');
+        var subsectorList = document.getElementById('sectors-split-subsector-list');
+        if (!sectorList || !subsectorList) return;
+
+        var countEl = document.getElementById('sectors-split-subsector-count');
+        var emptyEl = document.getElementById('sectors-split-subsector-empty');
+        var subsectorRows = subsectorList.querySelectorAll('.sectors-split-subsector-row');
+        var activeSectorId = null;
+
+        function updateCount(visible) {
+            if (countEl) countEl.textContent = String(visible);
+        }
+
+        function applyFilter(sectorId) {
+            var visible = 0;
+            subsectorRows.forEach(function(row) {
+                var rowSectorId = row.getAttribute('data-sector-id');
+                var show = !sectorId || rowSectorId === String(sectorId);
+                row.classList.toggle('hidden', !show);
+                if (show) visible++;
+            });
+            updateCount(visible);
+            if (emptyEl) {
+                emptyEl.classList.toggle('hidden', visible > 0);
+                subsectorList.classList.toggle('hidden', visible === 0 && !!sectorId);
+            }
+        }
+
+        function setActiveSector(sectorId) {
+            activeSectorId = sectorId;
+            sectorList.querySelectorAll('.sectors-split-sector-row').forEach(function(row) {
+                var id = row.getAttribute('data-sector-id');
+                row.classList.toggle('sectors-split-sector-row--active', !!sectorId && id === String(sectorId));
+                row.setAttribute('aria-pressed', id === String(sectorId) ? 'true' : 'false');
+            });
+            applyFilter(sectorId);
+        }
+
+        function onSectorSelect(sectorId) {
+            if (activeSectorId === sectorId) {
+                setActiveSector(null);
+            } else {
+                setActiveSector(sectorId);
+            }
+        }
+
+        sectorList.querySelectorAll('.sectors-split-sector-row').forEach(function(row) {
+            row.setAttribute('aria-pressed', 'false');
+            row.addEventListener('click', function(e) {
+                if (e.target.closest('.sectors-split-sector-row__actions')) return;
+                onSectorSelect(row.getAttribute('data-sector-id'));
+            });
+            row.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                onSectorSelect(row.getAttribute('data-sector-id'));
+            });
+        });
+
+        updateCount(subsectorRows.length);
+    })();
+
+    // Cards view: search and show more
+    (function initSectorsCardGrid() {
+        var grid = document.getElementById('sectorsCardGrid');
+        var searchInput = document.getElementById('sectorsCardSearch');
+        var noResults = document.getElementById('sectorsCardNoResults');
+        if (!grid) return;
+
+        function applyFilters() {
+            var query = (searchInput && searchInput.value || '').trim().toLowerCase();
+            var cards = grid.querySelectorAll('.sector-card-tile');
+            var visible = 0;
+            cards.forEach(function(card) {
+                var searchText = (card.getAttribute('data-search-text') || '').toLowerCase();
+                var show = !query || searchText.indexOf(query) !== -1;
+                card.classList.toggle('hidden', !show);
+                if (show) visible++;
+            });
+            if (noResults) {
+                noResults.classList.toggle('hidden', visible > 0);
+                grid.classList.toggle('hidden', visible === 0);
+            }
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', applyFilters);
+        }
+
+        grid.querySelectorAll('.sector-show-more').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var card = btn.closest('.sector-card-tile');
+                if (!card) return;
+                var expanded = btn.getAttribute('aria-expanded') === 'true';
+                card.querySelectorAll('.sector-sub-extra').forEach(function(item) {
+                    item.classList.toggle('hidden', expanded);
+                });
+                btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                var icon = btn.querySelector('.sector-show-more-icon');
+                if (icon) {
+                    icon.classList.toggle('fa-chevron-down', expanded);
+                    icon.classList.toggle('fa-chevron-up', !expanded);
+                }
+                var showMoreLabel = {{ _('Show more')|tojson|safe }};
+                var showLessLabel = {{ _('Show less')|tojson|safe }};
+                var labelEl = btn.querySelector('.sector-show-more-label');
+                if (labelEl) {
+                    labelEl.textContent = expanded ? showMoreLabel : showLessLabel;
+                }
+            });
+        });
+    })();
+
+    // Modal elements
+    const newSectorModal = document.getElementById('newSectorModal');
+    const editSectorModal = document.getElementById('editSectorModal');
+    const newSubsectorModal = document.getElementById('newSubsectorModal');
+    const editSubsectorModal = document.getElementById('editSubsectorModal');
+
+    // Button elements
+    const newSectorBtns = document.querySelectorAll('.new-sector-btn');
+    const editSectorBtns = document.querySelectorAll('.edit-sector-btn');
+    const newSubsectorBtns = document.querySelectorAll('.new-subsector-btn');
+    const editSubsectorBtns = document.querySelectorAll('.edit-subsector-btn');
+    const modalCloseBtns = document.querySelectorAll('.modal-close');
+
+    // Helper function to show modal
+    function showModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('hidden');
+    }
+
+    // Helper function to hide modal
+    function hideModal(modal) {
+        if (!modal) return;
+        modal.classList.add('hidden');
+    }
+
+    // Helper function to hide all modals
+    function hideAllModals() {
+        [newSectorModal, editSectorModal, newSubsectorModal, editSubsectorModal].forEach(modal => {
+            hideModal(modal);
+        });
+    }
+
+    // Add click event listeners for new sector buttons
+    newSectorBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const form = document.getElementById('newSectorForm');
+            if (form) form.action = "{{ url_for('system_admin.new_sector') }}";
+            showModal(newSectorModal);
+        });
+    });
+
+    // Add click event listeners for edit sector buttons
+    editSectorBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const sectorId = btn.dataset.sectorId;
+            try {
+                const response = await fetch(`{{ url_for('system_admin.get_sector', sector_id=0) }}`.replace('0', sectorId));
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                // Populate form fields
+                document.getElementById('edit_sector_name').value = data.name;
+                document.getElementById('edit_sector_description').value = data.description;
+                document.getElementById('edit_sector_display_order').value = data.display_order;
+                document.getElementById('edit_sector_icon_class').value = data.icon_class;
+                document.getElementById('edit_sector_is_active').checked = data.is_active;
+
+                // Populate multilingual fields
+                const trans = (data && data.name_translations) ? data.name_translations : {};
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                const el_sector_{{ code|replace('-', '_') }} = document.getElementById('edit_sector_name_{{ code }}');
+                if (el_sector_{{ code|replace('-', '_') }}) el_sector_{{ code|replace('-', '_') }}.value = trans['{{ code }}'] || '';
+                {% endfor %}
+
+                // Handle existing logo display
+                const logoPreview = document.querySelector('#editSectorModal .file-upload-preview');
+                if (data.logo_filename) {
+                    // Show existing logo
+                    const logoUrl = `{{ url_for('system_admin.sector_logo', sector_id=0) }}`.replace('0', sectorId);
+                    if (logoPreview) {
+                        logoPreview.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                    } else {
+                        // Create preview if it doesn't exist
+                        const logoInput = document.querySelector('#editSectorModal input[name="logo_file"]');
+                        const previewDiv = document.createElement('div');
+                        previewDiv.classList.add('file-upload-preview');
+                        previewDiv.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        logoInput.parentNode.insertBefore(previewDiv, logoInput.nextSibling);
+                    }
+                } else {
+                    // Clear preview if no logo
+                    if (logoPreview) {
+                        logoPreview.innerHTML = '';
+                    }
+                }
+
+                // Update form action
+                const form = document.getElementById('editSectorForm');
+                form.action = `{{ url_for('system_admin.edit_sector', sector_id=0) }}`.replace('0', sectorId);
+
+                showModal(editSectorModal);
+            } catch (error) {
+                console.error('Error fetching sector data:', error);
+                if (window.showAlert) window.showAlert('{{ _("Failed to load sector data. Please try again.") }}', 'error');
+                else console.error('Failed to load sector data');
+            }
+        });
+    });
+
+    // Add click event listeners for new subsector buttons
+    newSubsectorBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const form = document.getElementById('newSubsectorForm');
+            if (form) form.action = "{{ url_for('system_admin.new_subsector') }}";
+            const sectorSelect = document.getElementById('new_subsector_sector_id');
+            const presetSectorId = btn.getAttribute('data-sector-id');
+            if (sectorSelect) {
+                sectorSelect.value = presetSectorId || '';
+            }
+            showModal(newSubsectorModal);
+        });
+    });
+
+    // Add click event listeners for edit subsector buttons
+    editSubsectorBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const subsectorId = btn.dataset.subsectorId;
+            try {
+                const response = await fetch(`{{ url_for('system_admin.get_subsector', subsector_id=0) }}`.replace('0', subsectorId));
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                // Populate form fields
+                document.getElementById('edit_subsector_name').value = data.name;
+                document.getElementById('edit_subsector_description').value = data.description;
+                document.getElementById('edit_subsector_sector_id').value = data.sector_id;
+                document.getElementById('edit_subsector_display_order').value = data.display_order;
+                document.getElementById('edit_subsector_icon_class').value = data.icon_class;
+                document.getElementById('edit_subsector_is_active').checked = data.is_active;
+
+                // Populate multilingual fields
+                const trans = (data && data.name_translations) ? data.name_translations : {};
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                const el_subsector_{{ code|replace('-', '_') }} = document.getElementById('edit_subsector_name_{{ code }}');
+                if (el_subsector_{{ code|replace('-', '_') }}) el_subsector_{{ code|replace('-', '_') }}.value = trans['{{ code }}'] || '';
+                {% endfor %}
+
+                // Handle existing logo display
+                const logoPreview = document.querySelector('#editSubsectorModal .file-upload-preview');
+                if (data.logo_filename) {
+                    // Show existing logo
+                    const logoUrl = `{{ url_for('system_admin.subsector_logo', subsector_id=0) }}`.replace('0', subsectorId);
+                    if (logoPreview) {
+                        logoPreview.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                    } else {
+                        // Create preview if it doesn't exist
+                        const logoInput = document.querySelector('#editSubsectorModal input[name="logo_file"]');
+                        const previewDiv = document.createElement('div');
+                        previewDiv.classList.add('file-upload-preview');
+                        previewDiv.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        logoInput.parentNode.insertBefore(previewDiv, logoInput.nextSibling);
+                    }
+                } else {
+                    // Clear preview if no logo
+                    if (logoPreview) {
+                        logoPreview.innerHTML = '';
+                    }
+                }
+
+                // Update form action
+                const form = document.getElementById('editSubsectorForm');
+                form.action = `{{ url_for('system_admin.edit_subsector', subsector_id=0) }}`.replace('0', subsectorId);
+
+                showModal(editSubsectorModal);
+            } catch (error) {
+                console.error('Error fetching subsector data:', error);
+                if (window.showAlert) window.showAlert('{{ _("Failed to load subsector data. Please try again.") }}', 'error');
+                else console.error('Failed to load subsector data');
+            }
+        });
+    });
+
+    // Add click event listeners for modal close buttons
+    modalCloseBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            hideAllModals();
+        });
+    });
+
+    // Close modal when clicking outside
+    [newSectorModal, editSectorModal, newSubsectorModal, editSubsectorModal].forEach(modal => {
+        if (!modal) return;
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideAllModals();
+            }
+        });
+    });
+
+    // Handle delete form confirmations
+    const deleteForms = document.querySelectorAll('.delete-sector-form, .delete-subsector-form');
+    // Delete forms use global confirm handler (components.js) via data-confirm on form
+
+    // Handle form submissions
+    const forms = [
+        document.getElementById('newSectorForm'),
+        document.getElementById('editSectorForm'),
+        document.getElementById('newSubsectorForm'),
+        document.getElementById('editSubsectorForm')
+    ];
+
+    forms.forEach(form => {
+        if (!form) return;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrf_token')
+                    }
+                });
+
+                if (response.ok) {
+                    // Reload page to show changes
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    if (window.showAlert) window.showAlert(data.message || '{{ _("An error occurred. Please try again.") }}', 'error');
+                    else console.error(data.message);
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                if (window.showAlert) window.showAlert('{{ _("Failed to submit form. Please try again.") }}', 'error');
+                else console.error('Failed to submit form');
+            }
+        });
+    });
+
+    // Preview uploaded images
+    const imageInputs = document.querySelectorAll('input[type="file"][accept="image/*"]');
+    imageInputs.forEach(input => {
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Create or update preview
+                    let previewDiv = input.nextElementSibling;
+                    if (!previewDiv || !previewDiv.classList.contains('file-upload-preview')) {
+                        previewDiv = document.createElement('div');
+                        previewDiv.classList.add('file-upload-preview');
+                        input.parentNode.insertBefore(previewDiv, input.nextSibling);
+                    }
+                    previewDiv.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100px; max-height: 100px;">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    });
+
+    // Preview icon classes (XSS-safe: sanitize and use DOM APIs instead of innerHTML)
+    function sanitizeIconClass(str) {
+        if (!str || typeof str !== 'string') return '';
+        return str.replace(/[^a-zA-Z0-9\s_-]/g, '').trim().slice(0, 100);
+    }
+    const iconInputs = document.querySelectorAll('input[name="icon_class"]');
+    iconInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            const raw = e.target.value;
+            const iconClass = sanitizeIconClass(raw);
+            let previewDiv = input.nextElementSibling;
+            if (!previewDiv || !previewDiv.classList.contains('icon-preview')) {
+                previewDiv = document.createElement('div');
+                previewDiv.classList.add('icon-preview');
+                input.parentNode.insertBefore(previewDiv, input.nextSibling);
+            }
+            previewDiv.textContent = '';
+            if (iconClass) {
+                const i = document.createElement('i');
+                i.className = iconClass;
+                previewDiv.appendChild(i);
+            }
+        });
+    });
+
+    // Auto-translate multilingual names (edit sector / edit sub-sector modals) — same API pattern as manage_translations
+    const translatableLanguages = {{ TRANSLATABLE_LANGUAGES|default([])|tojson|safe }};
+    function isRtlLangCode(code) {
+        const base = String(code || '').split('_')[0].toLowerCase();
+        return ['ar', 'fa', 'he', 'ur'].indexOf(base) !== -1;
+    }
+    function setModalAutoTranslateBusy(modalId, busy) {
+        const root = document.getElementById(modalId);
+        if (!root) return;
+        root.querySelectorAll('.js-sectorsub-auto-translate').forEach(function(b) {
+            b.disabled = !!busy;
+            if (busy) b.classList.add('opacity-70', 'cursor-not-allowed');
+            else b.classList.remove('opacity-70', 'cursor-not-allowed');
+        });
+    }
+    function setAutoTranslateButtonLoading(btn, loading) {
+        if (!btn) return;
+        const icon = btn.querySelector('.js-sectorsub-at-icon');
+        const spin = btn.querySelector('.js-sectorsub-at-spinner');
+        const label = btn.querySelector('.js-sectorsub-at-label');
+        if (loading) {
+            if (icon) icon.classList.add('hidden');
+            if (spin) spin.classList.remove('hidden');
+            if (label) {
+                label.dataset.orig = label.textContent;
+                label.textContent = {{ _('Translating...')|tojson|safe }};
+            }
+        } else {
+            if (icon) icon.classList.remove('hidden');
+            if (spin) spin.classList.add('hidden');
+            if (label && label.dataset.orig) {
+                label.textContent = label.dataset.orig;
+                delete label.dataset.orig;
+            }
+        }
+    }
+    async function runSectorsSubsectorsModalAutoTranslate(btn) {
+        const modalId = btn.getAttribute('data-modal');
+        const primaryId = btn.getAttribute('data-primary-id');
+        const modalRoot = document.getElementById(modalId);
+        const primaryEl = primaryId ? document.getElementById(primaryId) : null;
+        const baseText = primaryEl && primaryEl.value ? String(primaryEl.value).trim() : '';
+        if (!baseText) {
+            if (window.showAlert) window.showAlert({{ _('Please enter a primary name to translate from.')|tojson|safe }}, 'warning');
+            return;
+        }
+        if (!modalRoot || !window.AutoTranslateService || typeof window.AutoTranslateService.translate !== 'function') {
+            if (window.showAlert) window.showAlert({{ _('Translation is not available on this page.')|tojson|safe }}, 'error');
+            return;
+        }
+        const inputs = modalRoot.querySelectorAll('input[name^="name_"]');
+        const targetLanguages = [];
+        inputs.forEach(function(inp) {
+            const code = (inp.name || '').replace(/^name_/, '');
+            if (!code || code === 'en') return;
+            if (String(inp.value || '').trim()) return;
+            if (targetLanguages.indexOf(code) === -1) targetLanguages.push(code);
+        });
+        if (!targetLanguages.length) {
+            if (window.showAlert) {
+                window.showAlert({{ _('Nothing to translate — all multilingual name fields already have values.')|tojson|safe }}, 'info');
+            }
+            return;
+        }
+        setModalAutoTranslateBusy(modalId, true);
+        setAutoTranslateButtonLoading(btn, true);
+        try {
+            const data = await window.AutoTranslateService.translate({
+                type: 'section_name',
+                permission_context: 'organization',
+                permission_code: 'admin.organization.manage',
+                text: baseText,
+                target_languages: targetLanguages,
+                translation_service: 'ifrc'
+            });
+            const translations = data && data.translations;
+            if (translations && typeof translations === 'object') {
+                Object.keys(translations).forEach(function(code) {
+                    const inp = modalRoot.querySelector('input[name="name_' + code + '"]');
+                    if (!inp) return;
+                    if (String(inp.value || '').trim()) return;
+                    inp.value = translations[code] != null ? String(translations[code]) : '';
+                    if (isRtlLangCode(code)) inp.setAttribute('dir', 'rtl');
+                    else inp.removeAttribute('dir');
+                });
+            }
+        } catch (e) {
+            var msg = {{ _('Auto-translate failed.')|tojson|safe }} + (e && e.message ? ' ' + e.message : '');
+            if (window.showAlert) window.showAlert(msg, 'error');
+            else console.error(msg);
+        } finally {
+            setAutoTranslateButtonLoading(btn, false);
+            setModalAutoTranslateBusy(modalId, false);
+        }
+    }
+    document.querySelectorAll('.js-sectorsub-auto-translate').forEach(function(b) {
+        b.addEventListener('click', function() {
+            runSectorsSubsectorsModalAutoTranslate(b);
+        });
+    });
+});
+</script>

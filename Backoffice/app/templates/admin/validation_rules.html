@@ -1,0 +1,276 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container, ag_grid_page_config %}
+
+{% block title %}{{ _('Validation Rules Registry') }} — {{ _('Admin') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ static_url('css/validation-dashboard.css') }}">
+{% endblock %}
+
+{% block content %}
+
+{% set vr_header_actions = namespace(items=[]) %}
+{% if is_system_manager or has_permission('admin.validation.dashboard') %}
+    {% set __ = vr_header_actions.items.append({
+        'type': 'link',
+        'text': _('Validation Dashboard'),
+        'icon': 'fas fa-chart-line',
+        'url': url_for('admin.validation_dashboard'),
+        'classes': 'professional-action-btn professional-action-btn-blue'
+    }) %}
+{% endif %}
+{% if is_system_manager or has_permission('admin.validation.questions') %}
+    {% set __ = vr_header_actions.items.append({
+        'type': 'link',
+        'text': _('Manage Questions'),
+        'icon': 'fas fa-clipboard-question',
+        'url': url_for('admin.validation_questions_admin'),
+        'classes': 'professional-action-btn'
+    }) %}
+{% endif %}
+
+{{ page_header(
+    title=_('Validation Rules Registry'),
+    subtitle=_('Browse automatic validation rules and manage variation thresholds, KPI check types, and question templates.'),
+    icon='fas fa-shield-alt',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Explore Data'), 'url': url_for('data_exploration.explore_data')},
+        {'name': _('Validation Rules Registry')}
+    ],
+    actions=vr_header_actions.items
+) }}
+
+<div id="vr-feedback" class="hidden mb-4 rounded-md px-4 py-3 text-sm border" role="status" aria-live="polite"></div>
+
+<div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 mb-6">
+    <div class="p-6 pb-0 border-b border-ifrc-gray-100">
+        <div class="flex flex-wrap gap-4 items-end">
+            <div class="vd-field min-w-[14rem] flex-1">
+                <label for="vr-template" class="vd-field-label">{{ _('Template (for thresholds & check types)') }}</label>
+                <select id="vr-template" class="vd-select">
+                    <option value="">{{ _('All templates / global') }}</option>
+                    {% for tmpl in template_options %}
+                    <option value="{{ tmpl.id }}">{{ tmpl.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="vd-field min-w-[12rem] flex-1">
+                <label for="vr-rule-pack" class="vd-field-label">{{ _('Rule pack') }}</label>
+                <select id="vr-rule-pack" class="vd-select">
+                    {% for pack in rule_packs %}
+                    <option value="{{ pack.code }}">{{ pack.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    {% call scroll_tab_bar(inner_id='vr-tabs', aria_label=_('Validation rules registry views'), wrapper_class='px-4 sm:px-6 mt-4') %}
+        <button type="button" role="tab" data-tab="catalog" id="vr-tab-catalog"
+                class="{{ admin_underline_tab_btn_classes(true) }}">
+            <i class="fas fa-book mr-1.5" aria-hidden="true"></i>{{ _('Rule catalog') }}
+        </button>
+        <button type="button" role="tab" data-tab="thresholds" id="vr-tab-thresholds"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-percent mr-1.5" aria-hidden="true"></i>{{ _('Variation thresholds') }}
+        </button>
+        <button type="button" role="tab" data-tab="check-types" id="vr-tab-check-types"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-sliders-h mr-1.5" aria-hidden="true"></i>{{ _('KPI check types') }}
+        </button>
+        <button type="button" role="tab" data-tab="question-templates" id="vr-tab-question-templates"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-comment-dots mr-1.5" aria-hidden="true"></i>{{ _('Question templates') }}
+        </button>
+    {% endcall %}
+
+    <div id="panel-catalog" class="vr-panel p-6">
+        <p class="text-sm text-ifrc-gray-600 mb-4">
+            {{ _('Automatic checks run when validation is enabled on a template. Variation rules require both a check type and a country threshold.') }}
+        </p>
+        {{ ag_grid_container('validationRulesCatalogGrid', loading_text=_('Loading rule catalog…'), grid_height='520px', placeholder_id='vr-catalog-col-vis', include_card=false) }}
+    </div>
+
+    <div id="panel-thresholds" class="vr-panel hidden p-6">
+        <div class="flex flex-wrap gap-3 items-center justify-between mb-4">
+            <p class="text-sm text-ifrc-gray-600 mb-0">
+                {{ _('Per-country KPI variation limits. Threshold is stored as a fraction (e.g. 0.25 = 25%%).') }}
+            </p>
+            <button type="button" id="vr-threshold-add" class="btn btn-primary">
+                <i class="fas fa-plus mr-2" aria-hidden="true"></i>{{ _('Add threshold') }}
+            </button>
+        </div>
+        {{ ag_grid_container('validationThresholdsGrid', loading_text=_('Loading thresholds…'), grid_height='480px', placeholder_id='vr-threshold-col-vis', include_card=false) }}
+    </div>
+
+    <div id="panel-check-types" class="vr-panel hidden p-6">
+        <div class="flex flex-wrap gap-3 items-center justify-between mb-4">
+            <p class="text-sm text-ifrc-gray-600 mb-0">
+                {{ _('How each KPI baseline is computed for variation checks (prior year vs three-year average).') }}
+            </p>
+            <button type="button" id="vr-check-type-add" class="btn btn-primary">
+                <i class="fas fa-plus mr-2" aria-hidden="true"></i>{{ _('Add check type') }}
+            </button>
+        </div>
+        {{ ag_grid_container('validationCheckTypesGrid', loading_text=_('Loading check types…'), grid_height='480px', placeholder_id='vr-check-type-col-vis', include_card=false) }}
+    </div>
+
+    <div id="panel-question-templates" class="vr-panel hidden p-6">
+        <p class="text-sm text-ifrc-gray-600 mb-4">
+            {{ _('Localized question text shown to focal points when a rule fires. Click Edit to change wording.') }}
+        </p>
+        {{ ag_grid_container('validationQuestionTemplatesGrid', loading_text=_('Loading question templates…'), grid_height='480px', placeholder_id='vr-qt-col-vis', include_card=false) }}
+    </div>
+</div>
+
+{# Threshold modal #}
+<div id="vr-threshold-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true" role="dialog">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/40" data-vr-close="threshold"></div>
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <h3 id="vr-threshold-modal-title" class="text-lg font-semibold text-ifrc-navy mb-4">{{ _('Threshold') }}</h3>
+            <form id="vr-threshold-form" class="space-y-4">
+                <input type="hidden" id="vr-threshold-id" value="">
+                <div>
+                    <label for="vr-threshold-country" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Country') }}</label>
+                    <select id="vr-threshold-country" class="w-full vd-select" required>
+                        <option value="">{{ _('Select country') }}</option>
+                        {% for c in countries %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="vr-threshold-kpi" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('KPI code') }}</label>
+                    <select id="vr-threshold-kpi" class="w-full vd-select" required>
+                        {% for code in kpi_codes %}
+                        <option value="{{ code }}">{{ code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="vr-threshold-percent" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Threshold (%%)') }}</label>
+                    <input type="number" id="vr-threshold-percent" class="w-full vd-select" min="0" step="0.01" required>
+                </div>
+            </form>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" class="btn btn-secondary" data-vr-close="threshold">{{ _('Cancel') }}</button>
+                <button type="button" id="vr-threshold-save" class="btn btn-primary">{{ _('Save') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Check type modal #}
+<div id="vr-check-type-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true" role="dialog">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/40" data-vr-close="check-type"></div>
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <h3 id="vr-check-type-modal-title" class="text-lg font-semibold text-ifrc-navy mb-4">{{ _('KPI check type') }}</h3>
+            <form id="vr-check-type-form" class="space-y-4">
+                <input type="hidden" id="vr-check-type-id" value="">
+                <div>
+                    <label for="vr-check-type-kpi" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('KPI code') }}</label>
+                    <select id="vr-check-type-kpi" class="w-full vd-select" required>
+                        {% for code in kpi_codes %}
+                        <option value="{{ code }}">{{ code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="vr-check-type-value" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Check type') }}</label>
+                    <select id="vr-check-type-value" class="w-full vd-select" required>
+                        {% for opt in check_type_options %}
+                        <option value="{{ opt.value }}">{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" class="btn btn-secondary" data-vr-close="check-type">{{ _('Cancel') }}</button>
+                <button type="button" id="vr-check-type-save" class="btn btn-primary">{{ _('Save') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Question template modal #}
+<div id="vr-qt-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true" role="dialog">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/40" data-vr-close="qt"></div>
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl p-6">
+            <h3 class="text-lg font-semibold text-ifrc-navy mb-2">{{ _('Question template') }}</h3>
+            <p id="vr-qt-meta" class="text-sm text-ifrc-gray-500 mb-4"></p>
+            <input type="hidden" id="vr-qt-id" value="">
+            <div class="space-y-4">
+                <div>
+                    <label for="vr-qt-text" class="block text-sm font-medium text-ifrc-gray-700 mb-1">{{ _('Template text') }}</label>
+                    <textarea id="vr-qt-text" class="w-full border border-ifrc-gray-300 rounded-md p-3 text-sm" rows="4"></textarea>
+                </div>
+                <label class="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" id="vr-qt-needs-suffix">
+                    <span>{{ _('Append dynamic suffix (percentage, population, etc.)') }}</span>
+                </label>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" class="btn btn-secondary" data-vr-close="qt">{{ _('Cancel') }}</button>
+                <button type="button" id="vr-qt-save" class="btn btn-primary">{{ _('Save') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% set vr_bootstrap = {
+    'catalogUrl': url_for('admin.validation_rules_catalog_api'),
+    'thresholdsUrl': url_for('admin.validation_rules_thresholds_list_api'),
+    'thresholdsUpsertUrl': url_for('admin.validation_rules_thresholds_upsert_api'),
+    'thresholdsDeleteBase': url_for('admin.validation_rules_thresholds_delete_api', row_id=0).rsplit('/', 1)[0] + '/',
+    'checkTypesUpsertUrl': url_for('admin.validation_rules_check_types_upsert_api'),
+    'checkTypesDeleteBase': url_for('admin.validation_rules_check_types_delete_api', row_id=0).rsplit('/', 1)[0] + '/',
+    'checkTypesUrl': url_for('admin.validation_rules_check_types_list_api'),
+    'questionTemplatesUrl': url_for('admin.validation_rules_question_templates_list_api'),
+    'questionTemplateUpdateBase': url_for('admin.validation_rules_question_templates_update_api', row_id=0).rsplit('/', 1)[0] + '/',
+    'initialCatalog': rule_catalog,
+    'translations': {
+        'edit': _('Edit'),
+        'delete': _('Delete'),
+        'confirmDelete': _('Delete this row?'),
+        'saveFailed': _('Save failed'),
+        'loadFailed': _('Failed to load data'),
+        'saved': _('Saved'),
+        'deleted': _('Deleted'),
+        'code': _('Code'),
+        'label': _('Label'),
+        'severity': _('Severity'),
+        'category': _('Category'),
+        'description': _('Description'),
+        'configurable': _('Configurable'),
+        'yes': _('Yes'),
+        'no': _('No'),
+        'country': _('Country'),
+        'kpiCode': _('KPI code'),
+        'thresholdPercent': _('Threshold %%'),
+        'checkType': _('Check type'),
+        'templateId': _('Template ID'),
+        'questionCode': _('Question code'),
+        'language': _('Language'),
+        'templateText': _('Template text'),
+        'needsSuffix': _('Needs suffix'),
+        'rulePack': _('Rule pack'),
+        'actions': _('Actions'),
+    }
+} %}
+{{ ag_grid_page_config('validationRulesConfig', 'VR_GRID_TRANSLATIONS', vr_bootstrap) }}
+
+<script type="application/json" id="vr-initial-catalog">{{ rule_catalog | tojson }}</script>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ ag_grid_js() }}
+<script src="{{ static_url('js/admin/validation-rules-registry.js') }}"></script>
+{% endblock %}

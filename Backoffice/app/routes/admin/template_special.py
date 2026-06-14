@@ -25,6 +25,20 @@ from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 bp = Blueprint("template_special", __name__, url_prefix="/admin/templates/special")
 
+
+def _country_by_aes_id_for_assignments(assignments):
+    """Batch-resolve Country for country-type AES rows (avoids ``aes.country`` N+1)."""
+    from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+
+    all_aes = []
+    for af in assignments or []:
+        all_aes.extend(af.country_statuses.all())
+    if not all_aes:
+        return {}
+    batch = batch_countries_for_aes_list(all_aes)
+    return {aes.id: _country_for_aes(aes, batch) for aes in all_aes}
+
+
 # -----------------------------
 # FDRS sync progress (in-memory)
 # -----------------------------
@@ -381,6 +395,7 @@ def preview_data(template_id: int):
         preview_data = []
         total_operations = 0
         completed_operations = 0
+        country_by_aes = _country_by_aes_id_for_assignments(assignments)
 
         # Calculate total operations for progress tracking
         for assignment in assignments:
@@ -388,7 +403,7 @@ def preview_data(template_id: int):
 
         for assignment in assignments:
             for aes in assignment.country_statuses.all():
-                country = aes.country
+                country = country_by_aes.get(aes.id)
                 if not country:
                     completed_operations += len(form_items)
                     continue
@@ -457,11 +472,14 @@ def preview_imputation(template_id: int):
             period_name=year
         ).all()
 
+        prev_assignments = AssignedForm.query.filter_by(template_id=template_id, period_name=prev_year).all()
+        country_by_aes = _country_by_aes_id_for_assignments(target_assignments + prev_assignments)
+
         prev_assignments_by_country = {}
-        for af in AssignedForm.query.filter_by(template_id=template_id, period_name=prev_year).all():
+        for af in prev_assignments:
             for aes in af.country_statuses.all():
-                if aes.country_id not in prev_assignments_by_country:
-                    prev_assignments_by_country[aes.country_id] = af
+                if aes.entity_id not in prev_assignments_by_country:
+                    prev_assignments_by_country[aes.entity_id] = af
 
         form_items = _imputable_items_for_template(template)
 
@@ -469,14 +487,16 @@ def preview_imputation(template_id: int):
 
         for assignment in target_assignments:
             for aes in assignment.country_statuses.all():
-                country = aes.country
+                country = country_by_aes.get(aes.id)
                 if not country:
                     continue
 
                 prev_af = prev_assignments_by_country.get(country.id)
                 prev_aes = None
                 if prev_af:
-                    prev_aes = prev_af.country_statuses.filter_by(country_id=country.id).first()
+                    prev_aes = prev_af.country_statuses.filter_by(
+                        entity_id=country.id, entity_type='country',
+                    ).first()
 
                 for item in form_items:
                     # Get current data
@@ -510,7 +530,9 @@ def preview_imputation(template_id: int):
                                     period_name=source_year
                                 ).first()
                                 if source_af:
-                                    source_aes = source_af.country_statuses.filter_by(country_id=country.id).first()
+                                    source_aes = source_af.country_statuses.filter_by(
+                                        entity_id=country.id, entity_type='country',
+                                    ).first()
                                     if source_aes:
                                         source_fd = FormData.query.filter_by(
                                             assignment_entity_status_id=source_aes.id,
@@ -593,10 +615,11 @@ def preview_data_chunked(template_id: int):
 
         # Gather filtered ACS (with country) for the target year
         assignments = AssignedForm.query.filter_by(template_id=template_id, period_name=year).all()
+        country_by_aes = _country_by_aes_id_for_assignments(assignments)
         filtered_aess = []  # List[Tuple[AssignmentEntityStatus, Country]]
         for assignment in assignments:
             for aes in assignment.country_statuses.all():
-                country = aes.country
+                country = country_by_aes.get(aes.id)
                 if not country:
                     continue
                 if country_filter and country.name != country_filter:
@@ -724,10 +747,11 @@ def preview_imputation_chunked(template_id: int):
 
         # Target AES list with countries (filtered)
         target_assignments = AssignedForm.query.filter_by(template_id=template_id, period_name=year).all()
+        country_by_aes = _country_by_aes_id_for_assignments(target_assignments)
         filtered_aess = []  # List[Tuple[AssignmentEntityStatus, Country]]
         for assignment in target_assignments:
             for aes in assignment.country_statuses.all():
-                country = aes.country
+                country = country_by_aes.get(aes.id)
                 if not country:
                     continue
                 if country_filter and country.name != country_filter:
@@ -778,8 +802,8 @@ def preview_imputation_chunked(template_id: int):
             ).all()
             for paf in prev_afs:
                 for p_aes in paf.country_statuses.all():
-                    if p_aes.country_id in country_ids_in_scope:
-                        country_year_to_aes_id[(paf.period_name, p_aes.country_id)] = p_aes.id
+                    if p_aes.entity_id in country_ids_in_scope:
+                        country_year_to_aes_id[(paf.period_name, p_aes.entity_id)] = p_aes.id
 
         # Collect needed FormData pairs for this chunk only
         current_pairs = set()
@@ -948,11 +972,14 @@ def get_filter_options(template_id: int):
         ).all()
 
         # Get unique countries from assignments
+        country_by_aes = _country_by_aes_id_for_assignments(assignments)
         countries = []
+        seen_names = set()
         for assignment in assignments:
             for aes in assignment.country_statuses.all():
-                country = aes.country
-                if country and country.name not in [c['name'] for c in countries]:
+                country = country_by_aes.get(aes.id)
+                if country and country.name not in seen_names:
+                    seen_names.add(country.name)
                     countries.append({
                         'id': country.id,
                         'name': country.name

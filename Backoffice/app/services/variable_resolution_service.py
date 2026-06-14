@@ -1103,14 +1103,15 @@ class VariableResolutionService:
         elif return_format == 'names_comma':
             # Comma-separated entity names: "France, Germany, Italy"
             from app.services.entity_service import EntityService
-            names = []
-            for e in entity_list:
-                name = EntityService.get_localized_entity_name(
-                    e['entity_type'],
-                    e['entity_id'],
-                    include_hierarchy=False
-                )
-                names.append(name or f"Entity {e['entity_id']}")
+            name_map = EntityService.batch_entity_names(
+                [(e['entity_type'], e['entity_id']) for e in entity_list],
+                include_hierarchy=False,
+                localized=True,
+            )
+            names = [
+                name_map.get((e['entity_type'], e['entity_id'])) or f"Entity {e['entity_id']}"
+                for e in entity_list
+            ]
             result = ', '.join(names)
             logger.debug(f"_resolve_entities_containing: Returning comma-separated names: {result}")
             return result
@@ -1118,13 +1119,14 @@ class VariableResolutionService:
         elif return_format == 'ids_and_names_comma':
             # Comma-separated with both IDs and names: "162 (France), 163 (Germany)"
             from app.services.entity_service import EntityService
+            name_map = EntityService.batch_entity_names(
+                [(e['entity_type'], e['entity_id']) for e in entity_list],
+                include_hierarchy=False,
+                localized=True,
+            )
             formatted = []
             for e in entity_list:
-                name = EntityService.get_localized_entity_name(
-                    e['entity_type'],
-                    e['entity_id'],
-                    include_hierarchy=False
-                )
+                name = name_map.get((e['entity_type'], e['entity_id']))
                 if name:
                     formatted.append(f"{e['entity_id']} ({name})")
                 else:

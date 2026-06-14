@@ -254,6 +254,7 @@ def new_assignment():
                 return render_template("admin/assignments/manage_assignment.html",
                                      form=form,
                                      assignment=None,
+                                     assignment_entity_display={},
                                      title="Create New Assignment",
                                      countries_by_region=get_countries_by_region(),
                                      get_localized_country_name=get_localized_country_name,
@@ -305,9 +306,11 @@ def new_assignment():
             # Process countries from form.countries.data
             selected_country_ids = form.countries.data
             if selected_country_ids:
+                valid_country_ids = {
+                    c.id for c in Country.query.filter(Country.id.in_(selected_country_ids)).all()
+                }
                 for country_id in selected_country_ids:
-                    country = Country.query.get(country_id)
-                    if country:
+                    if country_id in valid_country_ids:
                         aes = AssignmentEntityStatus(
                             assigned_form_id=new_assignment.id,
                             entity_type=EntityType.country.value,
@@ -419,6 +422,7 @@ def new_assignment():
     return render_template("admin/assignments/manage_assignment.html",
                          form=form,
                          assignment=None,
+                         assignment_entity_display={},
                          title="Create New Assignment",
                          countries_by_region=countries_by_region,
                          get_localized_country_name=get_localized_country_name,
@@ -491,8 +495,16 @@ def edit_assignment(assignment_id):
     assignment_entities = assignment.entity_statuses.all()
     countries_by_region = get_countries_by_region()
 
-    # Import EntityService for template use
     from app.services.entity_service import EntityService
+
+    aes_name_map = EntityService.batch_entity_names(
+        [(aes.entity_type, aes.entity_id) for aes in assignment_entities],
+        include_hierarchy=True,
+    )
+    assignment_entity_display = {
+        aes.id: aes_name_map.get((aes.entity_type, aes.entity_id), '')
+        for aes in assignment_entities
+    }
 
     # Create form for editing assignment entity status
     edit_aes_form = AssignmentEntityStatusForm()
@@ -503,6 +515,7 @@ def edit_assignment(assignment_id):
                          form=form,
                          assignment_countries=assignment_countries,
                          assignment_entities=assignment_entities,
+                         assignment_entity_display=assignment_entity_display,
                          countries_by_region=countries_by_region,
                          edit_aes_form=edit_aes_form,
                          assignment_entity_status_choices=assignment_entity_status_choices,
@@ -524,13 +537,15 @@ def add_countries_to_assignment(assignment_id):
     try:
         added_count = 0
         created_aes_list = []
+        existing_country_ids = {
+            aes.entity_id
+            for aes in AssignmentEntityStatus.query.filter(
+                AssignmentEntityStatus.assigned_form_id == assignment_id,
+                AssignmentEntityStatus.entity_type == EntityType.country.value,
+            ).all()
+        }
         for country_id in selected_country_ids:
-            existing = AssignmentEntityStatus.query.filter_by(
-                assigned_form_id=assignment_id,
-                entity_type=EntityType.country.value,
-                entity_id=country_id
-            ).first()
-            if not existing:
+            if country_id not in existing_country_ids:
                 aes = AssignmentEntityStatus(
                     assigned_form_id=assignment_id,
                     entity_type=EntityType.country.value,
@@ -539,6 +554,7 @@ def add_countries_to_assignment(assignment_id):
                 )
                 db.session.add(aes)
                 created_aes_list.append(aes)
+                existing_country_ids.add(country_id)
                 added_count += 1
 
         db.session.flush()
@@ -597,14 +613,19 @@ def get_assignment_entities(assignment_id):
     entity_statuses = AssignmentEntityStatus.query.filter_by(assigned_form_id=assignment_id).all()
 
     entities_data = []
+    pairs = [(aes.entity_type, aes.entity_id) for aes in entity_statuses]
+    prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=True)
+    hierarchy_names = EntityService.batch_entity_names(
+        pairs, include_hierarchy=True, prefetched=prefetched,
+    )
     for aes in entity_statuses:
-        entity = EntityService.get_entity(aes.entity_type, aes.entity_id)
+        entity = prefetched.get((aes.entity_type, aes.entity_id))
         if entity:
             entities_data.append({
                 'status_id': aes.id,
                 'entity_type': aes.entity_type,
                 'entity_id': aes.entity_id,
-                'entity_name': EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True),
+                'entity_name': hierarchy_names.get((aes.entity_type, aes.entity_id), entity.name),
                 'status': aes.status,
                 'due_date': aes.due_date.strftime('%Y-%m-%d') if aes.due_date else None,
                 'is_public_available': aes.is_public_available
@@ -720,11 +741,19 @@ def bulk_remove_entities_from_assignment(assignment_id):
     status_ids = data.get('status_ids') or []
     if not status_ids or not isinstance(status_ids, list):
         return json_bad_request('status_ids array required')
-    assignment = AssignedForm.query.get_or_404(assignment_id)
-    removed = 0
+    AssignedForm.query.get_or_404(assignment_id)
+    safe_ids = []
     for sid in status_ids:
-        aes = AssignmentEntityStatus.query.filter_by(id=int(sid), assigned_form_id=assignment_id).first()
-        if aes:
+        try:
+            safe_ids.append(int(sid))
+        except (ValueError, TypeError):
+            continue
+    removed = 0
+    if safe_ids:
+        for aes in AssignmentEntityStatus.query.filter(
+            AssignmentEntityStatus.id.in_(safe_ids),
+            AssignmentEntityStatus.assigned_form_id == assignment_id,
+        ).all():
             _delete_assignment_entity_status_with_children(aes)
             removed += 1
     db.session.flush()
@@ -750,12 +779,21 @@ def bulk_update_entity_status(assignment_id):
             due_date_obj = datetime.strptime(due_date_str, '%Y-%m-%d').date()
         except (ValueError, TypeError):
             pass
-    updated = 0
+    AssignedForm.query.get_or_404(assignment_id)
+    safe_ids = []
     for sid in status_ids:
-        aes = AssignmentEntityStatus.query.filter_by(id=int(sid), assigned_form_id=assignment_id).first()
-        if aes:
+        try:
+            safe_ids.append(int(sid))
+        except (ValueError, TypeError):
+            continue
+    updated = 0
+    if safe_ids:
+        _now = utcnow()
+        for aes in AssignmentEntityStatus.query.filter(
+            AssignmentEntityStatus.id.in_(safe_ids),
+            AssignmentEntityStatus.assigned_form_id == assignment_id,
+        ).all():
             aes.status = normalized_status
-            _now = utcnow()
             aes.status_timestamp = _now
             if normalized_status == AssignmentEntityStatusValue.approved:
                 aes.approved_by_user_id = current_user.id
@@ -1048,15 +1086,15 @@ def bulk_enable_public_reporting(assignment_id):
         country_ids = [int(id.strip()) for id in country_ids_str.split(',') if id.strip()]
         enabled_count = 0
 
-        for country_id in country_ids:
-            aes = AssignmentEntityStatus.query.filter_by(
-                assigned_form_id=assignment_id,
-                entity_type=EntityType.country.value,
-                entity_id=country_id
-            ).first()
-            if aes and not aes.is_public_available:
-                aes.is_public_available = True
-                enabled_count += 1
+        if country_ids:
+            for aes in AssignmentEntityStatus.query.filter(
+                AssignmentEntityStatus.assigned_form_id == assignment_id,
+                AssignmentEntityStatus.entity_type == EntityType.country.value,
+                AssignmentEntityStatus.entity_id.in_(country_ids),
+            ).all():
+                if not aes.is_public_available:
+                    aes.is_public_available = True
+                    enabled_count += 1
 
         db.session.flush()
 

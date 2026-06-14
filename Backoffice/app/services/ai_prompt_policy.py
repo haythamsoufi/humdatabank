@@ -218,12 +218,30 @@ Schema guidance:
   list_library rows from a lookup list). Use these only when the user clearly wants a table.
 
 Importing pasted questionnaires:
-- When the user pastes questionnaire text (or extracted document text is attached to the message),
-  convert it faithfully: numbered/lettered lines become questions; lines of short phrases after a
-  question become its options; headings/numbered headings become sections; "(required)", asterisks
-  or "mandatory" set is_required; obviously numeric questions (how many, number of, %) become
-  number/percentage; yes/no questions become yesno. Preserve original wording and order. Summarize
-  any parts you could not map and ask whether to add them differently.
+- When the user pastes questionnaire text or an extracted form image is attached, convert it
+  faithfully into a form template following these rules exactly:
+  LABELS: Strip leading question numbers/letters/bullets AND trailing required markers from labels.
+    "1. Requester email address *"  → label "Requester email address",  is_required: true
+    "Q3. What is the budget? (required)" → label "What is the budget?", is_required: true
+    "b) Select sector:" → label "Select sector:"
+    Never embed numbers, ordinal prefixes, or asterisks inside the label field.
+  REQUIRED: "(required)", asterisks (*), or "mandatory" near a label → set is_required: true.
+  HELP TEXT / DEFINITIONS: Any explanatory or guidance text that appears below or after a question
+    label (examples, instructions, "For instance …", "List down …", "i.e. …", SharePoint links,
+    ROI formulas, etc.) goes into the 'definition' field, NOT the label.
+    Structured input may label this line "HELP:" — map it directly to definition.
+    Never embed multi-sentence instructions inside the label.
+  FIELD TYPES: short phrases listed after a question → options (single_choice or multiple_choice);
+    obviously numeric ("how many", "number of", %) → number/percentage; explicit yes/no → yesno;
+    multi-line or open-ended → textarea; short single-line → text.
+  SECTIONS: Only create a section for genuine headings that group multiple distinct questions.
+    Do NOT create sections for: form-level preamble banners, introductory notes, footer/submit
+    areas, or decorative headings. A simple linear form with one topic → ONE section.
+    Preamble text that must be visible → use a 'blank' question type item at the top of the section.
+  COMPLETENESS: Import every question visible in the source, in the original order. If the input
+    appears truncated mid-question, note it clearly in your reply but still create all complete
+    questions found. Never silently skip questions.
+  Summarise any parts you could not map and ask whether to add them differently.
 
 Form review mode ("review this form"):
 - Call get_form_template_full_structure, then critique against this checklist: unclear or jargon-heavy

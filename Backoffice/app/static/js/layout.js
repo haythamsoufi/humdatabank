@@ -1,4 +1,55 @@
 // Layout Management JavaScript - SECURITY ENHANCED
+
+(function () {
+    'use strict';
+
+    var cfg = window.__layoutConfig || {};
+    var isMobileEmbedded = cfg.mobileAppEmbedded === true ||
+        document.documentElement.getAttribute('data-mobile-app') === 'true' ||
+        document.documentElement.classList.contains('mobile-app');
+
+    if (isMobileEmbedded && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (reg) { reg.unregister(); });
+        }).catch(function () { /* no-op */ });
+        return;
+    }
+
+    if (!cfg.swRegister || !('serviceWorker' in navigator)) {
+        return;
+    }
+
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js')
+            .then(function (reg) {
+                try {
+                    if (reg.waiting) {
+                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                } catch (e) { /* no-op */ }
+
+                try {
+                    var p = window.location.pathname || '';
+                    var shouldPrecacheForms =
+                        p.startsWith('/forms/') ||
+                        p.startsWith('/public/') ||
+                        p.startsWith('/forms/public-submission/');
+
+                    if (shouldPrecacheForms) {
+                        navigator.serviceWorker.ready.then(function (readyReg) {
+                            if (readyReg && readyReg.active) {
+                                readyReg.active.postMessage({ type: 'PRECACHE_FORMS' });
+                            }
+                        }).catch(function () { /* no-op */ });
+                    }
+                } catch (e) { /* no-op */ }
+            })
+            .catch(function (e) {
+                window.__clientWarn && window.__clientWarn('SW registration failed', e);
+            });
+    });
+})();
+
 //
 // SECURITY WARNING: localStorage Security
 // =====================================

@@ -621,6 +621,9 @@ function initPagination() {
                     saveCurrentSection(storageKey, targetSection);
                     updateURLWithPage(currentPageIdx, targetSection);
 
+                    window.__ifrcSectionNavScrollSpy?.setActive?.(targetSection);
+                    window.__ifrcSectionNavScrollSpy?.pause?.(900);
+
                     // Scroll to the section
                     scrollToSection(targetSection);
                 }

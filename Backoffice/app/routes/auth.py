@@ -1186,9 +1186,13 @@ def reset_password(token):
 def account_settings():
     """Account settings page for users to update their name and title."""
     form = AccountSettingsForm()
+    from sqlalchemy.orm import joinedload
+
     from app.models import CountryAccessRequest
     from app.models.core import UserEntityPermission
+    from app.models.enums import EntityType
     from app.models.system import CountryAccessRequestStatus
+    from app.services.authorization_service import AuthorizationService
     from app.services.entity_service import EntityService
     from app.forms.auth_forms import RequestCountryAccessForm
 
@@ -1237,21 +1241,28 @@ def account_settings():
         .all()
 
     # Entity permissions for display in Entity Access tab
+    entity_permissions = []
     entity_access_list = []
     try:
         entity_permissions = UserEntityPermission.query.filter_by(user_id=current_user.id).all()
+        permission_pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+        prefetched_entities = EntityService.prefetch_entities(permission_pairs, include_hierarchy=True)
+        hierarchy_names = EntityService.batch_entity_names(
+            permission_pairs, include_hierarchy=True, prefetched=prefetched_entities,
+        )
         for perm in entity_permissions:
-            entity = EntityService.get_entity(perm.entity_type, perm.entity_id)
+            entity = prefetched_entities.get((perm.entity_type, perm.entity_id))
             if not entity:
                 continue
             entity_access_list.append({
                 'entity_type': perm.entity_type,
                 'entity_id': perm.entity_id,
-                'entity_name': EntityService.get_entity_name(perm.entity_type, perm.entity_id, include_hierarchy=True),
+                'entity_name': hierarchy_names.get((perm.entity_type, perm.entity_id), entity.name),
             })
         entity_access_list.sort(key=lambda x: (x['entity_type'], x['entity_name']))
     except Exception as e:
         current_app.logger.error("Failed to load entity access for account settings: %s", e, exc_info=True)
+        entity_permissions = []
         entity_access_list = []
 
     # Country access request form and request history
@@ -1261,12 +1272,17 @@ def account_settings():
     try:
         all_access_requests = (
             CountryAccessRequest.query.filter_by(user_id=current_user.id)
+            .options(joinedload(CountryAccessRequest.country))
             .order_by(CountryAccessRequest.created_at.desc())
             .all()
         )
+        entity_permission_keys = {(p.entity_type, p.entity_id) for p in entity_permissions}
+        user_is_system_manager = AuthorizationService.is_system_manager(current_user)
         for req in all_access_requests:
             if req.status == CountryAccessRequestStatus.APPROVED and req.country_id:
-                req._access_revoked = not current_user.has_entity_access('country', req.country_id)
+                country_key = (EntityType.country.value, req.country_id)
+                has_access = user_is_system_manager or country_key in entity_permission_keys
+                req._access_revoked = not has_access
             else:
                 req._access_revoked = False
         pending_access_requests = [

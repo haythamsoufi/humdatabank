@@ -221,6 +221,10 @@ def create_test_admin(db_session, **kwargs):
         _grant(role_id, "admin.data_explore.data_table")
         _grant(role_id, "admin.data_explore.analysis")
         _grant(role_id, "admin.data_explore.compliance")
+    if kwargs.get("can_manage_validation", True):
+        _grant(role_id, "admin.validation.dashboard")
+        _grant(role_id, "admin.validation.questions")
+        _grant(role_id, "admin.validation.rules")
     # Additional permissions for mobile admin endpoints
     _grant(role_id, "admin.access_requests.view")
     _grant(role_id, "admin.access_requests.manage")

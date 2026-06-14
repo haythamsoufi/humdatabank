@@ -395,10 +395,15 @@ def delete_template_section(section_id):
 
     # Cascade: delete or archive child sections first (user confirmed via frontend warning)
     descendant_ids = _get_descendant_section_ids(section.id)
-    for desc_id in descendant_ids:
-        desc_section = FormSection.query.get(desc_id)
-        if desc_section:
-            _delete_or_archive_one_section(desc_section, delete_data, keep_data_delete_section)
+    if descendant_ids:
+        descendant_sections = {
+            s.id: s
+            for s in FormSection.query.filter(FormSection.id.in_(descendant_ids)).all()
+        }
+        for desc_id in descendant_ids:
+            desc_section = descendant_sections.get(desc_id)
+            if desc_section:
+                _delete_or_archive_one_section(desc_section, delete_data, keep_data_delete_section)
 
     try:
         version_id = section.version_id

@@ -128,7 +128,7 @@
         {% if modal|default(true) %}
         <button type="button" class="btn btn-secondary ml-unit-cancel" data-ml-modal-dismiss>{{ _('Cancel') }}</button>
         {% else %}
-        <a class="btn btn-secondary" href="{{ url_for('system_admin.manage_measurement_lookups') }}">{{ _('Cancel') }}</a>
+        <a class="btn btn-secondary" href="{{ url_for('system_admin.manage_indicator_bank', tab='units') }}">{{ _('Cancel') }}</a>
         {% endif %}
       </div>
     </div>

@@ -682,8 +682,10 @@ def build_admin_user_detail_dict(user_id: int) -> dict | None:
             countries_by_id[c.id] = c
 
     entities_data = []
+    perm_pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+    hierarchy_names = EntityService.batch_entity_names(perm_pairs, include_hierarchy=True)
     for perm in entity_permissions:
-        name = EntityService.get_entity_name(perm.entity_type, perm.entity_id, include_hierarchy=True)
+        name = hierarchy_names.get((perm.entity_type, perm.entity_id))
         if not isinstance(name, str) or not name.strip():
             et = (perm.entity_type or "entity").replace("_", " ")
             name = f"Unavailable ({et})"

@@ -404,7 +404,7 @@ def download_submission_pdf(submission_id):
     HTML(string=html_content, base_url=static_dir).write_pdf(
         pdf_buffer,
         stylesheets=[pdf_css],
-        optimize_size=('fonts', 'images')
+        optimize_images=True,
     )
 
     pdf_buffer.seek(0)

@@ -757,36 +757,45 @@
         sendOpenQuestions().catch(function (e) { showFeedback(e.message, 'error'); });
     });
     document.getElementById('vq-refresh')?.addEventListener('click', loadRows);
-    document.getElementById('vq-export')?.addEventListener('click', function () {
+
+    if (config.excelModalModule) {
+        import(config.excelModalModule).then(function (mod) {
+            mod.initExcelIoModal('vq-excel-io-modal', { openTrigger: '#vq-excel-io-btn' });
+        });
+    }
+    document.getElementById('vq-excel-io-modal-export-btn')?.addEventListener('click', function () {
         window.location.href = config.exportUrl;
     });
-    document.getElementById('vq-import')?.addEventListener('click', function () {
-        document.getElementById('vq-import-file')?.click();
-    });
-    document.getElementById('vq-import-file')?.addEventListener('change', async function (e) {
-        var file = e.target.files && e.target.files[0];
-        if (!file) return;
-        var formData = new FormData();
-        formData.append('excel_file', file);
-        formData.append('csrf_token', csrf);
-        try {
-            var resp = await fetch(config.importUrl, { method: 'POST', body: formData, credentials: 'same-origin', headers: { Accept: 'application/json' } });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.importFailed);
-            var msg = 'Import complete — updated: ' + (data.updated || 0);
-            if (data.errors && data.errors.length) {
-                msg += ' (' + data.errors.length + ' row(s) with errors: ' +
-                    data.errors.slice(0, 3).join('; ') +
-                    (data.errors.length > 3 ? '…' : '') + ')';
-            }
-            showFeedback(msg, data.has_errors ? 'error' : 'success');
-            await loadRows();
-        } catch (err) {
-            showFeedback(t.importFailed || 'Import failed', 'error');
-        } finally {
-            e.target.value = '';
-        }
-    });
+    if (config.excelDropzoneModule) {
+        import(config.excelDropzoneModule).then(function (mod) {
+            mod.initExcelImportDropzone('#vq-excel-dropzone', {
+                acceptExtensions: ['.xlsx', '.xls'],
+                onFileSelected: async function (file, ctx) {
+                    if (!file) return;
+                    var formData = new FormData();
+                    formData.append('excel_file', file);
+                    formData.append('csrf_token', csrf);
+                    try {
+                        var resp = await fetch(config.importUrl, { method: 'POST', body: formData, credentials: 'same-origin', headers: { Accept: 'application/json' } });
+                        var data = await resp.json();
+                        if (!resp.ok) throw new Error(data.error || t.importFailed);
+                        var msg = 'Import complete — updated: ' + (data.updated || 0);
+                        if (data.errors && data.errors.length) {
+                            msg += ' (' + data.errors.length + ' row(s) with errors: ' +
+                                data.errors.slice(0, 3).join('; ') +
+                                (data.errors.length > 3 ? '…' : '') + ')';
+                        }
+                        showFeedback(msg, data.has_errors ? 'error' : 'success');
+                        await loadRows();
+                        ctx.renderValidationStatus({ valid: true, preview: {} });
+                    } catch (err) {
+                        showFeedback(t.importFailed || 'Import failed', 'error');
+                        ctx.renderValidationStatus({ valid: false, message: err.message || t.importFailed });
+                    }
+                },
+            });
+        });
+    }
 
     document.getElementById('vq-edit-save')?.addEventListener('click', function () {
         saveEditedQuestion();

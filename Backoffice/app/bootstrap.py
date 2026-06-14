@@ -30,8 +30,28 @@ def init_upload_storage(app):
         app.logger.info("Filesystem storage active — upload folder: %s", upload_folder)
 
 
+def _apply_default_dynamic_settings(app, config_class):
+    """Apply config-class defaults without hitting the database."""
+    app.config['SUPPORTED_LANGUAGES'] = list(config_class.LANGUAGES)
+    app.config['TRANSLATABLE_LANGUAGES'] = [
+        code for code in config_class.LANGUAGES if code != 'en'
+    ]
+    app.config['SHOW_LANGUAGE_FLAGS'] = True
+    app.config['ENABLED_ENTITY_TYPES'] = list(
+        getattr(config_class, 'ENABLED_ENTITY_TYPES', ['countries', 'ns_structure', 'secretariat'])
+    )
+    app.config['DOCUMENT_TYPES'] = list(getattr(config_class, 'DOCUMENT_TYPES', []))
+    app.config['DEFAULT_AGE_GROUPS'] = list(getattr(config_class, 'DEFAULT_AGE_GROUPS', []))
+    app.config['DEFAULT_SEX_CATEGORIES'] = list(getattr(config_class, 'DEFAULT_SEX_CATEGORIES', []))
+
+
 def load_dynamic_settings(app, config_class, startup_start):
     """Load database-backed settings into app.config and Config class attributes."""
+    if app.config.get('TESTING'):
+        _apply_default_dynamic_settings(app, config_class)
+        app.logger.debug("Skipped dynamic settings DB load in TESTING mode")
+        return
+
     from app.services.app_settings_service import ALLOWED_ENTITY_TYPE_GROUPS, read_settings
 
     try:
@@ -133,17 +153,7 @@ def load_dynamic_settings(app, config_class, startup_start):
             app.logger.debug("AI settings apply skipped at startup: %s", ai_cfg_err)
 
     except Exception as e:
-        app.config['SUPPORTED_LANGUAGES'] = list(config_class.LANGUAGES)
-        app.config['TRANSLATABLE_LANGUAGES'] = [
-            code for code in config_class.LANGUAGES if code != 'en'
-        ]
-        app.config['SHOW_LANGUAGE_FLAGS'] = True
-        app.config['ENABLED_ENTITY_TYPES'] = list(
-            getattr(config_class, 'ENABLED_ENTITY_TYPES', ['countries', 'ns_structure', 'secretariat'])
-        )
-        app.config['DOCUMENT_TYPES'] = list(getattr(config_class, 'DOCUMENT_TYPES', []))
-        app.config['DEFAULT_AGE_GROUPS'] = list(getattr(config_class, 'DEFAULT_AGE_GROUPS', []))
-        app.config['DEFAULT_SEX_CATEGORIES'] = list(getattr(config_class, 'DEFAULT_SEX_CATEGORIES', []))
+        _apply_default_dynamic_settings(app, config_class)
         app.logger.warning("Dynamic settings failed, using defaults: %s", e)
 
     try:

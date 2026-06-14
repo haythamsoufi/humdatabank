@@ -29,10 +29,11 @@
     subtitle=_('Manage roles, permissions, and access rules.')
 ) }}
 
+<div class="bg-white shadow-md border border-gray-200">
 {% set active_tab = 'access_rules' %}
 {% include "admin/rbac/_rbac_tabs.html" %}
 
-<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+<div class="p-4 sm:p-6">
     <div class="mb-4 p-3 rounded-md border border-blue-200 bg-blue-50 text-blue-900 text-sm">
         <i class="fas fa-info-circle mr-2"></i>
         {{ _('Access rules let you allow or deny specific permissions for a user or role, optionally scoped (e.g., only for one template or assignment).') }}
@@ -136,5 +137,6 @@
     {% else %}
         {{ empty_state(icon="fas fa-inbox", title=_('No access rules defined yet.')) }}
     {% endif %}
+</div>
 </div>
 {% endblock %}

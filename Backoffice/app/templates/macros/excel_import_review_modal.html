@@ -1,0 +1,38 @@
+{#
+    Excel import review / confirm modal (indicator bank two-step import).
+
+    Page JS injects summary HTML into body_id and wires confirm/cancel handlers.
+#}
+{% from "macros/modal_shell.html" import modal_shell %}
+
+{% macro excel_import_review_modal(
+    modal_id='excel-import-review-modal',
+    body_id=none,
+    title=none,
+    confirm_label=none,
+    cancel_label=none,
+    confirm_variant='danger',
+    confirm_id=none,
+    cancel_id=none,
+    close_id=none,
+    max_width='max-w-2xl',
+    z_index=50
+) -%}
+{% set _title = title if title is not none else _('Review Import') %}
+{% set _confirm_label = confirm_label if confirm_label is not none else _('Apply Import') %}
+{% set _cancel_label = cancel_label if cancel_label is not none else _('Cancel') %}
+{% set _body_id = body_id or (modal_id ~ '-body') %}
+{% set _confirm_id = confirm_id or (modal_id ~ '-confirm-btn') %}
+{% set _cancel_id = cancel_id or (modal_id ~ '-cancel-btn') %}
+{% set _close_id = close_id or (modal_id ~ '-close-btn') %}
+{% set _confirm_btn_class = 'btn btn-danger' if confirm_variant == 'danger' else 'btn btn-success' %}
+{% set review_title %}<i class="fas fa-file-import mr-2 text-blue-600"></i> {{ _title }}{% endset %}
+{% call modal_shell(modal_id, review_title, aria_label=_title, max_width=max_width, title_safe=true, close_id=_close_id, z_index=z_index) %}
+    <div id="{{ _body_id }}" class="excel-io-review-modal__body"></div>
+    <div class="excel-io-review-modal__footer mt-4 -mx-6 -mb-6 px-6 pb-5 pt-3">
+        <button type="button" id="{{ _cancel_id }}" class="btn btn-secondary">{{ _cancel_label }}</button>
+        <button type="button" id="{{ _confirm_id }}" class="{{ _confirm_btn_class }}">{{ _confirm_label }}</button>
+        {{ caller() if caller else '' }}
+    </div>
+{% endcall %}
+{%- endmacro %}

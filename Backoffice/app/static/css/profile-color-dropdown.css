@@ -126,8 +126,8 @@
     font-weight: 500;
 }
 
-/* Dropdown arrow */
-.dropdown-arrow {
+/* Dropdown arrow (scoped to custom color dropdown only — avoid clashing with layout language selector) */
+.custom-color-dropdown .dropdown-arrow {
     width: 0;
     height: 0;
     border-left: 5px solid transparent;

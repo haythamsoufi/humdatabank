@@ -1407,7 +1407,7 @@ class FormDataService:
                 submission_id = assignment_entity_status.id if is_public_sub else None
 
                 if is_public_sub:
-                    st_ent_type, st_ent_id = "country", assignment_entity_status.country_id
+                    st_ent_type, st_ent_id = "country", assignment_entity_status.entity_id
                 else:
                     st_ent_type = assignment_entity_status.entity_type
                     st_ent_id = assignment_entity_status.entity_id
@@ -1652,7 +1652,7 @@ class FormDataService:
                     submission_id = assignment_entity_status.id if is_public_sub else None
 
                     if is_public_sub:
-                        st_ent_type, st_ent_id = "country", assignment_entity_status.country_id
+                        st_ent_type, st_ent_id = "country", assignment_entity_status.entity_id
                     else:
                         st_ent_type = assignment_entity_status.entity_type
                         st_ent_id = assignment_entity_status.entity_id

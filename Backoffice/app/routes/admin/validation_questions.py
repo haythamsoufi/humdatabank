@@ -8,7 +8,7 @@ from app import db
 from app.models import FormTemplate, Country
 from app.models.validation import ValidationQuestion
 from app.routes.admin import bp
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import VALIDATION_QUESTIONS_PERMISSION, permission_required
 from app.services.validation_dashboard_service import (
     global_periods_for_template,
     list_countries_for_period,
@@ -36,7 +36,7 @@ from app.utils.request_validation import enforce_csrf_json
 
 @bp.route("/validation-questions", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_admin():
     return render_template(
         "admin/validation_questions.html",
@@ -46,7 +46,7 @@ def validation_questions_admin():
 
 @bp.route("/validation-questions/api/periods", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_periods_api():
     template_id = request.args.get("template_id", type=int)
     if not template_id:
@@ -56,7 +56,7 @@ def validation_questions_periods_api():
 
 @bp.route("/validation-questions/api/countries", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_countries_api():
     template_id = request.args.get("template_id", type=int)
     period = request.args.get("period", type=str)
@@ -67,7 +67,7 @@ def validation_questions_countries_api():
 
 @bp.route("/validation-questions/api/list", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_list_api():
     template_id = request.args.get("template_id", type=int)
     period = request.args.get("period", type=str)
@@ -107,7 +107,7 @@ def validation_questions_list_api():
 
 @bp.route("/validation-questions/api/<int:question_id>/follow-up", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_create_follow_up(question_id: int):
     csrf_error = enforce_csrf_json()
     if csrf_error:
@@ -139,7 +139,7 @@ def validation_questions_create_follow_up(question_id: int):
 
 @bp.route("/validation-questions/api/<int:question_id>", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_update(question_id: int):
     csrf_error = enforce_csrf_json()
     if csrf_error:
@@ -184,7 +184,7 @@ def validation_questions_update(question_id: int):
 
 @bp.route("/validation-questions/api/<int:question_id>/status", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_update_status(question_id: int):
     csrf_error = enforce_csrf_json()
     if csrf_error:
@@ -218,7 +218,7 @@ def validation_questions_update_status(question_id: int):
 
 @bp.route("/validation-questions/export", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_export():
     template_id = request.args.get("template_id", type=int)
     period = request.args.get("period", type=str)
@@ -240,7 +240,7 @@ def validation_questions_export():
 
 @bp.route("/validation-questions/import-template", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_import_template():
     output = build_import_template_workbook()
     return send_file(
@@ -253,7 +253,7 @@ def validation_questions_import_template():
 
 @bp.route("/validation-questions/import", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.compliance")
+@permission_required(VALIDATION_QUESTIONS_PERMISSION)
 def validation_questions_import():
     csrf_form = FlaskForm()
     if not csrf_form.validate_on_submit():

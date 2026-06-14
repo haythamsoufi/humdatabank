@@ -42,6 +42,11 @@ function attachQuestionModal() {
     defaultTabSuffix: 'labels',
     // Add custom logic to load existing translations when modal opens
     onModalOpen: () => {
+      const questionTypeSelect = document.getElementById('item-question-type-select');
+      const questionType = questionTypeSelect ? questionTypeSelect.value : '';
+      if (window.ItemModal && typeof window.ItemModal.updateItemTranslationTabLabels === 'function') {
+        window.ItemModal.updateItemTranslationTabLabels('question', questionType);
+      }
       // Load existing translations from hidden inputs
       const labelTranslationsInput = document.getElementById('item-modal-shared-label-translations');
       const definitionTranslationsInput = document.getElementById('item-modal-definition-translations');
@@ -110,6 +115,9 @@ function attachIndicatorModal() {
     tabSuffixes: ['labels', 'definitions'],
     defaultTabSuffix: 'labels',
     onModalOpen: () => {
+      if (window.ItemModal && typeof window.ItemModal.updateItemTranslationTabLabels === 'function') {
+        window.ItemModal.updateItemTranslationTabLabels('indicator');
+      }
       const labelTranslationsInput = document.getElementById('item-modal-shared-label-translations');
       const definitionTranslationsInput = document.getElementById('item-modal-definition-translations');
       let labelTranslations = {};

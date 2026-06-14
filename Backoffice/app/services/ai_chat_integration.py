@@ -253,6 +253,7 @@ class AIChatIntegration:
                     'answer_content': result.get('answer_content'),
                     'output_hint': result.get('output_hint'),
                     'trace_id': result.get('trace_id'),
+                    'form_builder_result': result.get('form_builder_result'),
                 }
                 function_calls = [
                     step.get('action')
@@ -299,6 +300,8 @@ class AIChatIntegration:
                     'chart_payload': result.get('chart_payload'),
                     'answer_content': result.get('answer_content'),
                     'output_hint': result.get('output_hint'),
+                    'trace_id': result.get('trace_id'),
+                    'form_builder_result': result.get('form_builder_result'),
                 }
                 function_calls = [
                     step.get('action')

@@ -1,9 +1,13 @@
 # Full-suite coverage run (fresh .coverage + HTML + XML).
-# Usage: .\tests\run_full_coverage.ps1 [-Parallel] [-Workers <n>]
+# Usage: .\tests\run_full_coverage.ps1 [-Workers <n>] [-Parallel]
+#
+# Each worker gets its own database (ngo_databank_test_gw0 ... _gwN) so parallel
+# workers no longer contend for DDL locks. The databases are created
+# automatically by conftest.py if they do not already exist.
 
 param(
     [switch]$Parallel,
-    [int]$Workers = 0,
+    [int]$Workers = 4,
     [string[]]$ExtraArgs = @()
 )
 
@@ -18,12 +22,17 @@ if (-not $env:TEST_DATABASE_URL -and -not $env:DATABASE_URL) {
 }
 
 $parallelArgs = @()
-if ($Parallel) {
-    if ($Workers -gt 0) {
-        $parallelArgs = @("-n", "$Workers")
-    } else {
-        $parallelArgs = @("-n", "auto")
-    }
+if ($Workers -gt 0) {
+    $parallelArgs = @("-n", "$Workers", "--dist", "loadfile")
+}
+elseif ($Parallel) {
+    $parallelArgs = @("-n", "auto", "--dist", "loadfile")
+}
+
+if ($Workers -gt 8) {
+    Write-Host "NOTE: $Workers workers - each gets its own database (auto-created)." -ForegroundColor DarkGray
+    Write-Host "      Very high counts may exhaust PostgreSQL connection limits." -ForegroundColor DarkGray
+    Write-Host ""
 }
 
 Write-Host "Erasing previous coverage data..." -ForegroundColor Cyan
@@ -37,12 +46,18 @@ $pytestArgs = @(
 ) + $parallelArgs + $ExtraArgs
 
 Write-Host "Running full coverage suite..." -ForegroundColor Cyan
+Write-Host "Command: python -m pytest $($pytestArgs -join ' ')" -ForegroundColor DarkGray
+if ($parallelArgs.Count -gt 0) {
+    Write-Host "Tip: first tests are slow (Flask boot + full DB schema rebuild per test)." -ForegroundColor DarkGray
+    Write-Host "     Live progress: Get-Content test_results.log -Wait -Tail 5" -ForegroundColor DarkGray
+}
 python -m pytest @pytestArgs
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -eq 0) {
     Write-Host "Coverage: htmlcov\index.html and coverage.xml" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "Tests finished with exit code $exitCode" -ForegroundColor Red
 }
 

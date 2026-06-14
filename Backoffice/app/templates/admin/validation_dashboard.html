@@ -7,12 +7,31 @@
 
 {% block head %}
     {{ super() }}
-    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="{{ static_url('css/validation-dashboard.css') }}">
     <link rel="stylesheet" href="{{ static_url('vendor/leaflet/leaflet.css') }}">
 {% endblock %}
 
 {% block content %}
+
+{% set vd_header_actions = namespace(items=[]) %}
+{% if is_system_manager or has_permission('admin.validation.questions') %}
+    {% set __ = vd_header_actions.items.append({
+        'type': 'link',
+        'text': _('Manage Questions'),
+        'icon': 'fas fa-clipboard-question',
+        'url': url_for('admin.validation_questions_admin'),
+        'classes': 'professional-action-btn'
+    }) %}
+{% endif %}
+{% if is_system_manager or has_permission('admin.validation.rules') %}
+    {% set __ = vd_header_actions.items.append({
+        'type': 'link',
+        'text': _('Rules Registry'),
+        'icon': 'fas fa-shield-alt',
+        'url': url_for('admin.validation_rules_admin'),
+        'classes': 'professional-action-btn professional-action-btn-blue'
+    }) %}
+{% endif %}
 
 {{ page_header(
     title=_('Validation Dashboard'),
@@ -23,15 +42,7 @@
         {'name': _('Explore Data'), 'url': url_for('data_exploration.explore_data')},
         {'name': _('Validation Dashboard')}
     ],
-    actions=[
-        {
-            'type': 'link',
-            'text': _('Manage Questions'),
-            'icon': 'fas fa-clipboard-question',
-            'url': url_for('admin.validation_questions_admin'),
-            'classes': 'professional-action-btn'
-        }
-    ]
+    actions=vd_header_actions.items
 ) }}
 
 <div id="vd-feedback" class="hidden mb-4 rounded-md px-4 py-3 text-sm border" role="status" aria-live="polite"></div>

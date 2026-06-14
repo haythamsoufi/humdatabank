@@ -124,12 +124,34 @@ class AssignedForm(db.Model):
     @property
     def countries(self):
         """Get countries for country-level entity statuses (AES)."""
-        return [aes.country for aes in self.country_statuses.all() if aes.country]
+        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+
+        statuses = self.country_statuses.all()
+        if not statuses:
+            return []
+        countries_map = batch_countries_for_aes_list(statuses)
+        result = []
+        for aes in statuses:
+            country = _country_for_aes(aes, countries_map)
+            if country:
+                result.append(country)
+        return result
 
     @property
     def public_countries(self):
         """Get countries that are available for public reporting (AES)."""
-        return [aes.country for aes in self.country_statuses.filter_by(is_public_available=True).all() if aes.country]
+        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+
+        statuses = self.country_statuses.filter_by(is_public_available=True).all()
+        if not statuses:
+            return []
+        countries_map = batch_countries_for_aes_list(statuses)
+        result = []
+        for aes in statuses:
+            country = _country_for_aes(aes, countries_map)
+            if country:
+                result.append(country)
+        return result
 
     def add_country(self, country):
         """Add a country to this assignment by creating an AssignmentEntityStatus entry."""

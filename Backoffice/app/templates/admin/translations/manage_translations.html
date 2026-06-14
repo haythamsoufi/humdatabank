@@ -1,13 +1,11 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 
 {% block title %}{{ _('Manage Translations') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
-    <!-- CSRF Token -->
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
     <style>
         .tab-button {
             transition: all 0.2s ease-in-out;
@@ -226,9 +224,9 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {# Excel Export #}
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <h4 class="text-lg font-semibold text-gray-900 mb-2 flex items-center">
-                            <i class="fas fa-file-excel text-green-600 mr-2"></i>{{ _('Excel Export') }}
+                    <div class="excel-io-card">
+                        <h4 class="excel-io-card__title">
+                            <i class="fas fa-file-excel text-green-600"></i>{{ _('Excel Export') }}
                         </h4>
                         <p class="text-sm text-gray-600 mb-4">
                             {{ _('Export all languages in a single Excel file. Easy to edit and reimport.') }}
@@ -280,9 +278,9 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {# Excel Import #}
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <h4 class="text-lg font-semibold text-gray-900 mb-2 flex items-center">
-                            <i class="fas fa-file-excel text-green-600 mr-2"></i>{{ _('Excel Import') }}
+                    <div class="excel-io-card">
+                        <h4 class="excel-io-card__title">
+                            <i class="fas fa-file-excel text-green-600"></i>{{ _('Excel Import') }}
                         </h4>
                         <p class="text-sm text-gray-600 mb-4">
                             {{ _('Import an edited Excel file. Updates translations for all languages.') }}
@@ -292,15 +290,13 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <input type="hidden" name="format" value="xlsx"/>
 
-                            <div class="file-upload-wrapper relative h-32 border-2 border-dashed border-gray-300 rounded-lg">
-                                <input type="file" name="file" id="translations-import-excel-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select Excel file to import') }}" accept=".xlsx,.xls"/>
-                                <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
-                                    <div class="text-center">
-                                        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
-                                        <p class="text-sm text-gray-500">{{ _('Click or drag Excel file here') }}</p>
-                                    </div>
-                                </div>
-                            </div>
+                            {% call excel_import_dropzone(
+                                'translations-excel-dropzone',
+                                input_id='translations-import-excel-file',
+                                input_name='file',
+                                show_status_panel=false,
+                                title=_('Click or drag Excel file here')
+                            ) %}{% endcall %}
 
                             <div class="flex items-start gap-2">
                                 <input id="translations-excel-only-non-empty" type="checkbox" name="only_non_empty" value="1" checked class="mt-1">

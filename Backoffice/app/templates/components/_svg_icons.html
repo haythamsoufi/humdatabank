@@ -1,3 +1,10 @@
+{#
+  Icon system — hybrid rule:
+  - Use svg_icon('name') for icons that exist in icons/*.svg (custom set, inlined SVG)
+  - Use <i class="fas fa-xxx"> for icons not in the custom set (FontAwesome web font)
+  - To add a new icon to the SVG set, drop name.svg into icons/ and use svg_icon()
+  - Prefer SVG for icons used frequently in the sidebar (avoids extra FA requests)
+#}
 {# SVG Icon Helper Template #}
 {% macro svg_icon(name, class="w-6 h-6") %}
 <span class="inline-block {{ class }}">

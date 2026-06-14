@@ -53,6 +53,8 @@ from .data_retrieval_form import (
     get_assignment_indicator_values,
     get_form_field_value,
     get_indicator_timeseries,
+    query_dynamic_indicator_data,
+    query_repeat_group_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -581,4 +583,6 @@ __all__ = [
     'query_form_data',
     'get_form_data_queries',
     'get_form_field_value',
+    'query_dynamic_indicator_data',
+    'query_repeat_group_data',
 ]

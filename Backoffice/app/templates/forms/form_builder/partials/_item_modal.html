@@ -138,18 +138,39 @@
 
                         <div class="mb-4">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
-                                <label for="item-question-label" class="text-gray-700 text-sm font-semibold">{{ _('Question Text') }}</label>
+                                <label for="item-question-label"
+                                       id="item-question-label-caption"
+                                       class="text-gray-700 text-sm font-semibold"
+                                       data-default-text="{{ _('Question Text') }}"
+                                       data-blank-text="{{ _('Heading') }}">{{ _('Question Text') }}</label>
                                 <button type="button" id="question-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
-                            <textarea data-field-type="label" id="item-question-label" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Enter question text') }}" autocomplete="off"></textarea>
+                            <textarea data-field-type="label"
+                                      id="item-question-label"
+                                      class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                      rows="3"
+                                      data-default-placeholder="{{ _('Enter question text') }}"
+                                      data-blank-placeholder="{{ _('Optional heading shown in bold') }}"
+                                      placeholder="{{ _('Enter question text') }}"
+                                      autocomplete="off"></textarea>
                         </div>
 
-                        <!-- Definition -->
+                        <!-- Definition / body text (label varies for Blank/Note) -->
                         <div class="mb-4">
-                            <label for="item-question-definition" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Definition') }}</label>
-                            <textarea name="definition" id="item-question-definition" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Detailed definition/description of this question') }}"></textarea>
+                            <label for="item-question-definition"
+                                   id="item-question-definition-caption"
+                                   class="block text-gray-700 text-sm font-semibold mb-2"
+                                   data-default-text="{{ _('Definition') }}"
+                                   data-blank-text="{{ _('Body text') }}">{{ _('Definition') }}</label>
+                            <textarea name="definition"
+                                      id="item-question-definition"
+                                      class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                      rows="3"
+                                      data-default-placeholder="{{ _('Detailed definition/description of this question') }}"
+                                      data-blank-placeholder="{{ _('Text shown below the heading') }}"
+                                      placeholder="{{ _('Detailed definition/description of this question') }}"></textarea>
                         </div>
 
                         <!-- Options Source - Hidden by default -->
@@ -254,37 +275,35 @@
                                 return type === 'single_choice' || type === 'multiple_choice';
                             }
 
-                            // Function to handle options containers visibility
+                            // Function to handle options containers visibility.
+                            // Uses Utils.showElement / Utils.hideElement (available as window.Utils)
+                            // so that inline style set by those helpers is also cleared/restored,
+                            // not just the Tailwind 'hidden' CSS class.
                             function updateOptionsVisibility() {
                                 const selectedType = questionTypeSelect.value;
                                 const isChoice = isChoiceType(selectedType);
 
-                                // Show/hide options source section
+                                // Show/hide options source section (class-only; no Utils call touches this element)
                                 optionsSourceContainer.classList.toggle('hidden', !isChoice);
 
                                 // If it's not a choice type, hide both options containers
                                 if (!isChoice) {
-                                    manualOptionsContainer.classList.add('hidden');
-                                    calculatedListContainer.classList.add('hidden');
+                                    Utils.hideElement(manualOptionsContainer);
+                                    Utils.hideElement(calculatedListContainer);
                                     return;
                                 }
 
                                 // If it is a choice type, show the appropriate container based on selected source
                                 const selectedSource = Array.from(optionsSourceRadios).find(radio => radio.checked)?.value;
 
-                                // Manual list behaviour
                                 const isManual = selectedSource === 'manual';
-                                manualOptionsContainer.classList.toggle('hidden', !isManual);
-
-                                // List Library behaviour
                                 const isListLibrary = selectedSource === 'calculated';
 
                                 if (isListLibrary) {
                                     // Ensure right pane is visible & two-column layout activated
                                     if (rightHalf && gridContainer) {
-                                        rightHalf.classList.remove('hidden');
+                                        Utils.showElement(rightHalf);
                                         gridContainer.classList.add('md:grid-cols-2');
-                                        // Widen modal
                                         if (modalContent) {
                                             modalContent.classList.remove('max-w-xl');
                                             modalContent.classList.add('max-w-6xl');
@@ -295,10 +314,10 @@
                                             rightHalf.appendChild(calculatedListContainer);
                                         }
                                     }
-                                    calculatedListContainer.classList.remove('hidden');
+                                    Utils.showElement(calculatedListContainer);
                                 } else {
                                     // Hide calculated container & move back to original parent if needed
-                                    calculatedListContainer.classList.add('hidden');
+                                    Utils.hideElement(calculatedListContainer);
                                     if (calculatedOriginalParent && !calculatedOriginalParent.contains(calculatedListContainer)) {
                                         calculatedOriginalParent.appendChild(calculatedListContainer);
                                     }
@@ -307,7 +326,7 @@
                                     if (rightHalf && gridContainer) {
                                         const hasVisibleContent = Array.from(rightHalf.children).some(ch => !ch.classList.contains('hidden'));
                                         if (!hasVisibleContent) {
-                                            rightHalf.classList.add('hidden');
+                                            Utils.hideElement(rightHalf);
                                             gridContainer.classList.remove('md:grid-cols-2');
                                             if (modalContent) {
                                                 modalContent.classList.remove('max-w-6xl');
@@ -317,11 +336,10 @@
                                     }
                                 }
 
-                                if(isManual) {
-                                     if (rightHalf && gridContainer) {
-                                        rightHalf.classList.remove('hidden');
+                                if (isManual) {
+                                    if (rightHalf && gridContainer) {
+                                        Utils.showElement(rightHalf);
                                         gridContainer.classList.add('md:grid-cols-2');
-                                        // Widen modal
                                         if (modalContent) {
                                             modalContent.classList.remove('max-w-xl');
                                             modalContent.classList.add('max-w-6xl');
@@ -332,7 +350,7 @@
                                             rightHalf.appendChild(manualOptionsContainer);
                                         }
                                     }
-                                    manualOptionsContainer.classList.remove('hidden');
+                                    Utils.showElement(manualOptionsContainer);
 
                                     const optionsList = document.getElementById('item-question-options-list');
                                     if (optionsList && optionsList.children.length === 0) {
@@ -341,15 +359,15 @@
                                         }
                                     }
                                 } else {
-                                    manualOptionsContainer.classList.add('hidden');
+                                    Utils.hideElement(manualOptionsContainer);
                                     if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
                                         manualOriginalParent.appendChild(manualOptionsContainer);
                                     }
 
-                                     if (rightHalf && gridContainer) {
+                                    if (rightHalf && gridContainer) {
                                         const hasVisibleContent = Array.from(rightHalf.children).some(ch => !ch.classList.contains('hidden'));
                                         if (!hasVisibleContent) {
-                                            rightHalf.classList.add('hidden');
+                                            Utils.hideElement(rightHalf);
                                             gridContainer.classList.remove('md:grid-cols-2');
                                             if (modalContent) {
                                                 modalContent.classList.remove('max-w-6xl');

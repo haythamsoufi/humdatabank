@@ -5,9 +5,6 @@
 
 {% block head %}
     {{ super() }}
-    <!-- CSRF Token -->
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
 {% endblock %}
 
 {% block content %}
@@ -791,6 +788,7 @@
 <script src="{{ static_url('js/form_builder/modules/utils.js') }}"></script>
 <script type="application/json" id="entity-management-data">[
 {% for aes in assignment_entities %}
+{% set aes_display_name = assignment_entity_display.get(aes.id, '') if assignment_entity_display is defined else EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) %}
 {
     "id": {{ aes.id }},
     "entity_type": {{ (aes.entity_type or '')|tojson }},
@@ -805,7 +803,7 @@
         'Cluster Office' if aes.entity_type == 'cluster_office' else
         (aes.entity_type | replace('_', ' ') | title)
     )|tojson }},
-    "entity_name": {{ EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True)|tojson }},
+    "entity_name": {{ aes_display_name|tojson }},
     "entity_id": {{ aes.entity_id|tojson }},
     "status": {{ (aes.status or '')|tojson }},
     "due_date": {{ (aes.due_date|datetime_iso if aes.due_date else '')|tojson }},
@@ -816,8 +814,8 @@
     "add_to_public_url": {{ (url_for('assignment_management.add_country_to_public', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson }},
     "remove_country_url": {{ (url_for('assignment_management.remove_country_from_assignment', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and aes.entity_type == 'country' else '')|tojson }},
     "remove_entity_url": {{ (url_for('assignment_management.remove_entity_from_assignment', assignment_id=assignment.id, status_id=aes.id) if assignment and aes.entity_type != 'country' else '')|tojson }},
-    "remove_confirm": {{ ('Are you sure you want to remove ' + EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) + ' from this assignment and delete its data?')|tojson }},
-    "remove_public_confirm": {{ ('Remove ' + EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) + ' from public reporting?')|tojson }}
+    "remove_confirm": {{ ('Are you sure you want to remove ' + aes_display_name + ' from this assignment and delete its data?')|tojson }},
+    "remove_public_confirm": {{ ('Remove ' + aes_display_name + ' from public reporting?')|tojson }}
 }{% if not loop.last %},{% endif %}
 {% endfor %}
 ]</script>
@@ -837,7 +835,7 @@ window.manageAssignmentConfig = {
     assignmentCountryIds: [
         {%- if assignment -%}
         {%- for aes in assignment_countries -%}
-            {{ aes.country.id }}{%- if not loop.last -%},{%- endif -%}
+            {{ aes.entity_id }}{%- if not loop.last -%},{%- endif -%}
         {%- endfor -%}
         {%- endif -%}
     ],

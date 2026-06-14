@@ -1,0 +1,492 @@
+    <script nonce="{{ csp_nonce() }}">
+        // Add/Edit Modal functionality
+        function openAddModal() {
+            try {
+                const modal = document.getElementById('editModal');
+                if (modal) {
+                    // Set modal to "add" mode
+                    const modalTitle = document.getElementById('editModal-title');
+                    const modalSubtitle = document.getElementById('modalSubtitle');
+                    const submitButton = document.getElementById('submitButton');
+                    const editForm = document.getElementById('editForm');
+                    const idField = document.getElementById('edit_id');
+
+                    if (modalTitle) modalTitle.textContent = 'Add New Common Word';
+                    if (modalSubtitle) modalSubtitle.style.display = 'none';
+                    if (submitButton) submitButton.textContent = 'Save';
+                    if (editForm) {
+                        editForm.action = '{{ url_for("system_admin.add_common_word_modal") }}';
+                    }
+                    if (idField) idField.value = '';
+
+                    // Reset form
+                    if (editForm) {
+                        editForm.reset();
+                        // Set is_active checkbox to checked by default for new entries
+                        const activeField = document.getElementById('edit_is_active');
+                        if (activeField) activeField.checked = true;
+                    }
+
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    console.error('Edit modal not found');
+                }
+            } catch (error) {
+                console.error('Error opening add modal:', error);
+            }
+        }
+
+        function openEditModal(id, term, meaning, isActive, translations) {
+            try {
+                const modal = document.getElementById('editModal');
+                if (modal) {
+                    // Set modal to "edit" mode
+                    const modalTitle = document.getElementById('editModal-title');
+                    const modalSubtitle = document.getElementById('modalSubtitle');
+                    const submitButton = document.getElementById('submitButton');
+                    const termDisplay = document.getElementById('editTermDisplay');
+
+                    if (modalTitle) modalTitle.textContent = 'Edit Common Word';
+                    if (modalSubtitle) {
+                        modalSubtitle.style.display = 'block';
+                    }
+                    if (submitButton) submitButton.textContent = 'Update';
+                    if (termDisplay) termDisplay.textContent = term;
+
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+
+                    // Populate form fields
+                    const idField = document.getElementById('edit_id');
+                    const termField = document.getElementById('edit_term');
+                    const meaningField = document.getElementById('edit_meaning');
+                    const activeField = document.getElementById('edit_is_active');
+
+                    if (idField) idField.value = id;
+                    if (termField) termField.value = term;
+                    if (meaningField) meaningField.value = meaning;
+                    if (activeField) activeField.checked = isActive;
+
+                    // Set form action
+                    const editForm = document.getElementById('editForm');
+                    if (editForm) {
+                        editForm.action = `{{ url_for('system_admin.edit_common_word_modal', id=0) }}`.replace('/0', `/${id}`);
+                    }
+
+                    // Populate translations dynamically
+                    const translationFields = {};
+                    const translatableLanguages = {{ TRANSLATABLE_LANGUAGES | tojson | safe }};
+                    translatableLanguages.forEach(code => {
+                        translationFields[code] = `edit_meaning_${code}`;
+                    });
+
+                    Object.keys(translationFields).forEach(lang => {
+                        const fieldId = translationFields[lang];
+                        const field = document.getElementById(fieldId);
+                        const value = translations && translations[lang] ? translations[lang] : '';
+                        if (field) field.value = value;
+                    });
+                } else {
+                    console.error('Edit modal not found');
+                }
+            } catch (error) {
+                console.error('Error opening edit modal:', error);
+            }
+        }
+
+        function closeEditModal() {
+            try {
+                const modal = document.getElementById('editModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                }
+            } catch (error) {
+                console.error('Error closing edit modal:', error);
+            }
+        }
+
+        // Handle form submissions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Edit form submission (used for both add and edit)
+            const editForm = document.getElementById('editForm');
+            if (editForm) {
+                editForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const idField = document.getElementById('edit_id');
+                    const isAddMode = !idField || !idField.value;
+                    submitForm(editForm, isAddMode ? 'add' : 'edit');
+                });
+            }
+        });
+
+        function submitForm(form, type) {
+            const formData = new FormData(form);
+            const url = form.action;
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            // Prevent double submission
+            if (submitBtn && submitBtn.disabled) return;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Saving...") }}';
+            }
+
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    showNotification(data.message, 'success');
+
+                    // Close modal
+                    closeEditModal();
+
+                    // Reload page to show updated data
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    // Show error message
+                    showNotification(data.message, 'error');
+
+                    // Show validation errors if any
+                    if (data.errors) {
+                        showValidationErrors(data.errors);
+                    }
+
+                    // Re-enable button on error
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        if (submitBtn.dataset.originalHtml) {
+                            submitBtn.innerHTML = submitBtn.dataset.originalHtml;
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while processing your request.', 'error');
+
+                // Re-enable button on error
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    if (submitBtn.dataset.originalHtml) {
+                        submitBtn.innerHTML = submitBtn.dataset.originalHtml;
+                    }
+                }
+            });
+        }
+
+        function showNotification(message, type) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+                type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`;
+            notification.textContent = message;
+
+            // Add to page
+            document.body.appendChild(notification);
+
+            // Remove after 5 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        function showValidationErrors(errors) {
+            // Clear previous error messages
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+            // Show new error messages
+            Object.keys(errors).forEach(field => {
+                const fieldElement = document.querySelector(`[name="${field}"]`);
+                if (fieldElement) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message text-red-600 text-sm mt-1';
+                    errorDiv.textContent = errors[field].join(', ');
+
+                    fieldElement.parentNode.appendChild(errorDiv);
+                }
+            });
+        }
+
+        // Close edit modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            const editModal = document.getElementById('editModal');
+
+            if (editModal) {
+                editModal.addEventListener('click', function(e) {
+                    if (e.target === editModal) {
+                        closeEditModal();
+                    }
+                });
+            }
+
+            const form = document.getElementById('importForm');
+
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const fileInput = document.getElementById('excel_file');
+                    if (!fileInput || !fileInput.files[0]) {
+                        e.preventDefault();
+                        if (window.showAlert) window.showAlert('Please select a file', 'warning');
+                        else window.__clientWarn && window.__clientWarn('Please select a file');
+                        return;
+                    }
+
+                    const file = fileInput.files[0];
+                    if (!validateFile(file)) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            import('{{ static_url('js/components/excel-import-dropzone.js') }}').then(function(mod) {
+                mod.initExcelImportDropzone('#common-words-import-dropzone', {
+                    acceptExtensions: ['.xlsx', '.xls'],
+                    maxSizeBytes: 10 * 1024 * 1024,
+                    onFileSelected: function(file) {
+                        if (file && !validateFile(file)) {
+                            const fileInput = document.getElementById('excel_file');
+                            if (fileInput) fileInput.value = '';
+                        }
+                    },
+                });
+            });
+        });
+
+        function validateFile(file) {
+            const allowedTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+                'application/vnd.ms-excel' // .xls
+            ];
+
+            if (!allowedTypes.includes(file.type)) {
+                if (window.showAlert) window.showAlert('Please select a valid Excel file (.xlsx or .xls)', 'warning');
+                else window.__clientWarn && window.__clientWarn('Please select a valid Excel file');
+                return false;
+            }
+
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                if (window.showAlert) window.showAlert('File size must be less than 10MB', 'warning');
+                else window.__clientWarn && window.__clientWarn('File size must be less than 10MB');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeEditModal();
+            }
+        });
+
+    </script>
+
+    <script nonce="{{ csp_nonce() }}">
+    (function () {
+    'use strict';
+    if (typeof AgGridHelper === 'undefined') return;
+
+    let commonWordsGridHelper = null;
+    let commonWordsGridApi = null;
+
+    // Transform common words data for ag-grid
+    const commonWordsData = [
+        {% for word in common_words %}
+        {
+            id: {{ word.id }},
+            term: {{ word.term|tojson|safe }},
+            meaning: {{ word.meaning|tojson|safe }},
+            is_active: {{ word.is_active|lower }},
+            created_at: {{ (word.created_at|datetime_iso if word.created_at else '')|tojson|safe }},
+            meaning_translations: {{ (word.meaning_translations|tojson|safe if word.meaning_translations else '{}') }},
+            delete_url: "{{ url_for('system_admin.delete_common_word', id=word.id) }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const commonWordsColumnDefs = [
+        {
+            field: 'term',
+            headerName: 'Term',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'font-weight': '500', 'color': '#1f2937' }
+        },
+        {
+            field: 'meaning',
+            headerName: 'Meaning',
+            width: 400,
+            minWidth: 250,
+            maxWidth: 600,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellRenderer: function(params) {
+                if (!params.value) return '-';
+                const maxLength = 100;
+                if (params.value.length > maxLength) {
+                    return params.value.substring(0, maxLength) + '...';
+                }
+                return params.value;
+            }
+        },
+        {
+            field: 'is_active',
+            headerName: 'Status',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            filter: 'customSetFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                const isActive = params.value;
+                if (isActive) {
+                    return '<span class="status-badge status-active"><i class="fas fa-check-circle mr-1"></i>Active</span>';
+                } else {
+                    return '<span class="status-badge status-inactive"><i class="fas fa-times-circle mr-1"></i>Inactive</span>';
+                }
+            },
+            cellStyle: { 'text-align': 'center' }
+        },
+        {
+            field: 'created_at',
+            headerName: 'Created',
+            width: 150,
+            minWidth: 120,
+            maxWidth: 200,
+            filter: 'agDateColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateOnly
+        },
+        {
+            field: 'actions',
+            headerName: 'Actions',
+            width: 120,
+            minWidth: 100,
+            maxWidth: 150,
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                const data = params.data;
+                const termEscaped = (data.term || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const meaningEscaped = (data.meaning || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const translationsJson = JSON.stringify(data.meaning_translations || {}).replace(/'/g, "\\'");
+                const deleteUrl = data.delete_url || '';
+                const deleteConfirm = 'Are you sure you want to delete this common word?';
+
+                let html = '<div class="flex items-center justify-center gap-2">';
+                html += '<button class="edit-common-word-btn text-blue-600 hover:text-blue-800 transition-colors" ';
+                html += 'data-word-id="' + data.id + '" ';
+                html += 'data-term="' + termEscaped + '" ';
+                html += 'data-meaning="' + meaningEscaped + '" ';
+                html += 'data-is-active="' + data.is_active + '" ';
+                html += 'data-translations="' + translationsJson.replace(/"/g, '&quot;') + '" ';
+                html += 'title="Edit">';
+                html += '<i class="fas fa-pen"></i></button>';
+                html += '<form method="POST" action="' + deleteUrl + '" ';
+                html += 'class="inline delete-common-word-form" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '">';
+                html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+                html += '<button type="submit" title="Delete" class="text-red-600 hover:text-red-800 transition-colors">';
+                html += '<i class="fas fa-trash"></i></button>';
+                html += '</form>';
+                html += '</div>';
+                return html;
+            }
+        }
+    ];
+
+    function initCommonWordsGrid() {
+        if (commonWordsGridApi || !document.getElementById('commonWordsGrid')) return;
+        var result = AgGridHelper.create('commonWordsGrid', 'common-words', commonWordsColumnDefs, commonWordsData, {
+            columnVisibility: { buttonPlaceholderId: 'commonWordsGrid-colvis' },
+        });
+        commonWordsGridHelper = result.helper;
+        commonWordsGridApi = result.api;
+        window.commonWordsGridApi = commonWordsGridApi;
+        window.commonWordsGridHelper = commonWordsGridHelper;
+    }
+    window.initCommonWordsGrid = initCommonWordsGrid;
+
+    document.addEventListener('indicator-bank-tab-activated', function (e) {
+        if (e && e.detail && e.detail.tab === 'common_words') {
+            setTimeout(function () {
+                initCommonWordsGrid();
+                if (commonWordsGridApi && typeof commonWordsGridApi.sizeColumnsToFit === 'function') {
+                    commonWordsGridApi.sizeColumnsToFit();
+                }
+            }, 80);
+        }
+    });
+
+    // Event listeners for modal buttons
+    document.addEventListener('DOMContentLoaded', function() {
+        // Open add modal
+        const openAddBtn = document.getElementById('cwAddBtn');
+        if (openAddBtn && typeof openAddModal === 'function') {
+            openAddBtn.addEventListener('click', openAddModal);
+        }
+
+        // Close edit modal
+        const closeEditBtn = document.getElementById('close-edit-modal-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-modal-btn');
+        if (closeEditBtn && typeof closeEditModal === 'function') {
+            closeEditBtn.addEventListener('click', closeEditModal);
+        }
+        if (cancelEditBtn && typeof closeEditModal === 'function') {
+            cancelEditBtn.addEventListener('click', closeEditModal);
+        }
+
+        // Edit common word button (event delegation for dynamically created buttons)
+        $(document).on('click', '.edit-common-word-btn', function() {
+            if (typeof openEditModal === 'function') {
+                const wordId = $(this).data('word-id');
+                const term = $(this).data('term');
+                const meaning = $(this).data('meaning');
+                const isActive = $(this).data('is-active');
+                const translations = $(this).data('translations');
+                openEditModal(wordId, term, meaning, isActive, translations);
+            }
+        });
+
+        // Delete common word form (event delegation)
+        $(document).on('submit', '.delete-common-word-form', function(e) {
+            const confirmMsg = $(this).data('confirm');
+            if (confirmMsg) {
+                e.preventDefault();
+                const form = this;
+                function doSubmit() { form.submit(); }
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(confirmMsg, doSubmit, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                } else if (window.showConfirmation) {
+                    window.showConfirmation(confirmMsg, doSubmit, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                } else {
+                    doSubmit();
+                }
+                return false;
+            }
+        });
+    });
+    })();
+    </script>

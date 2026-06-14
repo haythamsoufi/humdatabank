@@ -91,20 +91,22 @@ def _standalone_entity_for_library_paths(document: SubmittedDocument) -> tuple[s
 
 def _document_modal_entity_choice_rows_for_admin():
     """All linkable entities for admin document modal (single dropdown)."""
-    rows = []
+    pairs = []
     for et_slug, model_class in EntityService.ENTITY_MODEL_MAP.items():
         try:
             for obj in model_class.query.all():
                 eid = getattr(obj, "id", None)
-                if eid is None:
-                    continue
-                try:
-                    label = EntityService.get_localized_entity_name(et_slug, int(eid), include_hierarchy=True)
-                except Exception:
-                    label = f"{et_slug} #{eid}"
-                rows.append({"entity_type": et_slug, "entity_id": int(eid), "label": label})
+                if eid is not None:
+                    pairs.append((et_slug, int(eid)))
         except Exception:
             continue
+    name_map = EntityService.batch_entity_names(
+        pairs, include_hierarchy=True, localized=True,
+    ) if pairs else {}
+    rows = []
+    for et_slug, eid in pairs:
+        label = name_map.get((et_slug, eid)) or f"{et_slug} #{eid}"
+        rows.append({"entity_type": et_slug, "entity_id": eid, "label": label})
     EntityService.sort_document_modal_entity_choice_rows(rows)
     return rows
 
@@ -152,7 +154,7 @@ def _focal_user_can_access_submitted_document(document: SubmittedDocument, user)
             aes = AssignmentEntityStatus.query.get(document.assignment_entity_status_id)
         if not aes:
             return False
-        if aes.country_id is not None and aes.country_id in cids:
+        if aes.entity_type == 'country' and aes.entity_id in cids:
             return True
         return EntityService.check_user_entity_access(user, aes.entity_type, aes.entity_id)
     if document.public_submission_id:

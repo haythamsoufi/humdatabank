@@ -18,9 +18,6 @@
 
 {% block head %}
     {{ super() }}
-    <!-- CSRF Token -->
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
 {% endblock %}
 
 {% block content %}
@@ -267,7 +264,12 @@
             "total_countries": {{ countries_by_region.values() | map('length') | sum }},
             {# Only System Managers can edit other admins; admins can still edit themselves. #}
             {% set can_edit_target_user = can_edit_user and (current_is_system_manager or (not is_admin_user) or (current_user.is_authenticated and user.id == current_user.id)) %}
-            "edit_url": {{ (url_for('user_management.edit_user', user_id=user.id) if can_edit_target_user else '')|tojson }}
+            {% set edit_denied_message = '' %}
+            {% if can_edit_user and not can_edit_target_user and is_admin_user %}
+                {% set edit_denied_message = _('Only a System Manager can modify an admin user.') %}
+            {% endif %}
+            "edit_url": {{ (url_for('user_management.edit_user', user_id=user.id) if can_edit_target_user else '')|tojson }},
+            "edit_denied_message": {{ edit_denied_message|tojson }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ]</script>

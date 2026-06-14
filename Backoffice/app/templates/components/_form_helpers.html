@@ -66,11 +66,11 @@
     {% if legend_text or field.label %}
       <legend class="block text-gray-700 text-sm font-semibold mb-2">{{ legend_text or field.label.text }}</legend>
     {% endif %}
-    <div class="p-4 border border-gray-200 rounded-md">
+    <div class="p-4 border border-gray-200 rounded-md" data-country-region-select="true">
       {# Global Select All Checkbox #}
       <div class="flex items-center mb-4 pb-4 border-b border-gray-200">
         <input type="checkbox" id="select-all-countries" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-        <label for="select-all-countries" class="ml-2 block text-sm font-bold text-gray-800">Select All Countries</label>
+        <label for="select-all-countries" class="ml-2 block text-sm font-bold text-gray-800">{{ _('Select All Countries') }}</label>
       </div>
 
       <div class="mt-1 space-y-4">
@@ -107,91 +107,6 @@
       {% endfor %}
     {% endif %}
   </div>
-
-  <script nonce="{{ csp_nonce() }}">
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get all "Select All" checkboxes for regions
-        const regionSelectAllCheckboxes = document.querySelectorAll('.region-select-all');
-        // Get all individual country checkboxes
-        const countryCheckboxes = document.querySelectorAll('.country-checkbox');
-        // Get the global "Select All" checkbox
-        const globalSelectAllCheckbox = document.getElementById('select-all-countries');
-
-        // Function to update the state of a region "Select All" checkbox
-        function updateRegionSelectAll(region) {
-            const regionSelectAllCheckbox = document.querySelector(`.region-select-all[data-region="${region}"]`);
-            const countriesInRegion = document.querySelectorAll(`.region-countries[data-region="${region}"] .country-checkbox`);
-            // Check if all countries in the region are checked, but only if there are countries in the region
-            const allChecked = countriesInRegion.length > 0 && Array.from(countriesInRegion).every(cb => cb.checked);
-            if (regionSelectAllCheckbox) {
-                regionSelectAllCheckbox.checked = allChecked;
-            }
-        }
-
-        // Function to update the state of the global "Select All" checkbox
-        function updateGlobalSelectAll() {
-            const allCountryCheckboxes = document.querySelectorAll('.country-checkbox');
-            // Check if all countries are checked, but only if there are countries
-            const allChecked = allCountryCheckboxes.length > 0 && Array.from(allCountryCheckboxes).every(cb => cb.checked);
-            if (globalSelectAllCheckbox) {
-                globalSelectAllCheckbox.checked = allChecked;
-            }
-        }
-
-        // Add event listener to the global "Select All" checkbox
-        if (globalSelectAllCheckbox) {
-            globalSelectAllCheckbox.addEventListener('change', function() {
-                const isChecked = this.checked;
-                // Set the checked state of all country checkboxes
-                countryCheckboxes.forEach(countryCheckbox => {
-                    countryCheckbox.checked = isChecked;
-                });
-                // Update the state of all region "Select All" checkboxes
-                regionSelectAllCheckboxes.forEach(regionCheckbox => {
-                    regionCheckbox.checked = isChecked;
-                });
-            });
-        }
-
-        // Add event listener to each region "Select All" checkbox
-        regionSelectAllCheckboxes.forEach(regionCheckbox => {
-            regionCheckbox.addEventListener('change', function() {
-                const region = this.dataset.region;
-                const isChecked = this.checked;
-                // Get all country checkboxes within this region
-                const countriesInRegion = document.querySelectorAll(`.region-countries[data-region="${region}"] .country-checkbox`);
-                // Set the checked state of country checkboxes based on the region checkbox
-                countriesInRegion.forEach(countryCheckbox => {
-                    countryCheckbox.checked = isChecked;
-                });
-                // After updating countries in the region, update the global select all checkbox
-                updateGlobalSelectAll();
-            });
-        });
-
-        // Add event listener to individual country checkboxes
-        countryCheckboxes.forEach(countryCheckbox => {
-            countryCheckbox.addEventListener('change', function() {
-                // Find the parent region container
-                const regionContainer = this.closest('.region-countries');
-                if (regionContainer) {
-                    const region = regionContainer.dataset.region;
-                    // Update the state of the region "Select All" checkbox
-                    updateRegionSelectAll(region);
-                }
-                // Update the state of the global "Select All" checkbox
-                updateGlobalSelectAll();
-            });
-        });
-
-        // Initial state on page load
-        updateGlobalSelectAll();
-        regionSelectAllCheckboxes.forEach(regionCheckbox => {
-            const region = regionCheckbox.dataset.region;
-            updateRegionSelectAll(region);
-        });
-    });
-  </script>
 {% endmacro %}
 
 {# Normalizes numeric field values for HTML number inputs (None / string "None" → empty). #}

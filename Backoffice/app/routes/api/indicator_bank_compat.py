@@ -22,6 +22,7 @@ from app import db
 from app.models import (
     CommonWord,
     IndicatorBank,
+    IndicatorBankSpef,
     IndicatorBankType,
     IndicatorBankUnit,
     IndicatorSuggestion,
@@ -445,6 +446,7 @@ def _indicator_detail(
         "disaggregation": indicator.disaggregation_guidance or "",
         "indicatorSource": indicator.data_source or "",
         "spef": indicator.area or "",
+        "spefLabel": getattr(indicator, "area_label", None) or "",
         "relatedPrograms": [{"text": p} for p in indicator.related_programs_list],
         "monitoringQuestions": [{"text": q} for q in indicator.monitoring_questions_list],
         "tags": [{"text": t} for t in indicator.tags_list],
@@ -687,10 +689,20 @@ def indicator_select_options():
 
     active_types = IndicatorBankType.query.filter_by(is_active=True).order_by(IndicatorBankType.sort_order).all()
     active_units = IndicatorBankUnit.query.filter_by(is_active=True).order_by(IndicatorBankUnit.sort_order).all()
+    active_spef = IndicatorBankSpef.query.filter_by(is_active=True).order_by(IndicatorBankSpef.sort_order, IndicatorBankSpef.code).all()
     if active_types:
         types = {t.get_name_translation(locale) if hasattr(t, "get_name_translation") else t.name for t in active_types}
     if active_units:
         units = {u.get_name_translation(locale) if hasattr(u, "get_name_translation") else u.name for u in active_units}
+    spef_options = []
+    if active_spef:
+        spef_options = [
+            _select_option(row.get_name_translation(locale) if hasattr(row, "get_name_translation") else row.name)
+            for row in active_spef
+        ]
+    else:
+        spef_codes = sorted({(ind.area or "").strip() for ind in indicators if (ind.area or "").strip()})
+        spef_options = [_select_option(c) for c in spef_codes]
 
     return jsonify(
         {
@@ -701,7 +713,7 @@ def indicator_select_options():
                 _select_option("Yes"),
                 _select_option(""),
             ],
-            "spef": [],
+            "spef": spef_options,
             "tags": [_select_option(x) for x in sorted(tag_items)],
             "monitoringQuestions": [_select_option(x) for x in sorted(monitoring_items)],
             "relatedPrograms": [_select_option(x) for x in sorted(program_items)],

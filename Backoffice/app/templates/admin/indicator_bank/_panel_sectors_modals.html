@@ -1,0 +1,343 @@
+{# New Sector Modal #}
+<div id="newSectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Add New Sector') }}</h3>
+                        <form id="newSectorForm" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" value="0"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-3">{{ _('Multilingual Names') }}</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text" name="name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" checked class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="newSectorForm" class="btn btn-purple w-full sm:ml-3 sm:w-auto sm:text-sm">{{ _('Create Sector') }}</button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">{{ _('Cancel') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Edit Sector Modal #}
+<div id="editSectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Edit Sector') }}</h3>
+                        <form id="editSectorForm" method="POST" action="" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" id="edit_sector_name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description" id="edit_sector_description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" id="edit_sector_display_order"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('Multilingual Names') }}</h4>
+                                    <div class="mb-3">
+                                        <button type="button"
+                                                class="btn btn-warning btn-sm js-sectorsub-auto-translate"
+                                                data-modal="editSectorModal"
+                                                data-primary-id="edit_sector_name"
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                            <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
+                                            <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
+                                            <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text" name="name_{{ code }}" id="edit_sector_name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" id="edit_sector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" id="edit_sector_is_active" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="editSectorForm" class="btn btn-purple w-full sm:ml-3 sm:w-auto sm:text-sm">{{ _('Update Sector') }}</button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">{{ _('Cancel') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# New Subsector Modal #}
+<div id="newSubsectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Add New Sub-Sector') }}</h3>
+                        <form id="newSubsectorForm" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Sector') }}</label>
+                                    <select name="sector_id" id="new_subsector_sector_id" required
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">{{ _('Select a sector...') }}</option>
+                                        {% for sector in sectors %}
+                                            <option value="{{ sector.id }}">{{ get_localized_sector_name(sector) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" value="0"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-3">{{ _('Multilingual Names') }}</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text" name="name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="newSubsectorForm" class="btn btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm">{{ _('Create Sub-Sector') }}</button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">{{ _('Cancel') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Edit Subsector Modal #}
+<div id="editSubsectorModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ _('Edit Sub-Sector') }}</h3>
+                        <form id="editSubsectorForm" method="POST" action="" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Name') }}</label>
+                                    <input type="text" name="name" id="edit_subsector_name" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                                    <textarea name="description" id="edit_subsector_description"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Sector') }}</label>
+                                    <select name="sector_id" id="edit_subsector_sector_id" required
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">{{ _('Select a sector...') }}</option>
+                                        {% for sector in sectors %}
+                                            <option value="{{ sector.id }}">{{ get_localized_sector_name(sector) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                                    <input type="number" name="display_order" id="edit_subsector_display_order"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div class="border-t pt-4">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('Multilingual Names') }}</h4>
+                                    <div class="mb-3">
+                                        <button type="button"
+                                                class="btn btn-warning btn-sm js-sectorsub-auto-translate"
+                                                data-modal="editSubsectorModal"
+                                                data-primary-id="edit_subsector_name"
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                            <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
+                                            <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
+                                            <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for code in TRANSLATABLE_LANGUAGES %}
+                                        <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </label>
+                                            <input type="text" name="name_{{ code }}" id="edit_subsector_name_{{ code }}"
+                                                   {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo File') }}</label>
+                                    <input type="file" name="logo_file" accept="image/*"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
+                                    <input type="text" name="icon_class" id="edit_subsector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="is_active" id="edit_subsector_is_active" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                    <label class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="editSubsectorForm" class="btn btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm">{{ _('Update Sub-Sector') }}</button>
+                <button type="button" class="modal-close btn btn-secondary w-full sm:w-auto mt-3 sm:mt-0 sm:ml-3 justify-center">{{ _('Cancel') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% set auto_translate_config = {
+    'title': _('Auto-Translate All Sector & Sub-Sector Names'),
+    'description': _('Translate blank multilingual names for all sectors and sub-sectors'),
+    'endpoint': url_for('utilities.api_auto_translate'),
+    'item_type': _('sectors and sub-sectors'),
+    'permission_context': 'organization',
+    'permission_code': 'admin.organization.manage'
+} %}
+<script id="auto-translate-config-json" type="application/json">{{ auto_translate_config | tojson | safe }}</script>

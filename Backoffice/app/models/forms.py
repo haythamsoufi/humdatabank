@@ -846,7 +846,11 @@ class FormData(DataEntryMixin, db.Model):
 
         # Access country and assignment info through the assignment_entity_status relationship
         status_info = self.assignment_entity_status
-        country_name = status_info.country.name if status_info and status_info.country else 'N/A'
+        country_name = 'N/A'
+        if status_info:
+            from app.utils.api_serialization import _country_for_aes
+            _c = _country_for_aes(status_info)
+            country_name = _c.name if _c else 'N/A'
         assignment_id = status_info.assigned_form_id if status_info else 'N/A'
 
         # Show appropriate value based on data type
@@ -929,8 +933,10 @@ class DynamicIndicatorData(DataEntryMixin, db.Model):
             display_value = f"Disaggregated ({self.disaggregation_mode})"
 
         country_name = None
-        if self.assignment_entity_status and self.assignment_entity_status.country:
-            country_name = self.assignment_entity_status.country.name
+        if self.assignment_entity_status:
+            from app.utils.api_serialization import _country_for_aes
+            _c = _country_for_aes(self.assignment_entity_status)
+            country_name = _c.name if _c else None
         return f'<DynamicIndicatorData {self.indicator_bank.name} for {country_name or "N/A"} Value:{display_value}>'
 
 

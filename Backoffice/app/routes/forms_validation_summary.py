@@ -717,7 +717,8 @@ def register_validation_summary_routes(bp) -> None:
 
         # Localized display names for header
         assignment = assignment_entity_status.assigned_form
-        country = assignment_entity_status.country
+        from app.utils.api_serialization import _country_for_aes
+        country = _country_for_aes(assignment_entity_status)
         form_template = assignment.template if assignment else None
         assignment_display_name = None
         with suppress(Exception):
@@ -1087,7 +1088,8 @@ def register_validation_summary_routes(bp) -> None:
                 return redirect(url_for("main.dashboard"))
 
             assignment = assignment_entity_status.assigned_form
-            country = assignment_entity_status.country
+            from app.utils.api_serialization import _country_for_aes
+            country = _country_for_aes(assignment_entity_status)
             form_template = assignment.template if assignment else None
             published_vid = getattr(form_template, "published_version_id", None) if form_template else None
 
@@ -1492,7 +1494,6 @@ def register_validation_summary_routes(bp) -> None:
                     margin: 8px 0;
                     page-break-inside: avoid;
                     background: #ffffff;
-                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
                 }
                 .field-filled { border-left: 4px solid #10b981; }
                 .field-empty-required { border-left: 4px solid #ef4444; background: #fef2f2; }
@@ -1540,7 +1541,7 @@ def register_validation_summary_routes(bp) -> None:
             HTML(string=html_content, base_url=static_dir).write_pdf(
                 pdf_buffer,
                 stylesheets=[pdf_css],
-                optimize_size=("fonts", "images"),
+                optimize_images=True,
             )
             pdf_buffer.seek(0)
 

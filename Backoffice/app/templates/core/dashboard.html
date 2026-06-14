@@ -586,7 +586,7 @@
                             {% elif selected_entity_type == 'department' %}fa-briefcase
                             {% else %}fa-folder
                             {% endif %} mr-1"></i>
-                        {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                        {{ selected_entity_display_name|default('', true) }}
                     </span>
                 {% elif selected_country %}
                     {{ get_localized_national_society_name(selected_country) }}
@@ -955,7 +955,7 @@
                             <p class="mt-2 text-sm font-medium text-gray-600">
                                 {{ _('All clear! No active assignments for') }}
                                 {% if selected_entity_type and selected_entity_type != 'country' %}
-                                    {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                                    {{ selected_entity_display_name|default('', true) }}
                                 {% elif selected_country %}
                                     {{ get_localized_national_society_name(selected_country) }}
                                 {% endif %}
@@ -983,7 +983,7 @@
                         </svg>
                         {{ _('Past Assignments for') }}
                         {% if selected_entity_type and selected_entity_type != 'country' %}
-                            {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                            {{ selected_entity_display_name|default('', true) }}
                         {% elif selected_country %}
                             {{ get_localized_national_society_name(selected_country) }}
                         {% endif %}
@@ -1232,7 +1232,7 @@
                             <p class="mt-2 text-sm font-medium text-gray-600">
                                 {{ _('No past assignments for') }}
                                 {% if selected_entity_type and selected_entity_type != 'country' %}
-                                    {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                                    {{ selected_entity_display_name|default('', true) }}
                                 {% elif selected_country %}
                                     {{ get_localized_national_society_name(selected_country) }}
                                 {% endif %}
@@ -1257,7 +1257,7 @@
                          </svg>
                          {{ _('Submission History and Data Quality for') }}
                          {% if selected_entity_type and selected_entity_type != 'country' %}
-                             {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                             {{ selected_entity_display_name|default('', true) }}
                          {% elif selected_country %}
                              {{ get_localized_national_society_name(selected_country) }}
                          {% endif %}
@@ -1756,7 +1756,7 @@
                                 <p class="text-xs text-gray-500 mt-1">
                                     {{ _('Activities from other focal points in') }}
                                     {% if selected_entity_type and selected_entity_type != 'country' %}
-                                        {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                                        {{ selected_entity_display_name|default('', true) }}
                                     {% elif selected_country %}
                                         {{ get_localized_national_society_name(selected_country) }}
                                     {% endif %}
@@ -1774,7 +1774,7 @@
                         <i class="fas fa-user-friends inline-block mr-2 text-green-700" aria-hidden="true"></i>
                         {{ _('Focal Points for') }}
                         {% if selected_entity_type and selected_entity_type != 'country' %}
-                            {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                            {{ selected_entity_display_name|default('', true) }}
                         {% elif selected_country %}
                             {{ get_localized_national_society_name(selected_country) }}
                         {% endif %}
@@ -1809,11 +1809,20 @@
                                                 <p class="text-sm text-gray-600">{{ fp.email }}</p>
                                             </div>
                                         </div>
-                                        {# Email contact link #}
+                                        {# Contact links #}
                                         {% if fp.email %}
-                                            <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800 ml-4" title="{{ _('Email') }} {{ fp.name if fp.name else fp.email }}">
-                                                <i class="fas fa-envelope"></i>
-                                            </a>
+                                            <div class="flex items-center ml-4 gap-2">
+                                                <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email') }} {{ fp.name if fp.name else fp.email }}">
+                                                    <i class="fas fa-envelope"></i>
+                                                </a>
+                                                <a href="msteams:/l/chat/0/0?users={{ fp.email|urlencode }}"
+                                                   data-teams-web-link="https://teams.microsoft.com/l/chat/0/0?users={{ fp.email|urlencode }}"
+                                                   class="ag-user-teams-link inline-flex items-center justify-center"
+                                                   title="{{ _('Teams Chat') }} {{ fp.name if fp.name else fp.email }}"
+                                                   aria-label="{{ _('Teams Chat') }}">
+                                                    <img src="{{ static_url('images/teams-icon.svg') }}" alt="" aria-hidden="true" class="w-4 h-4">
+                                                </a>
+                                            </div>
                                         {% endif %}
                                     </li>
                                 {% endfor %}
@@ -1853,11 +1862,20 @@
                                                 <p class="text-sm text-gray-600">{{ fp.email }}</p>
                                             </div>
                                         </div>
-                                        {# Email contact link #}
+                                        {# Contact links #}
                                         {% if fp.email %}
-                                            <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800 ml-4" title="{{ _('Email') }} {{ fp.name if fp.name else fp.email }}">
-                                                <i class="fas fa-envelope"></i>
-                                            </a>
+                                            <div class="flex items-center ml-4 gap-2">
+                                                <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email') }} {{ fp.name if fp.name else fp.email }}">
+                                                    <i class="fas fa-envelope"></i>
+                                                </a>
+                                                <a href="msteams:/l/chat/0/0?users={{ fp.email|urlencode }}"
+                                                   data-teams-web-link="https://teams.microsoft.com/l/chat/0/0?users={{ fp.email|urlencode }}"
+                                                   class="ag-user-teams-link inline-flex items-center justify-center"
+                                                   title="{{ _('Teams Chat') }} {{ fp.name if fp.name else fp.email }}"
+                                                   aria-label="{{ _('Teams Chat') }}">
+                                                    <img src="{{ static_url('images/teams-icon.svg') }}" alt="" aria-hidden="true" class="w-4 h-4">
+                                                </a>
+                                            </div>
                                         {% endif %}
                                     </li>
                                 {% endfor %}
@@ -1871,7 +1889,7 @@
                             <p class="mt-2 text-sm font-medium text-gray-600">
                                 {{ _('No focal points assigned to') }}
                                 {% if selected_entity_type and selected_entity_type != 'country' %}
-                                    {{ EntityService.get_localized_entity_name(selected_entity_type, selected_entity_id, include_hierarchy=True) }}
+                                    {{ selected_entity_display_name|default('', true) }}
                                 {% elif selected_country %}
                                     {{ get_localized_national_society_name(selected_country) }}
                                 {% endif %}

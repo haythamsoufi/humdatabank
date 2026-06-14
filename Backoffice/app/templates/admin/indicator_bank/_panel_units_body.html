@@ -1,0 +1,15 @@
+{% from "components/ag_grid_includes.html" import ag_grid_container %}
+<div class="relative">
+    <div class="flex flex-wrap items-center justify-end gap-3 mb-3">
+        <button type="button" class="btn btn-sm btn-success" id="mlAddUnitBtn">
+            <i class="fas fa-plus mr-1"></i>{{ _('Add unit') }}
+        </button>
+        <div id="measurementUnitsGrid-colvis" class="flex-shrink-0"></div>
+    </div>
+    {{ ag_grid_container('measurementUnitsGrid', loading_text=_('Loading...'), placeholder_id='measurementUnitsGrid-colvis', include_card=false, show_placeholder=False, empty_message=_('No units found. Run database migrations, then refresh.')) }}
+</div>
+
+{% from "macros/modal_shell.html" import modal_shell %}
+{% call modal_shell('measurementUnitModal', _('Unit'), max_width='max-w-2xl', z_index=60) %}
+<div id="measurementUnitModalBody" class="max-h-[min(80vh,720px)] overflow-y-auto"></div>
+{% endcall %}

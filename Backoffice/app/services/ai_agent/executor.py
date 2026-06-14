@@ -1003,6 +1003,14 @@ class AIAgentExecutor:
                 except Exception as e:
                     logger.debug("ai_form_builder_ctx assignment failed: %s", e)
 
+            _fb_assistant = False
+            try:
+                from app.services.ai_tools._utils import resolve_form_builder_context
+
+                _fb_assistant = bool(resolve_form_builder_context())
+            except Exception as e:
+                logger.debug("resolve_form_builder_context failed: %s", e)
+
             # Check if agent is enabled (still log a trace even when disabled)
             if not current_app.config.get('AI_AGENT_ENABLED', True):
                 result = self._direct_llm_fallback(query, conversation_history, language)
@@ -1010,14 +1018,6 @@ class AIAgentExecutor:
                 result['status'] = 'agent_disabled'
                 result['execution_path'] = 'agent_disabled'
             else:
-                _fb_assistant = False
-                try:
-                    from app.services.ai_tools._utils import resolve_form_builder_context
-
-                    _fb_assistant = bool(resolve_form_builder_context())
-                except Exception as e:
-                    logger.debug("resolve_form_builder_context failed: %s", e)
-
                 if _fb_assistant:
                     # Form-builder panel: every request is template create/edit/review/translate.
                     # Skip databank/document fast paths and go straight to ReAct with form-only tools.
@@ -1136,14 +1136,7 @@ class AIAgentExecutor:
 
             # Skip payload inference for platform usage/navigation help
             # questions — they don't produce data that should be visualized.
-            _fb_skip_payload = False
-            try:
-                from app.services.ai_tools._utils import resolve_form_builder_context
-
-                _fb_skip_payload = bool(resolve_form_builder_context())
-            except Exception:
-                pass
-            _skip_payload_inference = _fb_skip_payload or (
+            _skip_payload_inference = _fb_assistant or (
                 _is_platform_usage_help_question(query)
                 and not _is_assignment_form_question(query)
             )
@@ -1266,7 +1259,7 @@ class AIAgentExecutor:
             # Build structured sources from inline citations (non-blocking).
             # Form-builder assistant: tool actions are not databank/document evidence.
             try:
-                if final_answer_for_trace and not _fb_skip_payload:
+                if final_answer_for_trace and not _fb_assistant:
                     from app.utils.ai_citation_parser import build_sources_array
                     result['sources'] = build_sources_array(
                         final_answer_for_trace,
@@ -1449,6 +1442,13 @@ class AIAgentExecutor:
         _value_question_force_count = 0
         _tool_json_echo_nudge_count = 0
         _pre_force_answer: Optional[str] = None
+        _fb_assistant = False
+        try:
+            from app.services.ai_tools._utils import resolve_form_builder_context
+
+            _fb_assistant = bool(resolve_form_builder_context())
+        except Exception:
+            pass
         # Per-tool circuit breakers reset each execute(); global counter still guards cross-tool death spirals
         tool_breaker_factory = make_tool_breaker_factory()
         _cb_global_consecutive_failures = 0

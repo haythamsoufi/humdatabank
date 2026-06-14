@@ -75,7 +75,8 @@ def _export_pdf_impl(aes_id):
             return redirect(url_for("main.dashboard"))
 
         assignment = assignment_entity_status.assigned_form
-        country = assignment_entity_status.country
+        from app.utils.api_serialization import _country_for_aes
+        country = _country_for_aes(assignment_entity_status)
         form_template_for_export = assignment.template
 
         from app.services.variable_resolution_service import VariableResolutionService
@@ -618,7 +619,6 @@ def _export_pdf_impl(aes_id):
                 margin: 8px 0;
                 page-break-inside: avoid;
                 background: #ffffff;
-                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             }
             .field-box-matrix {
                 page-break-inside: auto;
@@ -787,7 +787,7 @@ def _export_pdf_impl(aes_id):
         HTML(string=html_content, base_url=static_dir).write_pdf(
             pdf_buffer,
             stylesheets=[pdf_css],
-            optimize_size=('fonts', 'images')
+            optimize_images=True,
         )
 
         pdf_buffer.seek(0)
@@ -815,7 +815,8 @@ def _export_excel_impl(aes_id):
          return redirect(url_for("main.dashboard"))
 
     assignment = assignment_entity_status.assigned_form
-    country = assignment_entity_status.country
+    from app.utils.api_serialization import _country_for_aes
+    country = _country_for_aes(assignment_entity_status)
     form_template_for_export = assignment.template
 
     from app.services.variable_resolution_service import VariableResolutionService

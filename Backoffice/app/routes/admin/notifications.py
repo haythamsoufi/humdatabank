@@ -159,9 +159,13 @@ def notifications_center():
 
     # Fetch campaigns for the campaigns tab
     campaigns = NotificationCampaign.query.order_by(NotificationCampaign.created_at.desc()).all()
+    creator_ids = {campaign.created_by for campaign in campaigns if campaign.created_by}
+    creators_by_id = {}
+    if creator_ids:
+        creators_by_id = {u.id: u for u in User.query.filter(User.id.in_(creator_ids)).all()}
     campaigns_data = []
     for campaign in campaigns:
-        creator = User.query.get(campaign.created_by)
+        creator = creators_by_id.get(campaign.created_by)
         # Format priority for display
         campaign_priority = campaign.priority or 'normal'
         campaign_priority_display = campaign_priority.title()

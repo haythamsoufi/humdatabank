@@ -2557,3 +2557,205 @@ def get_form_field_value(
         }
 
 
+def query_dynamic_indicator_data(
+    *,
+    template_id: Optional[int] = None,
+    submission_id: Optional[int] = None,
+    country_id: Optional[int] = None,
+    period_name: Optional[str] = None,
+    section_id: Optional[int] = None,
+    indicator_bank_id: Optional[int] = None,
+    submission_type: Optional[str] = None,
+    preload: bool = False,
+) -> Dict[str, Any]:
+    """
+    Build SQLAlchemy queries for DynamicIndicatorData (user-added indicators in dynamic sections).
+
+    Returns the same ``{'assigned': q, 'public': q}`` pattern as :func:`query_form_data`
+    so callers can apply the same RBAC / pagination helpers.
+
+    Unlike regular FormData, DynamicIndicatorData has no ``form_item_id`` — it references
+    ``indicator_bank_id`` directly.  Callers identify the template via the AES → AssignedForm
+    join, so ``template_id`` filtering works the same way.
+    """
+    from app.models.forms import DynamicIndicatorData
+
+    needs_aes_join = bool(template_id or country_id or period_name or submission_id)
+
+    # --- Assigned path ---
+    assigned_q = DynamicIndicatorData.query.filter(
+        DynamicIndicatorData.assignment_entity_status_id.isnot(None)
+    )
+    if needs_aes_join:
+        assigned_q = assigned_q.join(
+            AssignmentEntityStatus,
+            DynamicIndicatorData.assignment_entity_status_id == AssignmentEntityStatus.id,
+        ).join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+
+    # --- Public path ---
+    public_q = DynamicIndicatorData.query.filter(
+        DynamicIndicatorData.public_submission_id.isnot(None)
+    )
+    if needs_aes_join:
+        public_q = public_q.join(
+            PublicSubmission,
+            DynamicIndicatorData.public_submission_id == PublicSubmission.id,
+        ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
+
+    # --- Shared filters ---
+    if template_id:
+        assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
+        public_q = public_q.filter(AssignedForm.template_id == template_id)
+
+    if country_id:
+        assigned_q = assigned_q.filter(
+            AssignmentEntityStatus.entity_id == country_id,
+            AssignmentEntityStatus.entity_type == 'country',
+        )
+        public_q = public_q.filter(PublicSubmission.country_id == country_id)
+
+    if period_name:
+        _pat = f"%{escape_like_pattern(period_name)}%"
+        _period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
+        assigned_q = assigned_q.filter(_period_filter)
+        public_q = public_q.filter(_period_filter)
+
+    if submission_id:
+        assigned_q = assigned_q.filter(AssignmentEntityStatus.id == submission_id)
+        public_q = public_q.filter(PublicSubmission.id == submission_id)
+
+    if section_id:
+        assigned_q = assigned_q.filter(DynamicIndicatorData.section_id == section_id)
+        public_q = public_q.filter(DynamicIndicatorData.section_id == section_id)
+
+    if indicator_bank_id:
+        assigned_q = assigned_q.filter(DynamicIndicatorData.indicator_bank_id == indicator_bank_id)
+        public_q = public_q.filter(DynamicIndicatorData.indicator_bank_id == indicator_bank_id)
+
+    if preload:
+        from sqlalchemy.orm import joinedload
+        assigned_q = assigned_q.options(
+            joinedload(DynamicIndicatorData.assignment_entity_status).joinedload(
+                AssignmentEntityStatus.assigned_form
+            ),
+            joinedload(DynamicIndicatorData.indicator_bank),
+        )
+        public_q = public_q.options(
+            joinedload(DynamicIndicatorData.public_submission).joinedload(
+                PublicSubmission.assigned_form
+            ),
+            joinedload(DynamicIndicatorData.indicator_bank),
+        )
+
+    # Privacy: DynamicIndicatorData has no form_item, so no item-level privacy gate applies.
+    # Template-level access is the boundary (enforced by callers via template_id scoping).
+
+    return {
+        'assigned': None if submission_type == 'public' else assigned_q,
+        'public': None if submission_type == 'assigned' else public_q,
+    }
+
+
+def query_repeat_group_data(
+    *,
+    template_id: Optional[int] = None,
+    submission_id: Optional[int] = None,
+    item_id: Optional[int] = None,
+    country_id: Optional[int] = None,
+    period_name: Optional[str] = None,
+    section_id: Optional[int] = None,
+    submission_type: Optional[str] = None,
+    preload: bool = False,
+) -> Dict[str, Any]:
+    """
+    Build SQLAlchemy queries for RepeatGroupData (field answers inside repeat-section instances).
+
+    Returns the same ``{'assigned': q, 'public': q}`` pattern as :func:`query_form_data`.
+
+    Each row has a ``form_item_id`` (same semantics as regular FormData) plus
+    ``repeat_instance_id``, ``instance_number``, and ``instance_label`` for grouping.
+    """
+    from app.models.forms import RepeatGroupData, RepeatGroupInstance
+
+    needs_instance_join = bool(template_id or country_id or period_name or submission_id or section_id)
+
+    # --- Assigned path ---
+    assigned_q = RepeatGroupData.query.join(
+        RepeatGroupInstance,
+        RepeatGroupData.repeat_instance_id == RepeatGroupInstance.id,
+    ).filter(RepeatGroupInstance.assignment_entity_status_id.isnot(None))
+
+    if needs_instance_join:
+        assigned_q = assigned_q.join(
+            AssignmentEntityStatus,
+            RepeatGroupInstance.assignment_entity_status_id == AssignmentEntityStatus.id,
+        ).join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+
+    # --- Public path ---
+    public_q = RepeatGroupData.query.join(
+        RepeatGroupInstance,
+        RepeatGroupData.repeat_instance_id == RepeatGroupInstance.id,
+    ).filter(RepeatGroupInstance.public_submission_id.isnot(None))
+
+    if needs_instance_join:
+        public_q = public_q.join(
+            PublicSubmission,
+            RepeatGroupInstance.public_submission_id == PublicSubmission.id,
+        ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
+
+    # --- Shared filters ---
+    if template_id:
+        assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
+        public_q = public_q.filter(AssignedForm.template_id == template_id)
+
+    if country_id:
+        assigned_q = assigned_q.filter(
+            AssignmentEntityStatus.entity_id == country_id,
+            AssignmentEntityStatus.entity_type == 'country',
+        )
+        public_q = public_q.filter(PublicSubmission.country_id == country_id)
+
+    if period_name:
+        _pat = f"%{escape_like_pattern(period_name)}%"
+        _period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
+        assigned_q = assigned_q.filter(_period_filter)
+        public_q = public_q.filter(_period_filter)
+
+    if submission_id:
+        assigned_q = assigned_q.filter(AssignmentEntityStatus.id == submission_id)
+        public_q = public_q.filter(PublicSubmission.id == submission_id)
+
+    if section_id:
+        assigned_q = assigned_q.filter(RepeatGroupInstance.section_id == section_id)
+        public_q = public_q.filter(RepeatGroupInstance.section_id == section_id)
+
+    if item_id:
+        assigned_q = assigned_q.filter(RepeatGroupData.form_item_id == item_id)
+        public_q = public_q.filter(RepeatGroupData.form_item_id == item_id)
+
+    if preload:
+        from sqlalchemy.orm import joinedload
+        assigned_q = assigned_q.options(
+            joinedload(RepeatGroupData.repeat_instance).joinedload(
+                RepeatGroupInstance.assignment_entity_status
+            ).joinedload(AssignmentEntityStatus.assigned_form),
+            joinedload(RepeatGroupData.form_item),
+        )
+        public_q = public_q.options(
+            joinedload(RepeatGroupData.repeat_instance).joinedload(
+                RepeatGroupInstance.public_submission
+            ).joinedload(PublicSubmission.assigned_form),
+            joinedload(RepeatGroupData.form_item),
+        )
+
+    # Privacy: apply the same public-only gate that query_form_data uses on FormData.form_item.
+    viewer = get_effective_request_user()
+    if not can_view_non_public_form_items(viewer):
+        public_only = form_item_privacy_is_public_expr()
+        assigned_q = assigned_q.filter(RepeatGroupData.form_item.has(public_only))
+        public_q = public_q.filter(RepeatGroupData.form_item.has(public_only))
+
+    return {
+        'assigned': None if submission_type == 'public' else assigned_q,
+        'public': None if submission_type == 'assigned' else public_q,
+    }

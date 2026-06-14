@@ -1,0 +1,198 @@
+    <style nonce="{{ csp_style_nonce() }}">
+        .sector-logo, .subsector-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .subsector-logo {
+            width: 28px;
+            height: 28px;
+        }
+
+        .sector-logo-sm {
+            width: 28px;
+            height: 28px;
+        }
+
+        .sectors-split-column {
+            background: #fff;
+        }
+
+        .sectors-card-search {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            background: #fff;
+        }
+
+        .sectors-card-search:focus-within {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        .sectors-card-search-icon {
+            color: #9ca3af;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .sectors-card-search-input {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            background: transparent;
+            font-size: 0.875rem;
+            outline: none;
+            padding: 0;
+        }
+
+        .sectors-card-search-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .sector-card-tile {
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .sector-card-tile:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            border-color: #d1d5db;
+        }
+
+        .sector-card-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .sector-card-icon i {
+            font-size: 1.125rem;
+            line-height: 1;
+            color: inherit;
+        }
+
+        .sector-card-icon__img,
+        .sector-card-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 9999px;
+        }
+
+        .sector-card-icon[data-theme="0"],
+        .sector-card-count[data-theme="0"] { --sector-accent: #059669; --sector-bg: #d1fae5; --sector-badge-bg: #ecfdf5; --sector-badge-text: #047857; }
+        .sector-card-icon[data-theme="1"],
+        .sector-card-count[data-theme="1"] { --sector-accent: #0284c7; --sector-bg: #e0f2fe; --sector-badge-bg: #f0f9ff; --sector-badge-text: #0369a1; }
+        .sector-card-icon[data-theme="2"],
+        .sector-card-count[data-theme="2"] { --sector-accent: #e11d48; --sector-bg: #ffe4e6; --sector-badge-bg: #fff1f2; --sector-badge-text: #be123c; }
+        .sector-card-icon[data-theme="3"],
+        .sector-card-count[data-theme="3"] { --sector-accent: #d97706; --sector-bg: #fef3c7; --sector-badge-bg: #fffbeb; --sector-badge-text: #b45309; }
+        .sector-card-icon[data-theme="4"],
+        .sector-card-count[data-theme="4"] { --sector-accent: #7c3aed; --sector-bg: #ede9fe; --sector-badge-bg: #f5f3ff; --sector-badge-text: #6d28d9; }
+        .sector-card-icon[data-theme="5"],
+        .sector-card-count[data-theme="5"] { --sector-accent: #0d9488; --sector-bg: #ccfbf1; --sector-badge-bg: #f0fdfa; --sector-badge-text: #0f766e; }
+
+        .sector-card-icon--glyph[data-theme] {
+            background-color: var(--sector-bg);
+            color: var(--sector-accent);
+        }
+
+        .sector-card-icon--logo {
+            background: transparent;
+        }
+
+        .sector-card-count[data-theme] {
+            background-color: var(--sector-badge-bg);
+            color: var(--sector-badge-text);
+        }
+
+        .sector-avatar-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            background-color: #f3e8ff;
+            color: #7c3aed;
+            overflow: hidden;
+        }
+
+        .sector-avatar-icon--md {
+            width: 2rem;
+            height: 2rem;
+        }
+
+        .sector-avatar-icon--sm {
+            width: 1.75rem;
+            height: 1.75rem;
+        }
+
+        .sector-avatar-icon--sub {
+            background-color: #e0e7ff;
+            color: #4f46e5;
+        }
+
+        .sector-avatar-icon--fallback {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+        }
+
+        .sector-avatar-icon i {
+            font-size: 0.875rem;
+            line-height: 1;
+            color: inherit;
+        }
+
+        .sector-avatar-icon--md i {
+            font-size: 1rem;
+        }
+
+        .sector-avatar-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .sector-card-count {
+            min-width: 1.75rem;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+        }
+
+        .sectors-split-sector-row--active {
+            background-color: #f5f3ff;
+        }
+
+        .sectors-split-sector-row--active .sectors-split-sector-row__main p:first-child {
+            color: #5b21b6;
+        }
+
+        .sectors-split-sector-row:focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: -2px;
+        }
+
+        .file-upload-preview {
+            max-width: 100px;
+            max-height: 100px;
+            margin-top: 10px;
+        }
+
+        .icon-preview {
+            font-size: 24px;
+            margin-top: 10px;
+            display: block;
+        }
+    </style>

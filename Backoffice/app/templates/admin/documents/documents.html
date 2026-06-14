@@ -15,9 +15,6 @@
 
 {% block head %}
     {{ super() }}
-    <!-- CSRF Token -->
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
     <style nonce="{{ csp_style_nonce() }}">
         /* Ensure filename column wraps text properly */
         .break-words {

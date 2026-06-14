@@ -475,6 +475,7 @@
     z-index: 1000;
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 0.5rem;
     max-width: 380px;
     transition: left 0.3s ease-in-out;
@@ -482,14 +483,285 @@
 
 .presence-floating-bar {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0;
     background: #0f172a;
     border: 1px solid #1e293b;
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
     color: #e2e8f0;
+    width: fit-content;
+    max-width: 100%;
+    min-width: 0;
+    transition: min-width 0.2s ease;
+}
+
+/* Wider when expanded to accommodate names */
+.presence-floating-bar.presence-bar--expanded {
+    width: 100%;
+    min-width: 240px;
+}
+
+/* Show one view at a time (presence-bar-row uses display:flex and overrides Tailwind .hidden) */
+#presence-expanded-view {
+    display: none;
+}
+
+.presence-floating-bar.presence-bar--expanded #presence-collapsed-view {
+    display: none !important;
+}
+
+.presence-floating-bar.presence-bar--expanded #presence-expanded-view {
+    display: block;
+}
+
+/* Horizontal row inside the bar (collapsed header or expanded header) */
+.presence-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.presence-bar-header {
+    gap: 0.625rem;
+}
+
+/* Collapsed stacked avatars */
+#presence-users {
+    display: flex;
+    align-items: center;
+    overflow: visible;
+    padding: 2px 0;
+}
+
+.presence-collapsed-avatar-wrap {
+    --presence-avatar-color: #3B82F6;
+    --presence-anim-delay: 0s;
+    --presence-stack: 0;
+    position: relative;
+    width: 2rem;
+    height: 2rem;
+    margin-left: -0.5rem;
+    flex-shrink: 0;
+    z-index: calc(10 + var(--presence-stack, 0));
+}
+
+#presence-users .presence-collapsed-avatar-wrap:first-child {
+    margin-left: 0;
+}
+
+/* Rotating energy arc around each avatar */
+.presence-collapsed-avatar-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg 215deg,
+        var(--presence-avatar-color) 245deg,
+        rgba(255, 255, 255, 0.95) 275deg,
+        var(--presence-avatar-color) 305deg,
+        transparent 335deg 360deg
+    );
+    animation: presence-orbit-sweep 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    animation-delay: var(--presence-anim-delay, 0s);
+    filter: blur(0.35px) drop-shadow(0 0 4px var(--presence-avatar-color));
+    pointer-events: none;
+    z-index: 0;
+}
+
+.presence-collapsed-avatar {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 2px solid rgba(255, 255, 255, 0.92);
+    z-index: 2;
+    animation: presence-avatar-aura 3.2s ease-in-out infinite;
+    animation-delay: var(--presence-anim-delay, 0s);
+}
+
+/* Live editing indicator */
+.presence-collapsed-avatar::after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 0.5625rem;
+    height: 0.5625rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 32% 32%, #bbf7d0, #22c55e 52%, #15803d);
+    border: 1.5px solid #0f172a;
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55);
+    z-index: 3;
+    animation: presence-live-dot 2s ease-in-out infinite;
+    animation-delay: calc(var(--presence-anim-delay, 0s) + 0.15s);
+}
+
+@keyframes presence-orbit-sweep {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes presence-avatar-aura {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px var(--presence-avatar-color));
+    }
+    50% {
+        transform: scale(1.04);
+        filter: drop-shadow(0 0 7px var(--presence-avatar-color)) drop-shadow(0 0 12px rgba(255, 255, 255, 0.12));
+    }
+}
+
+@keyframes presence-live-dot {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55);
+    }
+    50% {
+        transform: scale(1.18);
+        box-shadow: 0 0 0 4px rgba(74, 222, 128, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .presence-collapsed-avatar-wrap::before {
+        animation: none;
+        opacity: 0.65;
+        transform: rotate(45deg);
+    }
+
+    .presence-collapsed-avatar {
+        animation: none;
+        filter: drop-shadow(0 0 3px var(--presence-avatar-color));
+    }
+
+    .presence-collapsed-avatar::after {
+        animation: none;
+        box-shadow: 0 0 6px rgba(74, 222, 128, 0.7);
+    }
+}
+
+/* Icon color inside dark bar */
+.presence-floating-bar .fa-users {
+    color: #94a3b8;
+}
+
+/* Label shown in expanded header */
+.presence-label {
+    font-size: 0.8125rem;
+    color: #cbd5e1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Chevron expand/collapse button */
+.presence-chevron-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.2rem 0.3rem;
+    color: #64748b;
+    border-radius: 0.25rem;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+.presence-chevron-btn:hover {
+    color: #e2e8f0;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Expanded panel: list of users */
+.presence-users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Single user row in expanded view */
+.presence-user-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Avatar circle in expanded view */
+.presence-user-avatar {
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.625rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* Name label in expanded view */
+.presence-user-name {
+    font-size: 0.8125rem;
+    color: #e2e8f0;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Microsoft Teams chat link */
+.presence-teams-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    flex-shrink: 0;
+    color: #cbd5e1;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.presence-teams-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+}
+
+.presence-teams-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+    display: block;
+    flex-shrink: 0;
+}
+
+.presence-teams-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 /* Override Tailwind text utility colors inside dark banner */

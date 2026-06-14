@@ -68,11 +68,9 @@ def reopen_assignment(aes_id):
             except Exception as e:
                 current_app.logger.error(f"Error sending assignment reopened notification: {e}", exc_info=True)
 
-            entity_name = (
-                assignment_entity_status.country.name
-                if assignment_entity_status.country
-                else "N/A"
-            )
+            from app.utils.api_serialization import _country_for_aes
+            aes_country = _country_for_aes(assignment_entity_status)
+            entity_name = aes_country.name if aes_country else "N/A"
             template_name = (
                 assignment_entity_status.assigned_form.template.name
                 if assignment_entity_status.assigned_form
@@ -147,7 +145,9 @@ def approve_assignment(aes_id):
             except Exception as e:
                 current_app.logger.error(f"Error sending assignment approved notification: {e}", exc_info=True)
 
-            flash(f"Assignment '{assignment_entity_status.assigned_form.template.name if assignment_entity_status.assigned_form.template else 'Template Missing'}' for {assignment_entity_status.country.name if assignment_entity_status.country else 'N/A'} has been approved.", "success")
+            from app.utils.api_serialization import _country_for_aes
+            _approved_country = _country_for_aes(assignment_entity_status)
+            flash(f"Assignment '{assignment_entity_status.assigned_form.template.name if assignment_entity_status.assigned_form.template else 'Template Missing'}' for {_approved_country.name if _approved_country else 'N/A'} has been approved.", "success")
             current_app.logger.info(f"AssignmentEntityStatus ID {aes_id} status changed to 'approved' by admin {current_user.email}.")
         except Exception as e:
             request_transaction_rollback()

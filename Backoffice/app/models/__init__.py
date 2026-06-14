@@ -54,6 +54,7 @@ from .assignments import (
 from .indicator_bank import (
     IndicatorBank,
     IndicatorBankHistory,
+    IndicatorBankSpef,
     IndicatorBankType,
     IndicatorBankUnit,
     IndicatorSuggestion,
@@ -236,6 +237,7 @@ __all__ = [
     # Indicator Bank models
     'IndicatorBank',
     'IndicatorBankHistory',
+    'IndicatorBankSpef',
     'IndicatorBankType',
     'IndicatorBankUnit',
     'IndicatorSuggestion',

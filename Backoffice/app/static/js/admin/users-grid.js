@@ -83,8 +83,12 @@
                     { showEmail: false, countriesCountField: 'country_count' }
                 );
                 var editUrl = params.data.edit_url || '';
+                var deniedMessage = params.data.edit_denied_message || '';
                 if (editUrl) {
                     return '<a href="' + escapeHtmlAttr(editUrl) + '" class="block hover:bg-gray-50 rounded -mx-1 px-1" style="text-decoration:none;color:inherit;">' + inner + '</a>';
+                }
+                if (deniedMessage) {
+                    return '<span class="block rounded -mx-1 px-1 users-grid-name-denied cursor-pointer hover:bg-gray-50" role="button" tabindex="0">' + inner + '</span>';
                 }
                 return inner;
             },
@@ -138,11 +142,35 @@
     var gridHelper = null;
     var gridApi = null;
 
+    function showEditDeniedMessage(message) {
+        if (!message) return;
+        if (window.FlashMessages && typeof window.FlashMessages.add === 'function') {
+            window.FlashMessages.add(message, 'danger');
+        } else if (typeof window.showFlashMessage === 'function') {
+            window.showFlashMessage(message, 'danger');
+        }
+    }
+
+    function handleNameCellActivation(data) {
+        if (!data || data.edit_url) return;
+        showEditDeniedMessage(data.edit_denied_message);
+    }
+
     function initializeGrid() {
         var result = AgGridHelper.create('usersGrid', 'users', columnDefs, usersData, {
             gridOptions: {
                 getRowClass: function (params) {
                     return (!params.data.active) ? 'inactive-user-row' : null;
+                },
+                onCellClicked: function (params) {
+                    if (!params || params.colDef.field !== 'name') return;
+                    handleNameCellActivation(params.data);
+                },
+                onCellKeyDown: function (params) {
+                    if (!params || params.colDef.field !== 'name') return;
+                    if (params.event && params.event.key === 'Enter') {
+                        handleNameCellActivation(params.data);
+                    }
                 }
             }
         });

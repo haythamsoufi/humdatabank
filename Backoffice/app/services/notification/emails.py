@@ -117,13 +117,18 @@ def send_notification_emails():
             email_notifications=True
         ).all()
 
+        user_ids = {pref.user_id for pref in preferences if pref.user_id}
+        users_by_id = {}
+        if user_ids:
+            users_by_id = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
+
         sent_count = 0
 
         digest_window_minutes = current_app.config.get('NOTIFICATION_DIGEST_TRIGGER_WINDOW_MINUTES', 60)
         default_digest_time = current_app.config.get('NOTIFICATION_DIGEST_DEFAULT_TIME', '09:00')
 
         for pref in preferences:
-            user = User.query.get(pref.user_id)
+            user = users_by_id.get(pref.user_id)
             if not user or not user.email:
                 continue
 

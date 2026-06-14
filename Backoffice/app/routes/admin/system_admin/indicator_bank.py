@@ -16,6 +16,8 @@ from flask_babel import _
 from flask_login import current_user
 from app import db
 from config import Config
+from collections import defaultdict
+
 from app.models import (
     Sector,
     SubSector,
@@ -23,13 +25,14 @@ from app.models import (
     IndicatorBankHistory,
     IndicatorSuggestion,
     CommonWord,
+    IndicatorBankSpef,
     IndicatorBankType,
     IndicatorBankUnit,
 )
 from app.models.enums import IndicatorSuggestionStatusValue
 from sqlalchemy.orm import joinedload
 from app.forms.system import IndicatorBankForm, CommonWordForm
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import permission_required, user_has_permission
 from app.utils.request_utils import get_json_or_form, is_json_request, get_request_data
 from sqlalchemy import func, or_
 from openpyxl import Workbook
@@ -63,17 +66,34 @@ def _indicator_bank_dynamic_list_values():
     }
 
 
+_INDICATOR_BANK_TABS = frozenset({'indicators', 'sectors', 'common_words', 'types', 'units', 'spef'})
+
+
+def _resolve_indicator_bank_tab() -> str:
+    tab = (request.args.get('tab') or 'indicators').strip().lower()
+    if tab == 'measurement':
+        return 'types'
+    return tab if tab in _INDICATOR_BANK_TABS else 'indicators'
+
+
 # === Indicator Bank Management Routes ===
 @bp.route("/indicator_bank", methods=["GET"])
 @permission_required('admin.indicator_bank.view')
 def manage_indicator_bank():
+    active_tab = _resolve_indicator_bank_tab()
     search = request.args.get('search', '')
     sector_filter = request.args.get('sector', '')
     type_filter = request.args.get('type', '')
 
+    if active_tab == 'sectors' and not user_has_permission('admin.organization.manage'):
+        active_tab = 'indicators'
+    if active_tab in ('common_words', 'types', 'units', 'spef') and not user_has_permission('admin.indicator_bank.edit'):
+        active_tab = 'indicators'
+
     query = IndicatorBank.query.options(
         joinedload(IndicatorBank.measurement_type),
         joinedload(IndicatorBank.measurement_unit),
+        joinedload(IndicatorBank.spef_area),
     )
 
     if search:
@@ -178,27 +198,82 @@ def manage_indicator_bank():
                 'sub_sector': subsector_name,
                 'unit': indicator.unit if hasattr(indicator, 'unit') else None,
                 'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
+                'area': getattr(indicator, 'area', None),
+                'area_label': getattr(indicator, 'area_label', None),
+                'spef_label': getattr(indicator, 'area_label', None),
                 'usage_count': usage_counts.get(indicator.id, 0),
             })
         return json_ok(indicators=indicators_data, count=len(indicators_data), total_count=total_count)
 
-    sectors = db.session.query(Sector.name).distinct().order_by(Sector.name).all()
+    sector_names = db.session.query(Sector.name).distinct().order_by(Sector.name).all()
     types = db.session.query(IndicatorBank.type).distinct().filter(IndicatorBank.type.isnot(None)).order_by(IndicatorBank.type).all()
 
     pending_suggestions_count = IndicatorSuggestion.query.filter(
         IndicatorSuggestion.status == IndicatorSuggestionStatusValue.pending
     ).count()
 
-    return render_template("admin/indicator_bank/indicator_bank.html",
-                         indicators=indicators,
-                         sectors=[s[0] for s in sectors],
-                         types=[t[0] for t in types if t[0]],
-                         search=search,
-                         sector_filter=sector_filter,
-                         type_filter=type_filter,
-                         title="Manage Indicator Bank",
-                         total_count=total_count,
-                         pending_suggestions_count=pending_suggestions_count)
+    template_ctx = {
+        'indicators': indicators,
+        'sectors': [s[0] for s in sector_names],
+        'types': [t[0] for t in types if t[0]],
+        'search': search,
+        'sector_filter': sector_filter,
+        'type_filter': type_filter,
+        'title': 'Manage Indicator Bank',
+        'total_count': total_count,
+        'pending_suggestions_count': pending_suggestions_count,
+        'active_tab': active_tab,
+        'can_edit_ml': user_has_permission('admin.indicator_bank.edit'),
+    }
+
+    if user_has_permission('admin.organization.manage'):
+        all_sectors = Sector.query.order_by(Sector.name).all()
+        all_subsectors = SubSector.query.order_by(SubSector.name).all()
+        subsectors_by_sector = defaultdict(list)
+        for sub in all_subsectors:
+            subsectors_by_sector[sub.sector_id].append(sub)
+        template_ctx.update(
+            sectors=all_sectors,
+            subsectors=all_subsectors,
+            subsectors_by_sector=dict(subsectors_by_sector),
+        )
+
+    if user_has_permission('admin.indicator_bank.edit'):
+        cw_query = CommonWord.query
+        cw_search = request.args.get('search', '')
+        if cw_search:
+            cw_query = cw_query.filter(
+                or_(CommonWord.term.contains(cw_search), CommonWord.meaning.contains(cw_search))
+            )
+        template_ctx['common_words'] = cw_query.order_by(CommonWord.term).all()
+        template_ctx['search'] = cw_search
+
+        from app.routes.admin.system_admin.indicator_lookups import (
+            _ensure_national_society_unit_row,
+            batch_spef_usage_counts,
+            batch_type_usage_counts,
+            batch_unit_usage_counts,
+        )
+        _ensure_national_society_unit_row()
+        ml_types = IndicatorBankType.query.order_by(
+            IndicatorBankType.sort_order, IndicatorBankType.name
+        ).all()
+        ml_units = IndicatorBankUnit.query.order_by(
+            IndicatorBankUnit.sort_order, IndicatorBankUnit.name
+        ).all()
+        spef_rows = IndicatorBankSpef.query.order_by(
+            IndicatorBankSpef.sort_order, IndicatorBankSpef.code
+        ).all()
+        template_ctx.update(
+            types=ml_types,
+            units=ml_units,
+            type_usage=batch_type_usage_counts([t.id for t in ml_types]),
+            unit_usage=batch_unit_usage_counts([u.id for u in ml_units]),
+            spef_rows=spef_rows,
+            spef_usage=batch_spef_usage_counts([r.id for r in spef_rows]),
+        )
+
+    return render_template("admin/indicator_bank/indicator_bank.html", **template_ctx)
 
 
 @bp.route("/indicator_bank/neural_map", methods=["GET"])
@@ -1119,24 +1194,7 @@ def get_filtered_indicator_count():
 @permission_required('admin.indicator_bank.edit')
 def manage_common_words():
     """Manage common words used in indicators."""
-    search = request.args.get('search', '')
-
-    query = CommonWord.query
-
-    if search:
-        query = query.filter(
-            or_(
-                CommonWord.term.contains(search),
-                CommonWord.meaning.contains(search)
-            )
-        )
-
-    common_words = query.order_by(CommonWord.term).all()
-
-    return render_template("admin/common_words/manage_common_words.html",
-                         common_words=common_words,
-                         search=search,
-                         title="Manage Common Words")
+    return redirect(url_for('system_admin.manage_indicator_bank', tab='common_words', **request.args))
 
 @bp.route("/common_words/add", methods=["POST"])
 @permission_required('admin.indicator_bank.edit')

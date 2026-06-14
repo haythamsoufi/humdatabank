@@ -739,6 +739,13 @@ class HumDatabankChatbot {
          * This method preloads common workflows for better UX, but tours can also
          * be registered on-demand when triggered from chatbot responses.
          */
+        // The FAB is only rendered by the server when the user has AI beta access.
+        // Skip prefetch entirely when the widget is absent — it would only produce
+        // 403s and unnecessary DB rollbacks for users without access.
+        if (!document.getElementById('aiChatbotFAB')) {
+            return;
+        }
+
         if (typeof window.InteractiveTour === 'undefined' || !window.InteractiveTour.registerTour) {
             // InteractiveTour not loaded yet, wait for it
             if (document.readyState === 'loading') {
